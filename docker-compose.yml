@@ -1,0 +1,54 @@
+services:
+  # 1. PostgreSQL Database
+  erp-db:
+    image: postgres:16-alpine
+    container_name: erp-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-erp_password}
+      POSTGRES_DB: ${DB_NAME:-cloud_erp_system}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - erp-network
+
+  # 2. Node.js Application
+  erp-app:
+    build: .
+    container_name: erp-backend
+    restart: always
+    environment:
+      DB_HOST: erp-db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-erp_password}
+      DB_NAME: ${DB_NAME:-cloud_erp_system}
+      JWT_SECRET: ${JWT_SECRET:-your_super_secret_key}
+      NODE_ENV: production
+    depends_on:
+      - erp-db
+    networks:
+      - erp-network
+    # Port 3000 is NOT exposed to the host for security, only accessible by Nginx internally
+
+  # 3. Nginx Reverse Proxy
+  erp-proxy:
+    image: nginx:alpine
+    container_name: erp-nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - erp-app
+    networks:
+      - erp-network
+
+networks:
+  erp-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

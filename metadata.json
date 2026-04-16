@@ -1,0 +1,8 @@
+{
+  "name": "AccuSmart - AI Accounting Suite",
+  "description": "A comprehensive accounting web application with AI-powered invoice creation, smart search, and real-time dashboards for small businesses.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ]
+}
