@@ -13,7 +13,7 @@ export interface User {
   id: string;
   username: string;
   name?: string;
-  role: 'admin' | 'user' | 'manager';
+  role: 'super_admin' | 'admin' | 'user' | 'manager';
   mobile?: string;
   email?: string;
   company_id: string;

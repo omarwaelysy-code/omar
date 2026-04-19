@@ -103,7 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser({ 
           id: userId, 
           username: email.split('@')[0], 
-          role: isSuperAdminEmail ? 'admin' : 'user', 
+          role: isSuperAdminEmail ? 'super_admin' : 'user', 
           company_id: isSuperAdminEmail ? 'system' : '',
           status: 'active',
           created_at: new Date().toISOString()
@@ -159,7 +159,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUserMemberships([]);
   };
 
-  const isSuperAdmin = user?.role === 'admin' && user?.company_id === 'system';
+  const isSuperAdmin = user?.role === 'super_admin';
   const isCompanyAdmin = user?.role === 'admin' && user?.company_id !== 'system';
   const isManager = user?.role === 'manager';
   const isStandardUser = user?.role === 'user';

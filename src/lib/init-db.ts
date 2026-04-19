@@ -380,6 +380,22 @@ export async function initDatabase() {
 
     await client.query('COMMIT');
     console.log('PostgreSQL Database initialized successfully.');
+
+    // Seed Super Admin
+    const adminEmail = 'omarwaelysy@gmail.com';
+    const { rows } = await client.query('SELECT id FROM users WHERE email = $1', [adminEmail]);
+    if (rows.length === 0) {
+      console.log('Seeding default Super Admin...');
+      const bcrypt = await import('bcryptjs');
+      const { v4: uuidv4 } = await import('uuid');
+      const hashedPassword = await bcrypt.default.hash('123456', 10);
+      await client.query(
+        'INSERT INTO users (id, username, name, email, password_hash, role, company_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [uuidv4(), 'omar_admin', 'Omar Super Admin', adminEmail, hashedPassword, 'super_admin', 'system']
+      );
+      console.log('Super Admin seeded.');
+    }
+
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Error initializing PostgreSQL database:', error);
