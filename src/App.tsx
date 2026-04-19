@@ -60,6 +60,7 @@ export default function App() {
     const checkHealth = async () => {
       try {
         const response = await fetch('/api/erp/db-health');
+        
         if (!response.ok) {
           const data = await response.json();
           setDbError(data.error || data.message || 'Failed to connect to database');

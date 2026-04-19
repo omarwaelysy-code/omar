@@ -14,7 +14,10 @@ router.get('/db-health', async (req, res) => {
     const client = await pool.connect();
     await client.query('SELECT 1');
     client.release();
-    res.json({ status: 'ok', message: 'Database connected successfully' });
+    res.json({ 
+      status: 'ok', 
+      message: 'Database connected successfully'
+    });
   } catch (error: any) {
     console.error('Database health check failed:', error);
     res.status(500).json({ 
@@ -121,7 +124,10 @@ router.post('/auth/logout', (req, res) => {
 // --- Generic CRUD Factory ---
 const modules = [
   'customers', 'suppliers', 'products', 'payment_methods', 
-  'expense_categories', 'accounts', 'account_types', 'settings', 'users', 'companies'
+  'expense_categories', 'accounts', 'account_types', 'settings', 'users', 'companies',
+  'invoices', 'invoice_items', 'journal_entries', 'journal_entry_lines', 'activity_logs',
+  'returns', 'return_items', 'purchase_invoices', 'purchase_returns', 
+  'customer_discounts', 'supplier_discounts', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers'
 ];
 
 modules.forEach(moduleName => {
@@ -235,7 +241,7 @@ router.post('/invoices', authenticateToken, async (req, res) => {
 });
 
 // --- Journal Entries (Accounting Transaction) ---
-router.post('/journal-entries', authenticateToken, async (req, res) => {
+router.post('/journal_entries', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');

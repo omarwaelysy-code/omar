@@ -157,7 +157,7 @@ export const dbService = {
   },
 
   async createJournalEntry(entry: any) {
-    return apiRequest('/journal-entries', 'POST', entry);
+    return apiRequest('/journal_entries', 'POST', entry);
   },
 
   async updateJournalEntry(id: string, entry: any) {

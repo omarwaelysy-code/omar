@@ -237,6 +237,147 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON activity_logs(user_id);
     `);
 
+    // 15. Returns
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS returns (
+        id VARCHAR(36) PRIMARY KEY,
+        company_id VARCHAR(36) REFERENCES companies(id),
+        customer_id VARCHAR(36) REFERENCES customers(id),
+        return_number VARCHAR(50) NOT NULL,
+        date DATE NOT NULL,
+        total_amount DECIMAL(18, 4) NOT NULL,
+        payment_type VARCHAR(20) DEFAULT 'cash',
+        payment_method_id VARCHAR(36) REFERENCES payment_methods(id),
+        notes TEXT
+      );
+    `);
+
+    // 16. Return Items
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS return_items (
+        id VARCHAR(36) PRIMARY KEY,
+        return_id VARCHAR(36) REFERENCES returns(id) ON DELETE CASCADE,
+        product_id VARCHAR(36) REFERENCES products(id),
+        description TEXT,
+        quantity DECIMAL(18, 4) NOT NULL,
+        unit_price DECIMAL(18, 4) NOT NULL,
+        total DECIMAL(18, 4) NOT NULL
+      );
+    `);
+
+    // 17. Purchase Invoices
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS purchase_invoices (
+        id VARCHAR(36) PRIMARY KEY,
+        company_id VARCHAR(36) REFERENCES companies(id),
+        supplier_id VARCHAR(36) REFERENCES suppliers(id),
+        invoice_number VARCHAR(50) NOT NULL,
+        date DATE NOT NULL,
+        due_date DATE,
+        subtotal DECIMAL(18, 4) NOT NULL,
+        tax_amount DECIMAL(18, 4) DEFAULT 0,
+        discount_amount DECIMAL(18, 4) DEFAULT 0,
+        total_amount DECIMAL(18, 4) NOT NULL,
+        status VARCHAR(20) DEFAULT 'draft',
+        payment_type VARCHAR(20) DEFAULT 'cash',
+        payment_method_id VARCHAR(36) REFERENCES payment_methods(id),
+        notes TEXT
+      );
+    `);
+
+    // 18. Purchase Returns
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS purchase_returns (
+        id VARCHAR(36) PRIMARY KEY,
+        company_id VARCHAR(36) REFERENCES companies(id),
+        supplier_id VARCHAR(36) REFERENCES suppliers(id),
+        return_number VARCHAR(50) NOT NULL,
+        date DATE NOT NULL,
+        total_amount DECIMAL(18, 4) NOT NULL,
+        payment_type VARCHAR(20) DEFAULT 'cash',
+        payment_method_id VARCHAR(36) REFERENCES payment_methods(id),
+        notes TEXT
+      );
+    `);
+
+    // 19. Customer Discounts
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS customer_discounts (
+        id VARCHAR(36) PRIMARY KEY,
+        company_id VARCHAR(36) REFERENCES companies(id),
+        customer_id VARCHAR(36) REFERENCES customers(id),
+        date DATE NOT NULL,
+        amount DECIMAL(18, 4) NOT NULL,
+        description TEXT
+      );
+    `);
+
+    // 20. Supplier Discounts
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS supplier_discounts (
+        id VARCHAR(36) PRIMARY KEY,
+        company_id VARCHAR(36) REFERENCES companies(id),
+        supplier_id VARCHAR(36) REFERENCES suppliers(id),
+        date DATE NOT NULL,
+        amount DECIMAL(18, 4) NOT NULL,
+        description TEXT
+      );
+    `);
+
+    // 21. Receipt Vouchers
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS receipt_vouchers (
+        id VARCHAR(36) PRIMARY KEY,
+        company_id VARCHAR(36) REFERENCES companies(id),
+        customer_id VARCHAR(36) REFERENCES customers(id),
+        date DATE NOT NULL,
+        amount DECIMAL(18, 4) NOT NULL,
+        description TEXT,
+        payment_method_id VARCHAR(36) REFERENCES payment_methods(id)
+      );
+    `);
+
+    // 22. Payment Vouchers
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS payment_vouchers (
+        id VARCHAR(36) PRIMARY KEY,
+        company_id VARCHAR(36) REFERENCES companies(id),
+        supplier_id VARCHAR(36),
+        expense_category_id VARCHAR(36),
+        date DATE NOT NULL,
+        amount DECIMAL(18, 4) NOT NULL,
+        description TEXT,
+        payment_method_id VARCHAR(36) REFERENCES payment_methods(id)
+      );
+    `);
+
+    // 23. Cash Transfers
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cash_transfers (
+        id VARCHAR(36) PRIMARY KEY,
+        company_id VARCHAR(36) REFERENCES companies(id),
+        date DATE NOT NULL,
+        amount DECIMAL(18, 4) NOT NULL,
+        from_payment_method_id VARCHAR(36) REFERENCES payment_methods(id),
+        to_payment_method_id VARCHAR(36) REFERENCES payment_methods(id),
+        description TEXT,
+        created_by VARCHAR(36) REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 24. Expense Categories
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS expense_categories (
+        id VARCHAR(36) PRIMARY KEY,
+        company_id VARCHAR(36) REFERENCES companies(id),
+        code VARCHAR(20) NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        description TEXT,
+        account_id VARCHAR(36) REFERENCES accounts(id)
+      );
+    `);
+
     await client.query('COMMIT');
     console.log('PostgreSQL Database initialized successfully.');
   } catch (error) {
