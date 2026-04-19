@@ -1,4 +1,6 @@
 import pool from './postgres';
+import bcrypt from 'bcryptjs';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function initDatabase() {
   console.log('Initializing PostgreSQL Database...');
@@ -379,28 +381,35 @@ export async function initDatabase() {
     `);
 
     await client.query('COMMIT');
-    console.log('PostgreSQL Database initialized successfully.');
+    console.log('✅ PostgreSQL Database schema checked/created successfully.');
 
     // Seed Super Admin
     const adminEmail = 'omarwaelysy@gmail.com';
-    const { rows } = await client.query('SELECT id FROM users WHERE email = $1', [adminEmail]);
-    if (rows.length === 0) {
-      console.log('Seeding default Super Admin...');
-      const bcrypt = await import('bcryptjs');
-      const { v4: uuidv4 } = await import('uuid');
-      const hashedPassword = await bcrypt.default.hash('123456', 10);
-      await client.query(
-        'INSERT INTO users (id, username, name, email, password_hash, role, company_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-        [uuidv4(), 'omar_admin', 'Omar Super Admin', adminEmail, hashedPassword, 'super_admin', 'system']
-      );
-      console.log('Super Admin seeded.');
+    try {
+      const { rows } = await client.query('SELECT id FROM users WHERE email = $1', [adminEmail]);
+      if (rows.length === 0) {
+        console.log(`Creating default Super Admin: ${adminEmail}...`);
+        const hashedPassword = await bcrypt.hash('123456', 10);
+        await client.query(
+          'INSERT INTO users (id, username, name, email, password_hash, role, company_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+          [uuidv4(), 'omar_admin', 'Omar Super Admin', adminEmail, hashedPassword, 'super_admin', 'system']
+        );
+        console.log('Admin created');
+      } else {
+        console.log('Admin already exists');
+      }
+    } catch (adminError) {
+      console.error('Error creating admin:', adminError);
+      // We don't throw here to allow the server to start, but it's logged
     }
 
+    console.log('🔥 Database initialization process complete.');
   } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Error initializing PostgreSQL database:', error);
+    if (client) await client.query('ROLLBACK');
+    console.error('❌ FATAL: Error during PostgreSQL database initialization:');
+    console.error(error);
     throw error;
   } finally {
-    client.release();
+    if (client) client.release();
   }
 }
