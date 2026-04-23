@@ -31,6 +31,15 @@ export async function initDatabase() {
   if (!client) return;
 
   try {
+    // 0. Ensure Migrations Table exists (Additive & Required for Tracking)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS migrations (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) UNIQUE NOT NULL,
+        run_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Start transaction
     await client.query('BEGIN');
 

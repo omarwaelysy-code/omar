@@ -59,7 +59,7 @@ router.get('/system/check', authenticateToken, authorizeRoles('super_admin'), as
     const masterMigrationPath = path.join(dbDir, 'master-migration.sql');
     const migrationsDir = path.join(dbDir, 'migrations');
 
-    const { rows: appliedMigrationsRows } = await client.query('SELECT name FROM _migrations').catch(() => ({ rows: [] }));
+    const { rows: appliedMigrationsRows } = await client.query('SELECT name FROM migrations').catch(() => ({ rows: [] }));
     const appliedMigrations = appliedMigrationsRows.map((m: any) => m.name);
 
     if (fs.existsSync(masterMigrationPath) && !appliedMigrations.includes('master-migration')) {

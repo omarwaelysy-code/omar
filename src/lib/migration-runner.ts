@@ -9,13 +9,25 @@ export async function runMigrations() {
   try {
     await client.query('BEGIN');
 
-    // Create migrations table if it doesn't exist
+    // Create migrations table if it doesn't exist (using the user's requested schema)
     await client.query(`
-      CREATE TABLE IF NOT EXISTS _migrations (
+      CREATE TABLE IF NOT EXISTS migrations (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) UNIQUE NOT NULL,
-        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        run_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    // Add a safety check to migrate from my previous '_migrations' if it exists (additive)
+    await client.query(`
+      DO $$ 
+      BEGIN 
+        IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = '_migrations') THEN
+          INSERT INTO migrations (name, run_at)
+          SELECT name, applied_at FROM _migrations
+          ON CONFLICT (name) DO NOTHING;
+        END IF;
+      END $$;
     `);
 
     // Path to migration files
@@ -25,12 +37,12 @@ export async function runMigrations() {
 
     // 1. Run Master Migration if not done
     if (fs.existsSync(masterMigrationPath)) {
-      const { rows } = await client.query('SELECT id FROM _migrations WHERE name = $1', ['master-migration']);
+      const { rows } = await client.query('SELECT id FROM migrations WHERE name = $1', ['master-migration']);
       if (rows.length === 0) {
         console.log('📦 Applying Master Migration...');
         const sql = fs.readFileSync(masterMigrationPath, 'utf8');
         await client.query(sql);
-        await client.query('INSERT INTO _migrations (name) VALUES ($1)', ['master-migration']);
+        await client.query('INSERT INTO migrations (name) VALUES ($1)', ['master-migration']);
         console.log('✅ Master Migration applied successfully.');
       }
     }
@@ -42,12 +54,12 @@ export async function runMigrations() {
         .sort();
 
       for (const file of files) {
-        const { rows } = await client.query('SELECT id FROM _migrations WHERE name = $1', [file]);
+        const { rows } = await client.query('SELECT id FROM migrations WHERE name = $1', [file]);
         if (rows.length === 0) {
           console.log(`🚀 Applying Migration: ${file}...`);
           const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
           await client.query(sql);
-          await client.query('INSERT INTO _migrations (name) VALUES ($1)', [file]);
+          await client.query('INSERT INTO migrations (name) VALUES ($1)', [file]);
           console.log(`✅ Migration ${file} applied successfully.`);
         }
       }
