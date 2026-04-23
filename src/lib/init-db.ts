@@ -1,6 +1,7 @@
 import pool from './postgres';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
+import { runMigrations } from './migration-runner';
 
 export async function initDatabase() {
   console.log('Initializing PostgreSQL Database...');
@@ -44,10 +45,19 @@ export async function initDatabase() {
         address TEXT,
         phone VARCHAR(20),
         email VARCHAR(100),
+        logo_url TEXT,
+        website VARCHAR(255),
         subscription_status VARCHAR(20) DEFAULT 'trial',
         subscription_plan VARCHAR(20) DEFAULT 'basic',
+        subscription_start TIMESTAMP,
+        subscription_end TIMESTAMP,
         subscription_expiry TIMESTAMP,
+        subscription_days INTEGER DEFAULT 30,
+        users_limit INTEGER DEFAULT 5,
+        transactions_limit INTEGER DEFAULT 1000,
         company_status VARCHAR(20) DEFAULT 'active',
+        features JSONB DEFAULT '[]',
+        settings JSONB DEFAULT '{}',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -73,6 +83,9 @@ export async function initDatabase() {
         mobile VARCHAR(20),
         role VARCHAR(20) DEFAULT 'user',
         company_id VARCHAR(36),
+        status VARCHAR(20) DEFAULT 'active',
+        temp_password VARCHAR(255),
+        permissions JSONB DEFAULT '{}',
         must_change_password BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -112,11 +125,15 @@ export async function initDatabase() {
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
         account_id VARCHAR(36) REFERENCES accounts(id),
+        code VARCHAR(50),
         name VARCHAR(255) NOT NULL,
         email VARCHAR(100),
         mobile VARCHAR(20),
         address TEXT,
-        tax_number VARCHAR(50)
+        tax_number VARCHAR(50),
+        opening_balance DECIMAL(18, 4) DEFAULT 0,
+        opening_balance_date DATE,
+        counter_account_id VARCHAR(36)
       );
     `);
 
@@ -131,7 +148,10 @@ export async function initDatabase() {
         email VARCHAR(100),
         mobile VARCHAR(20),
         address TEXT,
-        tax_number VARCHAR(50)
+        tax_number VARCHAR(50),
+        opening_balance DECIMAL(18, 4) DEFAULT 0,
+        opening_balance_date DATE,
+        counter_account_id VARCHAR(36)
       );
     `);
 
@@ -145,11 +165,15 @@ export async function initDatabase() {
         name VARCHAR(255) NOT NULL,
         code VARCHAR(100),
         barcode VARCHAR(100),
+        type VARCHAR(50) DEFAULT 'product',
+        description TEXT,
+        image_url TEXT,
         cost_price DECIMAL(18, 4) DEFAULT 0,
         sale_price DECIMAL(18, 4) DEFAULT 0,
         min_stock DECIMAL(18, 4) DEFAULT 0,
         current_stock DECIMAL(18, 4) DEFAULT 0,
-        is_service BOOLEAN DEFAULT FALSE
+        is_service BOOLEAN DEFAULT FALSE,
+        counter_account_id VARCHAR(36)
       );
     `);
 
@@ -168,6 +192,7 @@ export async function initDatabase() {
         total_amount DECIMAL(18, 4) NOT NULL,
         status VARCHAR(20) DEFAULT 'draft',
         payment_type VARCHAR(20) DEFAULT 'cash',
+        payment_method_id VARCHAR(36),
         notes TEXT,
         created_by VARCHAR(36) REFERENCES users(id)
       );
@@ -220,7 +245,12 @@ export async function initDatabase() {
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
         account_id VARCHAR(36) REFERENCES accounts(id),
-        name VARCHAR(100) NOT NULL
+        code VARCHAR(50),
+        name VARCHAR(100) NOT NULL,
+        type VARCHAR(20) DEFAULT 'cash',
+        opening_balance DECIMAL(18, 4) DEFAULT 0,
+        opening_balance_date DATE,
+        counter_account_id VARCHAR(36)
       );
     `);
 
@@ -381,7 +411,10 @@ export async function initDatabase() {
     `);
 
     await client.query('COMMIT');
-    console.log('✅ PostgreSQL Database schema checked/created successfully.');
+    console.log('✅ PostgreSQL Base Tables initialized successfully.');
+
+    // Run Migrations for existing systems
+    await runMigrations();
 
     // Seed Super Admin
     const adminEmail = 'omarwaelysy@gmail.com';
