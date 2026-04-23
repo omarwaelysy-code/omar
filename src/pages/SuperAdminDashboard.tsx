@@ -46,9 +46,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Set default tab to 'users' and implement minimal mode flag
-  const minimalMode = true; 
-  const [activeTab, setActiveTab] = useState<'companies' | 'users' | 'logs'>(initialTab || (minimalMode ? 'users' : 'companies'));
+  // Use simplified mode to keep UI clean
+  const simplifiedMode = true;
+  const [activeTab, setActiveTab] = useState<'companies' | 'users' | 'logs'>(initialTab || 'companies');
   
   const [showModal, setShowModal] = useState(false);
   const [showUserRoleModal, setShowUserRoleModal] = useState(false);
@@ -147,13 +147,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
     return { label: 'نشط', color: 'bg-emerald-100 text-emerald-800', icon: CheckCircle2 };
   };
 
-  const stats = minimalMode ? [
-    { label: 'إجمالي المستخدمين', value: users.length, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  ] : [
+  const stats = [
     { label: 'إجمالي الشركات', value: companies.length, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'إجمالي المستخدمين', value: users.length, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'اشتراكات نشطة', value: companies.filter(c => getSubscriptionStatus(c).label === 'نشط').length, icon: ShieldCheck, color: 'text-purple-600', bg: 'bg-purple-50' },
-    { label: 'اشتراكات منتهية', value: companies.filter(c => getSubscriptionStatus(c).label === 'منتهي').length, icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -448,14 +444,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
     <div className="p-6 space-y-6" dir="rtl">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800">
-            {minimalMode ? 'إدارة المستخدمين - المدير العام' : 'لوحة تحكم المدير العام'}
-          </h1>
-          <p className="text-stone-500">
-            {minimalMode 
-              ? 'إدارة مستخدمي النظام ومراجعة سلامة البيانات' 
-              : 'إدارة الشركات والمستخدمين والاشتراكات عبر النظام بالكامل'}
-          </p>
+          <h1 className="text-2xl font-bold text-stone-800">إدارة النظام - المدير العام</h1>
+          <p className="text-stone-500">إدارة الشركات والمستخدمين ومراجعة سلامة البيانات</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -466,34 +456,32 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
           >
             <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
           </button>
-          {!minimalMode && (
-            <button 
-              onClick={() => {
-                setEditingCompany(null);
-                setFormData({
-                  name: '',
-                  code: '',
-                  email: '',
-                  phone: '',
-                  users_limit: 5,
-                  transactions_limit: 1000,
-                  subscription_days: 30,
-                  subscription_plan: 'basic',
-                  company_status: 'active',
-                  subscription_status: 'active'
-                });
-                setShowModal(true);
-              }}
-              className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
-            >
-              <Plus className="w-5 h-5" />
-              <span>إضافة شركة جديدة</span>
-            </button>
-          )}
+          <button 
+            onClick={() => {
+              setEditingCompany(null);
+              setFormData({
+                name: '',
+                code: '',
+                email: '',
+                phone: '',
+                users_limit: 5,
+                transactions_limit: 1000,
+                subscription_days: 30,
+                subscription_plan: 'basic',
+                company_status: 'active',
+                subscription_status: 'active'
+              });
+              setShowModal(true);
+            }}
+            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
+          >
+            <Plus className="w-5 h-5" />
+            <span>إضافة شركة جديدة</span>
+          </button>
         </div>
       </div>
 
-      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${minimalMode ? '2' : '4'} gap-6`}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {stats.map((stat, index) => (
           <motion.div
             key={index}
@@ -516,25 +504,25 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
       </div>
 
       <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
-        {!minimalMode && (
-          <div className="border-b border-stone-200">
-            <div className="flex p-1">
-              <button
-                onClick={() => setActiveTab('companies')}
-                className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
-                  activeTab === 'companies' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
-                }`}
-              >
-                الشركات
-              </button>
-              <button
-                onClick={() => setActiveTab('users')}
-                className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
-                  activeTab === 'users' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
-                }`}
-              >
-                المستخدمين
-              </button>
+        <div className="border-b border-stone-200">
+          <div className="flex p-1">
+            <button
+              onClick={() => setActiveTab('companies')}
+              className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === 'companies' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+              }`}
+            >
+              الشركات
+            </button>
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === 'users' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+              }`}
+            >
+              المستخدمين
+            </button>
+            {!simplifiedMode && (
               <button
                 onClick={() => setActiveTab('logs')}
                 className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
@@ -543,9 +531,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
               >
                 سجل العمليات
               </button>
-            </div>
+            )}
           </div>
-        )}
+        </div>
 
         <div className="p-4 border-b border-stone-200 bg-stone-50/50 flex justify-between items-center gap-4">
           <div className="relative flex-1">
@@ -577,9 +565,6 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                   <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الشركة</th>
                   <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الكود</th>
                   <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الحالة</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الاشتراك</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">المستخدمين</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الحركات</th>
                   <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الإجراءات</th>
                 </tr>
               </thead>
@@ -599,33 +584,15 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600">{company.code}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {(() => {
-                        const status = getSubscriptionStatus(company);
-                        return (
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${status.color}`}>
-                            <status.icon className="w-3 h-3" />
-                            {status.label}
-                          </span>
-                        );
-                      })()}
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        company.company_status === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                      }`}>
+                        {company.company_status === 'active' ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                        {company.company_status === 'active' ? 'نشط' : 'موقوف'}
+                      </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm">
-                        <p className="text-stone-900 font-medium">{company.subscription_plan === 'enterprise' ? 'مؤسسة' : company.subscription_plan === 'pro' ? 'احترافي' : 'أساسي'}</p>
-                        <p className="text-xs text-stone-500">ينتهي: {company.subscription_end?.split('T')[0]}</p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600">{company.users_limit} مستخدم</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600">{company.transactions_limit} حركة</td>
                     <td className="px-6 py-4 whitespace-nowrap text-left">
                       <div className="flex items-center justify-end gap-2">
-                        <button 
-                          onClick={() => renewSubscription(company)}
-                          className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                          title="تجديد الاشتراك"
-                        >
-                          <Calendar className="w-5 h-5" />
-                        </button>
                         <button 
                           onClick={() => toggleStatus(company)}
                           className={`p-2 rounded-lg transition-colors ${
@@ -1043,56 +1010,6 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       className="w-full px-4 py-2 bg-stone-50 border border-stone-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 outline-none"
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-stone-700 flex items-center gap-2">
-                      <Users className="w-4 h-4" /> حد المستخدمين
-                    </label>
-                    <input
-                      required
-                      type="number"
-                      value={formData.users_limit}
-                      onChange={(e) => setFormData({ ...formData, users_limit: parseInt(e.target.value) })}
-                      className="w-full px-4 py-2 bg-stone-50 border border-stone-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 outline-none"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-stone-700 flex items-center gap-2">
-                      <ArrowLeftRight className="w-4 h-4" /> حد الحركات
-                    </label>
-                    <input
-                      required
-                      type="number"
-                      value={formData.transactions_limit}
-                      onChange={(e) => setFormData({ ...formData, transactions_limit: parseInt(e.target.value) })}
-                      className="w-full px-4 py-2 bg-stone-50 border border-stone-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 outline-none"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-stone-700 flex items-center gap-2">
-                      <Calendar className="w-4 h-4" /> أيام الاشتراك
-                    </label>
-                    <input
-                      required
-                      type="number"
-                      value={formData.subscription_days}
-                      onChange={(e) => setFormData({ ...formData, subscription_days: parseInt(e.target.value) })}
-                      className="w-full px-4 py-2 bg-stone-50 border border-stone-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 outline-none"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-stone-700 flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4" /> خطة الاشتراك
-                    </label>
-                    <select
-                      value={formData.subscription_plan}
-                      onChange={(e) => setFormData({ ...formData, subscription_plan: e.target.value as any })}
-                      className="w-full px-4 py-2 bg-stone-50 border border-stone-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 outline-none"
-                    >
-                      <option value="basic">أساسي</option>
-                      <option value="pro">احترافي</option>
-                      <option value="enterprise">مؤسسة</option>
-                    </select>
                   </div>
                 </div>
 
