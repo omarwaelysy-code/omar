@@ -94,14 +94,23 @@ CREATE TABLE IF NOT EXISTS products (
     company_id VARCHAR(36) REFERENCES companies(id),
     revenue_account_id VARCHAR(36) REFERENCES accounts(id),
     cost_account_id VARCHAR(36) REFERENCES accounts(id),
+    revenue_account_name VARCHAR(255),
+    cost_account_name VARCHAR(255),
     name VARCHAR(255) NOT NULL,
     code VARCHAR(100),
     barcode VARCHAR(100),
+    type VARCHAR(50) DEFAULT 'product',
+    description TEXT,
+    image_url TEXT,
+    category VARCHAR(100),
+    unit VARCHAR(50),
     cost_price DECIMAL(18, 4) DEFAULT 0,
     sale_price DECIMAL(18, 4) DEFAULT 0,
+    stock DECIMAL(18, 4) DEFAULT 0,
     min_stock DECIMAL(18, 4) DEFAULT 0,
     current_stock DECIMAL(18, 4) DEFAULT 0,
-    is_service BOOLEAN DEFAULT FALSE
+    is_service BOOLEAN DEFAULT FALSE,
+    counter_account_id VARCHAR(36)
 );
 
 -- 9. Invoices
@@ -130,7 +139,10 @@ CREATE TABLE IF NOT EXISTS invoice_items (
     description TEXT,
     quantity DECIMAL(18, 4) NOT NULL,
     unit_price DECIMAL(18, 4) NOT NULL,
-    total DECIMAL(18, 4) NOT NULL
+    total DECIMAL(18, 4) NOT NULL,
+    product_name VARCHAR(255),
+    product_code VARCHAR(100),
+    product_image_url TEXT
 );
 
 -- 11. Journal Entries

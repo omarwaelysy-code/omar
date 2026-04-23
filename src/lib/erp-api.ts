@@ -319,8 +319,8 @@ router.post('/system/import-excel', authenticateToken, authorizeRoles('super_adm
       const table = sheetName;
       if (!TABLES_TO_BACKUP.includes(table)) continue;
 
-      const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-      for (const row: any of rows) {
+      const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]) as any[];
+      for (const row of rows) {
         if (!row.id) continue;
         
         // Match user's company

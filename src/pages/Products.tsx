@@ -57,6 +57,8 @@ export const Products: React.FC = () => {
     code: '', 
     name: '', 
     type: 'product' as 'service' | 'product' | 'commodity',
+    category: '',
+    unit: 'قطعة',
     sale_price: 0, 
     cost_price: 0, 
     description: '',
@@ -255,6 +257,8 @@ export const Products: React.FC = () => {
         code: product.code, 
         name: product.name, 
         type: product.type || 'product',
+        category: product.category || '',
+        unit: product.unit || 'قطعة',
         sale_price: product.sale_price, 
         cost_price: product.cost_price, 
         description: product.description || '',
@@ -272,6 +276,8 @@ export const Products: React.FC = () => {
         code: '', 
         name: '', 
         type: 'product',
+        category: '',
+        unit: 'قطعة',
         sale_price: 0, 
         cost_price: 0, 
         description: '', 
@@ -564,6 +570,32 @@ export const Products: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
+                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_category')}</label>
+                    <input
+                      type="text"
+                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_unit')}</label>
+                    <select
+                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
+                      value={formData.unit}
+                      onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                    >
+                      <option value="قطعة">{t('products.unit_piece')}</option>
+                      <option value="كيلو">{t('products.unit_kg')}</option>
+                      <option value="متر">{t('products.unit_meter')}</option>
+                      <option value="لتر">{t('products.unit_liter')}</option>
+                      <option value="علبة">{t('products.unit_box')}</option>
+                      <option value="كرتونة">{t('products.unit_carton')}</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
                     <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_sale_price')}</label>
                     <input
                       required
@@ -583,6 +615,28 @@ export const Products: React.FC = () => {
                       className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
                       value={isNaN(formData.cost_price) ? '' : formData.cost_price}
                       onChange={(e) => setFormData({ ...formData, cost_price: parseFloat(e.target.value) })}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_stock_quantity')}</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
+                      value={isNaN(formData.stock) ? '' : formData.stock}
+                      onChange={(e) => setFormData({ ...formData, stock: parseFloat(e.target.value) })}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_min_stock')}</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
+                      value={isNaN(formData.min_stock) ? '' : formData.min_stock}
+                      onChange={(e) => setFormData({ ...formData, min_stock: parseFloat(e.target.value) })}
                     />
                   </div>
                 </div>

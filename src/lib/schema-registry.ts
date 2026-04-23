@@ -25,8 +25,8 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'tax_number', 'opening_balance', 'opening_balance_date', 'counter_account_id'
   ],
   products: [
-    'id', 'company_id', 'revenue_account_id', 'cost_account_id', 'name', 'code', 'barcode',
-    'type', 'description', 'image_url', 'cost_price', 'sale_price', 'min_stock', 
+    'id', 'company_id', 'revenue_account_id', 'cost_account_id', 'revenue_account_name', 'cost_account_name', 'name', 'code', 'barcode',
+    'type', 'description', 'image_url', 'category', 'unit', 'cost_price', 'sale_price', 'stock', 'min_stock', 
     'current_stock', 'is_service', 'counter_account_id'
   ],
   accounts: [

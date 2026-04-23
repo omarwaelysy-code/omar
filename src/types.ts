@@ -129,6 +129,8 @@ export interface Product {
   description?: string;
   image_url?: string;
   barcode?: string;
+  category?: string;
+  unit?: string;
   stock: number;
   min_stock: number;
   account_id?: string;

@@ -54,12 +54,12 @@ export const Returns: React.FC = () => {
 
   const [productFormData, setProductFormData] = useState({
     name: '',
-    sku: '',
+    code: '',
     category: '',
-    purchase_price: 0,
+    cost_price: 0,
     sale_price: 0,
-    stock_quantity: 0,
-    min_stock_level: 0,
+    stock: 0,
+    min_stock: 0,
     unit: 'قطعة'
   });
 
@@ -274,12 +274,12 @@ export const Returns: React.FC = () => {
       setIsProductModalOpen(false);
       setProductFormData({
         name: '',
-        sku: '',
+        code: '',
         category: '',
-        purchase_price: 0,
+        cost_price: 0,
         sale_price: 0,
-        stock_quantity: 0,
-        min_stock_level: 0,
+        stock: 0,
+        min_stock: 0,
         unit: 'قطعة'
       });
       showNotification('تم إضافة الصنف بنجاح');
@@ -1376,8 +1376,8 @@ export const Returns: React.FC = () => {
                   <input
                     type="text"
                     className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
-                    value={productFormData.sku}
-                    onChange={(e) => setProductFormData({ ...productFormData, sku: e.target.value })}
+                    value={productFormData.code}
+                    onChange={(e) => setProductFormData({ ...productFormData, code: e.target.value })}
                   />
                 </div>
                 <div>
@@ -1410,8 +1410,8 @@ export const Returns: React.FC = () => {
                     required
                     type="number"
                     className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
-                    value={productFormData.purchase_price}
-                    onChange={(e) => setProductFormData({ ...productFormData, purchase_price: Number(e.target.value) })}
+                    value={productFormData.cost_price}
+                    onChange={(e) => setProductFormData({ ...productFormData, cost_price: Number(e.target.value) })}
                   />
                 </div>
                 <div>
@@ -1429,8 +1429,8 @@ export const Returns: React.FC = () => {
                   <input
                     type="number"
                     className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
-                    value={productFormData.stock_quantity}
-                    onChange={(e) => setProductFormData({ ...productFormData, stock_quantity: Number(e.target.value) })}
+                    value={productFormData.stock}
+                    onChange={(e) => setProductFormData({ ...productFormData, stock: Number(e.target.value) })}
                   />
                 </div>
                 <div>
@@ -1438,8 +1438,8 @@ export const Returns: React.FC = () => {
                   <input
                     type="number"
                     className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
-                    value={productFormData.min_stock_level}
-                    onChange={(e) => setProductFormData({ ...productFormData, min_stock_level: Number(e.target.value) })}
+                    value={productFormData.min_stock}
+                    onChange={(e) => setProductFormData({ ...productFormData, min_stock: Number(e.target.value) })}
                   />
                 </div>
               </div>
