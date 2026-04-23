@@ -44,20 +44,31 @@ export const SystemCheck: React.FC = () => {
     setFixing(true);
     setMessage(null);
     try {
+      console.log('Starting system fix...');
       const token = localStorage.getItem('auth_token');
       const response = await fetch('/api/erp/system/fix', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
+      
+      const data = await response.json();
+      
       if (response.ok) {
-        setMessage({ type: 'success', text: 'All issues fixed successfully!' });
+        const count = data.appliedCount || 0;
+        setMessage({ 
+          type: 'success', 
+          text: count > 0 ? `Successfully applied ${count} migrations!` : 'System is already up to date.' 
+        });
         await fetchStatus();
       } else {
-        const data = await response.json();
         setMessage({ type: 'error', text: data.error || 'Failed to fix issues.' });
       }
     } catch (error) {
-      setMessage({ type: 'error', text: 'Connection error.' });
+      console.error('Fix error:', error);
+      setMessage({ type: 'error', text: 'Connection error while fixing.' });
     } finally {
       setFixing(false);
     }

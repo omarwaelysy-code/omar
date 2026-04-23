@@ -86,9 +86,10 @@ router.get('/system/check', authenticateToken, authorizeRoles('super_admin'), as
 
 router.post('/system/fix', authenticateToken, authorizeRoles('super_admin'), async (req, res) => {
   try {
-    await runMigrations();
-    res.json({ success: true, message: 'Schema fixed and migrations applied.' });
+    const result = await runMigrations();
+    res.json(result);
   } catch (error: any) {
+    console.error('API Error in /system/fix:', error);
     res.status(500).json({ error: error.message });
   }
 });

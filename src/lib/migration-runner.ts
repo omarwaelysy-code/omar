@@ -4,6 +4,7 @@ import pool from '../lib/postgres';
 
 export async function runMigrations() {
   console.log('🔄 Running Database Migrations...');
+  let appliedCount = 0;
   
   const client = await pool.connect();
   try {
@@ -18,7 +19,7 @@ export async function runMigrations() {
       );
     `);
 
-    // Add a safety check to migrate from my previous '_migrations' if it exists (additive)
+    // Safety check for previous table name
     await client.query(`
       DO $$ 
       BEGIN 
@@ -30,12 +31,11 @@ export async function runMigrations() {
       END $$;
     `);
 
-    // Path to migration files
     const dbDir = path.join(process.cwd(), 'src', 'db');
     const masterMigrationPath = path.join(dbDir, 'master-migration.sql');
     const migrationsDir = path.join(dbDir, 'migrations');
 
-    // 1. Run Master Migration if not done
+    // 1. Run Master Migration
     if (fs.existsSync(masterMigrationPath)) {
       const { rows } = await client.query('SELECT id FROM migrations WHERE name = $1', ['master-migration']);
       if (rows.length === 0) {
@@ -44,10 +44,11 @@ export async function runMigrations() {
         await client.query(sql);
         await client.query('INSERT INTO migrations (name) VALUES ($1)', ['master-migration']);
         console.log('✅ Master Migration applied successfully.');
+        appliedCount++;
       }
     }
 
-    // 2. Run sequential migrations from the migrations folder
+    // 2. Run sequential migrations
     if (fs.existsSync(migrationsDir)) {
       const files = fs.readdirSync(migrationsDir)
         .filter(f => f.endsWith('.sql'))
@@ -61,11 +62,13 @@ export async function runMigrations() {
           await client.query(sql);
           await client.query('INSERT INTO migrations (name) VALUES ($1)', [file]);
           console.log(`✅ Migration ${file} applied successfully.`);
+          appliedCount++;
         }
       }
     }
 
     await client.query('COMMIT');
+    return { success: true, appliedCount };
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('❌ Migration failed:', error);
