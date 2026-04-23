@@ -122,6 +122,7 @@ export default function App() {
     // Role-based access control for pages
     if (id === 'super_admin_dashboard' && !isSuperAdmin) return <Dashboard />;
     if (id === 'dashboard') return isSuperAdmin ? <SuperAdminDashboard /> : <Dashboard />;
+    if (id === 'users' && isSuperAdmin) return <SuperAdminDashboard initialTab="users" />;
 
     switch (id) {
       case 'super_admin_dashboard': return isSuperAdmin ? <SuperAdminDashboard /> : <Dashboard />;

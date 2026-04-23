@@ -269,13 +269,18 @@ export async function initDatabase() {
         id BIGSERIAL PRIMARY KEY,
         company_id VARCHAR(36),
         user_id VARCHAR(36),
+        username VARCHAR(100),
         action VARCHAR(100) NOT NULL,
         details TEXT,
         ip_address VARCHAR(45),
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        category JSONB,
+        document_id VARCHAR(36),
+        changes JSONB
       );
       CREATE INDEX IF NOT EXISTS idx_activity_logs_company_id ON activity_logs(company_id);
       CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON activity_logs(user_id);
+      CREATE INDEX IF NOT EXISTS idx_activity_logs_category ON activity_logs USING GIN (category);
     `);
 
     // 15. Returns
@@ -443,6 +448,24 @@ export async function initDatabase() {
     } catch (adminError) {
       console.error('Error creating admin:', adminError);
       // We don't throw here to allow the server to start, but it's logged
+    }
+
+    // Seed Activity Logs if empty
+    try {
+      const { rows: logRows } = await client.query('SELECT id FROM activity_logs LIMIT 1');
+      if (logRows.length === 0) {
+        console.log('Seeding initial activity logs...');
+        const { rows: userRows } = await client.query('SELECT id, username, company_id FROM users LIMIT 1');
+        if (userRows.length > 0) {
+          const firstUser = userRows[0];
+          await client.query(
+            'INSERT INTO activity_logs (company_id, user_id, username, action, details, category) VALUES ($1, $2, $3, $4, $5, $6)',
+            [firstUser.company_id, firstUser.id, firstUser.username, 'تهيئة النظام', 'تم بدء تشغيل سجل النشاط بنجاح', JSON.stringify(['system'])]
+          );
+        }
+      }
+    } catch (logSeedError) {
+      console.warn('Could not seed activity logs:', logSeedError);
     }
 
     console.log('🔥 Database initialization process complete.');

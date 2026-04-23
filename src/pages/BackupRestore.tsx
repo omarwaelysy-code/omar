@@ -10,36 +10,11 @@ import {
   Clock,
   Shield,
   FileJson,
-  FileSpreadsheet,
-  Trash2
+  FileSpreadsheet
 } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import * as XLSX from 'xlsx';
-import { sanitizeForExcel } from '../utils/excelUtils';
-
-const COLLECTIONS_TO_BACKUP = [
-  { id: 'customers', label: 'العملاء' },
-  { id: 'suppliers', label: 'الموردين' },
-  { id: 'products', label: 'الأصناف' },
-  { id: 'payment_methods', label: 'طرق السداد' },
-  { id: 'expense_categories', label: 'بنود المصروفات' },
-  { id: 'account_types', label: 'أنواع الحسابات' },
-  { id: 'accounts', label: 'دليل الحسابات' },
-  { id: 'invoices', label: 'فواتير المبيعات' },
-  { id: 'purchase_invoices', label: 'فواتير المشتريات' },
-  { id: 'receipt_vouchers', label: 'سندات القبض' },
-  { id: 'payment_vouchers', label: 'سندات الصرف' },
-  { id: 'returns', label: 'مرتجع المبيعات' },
-  { id: 'purchase_returns', label: 'مرتجع المشتريات' },
-  { id: 'customer_discounts', label: 'خصم العملاء' },
-  { id: 'supplier_discounts', label: 'خصم الموردين' },
-  { id: 'expenses', label: 'المصروفات' },
-  { id: 'journal_entries', label: 'قيود اليومية' },
-  { id: 'cash_transfers', label: 'التحويلات النقدية' },
-  { id: 'settings', label: 'الإعدادات' }
-];
 
 export const BackupRestore: React.FC = () => {
   const { user } = useAuth();
@@ -87,25 +62,23 @@ export const BackupRestore: React.FC = () => {
   const handleExportJSON = async () => {
     if (!user) return;
     setLoading(true);
-    setStatus({ type: 'info', message: 'جاري تحضير البيانات للنسخ الاحتياطي...' });
-    setProgress(0);
+    setStatus({ type: 'info', message: 'جاري تحضير النسخة الاحتياطية على الخادم...' });
+    setProgress(20);
 
     try {
-      const backupData: any = {
-        company_id: user.company_id,
-        exported_at: new Date().toISOString(),
-        version: '1.0',
-        data: {}
-      };
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/erp/system/backup?company_id=${user.company_id}`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
 
-      for (let i = 0; i < COLLECTIONS_TO_BACKUP.length; i++) {
-        const coll = COLLECTIONS_TO_BACKUP[i];
-        const data = await dbService.list(coll.id, user.company_id);
-        backupData.data[coll.id] = data;
-        setProgress(Math.round(((i + 1) / COLLECTIONS_TO_BACKUP.length) * 100));
+      if (!response.ok) {
+        throw new Error('فشل تصدير النسخة الاحتياطية من الخادم');
       }
 
-      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      setProgress(80);
+      const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -119,11 +92,12 @@ export const BackupRestore: React.FC = () => {
       setLastBackup(now);
       localStorage.setItem(`last_backup_${user.company_id}`, now);
       
+      setProgress(100);
       setStatus({ type: 'success', message: 'تم تصدير النسخة الاحتياطية بنجاح' });
       await dbService.logActivity(user.id, user.username, user.company_id, 'نسخ احتياطي', 'تصدير نسخة احتياطية كاملة (JSON)', 'backup');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Export error:', error);
-      setStatus({ type: 'error', message: 'فشل تصدير النسخة الاحتياطية' });
+      setStatus({ type: 'error', message: error.message || 'فشل تصدير النسخة الاحتياطية' });
     } finally {
       setLoading(false);
     }
@@ -132,31 +106,38 @@ export const BackupRestore: React.FC = () => {
   const handleExportExcel = async () => {
     if (!user) return;
     setLoading(true);
-    setStatus({ type: 'info', message: 'جاري تحضير ملف Excel...' });
-    setProgress(0);
+    setStatus({ type: 'info', message: 'جاري تحضير ملف Excel على الخادم...' });
+    setProgress(30);
 
     try {
-      const workbook = XLSX.utils.book_new();
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/erp/system/export-excel?company_id=${user.company_id}`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
 
-      for (let i = 0; i < COLLECTIONS_TO_BACKUP.length; i++) {
-        const coll = COLLECTIONS_TO_BACKUP[i];
-        const data = await dbService.list(coll.id, user.company_id);
-        
-        if (data.length > 0) {
-          const sanitizedData = sanitizeForExcel(data);
-          const worksheet = XLSX.utils.json_to_sheet(sanitizedData);
-          XLSX.utils.book_append_sheet(workbook, worksheet, coll.label);
-        }
-        setProgress(Math.round(((i + 1) / COLLECTIONS_TO_BACKUP.length) * 100));
+      if (!response.ok) {
+        throw new Error('فشل تصدير ملف Excel من الخادم');
       }
 
-      XLSX.writeFile(workbook, `backup_${user.company_id}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      setProgress(70);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `backup_${user.company_id}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
       
+      setProgress(100);
       setStatus({ type: 'success', message: 'تم تصدير ملف Excel بنجاح' });
       await dbService.logActivity(user.id, user.username, user.company_id, 'نسخ احتياطي', 'تصدير بيانات إلى Excel', 'backup');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Excel export error:', error);
-      setStatus({ type: 'error', message: 'فشل تصدير ملف Excel' });
+      setStatus({ type: 'error', message: error.message || 'فشل تصدير ملف Excel' });
     } finally {
       setLoading(false);
     }
@@ -165,66 +146,42 @@ export const BackupRestore: React.FC = () => {
   const executeImportJSON = async (file: File, mode: 'merge' | 'replace') => {
     if (!user) return;
     setLoading(true);
-    setStatus({ type: 'info', message: mode === 'replace' ? 'جاري حذف البيانات القديمة...' : 'جاري قراءة ملف النسخة الاحتياطية...' });
-    setProgress(0);
+    setStatus({ type: 'info', message: 'جاري رفع ومعالجة ملف النسخة الاحتياطية...' });
+    setProgress(10);
 
     try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const backupData = JSON.parse(e.target?.result as string);
-          
-          if (backupData.company_id !== user.company_id) {
-            throw new Error('هذه النسخة الاحتياطية تنتمي لشركة أخرى');
-          }
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/erp/system/restore?mode=${mode}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+        body: formData
+      });
 
-          const collections = Object.keys(backupData.data);
-          
-          // If replace mode, delete existing data first
-          if (mode === 'replace') {
-            for (let i = 0; i < COLLECTIONS_TO_BACKUP.length; i++) {
-              const coll = COLLECTIONS_TO_BACKUP[i];
-              const existingDocs = await dbService.list<any>(coll.id, user.company_id);
-              for (const doc of existingDocs) {
-                await dbService.delete(coll.id, doc.id);
-              }
-              setProgress(Math.round(((i + 1) / COLLECTIONS_TO_BACKUP.length) * 20)); // First 20% for deletion
-            }
-          }
+      setProgress(90);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'فشل استعادة البيانات');
+      }
 
-          let totalProcessed = 0;
-          const totalItems = collections.reduce((acc, key) => acc + backupData.data[key].length, 0);
-
-          for (const collId of collections) {
-            const items = backupData.data[collId];
-            for (const item of items) {
-              const { id, ...data } = item;
-              // Use addWithId to preserve original IDs and relationships
-              await dbService.addWithId(collId, id, { ...data, company_id: user.company_id });
-              totalProcessed++;
-              const baseProgress = mode === 'replace' ? 20 : 0;
-              const multiplier = mode === 'replace' ? 0.8 : 1;
-              setProgress(baseProgress + Math.round((totalProcessed / totalItems) * 100 * multiplier));
-            }
-          }
-
-          setStatus({ type: 'success', message: 'تم استعادة البيانات بنجاح' });
-          setSuccessModal({
-            show: true,
-            message: mode === 'replace' 
-              ? 'تم حذف البيانات القديمة واستبدالها بالنسخة الاحتياطية بنجاح' 
-              : 'تم دمج البيانات المستوردة مع البيانات الحالية بنجاح'
-          });
-          await dbService.logActivity(user.id, user.username, user.company_id, 'استعادة بيانات', `استعادة نسخة احتياطية (JSON) - وضع: ${mode === 'replace' ? 'استبدال' : 'دمج'}`, 'backup');
-        } catch (err: any) {
-          setStatus({ type: 'error', message: err.message || 'خطأ في تنسيق الملف' });
-        } finally {
-          setLoading(false);
-        }
-      };
-      reader.readAsText(file);
-    } catch (error) {
-      setStatus({ type: 'error', message: 'فشل استيراد البيانات' });
+      setProgress(100);
+      setStatus({ type: 'success', message: 'تم استعادة البيانات بنجاح' });
+      setSuccessModal({
+        show: true,
+        message: mode === 'replace' 
+          ? 'تم حذف البيانات القديمة واستبدالها بالنسخة الاحتياطية بنجاح' 
+          : 'تم دمج البيانات المستوردة مع البيانات الحالية بنجاح'
+      });
+      await dbService.logActivity(user.id, user.username, user.company_id, 'استعادة بيانات', `استعادة نسخة احتياطية (JSON) - وضع: ${mode === 'replace' ? 'استبدال' : 'دمج'}`, 'backup');
+    } catch (error: any) {
+      console.error('Import error:', error);
+      setStatus({ type: 'error', message: error.message || 'فشل استيراد البيانات' });
+    } finally {
       setLoading(false);
     }
   };
@@ -236,134 +193,53 @@ export const BackupRestore: React.FC = () => {
     setConfirmModal({
       show: true,
       title: 'تأكيد استعادة JSON',
-      message: 'يرجى اختيار طريقة الاستعادة المفضلة:',
+      message: 'تعمل هذه العملية على استعادة كافة الجداول والبيانات. يرجى اختيار طريقة الاستعادة:',
       onConfirm: (mode) => executeImportJSON(file, mode),
       type: 'json'
     });
     
-    // Reset input
     event.target.value = '';
   };
 
   const executeImportExcel = async (file: File, mode: 'merge' | 'replace') => {
     if (!user) return;
     setLoading(true);
-    setStatus({ type: 'info', message: mode === 'replace' ? 'جاري حذف البيانات القديمة...' : 'جاري قراءة ملف Excel...' });
-    setProgress(0);
+    setStatus({ type: 'info', message: 'جاري رفع ومعالجة ملف Excel...' });
+    setProgress(10);
 
     try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          
-          // If replace mode, delete existing data first
-          if (mode === 'replace') {
-            for (let i = 0; i < COLLECTIONS_TO_BACKUP.length; i++) {
-              const coll = COLLECTIONS_TO_BACKUP[i];
-              const existingDocs = await dbService.list<any>(coll.id, user.company_id);
-              for (const doc of existingDocs) {
-                await dbService.delete(coll.id, doc.id);
-              }
-              setProgress(Math.round(((i + 1) / COLLECTIONS_TO_BACKUP.length) * 20));
-            }
-          }
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/erp/system/import-excel?mode=${mode}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+        body: formData
+      });
 
-          let totalProcessed = 0;
-          let totalItems = 0;
-          
-          // First pass to count total items
-          workbook.SheetNames.forEach(sheetName => {
-            const worksheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet);
-            totalItems += jsonData.length;
-          });
+      setProgress(90);
 
-          if (totalItems === 0) {
-            throw new Error('الملف فارغ أو لا يحتوي على بيانات صالحة');
-          }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'فشل استيراد ملف Excel');
+      }
 
-          // Second pass to import data
-          for (const sheetName of workbook.SheetNames) {
-            const worksheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
-            
-            // Find the collection ID from the label
-            const collection = COLLECTIONS_TO_BACKUP.find(c => c.label === sheetName);
-            if (!collection) continue;
-
-            for (const item of jsonData) {
-              const { id, ...rest } = item;
-              if (!id) {
-                totalProcessed++;
-                continue;
-              }
-
-              // Reconstruct nested objects/arrays if they were flattened with dots
-              const reconstructed: any = { company_id: user.company_id };
-              Object.keys(rest).forEach(key => {
-                if (key.includes('.')) {
-                  const parts = key.split('.');
-                  let current = reconstructed;
-                  for (let i = 0; i < parts.length - 1; i++) {
-                    const part = parts[i];
-                    const nextPart = parts[i + 1];
-                    const isNextNumeric = !isNaN(Number(nextPart));
-                    
-                    if (!current[part]) {
-                      current[part] = isNextNumeric ? [] : {};
-                    }
-                    current = current[part];
-                  }
-                  
-                  const lastPart = parts[parts.length - 1];
-                  current[lastPart] = rest[key];
-                } else {
-                  reconstructed[key] = rest[key];
-                }
-              });
-
-              // Handle "Part" columns for long strings
-              Object.keys(reconstructed).forEach(key => {
-                if (key.includes('_Part')) return; // Skip part columns, they will be handled by the main column
-                
-                let fullValue = reconstructed[key];
-                let partIndex = 2;
-                while (reconstructed[`${key}_Part${partIndex}`] !== undefined) {
-                  fullValue += reconstructed[`${key}_Part${partIndex}`];
-                  delete reconstructed[`${key}_Part${partIndex}`];
-                  partIndex++;
-                }
-                reconstructed[key] = fullValue;
-              });
-
-              await dbService.addWithId(collection.id, id, reconstructed);
-              totalProcessed++;
-              const baseProgress = mode === 'replace' ? 20 : 0;
-              const multiplier = mode === 'replace' ? 0.8 : 1;
-              setProgress(baseProgress + Math.round((totalProcessed / totalItems) * 100 * multiplier));
-            }
-          }
-
-          setStatus({ type: 'success', message: 'تم استعادة البيانات من ملف Excel بنجاح' });
-          setSuccessModal({
-            show: true,
-            message: mode === 'replace' 
-              ? 'تم حذف البيانات القديمة واستبدالها ببيانات ملف Excel بنجاح' 
-              : 'تم دمج بيانات ملف Excel مع البيانات الحالية بنجاح'
-          });
-          await dbService.logActivity(user.id, user.username, user.company_id, 'استعادة بيانات', `استعادة بيانات من Excel - وضع: ${mode === 'replace' ? 'استبدال' : 'دمج'}`, 'backup');
-        } catch (err: any) {
-          console.error('Excel import error:', err);
-          setStatus({ type: 'error', message: err.message || 'خطأ في معالجة ملف Excel' });
-        } finally {
-          setLoading(false);
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    } catch (error) {
-      setStatus({ type: 'error', message: 'فشل استيراد ملف Excel' });
+      setProgress(100);
+      setStatus({ type: 'success', message: 'تم استعادة البيانات من ملف Excel بنجاح' });
+      setSuccessModal({
+        show: true,
+        message: mode === 'replace' 
+          ? 'تم حذف البيانات القديمة واستبدالها ببيانات ملف Excel بنجاح' 
+          : 'تم دمج بيانات ملف Excel مع البيانات الحالية بنجاح'
+      });
+      await dbService.logActivity(user.id, user.username, user.company_id, 'استعادة بيانات', `استعادة بيانات من Excel - وضع: ${mode === 'replace' ? 'استبدال' : 'دمج'}`, 'backup');
+    } catch (error: any) {
+      console.error('Excel import error:', error);
+      setStatus({ type: 'error', message: error.message || 'فشل استيراد ملف Excel' });
+    } finally {
       setLoading(false);
     }
   };

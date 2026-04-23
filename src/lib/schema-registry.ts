@@ -53,7 +53,8 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'opening_balance_date', 'counter_account_id'
   ],
   activity_logs: [
-    'id', 'company_id', 'user_id', 'action', 'details', 'ip_address', 'timestamp'
+    'id', 'company_id', 'user_id', 'username', 'action', 'details', 'ip_address', 
+    'timestamp', 'category', 'document_id', 'changes'
   ],
   receipt_vouchers: [
     'id', 'company_id', 'customer_id', 'date', 'amount', 'description', 'payment_method_id'

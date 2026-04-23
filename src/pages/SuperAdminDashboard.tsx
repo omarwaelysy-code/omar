@@ -34,14 +34,22 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export const SuperAdminDashboard: React.FC = () => {
+interface SuperAdminDashboardProps {
+  initialTab?: 'companies' | 'users' | 'logs';
+}
+
+export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initialTab }) => {
   const { user, isSuperAdmin } = useAuth();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'companies' | 'users' | 'logs'>('companies');
+  
+  // Set default tab to 'users' and implement minimal mode flag
+  const minimalMode = true; 
+  const [activeTab, setActiveTab] = useState<'companies' | 'users' | 'logs'>(initialTab || (minimalMode ? 'users' : 'companies'));
+  
   const [showModal, setShowModal] = useState(false);
   const [showUserRoleModal, setShowUserRoleModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -139,7 +147,9 @@ export const SuperAdminDashboard: React.FC = () => {
     return { label: 'نشط', color: 'bg-emerald-100 text-emerald-800', icon: CheckCircle2 };
   };
 
-  const stats = [
+  const stats = minimalMode ? [
+    { label: 'إجمالي المستخدمين', value: users.length, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+  ] : [
     { label: 'إجمالي الشركات', value: companies.length, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'إجمالي المستخدمين', value: users.length, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50' },
     { label: 'اشتراكات نشطة', value: companies.filter(c => getSubscriptionStatus(c).label === 'نشط').length, icon: ShieldCheck, color: 'text-purple-600', bg: 'bg-purple-50' },
@@ -438,8 +448,14 @@ export const SuperAdminDashboard: React.FC = () => {
     <div className="p-6 space-y-6" dir="rtl">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800">لوحة تحكم المدير العام</h1>
-          <p className="text-stone-500">إدارة الشركات والمستخدمين والاشتراكات عبر النظام بالكامل</p>
+          <h1 className="text-2xl font-bold text-stone-800">
+            {minimalMode ? 'إدارة المستخدمين - المدير العام' : 'لوحة تحكم المدير العام'}
+          </h1>
+          <p className="text-stone-500">
+            {minimalMode 
+              ? 'إدارة مستخدمي النظام ومراجعة سلامة البيانات' 
+              : 'إدارة الشركات والمستخدمين والاشتراكات عبر النظام بالكامل'}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -450,32 +466,34 @@ export const SuperAdminDashboard: React.FC = () => {
           >
             <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
           </button>
-          <button 
-            onClick={() => {
-              setEditingCompany(null);
-              setFormData({
-                name: '',
-                code: '',
-                email: '',
-                phone: '',
-                users_limit: 5,
-                transactions_limit: 1000,
-                subscription_days: 30,
-                subscription_plan: 'basic',
-                company_status: 'active',
-                subscription_status: 'active'
-              });
-              setShowModal(true);
-            }}
-            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
-          >
-            <Plus className="w-5 h-5" />
-            <span>إضافة شركة جديدة</span>
-          </button>
+          {!minimalMode && (
+            <button 
+              onClick={() => {
+                setEditingCompany(null);
+                setFormData({
+                  name: '',
+                  code: '',
+                  email: '',
+                  phone: '',
+                  users_limit: 5,
+                  transactions_limit: 1000,
+                  subscription_days: 30,
+                  subscription_plan: 'basic',
+                  company_status: 'active',
+                  subscription_status: 'active'
+                });
+                setShowModal(true);
+              }}
+              className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
+            >
+              <Plus className="w-5 h-5" />
+              <span>إضافة شركة جديدة</span>
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${minimalMode ? '2' : '4'} gap-6`}>
         {stats.map((stat, index) => (
           <motion.div
             key={index}
@@ -498,34 +516,36 @@ export const SuperAdminDashboard: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
-        <div className="border-b border-stone-200">
-          <div className="flex p-1">
-            <button
-              onClick={() => setActiveTab('companies')}
-              className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === 'companies' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
-              }`}
-            >
-              الشركات
-            </button>
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === 'users' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
-              }`}
-            >
-              المستخدمين
-            </button>
-            <button
-              onClick={() => setActiveTab('logs')}
-              className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === 'logs' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
-              }`}
-            >
-              سجل العمليات
-            </button>
+        {!minimalMode && (
+          <div className="border-b border-stone-200">
+            <div className="flex p-1">
+              <button
+                onClick={() => setActiveTab('companies')}
+                className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
+                  activeTab === 'companies' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+                }`}
+              >
+                الشركات
+              </button>
+              <button
+                onClick={() => setActiveTab('users')}
+                className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
+                  activeTab === 'users' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+                }`}
+              >
+                المستخدمين
+              </button>
+              <button
+                onClick={() => setActiveTab('logs')}
+                className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
+                  activeTab === 'logs' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+                }`}
+              >
+                سجل العمليات
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="p-4 border-b border-stone-200 bg-stone-50/50 flex justify-between items-center gap-4">
           <div className="relative flex-1">
