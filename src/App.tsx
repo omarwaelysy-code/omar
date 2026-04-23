@@ -47,6 +47,7 @@ import { AIAssistant } from './components/AIAssistant';
 import DatabaseError from './components/DatabaseError';
 
 import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
+import { SystemCheck } from './pages/SystemCheck';
 
 export default function App() {
   const { t, dir } = useLanguage();
@@ -160,6 +161,7 @@ export default function App() {
       case 'discount_settings': return <DiscountSettings />;
       case 'backup_restore': return <BackupRestore />;
       case 'activity_log': return <ActivityLogPage />;
+      case 'system_check': return <SystemCheck />;
       default: return <Dashboard />;
     }
   };

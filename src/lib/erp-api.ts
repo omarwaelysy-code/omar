@@ -3,10 +3,95 @@ import pool from './postgres';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { authenticateToken, AuthRequest } from './auth-middleware';
+import { authenticateToken, AuthRequest, authorizeRoles } from './auth-middleware';
+import { EXPECTED_SCHEMA } from './schema-registry';
+import { runMigrations } from './migration-runner';
+import fs from 'fs';
+import path from 'path';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+// --- System Diagnostics ---
+router.get('/system/check', authenticateToken, authorizeRoles('super_admin'), async (req, res) => {
+  const client = await pool.connect();
+  try {
+    // 1. Check Tables and Columns
+    const { rows: actualColumns } = await client.query(`
+      SELECT table_name, column_name 
+      FROM information_schema.columns 
+      WHERE table_schema = 'public'
+    `);
+
+    const schemaStatus: any = {
+      missingTables: [],
+      missingColumns: [],
+      databaseHealth: 'ok',
+      dbVersion: '',
+      pendingMigrations: []
+    };
+
+    // DB Version
+    const { rows: versionRow } = await client.query('SELECT version()');
+    schemaStatus.dbVersion = versionRow[0].version;
+
+    const actualTableMap: { [key: string]: string[] } = {};
+    actualColumns.forEach((col: any) => {
+      if (!actualTableMap[col.table_name]) actualTableMap[col.table_name] = [];
+      actualTableMap[col.table_name].push(col.column_name);
+    });
+
+    Object.keys(EXPECTED_SCHEMA).forEach(tableName => {
+      if (!actualTableMap[tableName]) {
+        schemaStatus.missingTables.push(tableName);
+      } else {
+        const expectedCols = EXPECTED_SCHEMA[tableName];
+        const actualCols = actualTableMap[tableName];
+        const missing = expectedCols.filter(col => !actualCols.includes(col));
+        if (missing.length > 0) {
+          schemaStatus.missingColumns.push({ table: tableName, columns: missing });
+        }
+      }
+    });
+
+    // 2. Check Migrations
+    const dbDir = path.join(process.cwd(), 'src', 'db');
+    const masterMigrationPath = path.join(dbDir, 'master-migration.sql');
+    const migrationsDir = path.join(dbDir, 'migrations');
+
+    const { rows: appliedMigrationsRows } = await client.query('SELECT name FROM _migrations').catch(() => ({ rows: [] }));
+    const appliedMigrations = appliedMigrationsRows.map((m: any) => m.name);
+
+    if (fs.existsSync(masterMigrationPath) && !appliedMigrations.includes('master-migration')) {
+      schemaStatus.pendingMigrations.push('master-migration');
+    }
+
+    if (fs.existsSync(migrationsDir)) {
+      const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.sql'));
+      files.forEach(file => {
+        if (!appliedMigrations.includes(file)) {
+          schemaStatus.pendingMigrations.push(file);
+        }
+      });
+    }
+
+    res.json(schemaStatus);
+  } catch (error: any) {
+    console.error('System check failed:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+router.post('/system/fix', authenticateToken, authorizeRoles('super_admin'), async (req, res) => {
+  try {
+    await runMigrations();
+    res.json({ success: true, message: 'Schema fixed and migrations applied.' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Database Health Check
 router.get('/db-health', async (req, res) => {

@@ -1,55 +1,90 @@
--- 1. Companies Extensions
+-- ERP MASTER MIGRATION - SAFE ADDITIVE CHANGES ONLY
+
+-- 1. Companies Table
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS logo_url TEXT;
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS website VARCHAR(255);
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(20) DEFAULT 'trial';
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS subscription_plan VARCHAR(20) DEFAULT 'basic';
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS subscription_start TIMESTAMP;
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS subscription_end TIMESTAMP;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS subscription_expiry TIMESTAMP;
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS subscription_days INTEGER DEFAULT 30;
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS users_limit INTEGER DEFAULT 5;
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS transactions_limit INTEGER DEFAULT 1000;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_status VARCHAR(20) DEFAULT 'active';
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS features JSONB DEFAULT '[]';
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS settings JSONB DEFAULT '{}';
 
--- 2. Users Extensions
+-- 2. Users Table
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile VARCHAR(20);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS temp_password VARCHAR(255);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions JSONB DEFAULT '{}';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT FALSE;
 
--- 3. Inventory & Trading Extensions
--- Customers
+-- 3. Customers Table
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS code VARCHAR(50);
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS opening_balance DECIMAL(18, 4) DEFAULT 0;
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS opening_balance_date DATE;
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS counter_account_id VARCHAR(36);
 
--- Suppliers
+-- 4. Suppliers Table
 ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS opening_balance DECIMAL(18, 4) DEFAULT 0;
 ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS opening_balance_date DATE;
 ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS counter_account_id VARCHAR(36);
 
--- Products
+-- 5. Products Table
 ALTER TABLE products ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'product';
 ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS min_stock DECIMAL(18, 4) DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS current_stock DECIMAL(18, 4) DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS is_service BOOLEAN DEFAULT FALSE;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS counter_account_id VARCHAR(36);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS revenue_account_id VARCHAR(36);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_account_id VARCHAR(36);
 
--- Payment Methods
-ALTER TABLE payment_methods ADD COLUMN IF NOT EXISTS code VARCHAR(50);
-ALTER TABLE payment_methods ADD COLUMN IF NOT EXISTS type VARCHAR(20) DEFAULT 'cash';
-ALTER TABLE payment_methods ADD COLUMN IF NOT EXISTS opening_balance DECIMAL(18, 4) DEFAULT 0;
-ALTER TABLE payment_methods ADD COLUMN IF NOT EXISTS opening_balance_date DATE;
-ALTER TABLE payment_methods ADD COLUMN IF NOT EXISTS counter_account_id VARCHAR(36);
+-- 6. Accounts Table
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS parent_id VARCHAR(36);
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS opening_balance DECIMAL(18, 4) DEFAULT 0;
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
 
--- Invoices
+-- 7. Invoices Table
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS due_date DATE;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS subtotal DECIMAL(18, 4) DEFAULT 0;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS tax_amount DECIMAL(18, 4) DEFAULT 0;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(18, 4) DEFAULT 0;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_method_id VARCHAR(36);
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS created_by VARCHAR(36);
 
--- 4. Audit & Denormalization (Optional but helpful for performance)
+-- 8. Purchase Invoices Table
+ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS due_date DATE;
+ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS subtotal DECIMAL(18, 4) DEFAULT 0;
+ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS tax_amount DECIMAL(18, 4) DEFAULT 0;
+ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(18, 4) DEFAULT 0;
+ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS payment_type VARCHAR(20) DEFAULT 'cash';
+ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS payment_method_id VARCHAR(36);
+ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS notes TEXT;
+
+-- 9. Denormalized Fields for Items (Audit/UI)
 ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS product_name VARCHAR(255);
 ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS product_code VARCHAR(100);
+ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS product_image_url TEXT;
 
 ALTER TABLE return_items ADD COLUMN IF NOT EXISTS product_name VARCHAR(255);
 ALTER TABLE return_items ADD COLUMN IF NOT EXISTS product_code VARCHAR(100);
+ALTER TABLE return_items ADD COLUMN IF NOT EXISTS product_image_url TEXT;
 
--- Ensure indexes for performance
-CREATE INDEX IF NOT EXISTS idx_invoices_date ON invoices(date);
-CREATE INDEX IF NOT EXISTS idx_journal_entries_date ON journal_entries(date);
-CREATE INDEX IF NOT EXISTS idx_companies_code ON companies(code);
+-- 10. Receipt & Payment Vouchers
+ALTER TABLE receipt_vouchers ADD COLUMN IF NOT EXISTS payment_method_id VARCHAR(36);
+ALTER TABLE payment_vouchers ADD COLUMN IF NOT EXISTS payment_method_id VARCHAR(36);
+
+-- 11. Custom System Check Table (for tracking)
+CREATE TABLE IF NOT EXISTS _system_settings (
+  key VARCHAR(100) PRIMARY KEY,
+  value JSONB,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO _system_settings (key, value) VALUES ('schema_version', '{"version": "1.0.0"}') ON CONFLICT (key) DO NOTHING;
