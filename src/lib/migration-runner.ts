@@ -37,14 +37,24 @@ export async function runMigrations() {
 
     // 1. Run Master Migration
     if (fs.existsSync(masterMigrationPath)) {
-      const { rows } = await client.query('SELECT id FROM migrations WHERE name = $1', ['master-migration']);
-      if (rows.length === 0) {
-        console.log('📦 Applying Master Migration...');
-        const sql = fs.readFileSync(masterMigrationPath, 'utf8');
+      console.log('📦 Checking Master Migration...');
+      const sql = fs.readFileSync(masterMigrationPath, 'utf8');
+      
+      // We run master migration EVERY TIME because it uses "IF NOT EXISTS"
+      // and we want it to act as a baseline sync.
+      try {
         await client.query(sql);
-        await client.query('INSERT INTO migrations (name) VALUES ($1)', ['master-migration']);
-        console.log('✅ Master Migration applied successfully.');
-        appliedCount++;
+        
+        // Still track it in migrations table for record keeping
+        const { rows } = await client.query('SELECT id FROM migrations WHERE name = $1', ['master-migration']);
+        if (rows.length === 0) {
+          await client.query('INSERT INTO migrations (name) VALUES ($1)', ['master-migration']);
+        }
+        
+        console.log('✅ Master Migration synced.');
+      } catch (masterError) {
+        console.warn('⚠️ Master Migration sync warning (non-fatal):', masterError instanceof Error ? masterError.message : masterError);
+        // We don't fail the whole process for master errors because it might have partial successes
       }
     }
 

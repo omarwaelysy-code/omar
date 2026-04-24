@@ -30,6 +30,11 @@ export async function initDatabase() {
   
   if (!client) return;
 
+  // NOTE FOR DEVELOPERS:
+  // When adding new columns to tables below, you MUST ALSO add an 
+  // "ALTER TABLE ... ADD COLUMN IF NOT EXISTS ..." statement to 
+  // src/db/master-migration.sql to ensure existing databases are updated.
+
   try {
     // 0. Ensure Migrations Table exists (Additive & Required for Tracking)
     await client.query(`
