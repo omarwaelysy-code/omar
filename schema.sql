@@ -182,10 +182,15 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     id BIGSERIAL PRIMARY KEY,
     company_id VARCHAR(36),
     user_id VARCHAR(36),
+    username VARCHAR(100),
     action VARCHAR(100) NOT NULL,
     details TEXT,
     ip_address VARCHAR(45),
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    category JSONB,
+    document_id VARCHAR(36),
+    changes JSONB
 );
-CREATE INDEX IF NOT EXISTS idx_activity_logs_company_id ON activity_logs(company_id);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_company_timestamp ON activity_logs(company_id, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON activity_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_category ON activity_logs USING GIN (category);

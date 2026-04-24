@@ -122,7 +122,7 @@ ALTER TABLE payment_methods ADD COLUMN IF NOT EXISTS counter_account_id VARCHAR(
 -- Indices 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_company_id ON users(company_id);
-CREATE INDEX IF NOT EXISTS idx_activity_logs_company_id ON activity_logs(company_id);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_company_timestamp ON activity_logs(company_id, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON activity_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_activity_logs_category ON activity_logs USING GIN (category);
 

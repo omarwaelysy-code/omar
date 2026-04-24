@@ -47,16 +47,34 @@ export const dbService = {
   },
 
   subscribe<T>(collectionName: string, companyId: string, callback: (data: T[]) => void) {
-    const interval = setInterval(async () => {
+    let lastData = '';
+    const fetchData = async () => {
       try {
         const data = await dbService.list<T>(collectionName, companyId);
-        callback(data);
+        const dataString = JSON.stringify(data);
+        if (dataString !== lastData) {
+          lastData = dataString;
+          callback(data);
+        }
       } catch (err) {
         console.error('Polling error:', err);
       }
-    }, 5000);
+    };
+
+    fetchData(); // Initial fetch
+    const interval = setInterval(fetchData, 2000); // Poll every 2 seconds
     
-    return () => clearInterval(interval);
+    const handleRefresh = (e: any) => {
+      if (e.detail?.collection === collectionName) {
+        fetchData();
+      }
+    };
+    window.addEventListener('db-refresh', handleRefresh as EventListener);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('db-refresh', handleRefresh as EventListener);
+    };
   },
 
   async get<T>(collectionName: string, id: string): Promise<T | null> {
@@ -102,6 +120,8 @@ export const dbService = {
         changes,
         timestamp: new Date().toISOString()
       });
+      // Trigger immediate refresh for subscribers
+      window.dispatchEvent(new CustomEvent('db-refresh', { detail: { collection: 'activity_logs' } }));
     } catch (error) {
       console.error('Failed to log activity:', error);
     }

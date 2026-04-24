@@ -500,7 +500,20 @@ modules.forEach(moduleName => {
   // List with filters
   router.get(`/${moduleName}`, authenticateToken, async (req, res) => {
     try {
-      const rows = await getList(moduleName, req.query);
+      let rows;
+      if (moduleName === 'activity_logs') {
+        const companyId = req.query.company_id;
+        if (!companyId) return res.status(400).json({ error: 'company_id is required' });
+        
+        // Optimize activity logs: sort by timestamp DESC and limit to most recent 500
+        const queryResult = await pool.query(
+          'SELECT * FROM activity_logs WHERE company_id = $1 ORDER BY timestamp DESC LIMIT 500',
+          [companyId]
+        );
+        rows = queryResult.rows;
+      } else {
+        rows = await getList(moduleName, req.query);
+      }
       res.json(rows);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

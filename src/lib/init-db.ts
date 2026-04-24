@@ -291,7 +291,7 @@ export async function initDatabase() {
         document_id VARCHAR(36),
         changes JSONB
       );
-      CREATE INDEX IF NOT EXISTS idx_activity_logs_company_id ON activity_logs(company_id);
+      CREATE INDEX IF NOT EXISTS idx_activity_logs_company_timestamp ON activity_logs(company_id, timestamp DESC);
       CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON activity_logs(user_id);
       CREATE INDEX IF NOT EXISTS idx_activity_logs_category ON activity_logs USING GIN (category);
     `);

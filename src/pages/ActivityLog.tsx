@@ -12,16 +12,11 @@ export const ActivityLogPage: React.FC = () => {
 
   useEffect(() => {
     if (user) {
+      setLoading(true);
       const unsub = dbService.subscribe<ActivityLog>('activity_logs', user.company_id, (data) => {
-        // Sort logs by timestamp descending
-        const sortedLogs = [...data].sort((a, b) => {
-          const dateA = new Date(a.timestamp).getTime();
-          const dateB = new Date(b.timestamp).getTime();
-          return dateB - dateA;
-        });
-        setLogs(sortedLogs);
+        setLogs(data);
+        setLoading(false);
       });
-      setLoading(false);
       return () => unsub();
     }
   }, [user]);
