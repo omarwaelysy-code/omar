@@ -26,16 +26,21 @@ export const SalesReport: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState<'customer' | 'product' | 'transactions'>('customer');
   const [searchTerm, setSearchTerm] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
       const fetchLists = async () => {
-        const [custs, prods] = await Promise.all([
-          dbService.list<Customer>('customers', user.company_id),
-          dbService.list<Product>('products', user.company_id)
-        ]);
-        setCustomers(custs);
-        setProducts(prods);
+        try {
+          const [custs, prods] = await Promise.all([
+            dbService.list<Customer>('customers', user.company_id),
+            dbService.list<Product>('products', user.company_id)
+          ]);
+          setCustomers(custs);
+          setProducts(prods);
+        } catch (err: any) {
+          setError(err.message);
+        }
       };
       fetchLists();
     }
@@ -44,16 +49,17 @@ export const SalesReport: React.FC = () => {
   const fetchData = async () => {
     if (!user) return;
     setLoading(true);
+    setError(null);
     try {
       const [invoices, returns, discounts] = await Promise.all([
-        dbService.list<Invoice>('invoices', user.company_id),
-        dbService.list<Return>('returns', user.company_id),
-        dbService.list<any>('customer_discounts', user.company_id)
+        dbService.list<Invoice>('invoices', { company_id: user.company_id, date_from: startDate, date_to: endDate }),
+        dbService.list<Return>('returns', { company_id: user.company_id, date_from: startDate, date_to: endDate }),
+        dbService.list<any>('customer_discounts', { company_id: user.company_id, date_from: startDate, date_to: endDate })
       ]);
 
-      let filteredInvoices = invoices.filter(i => i.date >= startDate && i.date <= endDate);
-      let filteredReturns = returns.filter(r => r.date >= startDate && r.date <= endDate);
-      let filteredDiscounts = discounts.filter(d => d.date >= startDate && d.date <= endDate);
+      let filteredInvoices = invoices;
+      let filteredReturns = returns;
+      let filteredDiscounts = discounts;
 
       if (selectedCustomerIds.length > 0) {
         filteredInvoices = filteredInvoices.filter(i => selectedCustomerIds.includes(i.customer_id));
@@ -188,8 +194,9 @@ export const SalesReport: React.FC = () => {
       setCustomerSales(custData);
       setProductSales(prodData);
 
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setError(e.message);
     } finally {
       setLoading(false);
     }
@@ -421,6 +428,17 @@ export const SalesReport: React.FC = () => {
         </div>
 
         <div className="overflow-x-auto">
+          {error && (
+            <div className="flex flex-col items-center justify-center p-12 bg-rose-50 rounded-3xl border border-rose-100 italic text-center mb-6">
+              <p className="text-rose-600 font-bold mb-4">{error}</p>
+              <button 
+                onClick={fetchData}
+                className="px-6 py-2 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-all shadow-lg shadow-rose-200"
+              >
+                {t('reports.update_report')}
+              </button>
+            </div>
+          )}
           {view === 'transactions' ? (
             <table className={`w-full border-collapse ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
               <thead>

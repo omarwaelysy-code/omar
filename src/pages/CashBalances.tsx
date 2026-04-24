@@ -35,32 +35,51 @@ export const CashBalances: React.FC = () => {
   });
   const [balances, setBalances] = useState<CashBalanceData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
-      const unsub = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setPaymentMethods);
+      const unsub = dbService.subscribe<PaymentMethod>(
+        'payment_methods', 
+        user.company_id, 
+        (data) => {
+          setPaymentMethods(data);
+          if (data.length === 0) setLoading(false);
+        },
+        (err) => {
+          setError(err.message);
+          setLoading(false);
+        }
+      );
       return () => unsub();
+    } else {
+      setLoading(false);
     }
   }, [user]);
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!user || paymentMethods.length === 0) {
-        if (paymentMethods.length === 0 && !loading) setLoading(false);
+      if (!user) return;
+      
+      // If we don't have payment methods yet, or the list is empty, we finish loading
+      if (paymentMethods.length === 0) {
+        if (!loading) return; 
+        setLoading(false);
         return;
       }
       
+      setError(null);
       setLoading(true);
       try {
         const [invoices, returns, receipts, purInvoices, purReturns, vouchers, transfers, journalEntries] = await Promise.all([
-          dbService.list<any>('invoices', user.company_id),
-          dbService.list<any>('returns', user.company_id),
-          dbService.list<any>('receipt_vouchers', user.company_id),
-          dbService.list<any>('purchase_invoices', user.company_id),
-          dbService.list<any>('purchase_returns', user.company_id),
-          dbService.list<any>('payment_vouchers', user.company_id),
-          dbService.list<any>('cash_transfers', user.company_id),
-          dbService.list<any>('journal_entries', user.company_id)
+          dbService.list<any>('invoices', { company_id: user.company_id, date_to: dateRange.end }),
+          dbService.list<any>('returns', { company_id: user.company_id, date_to: dateRange.end }),
+          dbService.list<any>('receipt_vouchers', { company_id: user.company_id, date_to: dateRange.end }),
+          dbService.list<any>('purchase_invoices', { company_id: user.company_id, date_to: dateRange.end }),
+          dbService.list<any>('purchase_returns', { company_id: user.company_id, date_to: dateRange.end }),
+          dbService.list<any>('payment_vouchers', { company_id: user.company_id, date_to: dateRange.end }),
+          dbService.list<any>('cash_transfers', { company_id: user.company_id, date_to: dateRange.end }),
+          dbService.list<any>('journal_entries', { company_id: user.company_id, date_to: dateRange.end })
         ]);
 
         const startDate = new Date(dateRange.start);
@@ -154,8 +173,9 @@ export const CashBalances: React.FC = () => {
         });
 
         setBalances(calculatedBalances);
-      } catch (e) {
+      } catch (e: any) {
         console.error(e);
+        setError(e.message);
       } finally {
         setLoading(false);
       }
@@ -200,8 +220,23 @@ export const CashBalances: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
         <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-zinc-500 font-medium italic animate-pulse">جاري تحميل البيانات...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4 p-8 bg-rose-50 rounded-3xl border border-rose-100 italic">
+        <p className="text-rose-600 font-bold">{error}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-6 py-2 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-all"
+        >
+          إعادة المحاولة
+        </button>
       </div>
     );
   }

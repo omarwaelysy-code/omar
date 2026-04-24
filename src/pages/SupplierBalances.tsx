@@ -15,80 +15,82 @@ export const SupplierBalances: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const reportRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (user) {
-      const unsubSuppliers = dbService.subscribe<Supplier>('suppliers', user.company_id, (sups) => {
-        const unsubInvoices = dbService.subscribe<any>('purchase_invoices', user.company_id, (invoices) => {
-          const unsubReturns = dbService.subscribe<any>('purchase_returns', user.company_id, (returns) => {
-            const unsubVouchers = dbService.subscribe<any>('payment_vouchers', user.company_id, (vouchers) => {
-              const unsubDiscounts = dbService.subscribe<any>('supplier_discounts', user.company_id, (discounts) => {
-                const unsubJournal = dbService.subscribe<any>('journal_entries', user.company_id, (journalEntries) => {
-                  const balances = sups.map((supplier: any) => {
-                    const supInvoices = invoices.filter((i: any) => i.supplier_id === supplier.id);
-                    const supReturns = returns.filter((r: any) => r.supplier_id === supplier.id);
-                    const supVouchers = vouchers.filter((v: any) => v.supplier_id === supplier.id);
-                    const supDiscounts = discounts.filter((d: any) => d.supplier_id === supplier.id);
-                    
-                    const openingBalance = supplier.opening_balance || 0;
-                    let journalDebit = 0;
-                    let journalCredit = 0;
-                    let manualJournalDebit = 0;
-                    let manualJournalCredit = 0;
-                    let currentBalance = 0;
+  const [error, setError] = useState<string | null>(null);
 
-                    journalEntries.forEach((je: any) => {
-                      je.items?.forEach((item: any) => {
-                        // Only count lines that affect the supplier's specific account
-                        if (item.supplier_id === supplier.id) {
-                          const debit = item.debit || 0;
-                          const credit = item.credit || 0;
-                          journalDebit += debit;
-                          journalCredit += credit;
-                          // For suppliers, credit increases balance (liability)
-                          currentBalance += credit - debit;
-                          
-                          if (je.reference_type === 'manual' || je.reference_type === 'journal') {
-                            manualJournalDebit += debit;
-                            manualJournalCredit += credit;
-                          }
-                        }
-                      });
-                    });
+  const fetchData = async () => {
+    if (!user) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const [sups, invoices, returns, vouchers, discounts, journalEntries] = await Promise.all([
+        dbService.list<Supplier>('suppliers', user.company_id),
+        dbService.list<any>('purchase_invoices', user.company_id),
+        dbService.list<any>('purchase_returns', user.company_id),
+        dbService.list<any>('payment_vouchers', user.company_id),
+        dbService.list<any>('supplier_discounts', user.company_id),
+        dbService.list<any>('journal_entries', user.company_id)
+      ]);
 
-                    const totalInvoices = supInvoices.reduce((sum: number, i: any) => sum + i.total_amount, 0);
-                    const totalReturns = supReturns.reduce((sum: number, r: any) => sum + r.total_amount, 0);
-                    const cashInvoicesAmount = supInvoices.filter((i: any) => i.payment_type === 'cash').reduce((sum: number, i: any) => sum + i.total_amount, 0);
-                    const totalVouchers = supVouchers.reduce((sum: number, v: any) => sum + v.amount, 0) + cashInvoicesAmount;
-                    const totalDiscounts = supDiscounts.reduce((sum: number, d: any) => sum + d.amount, 0);
-                    
-                    return {
-                      ...supplier,
-                      openingBalance,
-                      totalInvoices,
-                      totalReturns,
-                      totalVouchers,
-                      totalDiscounts,
-                      journalDebit,
-                      journalCredit,
-                      manualJournalImpact: journalCredit - journalDebit, // Note: For suppliers, credit increases balance
-                      currentBalance
-                    };
-                  });
-                  setSuppliers(balances);
-                  setLoading(false);
-                });
-                return () => unsubJournal();
-              });
-              return () => unsubDiscounts();
-            });
-            return () => unsubVouchers();
+      const balances = sups.map((supplier: any) => {
+        const supInvoices = invoices.filter((i: any) => i.supplier_id === supplier.id);
+        const supReturns = returns.filter((r: any) => r.supplier_id === supplier.id);
+        const supVouchers = vouchers.filter((v: any) => v.supplier_id === supplier.id);
+        const supDiscounts = discounts.filter((d: any) => d.supplier_id === supplier.id);
+        
+        const openingBalance = supplier.opening_balance || 0;
+        let journalDebit = 0;
+        let journalCredit = 0;
+        let manualJournalDebit = 0;
+        let manualJournalCredit = 0;
+        let currentBalance = 0;
+
+        journalEntries.forEach((je: any) => {
+          je.items?.forEach((item: any) => {
+            if (item.supplier_id === supplier.id) {
+              const debit = item.debit || 0;
+              const credit = item.credit || 0;
+              journalDebit += debit;
+              journalCredit += credit;
+              currentBalance += credit - debit;
+              
+              if (je.reference_type === 'manual' || je.reference_type === 'journal') {
+                manualJournalDebit += debit;
+                manualJournalCredit += credit;
+              }
+            }
           });
-          return () => unsubReturns();
         });
-        return () => unsubInvoices();
+
+        const totalInvoices = supInvoices.reduce((sum: number, i: any) => sum + i.total_amount, 0);
+        const totalReturns = supReturns.reduce((sum: number, r: any) => sum + r.total_amount, 0);
+        const cashInvoicesAmount = supInvoices.filter((i: any) => i.payment_type === 'cash').reduce((sum: number, i: any) => sum + i.total_amount, 0);
+        const totalVouchers = supVouchers.reduce((sum: number, v: any) => sum + v.amount, 0) + cashInvoicesAmount;
+        const totalDiscounts = supDiscounts.reduce((sum: number, d: any) => sum + d.amount, 0);
+        
+        return {
+          ...supplier,
+          openingBalance,
+          totalInvoices,
+          totalReturns,
+          totalVouchers,
+          totalDiscounts,
+          journalDebit,
+          journalCredit,
+          manualJournalImpact: journalCredit - journalDebit,
+          currentBalance
+        };
       });
-      return () => unsubSuppliers();
+      setSuppliers(balances);
+    } catch (err: any) {
+      console.error('Error fetching supplier balances:', err);
+      setError(err.message || 'Failed to load balances');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    fetchData();
   }, [user]);
 
   const exportExcel = () => {
@@ -135,6 +137,29 @@ export const SupplierBalances: React.FC = () => {
   );
 
   const totalOutstanding = filteredSuppliers.reduce((sum, s) => sum + s.currentBalance, 0);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-zinc-500 font-medium italic animate-pulse">جاري تحميل أرصدة الموردين...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4 p-8 bg-rose-50 rounded-3xl border border-rose-100 italic text-center">
+        <p className="text-rose-600 font-bold">{error}</p>
+        <button 
+          onClick={fetchData}
+          className="px-6 py-2 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-all shadow-lg shadow-rose-200"
+        >
+          إعادة المحاولة
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">

@@ -378,13 +378,29 @@ const getList = async (table: string, filters: any) => {
   const values: any[] = [];
   const conditions: string[] = [];
   
-  Object.keys(filters).forEach((key, index) => {
-    conditions.push(`${key} = $${index + 1}`);
-    values.push(filters[key]);
+  let paramIndex = 1;
+  Object.keys(filters).forEach((key) => {
+    const value = filters[key];
+    if (key === 'date_from') {
+      conditions.push(`date >= $${paramIndex++}`);
+      values.push(value);
+    } else if (key === 'date_to') {
+      conditions.push(`date <= $${paramIndex++}`);
+      values.push(value);
+    } else {
+      conditions.push(`${key} = $${paramIndex++}`);
+      values.push(value);
+    }
   });
   
   if (conditions.length > 0) {
     sql += ` WHERE ${conditions.join(' AND ')}`;
+  }
+  
+  // Default sorting for report tables
+  const reportTables = ['journal_entries', 'invoices', 'receipt_vouchers', 'payment_vouchers', 'purchase_invoices', 'purchase_returns', 'returns'];
+  if (reportTables.includes(table)) {
+    sql += ' ORDER BY date DESC, id DESC';
   }
   
   const { rows } = await pool.query(sql, values);

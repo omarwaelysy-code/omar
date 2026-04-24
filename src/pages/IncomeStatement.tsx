@@ -16,27 +16,36 @@ export const IncomeStatement: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountTypes, setAccountTypes] = useState<AccountType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState({
     start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
   });
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
-    const unsubscribeEntries = dbService.subscribe<JournalEntry>('journal_entries', user.company_id, (data) => {
+    setLoading(true);
+    setError(null);
+
+    const subscriptions: (() => void)[] = [];
+    const onError = (err: Error) => {
+      setError(err.message);
+      setLoading(false);
+    };
+
+    subscriptions.push(dbService.subscribe<JournalEntry>('journal_entries', user.company_id, (data) => {
       setEntries(data);
       setLoading(false);
-    });
+    }, onError));
 
-    const unsubscribeAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
-    const unsubscribeTypes = dbService.subscribe<AccountType>('account_types', user.company_id, setAccountTypes);
+    subscriptions.push(dbService.subscribe<Account>('accounts', user.company_id, setAccounts, onError));
+    subscriptions.push(dbService.subscribe<AccountType>('account_types', user.company_id, setAccountTypes, onError));
 
-    return () => {
-      unsubscribeEntries();
-      unsubscribeAccounts();
-      unsubscribeTypes();
-    };
+    return () => subscriptions.forEach(unsub => unsub());
   }, [user]);
 
   const calculateIncomeStatement = () => {
@@ -97,8 +106,23 @@ export const IncomeStatement: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
         <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-zinc-500 font-medium italic animate-pulse">{dir === 'rtl' ? 'جاري تحميل قائمة الدخل...' : 'Loading income statement...'}</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4 p-8 bg-rose-50 rounded-3xl border border-rose-100 italic text-center">
+        <p className="text-rose-600 font-bold">{error}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-6 py-2 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-all shadow-lg shadow-rose-200"
+        >
+          {dir === 'rtl' ? 'إعادة المحاولة' : 'Retry'}
+        </button>
       </div>
     );
   }

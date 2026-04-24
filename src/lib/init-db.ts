@@ -294,6 +294,17 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_activity_logs_company_timestamp ON activity_logs(company_id, timestamp DESC);
       CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON activity_logs(user_id);
       CREATE INDEX IF NOT EXISTS idx_activity_logs_category ON activity_logs USING GIN (category);
+
+      -- Report Optimization Indices
+      CREATE INDEX IF NOT EXISTS idx_journal_entries_company_date ON journal_entries(company_id, date DESC);
+      CREATE INDEX IF NOT EXISTS idx_journal_entry_lines_account_id ON journal_entry_lines(account_id);
+      CREATE INDEX IF NOT EXISTS idx_invoices_company_date ON invoices(company_id, date DESC);
+      CREATE INDEX IF NOT EXISTS idx_returns_company_date ON returns(company_id, date DESC);
+      CREATE INDEX IF NOT EXISTS idx_receipt_vouchers_company_date ON receipt_vouchers(company_id, date DESC);
+      CREATE INDEX IF NOT EXISTS idx_payment_vouchers_company_date ON payment_vouchers(company_id, date DESC);
+      CREATE INDEX IF NOT EXISTS idx_cash_transfers_company_date ON cash_transfers(company_id, date DESC);
+      CREATE INDEX IF NOT EXISTS idx_purchase_invoices_company_date ON purchase_invoices(company_id, date DESC);
+      CREATE INDEX IF NOT EXISTS idx_purchase_returns_company_date ON purchase_returns(company_id, date DESC);
     `);
 
     // 15. Returns

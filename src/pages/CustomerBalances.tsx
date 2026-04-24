@@ -15,79 +15,82 @@ export const CustomerBalances: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const reportRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (user) {
-      const unsubCustomers = dbService.subscribe<Customer>('customers', user.company_id, (custs) => {
-        const unsubInvoices = dbService.subscribe<any>('invoices', user.company_id, (invoices) => {
-          const unsubReturns = dbService.subscribe<any>('returns', user.company_id, (returns) => {
-            const unsubReceipts = dbService.subscribe<any>('receipt_vouchers', user.company_id, (receipts) => {
-              const unsubDiscounts = dbService.subscribe<any>('customer_discounts', user.company_id, (discounts) => {
-                const unsubJournal = dbService.subscribe<any>('journal_entries', user.company_id, (journalEntries) => {
-                  const balances = custs.map((customer: any) => {
-                    const custInvoices = invoices.filter((i: any) => i.customer_id === customer.id);
-                    const custReturns = returns.filter((r: any) => r.customer_id === customer.id);
-                    const custReceipts = receipts.filter((r: any) => r.customer_id === customer.id);
-                    const custDiscounts = discounts.filter((d: any) => d.customer_id === customer.id);
-                    
-                    const openingBalance = customer.opening_balance || 0;
-                    let journalDebit = 0;
-                    let journalCredit = 0;
-                    let manualJournalDebit = 0;
-                    let manualJournalCredit = 0;
-                    let currentBalance = 0;
+  const [error, setError] = useState<string | null>(null);
 
-                    journalEntries.forEach((je: any) => {
-                      je.items?.forEach((item: any) => {
-                        // Only count lines that affect the customer's specific account
-                        if (item.customer_id === customer.id) {
-                          const debit = item.debit || 0;
-                          const credit = item.credit || 0;
-                          journalDebit += debit;
-                          journalCredit += credit;
-                          currentBalance += debit - credit;
-                          
-                          if (je.reference_type === 'manual' || je.reference_type === 'journal') {
-                            manualJournalDebit += debit;
-                            manualJournalCredit += credit;
-                          }
-                        }
-                      });
-                    });
+  const fetchData = async () => {
+    if (!user) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const [custs, invoices, returns, receipts, discounts, journalEntries] = await Promise.all([
+        dbService.list<Customer>('customers', user.company_id),
+        dbService.list<any>('invoices', user.company_id),
+        dbService.list<any>('returns', user.company_id),
+        dbService.list<any>('receipt_vouchers', user.company_id),
+        dbService.list<any>('customer_discounts', user.company_id),
+        dbService.list<any>('journal_entries', user.company_id)
+      ]);
 
-                    const totalInvoices = custInvoices.reduce((sum: number, i: any) => sum + i.total_amount, 0);
-                    const totalReturns = custReturns.reduce((sum: number, r: any) => sum + r.total_amount, 0);
-                    const cashInvoicesAmount = custInvoices.filter((i: any) => i.payment_type === 'cash').reduce((sum: number, i: any) => sum + i.total_amount, 0);
-                    const totalReceipts = custReceipts.reduce((sum: number, r: any) => sum + r.amount, 0) + cashInvoicesAmount;
-                    const totalDiscounts = custDiscounts.reduce((sum: number, d: any) => sum + d.amount, 0);
-                    
-                    return {
-                      ...customer,
-                      openingBalance,
-                      totalInvoices,
-                      totalReturns,
-                      totalReceipts,
-                      totalDiscounts,
-                      journalDebit,
-                      journalCredit,
-                      manualJournalImpact: manualJournalDebit - manualJournalCredit,
-                      currentBalance
-                    };
-                  });
-                  setCustomers(balances);
-                  setLoading(false);
-                });
-                return () => unsubJournal();
-              });
-              return () => unsubDiscounts();
-            });
-            return () => unsubReceipts();
+      const balances = custs.map((customer: any) => {
+        const custInvoices = invoices.filter((i: any) => i.customer_id === customer.id);
+        const custReturns = returns.filter((r: any) => r.customer_id === customer.id);
+        const custReceipts = receipts.filter((r: any) => r.customer_id === customer.id);
+        const custDiscounts = discounts.filter((d: any) => d.customer_id === customer.id);
+        
+        const openingBalance = customer.opening_balance || 0;
+        let journalDebit = 0;
+        let journalCredit = 0;
+        let manualJournalDebit = 0;
+        let manualJournalCredit = 0;
+        let currentBalance = 0;
+
+        journalEntries.forEach((je: any) => {
+          je.items?.forEach((item: any) => {
+            if (item.customer_id === customer.id) {
+              const debit = item.debit || 0;
+              const credit = item.credit || 0;
+              journalDebit += debit;
+              journalCredit += credit;
+              currentBalance += debit - credit;
+              
+              if (je.reference_type === 'manual' || je.reference_type === 'journal') {
+                manualJournalDebit += debit;
+                manualJournalCredit += credit;
+              }
+            }
           });
-          return () => unsubReturns();
         });
-        return () => unsubInvoices();
+
+        const totalInvoices = custInvoices.reduce((sum: number, i: any) => sum + i.total_amount, 0);
+        const totalReturns = custReturns.reduce((sum: number, r: any) => sum + r.total_amount, 0);
+        const cashInvoicesAmount = custInvoices.filter((i: any) => i.payment_type === 'cash').reduce((sum: number, i: any) => sum + i.total_amount, 0);
+        const totalReceipts = custReceipts.reduce((sum: number, r: any) => sum + r.amount, 0) + cashInvoicesAmount;
+        const totalDiscounts = custDiscounts.reduce((sum: number, d: any) => sum + d.amount, 0);
+        
+        return {
+          ...customer,
+          openingBalance,
+          totalInvoices,
+          totalReturns,
+          totalReceipts,
+          totalDiscounts,
+          journalDebit,
+          journalCredit,
+          manualJournalImpact: manualJournalDebit - manualJournalCredit,
+          currentBalance
+        };
       });
-      return () => unsubCustomers();
+      setCustomers(balances);
+    } catch (err: any) {
+      console.error('Error fetching customer balances:', err);
+      setError(err.message || 'Failed to load balances');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    fetchData();
   }, [user]);
 
   const exportExcel = () => {
@@ -134,6 +137,29 @@ export const CustomerBalances: React.FC = () => {
   );
 
   const totalOutstanding = filteredCustomers.reduce((sum, c) => sum + c.currentBalance, 0);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-zinc-500 font-medium italic animate-pulse">جاري تحميل أرصدة العملاء...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4 p-8 bg-rose-50 rounded-3xl border border-rose-100 italic text-center">
+        <p className="text-rose-600 font-bold">{error}</p>
+        <button 
+          onClick={fetchData}
+          className="px-6 py-2 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-all shadow-lg shadow-rose-200"
+        >
+          إعادة المحاولة
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">

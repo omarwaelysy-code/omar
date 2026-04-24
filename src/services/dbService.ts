@@ -10,23 +10,37 @@ export enum OperationType {
 
 const API_BASE = '/api/erp';
 
-async function apiRequest<T>(path: string, method: string = 'GET', body?: any): Promise<T> {
+async function apiRequest<T>(path: string, method: string = 'GET', body?: any, timeoutMs: number = 30000): Promise<T> {
   const token = localStorage.getItem('auth_token');
-  const response = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': token ? `Bearer ${token}` : '',
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'API Request failed');
+  try {
+    const response = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : '',
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown API error' }));
+      throw new Error(error.error || `API Request failed with status ${response.status}`);
+    }
+
+    return response.json();
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('API Request timed out after ' + (timeoutMs / 1000) + ' seconds');
+    }
+    throw error;
   }
-
-  return response.json();
 }
 
 export const dbService = {
@@ -46,7 +60,7 @@ export const dbService = {
     return apiRequest<T[]>(`/${collectionName}?company_id=${companyId}`);
   },
 
-  subscribe<T>(collectionName: string, companyId: string, callback: (data: T[]) => void) {
+  subscribe<T>(collectionName: string, companyId: string, callback: (data: T[]) => void, onError?: (error: Error) => void) {
     let lastData = '';
     const fetchData = async () => {
       try {
@@ -56,8 +70,9 @@ export const dbService = {
           lastData = dataString;
           callback(data);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Polling error:', err);
+        if (onError) onError(err);
       }
     };
 
