@@ -16,7 +16,7 @@ import { ActivityLog } from '../types';
 
 export const Returns: React.FC = () => {
   const { user } = useAuth();
-  const { t, dir } = useLanguage();
+  const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
   const [returns, setReturns] = useState<Return[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -295,6 +295,8 @@ export const Returns: React.FC = () => {
     setItems(prev => [...prev, {
       product_id: product.id,
       product_name: product.name,
+      product_code: product.code,
+      product_image_url: product.image_url,
       quantity: 1,
       price: product.sale_price,
       total: product.sale_price

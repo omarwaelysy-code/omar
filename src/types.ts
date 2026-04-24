@@ -190,6 +190,7 @@ export interface ReceiptVoucher {
   id: string;
   customer_id: string;
   customer_name?: string;
+  voucher_number?: string;
   date: string;
   amount: number;
   description: string;
@@ -202,7 +203,7 @@ export interface PaymentVoucher {
   supplier_id?: string;
   supplier_name?: string;
   expense_category_id?: string;
-  expense_category_name?: string;
+  category_name?: string;
   date: string;
   amount: number;
   description: string;
@@ -332,6 +333,16 @@ export interface Account {
   company_id: string;
   opening_balance: number;
   opening_balance_date?: string;
+}
+
+export interface Setting {
+  id: string;
+  company_id: string;
+  type: string;
+  key: string;
+  value: string;
+  updated_at?: string;
+  created_at?: string;
 }
 
 export interface JournalEntry {

@@ -381,7 +381,7 @@ export const PaymentVouchers: React.FC = () => {
 
       const data = {
         ...voucherData,
-        voucher_number,
+        voucher_number: editingVoucher?.voucher_number || voucher_number,
         supplier_name: supplier?.name || '',
         category_name: category?.name || '',
         payment_method_name: paymentMethod?.name || '',
@@ -389,6 +389,7 @@ export const PaymentVouchers: React.FC = () => {
         company_id: user.company_id
       };
 
+      let id = '';
       if (editingVoucher) {
         const fieldsToTrack = [
           { field: 'type', label: 'النوع' },
@@ -408,11 +409,16 @@ export const PaymentVouchers: React.FC = () => {
           'payment_vouchers',
           fieldsToTrack
         );
+        id = editingVoucher.id;
+        // Delete old journal entry
+        await dbService.deleteJournalEntryByReference(id, user.company_id);
       } else {
-        const id = await dbService.add('payment_vouchers', data);
-        
-        // Create Journal Entry
-        const journalItems: JournalEntryItem[] = [];
+        id = await dbService.add('payment_vouchers', data);
+      }
+      
+      // Create Journal Entry
+      const journalItems: JournalEntryItem[] = [];
+      const currentVoucherNumber = data.voucher_number;
 
         // Debit: Supplier or Expense Account
         let debitAccountId = '';
@@ -486,7 +492,6 @@ export const PaymentVouchers: React.FC = () => {
         }
 
         await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة سند صرف', `إضافة سند صرف جديد رقم: ${voucher_number}`, 'payment_vouchers', id);
-      }
 
       showNotification(editingVoucher ? 'تم تعديل سند الصرف بنجاح' : 'تم حفظ سند الصرف بنجاح');
       setVoucherData({

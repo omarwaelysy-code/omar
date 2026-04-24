@@ -214,6 +214,8 @@ export const PurchaseReturns: React.FC = () => {
         const product = products.find(p => p.id === value);
         if (product) {
           newItems[index].cost_price = product.cost_price;
+          (newItems[index] as any).product_name = product.name;
+          (newItems[index] as any).product_code = product.code;
           (newItems[index] as any).product_image_url = product.image_url;
         }
       }

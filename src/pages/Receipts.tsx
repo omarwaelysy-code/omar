@@ -315,9 +315,13 @@ export const Receipts: React.FC = () => {
     try {
       const customer = customers.find(c => c.id === formData.customer_id);
       const paymentMethod = paymentMethods.find(pm => pm.id === formData.payment_method_id);
+      const voucher_number = editingReceipt 
+        ? editingReceipt.voucher_number 
+        : `RCPT-${Date.now().toString().slice(-6)}`;
       
       const receiptData = {
         ...formData,
+        voucher_number,
         customer_name: customer?.name || '',
         payment_method_name: paymentMethod?.name || '',
         company_id: user.company_id
@@ -345,7 +349,7 @@ export const Receipts: React.FC = () => {
         
         // Create Journal Entry
         const journalItems: JournalEntryItem[] = [];
-        const receipt_number = `RCPT-${Date.now().toString().slice(-6)}`;
+        const receipt_number = voucher_number;
 
         // Debit: Payment Method Account (Cash/Bank)
         let debitAccountId = paymentMethod?.account_id || '';

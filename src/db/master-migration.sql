@@ -71,18 +71,50 @@ ALTER TABLE invoices ADD COLUMN IF NOT EXISTS total_amount DECIMAL(18, 4) DEFAUL
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_method_id VARCHAR(36);
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS notes TEXT;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS created_by VARCHAR(36);
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255);
 
 -- 8. Purchase Invoices Table
 ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS due_date DATE;
 ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS subtotal DECIMAL(18, 4) DEFAULT 0;
 ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS tax_amount DECIMAL(18, 4) DEFAULT 0;
 ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(18, 4) DEFAULT 0;
+ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS total_amount DECIMAL(18, 4) DEFAULT 0;
 ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'draft';
 ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS payment_type VARCHAR(20) DEFAULT 'cash';
 ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS payment_method_id VARCHAR(36);
 ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS supplier_name VARCHAR(255);
 
--- 9. Denormalized Fields for Items (Audit/UI)
+-- 15. Purchase Invoice/Return Items Tables
+CREATE TABLE IF NOT EXISTS purchase_invoice_items (
+  id VARCHAR(36) PRIMARY KEY,
+  invoice_id VARCHAR(36) REFERENCES purchase_invoices(id) ON DELETE CASCADE,
+  product_id VARCHAR(36) REFERENCES products(id),
+  expense_category_id VARCHAR(36),
+  description TEXT,
+  quantity DECIMAL(18, 4) NOT NULL,
+  unit_price DECIMAL(18, 4) NOT NULL,
+  total DECIMAL(18, 4) NOT NULL,
+  product_name VARCHAR(255),
+  category_name VARCHAR(100),
+  product_code VARCHAR(100),
+  product_image_url TEXT
+);
+
+CREATE TABLE IF NOT EXISTS purchase_return_items (
+  id VARCHAR(36) PRIMARY KEY,
+  return_id VARCHAR(36) REFERENCES purchase_returns(id) ON DELETE CASCADE,
+  product_id VARCHAR(36) REFERENCES products(id),
+  description TEXT,
+  quantity DECIMAL(18, 4) NOT NULL,
+  unit_price DECIMAL(18, 4) NOT NULL,
+  total DECIMAL(18, 4) NOT NULL,
+  product_name VARCHAR(255),
+  product_code VARCHAR(100),
+  product_image_url TEXT
+);
+
+-- 16. Denormalized Fields for Items (Audit/UI)
 ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS product_name VARCHAR(255);
 ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS product_code VARCHAR(100);
 ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS product_image_url TEXT;
@@ -93,7 +125,9 @@ ALTER TABLE return_items ADD COLUMN IF NOT EXISTS product_image_url TEXT;
 
 -- 10. Receipt & Payment Vouchers
 ALTER TABLE receipt_vouchers ADD COLUMN IF NOT EXISTS payment_method_id VARCHAR(36);
+ALTER TABLE receipt_vouchers ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255);
 ALTER TABLE payment_vouchers ADD COLUMN IF NOT EXISTS payment_method_id VARCHAR(36);
+ALTER TABLE payment_vouchers ADD COLUMN IF NOT EXISTS supplier_name VARCHAR(255);
 
 -- 11. Activity Logs
 ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS company_id VARCHAR(36);
@@ -110,14 +144,70 @@ ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS reference_id VARCHAR(36);
 ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS reference_type VARCHAR(50);
 ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS reference_number VARCHAR(50);
 ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'posted';
+ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS total_debit DECIMAL(18, 4) DEFAULT 0;
+ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS total_credit DECIMAL(18, 4) DEFAULT 0;
 
--- 13. Payment Methods
+-- 13. Returns & Discounts
+ALTER TABLE returns ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255);
+ALTER TABLE returns ADD COLUMN IF NOT EXISTS total_amount DECIMAL(18, 4) DEFAULT 0;
+ALTER TABLE returns ADD COLUMN IF NOT EXISTS payment_type VARCHAR(20) DEFAULT 'cash';
+ALTER TABLE returns ADD COLUMN IF NOT EXISTS payment_method_id VARCHAR(36);
+ALTER TABLE returns ADD COLUMN IF NOT EXISTS payment_method_name VARCHAR(255);
+
+ALTER TABLE purchase_returns ADD COLUMN IF NOT EXISTS supplier_name VARCHAR(255);
+ALTER TABLE purchase_returns ADD COLUMN IF NOT EXISTS total_amount DECIMAL(18, 4) DEFAULT 0;
+ALTER TABLE purchase_returns ADD COLUMN IF NOT EXISTS payment_type VARCHAR(20) DEFAULT 'cash';
+ALTER TABLE purchase_returns ADD COLUMN IF NOT EXISTS payment_method_id VARCHAR(36);
+ALTER TABLE purchase_returns ADD COLUMN IF NOT EXISTS payment_method_name VARCHAR(255);
+
+ALTER TABLE customer_discounts ADD COLUMN IF NOT EXISTS company_id VARCHAR(36);
+ALTER TABLE customer_discounts ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255);
+ALTER TABLE supplier_discounts ADD COLUMN IF NOT EXISTS company_id VARCHAR(36);
+ALTER TABLE supplier_discounts ADD COLUMN IF NOT EXISTS supplier_name VARCHAR(255);
+
+-- 14. Payment Methods
 ALTER TABLE payment_methods ADD COLUMN IF NOT EXISTS account_id VARCHAR(36);
 ALTER TABLE payment_methods ADD COLUMN IF NOT EXISTS code VARCHAR(50);
 ALTER TABLE payment_methods ADD COLUMN IF NOT EXISTS type VARCHAR(20) DEFAULT 'cash';
 ALTER TABLE payment_methods ADD COLUMN IF NOT EXISTS opening_balance DECIMAL(18, 4) DEFAULT 0;
 ALTER TABLE payment_methods ADD COLUMN IF NOT EXISTS opening_balance_date DATE;
 ALTER TABLE payment_methods ADD COLUMN IF NOT EXISTS counter_account_id VARCHAR(36);
+
+-- 15. More Denormalization
+ALTER TABLE payment_methods ADD COLUMN IF NOT EXISTS account_name VARCHAR(255);
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS account_name VARCHAR(255);
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS account_name VARCHAR(255);
+
+-- 17. Additional Denormalization & Settings
+ALTER TABLE receipt_vouchers ADD COLUMN IF NOT EXISTS voucher_number VARCHAR(50);
+ALTER TABLE receipt_vouchers ADD COLUMN IF NOT EXISTS payment_method_name VARCHAR(255);
+
+ALTER TABLE payment_vouchers ADD COLUMN IF NOT EXISTS voucher_number VARCHAR(50);
+ALTER TABLE payment_vouchers ADD COLUMN IF NOT EXISTS category_name VARCHAR(255);
+ALTER TABLE payment_vouchers ADD COLUMN IF NOT EXISTS payment_method_name VARCHAR(255);
+
+ALTER TABLE cash_transfers ADD COLUMN IF NOT EXISTS from_payment_method_name VARCHAR(255);
+ALTER TABLE cash_transfers ADD COLUMN IF NOT EXISTS to_payment_method_name VARCHAR(255);
+
+ALTER TABLE expense_categories ADD COLUMN IF NOT EXISTS account_name VARCHAR(255);
+
+ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS account_name VARCHAR(255);
+ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS customer_id VARCHAR(36);
+ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS supplier_id VARCHAR(36);
+ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255);
+ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS supplier_name VARCHAR(255);
+
+CREATE TABLE IF NOT EXISTS settings (
+  id VARCHAR(36) PRIMARY KEY,
+  company_id VARCHAR(36),
+  type VARCHAR(50),
+  key VARCHAR(100),
+  value TEXT,
+  customer_discount_account_id VARCHAR(36),
+  supplier_discount_account_id VARCHAR(36),
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
 -- Indices 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -136,6 +226,10 @@ CREATE INDEX IF NOT EXISTS idx_payment_vouchers_company_date ON payment_vouchers
 CREATE INDEX IF NOT EXISTS idx_cash_transfers_company_date ON cash_transfers(company_id, date DESC);
 CREATE INDEX IF NOT EXISTS idx_purchase_invoices_company_date ON purchase_invoices(company_id, date DESC);
 CREATE INDEX IF NOT EXISTS idx_purchase_returns_company_date ON purchase_returns(company_id, date DESC);
+
+-- 18. Additional Consistency Fixes
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_method_name VARCHAR(255);
+ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS payment_method_name VARCHAR(255);
 
 -- 14. Custom System Check Table (for tracking)
 CREATE TABLE IF NOT EXISTS _system_settings (

@@ -295,6 +295,7 @@ export const Invoices: React.FC = () => {
     setItems(prev => [...prev, {
       product_id: product.id,
       product_name: product.name,
+      product_code: product.code,
       product_image_url: product.image_url,
       quantity: 1,
       price: product.sale_price,
@@ -368,6 +369,7 @@ export const Invoices: React.FC = () => {
       const subtotal = validItems.reduce((sum, item) => sum + item.total, 0);
       const total_amount = subtotal - discount;
       const customer = customers.find(c => c.id === selectedCustomerId);
+      const paymentMethod = paymentMethods.find(pm => pm.id === paymentMethodId);
       
       const invoiceData = { 
         customer_id: selectedCustomerId, 
@@ -379,6 +381,7 @@ export const Invoices: React.FC = () => {
         total_amount,
         payment_type: paymentType,
         payment_method_id: paymentType === 'cash' ? paymentMethodId : null,
+        payment_method_name: paymentType === 'cash' ? (paymentMethod?.name || '') : null,
         company_id: user.company_id
       };
 
@@ -687,9 +690,49 @@ export const Invoices: React.FC = () => {
   const handleProductFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.type === 'application/pdf') {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setProductFormData({ ...productFormData, image_url: reader.result as string });
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        showNotification('الصورة كبيرة جداً، سيتم ضغطها تلقائياً', 'info');
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
-        setProductFormData({ ...productFormData, image_url: reader.result as string });
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const MAX_WIDTH = 1200;
+          const MAX_HEIGHT = 1200;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          setProductFormData({ ...productFormData, image_url: resizedDataUrl });
+        };
+        img.src = reader.result as string;
       };
       reader.readAsDataURL(file);
     }

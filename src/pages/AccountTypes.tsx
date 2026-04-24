@@ -5,7 +5,7 @@ import { AccountType } from '../types';
 import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, PieChart } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
-import { parseAccountType } from '../services/geminiService';
+import { parseAccountType, parseAccountTypesBulk } from '../services/geminiService';
 
 export const AccountTypes: React.FC = () => {
   const { user } = useAuth();
@@ -41,14 +41,33 @@ export const AccountTypes: React.FC = () => {
     if (!aiText.trim()) return;
     setIsAiParsing(true);
     try {
-      const result = await parseAccountType(aiText);
-      if (result) {
-        setFormData({
-          code: result.code || '',
-          name: result.name || '',
-          statement_type: result.statementType || 'balance_sheet',
-          classification: result.classification || (result.statementType === 'income_statement' ? 'revenue' : 'asset')
-        });
+      const result = await parseAccountTypesBulk(aiText);
+      if (result && result.types && result.types.length > 0) {
+        if (result.types.length === 1) {
+          // Single item: fill form
+          const item = result.types[0];
+          setFormData({
+            code: item.code || '',
+            name: item.name || '',
+            statement_type: item.statementType || 'balance_sheet',
+            classification: item.classification || (item.statementType === 'income_statement' ? 'revenue' : 'asset')
+          });
+        } else {
+          // Multiple items: show notification and maybe handle later, but for now we can add them directly
+          if (window.confirm(`تم العثور على ${result.types.length} أنواع حسابات. هل تريد إضافتها جميعاً؟`)) {
+            for (const item of result.types) {
+              await dbService.add('account_types', {
+                code: item.code || '',
+                name: item.name || '',
+                statement_type: item.statementType || 'balance_sheet',
+                classification: item.classification || (item.statementType === 'income_statement' ? 'revenue' : 'asset'),
+                company_id: user?.company_id
+              });
+            }
+            showNotification(`تم إضافة ${result.types.length} أنواع حسابات بنجاح`, 'success');
+            closeModal();
+          }
+        }
         showNotification('تم تحليل البيانات بنجاح', 'success');
         setAiText('');
       }

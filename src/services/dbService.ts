@@ -56,15 +56,25 @@ export const dbService = {
     return apiRequest<T[]>(`/${collectionName}`);
   },
 
-  async list<T>(collectionName: string, companyId: string): Promise<T[]> {
-    return apiRequest<T[]>(`/${collectionName}?company_id=${companyId}`);
+  async list<T>(collectionName: string, options: string | { company_id: string; [key: string]: any }): Promise<T[]> {
+    const params = new URLSearchParams();
+    if (typeof options === 'string') {
+      params.append('company_id', options);
+    } else {
+      Object.entries(options).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          params.append(key, value.toString());
+        }
+      });
+    }
+    return apiRequest<T[]>(`/${collectionName}?${params.toString()}`);
   },
 
-  subscribe<T>(collectionName: string, companyId: string, callback: (data: T[]) => void, onError?: (error: Error) => void) {
+  subscribe<T>(collectionName: string, options: string | { company_id: string; [key: string]: any }, callback: (data: T[]) => void, onError?: (error: Error) => void) {
     let lastData = '';
     const fetchData = async () => {
       try {
-        const data = await dbService.list<T>(collectionName, companyId);
+        const data = await dbService.list<T>(collectionName, options);
         const dataString = JSON.stringify(data);
         if (dataString !== lastData) {
           lastData = dataString;

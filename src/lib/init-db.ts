@@ -139,6 +139,7 @@ export async function initDatabase() {
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
         account_id VARCHAR(36) REFERENCES accounts(id),
+        account_name VARCHAR(255),
         code VARCHAR(50),
         name VARCHAR(255) NOT NULL,
         email VARCHAR(100),
@@ -157,6 +158,7 @@ export async function initDatabase() {
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
         account_id VARCHAR(36) REFERENCES accounts(id),
+        account_name VARCHAR(255),
         name VARCHAR(255) NOT NULL,
         code VARCHAR(50),
         email VARCHAR(100),
@@ -202,6 +204,7 @@ export async function initDatabase() {
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
         customer_id VARCHAR(36) REFERENCES customers(id),
+        customer_name VARCHAR(255),
         invoice_number VARCHAR(50) NOT NULL,
         date DATE NOT NULL,
         due_date DATE,
@@ -212,6 +215,7 @@ export async function initDatabase() {
         status VARCHAR(20) DEFAULT 'draft',
         payment_type VARCHAR(20) DEFAULT 'cash',
         payment_method_id VARCHAR(36),
+        payment_method_name VARCHAR(255),
         notes TEXT,
         created_by VARCHAR(36) REFERENCES users(id)
       );
@@ -255,9 +259,14 @@ export async function initDatabase() {
         id VARCHAR(36) PRIMARY KEY,
         journal_entry_id VARCHAR(36) REFERENCES journal_entries(id) ON DELETE CASCADE,
         account_id VARCHAR(36) REFERENCES accounts(id),
+        account_name VARCHAR(255),
         description TEXT,
         debit DECIMAL(18, 4) DEFAULT 0,
-        credit DECIMAL(18, 4) DEFAULT 0
+        credit DECIMAL(18, 4) DEFAULT 0,
+        customer_id VARCHAR(36),
+        supplier_id VARCHAR(36),
+        customer_name VARCHAR(255),
+        supplier_name VARCHAR(255)
       );
     `);
 
@@ -267,6 +276,7 @@ export async function initDatabase() {
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
         account_id VARCHAR(36) REFERENCES accounts(id),
+        account_name VARCHAR(255),
         code VARCHAR(50),
         name VARCHAR(100) NOT NULL,
         type VARCHAR(20) DEFAULT 'cash',
@@ -313,11 +323,13 @@ export async function initDatabase() {
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
         customer_id VARCHAR(36) REFERENCES customers(id),
+        customer_name VARCHAR(255),
         return_number VARCHAR(50) NOT NULL,
         date DATE NOT NULL,
         total_amount DECIMAL(18, 4) NOT NULL,
         payment_type VARCHAR(20) DEFAULT 'cash',
         payment_method_id VARCHAR(36) REFERENCES payment_methods(id),
+        payment_method_name VARCHAR(255),
         notes TEXT
       );
     `);
@@ -344,6 +356,7 @@ export async function initDatabase() {
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
         supplier_id VARCHAR(36) REFERENCES suppliers(id),
+        supplier_name VARCHAR(255),
         invoice_number VARCHAR(50) NOT NULL,
         date DATE NOT NULL,
         due_date DATE,
@@ -354,7 +367,26 @@ export async function initDatabase() {
         status VARCHAR(20) DEFAULT 'draft',
         payment_type VARCHAR(20) DEFAULT 'cash',
         payment_method_id VARCHAR(36) REFERENCES payment_methods(id),
+        payment_method_name VARCHAR(255),
         notes TEXT
+      );
+    `);
+
+    // 17b. Purchase Invoice Items
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS purchase_invoice_items (
+        id VARCHAR(36) PRIMARY KEY,
+        invoice_id VARCHAR(36) REFERENCES purchase_invoices(id) ON DELETE CASCADE,
+        product_id VARCHAR(36) REFERENCES products(id),
+        expense_category_id VARCHAR(36) REFERENCES expense_categories(id),
+        description TEXT,
+        quantity DECIMAL(18, 4) NOT NULL,
+        unit_price DECIMAL(18, 4) NOT NULL,
+        total DECIMAL(18, 4) NOT NULL,
+        product_name VARCHAR(255),
+        category_name VARCHAR(100),
+        product_code VARCHAR(100),
+        product_image_url TEXT
       );
     `);
 
@@ -364,12 +396,30 @@ export async function initDatabase() {
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
         supplier_id VARCHAR(36) REFERENCES suppliers(id),
+        supplier_name VARCHAR(255),
         return_number VARCHAR(50) NOT NULL,
         date DATE NOT NULL,
         total_amount DECIMAL(18, 4) NOT NULL,
         payment_type VARCHAR(20) DEFAULT 'cash',
         payment_method_id VARCHAR(36) REFERENCES payment_methods(id),
+        payment_method_name VARCHAR(255),
         notes TEXT
+      );
+    `);
+
+    // 18b. Purchase Return Items
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS purchase_return_items (
+        id VARCHAR(36) PRIMARY KEY,
+        return_id VARCHAR(36) REFERENCES purchase_returns(id) ON DELETE CASCADE,
+        product_id VARCHAR(36) REFERENCES products(id),
+        description TEXT,
+        quantity DECIMAL(18, 4) NOT NULL,
+        unit_price DECIMAL(18, 4) NOT NULL,
+        total DECIMAL(18, 4) NOT NULL,
+        product_name VARCHAR(255),
+        product_code VARCHAR(100),
+        product_image_url TEXT
       );
     `);
 
@@ -379,6 +429,7 @@ export async function initDatabase() {
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
         customer_id VARCHAR(36) REFERENCES customers(id),
+        customer_name VARCHAR(255),
         date DATE NOT NULL,
         amount DECIMAL(18, 4) NOT NULL,
         description TEXT
@@ -391,6 +442,7 @@ export async function initDatabase() {
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
         supplier_id VARCHAR(36) REFERENCES suppliers(id),
+        supplier_name VARCHAR(255),
         date DATE NOT NULL,
         amount DECIMAL(18, 4) NOT NULL,
         description TEXT
@@ -403,10 +455,13 @@ export async function initDatabase() {
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
         customer_id VARCHAR(36) REFERENCES customers(id),
+        customer_name VARCHAR(255),
+        voucher_number VARCHAR(50),
         date DATE NOT NULL,
         amount DECIMAL(18, 4) NOT NULL,
         description TEXT,
-        payment_method_id VARCHAR(36) REFERENCES payment_methods(id)
+        payment_method_id VARCHAR(36) REFERENCES payment_methods(id),
+        payment_method_name VARCHAR(255)
       );
     `);
 
@@ -416,11 +471,14 @@ export async function initDatabase() {
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
         supplier_id VARCHAR(36),
+        supplier_name VARCHAR(255),
         expense_category_id VARCHAR(36),
+        category_name VARCHAR(255),
         date DATE NOT NULL,
         amount DECIMAL(18, 4) NOT NULL,
         description TEXT,
-        payment_method_id VARCHAR(36) REFERENCES payment_methods(id)
+        payment_method_id VARCHAR(36) REFERENCES payment_methods(id),
+        payment_method_name VARCHAR(255)
       );
     `);
 
@@ -433,6 +491,8 @@ export async function initDatabase() {
         amount DECIMAL(18, 4) NOT NULL,
         from_payment_method_id VARCHAR(36) REFERENCES payment_methods(id),
         to_payment_method_id VARCHAR(36) REFERENCES payment_methods(id),
+        from_payment_method_name VARCHAR(255),
+        to_payment_method_name VARCHAR(255),
         description TEXT,
         created_by VARCHAR(36) REFERENCES users(id),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -447,7 +507,23 @@ export async function initDatabase() {
         code VARCHAR(20) NOT NULL,
         name VARCHAR(100) NOT NULL,
         description TEXT,
-        account_id VARCHAR(36) REFERENCES accounts(id)
+        account_id VARCHAR(36) REFERENCES accounts(id),
+        account_name VARCHAR(255)
+      );
+    `);
+
+    // 25. Settings
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS settings (
+        id VARCHAR(36) PRIMARY KEY,
+        company_id VARCHAR(36) REFERENCES companies(id),
+        type VARCHAR(50),
+        key VARCHAR(100),
+        value TEXT,
+        customer_discount_account_id VARCHAR(36),
+        supplier_discount_account_id VARCHAR(36),
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 

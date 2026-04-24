@@ -323,6 +323,52 @@ export const parseAccountType = async (text: string) => {
   }
 };
 
+export const parseAccountTypesBulk = async (text: string) => {
+  if (!text || text.trim() === "") {
+    throw new Error("النص المدخل فارغ.");
+  }
+
+  try {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: "gemini-1.5-flash",
+      contents: {
+        parts: [{
+          text: `Parse the following text into a list of account types. 
+      Text: "${text}"
+      Return JSON with an array named 'types'. Each element must have: code, name, statementType ('income_statement' or 'balance_sheet'), classification ('asset', 'liability_equity', 'revenue', 'cost', 'expense').`
+        }]
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            types: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  code: { type: Type.STRING },
+                  name: { type: Type.STRING },
+                  statementType: { type: Type.STRING },
+                  classification: { type: Type.STRING }
+                },
+                required: ["code", "name", "statementType", "classification"]
+              }
+            }
+          },
+          required: ["types"]
+        }
+      }
+    });
+    return JSON.parse(response.text || '{"types": []}');
+  } catch (error) {
+    console.error("AI Error (parseAccountTypesBulk):", error);
+    throw new Error(`خطأ في تحليل البيانات الجماعية: ${error instanceof Error ? error.message : 'خطأ غير معروف'}`);
+  }
+};
+
 export const parseAccount = async (text: string) => {
   if (!text || text.trim() === "") {
     throw new Error("النص المدخل فارغ.");

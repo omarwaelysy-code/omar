@@ -37,8 +37,11 @@ async function logActivity(
   }
 }
 
-// Configure multer for memory storage
-const upload = multer({ storage: multer.memoryStorage() });
+// Configure multer for memory storage with 50MB limit
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB
+});
 
 // List of all tables available for backup/restore
 const TABLES_TO_BACKUP = [
@@ -512,6 +515,8 @@ const modules = [
   'customer_discounts', 'supplier_discounts', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers'
 ];
 
+const transactionalModules = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns', 'journal_entries'];
+
 modules.forEach(moduleName => {
   // List with filters
   router.get(`/${moduleName}`, authenticateToken, async (req, res) => {
@@ -529,6 +534,14 @@ modules.forEach(moduleName => {
         rows = queryResult.rows;
       } else {
         rows = await getList(moduleName, req.query);
+
+        // Fetch sub-items for relevant modules
+        if (transactionalModules.includes(moduleName)) {
+          for (let row of rows) {
+            const items = await fetchItems(moduleName, row.id);
+            row.items = items;
+          }
+        }
       }
       res.json(rows);
     } catch (error: any) {
@@ -540,52 +553,87 @@ modules.forEach(moduleName => {
   router.get(`/${moduleName}/:id`, authenticateToken, async (req, res) => {
     try {
       const { rows }: any = await pool.query(`SELECT * FROM ${moduleName} WHERE id = $1`, [req.params.id]);
-      res.json(rows[0] || null);
+      const row = rows[0] || null;
+      if (row && transactionalModules.includes(moduleName)) {
+        row.items = await fetchItems(moduleName, row.id);
+      }
+      res.json(row);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
+
+  // Helper to fetch items
+  async function fetchItems(module: string, id: string) {
+    let itemsTable = '';
+    let foreignKey = '';
+    
+    if (module === 'journal_entries') {
+      itemsTable = 'journal_entry_lines';
+      foreignKey = 'journal_entry_id';
+    } else if (module === 'invoices') {
+      itemsTable = 'invoice_items';
+      foreignKey = 'invoice_id';
+    } else if (module === 'returns') {
+      itemsTable = 'return_items';
+      foreignKey = 'return_id';
+    } else if (module === 'purchase_invoices') {
+      itemsTable = 'purchase_invoice_items';
+      foreignKey = 'invoice_id';
+    } else if (module === 'purchase_returns') {
+      itemsTable = 'purchase_return_items';
+      foreignKey = 'return_id';
+    }
+
+    if (itemsTable) {
+      const { rows } = await pool.query(`SELECT * FROM ${itemsTable} WHERE ${foreignKey} = $1`, [id]);
+      return rows;
+    }
+    return [];
+  }
 
   // Create
-  router.post(`/${moduleName}`, authenticateToken, async (req, res) => {
-    try {
-      const data = { ...req.body };
-      // Most tables use UUIDs, but activity_logs uses BIGSERIAL
-      if (!data.id && moduleName !== 'activity_logs') {
-        data.id = uuidv4();
+  if (!transactionalModules.includes(moduleName)) {
+    router.post(`/${moduleName}`, authenticateToken, async (req, res) => {
+      try {
+        const data = { ...req.body };
+        // Most tables use UUIDs, but activity_logs uses BIGSERIAL
+        if (!data.id && moduleName !== 'activity_logs') {
+          data.id = uuidv4();
+        }
+        
+        const keys = Object.keys(data);
+        const values = Object.values(data);
+        const placeholders = keys.map((_, index) => `$${index + 1}`).join(', ');
+        
+        const result = await pool.query(
+          `INSERT INTO ${moduleName} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`,
+          values
+        );
+        res.status(201).json(result.rows[0] || data);
+      } catch (error: any) {
+        console.error(`Error in POST /${moduleName}:`, error);
+        res.status(500).json({ error: error.message });
       }
-      
-      const keys = Object.keys(data);
-      const values = Object.values(data);
-      const placeholders = keys.map((_, index) => `$${index + 1}`).join(', ');
-      
-      const result = await pool.query(
-        `INSERT INTO ${moduleName} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`,
-        values
-      );
-      res.status(201).json(result.rows[0] || data);
-    } catch (error: any) {
-      console.error(`Error in POST /${moduleName}:`, error);
-      res.status(500).json({ error: error.message });
-    }
-  });
+    });
 
-  // Update
-  router.put(`/${moduleName}/:id`, authenticateToken, async (req, res) => {
-    try {
-      const keys = Object.keys(req.body);
-      const values = Object.values(req.body);
-      const setClause = keys.map((key, index) => `${key} = $${index + 1}`).join(', ');
-      
-      await pool.query(
-        `UPDATE ${moduleName} SET ${setClause} WHERE id = $${keys.length + 1}`,
-        [...values, req.params.id]
-      );
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+    // Update
+    router.put(`/${moduleName}/:id`, authenticateToken, async (req, res) => {
+      try {
+        const keys = Object.keys(req.body);
+        const values = Object.values(req.body);
+        const setClause = keys.map((key, index) => `${key} = $${index + 1}`).join(', ');
+        
+        await pool.query(
+          `UPDATE ${moduleName} SET ${setClause} WHERE id = $${keys.length + 1}`,
+          [...values, req.params.id]
+        );
+        res.json({ success: true });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+  }
 
   // Delete
   router.delete(`/${moduleName}/:id`, authenticateToken, async (req, res) => {
@@ -634,6 +682,290 @@ router.post('/invoices', authenticateToken, async (req, res) => {
     res.status(201).json({ id: invoiceId });
   } catch (error: any) {
     await client.query('ROLLBACK');
+    console.error('Invoice creation error:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+router.put('/invoices/:id', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { items, id: bodyId, ...invoiceData } = req.body;
+    const invoiceId = req.params.id;
+    
+    const invKeys = Object.keys(invoiceData);
+    const invValues = Object.values(invoiceData);
+    const invSetClause = invKeys.map((key, i) => `${key} = $${i + 1}`).join(', ');
+    
+    await client.query(
+      `UPDATE invoices SET ${invSetClause} WHERE id = $${invKeys.length + 1}`,
+      [...invValues, invoiceId]
+    );
+
+    // Sync Items
+    await client.query('DELETE FROM invoice_items WHERE invoice_id = $1', [invoiceId]);
+    for (const item of (items || [])) {
+      const { id: itemIdTrash, ...itemData } = item;
+      const itemId = uuidv4();
+      const finalItemData = { ...itemData, id: itemId, invoice_id: invoiceId };
+      const itemKeys = Object.keys(finalItemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+      await client.query(
+        `INSERT INTO invoice_items (${itemKeys.join(', ')}) VALUES (${itemPlaceholders})`,
+        Object.values(finalItemData)
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+// --- Sales Returns with Items (Transaction) ---
+router.post('/returns', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { items, ...returnData } = req.body;
+    const returnId = returnData.id || uuidv4();
+    
+    // Insert Return
+    const rData = { ...returnData, id: returnId };
+    const rKeys = Object.keys(rData);
+    const rPlaceholders = rKeys.map((_, i) => `$${i + 1}`).join(', ');
+    
+    await client.query(
+      `INSERT INTO returns (${rKeys.join(', ')}) VALUES (${rPlaceholders})`,
+      Object.values(rData)
+    );
+
+    // Insert Items
+    for (const item of items) {
+      const itemId = uuidv4();
+      const itemData = { ...item, id: itemId, return_id: returnId };
+      const itemKeys = Object.keys(itemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+      
+      await client.query(
+        `INSERT INTO return_items (${itemKeys.join(', ')}) VALUES (${itemPlaceholders})`,
+        Object.values(itemData)
+      );
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ id: returnId });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Return creation error:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+router.put('/returns/:id', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { items, id: bodyId, ...returnData } = req.body;
+    const returnId = req.params.id;
+    
+    const rKeys = Object.keys(returnData);
+    const rValues = Object.values(returnData);
+    const rSetClause = rKeys.map((key, i) => `${key} = $${i + 1}`).join(', ');
+    
+    await client.query(
+      `UPDATE returns SET ${rSetClause} WHERE id = $${rKeys.length + 1}`,
+      [...rValues, returnId]
+    );
+
+    await client.query('DELETE FROM return_items WHERE return_id = $1', [returnId]);
+    for (const item of (items || [])) {
+      const { id: itemIdTrash, ...itemData } = item;
+      const itemId = uuidv4();
+      const finalItemData = { ...itemData, id: itemId, return_id: returnId };
+      const itemKeys = Object.keys(finalItemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+      await client.query(
+        `INSERT INTO return_items (${itemKeys.join(', ')}) VALUES (${itemPlaceholders})`,
+        Object.values(finalItemData)
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+// --- Purchase Invoices with Items (Transaction) ---
+router.post('/purchase_invoices', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { items, ...invoiceData } = req.body;
+    const invoiceId = invoiceData.id || uuidv4();
+    
+    // Insert Purchase Invoice
+    const invData = { ...invoiceData, id: invoiceId };
+    const invKeys = Object.keys(invData);
+    const invPlaceholders = invKeys.map((_, i) => `$${i + 1}`).join(', ');
+    
+    await client.query(
+      `INSERT INTO purchase_invoices (${invKeys.join(', ')}) VALUES (${invPlaceholders})`,
+      Object.values(invData)
+    );
+
+    // Insert Items
+    for (const item of items) {
+      const itemId = uuidv4();
+      const itemData = { ...item, id: itemId, invoice_id: invoiceId };
+      const itemKeys = Object.keys(itemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+      
+      await client.query(
+        `INSERT INTO purchase_invoice_items (${itemKeys.join(', ')}) VALUES (${itemPlaceholders})`,
+        Object.values(itemData)
+      );
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ id: invoiceId });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Purchase invoice creation error:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+router.put('/purchase_invoices/:id', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { items, id: bodyId, ...invoiceData } = req.body;
+    const invoiceId = req.params.id;
+    
+    const invKeys = Object.keys(invoiceData);
+    const invValues = Object.values(invoiceData);
+    const invSetClause = invKeys.map((key, i) => `${key} = $${i + 1}`).join(', ');
+    
+    await client.query(
+      `UPDATE purchase_invoices SET ${invSetClause} WHERE id = $${invKeys.length + 1}`,
+      [...invValues, invoiceId]
+    );
+
+    await client.query('DELETE FROM purchase_invoice_items WHERE invoice_id = $1', [invoiceId]);
+    for (const item of (items || [])) {
+      const { id: itemIdTrash, ...itemData } = item;
+      const itemId = uuidv4();
+      const finalItemData = { ...itemData, id: itemId, invoice_id: invoiceId };
+      const itemKeys = Object.keys(finalItemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+      await client.query(
+        `INSERT INTO purchase_invoice_items (${itemKeys.join(', ')}) VALUES (${itemPlaceholders})`,
+        Object.values(finalItemData)
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+// --- Purchase Returns with Items (Transaction) ---
+router.post('/purchase_returns', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { items, ...returnData } = req.body;
+    const returnId = returnData.id || uuidv4();
+    
+    // Insert Purchase Return
+    const rData = { ...returnData, id: returnId };
+    const rKeys = Object.keys(rData);
+    const rPlaceholders = rKeys.map((_, i) => `$${i + 1}`).join(', ');
+    
+    await client.query(
+      `INSERT INTO purchase_returns (${rKeys.join(', ')}) VALUES (${rPlaceholders})`,
+      Object.values(rData)
+    );
+
+    // Insert Items
+    for (const item of items) {
+      const itemId = uuidv4();
+      const itemData = { ...item, id: itemId, return_id: returnId };
+      const itemKeys = Object.keys(itemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+      
+      await client.query(
+        `INSERT INTO purchase_return_items (${itemKeys.join(', ')}) VALUES (${itemPlaceholders})`,
+        Object.values(itemData)
+      );
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ id: returnId });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Purchase return creation error:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+router.put('/purchase_returns/:id', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { items, id: bodyId, ...returnData } = req.body;
+    const returnId = req.params.id;
+    
+    const rKeys = Object.keys(returnData);
+    const rValues = Object.values(returnData);
+    const rSetClause = rKeys.map((key, i) => `${key} = $${i + 1}`).join(', ');
+    
+    await client.query(
+      `UPDATE purchase_returns SET ${rSetClause} WHERE id = $${rKeys.length + 1}`,
+      [...rValues, returnId]
+    );
+
+    await client.query('DELETE FROM purchase_return_items WHERE return_id = $1', [returnId]);
+    for (const item of (items || [])) {
+      const { id: itemIdTrash, ...itemData } = item;
+      const itemId = uuidv4();
+      const finalItemData = { ...itemData, id: itemId, return_id: returnId };
+      const itemKeys = Object.keys(finalItemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+      await client.query(
+        `INSERT INTO purchase_return_items (${itemKeys.join(', ')}) VALUES (${itemPlaceholders})`,
+        Object.values(finalItemData)
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
     res.status(500).json({ error: error.message });
   } finally {
     client.release();
@@ -655,13 +987,43 @@ router.post('/journal_entries', authenticateToken, async (req, res) => {
 
     for (const item of items) {
       await client.query(
-        `INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, description, debit, credit) VALUES ($1, $2, $3, $4, $5, $6)`,
-        [uuidv4(), entryId, item.account_id, item.description, item.debit, item.credit]
+        `INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, customer_id, supplier_id, customer_name, supplier_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [uuidv4(), entryId, item.account_id, item.account_name, item.description, item.debit, item.credit, item.customer_id, item.supplier_id, item.customer_name, item.supplier_name]
       );
     }
 
     await client.query('COMMIT');
     res.status(201).json({ id: entryId });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+router.put('/journal_entries/:id', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { items, id: bodyId, ...entryData } = req.body;
+    const entryId = req.params.id;
+
+    await client.query(
+      `UPDATE journal_entries SET date = $1, description = $2, reference_id = $3, reference_type = $4, reference_number = $5, total_debit = $6, total_credit = $7 WHERE id = $8`,
+      [entryData.date, entryData.description, entryData.reference_id, entryData.reference_type, entryData.reference_number, entryData.total_debit, entryData.total_credit, entryId]
+    );
+
+    await client.query('DELETE FROM journal_entry_lines WHERE journal_entry_id = $1', [entryId]);
+    for (const item of (items || [])) {
+      await client.query(
+        `INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, customer_id, supplier_id, customer_name, supplier_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [uuidv4(), entryId, item.account_id, item.account_name, item.description, item.debit, item.credit, item.customer_id, item.supplier_id, item.customer_name, item.supplier_name]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true });
   } catch (error: any) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: error.message });

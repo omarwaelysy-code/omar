@@ -17,11 +17,11 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'status', 'temp_password', 'permissions', 'must_change_password', 'created_at'
   ],
   customers: [
-    'id', 'company_id', 'account_id', 'code', 'name', 'email', 'mobile', 'address', 
+    'id', 'company_id', 'account_id', 'account_name', 'code', 'name', 'email', 'mobile', 'address', 
     'tax_number', 'opening_balance', 'opening_balance_date', 'counter_account_id'
   ],
   suppliers: [
-    'id', 'company_id', 'account_id', 'name', 'code', 'email', 'mobile', 'address', 
+    'id', 'company_id', 'account_id', 'account_name', 'name', 'code', 'email', 'mobile', 'address', 
     'tax_number', 'opening_balance', 'opening_balance_date', 'counter_account_id'
   ],
   products: [
@@ -33,7 +33,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'id', 'company_id', 'type_id', 'parent_id', 'code', 'name', 'opening_balance', 'is_active'
   ],
   invoices: [
-    'id', 'company_id', 'customer_id', 'invoice_number', 'date', 'due_date', 'subtotal',
+    'id', 'company_id', 'customer_id', 'customer_name', 'invoice_number', 'date', 'due_date', 'subtotal',
     'tax_amount', 'discount_amount', 'total_amount', 'status', 'payment_type', 
     'payment_method_id', 'notes', 'created_by'
   ],
@@ -41,34 +41,61 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'id', 'invoice_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
     'product_name', 'product_code', 'product_image_url'
   ],
+  returns: [
+    'id', 'company_id', 'customer_id', 'customer_name', 'return_number', 'date', 'total_amount', 
+    'payment_type', 'payment_method_id', 'payment_method_name', 'notes'
+  ],
+  return_items: [
+    'id', 'return_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
+    'product_name', 'product_code', 'product_image_url'
+  ],
+  purchase_invoices: [
+    'id', 'company_id', 'supplier_id', 'supplier_name', 'invoice_number', 'date', 'due_date', 'subtotal',
+    'tax_amount', 'discount_amount', 'total_amount', 'status', 'payment_type', 
+    'payment_method_id', 'notes'
+  ],
+  purchase_returns: [
+    'id', 'company_id', 'supplier_id', 'supplier_name', 'return_number', 'date', 'total_amount', 
+    'payment_type', 'payment_method_id', 'payment_method_name', 'notes'
+  ],
+  receipt_vouchers: [
+    'id', 'company_id', 'customer_id', 'customer_name', 'voucher_number', 'date', 'amount', 'description', 
+    'payment_method_id', 'payment_method_name'
+  ],
+  payment_vouchers: [
+    'id', 'company_id', 'supplier_id', 'supplier_name', 'expense_category_id', 'category_name', 'date', 'amount', 
+    'description', 'payment_method_id', 'payment_method_name'
+  ],
+  customer_discounts: [
+    'id', 'company_id', 'customer_id', 'customer_name', 'date', 'amount', 'description'
+  ],
+  supplier_discounts: [
+    'id', 'company_id', 'supplier_id', 'supplier_name', 'date', 'amount', 'description'
+  ],
+  cash_transfers: [
+    'id', 'company_id', 'date', 'amount', 'from_payment_method_id', 'to_payment_method_id', 
+    'from_payment_method_name', 'to_payment_method_name', 'description', 'created_by', 'created_at'
+  ],
+  expense_categories: [
+    'id', 'company_id', 'code', 'name', 'description', 'account_id', 'account_name'
+  ],
   journal_entries: [
     'id', 'company_id', 'date', 'description', 'reference_id', 'reference_type', 
     'reference_number', 'total_debit', 'total_credit', 'status'
   ],
   journal_entry_lines: [
-    'id', 'journal_entry_id', 'account_id', 'description', 'debit', 'credit'
+    'id', 'journal_entry_id', 'account_id', 'account_name', 'description', 'debit', 'credit',
+    'customer_id', 'supplier_id', 'customer_name', 'supplier_name'
   ],
   payment_methods: [
-    'id', 'company_id', 'account_id', 'code', 'name', 'type', 'opening_balance', 
+    'id', 'company_id', 'account_id', 'account_name', 'code', 'name', 'type', 'opening_balance', 
     'opening_balance_date', 'counter_account_id'
   ],
   activity_logs: [
     'id', 'company_id', 'user_id', 'username', 'action', 'details', 'ip_address', 
     'timestamp', 'category', 'document_id', 'changes'
   ],
-  receipt_vouchers: [
-    'id', 'company_id', 'customer_id', 'date', 'amount', 'description', 'payment_method_id'
-  ],
-  payment_vouchers: [
-    'id', 'company_id', 'supplier_id', 'expense_category_id', 'date', 'amount', 
-    'description', 'payment_method_id'
-  ],
-  returns: [
-    'id', 'company_id', 'customer_id', 'return_number', 'date', 'total_amount', 
-    'payment_type', 'payment_method_id', 'notes'
-  ],
-  return_items: [
-    'id', 'return_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
-    'product_name', 'product_code', 'product_image_url'
+  settings: [
+    'id', 'company_id', 'type', 'key', 'value', 'customer_discount_account_id', 'supplier_discount_account_id', 'updated_at', 'created_at'
   ]
 };
