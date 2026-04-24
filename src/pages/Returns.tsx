@@ -1354,101 +1354,110 @@ export const Returns: React.FC = () => {
       {/* Add Product Modal */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-auto md:max-w-2xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
-            <div className="p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10">
+          <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-2xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+            <div className="p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between bg-white z-10">
               <h3 className="text-lg md:text-xl font-bold text-zinc-900">{t('products.add')}</h3>
               <button onClick={() => setIsProductModalOpen(false)} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-xl transition-all"><X size={24} /></button>
             </div>
-            <form onSubmit={handleProductSubmit} className="p-4 md:p-6 space-y-4 flex-1 overflow-y-auto pb-32 md:pb-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_name')}</label>
-                  <input
-                    required
-                    type="text"
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
-                    value={productFormData.name}
-                    onChange={(e) => setProductFormData({ ...productFormData, name: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_code')}</label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
-                    value={productFormData.code}
-                    onChange={(e) => setProductFormData({ ...productFormData, code: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_category')}</label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
-                    value={productFormData.category}
-                    onChange={(e) => setProductFormData({ ...productFormData, category: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_unit')}</label>
-                  <select
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
-                    value={productFormData.unit}
-                    onChange={(e) => setProductFormData({ ...productFormData, unit: e.target.value })}
-                  >
-                    <option value="قطعة">{t('products.unit_piece')}</option>
-                    <option value="كيلو">{t('products.unit_kg')}</option>
-                    <option value="متر">{t('products.unit_meter')}</option>
-                    <option value="لتر">{t('products.unit_liter')}</option>
-                    <option value="علبة">{t('products.unit_box')}</option>
-                    <option value="كرتونة">{t('products.unit_carton')}</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_cost_price')}</label>
-                  <input
-                    required
-                    type="number"
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
-                    value={productFormData.cost_price}
-                    onChange={(e) => setProductFormData({ ...productFormData, cost_price: Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_sale_price')}</label>
-                  <input
-                    required
-                    type="number"
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
-                    value={productFormData.sale_price}
-                    onChange={(e) => setProductFormData({ ...productFormData, sale_price: Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_stock_quantity')}</label>
-                  <input
-                    type="number"
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
-                    value={productFormData.stock}
-                    onChange={(e) => setProductFormData({ ...productFormData, stock: Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_min_stock')}</label>
-                  <input
-                    type="number"
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
-                    value={productFormData.min_stock}
-                    onChange={(e) => setProductFormData({ ...productFormData, min_stock: Number(e.target.value) })}
-                  />
+            <form onSubmit={handleProductSubmit} className="flex-1 flex flex-col overflow-hidden">
+              <div className="p-4 md:p-6 space-y-4 flex-1 overflow-y-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_name')}</label>
+                    <input
+                      required
+                      type="text"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                      value={productFormData.name}
+                      onChange={(e) => setProductFormData({ ...productFormData, name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_code')}</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                      value={productFormData.code}
+                      onChange={(e) => setProductFormData({ ...productFormData, code: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_category')}</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                      value={productFormData.category}
+                      onChange={(e) => setProductFormData({ ...productFormData, category: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_unit')}</label>
+                    <select
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                      value={productFormData.unit}
+                      onChange={(e) => setProductFormData({ ...productFormData, unit: e.target.value })}
+                    >
+                      <option value="قطعة">{t('products.unit_piece')}</option>
+                      <option value="كيلو">{t('products.unit_kg')}</option>
+                      <option value="متر">{t('products.unit_meter')}</option>
+                      <option value="لتر">{t('products.unit_liter')}</option>
+                      <option value="علبة">{t('products.unit_box')}</option>
+                      <option value="كرتونة">{t('products.unit_carton')}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_cost_price')}</label>
+                    <input
+                      required
+                      type="number"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                      value={productFormData.cost_price}
+                      onChange={(e) => setProductFormData({ ...productFormData, cost_price: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_sale_price')}</label>
+                    <input
+                      required
+                      type="number"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                      value={productFormData.sale_price}
+                      onChange={(e) => setProductFormData({ ...productFormData, sale_price: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_stock_quantity')}</label>
+                    <input
+                      type="number"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                      value={productFormData.stock}
+                      onChange={(e) => setProductFormData({ ...productFormData, stock: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_min_stock')}</label>
+                    <input
+                      type="number"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                      value={productFormData.min_stock}
+                      onChange={(e) => setProductFormData({ ...productFormData, min_stock: Number(e.target.value) })}
+                    />
+                  </div>
                 </div>
               </div>
-              <div className="pt-4 pb-8 md:pb-0">
+              <div className="p-4 md:p-6 border-t border-zinc-50 bg-zinc-50/50 flex gap-3 sticky bottom-0">
                 <button 
                   type="submit"
-                  className="w-full py-4 bg-orange-500 text-white rounded-2xl font-bold hover:bg-orange-600 transition-all shadow-lg shadow-orange-500/20 active:scale-95"
+                  className="flex-1 py-4 bg-orange-500 text-white rounded-2xl font-bold hover:bg-orange-600 transition-all shadow-lg shadow-orange-500/20 active:scale-95"
                 >
                   {t('common.save')}
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setIsProductModalOpen(false)}
+                  className="px-8 py-4 bg-zinc-200 text-zinc-700 rounded-2xl font-bold hover:bg-zinc-300 transition-all active:scale-95"
+                >
+                  {language === 'ar' ? 'إلغاء' : 'Cancel'}
                 </button>
               </div>
             </form>

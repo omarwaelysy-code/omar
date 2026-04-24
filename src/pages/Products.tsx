@@ -525,14 +525,15 @@ export const Products: React.FC = () => {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-auto md:max-w-6xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
-            <div className={`p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+          <div className="bg-white w-full h-full md:h-[90vh] md:max-w-6xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+            <div className={`p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between bg-white z-10 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
               <h3 className="text-lg md:text-xl font-bold text-zinc-900">{editingProduct ? t('products.edit') : t('products.add')}</h3>
               <button onClick={closeModal} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-xl transition-all"><X size={24} /></button>
             </div>
             
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-              <form onSubmit={handleSubmit} className="p-4 md:p-8 space-y-5 flex-1 overflow-y-auto pb-32 md:pb-8" dir={dir}>
+              <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden" dir={dir}>
+                <div className="p-4 md:p-8 space-y-5 flex-1 overflow-y-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
                     <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_code')}</label>
@@ -791,7 +792,9 @@ export const Products: React.FC = () => {
                     )}
                   </div>
                 )}
-                <div className="pt-4 flex gap-3">
+                </div>
+
+                <div className={`p-4 md:p-6 border-t border-zinc-50 bg-zinc-50/50 flex gap-3 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                   <button 
                     type="submit"
                     className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
@@ -801,7 +804,7 @@ export const Products: React.FC = () => {
                   <button 
                     type="button"
                     onClick={closeModal}
-                    className="px-8 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all active:scale-95"
+                    className="px-8 py-4 bg-zinc-200 text-zinc-700 rounded-2xl font-bold hover:bg-zinc-300 transition-all active:scale-95"
                   >
                     {language === 'ar' ? 'إلغاء' : 'Cancel'}
                   </button>
