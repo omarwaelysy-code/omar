@@ -381,7 +381,7 @@ export const PurchaseReturns: React.FC = () => {
             ...item,
             product_name: product?.name || '',
             product_image_url: product?.image_url || '',
-            price: item.cost_price,
+            unit_price: item.cost_price,
             total: item.quantity * item.cost_price
           };
         }),

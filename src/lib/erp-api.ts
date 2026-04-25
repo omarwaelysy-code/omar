@@ -517,6 +517,25 @@ const modules = [
 
 const transactionalModules = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns', 'journal_entries'];
 
+// Helper to sanitize data for a table by filtering out keys not in EXPECTED_SCHEMA
+function sanitizeData(table: string, data: any) {
+  const allowedKeys = EXPECTED_SCHEMA[table];
+  if (!allowedKeys) return data;
+  
+  const sanitized: any = {};
+  allowedKeys.forEach(key => {
+    if (key in data) {
+      // Convert empty strings to null for IDs and decimals
+      if (data[key] === '' && (key.endsWith('_id') || key === 'amount' || key === 'price' || key === 'unit_price' || key === 'total' || key === 'subtotal')) {
+        sanitized[key] = null;
+      } else {
+        sanitized[key] = data[key];
+      }
+    }
+  });
+  return sanitized;
+}
+
 modules.forEach(moduleName => {
   // List with filters
   router.get(`/${moduleName}`, authenticateToken, async (req, res) => {
@@ -596,7 +615,8 @@ modules.forEach(moduleName => {
   if (!transactionalModules.includes(moduleName)) {
     router.post(`/${moduleName}`, authenticateToken, async (req, res) => {
       try {
-        const data = { ...req.body };
+        const sanitizedData = sanitizeData(moduleName, req.body);
+        const data = { ...sanitizedData };
         // Most tables use UUIDs, but activity_logs uses BIGSERIAL
         if (!data.id && moduleName !== 'activity_logs') {
           data.id = uuidv4();
@@ -620,8 +640,9 @@ modules.forEach(moduleName => {
     // Update
     router.put(`/${moduleName}/:id`, authenticateToken, async (req, res) => {
       try {
-        const keys = Object.keys(req.body);
-        const values = Object.values(req.body);
+        const sanitizedData = sanitizeData(moduleName, req.body);
+        const keys = Object.keys(sanitizedData);
+        const values = Object.values(sanitizedData);
         const setClause = keys.map((key, index) => `${key} = $${index + 1}`).join(', ');
         
         await pool.query(
@@ -651,7 +672,8 @@ router.post('/invoices', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { items, ...invoiceData } = req.body;
+    const { items, ...rawInvoiceData } = req.body;
+    const invoiceData = sanitizeData('invoices', rawInvoiceData);
     const invoiceId = invoiceData.id || uuidv4();
     
     // Insert Invoice
@@ -667,8 +689,9 @@ router.post('/invoices', authenticateToken, async (req, res) => {
 
     // Insert Items
     for (const item of items) {
+      const sanitizedItem = sanitizeData('invoice_items', item);
       const itemId = uuidv4();
-      const itemData = { ...item, id: itemId, invoice_id: invoiceId };
+      const itemData = { ...sanitizedItem, id: itemId, invoice_id: invoiceId };
       const itemKeys = Object.keys(itemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       
@@ -693,7 +716,8 @@ router.put('/invoices/:id', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { items, id: bodyId, ...invoiceData } = req.body;
+    const { items, id: bodyId, ...rawInvoiceData } = req.body;
+    const invoiceData = sanitizeData('invoices', rawInvoiceData);
     const invoiceId = req.params.id;
     
     const invKeys = Object.keys(invoiceData);
@@ -708,7 +732,8 @@ router.put('/invoices/:id', authenticateToken, async (req, res) => {
     // Sync Items
     await client.query('DELETE FROM invoice_items WHERE invoice_id = $1', [invoiceId]);
     for (const item of (items || [])) {
-      const { id: itemIdTrash, ...itemData } = item;
+      const { id: itemIdTrash, ...itemDataRaw } = item;
+      const itemData = sanitizeData('invoice_items', itemDataRaw);
       const itemId = uuidv4();
       const finalItemData = { ...itemData, id: itemId, invoice_id: invoiceId };
       const itemKeys = Object.keys(finalItemData);
@@ -734,7 +759,8 @@ router.post('/returns', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { items, ...returnData } = req.body;
+    const { items, ...rawReturnData } = req.body;
+    const returnData = sanitizeData('returns', rawReturnData);
     const returnId = returnData.id || uuidv4();
     
     // Insert Return
@@ -749,8 +775,9 @@ router.post('/returns', authenticateToken, async (req, res) => {
 
     // Insert Items
     for (const item of items) {
+      const sanitizedItem = sanitizeData('return_items', item);
       const itemId = uuidv4();
-      const itemData = { ...item, id: itemId, return_id: returnId };
+      const itemData = { ...sanitizedItem, id: itemId, return_id: returnId };
       const itemKeys = Object.keys(itemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       
@@ -775,7 +802,8 @@ router.put('/returns/:id', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { items, id: bodyId, ...returnData } = req.body;
+    const { items, id: bodyId, ...rawReturnData } = req.body;
+    const returnData = sanitizeData('returns', rawReturnData);
     const returnId = req.params.id;
     
     const rKeys = Object.keys(returnData);
@@ -789,9 +817,10 @@ router.put('/returns/:id', authenticateToken, async (req, res) => {
 
     await client.query('DELETE FROM return_items WHERE return_id = $1', [returnId]);
     for (const item of (items || [])) {
-      const { id: itemIdTrash, ...itemData } = item;
+      const { id: itemIdTrash, ...itemRawData } = item;
+      const sanitizedItem = sanitizeData('return_items', itemRawData);
       const itemId = uuidv4();
-      const finalItemData = { ...itemData, id: itemId, return_id: returnId };
+      const finalItemData = { ...sanitizedItem, id: itemId, return_id: returnId };
       const itemKeys = Object.keys(finalItemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       await client.query(
@@ -815,23 +844,26 @@ router.post('/purchase_invoices', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { items, ...invoiceData } = req.body;
+    const { items, ...rawInvoiceData } = req.body;
+    const invoiceData = sanitizeData('purchase_invoices', rawInvoiceData);
     const invoiceId = invoiceData.id || uuidv4();
     
     // Insert Purchase Invoice
     const invData = { ...invoiceData, id: invoiceId };
     const invKeys = Object.keys(invData);
+    const invValues = Object.values(invData);
     const invPlaceholders = invKeys.map((_, i) => `$${i + 1}`).join(', ');
     
     await client.query(
       `INSERT INTO purchase_invoices (${invKeys.join(', ')}) VALUES (${invPlaceholders})`,
-      Object.values(invData)
+      invValues
     );
 
     // Insert Items
     for (const item of items) {
+      const sanitizedItem = sanitizeData('purchase_invoice_items', item);
       const itemId = uuidv4();
-      const itemData = { ...item, id: itemId, invoice_id: invoiceId };
+      const itemData = { ...sanitizedItem, id: itemId, invoice_id: invoiceId };
       const itemKeys = Object.keys(itemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       
@@ -856,7 +888,8 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { items, id: bodyId, ...invoiceData } = req.body;
+    const { items, id: bodyId, ...rawInvoiceData } = req.body;
+    const invoiceData = sanitizeData('purchase_invoices', rawInvoiceData);
     const invoiceId = req.params.id;
     
     const invKeys = Object.keys(invoiceData);
@@ -870,9 +903,10 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req, res) => {
 
     await client.query('DELETE FROM purchase_invoice_items WHERE invoice_id = $1', [invoiceId]);
     for (const item of (items || [])) {
-      const { id: itemIdTrash, ...itemData } = item;
+      const { id: itemIdTrash, ...itemRawData } = item;
+      const sanitizedItem = sanitizeData('purchase_invoice_items', itemRawData);
       const itemId = uuidv4();
-      const finalItemData = { ...itemData, id: itemId, invoice_id: invoiceId };
+      const finalItemData = { ...sanitizedItem, id: itemId, invoice_id: invoiceId };
       const itemKeys = Object.keys(finalItemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       await client.query(
@@ -896,7 +930,8 @@ router.post('/purchase_returns', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { items, ...returnData } = req.body;
+    const { items, ...rawReturnData } = req.body;
+    const returnData = sanitizeData('purchase_returns', rawReturnData);
     const returnId = returnData.id || uuidv4();
     
     // Insert Purchase Return
@@ -911,8 +946,9 @@ router.post('/purchase_returns', authenticateToken, async (req, res) => {
 
     // Insert Items
     for (const item of items) {
+      const sanitizedItem = sanitizeData('purchase_return_items', item);
       const itemId = uuidv4();
-      const itemData = { ...item, id: itemId, return_id: returnId };
+      const itemData = { ...sanitizedItem, id: itemId, return_id: returnId };
       const itemKeys = Object.keys(itemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       
@@ -937,7 +973,8 @@ router.put('/purchase_returns/:id', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { items, id: bodyId, ...returnData } = req.body;
+    const { items, id: bodyId, ...rawReturnData } = req.body;
+    const returnData = sanitizeData('purchase_returns', rawReturnData);
     const returnId = req.params.id;
     
     const rKeys = Object.keys(returnData);
@@ -951,9 +988,10 @@ router.put('/purchase_returns/:id', authenticateToken, async (req, res) => {
 
     await client.query('DELETE FROM purchase_return_items WHERE return_id = $1', [returnId]);
     for (const item of (items || [])) {
-      const { id: itemIdTrash, ...itemData } = item;
+      const { id: itemIdTrash, ...itemRawData } = item;
+      const sanitizedItem = sanitizeData('purchase_return_items', itemRawData);
       const itemId = uuidv4();
-      const finalItemData = { ...itemData, id: itemId, return_id: returnId };
+      const finalItemData = { ...sanitizedItem, id: itemId, return_id: returnId };
       const itemKeys = Object.keys(finalItemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       await client.query(
@@ -977,18 +1015,26 @@ router.post('/journal_entries', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { items, ...entryData } = req.body;
+    const { items, ...rawEntryData } = req.body;
+    const entryData = sanitizeData('journal_entries', rawEntryData);
     const entryId = entryData.id || uuidv4();
 
+    const keys = Object.keys(entryData);
+    const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
     await client.query(
-      `INSERT INTO journal_entries (id, company_id, date, description, reference_id, reference_type, reference_number, total_debit, total_credit) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [entryId, entryData.company_id, entryData.date, entryData.description, entryData.reference_id, entryData.reference_type, entryData.reference_number, entryData.total_debit, entryData.total_credit]
+      `INSERT INTO journal_entries (${keys.join(', ')}) VALUES (${placeholders})`,
+      Object.values(entryData)
     );
 
     for (const item of items) {
+      const sanitizedItem = sanitizeData('journal_entry_lines', item);
+      const itemId = uuidv4();
+      const itemData = { ...sanitizedItem, id: itemId, journal_entry_id: entryId };
+      const itemKeys = Object.keys(itemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       await client.query(
-        `INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, customer_id, supplier_id, customer_name, supplier_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [uuidv4(), entryId, item.account_id, item.account_name, item.description, item.debit, item.credit, item.customer_id, item.supplier_id, item.customer_name, item.supplier_name]
+        `INSERT INTO journal_entry_lines (${itemKeys.join(', ')}) VALUES (${itemPlaceholders})`,
+        Object.values(itemData)
       );
     }
 
@@ -1006,19 +1052,28 @@ router.put('/journal_entries/:id', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { items, id: bodyId, ...entryData } = req.body;
+    const { items, id: bodyId, ...rawEntryData } = req.body;
+    const entryData = sanitizeData('journal_entries', rawEntryData);
     const entryId = req.params.id;
 
+    const keys = Object.keys(entryData);
+    const setClause = keys.map((key, i) => `${key} = $${i + 1}`).join(', ');
+    
     await client.query(
-      `UPDATE journal_entries SET date = $1, description = $2, reference_id = $3, reference_type = $4, reference_number = $5, total_debit = $6, total_credit = $7 WHERE id = $8`,
-      [entryData.date, entryData.description, entryData.reference_id, entryData.reference_type, entryData.reference_number, entryData.total_debit, entryData.total_credit, entryId]
+      `UPDATE journal_entries SET ${setClause} WHERE id = $${keys.length + 1}`,
+      [...Object.values(entryData), entryId]
     );
 
     await client.query('DELETE FROM journal_entry_lines WHERE journal_entry_id = $1', [entryId]);
     for (const item of (items || [])) {
+      const sanitizedItem = sanitizeData('journal_entry_lines', item);
+      const itemId = uuidv4();
+      const itemData = { ...sanitizedItem, id: itemId, journal_entry_id: entryId };
+      const itemKeys = Object.keys(itemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       await client.query(
-        `INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, customer_id, supplier_id, customer_name, supplier_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [uuidv4(), entryId, item.account_id, item.account_name, item.description, item.debit, item.credit, item.customer_id, item.supplier_id, item.customer_name, item.supplier_name]
+        `INSERT INTO journal_entry_lines (${itemKeys.join(', ')}) VALUES (${itemPlaceholders})`,
+        Object.values(itemData)
       );
     }
 

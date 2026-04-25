@@ -298,7 +298,7 @@ export const Returns: React.FC = () => {
       product_code: product.code,
       product_image_url: product.image_url,
       quantity: 1,
-      price: product.sale_price,
+      unit_price: product.sale_price,
       total: product.sale_price
     }]);
   };
@@ -308,7 +308,7 @@ export const Returns: React.FC = () => {
       product_id: '',
       product_name: '',
       quantity: 1,
-      price: 0,
+      unit_price: 0,
       total: 0
     }]);
   };
@@ -327,18 +327,18 @@ export const Returns: React.FC = () => {
         if (product) {
           item.product_name = product.name;
           item.product_image_url = product.image_url;
-          item.price = product.sale_price;
-          item.total = (item.quantity || 0) * (item.price || 0);
+          item.unit_price = product.sale_price;
+          item.total = (item.quantity || 0) * (item.unit_price || 0);
         } else {
           item.product_name = '';
           item.product_image_url = '';
-          item.price = 0;
+          item.unit_price = 0;
           item.total = 0;
         }
       }
       
-      if (field === 'quantity' || field === 'price') {
-        item.total = (item.quantity || 0) * (item.price || 0);
+      if (field === 'quantity' || field === 'unit_price') {
+        item.total = (item.quantity || 0) * (item.unit_price || 0);
       }
       
       newItems[index] = item;
@@ -543,7 +543,7 @@ export const Returns: React.FC = () => {
       setDate(new Date().toISOString().slice(0, 10));
       setPaymentType('credit');
       setPaymentMethodId('');
-      setItems([{ product_id: '', product_name: '', quantity: 1, price: 0, total: 0 }]);
+      setItems([{ product_id: '', product_name: '', quantity: 1, unit_price: 0, total: 0 }]);
     }
     setIsModalOpen(true);
   };
@@ -1027,8 +1027,8 @@ export const Returns: React.FC = () => {
                             <input 
                               type="number"
                               className="w-full px-2 py-1 bg-zinc-50 border border-zinc-200 rounded-lg text-center"
-                              value={item.price}
-                              onChange={(e) => updateItem(index, 'price', Number(e.target.value))}
+                              value={item.unit_price}
+                              onChange={(e) => updateItem(index, 'unit_price', Number(e.target.value))}
                             />
                           </td>
                           <td className="px-4 py-3 font-bold text-zinc-900">{item.total.toLocaleString()}</td>
@@ -1169,7 +1169,7 @@ export const Returns: React.FC = () => {
                           </td>
                           <td className="px-6 py-4 font-bold text-zinc-900" style={{ color: '#18181b' }}>{item.product_name}</td>
                           <td className="px-6 py-4 text-zinc-500" style={{ color: '#71717a' }}>{item.quantity}</td>
-                          <td className="px-6 py-4 text-zinc-500" style={{ color: '#71717a' }}>{item.price.toLocaleString()}</td>
+                          <td className="px-6 py-4 text-zinc-500" style={{ color: '#71717a' }}>{item.unit_price.toLocaleString()}</td>
                           <td className="px-6 py-4 font-bold text-zinc-900" style={{ color: '#18181b' }}>{item.total.toLocaleString()}</td>
                         </tr>
                       ))}

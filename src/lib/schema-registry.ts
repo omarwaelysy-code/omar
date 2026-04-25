@@ -35,7 +35,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   invoices: [
     'id', 'company_id', 'customer_id', 'customer_name', 'invoice_number', 'date', 'due_date', 'subtotal',
     'tax_amount', 'discount_amount', 'total_amount', 'status', 'payment_type', 
-    'payment_method_id', 'notes', 'created_by'
+    'payment_method_id', 'payment_method_name', 'notes', 'created_by'
   ],
   invoice_items: [
     'id', 'invoice_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
@@ -52,7 +52,11 @@ export const EXPECTED_SCHEMA: TableSchema = {
   purchase_invoices: [
     'id', 'company_id', 'supplier_id', 'supplier_name', 'invoice_number', 'date', 'due_date', 'subtotal',
     'tax_amount', 'discount_amount', 'total_amount', 'status', 'payment_type', 
-    'payment_method_id', 'notes'
+    'payment_method_id', 'payment_method_name', 'notes'
+  ],
+  purchase_invoice_items: [
+    'id', 'invoice_id', 'product_id', 'expense_category_id', 'description', 'quantity', 'unit_price', 'total',
+    'product_name', 'category_name', 'product_code', 'product_image_url'
   ],
   purchase_returns: [
     'id', 'company_id', 'supplier_id', 'supplier_name', 'return_number', 'date', 'total_amount', 

@@ -182,7 +182,7 @@ export interface InvoiceItem {
   product_code?: string;
   product_image_url?: string;
   quantity: number;
-  price: number;
+  unit_price: number;
   total: number;
 }
 
@@ -245,7 +245,7 @@ export interface ReturnItem {
   product_code?: string;
   product_image_url?: string;
   quantity: number;
-  price: number;
+  unit_price: number;
   total: number;
 }
 

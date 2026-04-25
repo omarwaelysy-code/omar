@@ -298,7 +298,7 @@ export const Invoices: React.FC = () => {
       product_code: product.code,
       product_image_url: product.image_url,
       quantity: 1,
-      price: product.sale_price,
+      unit_price: product.sale_price,
       total: product.sale_price
     }]);
   };
@@ -308,7 +308,7 @@ export const Invoices: React.FC = () => {
       product_id: '',
       product_name: '',
       quantity: 1,
-      price: 0,
+      unit_price: 0,
       total: 0
     }]);
   };
@@ -327,18 +327,18 @@ export const Invoices: React.FC = () => {
         if (product) {
           item.product_name = product.name;
           item.product_image_url = product.image_url;
-          item.price = product.sale_price;
-          item.total = (item.quantity || 0) * (item.price || 0);
+          item.unit_price = product.sale_price;
+          item.total = (item.quantity || 0) * (item.unit_price || 0);
         } else {
           item.product_name = '';
           item.product_image_url = '';
-          item.price = 0;
+          item.unit_price = 0;
           item.total = 0;
         }
       }
       
-      if (field === 'quantity' || field === 'price') {
-        item.total = (item.quantity || 0) * (item.price || 0);
+      if (field === 'quantity' || field === 'unit_price') {
+        item.total = (item.quantity || 0) * (item.unit_price || 0);
       }
       
       newItems[index] = item;
@@ -1335,8 +1335,8 @@ export const Invoices: React.FC = () => {
                                   <input 
                                     type="number" 
                                     className="w-full bg-zinc-50 border border-zinc-100 rounded focus:ring-1 focus:ring-emerald-500 px-1 py-0.5 text-xs outline-none text-center font-mono"
-                                    value={isNaN(item.price) ? '' : item.price}
-                                    onChange={(e) => updateItem(index, 'price', parseFloat(e.target.value) || 0)}
+                                    value={isNaN(item.unit_price) ? '' : item.unit_price}
+                                    onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
                                   />
                                 </td>
                                 <td className="px-1 py-0.5 text-left font-mono font-bold text-zinc-900 text-xs">
@@ -1469,7 +1469,7 @@ export const Invoices: React.FC = () => {
                           </td>
                           <td className="px-4 py-3 font-medium text-[#18181b]">{item.product_name}</td>
                           <td className="px-4 py-3 text-[#71717a]">{item.quantity}</td>
-                          <td className="px-4 py-3 text-[#71717a]">{item.price.toLocaleString()} {t('invoices.currency')}</td>
+                          <td className="px-4 py-3 text-[#71717a]">{item.unit_price.toLocaleString()} {t('invoices.currency')}</td>
                           <td className="px-4 py-3 font-bold text-[#18181b]">{item.total.toLocaleString()} {t('invoices.currency')}</td>
                         </tr>
                       ))}

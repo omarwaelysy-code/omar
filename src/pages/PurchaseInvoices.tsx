@@ -387,7 +387,7 @@ export const PurchaseInvoices: React.FC = () => {
           product_id: product?.id || '',
           product_name: product?.name || item.productName,
           quantity: item.quantity || 1,
-          cost_price: item.price || product?.cost_price || 0,
+          unit_price: item.cost_price,
           total: (item.quantity || 1) * (item.price || product?.cost_price || 0)
         };
       });
@@ -679,7 +679,7 @@ export const PurchaseInvoices: React.FC = () => {
           product_name: item.product_name || '',
           category_name: item.category_name || '',
           quantity: item.quantity,
-          price: item.cost_price,
+          unit_price: item.cost_price,
           total: item.total
         })),
         company_id: user.company_id
