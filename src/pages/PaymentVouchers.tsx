@@ -410,15 +410,33 @@ export const PaymentVouchers: React.FC = () => {
           fieldsToTrack
         );
         id = editingVoucher.id;
-        // Delete old journal entry
-        await dbService.deleteJournalEntryByReference(id, user.company_id);
       } else {
         id = await dbService.add('payment_vouchers', data);
       }
       
-      // Create Journal Entry
-      const journalItems: JournalEntryItem[] = [];
-      const currentVoucherNumber = data.voucher_number;
+      // Success notification and modal close early
+      showNotification(editingVoucher ? 'تم تعديل سند الصرف بنجاح' : 'تم حفظ سند الصرف بنجاح');
+      setVoucherData({
+        type: 'supplier',
+        supplier_id: '',
+        expense_category_id: '',
+        amount: 0,
+        payment_method_id: '',
+        date: new Date().toISOString().slice(0, 10),
+        notes: ''
+      });
+      setIsModalOpen(false);
+      setEditingVoucher(null);
+
+      // Background post-save hooks
+      try {
+        if (editingVoucher) {
+          // Delete old journal entry
+          await dbService.deleteJournalEntryByReference(id, user.company_id);
+        }
+
+        // Create Journal Entry
+        const journalItems: JournalEntryItem[] = [];
 
         // Debit: Supplier or Expense Account
         let debitAccountId = '';
@@ -492,23 +510,14 @@ export const PaymentVouchers: React.FC = () => {
         }
 
         await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة سند صرف', `إضافة سند صرف جديد رقم: ${voucher_number}`, 'payment_vouchers', id);
-
-      showNotification(editingVoucher ? 'تم تعديل سند الصرف بنجاح' : 'تم حفظ سند الصرف بنجاح');
-      setVoucherData({
-        type: 'supplier',
-        supplier_id: '',
-        expense_category_id: '',
-        amount: 0,
-        payment_method_id: '',
-        date: new Date().toISOString().slice(0, 10),
-        notes: ''
-      });
-      setIsModalOpen(false);
-      setEditingVoucher(null);
+      } catch (postError) {
+        console.error('Post-save operations failed:', postError);
+      }
     } catch (e) {
       console.error(e);
       showNotification('حدث خطأ أثناء الاتصال بالخادم', 'error');
     }
+
   };
 
   const handleExportExcel = () => {

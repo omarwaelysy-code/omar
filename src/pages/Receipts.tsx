@@ -327,6 +327,7 @@ export const Receipts: React.FC = () => {
         company_id: user.company_id
       };
 
+      let id = '';
       if (editingReceipt) {
         const fieldsToTrack = [
           { field: 'customer_id', label: 'العميل' },
@@ -344,16 +345,29 @@ export const Receipts: React.FC = () => {
           'receipt_vouchers',
           fieldsToTrack
         );
+        id = editingReceipt.id;
       } else {
-        const id = await dbService.add('receipt_vouchers', receiptData);
-        
+        id = await dbService.add('receipt_vouchers', receiptData);
+      }
+
+      // Success notification and modal close early
+      showNotification(editingReceipt ? 'تم تحديث سند القبض بنجاح' : 'تم إضافة سند القبض بنجاح', 'success');
+      closeModal();
+
+      // Background post-save hooks
+      try {
+        if (editingReceipt) {
+          // Always handle journal entry to ensure consistency
+          await dbService.deleteJournalEntryByReference(id, user.company_id);
+        }
+
         // Create Journal Entry
         const journalItems: JournalEntryItem[] = [];
         const receipt_number = voucher_number;
 
         // Debit: Payment Method Account (Cash/Bank)
         let debitAccountId = paymentMethod?.account_id || '';
-        let debitAccountName = paymentMethod?.account_name || '';
+        let debitAccountName = paymentMethod?.name || '';
 
         if (!debitAccountId) {
           const fallbackAccount = accounts.find(a => 
@@ -408,12 +422,17 @@ export const Receipts: React.FC = () => {
           await dbService.createJournalEntry(journalEntry);
         }
 
-        await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة سند قبض', `إضافة سند قبض جديد للعميل: ${customer?.name}`, 'receipt_vouchers', id);
+        if (!editingReceipt) {
+          await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة سند قبض', `إضافة سند قبض جديد للعميل: ${customer?.name}`, 'receipt_vouchers', id);
+        }
+      } catch (postError) {
+        console.error('Post-save operations failed:', postError);
       }
-      closeModal();
     } catch (e) {
       console.error(e);
+      showNotification('حدث خطأ أثناء حفظ السند', 'error');
     }
+
   };
 
   const handleDelete = async (id: string) => {

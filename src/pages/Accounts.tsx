@@ -118,16 +118,16 @@ export const Accounts: React.FC = () => {
           'accounts',
           fieldsToTrack
         );
-        showNotification('تم تحديث الحساب بنجاح');
+        showNotification('تم تحديث بيانات الحساب بنجاح', 'success');
       } else {
         const id = await dbService.add('accounts', accountData);
         await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة حساب', `إضافة حساب جديد: ${formData.name}`, 'accounts', id);
-        showNotification('تم إضافة الحساب بنجاح');
+        showNotification('تم إضافة الحساب بنجاح', 'success');
       }
       closeModal();
     } catch (e) {
       console.error(e);
-      showNotification('حدث خطأ أثناء الحفظ', 'error');
+      showNotification('حدث خطأ أثناء حفظ البيانات', 'error');
     }
   };
 
@@ -144,7 +144,7 @@ export const Accounts: React.FC = () => {
       await dbService.logActivity(user.id, user.username, user.company_id, 'حذف حساب', `حذف الحساب: ${account?.name}`, 'accounts', accountToDelete);
       setIsDeleteModalOpen(false);
       setAccountToDelete(null);
-      showNotification('تم حذف الحساب بنجاح');
+      showNotification('تم حذف الحساب بنجاح', 'success');
     } catch (e) {
       console.error(e);
       showNotification('حدث خطأ أثناء الحذف', 'error');

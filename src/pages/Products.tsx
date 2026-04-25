@@ -163,6 +163,7 @@ export const Products: React.FC = () => {
         cost_account_name: costAccount?.name || ''
       };
 
+      let id = '';
       if (editingProduct) {
         const fieldsToTrack = [
           { field: 'code', label: 'كود الصنف' },
@@ -185,49 +186,26 @@ export const Products: React.FC = () => {
           'products',
           fieldsToTrack
         );
-
-        // Always handle journal entry to ensure consistency
-        await dbService.deleteJournalEntryByReference(editingProduct.id, user.company_id);
-
-        if (formData.stock > 0 && formData.cost_price > 0) {
-          const totalValue = formData.stock * formData.cost_price;
-          const inventoryAccount = accounts.find(a => a.name.includes('مخزون') || a.name.includes('بضاعة'));
-          const counterAccount = accounts.find(a => a.id === formData.counter_account_id);
-
-          await dbService.add('journal_entries', {
-            company_id: user.company_id,
-            date: new Date().toISOString().slice(0, 10),
-            description: `مخزون افتتاحي للصنف: ${formData.name}`,
-            reference_id: editingProduct.id,
-            reference_type: 'initial_stock',
-            items: [
-              {
-                account_id: inventoryAccount?.id || 'inventory_account_default',
-                account_name: inventoryAccount?.name || 'حساب المخزون (افتراضي)',
-                debit: totalValue,
-                credit: 0,
-                description: 'مخزون افتتاحي'
-              },
-              {
-                account_id: formData.counter_account_id,
-                account_name: counterAccount?.name || 'حساب الميزانية الافتتاحية',
-                debit: 0,
-                credit: totalValue,
-                description: `مخزون افتتاحي للصنف: ${formData.name}`
-              }
-            ],
-            total_debit: totalValue,
-            total_credit: totalValue,
-            created_at: new Date().toISOString(),
-            created_by: user.id
-          });
-        }
+        id = editingProduct.id;
       } else {
-        const id = await dbService.add('products', { 
+        id = await dbService.add('products', { 
           ...dataToSave, 
           company_id: user.company_id 
         });
-        await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة صنف', `إضافة صنف جديد: ${formData.name}`, 'products', id);
+      }
+
+      // Success notification and modal close early
+      showNotification(editingProduct ? 'تم تحديث بيانات الصنف بنجاح' : 'تم إضافة الصنف بنجاح', 'success');
+      closeModal();
+
+      // Background post-save hooks
+      try {
+        if (editingProduct) {
+          // Always handle journal entry to ensure consistency
+          await dbService.deleteJournalEntryByReference(id, user.company_id);
+        } else {
+          await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة صنف', `إضافة صنف جديد: ${formData.name}`, 'products', id);
+        }
 
         // Create initial stock entry
         if (formData.stock > 0 && formData.cost_price > 0) {
@@ -263,10 +241,12 @@ export const Products: React.FC = () => {
             created_by: user.id
           });
         }
+      } catch (postError) {
+        console.error('Post-save operations failed:', postError);
       }
-      closeModal();
     } catch (e) {
       console.error(e);
+      showNotification('حدث خطأ أثناء حفظ البيانات', 'error');
     }
   };
 

@@ -59,6 +59,7 @@ export const PaymentMethods: React.FC = () => {
         company_id: user.company_id
       };
 
+      let id = '';
       if (editingMethod) {
         const fieldsToTrack = [
           { field: 'code', label: 'الكود' },
@@ -77,46 +78,23 @@ export const PaymentMethods: React.FC = () => {
           'payment_methods',
           fieldsToTrack
         );
-
-        // Always handle journal entry to ensure consistency
-        await dbService.deleteJournalEntryByReference(editingMethod.id, user.company_id);
-
-        if (formData.opening_balance !== 0) {
-          const absBalance = Math.abs(formData.opening_balance);
-          const isNegative = formData.opening_balance < 0;
-          const counterAccount = accounts.find(a => a.id === formData.counter_account_id);
-
-          await dbService.add('journal_entries', {
-            company_id: user.company_id,
-            date: formData.opening_balance_date,
-            description: `رصيد افتتاحي لطريقة الدفع: ${formData.name}`,
-            reference_id: editingMethod.id,
-            reference_type: 'opening_balance',
-            items: [
-              {
-                account_id: formData.account_id,
-                account_name: selectedAccount?.name || '',
-                debit: isNegative ? 0 : absBalance,
-                credit: isNegative ? absBalance : 0,
-                description: 'رصيد افتتاحي'
-              },
-              {
-                account_id: formData.counter_account_id,
-                account_name: counterAccount?.name || 'حساب الميزانية الافتتاحية',
-                debit: isNegative ? absBalance : 0,
-                credit: isNegative ? 0 : absBalance,
-                description: `رصيد افتتاحي لطريقة الدفع: ${formData.name}`
-              }
-            ],
-            total_debit: absBalance,
-            total_credit: absBalance,
-            created_at: new Date().toISOString(),
-            created_by: user.id
-          });
-        }
+        id = editingMethod.id;
       } else {
-        const id = await dbService.add('payment_methods', dataToSave);
-        await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة طريقة دفع', `إضافة طريقة دفع جديدة: ${formData.name}`, 'payment_methods', id);
+        id = await dbService.add('payment_methods', dataToSave);
+      }
+
+      // Success notification and modal close early
+      showNotification(editingMethod ? 'تم تحديث بيانات طريقة الدفع بنجاح' : 'تم إضافة طريقة الدفع بنجاح', 'success');
+      closeModal();
+
+      // Background post-save hooks
+      try {
+        if (editingMethod) {
+          // Always handle journal entry to ensure consistency
+          await dbService.deleteJournalEntryByReference(id, user.company_id);
+        } else {
+          await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة طريقة دفع', `إضافة طريقة دفع جديدة: ${formData.name}`, 'payment_methods', id);
+        }
 
         // Create initial opening balance entry
         if (formData.opening_balance !== 0) {
@@ -152,10 +130,12 @@ export const PaymentMethods: React.FC = () => {
             created_by: user.id
           });
         }
+      } catch (postError) {
+        console.error('Post-save operations failed:', postError);
       }
-      closeModal();
     } catch (e) {
       console.error(e);
+      showNotification('حدث خطأ أثناء حفظ البيانات', 'error');
     }
   };
 

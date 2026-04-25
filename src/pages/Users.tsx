@@ -129,7 +129,7 @@ export const Users: React.FC = () => {
       }
 
       await dbService.logActivity(currentUser.id, currentUser.username, currentUser.company_id, 'إضافة مستخدم', `إضافة مستخدم جديد: ${cleanEmail}`, 'users', newUser.id);
-      showNotification('تم إضافة المستخدم بنجاح');
+      showNotification('تم إضافة المستخدم بنجاح', 'success');
       closeModal();
     } catch (e: any) {
       console.error(e);

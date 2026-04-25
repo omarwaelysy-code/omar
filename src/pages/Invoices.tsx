@@ -408,11 +408,16 @@ export const Invoices: React.FC = () => {
         id = await dbService.add('invoices', { ...invoiceData, invoice_number: invoiceNumber });
       }
 
-      // Create/Update Journal Entry
-      const journalItems: JournalEntryItem[] = [];
+      // Success notification and modal close early
+      closeModal();
+      showNotification(editingInvoice ? t('invoices.invoice_updated') : t('invoices.invoice_saved'));
 
-      // ALWAYS Debit: Customer Account first (for the invoice part)
-      let customerAccountId = customer?.account_id || '';
+      // Background post-save hooks
+      try {
+        const journalItems: JournalEntryItem[] = [];
+
+        // ALWAYS Debit: Customer Account first (for the invoice part)
+        let customerAccountId = customer?.account_id || '';
         let customerAccountName = customer?.account_name || '';
         
         if (!customerAccountId) {
@@ -531,12 +536,15 @@ export const Invoices: React.FC = () => {
         if (!editingInvoice && id) {
           await dbService.logActivity(user.id, user.username, user.company_id, t('invoices.log_add'), t('invoices.log_add_msg', { number: invoiceNumber }), 'invoices', id);
         }
-      closeModal();
-      showNotification(editingInvoice ? t('invoices.invoice_updated') : t('invoices.invoice_saved'));
+      } catch (postError) {
+        console.error('Post-save operations failed:', postError);
+        // We don't show an error toast here because the primary save succeeded
+      }
     } catch (e) {
-      console.error(e);
+      console.error('Primary save failed:', e);
       showNotification(t('common.server_error'), 'error');
     }
+
   };
 
   const handleDelete = async (id: string) => {

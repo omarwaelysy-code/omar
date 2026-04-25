@@ -385,122 +385,132 @@ export const Returns: React.FC = () => {
       if (editingReturn) {
         id = editingReturn.id;
         await dbService.update('returns', id, returnData);
-        // Delete old journal entry to recreate it
-        await dbService.deleteJournalEntryByReference(id, user.company_id);
       } else {
         id = await dbService.add('returns', returnData);
       }
 
-      // Create Journal Entry
-      const journalItems: JournalEntryItem[] = [];
+      // Success notification and modal close early
+      showNotification(editingReturn ? 'تم تعديل المرتجع بنجاح' : 'تم إضافة المرتجع بنجاح', 'success');
+      closeModal();
 
-      // ALWAYS Credit: Customer Account first (for the return part)
-      let customerAccountId = customer?.account_id || '';
-      let customerAccountName = customer?.account_name || '';
-      
-      if (!customerAccountId) {
-        const fallbackAccount = accounts.find(a => a.name.includes('عملاء'));
-        customerAccountId = fallbackAccount?.id || 'customers_account_default';
-        customerAccountName = fallbackAccount?.name || 'حساب العملاء (افتراضي)';
-      }
-
-      // Line 1: Cr. Customer (Reducing receivable)
-      journalItems.push({
-        account_id: customerAccountId,
-        account_name: customerAccountName,
-        debit: 0,
-        credit: total_amount,
-        description: `مرتجع مبيعات رقم ${return_number} - ${customer?.name}`,
-        customer_id: selectedCustomerId,
-        customer_name: customer?.name
-      });
-
-      // Line 2: Dr. Sales Return Accounts (per product) - reversing the sale
-      validItems.forEach(item => {
-        const product = products.find(p => p.id === item.product_id);
-        let debitAccountId = product?.revenue_account_id || '';
-        let debitAccountName = product?.revenue_account_name || '';
-
-        if (!debitAccountId) {
-          const fallbackAccount = accounts.find(a => 
-            a.name.includes('مبيعات') || a.name.includes('إيراد')
-          );
-          debitAccountId = fallbackAccount?.id || 'sales_account_default';
-          debitAccountName = fallbackAccount?.name || 'حساب المبيعات (افتراضي)';
+      // Background post-save hooks
+      try {
+        if (editingReturn) {
+          // Delete old journal entry to recreate it
+          await dbService.deleteJournalEntryByReference(id, user.company_id);
         }
 
-        journalItems.push({
-          account_id: debitAccountId,
-          account_name: debitAccountName,
-          debit: item.total,
-          credit: 0,
-          description: `مرتجع مبيعات صنف: ${item.product_name} - مرتجع ${return_number}`
-        });
-      });
+        // Create Journal Entry
+        const journalItems: JournalEntryItem[] = [];
 
-      // If Cash, add the payment lines (Dr. Customer / Cr. Cash)
-      // For Sales Return CASH: We paid cash to customer.
-      if (paymentType === 'cash' && paymentMethodId) {
-        const pm = paymentMethods.find(p => p.id === paymentMethodId);
-        let cashAccountId = pm?.account_id || '';
-        let cashAccountName = pm?.account_name || '';
+        // ALWAYS Credit: Customer Account first (for the return part)
+        let customerAccountId = customer?.account_id || '';
+        let customerAccountName = customer?.account_name || '';
         
-        if (!cashAccountId) {
-          const fallbackAccount = accounts.find(a => 
-            a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق')
-          );
-          cashAccountId = fallbackAccount?.id || 'cash_account_default';
-          cashAccountName = fallbackAccount?.name || 'حساب النقدية (افتراضي)';
+        if (!customerAccountId) {
+          const fallbackAccount = accounts.find(a => a.name.includes('عملاء'));
+          customerAccountId = fallbackAccount?.id || 'customers_account_default';
+          customerAccountName = fallbackAccount?.name || 'حساب العملاء (افتراضي)';
         }
 
-        // Line 3: Dr. Customer (Offsetting the credit from Line 1)
+        // Line 1: Cr. Customer (Reducing receivable)
         journalItems.push({
           account_id: customerAccountId,
           account_name: customerAccountName,
-          debit: total_amount,
-          credit: 0,
-          description: `تسوية نقدية لمرتجع مبيعات رقم ${return_number} - ${customer?.name}`,
+          debit: 0,
+          credit: total_amount,
+          description: `مرتجع مبيعات رقم ${return_number} - ${customer?.name}`,
           customer_id: selectedCustomerId,
           customer_name: customer?.name
         });
 
-        // Line 4: Cr. Cash/Bank (We paid money)
-        journalItems.push({
-          account_id: cashAccountId,
-          account_name: cashAccountName,
-          debit: 0,
-          credit: total_amount,
-          description: `دفع نقدية مقابل مرتجع مبيعات رقم ${return_number} - ${customer?.name}`
-        });
-      }
+        // Line 2: Dr. Sales Return Accounts (per product) - reversing the sale
+        validItems.forEach(item => {
+          const product = products.find(p => p.id === item.product_id);
+          let debitAccountId = product?.revenue_account_id || '';
+          let debitAccountName = product?.revenue_account_name || '';
 
-      if (journalItems.length > 0) {
-        const journalEntry: Omit<JournalEntry, 'id'> = {
-          date,
-          reference_number: return_number,
-          reference_id: id,
-          reference_type: 'return',
-          description: `قيد مرتجع مبيعات رقم ${return_number}`,
-          items: journalItems,
-          total_debit: journalItems.reduce((sum, item) => sum + item.debit, 0),
-          total_credit: journalItems.reduce((sum, item) => sum + item.credit, 0),
-          company_id: user.company_id,
-          created_at: new Date().toISOString(),
-          created_by: user.id
-        };
-        await dbService.createJournalEntry(journalEntry);
+          if (!debitAccountId) {
+            const fallbackAccount = accounts.find(a => 
+              a.name.includes('مبيعات') || a.name.includes('إيراد')
+            );
+            debitAccountId = fallbackAccount?.id || 'sales_account_default';
+            debitAccountName = fallbackAccount?.name || 'حساب المبيعات (افتراضي)';
+          }
+
+          journalItems.push({
+            account_id: debitAccountId,
+            account_name: debitAccountName,
+            debit: item.total,
+            credit: 0,
+            description: `مرتجع مبيعات صنف: ${item.product_name} - مرتجع ${return_number}`
+          });
+        });
+
+        // If Cash, add the payment lines (Dr. Customer / Cr. Cash)
+        // For Sales Return CASH: We paid cash to customer.
+        if (paymentType === 'cash' && paymentMethodId) {
+          const pm = paymentMethods.find(p => p.id === paymentMethodId);
+          let cashAccountId = pm?.account_id || '';
+          let cashAccountName = pm?.account_name || '';
+          
+          if (!cashAccountId) {
+            const fallbackAccount = accounts.find(a => 
+              a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق')
+            );
+            cashAccountId = fallbackAccount?.id || 'cash_account_default';
+            cashAccountName = fallbackAccount?.name || 'حساب النقدية (افتراضي)';
+          }
+
+          // Line 3: Dr. Customer (Offsetting the credit from Line 1)
+          journalItems.push({
+            account_id: customerAccountId,
+            account_name: customerAccountName,
+            debit: total_amount,
+            credit: 0,
+            description: `تسوية نقدية لمرتجع مبيعات رقم ${return_number} - ${customer?.name}`,
+            customer_id: selectedCustomerId,
+            customer_name: customer?.name
+          });
+
+          // Line 4: Cr. Cash/Bank (We paid money)
+          journalItems.push({
+            account_id: cashAccountId,
+            account_name: cashAccountName,
+            debit: 0,
+            credit: total_amount,
+            description: `دفع نقدية مقابل مرتجع مبيعات رقم ${return_number} - ${customer?.name}`
+          });
+        }
+
+        if (journalItems.length > 0) {
+          const journalEntry: Omit<JournalEntry, 'id'> = {
+            date,
+            reference_number: return_number,
+            reference_id: id,
+            reference_type: 'return',
+            description: `قيد مرتجع مبيعات رقم ${return_number}`,
+            items: journalItems,
+            total_debit: journalItems.reduce((sum, item) => sum + item.debit, 0),
+            total_credit: journalItems.reduce((sum, item) => sum + item.credit, 0),
+            company_id: user.company_id,
+            created_at: new Date().toISOString(),
+            created_by: user.id
+          };
+          await dbService.createJournalEntry(journalEntry);
+        }
+        
+        const action = editingReturn ? 'تعديل مرتجع' : 'إضافة مرتجع';
+        const details = editingReturn ? `تعديل المرتجع رقم: ${return_number}` : `إضافة مرتجع جديد رقم: ${return_number}`;
+        await dbService.logActivity(user.id, user.username, user.company_id, action, details, 'returns', id);
+      } catch (postError) {
+        console.error('Post-save operations failed:', postError);
       }
-      
-      const action = editingReturn ? 'تعديل مرتجع' : 'إضافة مرتجع';
-      const details = editingReturn ? `تعديل المرتجع رقم: ${return_number}` : `إضافة مرتجع جديد رقم: ${return_number}`;
-      await dbService.logActivity(user.id, user.username, user.company_id, action, details, 'returns', id);
-      
-      showNotification(editingReturn ? 'تم تعديل المرتجع بنجاح' : 'تم إضافة المرتجع بنجاح', 'success');
-      closeModal();
     } catch (e) {
       console.error(e);
       showNotification('حدث خطأ أثناء حفظ المرتجع', 'error');
-    } finally {
+    }
+ finally {
       setIsSaving(false);
     }
   };

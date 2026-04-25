@@ -710,29 +710,34 @@ export const PurchaseInvoices: React.FC = () => {
         id = await dbService.add('purchase_invoices', { ...data, invoice_number });
       }
 
-      // Create/Update Journal Entry
-      const journalItems: JournalEntryItem[] = [];
+      // Success notification and modal close early
+      showNotification(editingInvoice ? 'تم تعديل فاتورة المشتريات بنجاح' : 'تم حفظ فاتورة المشتريات بنجاح');
+      closeModal();
 
-      // ALWAYS Credit: Supplier Account first (for the invoice part)
-      let supplierAccountId = supplier?.account_id || '';
-      let supplierAccountName = supplier?.account_name || '';
-      
-      if (!supplierAccountId) {
-        const fallbackAccount = accounts.find(a => a.name.includes('موردين'));
-        supplierAccountId = fallbackAccount?.id || 'suppliers_account_default';
-        supplierAccountName = fallbackAccount?.name || 'حساب الموردين (افتراضي)';
-      }
+      // Background post-save hooks
+      try {
+        const journalItems: JournalEntryItem[] = [];
 
-      // Line 1: Cr. Supplier
-      journalItems.push({
-        account_id: supplierAccountId,
-        account_name: supplierAccountName,
-        debit: 0,
-        credit: total_amount,
-        description: `فاتورة مشتريات رقم ${invoice_number} - ${supplier?.name}`,
-        supplier_id: invoiceData.supplier_id,
-        supplier_name: supplier?.name
-      });
+        // ALWAYS Credit: Supplier Account first (for the invoice part)
+        let supplierAccountId = supplier?.account_id || '';
+        let supplierAccountName = supplier?.account_name || '';
+        
+        if (!supplierAccountId) {
+          const fallbackAccount = accounts.find(a => a.name.includes('موردين'));
+          supplierAccountId = fallbackAccount?.id || 'suppliers_account_default';
+          supplierAccountName = fallbackAccount?.name || 'حساب الموردين (افتراضي)';
+        }
+
+        // Line 1: Cr. Supplier
+        journalItems.push({
+          account_id: supplierAccountId,
+          account_name: supplierAccountName,
+          debit: 0,
+          credit: total_amount,
+          description: `فاتورة مشتريات رقم ${invoice_number} - ${supplier?.name}`,
+          supplier_id: invoiceData.supplier_id,
+          supplier_name: supplier?.name
+        });
 
         // Line 1.5: Cr. Discount Account (if any)
         if (invoiceData.discount > 0) {
@@ -851,13 +856,14 @@ export const PurchaseInvoices: React.FC = () => {
         if (!editingInvoice && id) {
           await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة فاتورة مشتريات', `إضافة فاتورة مشتريات جديدة رقم: ${invoice_number}`, 'purchase_invoices', id);
         }
-
-      showNotification(editingInvoice ? 'تم تعديل فاتورة المشتريات بنجاح' : 'تم حفظ فاتورة المشتريات بنجاح');
-      closeModal();
+      } catch (postError) {
+        console.error('Post-save operations failed:', postError);
+      }
     } catch (e) {
       console.error(e);
       showNotification('حدث خطأ أثناء الاتصال بالخادم', 'error');
     }
+
   };
 
   const handleDelete = async (id: string) => {

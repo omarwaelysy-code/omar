@@ -145,47 +145,7 @@ export const Suppliers: React.FC = () => {
           'suppliers',
           fieldsToTrack
         );
-
-        // Always handle journal entry to ensure consistency
-        await dbService.deleteJournalEntryByReference(editingSupplier.id, user.company_id);
-
-        // Create new Journal Entry if balance is not zero
-        if (formData.opening_balance !== 0) {
-          const counterAccount = accounts.find(a => a.id === formData.counter_account_id);
-          const absBalance = Math.abs(formData.opening_balance);
-          const isNegative = formData.opening_balance < 0;
-
-          await dbService.add('journal_entries', {
-            company_id: user.company_id,
-            date: formData.opening_balance_date,
-            description: `رصيد افتتاحي للمورد: ${formData.name}`,
-            reference_id: editingSupplier.id,
-            reference_type: 'opening_balance',
-            items: [
-              {
-                account_id: formData.account_id,
-                account_name: selectedAccount?.name || '',
-                debit: isNegative ? absBalance : 0,
-                credit: isNegative ? 0 : absBalance,
-                description: 'رصيد افتتاحي',
-                supplier_id: editingSupplier.id,
-                supplier_name: formData.name
-              },
-              {
-                account_id: formData.counter_account_id,
-                account_name: counterAccount?.name || '',
-                debit: isNegative ? 0 : absBalance,
-                credit: isNegative ? absBalance : 0,
-                description: `رصيد افتتاحي للمورد: ${formData.name}`
-              }
-            ],
-            total_debit: absBalance,
-            total_credit: absBalance,
-            created_at: new Date().toISOString(),
-            created_by: user.id
-          });
-        }
-        showNotification('تم تحديث بيانات المورد بنجاح', 'success');
+        id = editingSupplier.id;
       } else {
         // Generate sequential code: supp 00001
         const maxCodeNum = suppliers.reduce((max, s) => {
@@ -200,13 +160,27 @@ export const Suppliers: React.FC = () => {
         const nextNumber = maxCodeNum + 1;
         const code = `supp ${nextNumber.toString().padStart(5, '0')}`;
 
-        const id = await dbService.add('suppliers', { 
+        id = await dbService.add('suppliers', { 
           ...dataToSave, 
           code,
           company_id: user.company_id 
         });
+      }
 
-        // Create Journal Entry for Opening Balance
+      // Success notification and modal close early
+      showNotification(editingSupplier ? 'تم تحديث بيانات المورد بنجاح' : 'تم إضافة المورد بنجاح', 'success');
+      closeModal();
+
+      // Background post-save hooks
+      try {
+        if (editingSupplier) {
+          // Always handle journal entry to ensure consistency
+          await dbService.deleteJournalEntryByReference(id, user.company_id);
+        } else {
+          await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة مورد', `إضافة مورد جديد: ${formData.name}`, 'suppliers', id);
+        }
+
+        // Create Journal Entry if balance is not zero
         if (formData.opening_balance !== 0) {
           const counterAccount = accounts.find(a => a.id === formData.counter_account_id);
           const absBalance = Math.abs(formData.opening_balance);
@@ -242,11 +216,9 @@ export const Suppliers: React.FC = () => {
             created_by: user.id
           });
         }
-
-        await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة مورد', `إضافة مورد جديد: ${formData.name}`, 'suppliers', id);
-        showNotification('تم إضافة المورد بنجاح', 'success');
+      } catch (postError) {
+        console.error('Post-save operations failed:', postError);
       }
-      closeModal();
     } catch (e: any) {
       console.error(e);
       showNotification(e.message || 'حدث خطأ أثناء حفظ البيانات', 'error');

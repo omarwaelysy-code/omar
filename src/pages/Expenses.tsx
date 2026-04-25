@@ -74,13 +74,16 @@ export const Expenses: React.FC = () => {
           'expense_categories',
           fieldsToTrack
         );
+        showNotification('تم تحديث بيانات تصنيف المصروفات بنجاح', 'success');
       } else {
         await dbService.add('expense_categories', dataToSave);
         await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة تصنيف مصروفات', `إضافة تصنيف جديد: ${formData.name}`, 'expense_categories');
+        showNotification('تم إضافة تصنيف المصروفات بنجاح', 'success');
       }
       closeModal();
     } catch (e) {
       console.error(e);
+      showNotification('حدث خطأ أثناء حفظ البيانات', 'error');
     }
   };
 

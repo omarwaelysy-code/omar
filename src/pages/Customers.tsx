@@ -145,47 +145,7 @@ export const Customers: React.FC = () => {
           'customers',
           fieldsToTrack
         );
-
-        // Always handle journal entry to ensure consistency
-        await dbService.deleteJournalEntryByReference(editingCustomer.id, user.company_id);
-
-        // Create new Journal Entry if balance is not zero
-        if (formData.opening_balance !== 0) {
-          const counterAccount = accounts.find(a => a.id === formData.counter_account_id);
-          const absBalance = Math.abs(formData.opening_balance);
-          const isNegative = formData.opening_balance < 0;
-
-          await dbService.add('journal_entries', {
-            company_id: user.company_id,
-            date: formData.opening_balance_date,
-            description: `رصيد افتتاحي للعميل: ${formData.name}`,
-            reference_id: editingCustomer.id,
-            reference_type: 'opening_balance',
-            items: [
-              {
-                account_id: formData.account_id,
-                account_name: selectedAccount?.name || '',
-                debit: isNegative ? 0 : absBalance,
-                credit: isNegative ? absBalance : 0,
-                description: 'رصيد افتتاحي',
-                customer_id: editingCustomer.id,
-                customer_name: formData.name
-              },
-              {
-                account_id: formData.counter_account_id,
-                account_name: counterAccount?.name || '',
-                debit: isNegative ? absBalance : 0,
-                credit: isNegative ? 0 : absBalance,
-                description: `رصيد افتتاحي للعميل: ${formData.name}`
-              }
-            ],
-            total_debit: absBalance,
-            total_credit: absBalance,
-            created_at: new Date().toISOString(),
-            created_by: user.id
-          });
-        }
-        showNotification('تم تحديث بيانات العميل بنجاح', 'success');
+        id = editingCustomer.id;
       } else {
         // Generate sequential code: cust 00001
         const maxCodeNum = customers.reduce((max, c) => {
@@ -200,13 +160,27 @@ export const Customers: React.FC = () => {
         const nextNumber = maxCodeNum + 1;
         const code = `cust ${nextNumber.toString().padStart(5, '0')}`;
 
-        const id = await dbService.add('customers', { 
+        id = await dbService.add('customers', { 
           ...dataToSave, 
           code,
           company_id: user.company_id 
         });
+      }
 
-        // Create Journal Entry for Opening Balance
+      // Success notification and modal close early
+      showNotification(editingCustomer ? 'تم تحديث بيانات العميل بنجاح' : 'تم إضافة العميل بنجاح', 'success');
+      closeModal();
+
+      // Background post-save hooks
+      try {
+        if (editingCustomer) {
+          // Always handle journal entry to ensure consistency
+          await dbService.deleteJournalEntryByReference(id, user.company_id);
+        } else {
+          await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة عميل', `إضافة عميل جديد: ${formData.name}`, 'customers', id);
+        }
+
+        // Create Journal Entry if balance is not zero
         if (formData.opening_balance !== 0) {
           const counterAccount = accounts.find(a => a.id === formData.counter_account_id);
           const absBalance = Math.abs(formData.opening_balance);
@@ -242,11 +216,9 @@ export const Customers: React.FC = () => {
             created_by: user.id
           });
         }
-
-        await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة عميل', `إضافة عميل جديد: ${formData.name}`, 'customers', id);
-        showNotification('تم إضافة العميل بنجاح', 'success');
+      } catch (postError) {
+        console.error('Post-save operations failed:', postError);
       }
-      closeModal();
     } catch (e: any) {
       console.error(e);
       showNotification(e.message || 'حدث خطأ أثناء حفظ البيانات', 'error');
