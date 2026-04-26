@@ -1,6 +1,6 @@
 {
-  "name": "AccuSmart - AI Accounting Suite",
-  "description": "A comprehensive accounting web application with AI-powered invoice creation, smart search, and real-time dashboards for small businesses.",
+  "name": "Omar ERP V2",
+  "description": "The official enterprise-grade ERP (V2) with strict transactional integrity, migration safety, and automated health monitoring.",
   "requestFramePermissions": [
     "microphone",
     "camera"

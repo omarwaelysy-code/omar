@@ -618,9 +618,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           </div>
 
           {!isSidebarCollapsed && (
-            <div className="p-4 border-t border-zinc-100 bg-stone-50/50">
+            <div className="p-4 border-t border-zinc-100 bg-stone-50/50 space-y-1">
               <p className="text-[10px] text-zinc-400 font-bold text-center">
                 {t('common.switch_screens_hint')}
+              </p>
+              <p className="text-[9px] text-zinc-300 font-black text-center uppercase tracking-widest">
+                ERP V2 Baseline • v2.0.0
               </p>
             </div>
           )}
