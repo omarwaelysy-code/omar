@@ -35,6 +35,7 @@ import { GeneralLedger } from './pages/GeneralLedger';
 import { TrialBalance } from './pages/TrialBalance';
 import { IncomeStatement } from './pages/IncomeStatement';
 import { BalanceSheet } from './pages/BalanceSheet';
+import { IntegrityDashboard } from './pages/IntegrityDashboard';
 import { DiscountSettings } from './pages/DiscountSettings';
 import { BackupRestore } from './pages/BackupRestore';
 import { Login } from './pages/Login';
@@ -161,6 +162,7 @@ export default function App() {
       case 'balance_sheet': return <BalanceSheet />;
       case 'discount_settings': return <DiscountSettings />;
       case 'backup_restore': return <BackupRestore />;
+      case 'integrity_dashboard': return <IntegrityDashboard />;
       case 'activity_log': return <ActivityLogPage />;
       case 'system_check': return <SystemCheck />;
       default: return <Dashboard />;

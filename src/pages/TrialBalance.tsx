@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
-import { JournalEntry, Account } from '../types';
-import { Search, Calendar, FileText, Download, Printer, Filter, BarChart3, ArrowLeftRight } from 'lucide-react';
+import { JournalEntry, Account, TrialBalanceItem } from '../types';
+import { Search, Calendar, FileText, Download, Printer, Filter, BarChart3, ArrowLeftRight, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
+import { AccountingEngine } from '../services/AccountingEngine';
 
 export const TrialBalance: React.FC = () => {
   const { user } = useAuth();
@@ -55,54 +56,14 @@ export const TrialBalance: React.FC = () => {
     };
   }, [user]);
 
-  const calculateTrialBalance = () => {
-    const startDate = new Date(dateRange.start);
-    const endDate = new Date(dateRange.end);
-    endDate.setHours(23, 59, 59, 999);
+  const trialBalanceData = AccountingEngine.calculateTrialBalance(
+    accounts,
+    entries,
+    dateRange.start,
+    dateRange.end
+  ).filter(a => a.opening.debit !== 0 || a.opening.credit !== 0 || a.movement.debit !== 0 || a.movement.credit !== 0);
 
-    return accounts.map(account => {
-      let openingDebit = account.opening_balance > 0 ? account.opening_balance : 0;
-      let openingCredit = account.opening_balance < 0 ? Math.abs(account.opening_balance) : 0;
-      let movementDebit = 0;
-      let movementCredit = 0;
-
-      entries.forEach(entry => {
-        const entryDate = new Date(entry.date);
-        entry.items?.forEach(item => {
-          if (item.account_id === account.id) {
-            if (entryDate < startDate) {
-              openingDebit += item.debit;
-              openingCredit += item.credit;
-            } else if (entryDate >= startDate && entryDate <= endDate) {
-              movementDebit += item.debit;
-              movementCredit += item.credit;
-            }
-          }
-        });
-      });
-
-      const openingBalance = openingDebit - openingCredit;
-      const closingBalance = openingBalance + (movementDebit - movementCredit);
-
-      return {
-        ...account,
-        opening: {
-          debit: openingBalance > 0 ? openingBalance : 0,
-          credit: openingBalance < 0 ? Math.abs(openingBalance) : 0
-        },
-        movement: {
-          debit: movementDebit,
-          credit: movementCredit
-        },
-        closing: {
-          debit: closingBalance > 0 ? closingBalance : 0,
-          credit: closingBalance < 0 ? Math.abs(closingBalance) : 0
-        }
-      };
-    }).filter(a => a.opening.debit !== 0 || a.opening.credit !== 0 || a.movement.debit !== 0 || a.movement.credit !== 0);
-  };
-
-  const trialBalanceData = calculateTrialBalance();
+  const globalBalance = AccountingEngine.validateGlobalBalance(entries);
 
   const totals = trialBalanceData.reduce((acc, a) => ({
     openingDebit: acc.openingDebit + a.opening.debit,
@@ -247,24 +208,24 @@ export const TrialBalance: React.FC = () => {
 
       {/* Balance Check */}
       <div className={`p-8 rounded-[2.5rem] border-2 flex items-center justify-between shadow-lg ${
-        Math.abs(totals.closingDebit - totals.closingCredit) < 0.01 
+        globalBalance.isBalanced 
           ? 'bg-emerald-500 border-emerald-400 text-white shadow-emerald-500/20' 
           : 'bg-rose-500 border-rose-400 text-white shadow-rose-500/20'
       }`}>
         <div className={`flex items-center gap-4 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse text-left'}`}>
-          <ArrowLeftRight size={32} />
+          {globalBalance.isBalanced ? <CheckCircle2 size={32} /> : <AlertTriangle size={32} />}
           <div>
             <p className="font-black text-xl">{t('trial.check_title')}</p>
             <p className="text-sm opacity-80 font-bold">
-              {Math.abs(totals.closingDebit - totals.closingCredit) < 0.01 
+              {globalBalance.isBalanced 
                 ? t('trial.balanced') 
-                : `${t('trial.unbalanced')} ${(totals.closingDebit - totals.closingCredit).toLocaleString()}`}
+                : `${t('trial.unbalanced')} ${globalBalance.difference.toLocaleString()}`}
             </p>
           </div>
         </div>
         <div className={`${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
           <p className="text-xs font-black uppercase tracking-widest opacity-60">{t('trial.difference')}</p>
-          <p className="text-2xl font-black">{(totals.closingDebit - totals.closingCredit).toLocaleString()}</p>
+          <p className="text-2xl font-black">{globalBalance.difference.toLocaleString()}</p>
         </div>
       </div>
     </div>

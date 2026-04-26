@@ -125,6 +125,7 @@ export const Suppliers: React.FC = () => {
         company_id: user.company_id
       };
 
+      let id: string;
       if (editingSupplier) {
         const fieldsToTrack = [
           { field: 'name', label: 'اسم المورد' },

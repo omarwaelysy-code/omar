@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { dbService } from '../services/dbService';
 import { JournalEntry, Account, AccountType } from '../types';
-import { Search, Calendar, FileText, Download, Printer, Filter, PieChart, ArrowLeftRight, Shield, CreditCard, Wallet } from 'lucide-react';
+import { Search, Calendar, FileText, Download, Printer, Filter, PieChart, ArrowLeftRight, Shield, CreditCard, Wallet, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
+import { AccountingEngine } from '../services/AccountingEngine';
 
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -46,111 +47,12 @@ export const BalanceSheet: React.FC = () => {
     return () => subscriptions.forEach(unsub => unsub());
   }, [user]);
 
-  const calculateBalanceSheet = () => {
-    const targetDate = new Date(asOfDate);
-    targetDate.setHours(23, 59, 59, 999);
-
-    // Calculate Net Profit for the period up to targetDate
-    // A more robust way: Net Profit = (Total Credits of non-BS accounts) - (Total Debits of non-BS accounts)
-    const bsAccountIds = new Set(accounts.filter(account => {
-      const type = accountTypes.find(t => t.id === account.type_id);
-      return type?.statement_type === 'balance_sheet';
-    }).map(a => a.id));
-
-    let netProfit = 0;
-    entries.forEach(entry => {
-      const entryDate = new Date(entry.date);
-      if (entryDate <= targetDate) {
-        entry.items?.forEach(item => {
-          // If the account is NOT a balance sheet account, it contributes to net profit
-          if (!bsAccountIds.has(item.account_id)) {
-            netProfit += (item.credit - item.debit);
-          }
-        });
-      }
-    });
-
-    // Calculate Balance Sheet Accounts
-    const bsAccounts = accounts.filter(account => bsAccountIds.has(account.id));
-
-    const results = bsAccounts.map(account => {
-      let balance = account.opening_balance || 0;
-      entries.forEach(entry => {
-        const entryDate = new Date(entry.date);
-        if (entryDate <= targetDate) {
-          entry.items?.forEach(item => {
-            if (item.account_id === account.id) {
-              // Standard accounting: Assets are positive (Debit - Credit), 
-              // Liabilities/Equity are negative (Debit - Credit) or we can flip them.
-              // Let's keep Debit - Credit for all and handle display.
-              balance += (item.debit - item.credit);
-            }
-          });
-        }
-      });
-
-      const type = accountTypes.find(t => t.id === account.type_id);
-      return {
-        ...account,
-        balance,
-        classification: type?.classification
-      };
-    }).filter(a => a.balance !== 0);
-
-    const assets = results.filter(a => a.classification === 'asset');
-    const liabilitiesEquity = results.filter(a => a.classification === 'liability_equity');
-
-    const totalAssets = assets.reduce((sum, a) => sum + a.balance, 0);
-    // Liabilities and Equity normally have credit balances (negative in our Debit-Credit calc)
-    // So we subtract them (which adds their absolute value) and add net profit (which is also credit-based)
-    const totalLiabilitiesEquity = liabilitiesEquity.reduce((sum, a) => sum + (a.balance * -1), 0) + netProfit;
-
-    // Diagnostics: Check for unbalanced entries or entries with missing accounts
-    let globalDebit = 0;
-    let globalCredit = 0;
-    const unbalancedEntries: string[] = [];
-    const missingAccountEntries: string[] = [];
-
-    entries.forEach(entry => {
-      const entryDate = new Date(entry.date);
-      if (entryDate <= targetDate) {
-        let entryDebit = 0;
-        let entryCredit = 0;
-        entry.items?.forEach(item => {
-          entryDebit += item.debit;
-          entryCredit += item.credit;
-          globalDebit += item.debit;
-          globalCredit += item.credit;
-
-          // Check if account exists
-          if (!accounts.find(a => a.id === item.account_id)) {
-            missingAccountEntries.push(`${entry.description || t('common.no_description')} (${t('common.entry_no')}: ${entry.id.slice(-5)})`);
-          }
-        });
-
-        if (Math.abs(entryDebit - entryCredit) > 0.01) {
-          unbalancedEntries.push(`${entry.description || t('common.no_description')} (${t('common.difference')}: ${entryDebit - entryCredit})`);
-        }
-      }
-    });
-
-    return { 
-      assets, 
-      liabilitiesEquity, 
-      netProfit, 
-      totalAssets, 
-      totalLiabilitiesEquity,
-      diagnostics: {
-        globalDebit,
-        globalCredit,
-        globalDiff: globalDebit - globalCredit,
-        unbalancedEntries: Array.from(new Set(unbalancedEntries)),
-        missingAccountEntries: Array.from(new Set(missingAccountEntries))
-      }
-    };
-  };
-
-  const data = calculateBalanceSheet();
+  const data = AccountingEngine.calculateBalanceSheet(
+    accounts,
+    accountTypes,
+    entries,
+    asOfDate
+  );
 
   const handleExportPDF = async () => {
     if (reportRef.current) {

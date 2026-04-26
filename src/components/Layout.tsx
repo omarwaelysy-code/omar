@@ -239,6 +239,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       icon: Settings,
       subItems: [
         { id: 'users', label: t('nav.users'), icon: UsersIcon },
+        { id: 'integrity_dashboard', label: t('nav.integrity_check') || 'Integrity Check', icon: ShieldCheck },
         { id: 'backup_restore', label: t('nav.backup_restore'), icon: Database },
         { id: 'activity_log', label: t('nav.activity_log'), icon: History },
       ]

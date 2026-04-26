@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
-import { JournalEntry, Account, Customer, Supplier } from '../types';
+import { JournalEntry, Account, Customer, Supplier, LedgerLine } from '../types';
 import { Search, Calendar, FileText, Download, Printer, Filter, BookOpen, ArrowLeftRight, User, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
+import { AccountingEngine } from '../services/AccountingEngine';
 
 export const GeneralLedger: React.FC = () => {
   const { user } = useAuth();
@@ -23,13 +24,12 @@ export const GeneralLedger: React.FC = () => {
     start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
   });
-  const [startBalance, setStartBalance] = useState(0);
 
   useEffect(() => {
     if (!user) return;
 
     const unsubscribeEntries = dbService.subscribe<JournalEntry>('journal_entries', user.company_id, (data) => {
-      setEntries(data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+      setEntries(data);
       setLoading(false);
     });
 
@@ -46,71 +46,26 @@ export const GeneralLedger: React.FC = () => {
   }, [user]);
 
   const selectedAccount = accounts.find(a => a.id === selectedAccountId);
-  const isCustomerAccount = selectedAccount?.name.includes('عملاء') || selectedAccount?.name.includes('العملاء');
-  const isSupplierAccount = selectedAccount?.name.includes('موردين') || selectedAccount?.name.includes('الموردين');
 
-  const accountTransactions = entries.flatMap(entry => 
-    (entry.items || [])
-      .filter(item => {
-        const matchesAccount = item.account_id === selectedAccountId;
-        if (!matchesAccount) return false;
+  const { lines: ledgerData, openingBalance: startBalance } = selectedAccount
+    ? AccountingEngine.calculateLedger(
+        selectedAccount,
+        entries,
+        dateRange.start,
+        dateRange.end,
+        selectedEntityIds
+      )
+    : { lines: [], openingBalance: 0 };
 
-        if (selectedEntityIds.length > 0) {
-          return selectedEntityIds.includes(item.customer_id || '') || 
-                 selectedEntityIds.includes(item.supplier_id || '');
-        }
-        return true;
-      })
-      .map(item => ({
-        ...item,
-        date: entry.date,
-        description: item.description || entry.description,
-        reference_number: entry.reference_number,
-        reference_type: entry.reference_type,
-        customer_name: item.customer_name,
-        supplier_name: item.supplier_name,
-        entry_id: entry.id
-      }))
-  );
-
-  const filteredTransactions = accountTransactions.filter(tx => {
-    const txDate = new Date(tx.date);
-    const startDate = new Date(dateRange.start);
-    const endDate = new Date(dateRange.end);
-    endDate.setHours(23, 59, 59, 999);
-    return txDate >= startDate && txDate <= endDate;
-  });
-
-  // Calculate Running Balance including opening balance and transactions before start date
-  useEffect(() => {
-    if (selectedAccountId) {
-      const account = accounts.find(a => a.id === selectedAccountId);
-      const opBal = account?.opening_balance || 0;
-      
-      const transactionsBefore = accountTransactions.filter(tx => {
-        const txDate = new Date(tx.date);
-        const startDate = new Date(dateRange.start);
-        return txDate < startDate;
-      });
-      
-      const balBefore = transactionsBefore.reduce((sum, tx) => sum + (tx.debit - tx.credit), 0);
-      setStartBalance(opBal + balBefore);
-    }
-  }, [selectedAccountId, accountTransactions, dateRange.start, accounts]);
-
-  let runningBalance = startBalance;
-  const transactionsWithBalance = filteredTransactions.map(tx => {
-    runningBalance += (tx.debit - tx.credit);
-    return { ...tx, balance: runningBalance };
-  });
-
-  const totals = transactionsWithBalance.reduce((acc, tx) => ({
+  const totals = ledgerData.reduce((acc, tx) => ({
     debit: acc.debit + tx.debit,
     credit: acc.credit + tx.credit
   }), { 
     debit: startBalance > 0 ? startBalance : 0, 
     credit: startBalance < 0 ? Math.abs(startBalance) : 0 
   });
+
+  const currentBalance = ledgerData.length > 0 ? ledgerData[ledgerData.length - 1].balance : startBalance;
 
   const handleExportPDF = async () => {
     if (reportRef.current) {
@@ -125,11 +80,11 @@ export const GeneralLedger: React.FC = () => {
 
   const handleExportExcel = () => {
     const account = accounts.find(a => a.id === selectedAccountId);
-    const data = transactionsWithBalance.map(tx => ({
+    const data = ledgerData.map(tx => ({
       [t('journal.column_date')]: tx.date,
-      [t('ledger.column_entity')]: tx.customer_name || tx.supplier_name || '-',
+      [t('ledger.column_entity')]: tx.entity_name || '-',
       [t('journal.column_description')]: tx.description,
-      [t('journal.column_reference')]: tx.reference_number || '-',
+      [t('journal.column_reference')]: tx.reference || '-',
       [t('journal.column_debit')]: tx.debit,
       [t('journal.column_credit')]: tx.credit,
       [t('ledger.column_balance')]: tx.balance
@@ -292,8 +247,8 @@ export const GeneralLedger: React.FC = () => {
             </div>
             <div className={`bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
               <p className="text-xs font-black text-zinc-400 uppercase tracking-widest mb-1">{t('ledger.final_balance')}</p>
-              <p className={`text-2xl font-black ${runningBalance >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                {runningBalance.toLocaleString()}
+              <p className={`text-2xl font-black ${currentBalance >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                {currentBalance.toLocaleString()}
               </p>
             </div>
           </div>
@@ -323,18 +278,18 @@ export const GeneralLedger: React.FC = () => {
                     <td className="px-6 py-4 text-sm font-black text-rose-600 text-center">{startBalance < 0 ? Math.abs(startBalance).toLocaleString() : '-'}</td>
                     <td className="px-6 py-4 text-sm font-black text-zinc-900 text-center">{startBalance.toLocaleString()}</td>
                   </tr>
-                  {transactionsWithBalance.map((tx, idx) => (
+                  {ledgerData.map((tx, idx) => (
                     <tr key={idx} className="hover:bg-zinc-50/50 transition-colors">
                       <td className="px-6 py-4 text-sm font-bold text-zinc-900">{tx.date}</td>
                       <td className="px-6 py-4 text-sm font-bold text-emerald-600">
-                        {tx.customer_name || tx.supplier_name || '-'}
+                        {tx.entity_name || '-'}
                       </td>
                       <td className="px-6 py-4 text-sm font-medium text-zinc-600 max-w-xs truncate">
                         {tx.description}
                       </td>
                       <td className="px-6 py-4">
                         <span className="px-3 py-1 bg-zinc-100 text-zinc-600 rounded-lg text-xs font-bold">
-                          {tx.reference_number || '-'}
+                          {tx.reference || '-'}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{tx.debit > 0 ? tx.debit.toLocaleString() : '-'}</td>
@@ -342,7 +297,7 @@ export const GeneralLedger: React.FC = () => {
                       <td className="px-6 py-4 text-sm font-black text-zinc-900 text-center">{tx.balance.toLocaleString()}</td>
                     </tr>
                   ))}
-                  {transactionsWithBalance.length === 0 && (
+                  {ledgerData.length === 0 && (
                     <tr>
                       <td colSpan={7} className="px-6 py-12 text-center text-zinc-500 font-medium">
                         {t('ledger.no_transactions')}

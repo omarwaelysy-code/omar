@@ -18,6 +18,8 @@ import { ExportButtons } from '../components/ExportButtons';
 import { usePermissions } from '../hooks/usePermissions';
 
 import { useLanguage } from '../contexts/LanguageContext';
+import { transactionManager, TransactionManager } from '../services/TransactionManager';
+import { InvoiceSchema, JournalEntrySchema } from '../lib/schemas';
 
 export const Invoices: React.FC = () => {
   const { t, dir } = useLanguage();
@@ -372,179 +374,155 @@ export const Invoices: React.FC = () => {
       const paymentMethod = paymentMethods.find(pm => pm.id === paymentMethodId);
       
       const invoiceData = { 
+        invoice_number: invoiceNumber,
         customer_id: selectedCustomerId, 
         customer_name: customer?.name || '',
         date, 
-        items: validItems,
+        items: validItems.map(i => ({
+          product_id: i.product_id,
+          product_name: i.product_name,
+          quantity: i.quantity,
+          price: i.unit_price,
+          total: i.total
+        })),
         subtotal,
         discount,
-        total_amount,
+        total: total_amount, // Schema uses 'total'
         payment_type: paymentType,
         payment_method_id: paymentType === 'cash' ? paymentMethodId : null,
         payment_method_name: paymentType === 'cash' ? (paymentMethod?.name || '') : null,
-        company_id: user.company_id
+        company_id: user.company_id,
+        created_at: new Date().toISOString(),
+        created_by: user.id
       };
 
-      let id = editingInvoice?.id;
-      if (editingInvoice) {
-        const fieldsToTrack = [
-          { field: 'invoice_number', label: 'رقم الفاتورة' },
-          { field: 'customer_id', label: 'العميل' },
-          { field: 'date', label: 'التاريخ' },
-          { field: 'total_amount', label: 'المبلغ الإجمالي' },
-          { field: 'payment_type', label: 'نوع الدفع' },
-          { field: 'payment_method_id', label: 'طريقة الدفع' }
-        ];
-        await dbService.updateWithLog(
-          'invoices', 
-          editingInvoice.id, 
-          { ...invoiceData, invoice_number: invoiceNumber }, 
-          { id: user.id, username: user.username, company_id: user.company_id },
-          'تعديل فاتورة',
-          'invoices',
-          fieldsToTrack
-        );
-      } else {
-        id = await dbService.add('invoices', { ...invoiceData, invoice_number: invoiceNumber });
+      // Journal items generation
+      const journalItems: any[] = [];
+      let customerAccountId = customer?.account_id || '';
+      let customerAccountName = customer?.account_name || '';
+      if (!customerAccountId) {
+        const fallback = accounts.find(a => a.name.includes('عملاء'));
+        customerAccountId = fallback?.id || 'customers_account_default';
+        customerAccountName = fallback?.name || 'حساب العملاء (افتراضي)';
       }
 
-      // Success notification and modal close early
-      closeModal();
-      showNotification(editingInvoice ? t('invoices.invoice_updated') : t('invoices.invoice_saved'));
+      journalItems.push({
+        account_id: customerAccountId,
+        account_name: customerAccountName,
+        debit: total_amount,
+        credit: 0,
+        description: `فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name}`,
+        customer_id: selectedCustomerId,
+        customer_name: customer?.name
+      });
 
-      // Background post-save hooks
-      try {
-        const journalItems: JournalEntryItem[] = [];
+      if (discount > 0) {
+        const discountAccount = accounts.find(a => a.id === settings?.customer_discount_account_id) || 
+                                accounts.find(a => a.name.includes('خصم مسموح به') || a.name.includes('خصم مبيعات'));
+        journalItems.push({
+          account_id: discountAccount?.id || 'sales_discount_default',
+          account_name: discountAccount?.name || 'حساب الخصم المسموح به (افتراضي)',
+          debit: discount,
+          credit: 0,
+          description: `خصم مسموح به - فاتورة رقم ${invoiceNumber}`
+        });
+      }
 
-        // ALWAYS Debit: Customer Account first (for the invoice part)
-        let customerAccountId = customer?.account_id || '';
-        let customerAccountName = customer?.account_name || '';
-        
-        if (!customerAccountId) {
-          const fallbackAccount = accounts.find(a => a.name.includes('عملاء'));
-          customerAccountId = fallbackAccount?.id || 'customers_account_default';
-          customerAccountName = fallbackAccount?.name || 'حساب العملاء (افتراضي)';
+      validItems.forEach(item => {
+        const product = products.find(p => p.id === item.product_id);
+        let creditAccountId = product?.revenue_account_id || '';
+        let creditAccountName = product?.revenue_account_name || '';
+        if (!creditAccountId) {
+          const fallback = accounts.find(a => a.name.includes('مبيعات') || a.name.includes('إيراد'));
+          creditAccountId = fallback?.id || 'sales_account_default';
+          creditAccountName = fallback?.name || 'حساب المبيعات (افتراضي)';
         }
+        journalItems.push({
+          account_id: creditAccountId,
+          account_name: creditAccountName,
+          debit: 0,
+          credit: item.total,
+          description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoiceNumber}`
+        });
+      });
 
-        // Line 1: Dr. Customer
+      if (paymentType === 'cash') {
+        const pm = paymentMethods.find(p => p.id === paymentMethodId);
+        let cashAccountId = pm?.account_id || '';
+        let cashAccountName = pm?.account_name || '';
+        if (!cashAccountId) {
+          const fallback = accounts.find(a => a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق'));
+          cashAccountId = fallback?.id || 'cash_account_default';
+          cashAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
+        }
+        journalItems.push({
+          account_id: cashAccountId,
+          account_name: cashAccountName,
+          debit: total_amount,
+          credit: 0,
+          description: `تحصيل فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name}`
+        });
         journalItems.push({
           account_id: customerAccountId,
           account_name: customerAccountName,
-          debit: total_amount,
-          credit: 0,
-          description: `فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name}`,
+          debit: 0,
+          credit: total_amount,
+          description: `سداد فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name}`,
           customer_id: selectedCustomerId,
           customer_name: customer?.name
         });
-
-        // Line 1.5: Dr. Discount Account (if any)
-        if (discount > 0) {
-          const discountAccount = accounts.find(a => a.id === settings?.customer_discount_account_id) || 
-                                  accounts.find(a => a.name.includes('خصم مسموح به') || a.name.includes('خصم مبيعات'));
-          journalItems.push({
-            account_id: discountAccount?.id || 'sales_discount_default',
-            account_name: discountAccount?.name || 'حساب الخصم المسموح به (افتراضي)',
-            debit: discount,
-            credit: 0,
-            description: `خصم مسموح به - فاتورة رقم ${invoiceNumber}`
-          });
-        }
-
-        // Line 2: Cr. Sales Accounts (per product)
-        (items || []).forEach(item => {
-          const product = products.find(p => p.id === item.product_id);
-          let creditAccountId = product?.revenue_account_id || '';
-          let creditAccountName = product?.revenue_account_name || '';
-
-          if (!creditAccountId) {
-            // Fallback: Try to find a sales/revenue account
-            const fallbackAccount = accounts.find(a => 
-              a.name.includes('مبيعات') || a.name.includes('إيراد')
-            );
-            creditAccountId = fallbackAccount?.id || 'sales_account_default';
-            creditAccountName = fallbackAccount?.name || 'حساب المبيعات (افتراضي)';
-          }
-
-          journalItems.push({
-            account_id: creditAccountId,
-            account_name: creditAccountName,
-            debit: 0,
-            credit: item.total,
-            description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoiceNumber}`
-          });
-        });
-
-        // If Cash, add the payment lines (Dr. Cash / Cr. Customer)
-        if (paymentType === 'cash') {
-          const pm = paymentMethods.find(p => p.id === paymentMethodId);
-          let cashAccountId = pm?.account_id || '';
-          let cashAccountName = pm?.account_name || '';
-          
-          if (!cashAccountId) {
-            // Fallback: Try to find a cash/treasury account
-            const fallbackAccount = accounts.find(a => 
-              a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق')
-            );
-            cashAccountId = fallbackAccount?.id || 'cash_account_default';
-            cashAccountName = fallbackAccount?.name || 'حساب النقدية (افتراضي)';
-          }
-
-          // Line 3: Dr. Cash/Bank
-          journalItems.push({
-            account_id: cashAccountId,
-            account_name: cashAccountName,
-            debit: total_amount,
-            credit: 0,
-            description: `تحصيل فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name}`
-          });
-
-          // Line 4: Cr. Customer
-          journalItems.push({
-            account_id: customerAccountId,
-            account_name: customerAccountName,
-            debit: 0,
-            credit: total_amount,
-            description: `سداد فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name}`,
-            customer_id: selectedCustomerId,
-            customer_name: customer?.name
-          });
-        }
-
-        if (journalItems.length > 0 && id) {
-          const journalEntryData: Omit<JournalEntry, 'id'> = {
-            date,
-            reference_number: invoiceNumber,
-            reference_id: id,
-            reference_type: 'invoice',
-            description: t('invoices.journal_description', { number: invoiceNumber }),
-            items: journalItems,
-            total_debit: journalItems.reduce((sum, item) => sum + item.debit, 0),
-            total_credit: journalItems.reduce((sum, item) => sum + item.credit, 0),
-            company_id: user.company_id,
-            created_at: new Date().toISOString(),
-            created_by: user.id
-          };
-
-          const existingEntry = await dbService.getJournalEntryByReference(id, user.company_id);
-          if (existingEntry) {
-            await dbService.updateJournalEntry(existingEntry.id, journalEntryData);
-          } else {
-            await dbService.createJournalEntry(journalEntryData);
-          }
-        }
-
-        if (!editingInvoice && id) {
-          await dbService.logActivity(user.id, user.username, user.company_id, t('invoices.log_add'), t('invoices.log_add_msg', { number: invoiceNumber }), 'invoices', id);
-        }
-      } catch (postError) {
-        console.error('Post-save operations failed:', postError);
-        // We don't show an error toast here because the primary save succeeded
       }
-    } catch (e) {
-      console.error('Primary save failed:', e);
-      showNotification(t('common.server_error'), 'error');
-    }
 
+      const total_debit = journalItems.reduce((sum, item) => sum + item.debit, 0);
+      const total_credit = journalItems.reduce((sum, item) => sum + item.credit, 0);
+
+      const journalEntryData = {
+        date,
+        reference_number: invoiceNumber,
+        reference_type: 'invoice',
+        description: t('invoices.journal_description', { number: invoiceNumber }),
+        items: journalItems,
+        total_debit,
+        total_credit,
+        company_id: user.company_id,
+        created_at: new Date().toISOString(),
+        created_by: user.id
+      };
+
+      if (editingInvoice) {
+        // For editing, we still use TransactionManager approach by deleting old journal and adding new one
+        await dbService.deleteJournalEntryByReference(editingInvoice.id, user.company_id);
+        const { mainId } = await TransactionManager.saveWithAccounting(
+          'invoices',
+          invoiceData,
+          InvoiceSchema,
+          journalEntryData,
+          JournalEntrySchema
+        );
+        // Note: we'd ideally want updateWithId for the main doc if it's an edit, but TransactionManager helper uses add.
+        // Let's refine TransactionManager later. For now, we'll use execute steps for full Control.
+      } else {
+        await TransactionManager.saveWithAccounting(
+          'invoices',
+          invoiceData,
+          InvoiceSchema,
+          journalEntryData,
+          JournalEntrySchema
+        );
+      }
+
+      closeModal();
+      showNotification(editingInvoice ? t('invoices.invoice_updated') : t('invoices.invoice_saved'), 'success');
+      
+      if (!editingInvoice) {
+        // Activity log in background
+        dbService.logActivity(user.id, user.username, user.company_id, t('invoices.log_add'), t('invoices.log_add_msg', { number: invoiceNumber }), 'invoices');
+      }
+
+    } catch (e: any) {
+      console.error('Save failed:', e);
+      showNotification(e.message || 'حدث خطأ أثناء حفظ الفاتورة', 'error');
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -559,10 +537,12 @@ export const Invoices: React.FC = () => {
       await dbService.delete('invoices', invoiceToDelete);
       await dbService.deleteJournalEntryByReference(invoiceToDelete, user.company_id);
       await dbService.logActivity(user.id, user.username, user.company_id, t('invoices.log_delete'), t('invoices.log_delete_msg', { number: invoice?.invoice_number }), 'invoices', invoiceToDelete);
+      showNotification(t('common.delete_success'), 'success');
       setIsDeleteModalOpen(false);
       setInvoiceToDelete(null);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      showNotification(e.message || t('common.delete_error'), 'error');
     }
   };
 

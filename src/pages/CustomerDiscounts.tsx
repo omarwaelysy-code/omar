@@ -8,6 +8,8 @@ import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { SmartAIInput } from '../components/SmartAIInput';
+import { TransactionManager } from '../services/TransactionManager';
+import { DiscountSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog } from '../types';
 
 export const CustomerDiscounts: React.FC = () => {
@@ -199,15 +201,72 @@ export const CustomerDiscounts: React.FC = () => {
       const number = `CDISC-${Date.now().toString().slice(-6)}`;
       
       const data = {
-        ...discountData,
+        customer_id: discountData.customer_id,
         customer_name: customer?.name || '',
+        amount: discountData.amount,
+        date: discountData.date,
+        account_id: discountData.account_id,
+        notes: discountData.notes,
         number,
-        company_id: user.company_id
+        type: 'customer',
+        company_id: user.company_id,
+        created_at: new Date().toISOString(),
+        created_by: user.id
       };
 
-      const id = await dbService.add('customer_discounts', data);
+      const journalItems: any[] = [];
+      const discountAccount = accounts.find(a => a.id === discountData.account_id) || 
+                              accounts.find(a => a.name.includes('خصم مسموح به') || a.name.includes('خصومات مسموح بها'));
+      const debitAccountId = discountAccount?.id || 'discount_allowed_default';
+      const debitAccountName = discountAccount?.name || 'حساب الخصم المسموح به (افتراضي)';
 
-      // Success notification and modal close early
+      journalItems.push({
+        account_id: debitAccountId,
+        account_name: debitAccountName,
+        debit: discountData.amount,
+        credit: 0,
+        description: `خصم مسموح به للعميل: ${customer?.name} - رقم ${number}`
+      });
+
+      let creditAccountId = customer?.account_id || '';
+      let creditAccountName = customer?.account_name || '';
+      if (!creditAccountId) {
+        const fallback = accounts.find(a => a.name.includes('عملاء'));
+        creditAccountId = fallback?.id || 'customers_account_default';
+        creditAccountName = fallback?.name || 'حساب العملاء (افتراضي)';
+      }
+
+      journalItems.push({
+        account_id: creditAccountId,
+        account_name: creditAccountName,
+        debit: 0,
+        credit: discountData.amount,
+        description: `خصم مسموح به رقم ${number}`,
+        customer_id: discountData.customer_id,
+        customer_name: customer?.name
+      });
+
+      const journalEntryData = {
+        date: discountData.date,
+        reference_number: number,
+        reference_type: 'customer_discount',
+        description: `قيد خصم مسموح به رقم ${number}`,
+        items: journalItems,
+        total_debit: discountData.amount,
+        total_credit: discountData.amount,
+        company_id: user.company_id,
+        created_at: new Date().toISOString(),
+        created_by: user.id
+      };
+
+      await TransactionManager.saveWithAccounting(
+        'customer_discounts',
+        data,
+        DiscountSchema,
+        journalEntryData,
+        JournalEntrySchema
+      );
+
       showNotification('تم إضافة الخصم بنجاح', 'success');
       setDiscountData({
         customer_id: '',
@@ -218,71 +277,12 @@ export const CustomerDiscounts: React.FC = () => {
       });
       setIsModalOpen(false);
 
-      // Background post-save hooks
-      try {
-        // Create Journal Entry
-        const journalItems: JournalEntryItem[] = [];
+      dbService.logActivity(user.id, user.username, user.company_id, 'إضافة خصم عميل', `إضافة خصم للعميل: ${customer?.name} بمبلغ: ${discountData.amount}`, 'customer_discounts');
 
-        // Debit: Selected Account
-        const discountAccount = accounts.find(a => a.id === discountData.account_id) || 
-                                accounts.find(a => a.name.includes('خصم مسموح به') || a.name.includes('خصومات مسموح بها'));
-        const debitAccountId = discountAccount?.id || 'discount_allowed_default';
-        const debitAccountName = discountAccount?.name || 'حساب الخصم المسموح به (افتراضي)';
-
-        journalItems.push({
-          account_id: debitAccountId,
-          account_name: debitAccountName,
-          debit: discountData.amount,
-          credit: 0,
-          description: `خصم مسموح به للعميل: ${customer?.name} - رقم ${number}`
-        });
-
-        // Credit: Customer Account
-        let creditAccountId = customer?.account_id || '';
-        let creditAccountName = customer?.account_name || '';
-
-        if (!creditAccountId) {
-          const fallbackAccount = accounts.find(a => a.name.includes('عملاء'));
-          creditAccountId = fallbackAccount?.id || 'customers_account_default';
-          creditAccountName = fallbackAccount?.name || 'حساب العملاء (افتراضي)';
-        }
-
-        journalItems.push({
-          account_id: creditAccountId,
-          account_name: creditAccountName,
-          debit: 0,
-          credit: discountData.amount,
-          description: `خصم مسموح به رقم ${number}`,
-          customer_id: discountData.customer_id,
-          customer_name: customer?.name
-        });
-
-        if (journalItems.length > 0) {
-          const journalEntry: Omit<JournalEntry, 'id'> = {
-            date: discountData.date,
-            reference_number: number,
-            reference_id: id,
-            reference_type: 'customer_discount',
-            description: `قيد خصم مسموح به رقم ${number}`,
-            items: journalItems,
-            total_debit: discountData.amount,
-            total_credit: discountData.amount,
-            company_id: user.company_id,
-            created_at: new Date().toISOString(),
-            created_by: user.id
-          };
-          await dbService.createJournalEntry(journalEntry);
-        }
-
-        await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة خصم عميل', `إضافة خصم للعميل: ${customer?.name} بمبلغ: ${discountData.amount}`, 'customer_discounts', id);
-      } catch (postError) {
-        console.error('Post-save operations failed:', postError);
-      }
-    } catch (e) {
-      console.error(e);
-      showNotification('حدث خطأ أثناء حفظ البيانات', 'error');
+    } catch (e: any) {
+      console.error('Save failed:', e);
+      showNotification(e.message || 'حدث خطأ أثناء حفظ البيانات', 'error');
     }
-
   };
 
   const handleDelete = (id: string) => {

@@ -14,6 +14,8 @@ import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { ExportButtons } from '../components/ExportButtons';
 import { SmartAIInput } from '../components/SmartAIInput';
+import { TransactionManager } from '../services/TransactionManager';
+import { VoucherSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog } from '../types';
 
 export const Receipts: React.FC = () => {
@@ -320,119 +322,93 @@ export const Receipts: React.FC = () => {
         : `RCPT-${Date.now().toString().slice(-6)}`;
       
       const receiptData = {
-        ...formData,
         voucher_number,
+        date: formData.date,
+        amount: formData.amount,
+        description: formData.description,
+        customer_id: formData.customer_id,
         customer_name: customer?.name || '',
+        payment_method_id: formData.payment_method_id || null,
         payment_method_name: paymentMethod?.name || '',
-        company_id: user.company_id
+        type: 'receipt' as const,
+        company_id: user.company_id,
+        created_at: new Date().toISOString(),
+        created_by: user.id
       };
 
-      let id = '';
-      if (editingReceipt) {
-        const fieldsToTrack = [
-          { field: 'customer_id', label: 'العميل' },
-          { field: 'amount', label: 'المبلغ' },
-          { field: 'payment_method_id', label: 'طريقة الدفع' },
-          { field: 'date', label: 'التاريخ' },
-          { field: 'description', label: 'البيان' }
-        ];
-        await dbService.updateWithLog(
-          'receipt_vouchers', 
-          editingReceipt.id, 
-          receiptData,
-          { id: user.id, username: user.username, company_id: user.company_id },
-          'تعديل سند قبض',
-          'receipt_vouchers',
-          fieldsToTrack
+      const journalItems: any[] = [];
+      let debitAccountId = paymentMethod?.account_id || '';
+      let debitAccountName = paymentMethod?.name || '';
+      if (!debitAccountId) {
+        const fallback = accounts.find(a => 
+          a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق') || a.name.includes('بنك')
         );
-        id = editingReceipt.id;
-      } else {
-        id = await dbService.add('receipt_vouchers', receiptData);
+        debitAccountId = fallback?.id || 'cash_account_default';
+        debitAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
       }
 
-      // Success notification and modal close early
+      journalItems.push({
+        account_id: debitAccountId,
+        account_name: debitAccountName,
+        debit: formData.amount,
+        credit: 0,
+        description: `سند قبض رقم ${voucher_number} - ${formData.description}`
+      });
+
+      let creditAccountId = customer?.account_id || '';
+      let creditAccountName = customer?.account_name || '';
+      if (!creditAccountId) {
+        const fallback = accounts.find(a => a.name.includes('عملاء'));
+        creditAccountId = fallback?.id || 'customers_account_default';
+        creditAccountName = fallback?.name || 'حساب العملاء (افتراضي)';
+      }
+
+      journalItems.push({
+        account_id: creditAccountId,
+        account_name: creditAccountName,
+        debit: 0,
+        credit: formData.amount,
+        description: `سند قبض رقم ${voucher_number} من العميل: ${customer?.name}`,
+        customer_id: formData.customer_id,
+        customer_name: customer?.name
+      });
+
+      const journalEntryData = {
+        date: formData.date,
+        reference_number: voucher_number,
+        reference_type: 'receipt',
+        description: `قيد سند قبض رقم ${voucher_number}`,
+        items: journalItems,
+        total_debit: formData.amount,
+        total_credit: formData.amount,
+        company_id: user.company_id,
+        created_at: new Date().toISOString(),
+        created_by: user.id
+      };
+
+      if (editingReceipt) {
+        await dbService.deleteJournalEntryByReference(editingReceipt.id, user.company_id);
+      }
+
+      await TransactionManager.saveWithAccounting(
+        'receipt_vouchers',
+        receiptData,
+        VoucherSchema,
+        journalEntryData,
+        JournalEntrySchema
+      );
+
       showNotification(editingReceipt ? 'تم تحديث سند القبض بنجاح' : 'تم إضافة سند القبض بنجاح', 'success');
       closeModal();
 
-      // Background post-save hooks
-      try {
-        if (editingReceipt) {
-          // Always handle journal entry to ensure consistency
-          await dbService.deleteJournalEntryByReference(id, user.company_id);
-        }
-
-        // Create Journal Entry
-        const journalItems: JournalEntryItem[] = [];
-        const receipt_number = voucher_number;
-
-        // Debit: Payment Method Account (Cash/Bank)
-        let debitAccountId = paymentMethod?.account_id || '';
-        let debitAccountName = paymentMethod?.name || '';
-
-        if (!debitAccountId) {
-          const fallbackAccount = accounts.find(a => 
-            a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق') || a.name.includes('بنك')
-          );
-          debitAccountId = fallbackAccount?.id || 'cash_account_default';
-          debitAccountName = fallbackAccount?.name || 'حساب النقدية (افتراضي)';
-        }
-
-        journalItems.push({
-          account_id: debitAccountId,
-          account_name: debitAccountName,
-          debit: formData.amount,
-          credit: 0,
-          description: `سند قبض رقم ${receipt_number} - ${formData.description}`
-        });
-
-        // Credit: Customer Account
-        let creditAccountId = customer?.account_id || '';
-        let creditAccountName = customer?.account_name || '';
-
-        if (!creditAccountId) {
-          const fallbackAccount = accounts.find(a => a.name.includes('عملاء'));
-          creditAccountId = fallbackAccount?.id || 'customers_account_default';
-          creditAccountName = fallbackAccount?.name || 'حساب العملاء (افتراضي)';
-        }
-
-        journalItems.push({
-          account_id: creditAccountId,
-          account_name: creditAccountName,
-          debit: 0,
-          credit: formData.amount,
-          description: `سند قبض رقم ${receipt_number} من العميل: ${customer?.name}`,
-          customer_id: formData.customer_id,
-          customer_name: customer?.name
-        });
-
-        if (journalItems.length > 0) {
-          const journalEntry: Omit<JournalEntry, 'id'> = {
-            date: formData.date,
-            reference_number: receipt_number,
-            reference_id: id,
-            reference_type: 'receipt',
-            description: `قيد سند قبض رقم ${receipt_number}`,
-            items: journalItems,
-            total_debit: formData.amount,
-            total_credit: formData.amount,
-            company_id: user.company_id,
-            created_at: new Date().toISOString(),
-            created_by: user.id
-          };
-          await dbService.createJournalEntry(journalEntry);
-        }
-
-        if (!editingReceipt) {
-          await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة سند قبض', `إضافة سند قبض جديد للعميل: ${customer?.name}`, 'receipt_vouchers', id);
-        }
-      } catch (postError) {
-        console.error('Post-save operations failed:', postError);
+      if (!editingReceipt) {
+        dbService.logActivity(user.id, user.username, user.company_id, 'إضافة سند قبض', `إضافة سند قبض جديد للعميل: ${customer?.name}`, 'receipt_vouchers');
       }
-    } catch (e) {
-      console.error(e);
-      showNotification('حدث خطأ أثناء حفظ السند', 'error');
-    }
 
+    } catch (e: any) {
+      console.error('Save failed:', e);
+      showNotification(e.message || 'حدث خطأ أثناء حفظ السند', 'error');
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -450,10 +426,12 @@ export const Receipts: React.FC = () => {
       
       await dbService.delete('receipt_vouchers', receiptToDelete);
       await dbService.logActivity(user.id, user.username, user.company_id, 'حذف سند قبض', `حذف سند قبض للعميل: ${receipt?.customer_name}`, 'receipt_vouchers');
+      showNotification(t('common.delete_success'), 'success');
       setIsDeleteModalOpen(false);
       setReceiptToDelete(null);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      showNotification(e.message || t('common.delete_error'), 'error');
     }
   };
 

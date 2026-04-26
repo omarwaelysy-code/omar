@@ -9,6 +9,10 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "ci": "npm run lint && npm run test",
+    "build": "npm run ci && vite build",
     "start": "node server.ts"
   },
   "dependencies": {
@@ -46,7 +50,8 @@
     "tailwind-merge": "^3.5.0",
     "uuid": "^13.0.0",
     "vite": "^6.2.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

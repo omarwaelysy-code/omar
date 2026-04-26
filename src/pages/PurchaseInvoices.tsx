@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { Supplier, Product, PaymentMethod, ExpenseCategory, Account, JournalEntry, JournalEntryItem } from '../types';
 import { 
   Search, Plus, Trash2, X, ShoppingCart, User, CreditCard, 
@@ -18,11 +19,14 @@ import { InlineActivityLog } from '../components/InlineActivityLog';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import DocumentChatter from '../components/DocumentChatter';
+import { TransactionManager } from '../services/TransactionManager';
+import { InvoiceSchema, JournalEntrySchema } from '../lib/schemas';
 import { ExportButtons } from '../components/ExportButtons';
 import { ActivityLog } from '../types';
 
 export const PurchaseInvoices: React.FC = () => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { showNotification } = useNotification();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -666,204 +670,163 @@ export const PurchaseInvoices: React.FC = () => {
       
       const subtotal = validItems.reduce((sum, item) => sum + (item.total || 0), 0);
       const total_amount = subtotal - invoiceData.discount;
+      const invoice_number = editingInvoice?.invoice_number || invoiceNumber;
 
       const data = {
-        ...invoiceData,
+        invoice_number,
+        supplier_id: invoiceData.supplier_id,
         supplier_name: supplier?.name || '',
-        payment_method_name: paymentMethod?.name || '',
+        date: invoiceData.date, 
         subtotal,
-        total_amount,
+        discount: invoiceData.discount,
+        total: total_amount,
         items: validItems.map(item => ({
-          product_id: item.product_id || null,
-          expense_category_id: item.expense_category_id || null,
+          product_id: item.product_id || '',
+          expense_category_id: item.expense_category_id || '',
           product_name: item.product_name || '',
           category_name: item.category_name || '',
           quantity: item.quantity,
-          unit_price: item.cost_price,
+          price: item.cost_price,
           total: item.total
         })),
-        company_id: user.company_id
+        payment_type: invoiceData.payment_type,
+        payment_method_id: invoiceData.payment_method_id || null,
+        payment_method_name: paymentMethod?.name || '',
+        company_id: user.company_id,
+        created_at: new Date().toISOString(),
+        created_by: user.id
       };
 
-      let id = editingInvoice?.id;
-      const invoice_number = editingInvoice?.invoice_number || invoiceNumber;
-
-      if (editingInvoice) {
-        const fieldsToTrack = [
-          { field: 'supplier_id', label: 'المورد' },
-          { field: 'date', label: 'التاريخ' },
-          { field: 'total_amount', label: 'المبلغ الإجمالي' },
-          { field: 'payment_type', label: 'نوع الدفع' },
-          { field: 'payment_method_id', label: 'طريقة الدفع' },
-          { field: 'purchase_type', label: 'نوع المشتريات' }
-        ];
-        await dbService.updateWithLog(
-          'purchase_invoices', 
-          editingInvoice.id, 
-          { ...data, invoice_number }, 
-          { id: user.id, username: user.username, company_id: user.company_id },
-          'تعديل فاتورة مشتريات',
-          'purchase_invoices',
-          fieldsToTrack
-        );
-      } else {
-        id = await dbService.add('purchase_invoices', { ...data, invoice_number });
+      // Journal items generation
+      const journalItems: any[] = [];
+      let supplierAccountId = supplier?.account_id || '';
+      let supplierAccountName = supplier?.account_name || '';
+      if (!supplierAccountId) {
+        const fallback = accounts.find(a => a.name.includes('موردين'));
+        supplierAccountId = fallback?.id || 'suppliers_account_default';
+        supplierAccountName = fallback?.name || 'حساب الموردين (افتراضي)';
       }
 
-      // Success notification and modal close early
-      showNotification(editingInvoice ? 'تم تعديل فاتورة المشتريات بنجاح' : 'تم حفظ فاتورة المشتريات بنجاح');
-      closeModal();
+      journalItems.push({
+        account_id: supplierAccountId,
+        account_name: supplierAccountName,
+        debit: 0,
+        credit: total_amount,
+        description: `فاتورة مشتريات رقم ${invoice_number} - ${supplier?.name}`,
+        supplier_id: invoiceData.supplier_id,
+        supplier_name: supplier?.name
+      });
 
-      // Background post-save hooks
-      try {
-        const journalItems: JournalEntryItem[] = [];
+      if (invoiceData.discount > 0) {
+        const discountAccount = accounts.find(a => a.id === settings?.supplier_discount_account_id) || 
+                                accounts.find(a => a.name.includes('خصم مكتسب') || a.name.includes('خصم مشتريات'));
+        journalItems.push({
+          account_id: discountAccount?.id || 'purchase_discount_default',
+          account_name: discountAccount?.name || 'حساب الخصم المكتسب (افتراضي)',
+          debit: 0,
+          credit: invoiceData.discount,
+          description: `خصم مكتسب - فاتورة رقم ${invoice_number}`
+        });
+      }
 
-        // ALWAYS Credit: Supplier Account first (for the invoice part)
-        let supplierAccountId = supplier?.account_id || '';
-        let supplierAccountName = supplier?.account_name || '';
-        
-        if (!supplierAccountId) {
-          const fallbackAccount = accounts.find(a => a.name.includes('موردين'));
-          supplierAccountId = fallbackAccount?.id || 'suppliers_account_default';
-          supplierAccountName = fallbackAccount?.name || 'حساب الموردين (افتراضي)';
+      validItems.forEach(item => {
+        let debitAccountId = '';
+        let debitAccountName = '';
+
+        if (invoiceData.purchase_type === 'items') {
+          const product = products.find(p => p.id === item.product_id);
+          debitAccountId = product?.cost_account_id || '';
+          debitAccountName = product?.cost_account_name || '';
+          if (!debitAccountId) {
+            const fallback = accounts.find(a => a.name.includes('مشتريات') || a.name.includes('تكلفة'));
+            debitAccountId = fallback?.id || 'purchase_account_default';
+            debitAccountName = fallback?.name || 'حساب المشتريات (افتراضي)';
+          }
+        } else {
+          const category = categories.find(c => c.id === item.expense_category_id);
+          debitAccountId = (category as any)?.account_id || '';
+          debitAccountName = (category as any)?.account_name || '';
+          if (!debitAccountId) {
+            const fallback = accounts.find(a => (category && a.name.includes(category.name)) || a.name.includes('مصروفات'));
+            debitAccountId = fallback?.id || 'expense_account_default';
+            debitAccountName = fallback?.name || 'حساب المصروفات (افتراضي)';
+          }
         }
+        journalItems.push({
+          account_id: debitAccountId,
+          account_name: debitAccountName,
+          debit: item.total,
+          credit: 0,
+          description: `مشتريات: ${item.product_name || item.category_name} - فاتورة ${invoice_number}`
+        });
+      });
 
-        // Line 1: Cr. Supplier
+      if (invoiceData.payment_type === 'cash') {
+        const pm = paymentMethods.find(p => p.id === invoiceData.payment_method_id);
+        let cashAccountId = pm?.account_id || '';
+        let cashAccountName = pm?.account_name || '';
+        if (!cashAccountId) {
+          const fallback = accounts.find(a => a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق'));
+          cashAccountId = fallback?.id || 'cash_account_default';
+          cashAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
+        }
+        journalItems.push({
+          account_id: cashAccountId,
+          account_name: cashAccountName,
+          debit: 0,
+          credit: total_amount,
+          description: `سداد فاتورة مشتريات رقم ${invoice_number} - ${supplier?.name}`
+        });
         journalItems.push({
           account_id: supplierAccountId,
           account_name: supplierAccountName,
-          debit: 0,
-          credit: total_amount,
-          description: `فاتورة مشتريات رقم ${invoice_number} - ${supplier?.name}`,
+          debit: total_amount,
+          credit: 0,
+          description: `تسوية فاتورة مشتريات رقم ${invoice_number} - ${supplier?.name}`,
           supplier_id: invoiceData.supplier_id,
           supplier_name: supplier?.name
         });
-
-        // Line 1.5: Cr. Discount Account (if any)
-        if (invoiceData.discount > 0) {
-          const discountAccount = accounts.find(a => a.id === settings?.supplier_discount_account_id) || 
-                                  accounts.find(a => a.name.includes('خصم مكتسب') || a.name.includes('خصم مشتريات'));
-          journalItems.push({
-            account_id: discountAccount?.id || 'purchase_discount_default',
-            account_name: discountAccount?.name || 'حساب الخصم المكتسب (افتراضي)',
-            debit: 0,
-            credit: invoiceData.discount,
-            description: `خصم مكتسب - فاتورة رقم ${invoice_number}`
-          });
-        }
-
-        // Line 2: Dr. Purchase/Expense Accounts
-        (items || []).forEach(item => {
-          let debitAccountId = '';
-          let debitAccountName = '';
-
-          if (invoiceData.purchase_type === 'items') {
-            const product = products.find(p => p.id === item.product_id);
-            debitAccountId = product?.cost_account_id || '';
-            debitAccountName = product?.cost_account_name || '';
-            
-            if (!debitAccountId) {
-              // Fallback: Try to find a purchase/cost account
-              const fallbackAccount = accounts.find(a => 
-                a.name.includes('مشتريات') || a.name.includes('تكلفة')
-              );
-              debitAccountId = fallbackAccount?.id || 'purchase_account_default';
-              debitAccountName = fallbackAccount?.name || 'حساب المشتريات (افتراضي)';
-            }
-          } else {
-            const category = categories.find(c => c.id === item.expense_category_id);
-            debitAccountId = (category as any)?.account_id || '';
-            debitAccountName = (category as any)?.account_name || '';
-            
-            if (!debitAccountId) {
-              // Fallback: Try to find a matching expense account or general expense account
-              const fallbackAccount = accounts.find(a => 
-                (category && a.name.includes(category.name)) || a.name.includes('مصروفات')
-              );
-              debitAccountId = fallbackAccount?.id || 'expense_account_default';
-              debitAccountName = fallbackAccount?.name || 'حساب المصروفات (افتراضي)';
-            }
-          }
-
-          journalItems.push({
-            account_id: debitAccountId,
-            account_name: debitAccountName,
-            debit: item.total,
-            credit: 0,
-            description: `مشتريات: ${item.product_name || item.category_name} - فاتورة ${invoice_number}`
-          });
-        });
-
-        // If Cash, add the payment lines (Cr. Cash / Dr. Supplier)
-        if (invoiceData.payment_type === 'cash') {
-          const pm = paymentMethods.find(p => p.id === invoiceData.payment_method_id);
-          let cashAccountId = pm?.account_id || '';
-          let cashAccountName = pm?.account_name || '';
-          
-          if (!cashAccountId) {
-            // Fallback: Try to find a cash/treasury account
-            const fallbackAccount = accounts.find(a => 
-              a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق')
-            );
-            cashAccountId = fallbackAccount?.id || 'cash_account_default';
-            cashAccountName = fallbackAccount?.name || 'حساب النقدية (افتراضي)';
-          }
-
-          // Line 3: Cr. Cash/Bank
-          journalItems.push({
-            account_id: cashAccountId,
-            account_name: cashAccountName,
-            debit: 0,
-            credit: total_amount,
-            description: `سداد فاتورة مشتريات رقم ${invoice_number} - ${supplier?.name}`
-          });
-
-          // Line 4: Dr. Supplier
-          journalItems.push({
-            account_id: supplierAccountId,
-            account_name: supplierAccountName,
-            debit: total_amount,
-            credit: 0,
-            description: `تسوية فاتورة مشتريات رقم ${invoice_number} - ${supplier?.name}`,
-            supplier_id: invoiceData.supplier_id,
-            supplier_name: supplier?.name
-          });
-        }
-
-        if (journalItems.length > 0 && id) {
-          const journalEntry: Omit<JournalEntry, 'id'> = {
-            date: invoiceData.date,
-            reference_number: invoice_number,
-            reference_id: id,
-            reference_type: 'purchase_invoice',
-            description: `قيد فاتورة مشتريات رقم ${invoice_number}`,
-            items: journalItems,
-            total_debit: journalItems.reduce((sum, item) => sum + item.debit, 0),
-            total_credit: journalItems.reduce((sum, item) => sum + item.credit, 0),
-            company_id: user.company_id,
-            created_at: new Date().toISOString(),
-            created_by: user.id
-          };
-          
-          const existingEntry = await dbService.getJournalEntryByReference(id, user.company_id);
-          if (existingEntry) {
-            await dbService.updateJournalEntry(existingEntry.id, journalEntry);
-          } else {
-            await dbService.createJournalEntry(journalEntry);
-          }
-        }
-
-        if (!editingInvoice && id) {
-          await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة فاتورة مشتريات', `إضافة فاتورة مشتريات جديدة رقم: ${invoice_number}`, 'purchase_invoices', id);
-        }
-      } catch (postError) {
-        console.error('Post-save operations failed:', postError);
       }
-    } catch (e) {
-      console.error(e);
-      showNotification('حدث خطأ أثناء الاتصال بالخادم', 'error');
-    }
 
+      const total_debit = journalItems.reduce((sum, item) => sum + item.debit, 0);
+      const total_credit = journalItems.reduce((sum, item) => sum + item.credit, 0);
+
+      const journalEntryData = {
+        date: invoiceData.date,
+        reference_number: invoice_number,
+        reference_type: 'purchase_invoice',
+        description: `قيد فاتورة مشتريات رقم ${invoice_number}`,
+        items: journalItems,
+        total_debit,
+        total_credit,
+        company_id: user.company_id,
+        created_at: new Date().toISOString(),
+        created_by: user.id
+      };
+
+      if (editingInvoice) {
+        await dbService.deleteJournalEntryByReference(editingInvoice.id, user.company_id);
+      }
+
+      await TransactionManager.saveWithAccounting(
+        'purchase_invoices',
+        data,
+        InvoiceSchema,
+        journalEntryData,
+        JournalEntrySchema
+      );
+
+      showNotification(editingInvoice ? 'تم تعديل فاتورة المشتريات بنجاح' : 'تم حفظ فاتورة المشتريات بنجاح', 'success');
+      closeModal();
+
+      if (!editingInvoice) {
+        dbService.logActivity(user.id, user.username, user.company_id, 'إضافة فاتورة مشتريات', `إضافة فاتورة مشتريات جديدة رقم: ${invoice_number}`, 'purchase_invoices');
+      }
+
+    } catch (e: any) {
+      console.error('Save failed:', e);
+      showNotification(e.message || 'حدث خطأ أثناء حفظ الفاتورة', 'error');
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -881,10 +844,12 @@ export const PurchaseInvoices: React.FC = () => {
       
       await dbService.delete('purchase_invoices', invoiceToDelete);
       await dbService.logActivity(user.id, user.username, user.company_id, 'حذف فاتورة مشتريات', `حذف فاتورة مشتريات رقم: ${invoice?.invoice_number}`, 'purchase_invoices', invoiceToDelete);
+      showNotification(t('common.delete_success'), 'success');
       setIsDeleteModalOpen(false);
       setInvoiceToDelete(null);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      showNotification(e.message || t('common.delete_error'), 'error');
     }
   };
 

@@ -14,6 +14,8 @@ import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { ExportButtons } from '../components/ExportButtons';
+import { TransactionManager } from '../services/TransactionManager';
+import { VoucherSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog } from '../types';
 
 export const PaymentVouchers: React.FC = () => {
@@ -380,42 +382,99 @@ export const PaymentVouchers: React.FC = () => {
         : `PAY-${Date.now().toString().slice(-6)}`;
 
       const data = {
-        ...voucherData,
-        voucher_number: editingVoucher?.voucher_number || voucher_number,
+        voucher_number,
+        date: voucherData.date,
+        amount: voucherData.amount,
+        description: voucherData.notes,
+        supplier_id: voucherData.supplier_id || null,
+        expense_category_id: voucherData.expense_category_id || null,
+        customer_id: null,
         supplier_name: supplier?.name || '',
         category_name: category?.name || '',
+        payment_method_id: voucherData.payment_method_id,
         payment_method_name: paymentMethod?.name || '',
-        description: voucherData.notes,
-        company_id: user.company_id
+        type: 'payment' as const,
+        company_id: user.company_id,
+        created_at: new Date().toISOString(),
+        created_by: user.id
       };
 
-      let id = '';
-      if (editingVoucher) {
-        const fieldsToTrack = [
-          { field: 'type', label: 'النوع' },
-          { field: 'supplier_id', label: 'المورد' },
-          { field: 'expense_category_id', label: 'التصنيف' },
-          { field: 'amount', label: 'المبلغ' },
-          { field: 'payment_method_id', label: 'طريقة الدفع' },
-          { field: 'date', label: 'التاريخ' },
-          { field: 'notes', label: 'ملاحظات' }
-        ];
-        await dbService.updateWithLog(
-          'payment_vouchers', 
-          editingVoucher.id, 
-          data,
-          { id: user.id, username: user.username, company_id: user.company_id },
-          'تعديل سند صرف',
-          'payment_vouchers',
-          fieldsToTrack
-        );
-        id = editingVoucher.id;
+      const journalItems: any[] = [];
+      let debitAccountId = '';
+      let debitAccountName = '';
+
+      if (voucherData.type === 'supplier') {
+        debitAccountId = supplier?.account_id || '';
+        debitAccountName = supplier?.account_name || '';
+        if (!debitAccountId) {
+          const fallback = accounts.find(a => a.name.includes('موردين'));
+          debitAccountId = fallback?.id || 'suppliers_account_default';
+          debitAccountName = fallback?.name || 'حساب الموردين (افتراضي)';
+        }
       } else {
-        id = await dbService.add('payment_vouchers', data);
+        debitAccountId = category?.account_id || '';
+        debitAccountName = category?.account_name || '';
+        if (!debitAccountId) {
+          const fallback = accounts.find(a => a.name.includes('مصروف'));
+          debitAccountId = fallback?.id || 'expenses_account_default';
+          debitAccountName = fallback?.name || 'حساب المصروفات (افتراضي)';
+        }
       }
-      
-      // Success notification and modal close early
-      showNotification(editingVoucher ? 'تم تعديل سند الصرف بنجاح' : 'تم حفظ سند الصرف بنجاح');
+
+      journalItems.push({
+        account_id: debitAccountId,
+        account_name: debitAccountName,
+        debit: voucherData.amount,
+        credit: 0,
+        description: `سند صرف رقم ${voucher_number} - ${voucherData.notes}`,
+        supplier_id: voucherData.type === 'supplier' ? voucherData.supplier_id : undefined,
+        supplier_name: voucherData.type === 'supplier' ? supplier?.name : undefined
+      });
+
+      let creditAccountId = paymentMethod?.account_id || '';
+      let creditAccountName = paymentMethod?.account_name || '';
+      if (!creditAccountId) {
+        const fallback = accounts.find(a => 
+          a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق') || a.name.includes('بنك')
+        );
+        creditAccountId = fallback?.id || 'cash_account_default';
+        creditAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
+      }
+
+      journalItems.push({
+        account_id: creditAccountId,
+        account_name: creditAccountName,
+        debit: 0,
+        credit: voucherData.amount,
+        description: `سند صرف رقم ${voucher_number} من حساب: ${paymentMethod?.name}`
+      });
+
+      const journalEntryData = {
+        date: voucherData.date,
+        reference_number: voucher_number,
+        reference_type: 'payment',
+        description: `قيد سند صرف رقم ${voucher_number}`,
+        items: journalItems,
+        total_debit: voucherData.amount,
+        total_credit: voucherData.amount,
+        company_id: user.company_id,
+        created_at: new Date().toISOString(),
+        created_by: user.id
+      };
+
+      if (editingVoucher) {
+        await dbService.deleteJournalEntryByReference(editingVoucher.id, user.company_id);
+      }
+
+      await TransactionManager.saveWithAccounting(
+        'payment_vouchers',
+        data,
+        VoucherSchema,
+        journalEntryData,
+        JournalEntrySchema
+      );
+
+      showNotification(editingVoucher ? 'تم تعديل سند الصرف بنجاح' : 'تم حفظ سند الصرف بنجاح', 'success');
       setVoucherData({
         type: 'supplier',
         supplier_id: '',
@@ -428,96 +487,14 @@ export const PaymentVouchers: React.FC = () => {
       setIsModalOpen(false);
       setEditingVoucher(null);
 
-      // Background post-save hooks
-      try {
-        if (editingVoucher) {
-          // Delete old journal entry
-          await dbService.deleteJournalEntryByReference(id, user.company_id);
-        }
-
-        // Create Journal Entry
-        const journalItems: JournalEntryItem[] = [];
-
-        // Debit: Supplier or Expense Account
-        let debitAccountId = '';
-        let debitAccountName = '';
-
-        if (voucherData.type === 'supplier') {
-          debitAccountId = supplier?.account_id || '';
-          debitAccountName = supplier?.account_name || '';
-          
-          if (!debitAccountId) {
-            const fallbackAccount = accounts.find(a => a.name.includes('موردين'));
-            debitAccountId = fallbackAccount?.id || 'suppliers_account_default';
-            debitAccountName = fallbackAccount?.name || 'حساب الموردين (افتراضي)';
-          }
-        } else {
-          debitAccountId = category?.account_id || '';
-          debitAccountName = category?.account_name || '';
-          
-          if (!debitAccountId) {
-            const fallbackAccount = accounts.find(a => a.name.includes('مصروف'));
-            debitAccountId = fallbackAccount?.id || 'expenses_account_default';
-            debitAccountName = fallbackAccount?.name || 'حساب المصروفات (افتراضي)';
-          }
-        }
-
-        journalItems.push({
-          account_id: debitAccountId,
-          account_name: debitAccountName,
-          debit: voucherData.amount,
-          credit: 0,
-          description: `سند صرف رقم ${voucher_number} - ${voucherData.notes}`,
-          supplier_id: voucherData.type === 'supplier' ? voucherData.supplier_id : undefined,
-          supplier_name: voucherData.type === 'supplier' ? supplier?.name : undefined
-        });
-
-        // Credit: Payment Method Account (Cash/Bank)
-        let creditAccountId = paymentMethod?.account_id || '';
-        let creditAccountName = paymentMethod?.account_name || '';
-
-        if (!creditAccountId) {
-          const fallbackAccount = accounts.find(a => 
-            a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق') || a.name.includes('بنك')
-          );
-          creditAccountId = fallbackAccount?.id || 'cash_account_default';
-          creditAccountName = fallbackAccount?.name || 'حساب النقدية (افتراضي)';
-        }
-
-        journalItems.push({
-          account_id: creditAccountId,
-          account_name: creditAccountName,
-          debit: 0,
-          credit: voucherData.amount,
-          description: `سند صرف رقم ${voucher_number} من حساب: ${paymentMethod?.name}`
-        });
-
-        if (journalItems.length > 0) {
-          const journalEntry: Omit<JournalEntry, 'id'> = {
-            date: voucherData.date,
-            reference_number: voucher_number,
-            reference_id: id,
-            reference_type: 'payment',
-            description: `قيد سند صرف رقم ${voucher_number}`,
-            items: journalItems,
-            total_debit: voucherData.amount,
-            total_credit: voucherData.amount,
-            company_id: user.company_id,
-            created_at: new Date().toISOString(),
-            created_by: user.id
-          };
-          await dbService.createJournalEntry(journalEntry);
-        }
-
-        await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة سند صرف', `إضافة سند صرف جديد رقم: ${voucher_number}`, 'payment_vouchers', id);
-      } catch (postError) {
-        console.error('Post-save operations failed:', postError);
+      if (!editingVoucher) {
+        dbService.logActivity(user.id, user.username, user.company_id, 'إضافة سند صرف', `إضافة سند صرف جديد رقم: ${voucher_number}`, 'payment_vouchers');
       }
-    } catch (e) {
-      console.error(e);
-      showNotification('حدث خطأ أثناء الاتصال بالخادم', 'error');
-    }
 
+    } catch (e: any) {
+      console.error('Save failed:', e);
+      showNotification(e.message || 'حدث خطأ أثناء حفظ السند', 'error');
+    }
   };
 
   const handleExportExcel = () => {
@@ -552,10 +529,12 @@ export const PaymentVouchers: React.FC = () => {
       
       await dbService.delete('payment_vouchers', voucherToDelete);
       await dbService.logActivity(user.id, user.username, user.company_id, 'حذف سند صرف', `حذف سند صرف رقم: ${voucher?.number}`, 'payment_vouchers');
+      showNotification(t('common.delete_success'), 'success');
       setIsDeleteModalOpen(false);
       setVoucherToDelete(null);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      showNotification(e.message || t('common.delete_error'), 'error');
     }
   };
 

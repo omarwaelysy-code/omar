@@ -125,6 +125,7 @@ export const Customers: React.FC = () => {
         company_id: user.company_id
       };
 
+      let id: string;
       if (editingCustomer) {
         const fieldsToTrack = [
           { field: 'name', label: 'اسم العميل' },

@@ -371,3 +371,33 @@ export interface JournalEntryItem {
   supplier_id?: string;
   supplier_name?: string;
 }
+
+export interface TrialBalanceItem {
+  id: string;
+  code: string;
+  name: string;
+  type?: string;
+  opening: {
+    debit: number;
+    credit: number;
+  };
+  movement: {
+    debit: number;
+    credit: number;
+  };
+  closing: {
+    debit: number;
+    credit: number;
+  };
+}
+
+export interface LedgerLine {
+  id: string;
+  date: string;
+  reference: string;
+  description: string;
+  debit: number;
+  credit: number;
+  balance: number;
+  entity_name?: string;
+}

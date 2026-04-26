@@ -7,6 +7,7 @@ import { Search, Calendar, FileText, Download, Printer, Filter, PieChart, ArrowL
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
+import { AccountingEngine } from '../services/AccountingEngine';
 
 export const IncomeStatement: React.FC = () => {
   const { user } = useAuth();
@@ -48,51 +49,13 @@ export const IncomeStatement: React.FC = () => {
     return () => subscriptions.forEach(unsub => unsub());
   }, [user]);
 
-  const calculateIncomeStatement = () => {
-    const startDate = new Date(dateRange.start);
-    const endDate = new Date(dateRange.end);
-    endDate.setHours(23, 59, 59, 999);
-
-    const incomeAccounts = accounts.filter(account => {
-      const type = accountTypes.find(t => t.id === account.type_id);
-      return type?.statement_type === 'income_statement';
-    });
-
-    const results = incomeAccounts.map(account => {
-      let balance = 0;
-      entries.forEach(entry => {
-        const entryDate = new Date(entry.date);
-        if (entryDate >= startDate && entryDate <= endDate) {
-          entry.items?.forEach(item => {
-            if (item.account_id === account.id) {
-              balance += (item.credit - item.debit); // Revenue is credit-based
-            }
-          });
-        }
-      });
-
-      const type = accountTypes.find(t => t.id === account.type_id);
-      return {
-        ...account,
-        balance,
-        classification: type?.classification
-      };
-    }).filter(a => a.balance !== 0);
-
-    const revenues = results.filter(a => a.classification === 'revenue');
-    const costs = results.filter(a => a.classification === 'cost');
-    const expenses = results.filter(a => a.classification === 'expense');
-
-    const totalRevenues = revenues.reduce((sum, a) => sum + a.balance, 0);
-    const totalCosts = costs.reduce((sum, a) => sum + Math.abs(a.balance), 0);
-    const grossProfit = totalRevenues - totalCosts;
-    const totalExpenses = expenses.reduce((sum, a) => sum + Math.abs(a.balance), 0);
-    const netProfit = grossProfit - totalExpenses;
-
-    return { revenues, costs, expenses, totalRevenues, totalCosts, grossProfit, totalExpenses, netProfit };
-  };
-
-  const data = calculateIncomeStatement();
+  const data = AccountingEngine.calculateIncomeStatement(
+    accounts,
+    accountTypes,
+    entries,
+    dateRange.start,
+    dateRange.end
+  );
 
   const handleExportPDF = async () => {
     if (reportRef.current) {

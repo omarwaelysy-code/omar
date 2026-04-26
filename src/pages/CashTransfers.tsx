@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
+import { TransactionManager } from '../services/TransactionManager';
+import { CashTransferSchema, JournalEntrySchema } from '../lib/schemas';
 import { CashTransfer, PaymentMethod, JournalEntry, JournalEntryItem, Account, ActivityLog } from '../types';
 import { 
   Search, Plus, Trash2, X, ArrowLeftRight, Pencil, 
@@ -160,7 +162,11 @@ export const CashTransfers: React.FC = () => {
       }
 
       const data = {
-        ...formData,
+        date: formData.date,
+        amount: formData.amount,
+        description: formData.description,
+        from_payment_method_id: formData.from_payment_method_id,
+        to_payment_method_id: formData.to_payment_method_id,
         from_payment_method_name: fromPM?.name || '',
         to_payment_method_name: toPM?.name || '',
         company_id: user.company_id,
@@ -168,34 +174,47 @@ export const CashTransfers: React.FC = () => {
         created_by: editingTransfer ? editingTransfer.created_by : user.id
       };
 
-      let transferId = '';
+      const journalItems = [
+        {
+          account_id: toPM.account_id || '',
+          account_name: toPM.account_name || toPM.name || '',
+          debit: formData.amount,
+          credit: 0,
+          description: `تحويل من ${fromPM.name} إلى ${toPM.name}${formData.description ? ': ' + formData.description : ''}`
+        },
+        {
+          account_id: fromPM.account_id || '',
+          account_name: fromPM.account_name || fromPM.name || '',
+          debit: 0,
+          credit: formData.amount,
+          description: `تحويل من ${fromPM.name} إلى ${toPM.name}${formData.description ? ': ' + formData.description : ''}`
+        }
+      ];
+
+      const journalEntryData = {
+        date: formData.date,
+        description: `قيد تحويل نقدية${formData.description ? ': ' + formData.description : ''}`,
+        reference_type: 'cash_transfer',
+        items: journalItems,
+        total_debit: formData.amount,
+        total_credit: formData.amount,
+        company_id: user.company_id,
+        created_at: new Date().toISOString(),
+        created_by: user.id
+      };
+
       if (editingTransfer) {
-        const fieldsToTrack = [
-          { field: 'amount', label: 'المبلغ' },
-          { field: 'date', label: 'التاريخ' },
-          { field: 'from_payment_method_name', label: 'من خزينة' },
-          { field: 'to_payment_method_name', label: 'إلى خزينة' },
-          { field: 'description', label: 'الوصف' }
-        ];
-        await dbService.updateWithLog(
-          'cash_transfers',
-          editingTransfer.id,
-          data,
-          { id: user.id, username: user.username, company_id: user.company_id },
-          'تعديل تحويل نقدية',
-          'cash_transfers',
-          fieldsToTrack
-        );
-        transferId = editingTransfer.id;
-      } else {
-        transferId = await dbService.add('cash_transfers', data);
+        await dbService.deleteJournalEntryByReference(editingTransfer.id, user.company_id);
       }
 
-      if (!transferId) {
-        throw new Error('فشل في حفظ عملية التحويل');
-      }
+      await TransactionManager.saveWithAccounting(
+        'cash_transfers',
+        data,
+        CashTransferSchema,
+        journalEntryData,
+        JournalEntrySchema
+      );
 
-      // Success notification and modal close early
       setIsModalOpen(false);
       setEditingTransfer(null);
       setFormData({
@@ -205,61 +224,21 @@ export const CashTransfers: React.FC = () => {
         to_payment_method_id: '',
         description: ''
       });
-      showNotification(editingTransfer ? 'تم تحديث التحويل بنجاح' : 'تم إضافة التحويل بنجاح');
+      showNotification(editingTransfer ? 'تم تحديث التحويل بنجاح' : 'تم إضافة التحويل بنجاح', 'success');
 
-      // Background post-save hooks
-      try {
-        if (editingTransfer) {
-          // Delete old journal entry
-          await dbService.deleteJournalEntryByReference(transferId, user.company_id);
-        } else {
-          await dbService.logActivity(
-            user.id,
-            user.username,
-            user.company_id,
-            'إضافة تحويل نقدية',
-            `تحويل مبلغ ${formData.amount} من ${fromPM?.name} إلى ${toPM?.name}`,
-            ['cash_transfers', 'journal_entries'],
-            transferId
-          );
-        }
-
-        // Create Journal Entry
-        const journalItems: JournalEntryItem[] = [
-          {
-            account_id: toPM?.account_id || '',
-            account_name: toPM?.account_name || toPM?.name || '',
-            debit: formData.amount,
-            credit: 0,
-            description: `تحويل من ${fromPM?.name} إلى ${toPM?.name}${formData.description ? ': ' + formData.description : ''}`
-          },
-          {
-            account_id: fromPM?.account_id || '',
-            account_name: fromPM?.account_name || fromPM?.name || '',
-            debit: 0,
-            credit: formData.amount,
-            description: `تحويل من ${fromPM?.name} إلى ${toPM?.name}${formData.description ? ': ' + formData.description : ''}`
-          }
-        ];
-
-        await dbService.createJournalEntry({
-          date: formData.date,
-          description: `قيد تحويل نقدية${formData.description ? ': ' + formData.description : ''}`,
-          reference_id: transferId,
-          reference_type: 'cash_transfer',
-          items: journalItems,
-          total_debit: formData.amount,
-          total_credit: formData.amount,
-          company_id: user.company_id,
-          created_at: new Date().toISOString(),
-          created_by: user.id
-        });
-      } catch (postError) {
-        console.error('Post-save operations failed:', postError);
+      if (!editingTransfer) {
+        dbService.logActivity(
+          user.id,
+          user.username,
+          user.company_id,
+          'إضافة تحويل نقدية',
+          `تحويل مبلغ ${formData.amount} من ${fromPM.name} إلى ${toPM.name}`,
+          ['cash_transfers', 'journal_entries']
+        );
       }
-    } catch (e) {
-      console.error(e);
-      showNotification('حدث خطأ أثناء حفظ التحويل', 'error');
+    } catch (e: any) {
+      console.error('Save failed:', e);
+      showNotification(e.message || 'حدث خطأ أثناء حفظ التحويل', 'error');
     }
   };
 

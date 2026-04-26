@@ -8,6 +8,8 @@ import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { SmartAIInput } from '../components/SmartAIInput';
+import { TransactionManager } from '../services/TransactionManager';
+import { DiscountSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog } from '../types';
 
 export const SupplierDiscounts: React.FC = () => {
@@ -199,15 +201,73 @@ export const SupplierDiscounts: React.FC = () => {
       const number = `SDISC-${Date.now().toString().slice(-6)}`;
       
       const data = {
-        ...discountData,
+        supplier_id: discountData.supplier_id,
         supplier_name: supplier?.name || '',
+        amount: discountData.amount,
+        date: discountData.date,
+        account_id: discountData.account_id,
+        notes: discountData.notes,
         number,
-        company_id: user.company_id
+        type: 'supplier' as const,
+        company_id: user.company_id,
+        created_at: new Date().toISOString(),
+        created_by: user.id
       };
 
-      const id = await dbService.add('supplier_discounts', data);
+      const journalItems: any[] = [];
+      let debitAccountId = supplier?.account_id || '';
+      let debitAccountName = supplier?.account_name || '';
 
-      // Success notification and modal close early
+      if (!debitAccountId) {
+        const fallback = accounts.find(a => a.name.includes('موردين'));
+        debitAccountId = fallback?.id || 'suppliers_account_default';
+        debitAccountName = fallback?.name || 'حساب الموردين (افتراضي)';
+      }
+
+      journalItems.push({
+        account_id: debitAccountId,
+        account_name: debitAccountName,
+        debit: discountData.amount,
+        credit: 0,
+        description: `خصم مكتسب من المورد: ${supplier?.name} - رقم ${number}`,
+        supplier_id: discountData.supplier_id,
+        supplier_name: supplier?.name
+      });
+
+      const discountAccount = accounts.find(a => a.id === discountData.account_id) || 
+                              accounts.find(a => a.name.includes('خصم مكتسب') || a.name.includes('خصومات مكتسبة'));
+      const creditAccountId = discountAccount?.id || 'discount_received_default';
+      const creditAccountName = discountAccount?.name || 'حساب الخصم المكتسب (افتراضي)';
+
+      journalItems.push({
+        account_id: creditAccountId,
+        account_name: creditAccountName,
+        debit: 0,
+        credit: discountData.amount,
+        description: `خصم مكتسب رقم ${number}`
+      });
+
+      const journalEntryData = {
+        date: discountData.date,
+        reference_number: number,
+        reference_type: 'supplier_discount',
+        description: `قيد خصم مكتسب رقم ${number}`,
+        items: journalItems,
+        total_debit: discountData.amount,
+        total_credit: discountData.amount,
+        company_id: user.company_id,
+        created_at: new Date().toISOString(),
+        created_by: user.id
+      };
+
+      await TransactionManager.saveWithAccounting(
+        'supplier_discounts',
+        data,
+        DiscountSchema,
+        journalEntryData,
+        JournalEntrySchema
+      );
+
       showNotification('تم إضافة الخصم بنجاح', 'success');
       setDiscountData({
         supplier_id: '',
@@ -218,71 +278,12 @@ export const SupplierDiscounts: React.FC = () => {
       });
       setIsModalOpen(false);
 
-      // Background post-save hooks
-      try {
-        // Create Journal Entry
-        const journalItems: JournalEntryItem[] = [];
+      dbService.logActivity(user.id, user.username, user.company_id, 'إضافة خصم مورد', `إضافة خصم للمورد: ${supplier?.name} بمبلغ: ${discountData.amount}`, 'supplier_discounts');
 
-        // Debit: Supplier Account
-        let debitAccountId = supplier?.account_id || '';
-        let debitAccountName = supplier?.account_name || '';
-
-        if (!debitAccountId) {
-          const fallbackAccount = accounts.find(a => a.name.includes('موردين'));
-          debitAccountId = fallbackAccount?.id || 'suppliers_account_default';
-          debitAccountName = fallbackAccount?.name || 'حساب الموردين (افتراضي)';
-        }
-
-        journalItems.push({
-          account_id: debitAccountId,
-          account_name: debitAccountName,
-          debit: discountData.amount,
-          credit: 0,
-          description: `خصم مكتسب من المورد: ${supplier?.name} - رقم ${number}`,
-          supplier_id: discountData.supplier_id,
-          supplier_name: supplier?.name
-        });
-
-        // Credit: Selected Account
-        const discountAccount = accounts.find(a => a.id === discountData.account_id) || 
-                                accounts.find(a => a.name.includes('خصم مكتسب') || a.name.includes('خصومات مكتسبة'));
-        const creditAccountId = discountAccount?.id || 'discount_received_default';
-        const creditAccountName = discountAccount?.name || 'حساب الخصم المكتسب (افتراضي)';
-
-        journalItems.push({
-          account_id: creditAccountId,
-          account_name: creditAccountName,
-          debit: 0,
-          credit: discountData.amount,
-          description: `خصم مكتسب رقم ${number}`
-        });
-
-        if (journalItems.length > 0) {
-          const journalEntry: Omit<JournalEntry, 'id'> = {
-            date: discountData.date,
-            reference_number: number,
-            reference_id: id,
-            reference_type: 'supplier_discount',
-            description: `قيد خصم مكتسب رقم ${number}`,
-            items: journalItems,
-            total_debit: discountData.amount,
-            total_credit: discountData.amount,
-            company_id: user.company_id,
-            created_at: new Date().toISOString(),
-            created_by: user.id
-          };
-          await dbService.createJournalEntry(journalEntry);
-        }
-
-        await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة خصم مورد', `إضافة خصم للمورد: ${supplier?.name} بمبلغ: ${discountData.amount}`, 'supplier_discounts', id);
-      } catch (postError) {
-        console.error('Post-save operations failed:', postError);
-      }
-    } catch (e) {
-      console.error(e);
-      showNotification('حدث خطأ أثناء حفظ البيانات', 'error');
+    } catch (e: any) {
+      console.error('Save failed:', e);
+      showNotification(e.message || 'حدث خطأ أثناء حفظ البيانات', 'error');
     }
-
   };
 
   const handleDelete = (id: string) => {

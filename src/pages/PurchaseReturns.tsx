@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { Supplier, Product, PaymentMethod, JournalEntry, JournalEntryItem, Account } from '../types';
 import { Search, Plus, Trash2, X, RotateCcw, User, CreditCard, Calendar, Hash, Package, Save, Eye, Download, History, Printer, Edit, Phone, Mail, MapPin, Wallet, Box } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,10 +12,13 @@ import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { ExportButtons } from '../components/ExportButtons';
+import { TransactionManager } from '../services/TransactionManager';
+import { ReturnSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog } from '../types';
 
 export const PurchaseReturns: React.FC = () => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { showNotification } = useNotification();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -370,162 +374,133 @@ export const PurchaseReturns: React.FC = () => {
       const total_amount = validItems.reduce((sum, item) => sum + (item.quantity * item.cost_price), 0);
 
       const data = {
-        ...returnData,
-        supplier_name: supplier?.name || '',
-        payment_method_name: paymentMethod?.name || '',
-        total_amount,
         return_number,
+        supplier_id: returnData.supplier_id,
+        supplier_name: supplier?.name || '',
+        date: returnData.date, 
         items: validItems.map(item => {
           const product = products.find(p => p.id === item.product_id);
           return {
-            ...item,
+            product_id: item.product_id,
             product_name: product?.name || '',
-            product_image_url: product?.image_url || '',
-            unit_price: item.cost_price,
+            quantity: item.quantity,
+            price: item.cost_price,
             total: item.quantity * item.cost_price
           };
         }),
-        company_id: user.company_id
+        total: total_amount,
+        payment_type: returnData.payment_type,
+        payment_method_id: returnData.payment_method_id || null,
+        payment_method_name: paymentMethod?.name || '',
+        company_id: user.company_id,
+        created_at: new Date().toISOString(),
+        created_by: user.id
       };
 
-      let id = '';
-
-      if (editingReturn) {
-        id = editingReturn.id;
-        await dbService.update('purchase_returns', id, data);
-      } else {
-        id = await dbService.add('purchase_returns', data);
+      const journalItems: any[] = [];
+      let supplierAccountId = supplier?.account_id || '';
+      let supplierAccountName = supplier?.account_name || '';
+      if (!supplierAccountId) {
+        const fallback = accounts.find(a => a.name.includes('موردين'));
+        supplierAccountId = fallback?.id || 'suppliers_account_default';
+        supplierAccountName = fallback?.name || 'حساب الموردين (افتراضي)';
       }
 
-      // Success notification and modal close early
-      showNotification(editingReturn ? 'تم تحديث مرتجع المشتريات بنجاح' : 'تم حفظ مرتجع المشتريات بنجاح');
-      closeModal();
-      setEditingReturn(null);
+      journalItems.push({
+        account_id: supplierAccountId,
+        account_name: supplierAccountName,
+        debit: total_amount,
+        credit: 0,
+        description: `مرتجع مشتريات رقم ${return_number} - ${supplier?.name}`,
+        supplier_id: returnData.supplier_id,
+        supplier_name: supplier?.name
+      });
 
-      // Background post-save hooks
-      try {
-        if (editingReturn) {
-          // Delete old journal entry and create new one
-          await dbService.deleteJournalEntryByReference(id, user.company_id);
+      validItems.forEach(item => {
+        const product = products.find(p => p.id === item.product_id);
+        let creditAccountId = product?.cost_account_id || '';
+        let creditAccountName = product?.cost_account_name || '';
+        if (!creditAccountId) {
+          const fallback = accounts.find(a => a.name.includes('مشتريات') || a.name.includes('تكلفة'));
+          creditAccountId = fallback?.id || 'purchase_account_default';
+          creditAccountName = fallback?.name || 'حساب المشتريات (افتراضي)';
         }
+        journalItems.push({
+          account_id: creditAccountId,
+          account_name: creditAccountName,
+          debit: 0,
+          credit: item.quantity * item.cost_price,
+          description: `مرتجع مشتريات صنف: ${product?.name} - مرتجع ${return_number}`
+        });
+      });
 
-        // Create Journal Entry
-        const journalItems: JournalEntryItem[] = [];
-
-        // ALWAYS Debit: Supplier Account first (for the return part)
-        let supplierAccountId = supplier?.account_id || '';
-        let supplierAccountName = supplier?.account_name || '';
-        
-        if (!supplierAccountId) {
-          const fallbackAccount = accounts.find(a => a.name.includes('موردين'));
-          supplierAccountId = fallbackAccount?.id || 'suppliers_account_default';
-          supplierAccountName = fallbackAccount?.name || 'حساب الموردين (افتراضي)';
+      if (returnData.payment_type === 'cash' && returnData.payment_method_id) {
+        const pm = paymentMethods.find(p => p.id === returnData.payment_method_id);
+        let cashAccountId = pm?.account_id || '';
+        let cashAccountName = pm?.account_name || '';
+        if (!cashAccountId) {
+          const fallback = accounts.find(a => a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق'));
+          cashAccountId = fallback?.id || 'cash_account_default';
+          cashAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
         }
-
-        // Line 1: Dr. Supplier (Reducing liability)
+        journalItems.push({
+          account_id: cashAccountId,
+          account_name: cashAccountName,
+          debit: total_amount,
+          credit: 0,
+          description: `استلام نقدية مقابل مرتجع مشتريات رقم ${return_number} - ${supplier?.name}`
+        });
         journalItems.push({
           account_id: supplierAccountId,
           account_name: supplierAccountName,
-          debit: total_amount,
-          credit: 0,
-          description: `مرتجع مشتريات رقم ${return_number} - ${supplier?.name}`,
+          debit: 0,
+          credit: total_amount,
+          description: `تسوية نقدية لمرتجع مشتريات رقم ${return_number} - ${supplier?.name}`,
           supplier_id: returnData.supplier_id,
           supplier_name: supplier?.name
         });
-
-        // Line 2: Cr. Cost Accounts (per product) - reversing the purchase
-        (items || []).forEach(item => {
-          const product = products.find(p => p.id === item.product_id);
-          let creditAccountId = product?.cost_account_id || '';
-          let creditAccountName = product?.cost_account_name || '';
-
-          if (!creditAccountId) {
-            const fallbackAccount = accounts.find(a => 
-              a.name.includes('مشتريات') || a.name.includes('تكلفة')
-            );
-            creditAccountId = fallbackAccount?.id || 'purchase_account_default';
-            creditAccountName = fallbackAccount?.name || 'حساب المشتريات (افتراضي)';
-          }
-
-          journalItems.push({
-            account_id: creditAccountId,
-            account_name: creditAccountName,
-            debit: 0,
-            credit: item.quantity * item.cost_price,
-            description: `مرتجع مشتريات صنف: ${product?.name} - مرتجع ${return_number}`
-          });
-        });
-
-        // If Cash, add the payment lines (Dr. Cash / Cr. Supplier)
-        // For Purchase Return CASH: We received cash from supplier.
-        if (returnData.payment_type === 'cash' && returnData.payment_method_id) {
-          const pm = paymentMethods.find(p => p.id === returnData.payment_method_id);
-          let cashAccountId = pm?.account_id || '';
-          let cashAccountName = pm?.account_name || '';
-          
-          if (!cashAccountId) {
-            const fallbackAccount = accounts.find(a => 
-              a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق')
-            );
-            cashAccountId = fallbackAccount?.id || 'cash_account_default';
-            cashAccountName = fallbackAccount?.name || 'حساب النقدية (افتراضي)';
-          }
-
-          // Line 3: Dr. Cash/Bank (We received money)
-          journalItems.push({
-            account_id: cashAccountId,
-            account_name: cashAccountName,
-            debit: total_amount,
-            credit: 0,
-            description: `استلام نقدية مقابل مرتجع مشتريات رقم ${return_number} - ${supplier?.name}`
-          });
-
-          // Line 4: Cr. Supplier (Offsetting the debit from Line 1)
-          journalItems.push({
-            account_id: supplierAccountId,
-            account_name: supplierAccountName,
-            debit: 0,
-            credit: total_amount,
-            description: `تسوية نقدية لمرتجع مشتريات رقم ${return_number} - ${supplier?.name}`,
-            supplier_id: returnData.supplier_id,
-            supplier_name: supplier?.name
-          });
-        }
-
-        if (journalItems.length > 0) {
-          const journalEntry: Omit<JournalEntry, 'id'> = {
-            date: returnData.date,
-            reference_number: return_number,
-            reference_id: id,
-            reference_type: 'purchase_return',
-            description: `قيد مرتجع مشتريات رقم ${return_number}`,
-            items: journalItems,
-            total_debit: total_amount,
-            total_credit: total_amount,
-            company_id: user.company_id,
-            created_at: new Date().toISOString(),
-            created_by: user.id
-          };
-          await dbService.createJournalEntry(journalEntry);
-        }
-        
-        await dbService.logActivity(
-          user.id, 
-          user.username, 
-          user.company_id, 
-          editingReturn ? 'تعديل مرتجع مشتريات' : 'إضافة مرتجع مشتريات', 
-          `${editingReturn ? 'تعديل' : 'إضافة'} مرتجع مشتريات رقم: ${return_number}`, 
-          'purchase_returns', 
-          id
-        );
-      } catch (postError) {
-        console.error('Post-save operations failed:', postError);
       }
-    } catch (e) {
-      console.error(e);
-      showNotification('حدث خطأ أثناء حفظ مرتجع المشتريات', 'error');
-    }
 
+      const total_debit = journalItems.reduce((sum, item) => sum + item.debit, 0);
+      const total_credit = journalItems.reduce((sum, item) => sum + item.credit, 0);
+
+      const journalEntryData = {
+        date: returnData.date,
+        reference_number: return_number,
+        reference_type: 'purchase_return',
+        description: `قيد مرتجع مشتريات رقم ${return_number}`,
+        items: journalItems,
+        total_debit,
+        total_credit,
+        company_id: user.company_id,
+        created_at: new Date().toISOString(),
+        created_by: user.id
+      };
+
+      if (editingReturn) {
+        await dbService.deleteJournalEntryByReference(editingReturn.id, user.company_id);
+      }
+
+      await TransactionManager.saveWithAccounting(
+        'purchase_returns',
+        data,
+        ReturnSchema,
+        journalEntryData,
+        JournalEntrySchema
+      );
+
+      showNotification(editingReturn ? 'تم تحديث مرتجع المشتريات بنجاح' : 'تم حفظ مرتجع المشتريات بنجاح', 'success');
+      closeModal();
+      setEditingReturn(null);
+
+      if (!editingReturn) {
+        dbService.logActivity(user.id, user.username, user.company_id, 'إضافة مرتجع مشتريات', `إضافة مرتجع مشتريات جديد رقم: ${return_number}`, 'purchase_returns');
+      }
+
+    } catch (e: any) {
+      console.error('Save failed:', e);
+      showNotification(e.message || 'حدث خطأ أثناء حفظ مرتجع المشتريات', 'error');
+    }
   };
 
   const handleExportExcel = () => {
@@ -596,10 +571,12 @@ export const PurchaseReturns: React.FC = () => {
       
       await dbService.delete('purchase_returns', returnToDelete);
       await dbService.logActivity(user.id, user.username, user.company_id, 'حذف مرتجع مشتريات', `حذف مرتجع مشتريات رقم: ${ret?.return_number}`, 'purchase_returns');
+      showNotification(t('common.delete_success'), 'success');
       setIsDeleteModalOpen(false);
       setReturnToDelete(null);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      showNotification(e.message || t('common.delete_error'), 'error');
     }
   };
 
