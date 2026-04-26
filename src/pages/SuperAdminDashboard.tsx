@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { dbService } from '../services/dbService';
-import { Company, User, ActivityLog } from '../types';
+import { Company, User, ActivityLog, AuditLog, SystemConfig } from '../types';
+import { MaintenanceService } from '../services/MaintenanceService';
+import { AuditService } from '../services/AuditService';
 import { 
   Building2, 
   Users, 
@@ -30,7 +32,12 @@ import {
   Lock,
   Shield,
   Send,
-  Key
+  Key,
+  Hammer,
+  Activity,
+  Settings,
+  Clock,
+  Database
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -48,7 +55,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
   
   // Use simplified mode to keep UI clean
   const simplifiedMode = true;
-  const [activeTab, setActiveTab] = useState<'companies' | 'users' | 'logs'>(initialTab || 'companies');
+  const [activeTab, setActiveTab] = useState<'companies' | 'users' | 'logs' | 'system' | 'audit'>(initialTab || 'companies');
+  const [config, setConfig] = useState<SystemConfig | null>(null);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   
   const [showModal, setShowModal] = useState(false);
   const [showUserRoleModal, setShowUserRoleModal] = useState(false);
@@ -70,10 +79,12 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [allCompanies, allUsers, allLogs] = await Promise.all([
+      const [allCompanies, allUsers, allLogs, sysConfig, v2AuditLogs] = await Promise.all([
         dbService.listAll<Company>('companies'),
         dbService.listAll<User>('users'),
-        dbService.listAll<ActivityLog>('activity_logs')
+        dbService.listAll<ActivityLog>('activity_logs'),
+        MaintenanceService.getStatus(),
+        dbService.listAll<AuditLog>('audit_logs').catch(() => [])
       ]);
       
       const allowedActions = ['إضافة شركة جديدة', 'تعديل بيانات شركة', 'حذف شركة', 'إضافة مستخدم', 'حذف مستخدم'];
@@ -82,10 +93,31 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
       setCompanies(allCompanies);
       setUsers(allUsers);
       setLogs(filteredLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+      setConfig(sysConfig);
+      setAuditLogs(v2AuditLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
     } catch (error) {
       console.error('Error fetching super admin data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleMaintenanceToggle = async () => {
+    if (!user) return;
+    const newState = !config?.maintenance_mode;
+    try {
+      await MaintenanceService.setMaintenance(newState, user.id);
+      await AuditService.log({
+        userId: user.id,
+        email: user.email || user.username,
+        action: newState ? 'ENABLE_MAINTENANCE' : 'DISABLE_MAINTENANCE',
+        resource: 'system_config',
+        severity: 'critical',
+        companyId: 'SYSTEM'
+      });
+      fetchData();
+    } catch (e: any) {
+      alert(e.message);
     }
   };
 
@@ -522,6 +554,22 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
             >
               المستخدمين
             </button>
+            <button
+               onClick={() => setActiveTab('system')}
+               className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
+                 activeTab === 'system' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+               }`}
+             >
+               النظام (V2)
+             </button>
+             <button
+                onClick={() => setActiveTab('audit')}
+                className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
+                  activeTab === 'audit' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+                }`}
+              >
+                سجل الرقابة
+              </button>
             {!simplifiedMode && (
               <button
                 onClick={() => setActiveTab('logs')}
@@ -786,6 +834,139 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                   </div>
                 ))
               )}
+            </div>
+          )}
+
+          {activeTab === 'system' && (
+             <div className="p-8 space-y-12">
+               <div className="bg-amber-50 border border-amber-200 p-8 rounded-[32px] space-y-6">
+                 <div className="flex items-center justify-between">
+                   <div className="flex items-center gap-4">
+                     <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${config?.maintenance_mode ? 'bg-red-500 text-white animate-pulse' : 'bg-emerald-500 text-white'}`}>
+                       <Hammer size={32} />
+                     </div>
+                     <div>
+                       <h3 className="text-2xl font-black text-stone-900">وضع الصيانة الطارئ</h3>
+                       <p className="text-stone-500 font-bold">عند التفعيل، يتم منع جميع المستخدمين من الدخول عدا الـ Super Admin</p>
+                     </div>
+                   </div>
+                   <button 
+                     onClick={handleMaintenanceToggle}
+                     className={`px-8 py-4 rounded-2xl font-black transition-all shadow-lg ${
+                       config?.maintenance_mode 
+                       ? 'bg-emerald-500 text-white hover:bg-emerald-600' 
+                       : 'bg-red-500 text-white hover:bg-red-600'
+                     }`}
+                   >
+                     {config?.maintenance_mode ? 'إيقاف وضع الصيانة' : 'تفعيل وضع الصيانة'}
+                   </button>
+                 </div>
+               </div>
+
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="p-8 bg-zinc-900 rounded-[32px] text-white space-y-6">
+                    <div className="flex items-center gap-3 text-emerald-400">
+                      <ShieldCheck size={24} />
+                      <span className="font-black uppercase tracking-widest text-sm">V2 Security Cluster</span>
+                    </div>
+                    <h4 className="text-3xl font-black">أدوات النزاهة والتعافي</h4>
+                    <p className="text-zinc-400 leading-relaxed font-medium">
+                      فحص شامل للمنظومة، كشف الاختلالات المحاسبية، وتصحيح القيود المزدوجة التالفة.
+                    </p>
+                    <div className="pt-4 flex gap-4">
+                      <button 
+                        onClick={() => setActiveTab('audit')}
+                        className="flex-1 py-4 bg-zinc-800 border border-zinc-700 rounded-2xl font-black hover:bg-zinc-700 transition-all flex items-center justify-center gap-2"
+                      >
+                        <Search size={20} />
+                        فتح فحص النزاهة
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-8 bg-zinc-50 border border-zinc-200 rounded-[32px] space-y-6">
+                    <div className="flex items-center gap-3 text-blue-500">
+                      <RefreshCw size={24} />
+                      <span className="font-black uppercase tracking-widest text-sm">System Backups</span>
+                    </div>
+                    <h4 className="text-3xl font-black">النسخ الاحتياطي</h4>
+                    <p className="text-stone-500 leading-relaxed font-medium">
+                      إدارة النسخ الاحتياطية للنظام بالكامل والقدرة على الاستعادة السريعة في حالات الكوارث.
+                    </p>
+                    <button className="w-full py-4 bg-white border border-stone-200 rounded-2xl font-black hover:border-stone-400 transition-all text-stone-900 shadow-sm">
+                      إدارة المستودع السحابي
+                    </button>
+                  </div>
+               </div>
+             </div>
+          )}
+
+          {activeTab === 'audit' && (
+            <div className="p-4">
+              <div className="mb-6 flex justify-between items-center">
+                <h3 className="text-xl font-black text-stone-900 flex items-center gap-2">
+                  <Activity className="text-emerald-500" />
+                  سجل الرقابة الصارم (Audit Trail)
+                </h3>
+                <div className="flex gap-2">
+                   <button className="p-2 text-stone-400 hover:bg-stone-50 rounded-lg"><Filter size={20}/></button>
+                   <button onClick={fetchData} className="p-2 text-stone-400 hover:bg-stone-50 rounded-lg"><RefreshCw size={20}/></button>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {auditLogs.length === 0 ? (
+                  <div className="px-12 py-24 text-center">
+                    <div className="w-20 h-20 bg-stone-50 border border-dashed border-stone-200 rounded-full flex items-center justify-center mx-auto mb-4 text-stone-300">
+                      <Settings size={40} className="animate-spin-slow" />
+                    </div>
+                    <p className="text-stone-400 font-bold">لا توجد سجلات رقابة حالياً لنسخة V2</p>
+                  </div>
+                ) : (
+                  <div className="border border-stone-100 rounded-2xl overflow-hidden">
+                    <table className="w-full text-right text-sm">
+                      <thead className="bg-stone-50 border-b border-stone-100">
+                        <tr>
+                          <th className="px-4 py-3 font-black text-stone-500 tracking-tighter">التوقيت</th>
+                          <th className="px-4 py-3 font-black text-stone-500 tracking-tighter">المستخدم</th>
+                          <th className="px-4 py-3 font-black text-stone-500 tracking-tighter">الإجراء</th>
+                          <th className="px-4 py-3 font-black text-stone-500 tracking-tighter">الخطورة</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-50">
+                        {auditLogs.map((alog) => (
+                          <tr key={alog.id} className="hover:bg-amber-50/30 transition-colors">
+                            <td className="px-4 py-4 font-mono text-[11px] text-stone-400">
+                               <div className="flex items-center gap-2">
+                                 <Clock size={12} />
+                                 {new Date(alog.timestamp).toLocaleString()}
+                               </div>
+                            </td>
+                            <td className="px-4 py-4">
+                               <div className="font-bold text-stone-900">{alog.user_email}</div>
+                               <div className="text-[10px] text-stone-400 font-mono">{alog.user_id}</div>
+                            </td>
+                            <td className="px-4 py-4">
+                               <span className="font-black text-zinc-900 bg-stone-100 px-2 py-1 rounded text-[10px] uppercase">
+                                 {alog.action.replace(/_/g, ' ')}
+                               </span>
+                            </td>
+                            <td className="px-4 py-4">
+                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                 alog.severity === 'critical' ? 'bg-red-500 text-white' : 
+                                 alog.severity === 'warning' ? 'bg-amber-500 text-white' : 
+                                 'bg-blue-500 text-white'
+                               }`}>
+                                 {alog.severity}
+                               </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

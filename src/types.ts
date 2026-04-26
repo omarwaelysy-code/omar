@@ -13,7 +13,7 @@ export interface User {
   id: string;
   username: string;
   name?: string;
-  role: 'super_admin' | 'admin' | 'user' | 'manager';
+  role: 'super_admin' | 'admin' | 'user' | 'manager' | 'auditor';
   mobile?: string;
   email?: string;
   company_id: string;
@@ -23,6 +23,33 @@ export interface User {
   must_change_password?: boolean;
   temp_password?: string;
   created_at: string;
+}
+
+export interface AuditLog {
+  id: string;
+  user_id: string;
+  user_email: string;
+  action: string;
+  resource: string;
+  resource_id?: string;
+  changes?: {
+    before: any;
+    after: any;
+  };
+  severity: 'info' | 'warning' | 'critical';
+  ip_address?: string;
+  timestamp: string;
+  company_id: string;
+}
+
+export interface SystemConfig {
+  id: string;
+  maintenance_mode: boolean;
+  maintenance_message?: string;
+  allowed_users: string[]; // UIDs allowed during maintenance
+  min_client_version: string;
+  updated_at: string;
+  updated_by: string;
 }
 
 export interface Company {

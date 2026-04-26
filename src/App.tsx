@@ -49,6 +49,7 @@ import DatabaseError from './components/DatabaseError';
 
 import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
 import { SystemCheck } from './pages/SystemCheck';
+import { MaintenanceModeGuard } from './components/MaintenanceModeGuard';
 
 export default function App() {
   const { t, dir } = useLanguage();
@@ -117,7 +118,6 @@ export default function App() {
     // Handle custom super admin route
     if (window.location.pathname === '/super-admin@m@r2020') {
       if (isSuperAdmin) return <SuperAdminDashboard />;
-      // If not super admin, redirect or show error
     }
 
     // Role-based access control for pages
@@ -171,22 +171,25 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-stone-50">
-      <Layout onNavigate={setCurrentPage} currentPage={currentPage}>
-        <div className="relative w-full h-full">
-          {window.location.pathname === '/super-admin@m@r2020' && isSuperAdmin ? (
-            <SuperAdminDashboard />
-          ) : (
-            openTabs.map((tab) => (
-              <div 
-                key={tab.id} 
-                className={activeTabId === tab.id ? 'block' : 'hidden'}
-              >
-                {getPageComponent(tab.id)}
-              </div>
-            ))
-          )}
-        </div>
-      </Layout>
+      <MaintenanceModeGuard>
+        <Layout onNavigate={setCurrentPage} currentPage={currentPage}>
+          <div className="relative w-full h-full">
+            {window.location.pathname === '/super-admin@m@r2020' && isSuperAdmin ? (
+              <SuperAdminDashboard />
+            ) : (
+              openTabs.map((tab) => (
+                <div 
+                  key={tab.id} 
+                  className={activeTabId === tab.id ? 'block' : 'hidden'}
+                >
+                  {getPageComponent(tab.id)}
+                </div>
+              ))
+            )}
+          </div>
+        </Layout>
+      </MaintenanceModeGuard>
     </div>
   );
 }
+
