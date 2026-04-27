@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
 
 interface Tab {
   id: string;
@@ -13,12 +14,14 @@ interface NavigationContextType {
   openTab: (id: string, label: string) => void;
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
+  resetNavigation: () => void;
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
 
 const pageLabels: { [key: string]: string } = {
   'dashboard': 'لوحة التحكم',
+  'super_admin_dashboard': 'لوحة تحكم المدير العام',
   'customers': 'العملاء',
   'suppliers': 'الموردين',
   'products': 'الأصناف',
@@ -51,12 +54,28 @@ const pageLabels: { [key: string]: string } = {
   'balance_sheet': 'المركز المالي',
   'discount_settings': 'إعدادات الخصومات',
   'activity_log': 'سجل النشاط',
+  'companies': 'إدارة الشركات',
+  'system_check': 'فحص النظام',
 };
 
 export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, isSuperAdmin } = useAuth();
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [openTabs, setOpenTabs] = useState<Tab[]>([{ id: 'dashboard', label: 'لوحة التحكم' }]);
   const [activeTabId, setActiveTabId] = useState('dashboard');
+
+  const resetNavigation = () => {
+    const initialId = isSuperAdmin ? 'dashboard' : 'dashboard';
+    const initialLabel = pageLabels[initialId] || 'لوحة التحكم';
+    setCurrentPage(initialId);
+    setOpenTabs([{ id: initialId, label: initialLabel }]);
+    setActiveTabId(initialId);
+  };
+
+  // Reset tabs when user changes (login/logout/switch company)
+  useEffect(() => {
+    resetNavigation();
+  }, [user?.id, user?.company_id]);
 
   const openTab = (id: string, label: string) => {
     setOpenTabs(prev => {
@@ -68,7 +87,7 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const closeTab = (id: string) => {
-    if (id === 'dashboard') return; // Don't close dashboard
+    if (id === 'dashboard') return;
     
     setOpenTabs(prev => {
       const newTabs = prev.filter(tab => tab.id !== id);
@@ -97,7 +116,8 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       activeTabId,
       openTab,
       closeTab,
-      setActiveTab
+      setActiveTab,
+      resetNavigation
     }}>
       {children}
     </NavigationContext.Provider>

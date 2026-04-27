@@ -250,7 +250,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
     { id: 'dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
     { id: 'companies', label: t('nav.companies'), icon: Building2 },
     { id: 'users', label: t('nav.users'), icon: UsersIcon },
-    { id: 'system_check', label: 'System Integrity Check', icon: ShieldCheck },
+    { id: 'system_check', label: 'System Integrity', icon: ShieldCheck },
+    { id: 'activity_log', label: 'Audit Logs', icon: History },
   ];
   
   const filteredNavItems = React.useMemo(() => {

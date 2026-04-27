@@ -115,19 +115,22 @@ export default function App() {
   }
 
   const getPageComponent = (id: string) => {
-    // Handle custom super admin route
-    if (window.location.pathname === '/super-admin@m@r2020') {
-      if (isSuperAdmin) return <SuperAdminDashboard />;
+    // Role-based access control for pages
+    // Super Admin should NEVER see regular tenant pages
+    if (isSuperAdmin) {
+      if (id === 'dashboard' || id === 'super_admin_dashboard') return <SuperAdminDashboard />;
+      if (id === 'companies') return <SuperAdminDashboard initialTab="companies" />;
+      if (id === 'users') return <SuperAdminDashboard initialTab="users" />;
+      if (id === 'system_check') return <SuperAdminDashboard initialTab="system" />;
+      if (id === 'activity_log' || id === 'audit_logs') return <SuperAdminDashboard initialTab="audit" />;
+      
+      // If Super Admin tries to access any regular page, show Super Admin Dashboard
+      // This prevents them from seeing company-specific widgets/pages
+      return <SuperAdminDashboard />;
     }
 
-    // Role-based access control for pages
-    if (id === 'super_admin_dashboard' && !isSuperAdmin) return <Dashboard />;
-    if (id === 'dashboard') return isSuperAdmin ? <SuperAdminDashboard /> : <Dashboard />;
-    if (id === 'users' && isSuperAdmin) return <SuperAdminDashboard initialTab="users" />;
-
     switch (id) {
-      case 'super_admin_dashboard': return isSuperAdmin ? <SuperAdminDashboard /> : <Dashboard />;
-      case 'dashboard': return isSuperAdmin ? <SuperAdminDashboard /> : <Dashboard />;
+      case 'dashboard': return <Dashboard />;
       case 'customers': return <Customers />;
       case 'products': return <Products />;
       case 'suppliers': return <Suppliers />;

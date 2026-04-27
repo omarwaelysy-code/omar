@@ -57,8 +57,8 @@ export const Dashboard: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
-    if (user) {
-      const companyId = isSuperAdmin ? 'super_admin' : user.company_id;
+    if (user && !isSuperAdmin) {
+      const companyId = user.company_id;
       const cached = statsCache[companyId];
       
       if (cached && (Date.now() - cached.timestamp < CACHE_DURATION)) {
@@ -67,14 +67,16 @@ export const Dashboard: React.FC = () => {
       } else {
         fetchStats();
       }
+    } else if (isSuperAdmin) {
+      setLoading(false);
     }
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
-  }, [user]);
+  }, [user, isSuperAdmin]);
 
   const fetchStats = async () => {
-    if (!user) return;
-    const companyId = isSuperAdmin ? 'super_admin' : user.company_id;
+    if (!user || isSuperAdmin) return;
+    const companyId = user.company_id;
     
     try {
       setLoading(true);
@@ -93,19 +95,19 @@ export const Dashboard: React.FC = () => {
         accounts,
         accountTypes
       ] = await Promise.all([
-        isSuperAdmin ? dbService.listAll<Invoice>('invoices') : dbService.list<Invoice>('invoices', user.company_id),
-        isSuperAdmin ? dbService.listAll<Return>('returns') : dbService.list<Return>('returns', user.company_id),
-        isSuperAdmin ? dbService.listAll<ReceiptVoucher>('receipt_vouchers') : dbService.list<ReceiptVoucher>('receipt_vouchers', user.company_id),
-        isSuperAdmin ? dbService.listAll<PaymentVoucher>('payment_vouchers') : dbService.list<PaymentVoucher>('payment_vouchers', user.company_id),
-        isSuperAdmin ? dbService.listAll<Customer>('customers') : dbService.list<Customer>('customers', user.company_id),
-        isSuperAdmin ? dbService.listAll<Supplier>('suppliers') : dbService.list<Supplier>('suppliers', user.company_id),
-        isSuperAdmin ? dbService.listAll<PurchaseInvoice>('purchase_invoices') : dbService.list<PurchaseInvoice>('purchase_invoices', user.company_id),
-        isSuperAdmin ? dbService.listAll<PurchaseReturn>('purchase_returns') : dbService.list<PurchaseReturn>('purchase_returns', user.company_id),
-        isSuperAdmin ? dbService.listAll<CustomerDiscount>('customer_discounts') : dbService.list<CustomerDiscount>('customer_discounts', user.company_id),
-        isSuperAdmin ? dbService.listAll<SupplierDiscount>('supplier_discounts') : dbService.list<SupplierDiscount>('supplier_discounts', user.company_id),
-        isSuperAdmin ? dbService.listAll<any>('journal_entries') : dbService.list<any>('journal_entries', user.company_id),
-        isSuperAdmin ? dbService.listAll<Account>('accounts') : dbService.list<Account>('accounts', user.company_id),
-        isSuperAdmin ? dbService.listAll<AccountType>('account_types') : dbService.list<AccountType>('account_types', user.company_id)
+        dbService.list<Invoice>('invoices', user.company_id),
+        dbService.list<Return>('returns', user.company_id),
+        dbService.list<ReceiptVoucher>('receipt_vouchers', user.company_id),
+        dbService.list<PaymentVoucher>('payment_vouchers', user.company_id),
+        dbService.list<Customer>('customers', user.company_id),
+        dbService.list<Supplier>('suppliers', user.company_id),
+        dbService.list<PurchaseInvoice>('purchase_invoices', user.company_id),
+        dbService.list<PurchaseReturn>('purchase_returns', user.company_id),
+        dbService.list<CustomerDiscount>('customer_discounts', user.company_id),
+        dbService.list<SupplierDiscount>('supplier_discounts', user.company_id),
+        dbService.list<any>('journal_entries', user.company_id),
+        dbService.list<Account>('accounts', user.company_id),
+        dbService.list<AccountType>('account_types', user.company_id)
       ]);
 
       const totalInvoicesAmount = invoices.reduce((sum, inv) => sum + inv.total_amount, 0);

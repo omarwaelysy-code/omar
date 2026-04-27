@@ -89,14 +89,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUserMemberships(memberships);
 
       if (memberships.length > 0) {
+        const isSuperAdminEmail = email === 'omarwaelysy@gmail.com' || email === 'omarwaelsys@gmail.com';
         const preferredCompanyId = localStorage.getItem(`preferred_company_${userId}`);
         const preferredMembership = memberships.find(m => m.company_id === preferredCompanyId);
         
         const activeMembership = preferredMembership || memberships[0];
-        setUser({ 
-          ...activeMembership, 
-          must_change_password: activeMembership.must_change_password || false
-        });
+        
+        // Force super_admin role if email matches, even if they have other memberships
+        if (isSuperAdminEmail) {
+          setUser({ 
+            ...activeMembership, 
+            role: 'super_admin',
+            company_id: 'system',
+            must_change_password: activeMembership.must_change_password || false
+          });
+        } else {
+          setUser({ 
+            ...activeMembership, 
+            must_change_password: activeMembership.must_change_password || false
+          });
+        }
       } else {
         // Fallback for super admin
         const isSuperAdminEmail = email === 'omarwaelysy@gmail.com' || email === 'omarwaelsys@gmail.com';
@@ -117,6 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string) => {
     try {
+      setLoading(true);
       const response = await fetch('/api/erp/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -136,19 +149,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('AuthContext: Login error:', error);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const switchCompany = async (companyId: string) => {
     if (!user) return;
     
-    const membership = userMemberships.find(m => m.company_id === companyId);
-    if (membership) {
-      setUser({
-        ...membership,
-        must_change_password: membership.must_change_password || false
-      });
-      localStorage.setItem(`preferred_company_${user.id}`, companyId);
+    try {
+      setLoading(true);
+      const membership = userMemberships.find(m => m.company_id === companyId);
+      if (membership) {
+        setUser({
+          ...membership,
+          must_change_password: membership.must_change_password || false
+        });
+        localStorage.setItem(`preferred_company_${user.id}`, companyId);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 

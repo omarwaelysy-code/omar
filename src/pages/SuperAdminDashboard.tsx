@@ -42,7 +42,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface SuperAdminDashboardProps {
-  initialTab?: 'companies' | 'users' | 'logs';
+  initialTab?: 'companies' | 'users' | 'logs' | 'system' | 'audit';
 }
 
 export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initialTab }) => {
