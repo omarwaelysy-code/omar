@@ -19,7 +19,7 @@ export class MaintenanceService {
       maintenance_message: message || (enabled ? 'System is undergoing maintenance. Please try again later.' : ''),
       updated_at: new Date().toISOString(),
       updated_by: userId,
-      allowed_users: current?.allowed_users || [userId]
+      allowed_users: Array.isArray(current?.allowed_users) ? current!.allowed_users : [userId]
     };
 
     if (current) {
@@ -39,6 +39,6 @@ export class MaintenanceService {
   static isAllowed(user: { id: string; role: string }, config: SystemConfig | null): boolean {
     if (!config?.maintenance_mode) return true;
     if (user.role === 'super_admin') return true;
-    return config.allowed_users.includes(user.id);
+    return Array.isArray(config.allowed_users) && config.allowed_users.includes(user.id);
   }
 }

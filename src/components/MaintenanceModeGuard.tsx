@@ -28,7 +28,7 @@ export const MaintenanceModeGuard: React.FC<Props> = ({ children }) => {
 
   if (loading || checking) return null;
 
-  const isBypassed = user && (user.role === 'super_admin' || config?.allowed_users.includes(user.id));
+  const isBypassed = user && (user.role === 'super_admin' || (Array.isArray(config?.allowed_users) && config.allowed_users.includes(user.id)));
 
   if (config?.maintenance_mode && !isBypassed) {
     return (
