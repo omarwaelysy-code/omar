@@ -50,6 +50,7 @@ import DatabaseError from './components/DatabaseError';
 import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
 import { SystemCheck } from './pages/SystemCheck';
 import { MaintenanceModeGuard } from './components/MaintenanceModeGuard';
+import { ChangePasswordModal } from './components/ChangePasswordModal';
 
 export default function App() {
   const { t, dir } = useLanguage();
@@ -175,6 +176,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-stone-50">
       <MaintenanceModeGuard>
+        <ChangePasswordModal />
         <Layout onNavigate={setCurrentPage} currentPage={currentPage}>
           <div className="relative w-full h-full">
             {window.location.pathname === '/super-admin@m@r2020' && isSuperAdmin ? (

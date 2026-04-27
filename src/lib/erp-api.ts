@@ -449,7 +449,13 @@ router.post('/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+    let isPasswordValid = await bcrypt.compare(password, user.password_hash);
+    
+    // Support temporary passwords
+    if (!isPasswordValid && user.temp_password && password === user.temp_password) {
+      isPasswordValid = true;
+    }
+
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
@@ -643,6 +649,19 @@ modules.forEach(moduleName => {
   if (!transactionalModules.includes(moduleName)) {
     router.post(`/${moduleName}`, authenticateToken, async (req, res) => {
       try {
+        // Special case for users: handle password/temp_password hashing
+        if (moduleName === 'users') {
+          if (req.body.password) {
+            req.body.password_hash = await bcrypt.hash(req.body.password, 10);
+            delete req.body.password;
+          }
+          if (req.body.temp_password) {
+            // Also hash temp_password into password_hash for backward compatibility
+            // but keep the temp_password for display in admin panel
+            req.body.password_hash = await bcrypt.hash(req.body.temp_password, 10);
+          }
+        }
+
         const sanitizedData = sanitizeData(moduleName, req.body);
         const data = { ...sanitizedData };
         // Most tables use UUIDs, but activity_logs uses BIGSERIAL
@@ -668,6 +687,21 @@ modules.forEach(moduleName => {
     // Update
     router.put(`/${moduleName}/:id`, authenticateToken, async (req, res) => {
       try {
+        // Special case for users: handle password/temp_password hashing
+        if (moduleName === 'users') {
+          if (req.body.password) {
+            req.body.password_hash = await bcrypt.hash(req.body.password, 10);
+            delete req.body.password;
+            // When password is set, we usually want to clear temp_password
+            req.body.temp_password = null;
+            req.body.must_change_password = false;
+          }
+          if (req.body.temp_password) {
+            // Also hash temp_password into password_hash for backward compatibility
+            req.body.password_hash = await bcrypt.hash(req.body.temp_password, 10);
+          }
+        }
+
         const sanitizedData = sanitizeData(moduleName, req.body);
         const keys = Object.keys(sanitizedData);
         const values = Object.values(sanitizedData);
