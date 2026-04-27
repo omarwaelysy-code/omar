@@ -3,40 +3,40 @@ import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { runMigrations } from './migration-runner';
 
+/**
+ * ERP V2 Database Initialization
+ * Ensures tables are created in correct dependency order and
+ * performance indices are applied only after tables exist.
+ */
 export async function initDatabase() {
-  console.log('Initializing PostgreSQL Database...');
+  console.log('🚀 Initializing PostgreSQL ERP V2 Core...');
   
   let client;
-  let retries = 3;
+  let retries = 5;
   let delay = 2000;
 
+  // Connection Resilience Loop
   while (retries > 0) {
     try {
       client = await pool.connect();
-      console.log('Successfully connected to PostgreSQL.');
+      console.log('✅ Successfully connected to PostgreSQL.');
       break;
     } catch (err: any) {
       retries--;
-      console.error(`Failed to connect to PostgreSQL (Retries left: ${retries}):`, err.message);
+      console.error(`⚠️ Failed to connect to PostgreSQL (Retries left: ${retries}):`, err.message);
       if (retries === 0) {
-        console.error('CRITICAL: Could not establish a connection to PostgreSQL after multiple attempts.');
-        console.error('Please check your DB_HOST, DB_USER, DB_PASSWORD, and DB_NAME in the environment variables.');
+        console.error('❌ CRITICAL: Could not establish a connection to PostgreSQL after multiple attempts.');
         throw err;
       }
       await new Promise(resolve => setTimeout(resolve, delay));
-      delay *= 2; // Exponential backoff
+      delay *= 1.5;
     }
   }
   
   if (!client) return;
 
-  // NOTE FOR DEVELOPERS:
-  // When adding new columns to tables below, you MUST ALSO add an 
-  // "ALTER TABLE ... ADD COLUMN IF NOT EXISTS ..." statement to 
-  // src/db/master-migration.sql to ensure existing databases are updated.
-
   try {
-    // 0. Ensure Migrations Table exists (Additive & Required for Tracking)
+    // 0. Base Tracking
     await client.query(`
       CREATE TABLE IF NOT EXISTS migrations (
         id SERIAL PRIMARY KEY,
@@ -45,10 +45,14 @@ export async function initDatabase() {
       );
     `);
 
-    // Start transaction
+    // Start Transaction for Schema Integrity
     await client.query('BEGIN');
 
-    // 1. Companies
+    // ==========================================
+    // PHASE 1: CORE IDENTITY CLUSTER
+    // ==========================================
+    console.log('  - Building Identity Cluster...');
+    
     await client.query(`
       CREATE TABLE IF NOT EXISTS companies (
         id VARCHAR(36) PRIMARY KEY,
@@ -63,8 +67,6 @@ export async function initDatabase() {
         website VARCHAR(255),
         subscription_status VARCHAR(20) DEFAULT 'trial',
         subscription_plan VARCHAR(20) DEFAULT 'basic',
-        subscription_start TIMESTAMP,
-        subscription_end TIMESTAMP,
         subscription_expiry TIMESTAMP,
         subscription_days INTEGER DEFAULT 30,
         users_limit INTEGER DEFAULT 5,
@@ -75,19 +77,13 @@ export async function initDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-    `);
 
-    // 2. Roles
-    await client.query(`
       CREATE TABLE IF NOT EXISTS roles (
         id VARCHAR(36) PRIMARY KEY,
         name VARCHAR(50) NOT NULL,
         description TEXT
       );
-    `);
 
-    // 3. Users
-    await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id VARCHAR(36) PRIMARY KEY,
         username VARCHAR(100) NOT NULL,
@@ -96,18 +92,20 @@ export async function initDatabase() {
         password_hash VARCHAR(255) NOT NULL,
         mobile VARCHAR(20),
         role VARCHAR(20) DEFAULT 'user',
-        company_id VARCHAR(36),
+        company_id VARCHAR(36) REFERENCES companies(id),
         status VARCHAR(20) DEFAULT 'active',
         temp_password VARCHAR(255),
         permissions JSONB DEFAULT '{}',
         must_change_password BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-      CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-      CREATE INDEX IF NOT EXISTS idx_users_company_id ON users(company_id);
     `);
 
-    // 4. Account Types
+    // ==========================================
+    // PHASE 2: FINANCIAL ARMATURE
+    // ==========================================
+    console.log('  - Wiring Financial Armature...');
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS account_types (
         id VARCHAR(36) PRIMARY KEY,
@@ -117,10 +115,7 @@ export async function initDatabase() {
         statement_type VARCHAR(50) NOT NULL,
         classification VARCHAR(50) NOT NULL
       );
-    `);
 
-    // 5. Chart of Accounts
-    await client.query(`
       CREATE TABLE IF NOT EXISTS accounts (
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
@@ -129,11 +124,27 @@ export async function initDatabase() {
         code VARCHAR(20) NOT NULL,
         name VARCHAR(200) NOT NULL,
         opening_balance DECIMAL(18, 4) DEFAULT 0,
-        is_active BOOLEAN DEFAULT TRUE
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS expense_categories (
+        id VARCHAR(36) PRIMARY KEY,
+        company_id VARCHAR(36) REFERENCES companies(id),
+        code VARCHAR(20) NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        description TEXT,
+        account_id VARCHAR(36) REFERENCES accounts(id),
+        account_name VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
-    // 6. Customers
+    // ==========================================
+    // PHASE 3: STAKEHOLDERS & ASSETS
+    // ==========================================
+    console.log('  - Mapping Stakeholders & Assets...');
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS customers (
         id VARCHAR(36) PRIMARY KEY,
@@ -148,12 +159,10 @@ export async function initDatabase() {
         tax_number VARCHAR(50),
         opening_balance DECIMAL(18, 4) DEFAULT 0,
         opening_balance_date DATE,
-        counter_account_id VARCHAR(36)
+        counter_account_id VARCHAR(36),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-    `);
 
-    // 7. Suppliers
-    await client.query(`
       CREATE TABLE IF NOT EXISTS suppliers (
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
@@ -167,12 +176,24 @@ export async function initDatabase() {
         tax_number VARCHAR(50),
         opening_balance DECIMAL(18, 4) DEFAULT 0,
         opening_balance_date DATE,
-        counter_account_id VARCHAR(36)
+        counter_account_id VARCHAR(36),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-    `);
 
-    // 8. Products
-    await client.query(`
+      CREATE TABLE IF NOT EXISTS payment_methods (
+        id VARCHAR(36) PRIMARY KEY,
+        company_id VARCHAR(36) REFERENCES companies(id),
+        account_id VARCHAR(36) REFERENCES accounts(id),
+        account_name VARCHAR(255),
+        code VARCHAR(50),
+        name VARCHAR(100) NOT NULL,
+        type VARCHAR(20) DEFAULT 'cash',
+        opening_balance DECIMAL(18, 4) DEFAULT 0,
+        opening_balance_date DATE,
+        counter_account_id VARCHAR(36),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE TABLE IF NOT EXISTS products (
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
@@ -194,12 +215,31 @@ export async function initDatabase() {
         min_stock DECIMAL(18, 4) DEFAULT 0,
         current_stock DECIMAL(18, 4) DEFAULT 0,
         is_service BOOLEAN DEFAULT FALSE,
-        counter_account_id VARCHAR(36)
+        counter_account_id VARCHAR(36),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
-    // 9. Invoices
+    // ==========================================
+    // PHASE 4: TRANSACTIONAL LAYER (PARENTS)
+    // ==========================================
+    console.log('  - Initiating Transactional Layer...');
+
     await client.query(`
+      CREATE TABLE IF NOT EXISTS journal_entries (
+        id VARCHAR(36) PRIMARY KEY,
+        company_id VARCHAR(36) REFERENCES companies(id),
+        date DATE NOT NULL,
+        description TEXT,
+        reference_id VARCHAR(36),
+        reference_type VARCHAR(50),
+        reference_number VARCHAR(50),
+        total_debit DECIMAL(18, 4) NOT NULL,
+        total_credit DECIMAL(18, 4) NOT NULL,
+        status VARCHAR(20) DEFAULT 'posted',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE TABLE IF NOT EXISTS invoices (
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
@@ -214,111 +254,13 @@ export async function initDatabase() {
         total_amount DECIMAL(18, 4) NOT NULL,
         status VARCHAR(20) DEFAULT 'draft',
         payment_type VARCHAR(20) DEFAULT 'cash',
-        payment_method_id VARCHAR(36),
+        payment_method_id VARCHAR(36) REFERENCES payment_methods(id),
         payment_method_name VARCHAR(255),
         notes TEXT,
-        created_by VARCHAR(36) REFERENCES users(id)
+        created_by VARCHAR(36) REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-    `);
 
-    // 10. Invoice Items
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS invoice_items (
-        id VARCHAR(36) PRIMARY KEY,
-        invoice_id VARCHAR(36) REFERENCES invoices(id) ON DELETE CASCADE,
-        product_id VARCHAR(36) REFERENCES products(id),
-        description TEXT,
-        quantity DECIMAL(18, 4) NOT NULL,
-        unit_price DECIMAL(18, 4) NOT NULL,
-        total DECIMAL(18, 4) NOT NULL,
-        product_name VARCHAR(255),
-        product_code VARCHAR(100),
-        product_image_url TEXT
-      );
-    `);
-
-    // 11. Journal Entries
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS journal_entries (
-        id VARCHAR(36) PRIMARY KEY,
-        company_id VARCHAR(36) REFERENCES companies(id),
-        date DATE NOT NULL,
-        description TEXT,
-        reference_id VARCHAR(36),
-        reference_type VARCHAR(50),
-        reference_number VARCHAR(50),
-        total_debit DECIMAL(18, 4) NOT NULL,
-        total_credit DECIMAL(18, 4) NOT NULL,
-        status VARCHAR(20) DEFAULT 'posted'
-      );
-    `);
-
-    // 12. Journal Entry Lines
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS journal_entry_lines (
-        id VARCHAR(36) PRIMARY KEY,
-        journal_entry_id VARCHAR(36) REFERENCES journal_entries(id) ON DELETE CASCADE,
-        account_id VARCHAR(36) REFERENCES accounts(id),
-        account_name VARCHAR(255),
-        description TEXT,
-        debit DECIMAL(18, 4) DEFAULT 0,
-        credit DECIMAL(18, 4) DEFAULT 0,
-        customer_id VARCHAR(36),
-        supplier_id VARCHAR(36),
-        customer_name VARCHAR(255),
-        supplier_name VARCHAR(255)
-      );
-    `);
-
-    // 13. Payment Methods
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS payment_methods (
-        id VARCHAR(36) PRIMARY KEY,
-        company_id VARCHAR(36) REFERENCES companies(id),
-        account_id VARCHAR(36) REFERENCES accounts(id),
-        account_name VARCHAR(255),
-        code VARCHAR(50),
-        name VARCHAR(100) NOT NULL,
-        type VARCHAR(20) DEFAULT 'cash',
-        opening_balance DECIMAL(18, 4) DEFAULT 0,
-        opening_balance_date DATE,
-        counter_account_id VARCHAR(36)
-      );
-    `);
-
-    // 14. Activity Logs
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS activity_logs (
-        id BIGSERIAL PRIMARY KEY,
-        company_id VARCHAR(36),
-        user_id VARCHAR(36),
-        username VARCHAR(100),
-        action VARCHAR(100) NOT NULL,
-        details TEXT,
-        ip_address VARCHAR(45),
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        category JSONB,
-        document_id VARCHAR(36),
-        changes JSONB
-      );
-      CREATE INDEX IF NOT EXISTS idx_activity_logs_company_timestamp ON activity_logs(company_id, timestamp DESC);
-      CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON activity_logs(user_id);
-      CREATE INDEX IF NOT EXISTS idx_activity_logs_category ON activity_logs USING GIN (category);
-
-      -- Report Optimization Indices
-      CREATE INDEX IF NOT EXISTS idx_journal_entries_company_date ON journal_entries(company_id, date DESC);
-      CREATE INDEX IF NOT EXISTS idx_journal_entry_lines_account_id ON journal_entry_lines(account_id);
-      CREATE INDEX IF NOT EXISTS idx_invoices_company_date ON invoices(company_id, date DESC);
-      CREATE INDEX IF NOT EXISTS idx_returns_company_date ON returns(company_id, date DESC);
-      CREATE INDEX IF NOT EXISTS idx_receipt_vouchers_company_date ON receipt_vouchers(company_id, date DESC);
-      CREATE INDEX IF NOT EXISTS idx_payment_vouchers_company_date ON payment_vouchers(company_id, date DESC);
-      CREATE INDEX IF NOT EXISTS idx_cash_transfers_company_date ON cash_transfers(company_id, date DESC);
-      CREATE INDEX IF NOT EXISTS idx_purchase_invoices_company_date ON purchase_invoices(company_id, date DESC);
-      CREATE INDEX IF NOT EXISTS idx_purchase_returns_company_date ON purchase_returns(company_id, date DESC);
-    `);
-
-    // 15. Returns
-    await client.query(`
       CREATE TABLE IF NOT EXISTS returns (
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
@@ -330,28 +272,10 @@ export async function initDatabase() {
         payment_type VARCHAR(20) DEFAULT 'cash',
         payment_method_id VARCHAR(36) REFERENCES payment_methods(id),
         payment_method_name VARCHAR(255),
-        notes TEXT
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-    `);
 
-    // 16. Return Items
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS return_items (
-        id VARCHAR(36) PRIMARY KEY,
-        return_id VARCHAR(36) REFERENCES returns(id) ON DELETE CASCADE,
-        product_id VARCHAR(36) REFERENCES products(id),
-        description TEXT,
-        quantity DECIMAL(18, 4) NOT NULL,
-        unit_price DECIMAL(18, 4) NOT NULL,
-        total DECIMAL(18, 4) NOT NULL,
-        product_name VARCHAR(255),
-        product_code VARCHAR(100),
-        product_image_url TEXT
-      );
-    `);
-
-    // 17. Purchase Invoices
-    await client.query(`
       CREATE TABLE IF NOT EXISTS purchase_invoices (
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
@@ -368,30 +292,10 @@ export async function initDatabase() {
         payment_type VARCHAR(20) DEFAULT 'cash',
         payment_method_id VARCHAR(36) REFERENCES payment_methods(id),
         payment_method_name VARCHAR(255),
-        notes TEXT
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-    `);
 
-    // 17b. Purchase Invoice Items
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS purchase_invoice_items (
-        id VARCHAR(36) PRIMARY KEY,
-        invoice_id VARCHAR(36) REFERENCES purchase_invoices(id) ON DELETE CASCADE,
-        product_id VARCHAR(36) REFERENCES products(id),
-        expense_category_id VARCHAR(36) REFERENCES expense_categories(id),
-        description TEXT,
-        quantity DECIMAL(18, 4) NOT NULL,
-        unit_price DECIMAL(18, 4) NOT NULL,
-        total DECIMAL(18, 4) NOT NULL,
-        product_name VARCHAR(255),
-        category_name VARCHAR(100),
-        product_code VARCHAR(100),
-        product_image_url TEXT
-      );
-    `);
-
-    // 18. Purchase Returns
-    await client.query(`
       CREATE TABLE IF NOT EXISTS purchase_returns (
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
@@ -403,54 +307,10 @@ export async function initDatabase() {
         payment_type VARCHAR(20) DEFAULT 'cash',
         payment_method_id VARCHAR(36) REFERENCES payment_methods(id),
         payment_method_name VARCHAR(255),
-        notes TEXT
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-    `);
 
-    // 18b. Purchase Return Items
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS purchase_return_items (
-        id VARCHAR(36) PRIMARY KEY,
-        return_id VARCHAR(36) REFERENCES purchase_returns(id) ON DELETE CASCADE,
-        product_id VARCHAR(36) REFERENCES products(id),
-        description TEXT,
-        quantity DECIMAL(18, 4) NOT NULL,
-        unit_price DECIMAL(18, 4) NOT NULL,
-        total DECIMAL(18, 4) NOT NULL,
-        product_name VARCHAR(255),
-        product_code VARCHAR(100),
-        product_image_url TEXT
-      );
-    `);
-
-    // 19. Customer Discounts
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS customer_discounts (
-        id VARCHAR(36) PRIMARY KEY,
-        company_id VARCHAR(36) REFERENCES companies(id),
-        customer_id VARCHAR(36) REFERENCES customers(id),
-        customer_name VARCHAR(255),
-        date DATE NOT NULL,
-        amount DECIMAL(18, 4) NOT NULL,
-        description TEXT
-      );
-    `);
-
-    // 20. Supplier Discounts
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS supplier_discounts (
-        id VARCHAR(36) PRIMARY KEY,
-        company_id VARCHAR(36) REFERENCES companies(id),
-        supplier_id VARCHAR(36) REFERENCES suppliers(id),
-        supplier_name VARCHAR(255),
-        date DATE NOT NULL,
-        amount DECIMAL(18, 4) NOT NULL,
-        description TEXT
-      );
-    `);
-
-    // 21. Receipt Vouchers
-    await client.query(`
       CREATE TABLE IF NOT EXISTS receipt_vouchers (
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
@@ -461,29 +321,25 @@ export async function initDatabase() {
         amount DECIMAL(18, 4) NOT NULL,
         description TEXT,
         payment_method_id VARCHAR(36) REFERENCES payment_methods(id),
-        payment_method_name VARCHAR(255)
+        payment_method_name VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-    `);
 
-    // 22. Payment Vouchers
-    await client.query(`
       CREATE TABLE IF NOT EXISTS payment_vouchers (
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
-        supplier_id VARCHAR(36),
+        supplier_id VARCHAR(36) REFERENCES suppliers(id),
         supplier_name VARCHAR(255),
-        expense_category_id VARCHAR(36),
+        expense_category_id VARCHAR(36) REFERENCES expense_categories(id),
         category_name VARCHAR(255),
         date DATE NOT NULL,
         amount DECIMAL(18, 4) NOT NULL,
         description TEXT,
         payment_method_id VARCHAR(36) REFERENCES payment_methods(id),
-        payment_method_name VARCHAR(255)
+        payment_method_name VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-    `);
 
-    // 23. Cash Transfers
-    await client.query(`
       CREATE TABLE IF NOT EXISTS cash_transfers (
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
@@ -499,21 +355,145 @@ export async function initDatabase() {
       );
     `);
 
-    // 24. Expense Categories
+    // ==========================================
+    // PHASE 5: DETAIL LAYER (CHILDREN / LINES)
+    // ==========================================
+    console.log('  - Linking Financial Details...');
+
     await client.query(`
-      CREATE TABLE IF NOT EXISTS expense_categories (
+      CREATE TABLE IF NOT EXISTS journal_entry_lines (
         id VARCHAR(36) PRIMARY KEY,
-        company_id VARCHAR(36) REFERENCES companies(id),
-        code VARCHAR(20) NOT NULL,
-        name VARCHAR(100) NOT NULL,
-        description TEXT,
+        journal_entry_id VARCHAR(36) REFERENCES journal_entries(id) ON DELETE CASCADE,
         account_id VARCHAR(36) REFERENCES accounts(id),
-        account_name VARCHAR(255)
+        account_name VARCHAR(255),
+        description TEXT,
+        debit DECIMAL(18, 4) DEFAULT 0,
+        credit DECIMAL(18, 4) DEFAULT 0,
+        customer_id VARCHAR(36) REFERENCES customers(id),
+        supplier_id VARCHAR(36) REFERENCES suppliers(id),
+        customer_name VARCHAR(255),
+        supplier_name VARCHAR(255)
+      );
+
+      CREATE TABLE IF NOT EXISTS invoice_items (
+        id VARCHAR(36) PRIMARY KEY,
+        invoice_id VARCHAR(36) REFERENCES invoices(id) ON DELETE CASCADE,
+        product_id VARCHAR(36) REFERENCES products(id),
+        description TEXT,
+        quantity DECIMAL(18, 4) NOT NULL,
+        unit_price DECIMAL(18, 4) NOT NULL,
+        total DECIMAL(18, 4) NOT NULL,
+        product_name VARCHAR(255),
+        product_code VARCHAR(100),
+        product_image_url TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS return_items (
+        id VARCHAR(36) PRIMARY KEY,
+        return_id VARCHAR(36) REFERENCES returns(id) ON DELETE CASCADE,
+        product_id VARCHAR(36) REFERENCES products(id),
+        description TEXT,
+        quantity DECIMAL(18, 4) NOT NULL,
+        unit_price DECIMAL(18, 4) NOT NULL,
+        total DECIMAL(18, 4) NOT NULL,
+        product_name VARCHAR(255),
+        product_code VARCHAR(100),
+        product_image_url TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS purchase_invoice_items (
+        id VARCHAR(36) PRIMARY KEY,
+        invoice_id VARCHAR(36) REFERENCES purchase_invoices(id) ON DELETE CASCADE,
+        product_id VARCHAR(36) REFERENCES products(id),
+        expense_category_id VARCHAR(36) REFERENCES expense_categories(id),
+        description TEXT,
+        quantity DECIMAL(18, 4) NOT NULL,
+        unit_price DECIMAL(18, 4) NOT NULL,
+        total DECIMAL(18, 4) NOT NULL,
+        product_name VARCHAR(255),
+        category_name VARCHAR(100),
+        product_code VARCHAR(100),
+        product_image_url TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS purchase_return_items (
+        id VARCHAR(36) PRIMARY KEY,
+        return_id VARCHAR(36) REFERENCES purchase_returns(id) ON DELETE CASCADE,
+        product_id VARCHAR(36) REFERENCES products(id),
+        description TEXT,
+        quantity DECIMAL(18, 4) NOT NULL,
+        unit_price DECIMAL(18, 4) NOT NULL,
+        total DECIMAL(18, 4) NOT NULL,
+        product_name VARCHAR(255),
+        product_code VARCHAR(100),
+        product_image_url TEXT
       );
     `);
 
-    // 25. Settings
+    // ==========================================
+    // PHASE 6: SYSTEM UTILITIES & CONFIG
+    // ==========================================
+    console.log('  - Applying System Infrastructure...');
+
     await client.query(`
+      CREATE TABLE IF NOT EXISTS activity_logs (
+        id BIGSERIAL PRIMARY KEY,
+        company_id VARCHAR(36),
+        user_id VARCHAR(36),
+        username VARCHAR(100),
+        action VARCHAR(100) NOT NULL,
+        details TEXT,
+        ip_address VARCHAR(45),
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        category JSONB,
+        document_id VARCHAR(36),
+        changes JSONB
+      );
+
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36),
+        user_email VARCHAR(100),
+        action VARCHAR(100) NOT NULL,
+        resource VARCHAR(100) NOT NULL,
+        resource_id VARCHAR(36),
+        changes JSONB,
+        severity VARCHAR(20) DEFAULT 'info',
+        ip_address VARCHAR(45),
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        company_id VARCHAR(36)
+      );
+
+      CREATE TABLE IF NOT EXISTS system_config (
+        id VARCHAR(50) PRIMARY KEY,
+        maintenance_mode BOOLEAN DEFAULT FALSE,
+        maintenance_message TEXT,
+        allowed_users JSONB DEFAULT '[]',
+        min_client_version VARCHAR(20) DEFAULT '2.0.0',
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_by VARCHAR(36)
+      );
+
+      CREATE TABLE IF NOT EXISTS customer_discounts (
+        id VARCHAR(36) PRIMARY KEY,
+        company_id VARCHAR(36) REFERENCES companies(id),
+        customer_id VARCHAR(36) REFERENCES customers(id),
+        customer_name VARCHAR(255),
+        date DATE NOT NULL,
+        amount DECIMAL(18, 4) NOT NULL,
+        description TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS supplier_discounts (
+        id VARCHAR(36) PRIMARY KEY,
+        company_id VARCHAR(36) REFERENCES companies(id),
+        supplier_id VARCHAR(36) REFERENCES suppliers(id),
+        supplier_name VARCHAR(255),
+        date DATE NOT NULL,
+        amount DECIMAL(18, 4) NOT NULL,
+        description TEXT
+      );
+
       CREATE TABLE IF NOT EXISTS settings (
         id VARCHAR(36) PRIMARY KEY,
         company_id VARCHAR(36) REFERENCES companies(id),
@@ -527,57 +507,81 @@ export async function initDatabase() {
       );
     `);
 
+    // ==========================================
+    // PHASE 7: PERFORMANCE INDICES
+    // ==========================================
+    console.log('  - Hardening with Performance Indices...');
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+      CREATE INDEX IF NOT EXISTS idx_users_company_id ON users(company_id);
+      CREATE INDEX IF NOT EXISTS idx_activity_logs_company_timestamp ON activity_logs(company_id, timestamp DESC);
+      CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON activity_logs(user_id);
+      CREATE INDEX IF NOT EXISTS idx_activity_logs_category ON activity_logs USING GIN (category);
+      
+      CREATE INDEX IF NOT EXISTS idx_journal_entries_company_date ON journal_entries(company_id, date DESC);
+      CREATE INDEX IF NOT EXISTS idx_journal_entry_lines_account_id ON journal_entry_lines(account_id);
+      CREATE INDEX IF NOT EXISTS idx_invoices_company_date ON invoices(company_id, date DESC);
+      CREATE INDEX IF NOT EXISTS idx_returns_company_date ON returns(company_id, date DESC);
+      CREATE INDEX IF NOT EXISTS idx_receipt_vouchers_company_date ON receipt_vouchers(company_id, date DESC);
+      CREATE INDEX IF NOT EXISTS idx_payment_vouchers_company_date ON payment_vouchers(company_id, date DESC);
+      CREATE INDEX IF NOT EXISTS idx_cash_transfers_company_date ON cash_transfers(company_id, date DESC);
+      CREATE INDEX IF NOT EXISTS idx_purchase_invoices_company_date ON purchase_invoices(company_id, date DESC);
+      CREATE INDEX IF NOT EXISTS idx_purchase_returns_company_date ON purchase_returns(company_id, date DESC);
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_company_timestamp ON audit_logs(company_id, timestamp DESC);
+    `);
+
     await client.query('COMMIT');
-    console.log('✅ PostgreSQL Base Tables initialized successfully.');
+    console.log('✅ Base Schema and Relational Guardrails established.');
 
-    // Run Migrations for existing systems
+    // 8. Seeding & Post-Init
+    await seedDatabase(client);
     await runMigrations();
-
-    // Seed Super Admin
-    const adminEmail = 'omarwaelysy@gmail.com';
-    try {
-      const { rows } = await client.query('SELECT id FROM users WHERE email = $1', [adminEmail]);
-      if (rows.length === 0) {
-        console.log(`Creating default Super Admin: ${adminEmail}...`);
-        const hashedPassword = await bcrypt.hash('123456', 10);
-        await client.query(
-          'INSERT INTO users (id, username, name, email, password_hash, role, company_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-          [uuidv4(), 'omar_admin', 'Omar Super Admin', adminEmail, hashedPassword, 'super_admin', 'system']
-        );
-        console.log('Admin created');
-      } else {
-        console.log('Admin already exists');
-      }
-    } catch (adminError) {
-      console.error('Error creating admin:', adminError);
-      // We don't throw here to allow the server to start, but it's logged
-    }
-
-    // Seed Activity Logs if empty
-    try {
-      const { rows: logRows } = await client.query('SELECT id FROM activity_logs LIMIT 1');
-      if (logRows.length === 0) {
-        console.log('Seeding initial activity logs...');
-        const { rows: userRows } = await client.query('SELECT id, username, company_id FROM users LIMIT 1');
-        if (userRows.length > 0) {
-          const firstUser = userRows[0];
-          await client.query(
-            'INSERT INTO activity_logs (company_id, user_id, username, action, details, category) VALUES ($1, $2, $3, $4, $5, $6)',
-            [firstUser.company_id, firstUser.id, firstUser.username, 'تهيئة النظام', 'تم بدء تشغيل سجل النشاط بنجاح', JSON.stringify(['system'])]
-          );
-        }
-      }
-    } catch (logSeedError) {
-      console.warn('Could not seed activity logs:', logSeedError);
-    }
 
     console.log('🔥 Database initialization process complete.');
   } catch (error) {
     if (client) await client.query('ROLLBACK');
-    console.error('❌ FATAL: Error during PostgreSQL database initialization:');
+    console.error('❌ FATAL: Error during database initialization:');
     console.error(error);
     throw error;
   } finally {
     if (client) client.release();
+  }
+}
+
+/**
+ * System Data Seeding
+ */
+async function seedDatabase(client: any) {
+  console.log('  - Applying System Seeding...');
+  
+  // 1. Super Admin
+  const adminEmail = 'omarwaelysy@gmail.com';
+  try {
+    const { rows } = await client.query('SELECT id FROM users WHERE email = $1', [adminEmail]);
+    if (rows.length === 0) {
+      console.log(`    + Seeding Super Admin: ${adminEmail}`);
+      const hashedPassword = await bcrypt.hash('123456', 10);
+      await client.query(
+        'INSERT INTO users (id, username, name, email, password_hash, role, company_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [uuidv4(), 'omar_admin', 'Omar Super Admin', adminEmail, hashedPassword, 'super_admin', 'SYSTEM']
+      );
+    }
+  } catch (e) {
+    console.warn('    ! Admin seeding check failed:', e);
+  }
+
+  // 2. Default System Config
+  try {
+    const { rows } = await client.query('SELECT id FROM system_config WHERE id = $1', ['global_config']);
+    if (rows.length === 0) {
+      console.log('    + Initializing Global Configuration');
+      await client.query(
+        'INSERT INTO system_config (id, maintenance_mode, min_client_version) VALUES ($1, $2, $3)',
+        ['global_config', false, '2.0.0']
+      );
+    }
+  } catch (e) {
+    console.warn('    ! System config seeding check failed:', e);
   }
 }
