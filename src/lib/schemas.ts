@@ -12,8 +12,8 @@ const BaseSchema = z.object({
 export const JournalEntryItemSchema = z.object({
   account_id: z.string(),
   account_name: z.string(),
-  debit: z.number().min(0),
-  credit: z.number().min(0),
+  debit: z.coerce.number().default(0),
+  credit: z.coerce.number().default(0),
   description: z.string().optional(),
   customer_id: z.string().optional(),
   customer_name: z.string().optional(),
@@ -29,8 +29,8 @@ export const JournalEntrySchema = BaseSchema.extend({
   reference_type: z.string().optional(), // 'invoice', 'payment', 'receipt', 'expense', etc.
   reference_number: z.string().optional(),
   items: z.array(JournalEntryItemSchema).min(2),
-  total_debit: z.number().min(0),
-  total_credit: z.number().min(0),
+  total_debit: z.coerce.number().default(0),
+  total_credit: z.coerce.number().default(0),
 }).refine((data) => Math.abs(data.total_debit - data.total_credit) < 0.01, {
   message: "Debit and Credit must be balanced",
   path: ["total_debit"],
@@ -39,10 +39,10 @@ export const JournalEntrySchema = BaseSchema.extend({
 // Invoice Payload
 export const InvoiceItemSchema = z.object({
   product_id: z.string(),
-  product_name: z.string(),
-  quantity: z.number().positive(),
-  price: z.number().nonnegative(),
-  total: z.number().nonnegative(),
+  product_name: z.string().optional(),
+  quantity: z.coerce.number().default(0),
+  unit_price: z.coerce.number().default(0),
+  total: z.coerce.number().default(0),
 });
 
 export const InvoiceSchema = BaseSchema.extend({
@@ -53,9 +53,12 @@ export const InvoiceSchema = BaseSchema.extend({
   supplier_id: z.string().optional(),
   supplier_name: z.string().optional(),
   items: z.array(InvoiceItemSchema),
-  subtotal: z.number(),
-  discount: z.number(),
-  total: z.number(),
+  subtotal: z.coerce.number().default(0),
+  discount_amount: z.coerce.number().default(0),
+  total_amount: z.coerce.number().default(0),
+  payment_type: z.enum(['cash', 'credit']).default('credit'),
+  payment_method_id: z.string().nullable().optional(),
+  payment_method_name: z.string().nullable().optional(),
   status: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -64,7 +67,7 @@ export const InvoiceSchema = BaseSchema.extend({
 export const VoucherSchema = BaseSchema.extend({
   voucher_number: z.string(),
   date: z.string(),
-  amount: z.number().nonnegative(),
+  amount: z.coerce.number().default(0),
   notes: z.string().optional(),
   description: z.string().optional(),
   customer_id: z.string().optional(),
@@ -79,7 +82,7 @@ export const AccountSchema = BaseSchema.extend({
   code: z.string(),
   name: z.string(),
   type_id: z.string(),
-  opening_balance: z.number(),
+  opening_balance: z.coerce.number().default(0),
   opening_balance_date: z.string().optional(),
 });
 
@@ -90,9 +93,10 @@ export const ReturnSchema = BaseSchema.extend({
   customer_id: z.string().optional(),
   supplier_id: z.string().optional(),
   items: z.array(InvoiceItemSchema),
-  total_amount: z.number(),
-  payment_type: z.enum(['cash', 'credit']),
-  payment_method_id: z.string().optional(),
+  total_amount: z.coerce.number().default(0),
+  payment_type: z.enum(['cash', 'credit']).default('credit'),
+  payment_method_id: z.string().nullable().optional(),
+  payment_method_name: z.string().optional(),
   notes: z.string().optional(),
 });
 

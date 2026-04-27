@@ -368,7 +368,7 @@ export const Returns: React.FC = () => {
       const customer = customers.find(c => c.id === selectedCustomerId);
       const paymentMethod = paymentMethods.find(m => m.id === paymentMethodId);
       const return_number = editingReturn ? editingReturn.return_number : `RET-${Date.now().toString().slice(-6)}`;
-      const total_amount = Number(validItems.reduce((sum, item) => sum + Number(item.total || 0), 0));
+      const total_amount = Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)), 0)) || 0;
       
       const returnData = { 
         return_number,
@@ -378,14 +378,14 @@ export const Returns: React.FC = () => {
         items: validItems.map(i => ({
           product_id: i.product_id,
           product_name: i.product_name,
-          quantity: Number(i.quantity || 0),
-          unit_price: Number(i.unit_price || 0),
-          total: Number(i.total || 0)
+          quantity: Number(i.quantity) || 0,
+          unit_price: Number(i.unit_price) || 0,
+          total: (Number(i.quantity) || 0) * (Number(i.unit_price) || 0)
         })),
-        total_amount: Number(total_amount),
+        total_amount,
         payment_type: paymentType,
-        payment_method_id: paymentMethodId || null,
-        payment_method_name: paymentMethod?.name || '',
+        payment_method_id: paymentType === 'cash' ? (paymentMethodId || null) : null,
+        payment_method_name: paymentType === 'cash' ? (paymentMethod?.name || '') : null,
         company_id: user.company_id,
         created_at: new Date().toISOString(),
         created_by: user.id
