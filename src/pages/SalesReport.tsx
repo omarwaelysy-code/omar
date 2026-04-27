@@ -81,8 +81,8 @@ export const SalesReport: React.FC = () => {
               customer: cust?.name || t('common.unknown'),
               product: prod?.name || t('common.unknown'),
               quantity: item.quantity,
-              price: item.price,
-              total: item.quantity * item.price,
+              price: item.unit_price || item.price || 0,
+              total: Number(item.total) || (item.quantity * (item.unit_price || item.price || 0)),
               isReturn: false
             });
           }
@@ -101,8 +101,8 @@ export const SalesReport: React.FC = () => {
               customer: cust?.name || t('common.unknown'),
               product: prod?.name || t('common.unknown'),
               quantity: -item.quantity,
-              price: item.price,
-              total: -(item.quantity * item.price),
+              price: item.unit_price || item.price || 0,
+              total: -(Number(item.total) || (item.quantity * (item.unit_price || item.price || 0))),
               isReturn: true
             });
           }
@@ -126,8 +126,9 @@ export const SalesReport: React.FC = () => {
           cInvoices.forEach(inv => {
             inv.items?.forEach((item: any) => {
               if (selectedProductIds.length === 0 || selectedProductIds.includes(item.product_id)) {
-                totalSales += item.quantity * item.price;
-                totalQuantity += item.quantity;
+                const itemTotal = Number(item.total) || (Number(item.quantity || 0) * Number(item.unit_price || item.price || 0));
+                totalSales += itemTotal;
+                totalQuantity += Number(item.quantity || 0);
               }
             });
           });
@@ -135,7 +136,7 @@ export const SalesReport: React.FC = () => {
           cReturns.forEach(ret => {
             ret.items?.forEach((item: any) => {
               if (selectedProductIds.length === 0 || selectedProductIds.includes(item.product_id)) {
-                totalReturns += item.quantity * item.price;
+                totalReturns += Number(item.total) || (Number(item.quantity || 0) * Number(item.unit_price || item.price || 0));
               }
             });
           });

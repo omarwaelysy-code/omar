@@ -368,8 +368,8 @@ export const Invoices: React.FC = () => {
     }
 
     try {
-      const subtotal = validItems.reduce((sum, item) => sum + item.total, 0);
-      const total_amount = subtotal - discount;
+      const subtotal = Number(validItems.reduce((sum, item) => sum + Number(item.total || 0), 0));
+      const total_amount = Number(subtotal - Number(discount || 0));
       const customer = customers.find(c => c.id === selectedCustomerId);
       const paymentMethod = paymentMethods.find(pm => pm.id === paymentMethodId);
       
@@ -381,13 +381,13 @@ export const Invoices: React.FC = () => {
         items: validItems.map(i => ({
           product_id: i.product_id,
           product_name: i.product_name,
-          quantity: i.quantity,
-          price: i.unit_price,
-          total: i.total
+          quantity: Number(i.quantity || 0),
+          unit_price: Number(i.unit_price || 0),
+          total: Number(i.total || 0)
         })),
-        subtotal,
-        discount,
-        total: total_amount, // Schema uses 'total'
+        subtotal: Number(subtotal),
+        discount_amount: Number(discount || 0),
+        total_amount: Number(total_amount), // Schema uses 'total_amount'
         payment_type: paymentType,
         payment_method_id: paymentType === 'cash' ? paymentMethodId : null,
         payment_method_name: paymentType === 'cash' ? (paymentMethod?.name || '') : null,

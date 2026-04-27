@@ -368,7 +368,7 @@ export const Returns: React.FC = () => {
       const customer = customers.find(c => c.id === selectedCustomerId);
       const paymentMethod = paymentMethods.find(m => m.id === paymentMethodId);
       const return_number = editingReturn ? editingReturn.return_number : `RET-${Date.now().toString().slice(-6)}`;
-      const total_amount = validItems.reduce((sum, item) => sum + item.total, 0);
+      const total_amount = Number(validItems.reduce((sum, item) => sum + Number(item.total || 0), 0));
       
       const returnData = { 
         return_number,
@@ -378,11 +378,11 @@ export const Returns: React.FC = () => {
         items: validItems.map(i => ({
           product_id: i.product_id,
           product_name: i.product_name,
-          quantity: i.quantity,
-          price: i.unit_price,
-          total: i.total
+          quantity: Number(i.quantity || 0),
+          unit_price: Number(i.unit_price || 0),
+          total: Number(i.total || 0)
         })),
-        total: total_amount,
+        total_amount: Number(total_amount),
         payment_type: paymentType,
         payment_method_id: paymentMethodId || null,
         payment_method_name: paymentMethod?.name || '',

@@ -61,11 +61,11 @@ export const CustomerBalances: React.FC = () => {
           });
         });
 
-        const totalInvoices = custInvoices.reduce((sum: number, i: any) => sum + i.total_amount, 0);
-        const totalReturns = custReturns.reduce((sum: number, r: any) => sum + r.total_amount, 0);
-        const cashInvoicesAmount = custInvoices.filter((i: any) => i.payment_type === 'cash').reduce((sum: number, i: any) => sum + i.total_amount, 0);
-        const totalReceipts = custReceipts.reduce((sum: number, r: any) => sum + r.amount, 0) + cashInvoicesAmount;
-        const totalDiscounts = custDiscounts.reduce((sum: number, d: any) => sum + d.amount, 0);
+        const totalInvoices = custInvoices.reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
+        const totalReturns = custReturns.reduce((sum: number, r: any) => sum + (Number(r.total_amount) || 0), 0);
+        const cashInvoicesAmount = custInvoices.filter((i: any) => i.payment_type === 'cash').reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
+        const totalReceipts = custReceipts.reduce((sum: number, r: any) => sum + (Number(r.amount) || 0), 0) + cashInvoicesAmount;
+        const totalDiscounts = custDiscounts.reduce((sum: number, d: any) => sum + (Number(d.amount) || 0), 0);
         
         return {
           ...customer,

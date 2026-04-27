@@ -61,11 +61,11 @@ export const SupplierBalances: React.FC = () => {
           });
         });
 
-        const totalInvoices = supInvoices.reduce((sum: number, i: any) => sum + i.total_amount, 0);
-        const totalReturns = supReturns.reduce((sum: number, r: any) => sum + r.total_amount, 0);
-        const cashInvoicesAmount = supInvoices.filter((i: any) => i.payment_type === 'cash').reduce((sum: number, i: any) => sum + i.total_amount, 0);
-        const totalVouchers = supVouchers.reduce((sum: number, v: any) => sum + v.amount, 0) + cashInvoicesAmount;
-        const totalDiscounts = supDiscounts.reduce((sum: number, d: any) => sum + d.amount, 0);
+        const totalInvoices = supInvoices.reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
+        const totalReturns = supReturns.reduce((sum: number, r: any) => sum + (Number(r.total_amount) || 0), 0);
+        const cashInvoicesAmount = supInvoices.filter((i: any) => i.payment_type === 'cash').reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
+        const totalVouchers = supVouchers.reduce((sum: number, v: any) => sum + (Number(v.amount) || 0), 0) + cashInvoicesAmount;
+        const totalDiscounts = supDiscounts.reduce((sum: number, d: any) => sum + (Number(d.amount) || 0), 0);
         
         return {
           ...supplier,

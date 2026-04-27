@@ -371,7 +371,7 @@ export const PurchaseReturns: React.FC = () => {
       const paymentMethod = paymentMethods.find(pm => pm.id === returnData.payment_method_id);
       const return_number = editingReturn ? editingReturn.return_number : `PRET-${Date.now().toString().slice(-6)}`;
       
-      const total_amount = validItems.reduce((sum, item) => sum + (item.quantity * item.cost_price), 0);
+      const total_amount = Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.cost_price || 0)), 0));
 
       const data = {
         return_number,
@@ -383,12 +383,12 @@ export const PurchaseReturns: React.FC = () => {
           return {
             product_id: item.product_id,
             product_name: product?.name || '',
-            quantity: item.quantity,
-            price: item.cost_price,
-            total: item.quantity * item.cost_price
+            quantity: Number(item.quantity || 0),
+            unit_price: Number(item.cost_price || 0),
+            total: Number(Number(item.quantity || 0) * Number(item.cost_price || 0))
           };
         }),
-        total: total_amount,
+        total_amount: Number(total_amount),
         payment_type: returnData.payment_type,
         payment_method_id: returnData.payment_method_id || null,
         payment_method_name: paymentMethod?.name || '',

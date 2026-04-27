@@ -1081,11 +1081,12 @@ router.post('/journal_entries', authenticateToken, async (req, res) => {
     const entryData = sanitizeData('journal_entries', rawEntryData);
     const entryId = entryData.id || uuidv4();
 
-    const keys = Object.keys(entryData);
+    const finalEntryData = { ...entryData, id: entryId };
+    const keys = Object.keys(finalEntryData);
     const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
     await client.query(
       `INSERT INTO journal_entries (${keys.join(', ')}) VALUES (${placeholders})`,
-      Object.values(entryData)
+      Object.values(finalEntryData)
     );
 
     for (const item of items) {

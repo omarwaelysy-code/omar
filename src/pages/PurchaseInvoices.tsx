@@ -668,8 +668,8 @@ export const PurchaseInvoices: React.FC = () => {
       const supplier = suppliers.find(s => s.id === invoiceData.supplier_id);
       const paymentMethod = paymentMethods.find(pm => pm.id === invoiceData.payment_method_id);
       
-      const subtotal = validItems.reduce((sum, item) => sum + (item.total || 0), 0);
-      const total_amount = subtotal - invoiceData.discount;
+      const subtotal = Number(validItems.reduce((sum, item) => sum + Number(item.total || 0), 0));
+      const total_amount = Number(subtotal - Number(invoiceData.discount || 0));
       const invoice_number = editingInvoice?.invoice_number || invoiceNumber;
 
       const data = {
@@ -677,17 +677,17 @@ export const PurchaseInvoices: React.FC = () => {
         supplier_id: invoiceData.supplier_id,
         supplier_name: supplier?.name || '',
         date: invoiceData.date, 
-        subtotal,
-        discount: invoiceData.discount,
-        total: total_amount,
+        subtotal: Number(subtotal),
+        discount_amount: Number(invoiceData.discount || 0),
+        total_amount: Number(total_amount),
         items: validItems.map(item => ({
           product_id: item.product_id || '',
           expense_category_id: item.expense_category_id || '',
           product_name: item.product_name || '',
           category_name: item.category_name || '',
-          quantity: item.quantity,
-          price: item.cost_price,
-          total: item.total
+          quantity: Number(item.quantity || 0),
+          unit_price: Number(item.cost_price || 0),
+          total: Number(item.total || 0)
         })),
         payment_type: invoiceData.payment_type,
         payment_method_id: invoiceData.payment_method_id || null,

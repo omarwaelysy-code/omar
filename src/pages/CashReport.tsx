@@ -60,29 +60,30 @@ export const CashReport: React.FC = () => {
       const allTrans: CashTransaction[] = [];
 
       invoices.forEach((inv: any) => {
-        allTrans.push({ id: `inv-${inv.id}`, date: inv.date, type: t('invoices.title'), reference: inv.invoice_number, in: inv.total_amount, out: 0, notes: '' });
+        allTrans.push({ id: `inv-${inv.id}`, date: inv.date, type: t('invoices.title'), reference: inv.invoice_number, in: Number(inv.total_amount) || 0, out: 0, notes: '' });
       });
       returns.forEach((ret: any) => {
-        allTrans.push({ id: `ret-${ret.id}`, date: ret.date, type: t('returns.title'), reference: ret.return_number, in: 0, out: ret.total_amount, notes: '' });
+        allTrans.push({ id: `ret-${ret.id}`, date: ret.date, type: t('returns.title'), reference: ret.return_number, in: 0, out: Number(ret.total_amount) || 0, notes: '' });
       });
       receipts.forEach((rec: any) => {
-        allTrans.push({ id: `rec-${rec.id}`, date: rec.date, type: t('vouchers.receipt'), reference: `${t('vouchers.voucher')}-${rec.id.slice(-6)}`, in: rec.amount, out: 0, notes: rec.description || '' });
+        allTrans.push({ id: `rec-${rec.id}`, date: rec.date, type: t('vouchers.receipt'), reference: `${t('vouchers.voucher')}-${rec.id.slice(-6)}`, in: Number(rec.amount) || 0, out: 0, notes: rec.description || '' });
       });
       purInvoices.forEach((pinv: any) => {
-        allTrans.push({ id: `pinv-${pinv.id}`, date: pinv.date, type: t('purchase_invoices.title'), reference: pinv.invoice_number, in: 0, out: pinv.total_amount, notes: '' });
+        allTrans.push({ id: `pinv-${pinv.id}`, date: pinv.date, type: t('purchase_invoices.title'), reference: pinv.invoice_number, in: 0, out: Number(pinv.total_amount) || 0, notes: '' });
       });
       purReturns.forEach((pret: any) => {
-        allTrans.push({ id: `pret-${pret.id}`, date: pret.date, type: t('purchase_returns.title'), reference: pret.return_number, in: pret.total_amount, out: 0, notes: '' });
+        allTrans.push({ id: `pret-${pret.id}`, date: pret.date, type: t('purchase_returns.title'), reference: pret.return_number, in: Number(pret.total_amount) || 0, out: 0, notes: '' });
       });
       vouchers.forEach((vou: any) => {
-        allTrans.push({ id: `vou-${vou.id}`, date: vou.date, type: t('vouchers.payment'), reference: `${t('vouchers.voucher')}-${vou.id.slice(-6)}`, in: 0, out: vou.amount, notes: vou.description || '' });
+        allTrans.push({ id: `vou-${vou.id}`, date: vou.date, type: t('vouchers.payment'), reference: `${t('vouchers.voucher')}-${vou.id.slice(-6)}`, in: 0, out: Number(vou.amount) || 0, notes: vou.description || '' });
       });
       transfers.forEach((tr: any) => {
+        const amount = Number(tr.amount) || 0;
         if (tr.from_payment_method_id === selectedMethodId) {
-          allTrans.push({ id: `tr-out-${tr.id}`, date: tr.date, type: t('cash_transfers.outgoing'), reference: `${t('cash_transfers.transfer')}-${tr.id.slice(-6)}`, in: 0, out: tr.amount, notes: `${t('common.to')} ${tr.to_payment_method_name}: ${tr.description}` });
+          allTrans.push({ id: `tr-out-${tr.id}`, date: tr.date, type: t('cash_transfers.outgoing'), reference: `${t('cash_transfers.transfer')}-${tr.id.slice(-6)}`, in: 0, out: amount, notes: `${t('common.to')} ${tr.to_payment_method_name}: ${tr.description}` });
         }
         if (tr.to_payment_method_id === selectedMethodId) {
-          allTrans.push({ id: `tr-in-${tr.id}`, date: tr.date, type: t('cash_transfers.incoming'), reference: `${t('cash_transfers.transfer')}-${tr.id.slice(-6)}`, in: tr.amount, out: 0, notes: `${t('common.from')} ${tr.from_payment_method_name}: ${tr.description}` });
+          allTrans.push({ id: `tr-in-${tr.id}`, date: tr.date, type: t('cash_transfers.incoming'), reference: `${t('cash_transfers.transfer')}-${tr.id.slice(-6)}`, in: amount, out: 0, notes: `${t('common.from')} ${tr.from_payment_method_name}: ${tr.description}` });
         }
       });
 
