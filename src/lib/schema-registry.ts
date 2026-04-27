@@ -101,5 +101,11 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   settings: [
     'id', 'company_id', 'type', 'key', 'value', 'customer_discount_account_id', 'supplier_discount_account_id', 'updated_at', 'created_at'
+  ],
+  system_config: [
+    'id', 'maintenance_mode', 'maintenance_message', 'allowed_users', 'min_client_version', 'updated_at', 'updated_by'
+  ],
+  audit_logs: [
+    'id', 'company_id', 'user_id', 'user_email', 'action', 'resource', 'resource_id', 'changes', 'severity', 'ip_address', 'timestamp'
   ]
 };

@@ -40,7 +40,10 @@ export class TransactionManager {
 
       return { success: true, ids: this.createdIds };
     } catch (error) {
-      console.error('Transaction failed, rolling back...', error);
+      // Only log rollback if it's not a handled test error
+      if (process.env.NODE_ENV !== 'test') {
+        console.warn('Transaction operation failed, initiating rollback.');
+      }
       await this.rollback();
       throw error;
     }
@@ -52,9 +55,11 @@ export class TransactionManager {
     for (const item of toReset) {
       try {
         await dbService.delete(item.collection, item.id);
-        console.log(`Rolled back ${item.collection}:${item.id}`);
+        if (process.env.NODE_ENV !== 'test') {
+          console.log(`[Rollback] Successful: ${item.collection}:${item.id}`);
+        }
       } catch (err) {
-        console.error(`Rollback failed for ${item.collection}:${item.id}`, err);
+        console.error(`[Rollback] Failed for ${item.collection}:${item.id}`, err);
       }
     }
     this.createdIds = [];

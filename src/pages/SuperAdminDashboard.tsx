@@ -79,13 +79,20 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [allCompanies, allUsers, allLogs, sysConfig, v2AuditLogs] = await Promise.all([
+      
+      const fetchResults = await Promise.allSettled([
         dbService.listAll<Company>('companies'),
         dbService.listAll<User>('users'),
         dbService.listAll<ActivityLog>('activity_logs'),
         MaintenanceService.getStatus(),
-        dbService.listAll<AuditLog>('audit_logs').catch(() => [])
+        dbService.listAll<AuditLog>('audit_logs')
       ]);
+      
+      const allCompanies = fetchResults[0].status === 'fulfilled' ? fetchResults[0].value : [];
+      const allUsers = fetchResults[1].status === 'fulfilled' ? fetchResults[1].value : [];
+      const allLogs = fetchResults[2].status === 'fulfilled' ? fetchResults[2].value : [];
+      const sysConfig = fetchResults[3].status === 'fulfilled' ? fetchResults[3].value : null;
+      const v2AuditLogs = fetchResults[4].status === 'fulfilled' ? fetchResults[4].value : [];
       
       const allowedActions = ['إضافة شركة جديدة', 'تعديل بيانات شركة', 'حذف شركة', 'إضافة مستخدم', 'حذف مستخدم'];
       const filteredLogs = allLogs.filter(log => allowedActions.includes(log.action));
@@ -873,14 +880,45 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                     <p className="text-zinc-400 leading-relaxed font-medium">
                       فحص شامل للمنظومة، كشف الاختلالات المحاسبية، وتصحيح القيود المزدوجة التالفة.
                     </p>
-                    <div className="pt-4 flex gap-4">
+                    <div className="pt-4 flex flex-col gap-4">
                       <button 
-                        onClick={() => setActiveTab('audit')}
+                        onClick={async () => {
+                          if (!window.confirm('بدء فحص النظام العميق؟')) return;
+                          try {
+                            const res = await fetch('/api/erp/system/check', {
+                              headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+                            });
+                            const data = await res.json();
+                            alert(`نتائج الفحص: ${JSON.stringify(data)}`);
+                          } catch (err: any) {
+                            alert('فشل الفحص: ' + err.message);
+                          }
+                        }}
                         className="flex-1 py-4 bg-zinc-800 border border-zinc-700 rounded-2xl font-black hover:bg-zinc-700 transition-all flex items-center justify-center gap-2"
                       >
-                        <Search size={20} />
-                        فتح فحص النزاهة
+                        <ShieldCheck size={20} />
+                        تشغيل فحص النظام
                       </button>
+                      <button 
+                         onClick={async () => {
+                           if (!window.confirm('هل أنت متأكد من تشغيل أدوات الإصلاح التلقائي؟ قد يتسبب ذلك في إعادة تهيئة بعض الجداول المفقودة.')) return;
+                           try {
+                             const res = await fetch('/api/erp/system/fix', {
+                               method: 'POST',
+                               headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+                             });
+                             const data = await res.json();
+                             alert(`تم اكتمال الإصلاح: ${data.message || 'نجاح'}`);
+                             fetchData();
+                           } catch (err: any) {
+                             alert('فشل الإصلاح: ' + err.message);
+                           }
+                         }}
+                         className="flex-1 py-4 bg-emerald-600/20 border border-emerald-600/30 text-emerald-400 rounded-2xl font-black hover:bg-emerald-600/30 transition-all flex items-center justify-center gap-2"
+                       >
+                         <Hammer size={20} />
+                         إصلاح أخطاء النظام
+                       </button>
                     </div>
                   </div>
 
@@ -893,7 +931,15 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                     <p className="text-stone-500 leading-relaxed font-medium">
                       إدارة النسخ الاحتياطية للنظام بالكامل والقدرة على الاستعادة السريعة في حالات الكوارث.
                     </p>
-                    <button className="w-full py-4 bg-white border border-stone-200 rounded-2xl font-black hover:border-stone-400 transition-all text-stone-900 shadow-sm">
+                    <button 
+                      onClick={() => {
+                        // Change active page to backup_restore if we can, or just redirect
+                        // Since this is SuperAdminDashboard, we might need NavigationContext
+                        const navEvent = new CustomEvent('navigate-to', { detail: { page: 'backup_restore' } });
+                        window.dispatchEvent(navEvent);
+                      }}
+                      className="w-full py-4 bg-white border border-stone-200 rounded-2xl font-black hover:border-stone-400 transition-all text-stone-900 shadow-sm"
+                    >
                       إدارة المستودع السحابي
                     </button>
                   </div>

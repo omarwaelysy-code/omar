@@ -512,7 +512,8 @@ const modules = [
   'expense_categories', 'accounts', 'account_types', 'settings', 'users', 'companies',
   'invoices', 'invoice_items', 'journal_entries', 'journal_entry_lines', 'activity_logs',
   'returns', 'return_items', 'purchase_invoices', 'purchase_returns', 
-  'customer_discounts', 'supplier_discounts', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers'
+  'customer_discounts', 'supplier_discounts', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers',
+  'system_config', 'audit_logs'
 ];
 
 const transactionalModules = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns', 'journal_entries'];
@@ -538,18 +539,45 @@ function sanitizeData(table: string, data: any) {
 
 modules.forEach(moduleName => {
   // List with filters
-  router.get(`/${moduleName}`, authenticateToken, async (req, res) => {
+  router.get(`/${moduleName}`, authenticateToken, async (req: AuthRequest, res) => {
     try {
       let rows;
       if (moduleName === 'activity_logs') {
         const companyId = req.query.company_id;
-        if (!companyId) return res.status(400).json({ error: 'company_id is required' });
+        const isSuperAdmin = req.user?.role === 'super_admin';
         
-        // Optimize activity logs: sort by timestamp DESC and limit to most recent 500
-        const queryResult = await pool.query(
-          'SELECT * FROM activity_logs WHERE company_id = $1 ORDER BY timestamp DESC LIMIT 500',
-          [companyId]
-        );
+        if (!companyId && !isSuperAdmin) {
+          return res.status(400).json({ error: 'company_id is required for non-super-admins' });
+        }
+        
+        let query = 'SELECT * FROM activity_logs';
+        let params: any[] = [];
+        
+        if (companyId) {
+          query += ' WHERE company_id = $1';
+          params.push(companyId);
+        }
+        
+        query += ' ORDER BY timestamp DESC LIMIT 500';
+        
+        const queryResult = await pool.query(query, params);
+        rows = queryResult.rows;
+      } else if (moduleName === 'audit_logs') {
+        const companyId = req.query.company_id;
+        const isSuperAdmin = req.user?.role === 'super_admin';
+
+        let query = 'SELECT * FROM audit_logs';
+        let params: any[] = [];
+
+        if (companyId) {
+          query += ' WHERE company_id = $1';
+          params.push(companyId);
+        } else if (!isSuperAdmin) {
+          return res.status(400).json({ error: 'company_id is required' });
+        }
+
+        query += ' ORDER BY timestamp DESC LIMIT 500';
+        const queryResult = await pool.query(query, params);
         rows = queryResult.rows;
       } else {
         rows = await getList(moduleName, req.query);

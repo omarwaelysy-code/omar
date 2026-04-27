@@ -56,6 +56,8 @@ const pageLabels: { [key: string]: string } = {
   'activity_log': 'سجل النشاط',
   'companies': 'إدارة الشركات',
   'system_check': 'فحص النظام',
+  'backup_restore': 'النسخ الاحتياطي والاستعادة',
+  'audit_logs': 'سجل الرقابة',
 };
 
 export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -63,6 +65,25 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [openTabs, setOpenTabs] = useState<Tab[]>([{ id: 'dashboard', label: 'لوحة التحكم' }]);
   const [activeTabId, setActiveTabId] = useState('dashboard');
+
+  const openTab = (id: string, label: string) => {
+    setOpenTabs(prev => {
+      if (prev.find(tab => tab.id === id)) return prev;
+      return [...prev, { id, label }];
+    });
+    setActiveTabId(id);
+    setCurrentPage(id);
+  };
+
+  useEffect(() => {
+    const handleNavigate = (e: any) => {
+      const { page } = e.detail;
+      const label = pageLabels[page] || page;
+      openTab(page, label);
+    };
+    window.addEventListener('navigate-to', handleNavigate as EventListener);
+    return () => window.removeEventListener('navigate-to', handleNavigate as EventListener);
+  }, []);
 
   const resetNavigation = () => {
     const initialId = isSuperAdmin ? 'dashboard' : 'dashboard';
@@ -76,15 +97,6 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   useEffect(() => {
     resetNavigation();
   }, [user?.id, user?.company_id]);
-
-  const openTab = (id: string, label: string) => {
-    setOpenTabs(prev => {
-      if (prev.find(tab => tab.id === id)) return prev;
-      return [...prev, { id, label }];
-    });
-    setActiveTabId(id);
-    setCurrentPage(id);
-  };
 
   const closeTab = (id: string) => {
     if (id === 'dashboard') return;

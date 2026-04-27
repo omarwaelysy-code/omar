@@ -59,7 +59,8 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     if (user && !isSuperAdmin) {
       const companyId = user.company_id;
-      const cached = statsCache[companyId];
+      const cacheKey = `${user.id}_${companyId}`;
+      const cached = statsCache[cacheKey];
       
       if (cached && (Date.now() - cached.timestamp < CACHE_DURATION)) {
         setStats(cached.stats);
@@ -80,21 +81,8 @@ export const Dashboard: React.FC = () => {
     
     try {
       setLoading(true);
-      const [
-        invoices, 
-        returns, 
-        receipts, 
-        payments, 
-        customers, 
-        suppliers,
-        purchaseInvoices,
-        purchaseReturns,
-        customerDiscounts,
-        supplierDiscounts,
-        journalEntries,
-        accounts,
-        accountTypes
-      ] = await Promise.all([
+      
+      const results = await Promise.allSettled([
         dbService.list<Invoice>('invoices', user.company_id),
         dbService.list<Return>('returns', user.company_id),
         dbService.list<ReceiptVoucher>('receipt_vouchers', user.company_id),
@@ -110,30 +98,36 @@ export const Dashboard: React.FC = () => {
         dbService.list<AccountType>('account_types', user.company_id)
       ]);
 
-      const totalInvoicesAmount = invoices.reduce((sum, inv) => sum + inv.total_amount, 0);
-      const totalReturnsAmount = returns.reduce((sum, ret) => sum + ret.total_amount, 0);
+      const [
+        invoices, returns, receipts, payments, customers, suppliers,
+        purchaseInvoices, purchaseReturns, customerDiscounts, supplierDiscounts,
+        journalEntries, accounts, accountTypes
+      ] = results.map(r => r.status === 'fulfilled' ? r.value : []);
+
+      const totalInvoicesAmount = invoices.reduce((sum: number, inv: Invoice) => sum + inv.total_amount, 0);
+      const totalReturnsAmount = returns.reduce((sum: number, ret: Return) => sum + ret.total_amount, 0);
       const netSales = totalInvoicesAmount - totalReturnsAmount;
 
-      const cashSalesAmount = invoices.filter(i => i.payment_type === 'cash').reduce((sum, i) => sum + i.total_amount, 0);
-      const cashPurchasesAmount = purchaseInvoices.filter(i => i.payment_type === 'cash').reduce((sum, i) => sum + i.total_amount, 0);
+      const cashSalesAmount = invoices.filter((i: Invoice) => i.payment_type === 'cash').reduce((sum: number, i: Invoice) => sum + i.total_amount, 0);
+      const cashPurchasesAmount = purchaseInvoices.filter((i: PurchaseInvoice) => i.payment_type === 'cash').reduce((sum: number, i: PurchaseInvoice) => sum + i.total_amount, 0);
 
-      const totalReceipts = receipts.reduce((sum, r) => sum + r.amount, 0) + cashSalesAmount;
-      const totalExpenses = payments.reduce((sum, p) => sum + p.amount, 0) + cashPurchasesAmount;
+      const totalReceipts = receipts.reduce((sum: number, r: ReceiptVoucher) => sum + r.amount, 0) + cashSalesAmount;
+      const totalExpenses = payments.reduce((sum: number, p: PaymentVoucher) => sum + p.amount, 0) + cashPurchasesAmount;
 
       // Calculate Customer Balances (Matching Balance Sheet logic)
       const customerAccountIds = new Set([
-        ...customers.map(c => c.account_id).filter(Boolean),
-        ...accounts.filter(a => a.name === 'عملاء' || a.name === 'العملاء' || a.name === 'حساب العملاء').map(a => a.id)
+        ...customers.map((c: Customer) => c.account_id).filter(Boolean),
+        ...accounts.filter((a: Account) => a.name === 'عملاء' || a.name === 'العملاء' || a.name === 'حساب العملاء').map((a: Account) => a.id)
       ]);
 
       const totalCustomerBalances = accounts
-        .filter(acc => customerAccountIds.has(acc.id))
-        .reduce((sum, acc) => {
-          const type = accountTypes.find(t => t.id === acc.type_id);
+        .filter((acc: Account) => customerAccountIds.has(acc.id))
+        .reduce((sum: number, acc: Account) => {
+          const type = (accountTypes as AccountType[]).find(t => t.id === acc.type_id);
           if (type?.classification !== 'asset') return sum;
 
           let balance = acc.opening_balance || 0;
-          journalEntries.forEach((je: any) => {
+          (journalEntries as any[]).forEach((je: any) => {
             je.items?.forEach((item: any) => {
               if (item.account_id === acc.id) {
                 balance += (item.debit || 0) - (item.credit || 0);
@@ -145,18 +139,18 @@ export const Dashboard: React.FC = () => {
 
       // Calculate Supplier Balances (Matching Balance Sheet logic)
       const supplierAccountIds = new Set([
-        ...suppliers.map(s => s.account_id).filter(Boolean),
-        ...accounts.filter(a => a.name === 'موردين' || a.name === 'الموردين' || a.name === 'حساب الموردين').map(a => a.id)
+        ...suppliers.map((s: Supplier) => s.account_id).filter(Boolean),
+        ...accounts.filter((a: Account) => a.name === 'موردين' || a.name === 'الموردين' || a.name === 'حساب الموردين').map((a: Account) => a.id)
       ]);
 
       const totalSupplierBalances = accounts
-        .filter(acc => supplierAccountIds.has(acc.id))
-        .reduce((sum, acc) => {
-          const type = accountTypes.find(t => t.id === acc.type_id);
+        .filter((acc: Account) => supplierAccountIds.has(acc.id))
+        .reduce((sum: number, acc: Account) => {
+          const type = (accountTypes as AccountType[]).find(t => t.id === acc.type_id);
           if (type?.classification !== 'liability_equity') return sum;
 
           let balance = acc.opening_balance || 0;
-          journalEntries.forEach((je: any) => {
+          (journalEntries as any[]).forEach((je: any) => {
             je.items?.forEach((item: any) => {
               if (item.account_id === acc.id) {
                 balance += (item.debit || 0) - (item.credit || 0);
@@ -170,15 +164,15 @@ export const Dashboard: React.FC = () => {
       // Simple sales by month calculation
       const monthKeys = ['months.jan', 'months.feb', 'months.mar', 'months.apr', 'months.may', 'months.jun', 'months.jul', 'months.aug', 'months.sep', 'months.oct', 'months.nov', 'months.dec'];
       const salesByMonth = monthKeys.map((key, index) => {
-        const monthInvoices = invoices.filter(inv => new Date(inv.date).getMonth() === index);
-        const monthReturns = returns.filter(ret => new Date(ret.date).getMonth() === index);
-        const total = monthInvoices.reduce((sum, inv) => sum + inv.total_amount, 0) - 
-                      monthReturns.reduce((sum, ret) => sum + ret.total_amount, 0);
+        const monthInvoices = invoices.filter((inv: Invoice) => new Date(inv.date).getMonth() === index);
+        const monthReturns = returns.filter((ret: Return) => new Date(ret.date).getMonth() === index);
+        const total = monthInvoices.reduce((sum: number, inv: Invoice) => sum + inv.total_amount, 0) - 
+                      monthReturns.reduce((sum: number, ret: Return) => sum + ret.total_amount, 0);
         return { month: t(key), total };
       });
 
       const recentTransactions: DashboardTransaction[] = [
-        ...invoices.map(inv => ({
+        ...invoices.map((inv: Invoice) => ({
           id: inv.id,
           type: 'invoice' as const,
           number: inv.invoice_number,
@@ -186,7 +180,7 @@ export const Dashboard: React.FC = () => {
           date: inv.date,
           total_amount: inv.total_amount
         })),
-        ...returns.map(ret => ({
+        ...returns.map((ret: Return) => ({
           id: ret.id,
           type: 'return' as const,
           number: ret.return_number,
@@ -194,7 +188,7 @@ export const Dashboard: React.FC = () => {
           date: ret.date,
           total_amount: ret.total_amount
         })),
-        ...journalEntries.filter((je: any) => je.reference_type === 'manual').map((je: any) => ({
+        ...(journalEntries as any[]).filter((je: any) => je.reference_type === 'manual').map((je: any) => ({
           id: je.id,
           type: 'journal' as any,
           number: je.reference_number || `${t('journal.entry')}-${je.id.slice(-6)}`,
@@ -219,10 +213,13 @@ export const Dashboard: React.FC = () => {
       setStats(newStats);
       
       // Update cache
-      statsCache[companyId] = {
-        stats: newStats,
-        timestamp: Date.now()
-      };
+      if (user) {
+        const cacheKey = `${user.id}_${companyId}`;
+        statsCache[cacheKey] = {
+          stats: newStats,
+          timestamp: Date.now()
+        };
+      }
     } catch (e) {
       console.error(e);
     } finally {

@@ -175,8 +175,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     localStorage.removeItem('auth_user');
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_email');
+    localStorage.removeItem('user_id');
+    // Clear company preference to avoid state leakage
+    Object.keys(localStorage).forEach(key => {
+      if (key.includes('preferred_company_')) localStorage.removeItem(key);
+    });
     setUser(null);
     setUserMemberships([]);
+    window.location.href = '/login';
   };
 
   const isSuperAdmin = user?.role === 'super_admin';
