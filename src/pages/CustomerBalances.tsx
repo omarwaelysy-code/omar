@@ -6,6 +6,7 @@ import { Search, Download, Wallet, User, ArrowUpRight, FileSpreadsheet } from 'l
 import { exportToPDF } from '../utils/pdfUtils';
 import { dbService } from '../services/dbService';
 import { utils, writeFile } from 'xlsx';
+import { formatNumber } from '../utils/formatUtils';
 
 export const CustomerBalances: React.FC = () => {
   const { user } = useAuth();
@@ -114,7 +115,7 @@ export const CustomerBalances: React.FC = () => {
 
   const formatBalance = (balance: number) => {
     if (balance === 0) return '0';
-    return balance > 0 ? `+${balance.toLocaleString()}` : balance.toLocaleString();
+    return balance > 0 ? `+${formatNumber(balance)}` : formatNumber(balance);
   };
 
   const exportReport = async () => {
@@ -192,7 +193,7 @@ export const CustomerBalances: React.FC = () => {
         <div className="bg-zinc-900 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full -mr-16 -mt-16 group-hover:bg-white/10 transition-colors" />
           <p className="text-zinc-400 text-sm font-bold uppercase tracking-widest mb-1">إجمالي المديونيات</p>
-          <h3 className="text-3xl font-bold">{totalOutstanding.toLocaleString()} ج.م</h3>
+          <h3 className="text-3xl font-bold">{formatNumber(totalOutstanding)} ج.م</h3>
           <div className="mt-4 flex items-center gap-2 text-emerald-400 text-sm">
             <ArrowUpRight size={16} />
             <span>مستحقات لدى العملاء</span>
@@ -272,12 +273,12 @@ export const CustomerBalances: React.FC = () => {
               <tfoot className="bg-zinc-900 text-white font-bold">
                 <tr>
                   <td colSpan={2} className="px-4 py-4 text-left">الإجمالي:</td>
-                  <td className="px-4 py-4">{filteredCustomers.reduce((sum, c) => sum + c.openingBalance, 0).toLocaleString()}</td>
-                  <td className="px-4 py-4">{filteredCustomers.reduce((sum, c) => sum + c.totalInvoices, 0).toLocaleString()}</td>
-                  <td className="px-4 py-4">{filteredCustomers.reduce((sum, c) => sum + c.totalReturns, 0).toLocaleString()}</td>
-                  <td className="px-4 py-4">{filteredCustomers.reduce((sum, c) => sum + c.totalDiscounts, 0).toLocaleString()}</td>
-                  <td className="px-4 py-4">{filteredCustomers.reduce((sum, c) => sum + c.totalReceipts, 0).toLocaleString()}</td>
-                  <td className="px-4 py-4">{filteredCustomers.reduce((sum, c) => sum + (c.journalDebit - c.journalCredit), 0).toLocaleString()}</td>
+                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + c.openingBalance, 0))}</td>
+                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + c.totalInvoices, 0))}</td>
+                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + c.totalReturns, 0))}</td>
+                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + c.totalDiscounts, 0))}</td>
+                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + c.totalReceipts, 0))}</td>
+                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + (c.journalDebit - c.journalCredit), 0))}</td>
                   <td className="px-4 py-4">{formatBalance(totalOutstanding)} ج.م</td>
                 </tr>
               </tfoot>
@@ -306,23 +307,23 @@ export const CustomerBalances: React.FC = () => {
               <div className="grid grid-cols-2 gap-2 text-[10px]">
                 <div className="flex justify-between border-b border-zinc-50 pb-1">
                   <span className="text-zinc-400">رصيد أول:</span>
-                  <span className="font-medium">{customer.openingBalance.toLocaleString()}</span>
+                  <span className="font-medium">{formatNumber(customer.openingBalance)}</span>
                 </div>
                 <div className="flex justify-between border-b border-zinc-50 pb-1">
                   <span className="text-zinc-400">مبيعات (+):</span>
-                  <span className="text-emerald-600 font-medium">{customer.totalInvoices.toLocaleString()}</span>
+                  <span className="text-emerald-600 font-medium">{formatNumber(customer.totalInvoices)}</span>
                 </div>
                 <div className="flex justify-between border-b border-zinc-50 pb-1">
                   <span className="text-zinc-400">مرتجع (-):</span>
-                  <span className="text-rose-600 font-medium">{customer.totalReturns.toLocaleString()}</span>
+                  <span className="text-rose-600 font-medium">{formatNumber(customer.totalReturns)}</span>
                 </div>
                 <div className="flex justify-between border-b border-zinc-50 pb-1">
                   <span className="text-zinc-400">تحصيل (-):</span>
-                  <span className="text-blue-600 font-medium">{customer.totalReceipts.toLocaleString()}</span>
+                  <span className="text-blue-600 font-medium">{formatNumber(customer.totalReceipts)}</span>
                 </div>
                 <div className="flex justify-between border-b border-zinc-50 pb-1">
                   <span className="text-zinc-400">قيود (+/-):</span>
-                  <span className="text-zinc-600 font-medium">{(customer.journalDebit - customer.journalCredit).toLocaleString()}</span>
+                  <span className="text-zinc-600 font-medium">{formatNumber(customer.journalDebit - customer.journalCredit)}</span>
                 </div>
               </div>
               <div className="flex items-center justify-between pt-2 border-t border-zinc-100">

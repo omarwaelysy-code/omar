@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { AccountingEngine } from '../services/AccountingEngine';
+import { formatNumber } from '../utils/formatUtils';
 
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -121,13 +122,13 @@ export const BalanceSheet: React.FC = () => {
                 <Wallet size={24} />
                 {t('balance_sheet.assets')}
               </h3>
-              <span className="text-2xl font-black text-emerald-600">{data.totalAssets.toLocaleString()}</span>
+              <span className="text-2xl font-black text-emerald-600">{formatNumber(data.totalAssets)}</span>
             </div>
             <div className="p-4 space-y-2">
               {data.assets.map(a => (
                 <div key={a.id} className={`flex items-center justify-between p-4 hover:bg-zinc-50 rounded-2xl transition-all ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                   <span className="font-bold text-zinc-600">{a.name}</span>
-                  <span className="font-black text-zinc-900">{a.balance.toLocaleString()}</span>
+                  <span className="font-black text-zinc-900">{formatNumber(a.balance)}</span>
                 </div>
               ))}
               {data.assets.length === 0 && (
@@ -145,18 +146,18 @@ export const BalanceSheet: React.FC = () => {
                 <CreditCard size={24} />
                 {t('balance_sheet.liabilities_equity')}
               </h3>
-              <span className="text-2xl font-black text-rose-600">{data.totalLiabilitiesEquity.toLocaleString()}</span>
+              <span className="text-2xl font-black text-rose-600">{formatNumber(data.totalLiabilitiesEquity)}</span>
             </div>
             <div className="p-4 space-y-2">
               {data.liabilitiesEquity.map(a => (
                 <div key={a.id} className={`flex items-center justify-between p-4 hover:bg-zinc-50 rounded-2xl transition-all ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                   <span className="font-bold text-zinc-600">{a.name}</span>
-                  <span className="font-black text-zinc-900">{Math.abs(a.balance).toLocaleString()}</span>
+                  <span className="font-black text-zinc-900">{formatNumber(Math.abs(a.balance))}</span>
                 </div>
               ))}
               <div className={`flex items-center justify-between p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                 <span className="font-bold text-emerald-700">{t('balance_sheet.net_profit_period')}</span>
-                <span className="font-black text-emerald-600">{data.netProfit.toLocaleString()}</span>
+                <span className="font-black text-emerald-600">{formatNumber(data.netProfit)}</span>
               </div>
             </div>
           </div>
@@ -174,13 +175,13 @@ export const BalanceSheet: React.FC = () => {
                 <p className="text-sm opacity-80 font-bold">
                   {Math.abs(data.totalAssets - data.totalLiabilitiesEquity) < 0.01 
                     ? t('balance_sheet.balanced_msg') 
-                    : `${t('balance_sheet.unbalanced_msg')} ${(data.totalAssets - data.totalLiabilitiesEquity).toLocaleString()}`}
+                    : `${t('balance_sheet.unbalanced_msg')} ${formatNumber(data.totalAssets - data.totalLiabilitiesEquity)}`}
                 </p>
               </div>
             </div>
             <div className={`${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
               <p className="text-xs font-black uppercase tracking-widest opacity-60">{t('balance_sheet.difference')}</p>
-              <p className="text-2xl font-black">{(data.totalAssets - data.totalLiabilitiesEquity).toLocaleString()}</p>
+              <p className="text-2xl font-black">{formatNumber(data.totalAssets - data.totalLiabilitiesEquity)}</p>
             </div>
           </div>
 
@@ -199,11 +200,11 @@ export const BalanceSheet: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-4 bg-white rounded-2xl border border-amber-100">
                   <p className="text-xs font-bold text-zinc-500 mb-1">{t('balance_sheet.total_debit_all')}</p>
-                  <p className="text-xl font-black text-zinc-900">{data.diagnostics.globalDebit.toLocaleString()}</p>
+                  <p className="text-xl font-black text-zinc-900">{formatNumber(data.diagnostics.globalDebit)}</p>
                 </div>
                 <div className="p-4 bg-white rounded-2xl border border-amber-100">
                   <p className="text-xs font-bold text-zinc-500 mb-1">{t('balance_sheet.total_credit_all')}</p>
-                  <p className="text-xl font-black text-zinc-900">{data.diagnostics.globalCredit.toLocaleString()}</p>
+                  <p className="text-xl font-black text-zinc-900">{formatNumber(data.diagnostics.globalCredit)}</p>
                 </div>
               </div>
 

@@ -4,6 +4,7 @@ import { ActivityLog, JournalEntry } from '../types';
 import { dbService } from '../services/dbService';
 import { Clock, User, Activity, Calendar, History, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatNumber } from '../utils/formatUtils';
 
 interface TransactionSidePanelProps {
   documentId?: string;
@@ -121,10 +122,10 @@ export const TransactionSidePanel: React.FC<TransactionSidePanelProps> = ({
                           <span className="flex-1 font-medium text-zinc-700 group-hover:text-emerald-600 transition-colors">{item.account_name}</span>
                           <div className="flex gap-6">
                             <span className={`w-14 text-left font-bold ${item.debit > 0 ? 'text-emerald-600' : 'text-zinc-300'}`}>
-                              {item.debit > 0 ? item.debit.toLocaleString() : '-'}
+                              {item.debit > 0 ? formatNumber(item.debit) : '-'}
                             </span>
                             <span className={`w-14 text-left font-bold ${item.credit > 0 ? 'text-red-500' : 'text-zinc-300'}`}>
-                              {item.credit > 0 ? item.credit.toLocaleString() : '-'}
+                              {item.credit > 0 ? formatNumber(item.credit) : '-'}
                             </span>
                           </div>
                         </div>
@@ -133,8 +134,8 @@ export const TransactionSidePanel: React.FC<TransactionSidePanelProps> = ({
                     <div className="pt-3 border-t border-zinc-200 flex justify-between items-center">
                       <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">الإجمالي</span>
                       <div className="flex gap-6">
-                        <span className="w-14 text-left font-black text-emerald-600 text-xs">{displayJournal.total_debit.toLocaleString()}</span>
-                        <span className="w-14 text-left font-black text-red-600 text-xs">{displayJournal.total_credit.toLocaleString()}</span>
+                        <span className="w-14 text-left font-black text-emerald-600 text-xs">{formatNumber(displayJournal.total_debit)}</span>
+                        <span className="w-14 text-left font-black text-red-600 text-xs">{formatNumber(displayJournal.total_credit)}</span>
                       </div>
                     </div>
                   </div>

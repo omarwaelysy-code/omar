@@ -1,5 +1,6 @@
 import React from 'react';
 import { FileText } from 'lucide-react';
+import { formatNumber } from '../utils/formatUtils';
 
 interface JournalEntryItem {
   account_name: string;
@@ -42,10 +43,10 @@ export const JournalEntryPreview: React.FC<JournalEntryPreviewProps> = ({ items,
                   <div className="text-[10px] text-zinc-400 italic">{item.description}</div>
                 </td>
                 <td className="px-4 py-2 text-left font-mono font-bold text-emerald-600">
-                  {item.debit > 0 ? item.debit.toLocaleString() : '-'}
+                  {item.debit > 0 ? formatNumber(item.debit) : '-'}
                 </td>
                 <td className="px-4 py-2 text-left font-mono font-bold text-rose-600">
-                  {item.credit > 0 ? item.credit.toLocaleString() : '-'}
+                  {item.credit > 0 ? formatNumber(item.credit) : '-'}
                 </td>
               </tr>
             ))}
@@ -53,8 +54,8 @@ export const JournalEntryPreview: React.FC<JournalEntryPreviewProps> = ({ items,
           <tfoot>
             <tr className="bg-zinc-100/30 font-black border-t border-zinc-200">
               <td className="px-4 py-2 text-zinc-600">الإجمالي</td>
-              <td className="px-4 py-2 text-left font-mono text-emerald-700">{totalDebit.toLocaleString()}</td>
-              <td className="px-4 py-2 text-left font-mono text-rose-700">{totalCredit.toLocaleString()}</td>
+              <td className="px-4 py-2 text-left font-mono text-emerald-700">{formatNumber(totalDebit)}</td>
+              <td className="px-4 py-2 text-left font-mono text-rose-700">{formatNumber(totalCredit)}</td>
             </tr>
           </tfoot>
         </table>

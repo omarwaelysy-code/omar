@@ -7,6 +7,7 @@ import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
 import { ExportButtons } from '../components/ExportButtons';
+import { formatNumber } from '../utils/formatUtils';
 
 interface CashTransaction {
   id: string;
@@ -282,9 +283,9 @@ export const CashReport: React.FC = () => {
                       <td className="px-4 py-3 text-sm"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600">{t('reports.balance')}</span></td>
                       <td className="px-4 py-3 text-sm font-mono">-</td>
                       <td className="px-4 py-3 text-sm">{t('reports.brought_forward')}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance > 0 ? startBalance.toLocaleString() : '-'}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-rose-600">{startBalance < 0 ? Math.abs(startBalance).toLocaleString() : '-'}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-zinc-900">{startBalance.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance > 0 ? formatNumber(startBalance) : '-'}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-rose-600">{startBalance < 0 ? formatNumber(Math.abs(startBalance)) : '-'}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-zinc-900">{formatNumber(startBalance)}</td>
                     </tr>
                     {transactions.map((t) => (
                       <tr key={t.id} className="border-b border-zinc-50 hover:bg-zinc-50/50 transition-colors">
@@ -298,9 +299,9 @@ export const CashReport: React.FC = () => {
                         </td>
                         <td className="px-4 py-3 text-sm font-mono">{t.reference}</td>
                         <td className="px-4 py-3 text-sm">{t.notes}</td>
-                        <td className="px-4 py-3 text-sm font-bold text-emerald-600">{t.in > 0 ? t.in.toLocaleString() : '-'}</td>
-                        <td className="px-4 py-3 text-sm font-bold text-rose-600">{t.out > 0 ? t.out.toLocaleString() : '-'}</td>
-                        <td className="px-4 py-3 text-sm font-bold text-zinc-900">{t.balance?.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-emerald-600">{t.in > 0 ? formatNumber(t.in) : '-'}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-rose-600">{t.out > 0 ? formatNumber(t.out) : '-'}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-zinc-900">{t.balance !== undefined ? formatNumber(t.balance) : '-'}</td>
                       </tr>
                     ))}
                     {transactions.length === 0 && (
@@ -312,9 +313,9 @@ export const CashReport: React.FC = () => {
                   <tfoot>
                     <tr className="bg-zinc-900 text-white font-bold">
                       <td colSpan={4} className={`px-4 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.total')}</td>
-                      <td className="px-4 py-3">{(transactions.reduce((sum, t) => sum + t.in, 0) + (startBalance > 0 ? startBalance : 0)).toLocaleString()}</td>
-                      <td className="px-4 py-3">{(transactions.reduce((sum, t) => sum + t.out, 0) + (startBalance < 0 ? Math.abs(startBalance) : 0)).toLocaleString()}</td>
-                      <td className="px-4 py-3">{(transactions.length > 0 ? transactions[transactions.length - 1].balance : startBalance)?.toLocaleString()}</td>
+                      <td className="px-4 py-3">{formatNumber(transactions.reduce((sum, t) => sum + t.in, 0) + (startBalance > 0 ? startBalance : 0))}</td>
+                      <td className="px-4 py-3">{formatNumber(transactions.reduce((sum, t) => sum + t.out, 0) + (startBalance < 0 ? Math.abs(startBalance) : 0))}</td>
+                      <td className="px-4 py-3">{formatNumber(transactions.length > 0 ? (transactions[transactions.length - 1].balance ?? 0) : startBalance)}</td>
                     </tr>
                   </tfoot>
                 </table>

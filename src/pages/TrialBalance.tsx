@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { AccountingEngine } from '../services/AccountingEngine';
+import { formatNumber } from '../utils/formatUtils';
 
 export const TrialBalance: React.FC = () => {
   const { user } = useAuth();
@@ -184,22 +185,22 @@ export const TrialBalance: React.FC = () => {
                 <tr key={a.id} className="hover:bg-zinc-50/50 transition-colors">
                   <td className={`px-6 py-4 text-sm font-bold text-zinc-500 ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.code}</td>
                   <td className={`px-6 py-4 text-sm font-bold text-zinc-900 ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.name}</td>
-                  <td className={`px-4 py-4 text-sm font-black text-emerald-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.opening.debit > 0 ? a.opening.debit.toLocaleString() : '-'}</td>
-                  <td className={`px-4 py-4 text-sm font-black text-rose-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.opening.credit > 0 ? a.opening.credit.toLocaleString() : '-'}</td>
-                  <td className={`px-4 py-4 text-sm font-black text-emerald-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.movement.debit > 0 ? a.movement.debit.toLocaleString() : '-'}</td>
-                  <td className={`px-4 py-4 text-sm font-black text-rose-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.movement.credit > 0 ? a.movement.credit.toLocaleString() : '-'}</td>
-                  <td className={`px-4 py-4 text-sm font-black text-emerald-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.closing.debit > 0 ? a.closing.debit.toLocaleString() : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-rose-600 text-center">{a.closing.credit > 0 ? a.closing.credit.toLocaleString() : '-'}</td>
+                  <td className={`px-4 py-4 text-sm font-black text-emerald-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.opening.debit > 0 ? formatNumber(a.opening.debit) : '-'}</td>
+                  <td className={`px-4 py-4 text-sm font-black text-rose-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.opening.credit > 0 ? formatNumber(a.opening.credit) : '-'}</td>
+                  <td className={`px-4 py-4 text-sm font-black text-emerald-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.movement.debit > 0 ? formatNumber(a.movement.debit) : '-'}</td>
+                  <td className={`px-4 py-4 text-sm font-black text-rose-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.movement.credit > 0 ? formatNumber(a.movement.credit) : '-'}</td>
+                  <td className={`px-4 py-4 text-sm font-black text-emerald-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.closing.debit > 0 ? formatNumber(a.closing.debit) : '-'}</td>
+                  <td className="px-4 py-4 text-sm font-black text-rose-600 text-center">{a.closing.credit > 0 ? formatNumber(a.closing.credit) : '-'}</td>
                 </tr>
               ))}
               <tr className="bg-zinc-900 text-white font-black">
                 <td colSpan={2} className="px-6 py-4 text-sm text-center">{t('trial.total')}</td>
-                <td className="px-4 py-4 text-sm text-center">{totals.openingDebit.toLocaleString()}</td>
-                <td className="px-4 py-4 text-sm text-center">{totals.openingCredit.toLocaleString()}</td>
-                <td className="px-4 py-4 text-sm text-center">{totals.movementDebit.toLocaleString()}</td>
-                <td className="px-4 py-4 text-sm text-center">{totals.movementCredit.toLocaleString()}</td>
-                <td className="px-4 py-4 text-sm text-center">{totals.closingDebit.toLocaleString()}</td>
-                <td className="px-4 py-4 text-sm text-center">{totals.closingCredit.toLocaleString()}</td>
+                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.openingDebit)}</td>
+                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.openingCredit)}</td>
+                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.movementDebit)}</td>
+                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.movementCredit)}</td>
+                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.closingDebit)}</td>
+                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.closingCredit)}</td>
               </tr>
             </tbody>
           </table>
@@ -219,13 +220,13 @@ export const TrialBalance: React.FC = () => {
             <p className="text-sm opacity-80 font-bold">
               {globalBalance.isBalanced 
                 ? t('trial.balanced') 
-                : `${t('trial.unbalanced')} ${globalBalance.difference.toLocaleString()}`}
+                : `${t('trial.unbalanced')} ${formatNumber(globalBalance.difference)}`}
             </p>
           </div>
         </div>
         <div className={`${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
           <p className="text-xs font-black uppercase tracking-widest opacity-60">{t('trial.difference')}</p>
-          <p className="text-2xl font-black">{globalBalance.difference.toLocaleString()}</p>
+          <p className="text-2xl font-black">{formatNumber(globalBalance.difference)}</p>
         </div>
       </div>
     </div>

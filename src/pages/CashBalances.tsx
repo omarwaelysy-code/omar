@@ -5,6 +5,7 @@ import { Calendar, Download, Printer, Wallet, ArrowLeftRight, BarChart3 } from '
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
+import { formatNumber } from '../utils/formatUtils';
 
 interface CashBalanceData {
   id: string;
@@ -299,28 +300,28 @@ export const CashBalances: React.FC = () => {
               {balances.map((b) => (
                 <tr key={b.id} className="hover:bg-zinc-50/50 transition-colors">
                   <td className="px-6 py-4 text-sm font-bold text-zinc-900 border-l border-zinc-100">{b.name}</td>
-                  <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.opening.in > 0 ? b.opening.in.toLocaleString() : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-rose-600 text-center border-l border-zinc-100">{b.opening.out > 0 ? b.opening.out.toLocaleString() : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.movement.in > 0 ? b.movement.in.toLocaleString() : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-rose-600 text-center border-l border-zinc-100">{b.movement.out > 0 ? b.movement.out.toLocaleString() : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.closing.in > 0 ? b.closing.in.toLocaleString() : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-rose-600 text-center border-l border-zinc-100">{b.closing.out > 0 ? b.closing.out.toLocaleString() : '-'}</td>
+                  <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.opening.in > 0 ? formatNumber(b.opening.in) : '-'}</td>
+                  <td className="px-4 py-4 text-sm font-black text-rose-600 text-center border-l border-zinc-100">{b.opening.out > 0 ? formatNumber(b.opening.out) : '-'}</td>
+                  <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.movement.in > 0 ? formatNumber(b.movement.in) : '-'}</td>
+                  <td className="px-4 py-4 text-sm font-black text-rose-600 text-center border-l border-zinc-100">{b.movement.out > 0 ? formatNumber(b.movement.out) : '-'}</td>
+                  <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.closing.in > 0 ? formatNumber(b.closing.in) : '-'}</td>
+                  <td className="px-4 py-4 text-sm font-black text-rose-600 text-center border-l border-zinc-100">{b.closing.out > 0 ? formatNumber(b.closing.out) : '-'}</td>
                   <td className="px-4 py-4 text-sm font-black text-zinc-900 text-center">
                     <span className={b.closing.balance >= 0 ? 'text-emerald-600' : 'text-rose-600'}>
-                      {b.closing.balance.toLocaleString()}
+                      {formatNumber(b.closing.balance)}
                     </span>
                   </td>
                 </tr>
               ))}
               <tr className="bg-zinc-900 text-white font-black">
                 <td className="px-6 py-4 text-sm text-center">الإجمالي</td>
-                <td className="px-4 py-4 text-sm text-center">{totals.opIn.toLocaleString()}</td>
-                <td className="px-4 py-4 text-sm text-center">{totals.opOut.toLocaleString()}</td>
-                <td className="px-4 py-4 text-sm text-center">{totals.movIn.toLocaleString()}</td>
-                <td className="px-4 py-4 text-sm text-center">{totals.movOut.toLocaleString()}</td>
-                <td className="px-4 py-4 text-sm text-center">{totals.clIn.toLocaleString()}</td>
-                <td className="px-4 py-4 text-sm text-center">{totals.clOut.toLocaleString()}</td>
-                <td className="px-4 py-4 text-sm text-center">{totals.clBal.toLocaleString()}</td>
+                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.opIn)}</td>
+                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.opOut)}</td>
+                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.movIn)}</td>
+                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.movOut)}</td>
+                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.clIn)}</td>
+                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.clOut)}</td>
+                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.clBal)}</td>
               </tr>
             </tbody>
           </table>

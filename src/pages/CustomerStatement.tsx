@@ -4,6 +4,7 @@ import { Customer, Invoice, ReceiptVoucher, Return } from '../types';
 import { Search, FileText, Download, Calendar, User, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfUtils';
 import { dbService } from '../services/dbService';
+import { formatNumber } from '../utils/formatUtils';
 
 import { utils, writeFile } from 'xlsx';
 
@@ -122,7 +123,7 @@ export const CustomerStatement: React.FC = () => {
 
   const formatBalance = (balance: number) => {
     if (balance === 0) return '0';
-    return balance > 0 ? `+${balance.toLocaleString()}` : balance.toLocaleString();
+    return balance > 0 ? `+${formatNumber(balance)}` : formatNumber(balance);
   };
 
   const handleExportExcel = () => {
@@ -283,8 +284,8 @@ export const CustomerStatement: React.FC = () => {
                         </td>
                         <td className="px-4 py-3 text-sm font-mono">{entry.reference}</td>
                         <td className="px-4 py-3 text-sm">{entry.description}</td>
-                        <td className="px-4 py-3 text-sm font-bold text-emerald-600">{entry.debit > 0 ? entry.debit.toLocaleString() : '-'}</td>
-                        <td className="px-4 py-3 text-sm font-bold text-rose-600">{entry.credit > 0 ? entry.credit.toLocaleString() : '-'}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-emerald-600">{entry.debit > 0 ? formatNumber(entry.debit) : '-'}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-rose-600">{entry.credit > 0 ? formatNumber(entry.credit) : '-'}</td>
                         <td className="px-4 py-3 text-sm font-bold text-zinc-900">{formatBalance(entry.balance)}</td>
                       </tr>
                     ))}
@@ -297,8 +298,8 @@ export const CustomerStatement: React.FC = () => {
                   <tfoot>
                     <tr className="bg-zinc-900 text-white font-bold">
                       <td colSpan={4} className="px-4 py-3 text-left">الرصيد الختامي</td>
-                      <td className="px-4 py-3">{(entries.filter(e => e.id !== 'balance-forward').reduce((sum, e) => sum + e.debit, 0) + (entries.find(e => e.id === 'balance-forward')?.debit || 0)).toLocaleString()}</td>
-                      <td className="px-4 py-3">{(entries.filter(e => e.id !== 'balance-forward').reduce((sum, e) => sum + e.credit, 0) + (entries.find(e => e.id === 'balance-forward')?.credit || 0)).toLocaleString()}</td>
+                      <td className="px-4 py-3">{formatNumber(entries.filter(e => e.id !== 'balance-forward').reduce((sum, e) => sum + e.debit, 0) + (entries.find(e => e.id === 'balance-forward')?.debit || 0))}</td>
+                      <td className="px-4 py-3">{formatNumber(entries.filter(e => e.id !== 'balance-forward').reduce((sum, e) => sum + e.credit, 0) + (entries.find(e => e.id === 'balance-forward')?.credit || 0))}</td>
                       <td className="px-4 py-3">{formatBalance(entries[entries.length - 1]?.balance)}</td>
                     </tr>
                   </tfoot>

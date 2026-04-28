@@ -4,6 +4,7 @@ import { Supplier, PurchaseInvoice, PaymentVoucher, PurchaseReturn } from '../ty
 import { Search, Calendar, FileText, Download, User, ArrowUpRight, ArrowDownLeft, Wallet } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfUtils';
 import { dbService } from '../services/dbService';
+import { formatNumber } from '../utils/formatUtils';
 
 import { utils, writeFile } from 'xlsx';
 
@@ -114,7 +115,7 @@ export const SupplierStatement: React.FC = () => {
   const formatBalance = (balance: number) => {
     if (balance === 0) return '0';
     // For suppliers, Credit is positive (+)
-    return balance > 0 ? `+${balance.toLocaleString()}` : balance.toLocaleString();
+    return balance > 0 ? `+${formatNumber(balance)}` : formatNumber(balance);
   };
 
   const handleExportExcel = () => {
@@ -257,8 +258,8 @@ export const SupplierStatement: React.FC = () => {
                       <td className="px-4 py-3 text-sm"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600">رصيد</span></td>
                       <td className="px-4 py-3 text-sm font-mono">-</td>
                       <td className="px-4 py-3 text-sm">رصيد منقول</td>
-                      <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance > 0 ? startBalance.toLocaleString() : '-'}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-rose-600">{startBalance < 0 ? Math.abs(startBalance).toLocaleString() : '-'}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance > 0 ? formatNumber(startBalance) : '-'}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-rose-600">{startBalance < 0 ? formatNumber(Math.abs(startBalance)) : '-'}</td>
                       <td className="px-4 py-3 text-sm font-bold text-zinc-900">{formatBalance(startBalance)}</td>
                     </tr>
                     {statement.map((item) => (
@@ -283,8 +284,8 @@ export const SupplierStatement: React.FC = () => {
                         </td>
                         <td className="px-4 py-3 text-sm font-mono">{item.reference}</td>
                         <td className="px-4 py-3 text-sm">{item.notes}</td>
-                        <td className="px-4 py-3 text-sm font-bold text-emerald-600">{item.debit > 0 ? item.debit.toLocaleString() : '-'}</td>
-                        <td className="px-4 py-3 text-sm font-bold text-rose-600">{item.credit > 0 ? item.credit.toLocaleString() : '-'}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-emerald-600">{item.debit > 0 ? formatNumber(item.debit) : '-'}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-rose-600">{item.credit > 0 ? formatNumber(item.credit) : '-'}</td>
                         <td className="px-4 py-3 text-sm font-bold text-zinc-900">{formatBalance(item.balance || 0)}</td>
                       </tr>
                     ))}
@@ -297,8 +298,8 @@ export const SupplierStatement: React.FC = () => {
                   <tfoot>
                     <tr className="bg-zinc-900 text-white font-bold">
                       <td colSpan={4} className="px-4 py-3 text-left">الرصيد الختامي</td>
-                      <td className="px-4 py-3">{(statement.reduce((sum, e) => sum + e.debit, 0) + (startBalance > 0 ? startBalance : 0)).toLocaleString()}</td>
-                      <td className="px-4 py-3">{(statement.reduce((sum, e) => sum + e.credit, 0) + (startBalance < 0 ? Math.abs(startBalance) : 0)).toLocaleString()}</td>
+                      <td className="px-4 py-3">{formatNumber(statement.reduce((sum, e) => sum + e.debit, 0) + (startBalance > 0 ? startBalance : 0))}</td>
+                      <td className="px-4 py-3">{formatNumber(statement.reduce((sum, e) => sum + e.credit, 0) + (startBalance < 0 ? Math.abs(startBalance) : 0))}</td>
                       <td className="px-4 py-3">{formatBalance(statement.length > 0 ? (statement[statement.length - 1].balance || 0) : startBalance)}</td>
                     </tr>
                   </tfoot>

@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { AccountingEngine } from '../services/AccountingEngine';
+import { formatNumber } from '../utils/formatUtils';
 
 export const IncomeStatement: React.FC = () => {
   const { user } = useAuth();
@@ -133,13 +134,13 @@ export const IncomeStatement: React.FC = () => {
                 <TrendingUp size={20} />
                 {t('income.revenues')}
               </h3>
-              <span className="text-lg font-black text-emerald-600">{data.totalRevenues.toLocaleString()}</span>
+              <span className="text-lg font-black text-emerald-600">{formatNumber(data.totalRevenues)}</span>
             </div>
             <div className="p-2">
               {data.revenues.map(a => (
                 <div key={a.id} className={`flex items-center justify-between p-4 hover:bg-zinc-50 rounded-2xl transition-all ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                   <span className="font-bold text-zinc-600">{a.name}</span>
-                  <span className="font-black text-zinc-900">{a.balance.toLocaleString()}</span>
+                  <span className="font-black text-zinc-900">{formatNumber(a.balance)}</span>
                 </div>
               ))}
             </div>
@@ -152,13 +153,13 @@ export const IncomeStatement: React.FC = () => {
                 <TrendingDown size={20} />
                 {t('income.costs')}
               </h3>
-              <span className="text-lg font-black text-rose-600">{data.totalCosts.toLocaleString()}</span>
+              <span className="text-lg font-black text-rose-600">{formatNumber(data.totalCosts)}</span>
             </div>
             <div className="p-2">
               {data.costs.map(a => (
                 <div key={a.id} className={`flex items-center justify-between p-4 hover:bg-zinc-50 rounded-2xl transition-all ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                   <span className="font-bold text-zinc-600">{a.name}</span>
-                  <span className="font-black text-zinc-900">{Math.abs(a.balance).toLocaleString()}</span>
+                  <span className="font-black text-zinc-900">{formatNumber(Math.abs(a.balance))}</span>
                 </div>
               ))}
             </div>
@@ -171,13 +172,13 @@ export const IncomeStatement: React.FC = () => {
                 <TrendingDown size={20} />
                 {t('income.expenses')}
               </h3>
-              <span className="text-lg font-black text-zinc-600">{data.totalExpenses.toLocaleString()}</span>
+              <span className="text-lg font-black text-zinc-600">{formatNumber(data.totalExpenses)}</span>
             </div>
             <div className="p-2">
               {data.expenses.map(a => (
                 <div key={a.id} className={`flex items-center justify-between p-4 hover:bg-zinc-50 rounded-2xl transition-all ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                   <span className="font-bold text-zinc-600">{a.name}</span>
-                  <span className="font-black text-zinc-900">{Math.abs(a.balance).toLocaleString()}</span>
+                  <span className="font-black text-zinc-900">{formatNumber(Math.abs(a.balance))}</span>
                 </div>
               ))}
             </div>
@@ -192,16 +193,16 @@ export const IncomeStatement: React.FC = () => {
             <div className="space-y-4">
               <div className={`flex items-center justify-between text-zinc-400 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                 <span className="font-bold">{t('income.gross_profit')}</span>
-                <span className="font-black text-white">{data.grossProfit.toLocaleString()}</span>
+                <span className="font-black text-white">{formatNumber(data.grossProfit)}</span>
               </div>
               <div className={`flex items-center justify-between text-zinc-400 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                 <span className="font-bold">{t('income.total_expenses')}</span>
-                <span className="font-black text-white">{data.totalExpenses.toLocaleString()}</span>
+                <span className="font-black text-white">{formatNumber(data.totalExpenses)}</span>
               </div>
               <div className={`pt-4 border-t border-white/10 flex items-center justify-between ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                 <span className="font-black text-lg">{t('income.net')}</span>
                 <span className={`text-3xl font-black ${data.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {data.netProfit.toLocaleString()}
+                  {formatNumber(data.netProfit)}
                 </span>
               </div>
             </div>

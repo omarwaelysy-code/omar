@@ -4,6 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { Search, Calendar, Download, Wallet, PieChart, TrendingDown } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfUtils';
 import { dbService } from '../services/dbService';
+import { formatNumber } from '../utils/formatUtils';
 
 export const ExpensesReport: React.FC = () => {
   const { user } = useAuth();
@@ -129,7 +130,7 @@ export const ExpensesReport: React.FC = () => {
                   <TrendingDown size={20} />
                   <span className="text-sm font-bold uppercase tracking-tighter">{t('reports.total_expenses')}</span>
                 </div>
-                <div className="text-3xl font-bold text-rose-900">{totalExpenses.toLocaleString()}</div>
+                <div className="text-3xl font-bold text-rose-900">{formatNumber(totalExpenses)}</div>
               </div>
               <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-100">
                 <div className="flex items-center gap-3 text-zinc-600 mb-2">
@@ -162,7 +163,7 @@ export const ExpensesReport: React.FC = () => {
                     <tr key={index} className="border-b border-zinc-50 hover:bg-zinc-50/50 transition-colors">
                       <td className="px-6 py-4 text-sm font-mono">{item.code}</td>
                       <td className="px-6 py-4 text-sm font-bold">{item.name}</td>
-                      <td className="px-6 py-4 text-sm font-bold text-rose-600">{item.totalAmount.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-rose-600">{formatNumber(item.totalAmount)}</td>
                       <td className="px-6 py-4 text-sm">
                         <div className="flex items-center gap-3">
                           <div className="flex-1 h-2 bg-zinc-100 rounded-full overflow-hidden">
@@ -182,7 +183,7 @@ export const ExpensesReport: React.FC = () => {
                 <tfoot>
                   <tr className="bg-zinc-900 text-white font-bold">
                     <td colSpan={2} className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('reports.total_overall')}</td>
-                    <td colSpan={2} className={`${dir === 'rtl' ? 'text-right' : 'text-left'} px-6 py-4`}>{totalExpenses.toLocaleString()}</td>
+                    <td colSpan={2} className={`${dir === 'rtl' ? 'text-right' : 'text-left'} px-6 py-4`}>{formatNumber(totalExpenses)}</td>
                   </tr>
                 </tfoot>
               </table>

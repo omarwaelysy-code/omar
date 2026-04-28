@@ -7,6 +7,7 @@ import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
 import { ExportButtons } from '../components/ExportButtons';
 import { Invoice, Return, Customer, Product } from '../types';
+import { formatNumber } from '../utils/formatUtils';
 
 export const SalesReport: React.FC = () => {
   const { user } = useAuth();
@@ -478,15 +479,15 @@ export const SalesReport: React.FC = () => {
                     <td className="px-4 py-4">{item.customer}</td>
                     <td className="px-4 py-4">{item.product}</td>
                     <td className={`px-4 py-4 font-bold ${item.isReturn ? 'text-red-600' : 'text-zinc-600'}`}>{item.quantity}</td>
-                    <td className="px-4 py-4">{item.price.toLocaleString()} {t('invoices.currency')}</td>
-                    <td className={`px-4 py-4 font-bold ${item.isReturn ? 'text-red-600' : 'text-emerald-600'}`}>{item.total.toLocaleString()} {t('invoices.currency')}</td>
+                    <td className="px-4 py-4">{formatNumber(item.price)} {t('invoices.currency')}</td>
+                    <td className={`px-4 py-4 font-bold ${item.isReturn ? 'text-red-600' : 'text-emerald-600'}`}>{formatNumber(item.total)} {t('invoices.currency')}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="bg-zinc-900 text-white font-bold text-sm">
                   <td colSpan={7} className={`px-4 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('reports.total_net')}</td>
-                  <td className="px-4 py-4">{transactions.reduce((sum, item) => sum + item.total, 0).toLocaleString()} {t('invoices.currency')}</td>
+                  <td className="px-4 py-4">{formatNumber(transactions.reduce((sum, item) => sum + item.total, 0))} {t('invoices.currency')}</td>
                 </tr>
               </tfoot>
             </table>
@@ -521,24 +522,24 @@ export const SalesReport: React.FC = () => {
                       <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg uppercase tracking-wider">{item.code}</span>
                     </td>
                     <td className="px-4 py-4 font-bold text-zinc-900 text-sm">{item.name}</td>
-                    <td className="px-4 py-4 font-bold text-zinc-600">{item.totalQuantity.toLocaleString()}</td>
-                    <td className="px-4 py-4 text-zinc-500">{item.avgPrice.toLocaleString()} {t('invoices.currency')}</td>
-                    <td className="px-4 py-4 text-emerald-600 font-bold">{item.totalSales.toLocaleString()} {t('invoices.currency')}</td>
-                    <td className="px-4 py-4 text-red-600 font-bold">{item.totalReturns.toLocaleString()} {t('invoices.currency')}</td>
-                    {view === 'customer' && <td className="px-4 py-4 text-amber-600 font-bold">{item.totalDiscounts.toLocaleString()} {t('invoices.currency')}</td>}
-                    <td className="px-4 py-4 font-bold text-zinc-900 bg-[rgba(244,244,245,0.3)]">{item.net.toLocaleString()} {t('invoices.currency')}</td>
+                    <td className="px-4 py-4 font-bold text-zinc-600">{formatNumber(item.totalQuantity)}</td>
+                    <td className="px-4 py-4 text-zinc-500">{formatNumber(item.avgPrice)} {t('invoices.currency')}</td>
+                    <td className="px-4 py-4 text-emerald-600 font-bold">{formatNumber(item.totalSales)} {t('invoices.currency')}</td>
+                    <td className="px-4 py-4 text-red-600 font-bold">{formatNumber(item.totalReturns)} {t('invoices.currency')}</td>
+                    {view === 'customer' && <td className="px-4 py-4 text-amber-600 font-bold">{formatNumber(item.totalDiscounts)} {t('invoices.currency')}</td>}
+                    <td className="px-4 py-4 font-bold text-zinc-900 bg-[rgba(244,244,245,0.3)]">{formatNumber(item.net)} {t('invoices.currency')}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="bg-zinc-900 text-white font-bold text-sm">
                   <td colSpan={2} className={`px-4 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('reports.total_overall')}</td>
-                  <td className="px-4 py-4">{(view === 'customer' ? customerSales : productSales).reduce((sum, item) => sum + item.totalQuantity, 0).toLocaleString()}</td>
+                  <td className="px-4 py-4">{formatNumber((view === 'customer' ? customerSales : productSales).reduce((sum, item) => sum + item.totalQuantity, 0))}</td>
                   <td className="px-4 py-4">-</td>
-                  <td className="px-4 py-4">{(view === 'customer' ? customerSales : productSales).reduce((sum, item) => sum + item.totalSales, 0).toLocaleString()} {t('invoices.currency')}</td>
-                  <td className="px-4 py-4">{(view === 'customer' ? customerSales : productSales).reduce((sum, item) => sum + item.totalReturns, 0).toLocaleString()} {t('invoices.currency')}</td>
-                  {view === 'customer' && <td className="px-4 py-4">{customerSales.reduce((sum, item) => sum + item.totalDiscounts, 0).toLocaleString()} {t('invoices.currency')}</td>}
-                  <td className="px-4 py-4">{(view === 'customer' ? customerSales : productSales).reduce((sum, item) => sum + item.net, 0).toLocaleString()} {t('invoices.currency')}</td>
+                  <td className="px-4 py-4">{formatNumber((view === 'customer' ? customerSales : productSales).reduce((sum, item) => sum + item.totalSales, 0))} {t('invoices.currency')}</td>
+                  <td className="px-4 py-4">{formatNumber((view === 'customer' ? customerSales : productSales).reduce((sum, item) => sum + item.totalReturns, 0))} {t('invoices.currency')}</td>
+                  {view === 'customer' && <td className="px-4 py-4">{formatNumber(customerSales.reduce((sum, item) => sum + item.totalDiscounts, 0))} {t('invoices.currency')}</td>}
+                  <td className="px-4 py-4">{formatNumber((view === 'customer' ? customerSales : productSales).reduce((sum, item) => sum + item.net, 0))} {t('invoices.currency')}</td>
                 </tr>
               </tfoot>
             </table>

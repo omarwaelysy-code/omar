@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { useNotification } from '../contexts/NotificationContext';
+import { formatNumber } from '../utils/formatUtils';
 
 export const JournalEntries: React.FC = () => {
   const { user } = useAuth();
@@ -283,8 +284,8 @@ export const JournalEntries: React.FC = () => {
                       {entry.reference_number || '-'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{entry.total_debit.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-sm font-black text-rose-600 text-center">{entry.total_credit.toLocaleString()}</td>
+                  <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{formatNumber(entry.total_debit)}</td>
+                  <td className="px-6 py-4 text-sm font-black text-rose-600 text-center">{formatNumber(entry.total_credit)}</td>
                   <td className="px-6 py-4 text-center">
                     <div className="flex items-center justify-center gap-2">
                       <button 
@@ -358,11 +359,11 @@ export const JournalEntries: React.FC = () => {
                   </div>
                   <div className={`p-4 bg-emerald-50 rounded-2xl ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                     <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">{t('journal.column_debit')}</p>
-                    <p className="text-sm font-black text-emerald-600">{selectedEntry.total_debit.toLocaleString()}</p>
+                    <p className="text-sm font-black text-emerald-600">{formatNumber(selectedEntry.total_debit)}</p>
                   </div>
                   <div className={`p-4 bg-rose-50 rounded-2xl ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                     <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1">{t('journal.column_credit')}</p>
-                    <p className="text-sm font-black text-rose-600">{selectedEntry.total_credit.toLocaleString()}</p>
+                    <p className="text-sm font-black text-rose-600">{formatNumber(selectedEntry.total_credit)}</p>
                   </div>
                 </div>
 
@@ -393,10 +394,10 @@ export const JournalEntries: React.FC = () => {
                             {item.description && <p className="text-[10px] text-zinc-400 font-medium">{item.description}</p>}
                           </td>
                           <td className="px-4 py-3 text-sm font-black text-emerald-600 text-center">
-                            {item.debit > 0 ? item.debit.toLocaleString() : '-'}
+                            {item.debit > 0 ? formatNumber(item.debit) : '-'}
                           </td>
                           <td className="px-4 py-3 text-sm font-black text-rose-600 text-center">
-                            {item.credit > 0 ? item.credit.toLocaleString() : '-'}
+                            {item.credit > 0 ? formatNumber(item.credit) : '-'}
                           </td>
                         </tr>
                       ))}

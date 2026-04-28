@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { AccountingEngine } from '../services/AccountingEngine';
+import { formatNumber } from '../utils/formatUtils';
 
 export const GeneralLedger: React.FC = () => {
   const { user } = useAuth();
@@ -239,16 +240,16 @@ export const GeneralLedger: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className={`bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
               <p className="text-xs font-black text-zinc-400 uppercase tracking-widest mb-1">{t('ledger.total_debit')}</p>
-              <p className="text-2xl font-black text-emerald-600">{totals.debit.toLocaleString()}</p>
+              <p className="text-2xl font-black text-emerald-600">{formatNumber(totals.debit)}</p>
             </div>
             <div className={`bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
               <p className="text-xs font-black text-zinc-400 uppercase tracking-widest mb-1">{t('ledger.total_credit')}</p>
-              <p className="text-2xl font-black text-rose-600">{totals.credit.toLocaleString()}</p>
+              <p className="text-2xl font-black text-rose-600">{formatNumber(totals.credit)}</p>
             </div>
             <div className={`bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
               <p className="text-xs font-black text-zinc-400 uppercase tracking-widest mb-1">{t('ledger.final_balance')}</p>
               <p className={`text-2xl font-black ${currentBalance >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                {currentBalance.toLocaleString()}
+                {formatNumber(currentBalance)}
               </p>
             </div>
           </div>
@@ -274,9 +275,9 @@ export const GeneralLedger: React.FC = () => {
                     <td className="px-6 py-4 text-sm text-zinc-400">-</td>
                     <td className="px-6 py-4 text-sm font-medium text-zinc-600">{t('ledger.opening_balance_row')}</td>
                     <td className="px-6 py-4 text-sm text-zinc-400 text-center">-</td>
-                    <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{startBalance > 0 ? startBalance.toLocaleString() : '-'}</td>
-                    <td className="px-6 py-4 text-sm font-black text-rose-600 text-center">{startBalance < 0 ? Math.abs(startBalance).toLocaleString() : '-'}</td>
-                    <td className="px-6 py-4 text-sm font-black text-zinc-900 text-center">{startBalance.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{startBalance > 0 ? formatNumber(startBalance) : '-'}</td>
+                    <td className="px-6 py-4 text-sm font-black text-rose-600 text-center">{startBalance < 0 ? formatNumber(Math.abs(startBalance)) : '-'}</td>
+                    <td className="px-6 py-4 text-sm font-black text-zinc-900 text-center">{formatNumber(startBalance)}</td>
                   </tr>
                   {ledgerData.map((tx, idx) => (
                     <tr key={idx} className="hover:bg-zinc-50/50 transition-colors">
@@ -292,9 +293,9 @@ export const GeneralLedger: React.FC = () => {
                           {tx.reference || '-'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{tx.debit > 0 ? tx.debit.toLocaleString() : '-'}</td>
-                      <td className="px-6 py-4 text-sm font-black text-rose-600 text-center">{tx.credit > 0 ? tx.credit.toLocaleString() : '-'}</td>
-                      <td className="px-6 py-4 text-sm font-black text-zinc-900 text-center">{tx.balance.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{tx.debit > 0 ? formatNumber(tx.debit) : '-'}</td>
+                      <td className="px-6 py-4 text-sm font-black text-rose-600 text-center">{tx.credit > 0 ? formatNumber(tx.credit) : '-'}</td>
+                      <td className="px-6 py-4 text-sm font-black text-zinc-900 text-center">{formatNumber(tx.balance)}</td>
                     </tr>
                   ))}
                   {ledgerData.length === 0 && (

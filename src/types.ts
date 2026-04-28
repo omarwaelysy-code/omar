@@ -178,6 +178,7 @@ export interface Invoice {
   due_date?: string;
   subtotal?: number;
   discount?: number;
+  discount_amount?: number;
   total_amount: number;
   payment_type: 'credit' | 'cash';
   payment_method_id?: string;

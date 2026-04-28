@@ -16,6 +16,7 @@ import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import DocumentChatter from '../components/DocumentChatter';
 import { ExportButtons } from '../components/ExportButtons';
 import { usePermissions } from '../hooks/usePermissions';
+import { formatNumber } from '../utils/formatUtils';
 
 import { useLanguage } from '../contexts/LanguageContext';
 import { transactionManager, TransactionManager } from '../services/TransactionManager';
@@ -1317,7 +1318,7 @@ export const Invoices: React.FC = () => {
                                   <input 
                                     type="number" 
                                     className="w-full bg-zinc-50 border border-zinc-100 rounded focus:ring-1 focus:ring-emerald-500 px-1 py-0.5 text-xs outline-none text-center font-mono"
-                                    value={isNaN(item.quantity) ? '' : item.quantity}
+                                    value={isNaN(Number(item.quantity)) ? '' : Number(item.quantity)}
                                     onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
                                   />
                                 </td>
@@ -1325,12 +1326,12 @@ export const Invoices: React.FC = () => {
                                   <input 
                                     type="number" 
                                     className="w-full bg-zinc-50 border border-zinc-100 rounded focus:ring-1 focus:ring-emerald-500 px-1 py-0.5 text-xs outline-none text-center font-mono"
-                                    value={isNaN(item.unit_price) ? '' : item.unit_price}
+                                    value={isNaN(Number(item.unit_price)) ? '' : Number(item.unit_price)}
                                     onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
                                   />
                                 </td>
                                 <td className="px-1 py-0.5 text-left font-mono font-bold text-zinc-900 text-xs">
-                                  {item.total.toLocaleString()}
+                                  {formatNumber(item.total)}
                                 </td>
                                 <td className="px-1 py-0.5 text-center">
                                   <button 
@@ -1351,7 +1352,7 @@ export const Invoices: React.FC = () => {
                       <tfoot className="bg-zinc-50/50 font-bold">
                         <tr>
                           <td colSpan={3} className={`px-2 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-zinc-500`}>{t('invoices.summary_subtotal')}:</td>
-                          <td className="px-2 py-2 text-base text-zinc-900 font-mono">{items.reduce((sum, i) => sum + i.total, 0).toLocaleString()}</td>
+                          <td className="px-2 py-2 text-base text-zinc-900 font-mono">{formatNumber(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}</td>
                           <td></td>
                         </tr>
                         <tr>
@@ -1360,16 +1361,16 @@ export const Invoices: React.FC = () => {
                             <input 
                               type="number" 
                               className="w-24 bg-white border border-zinc-200 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
-                              value={discount}
+                              value={Number(discount)}
                               onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
                             />
                           </td>
-                          <td className="px-2 py-2 text-base text-red-600 font-mono">-{discount.toLocaleString()}</td>
+                          <td className="px-2 py-2 text-base text-red-600 font-mono">-{formatNumber(discount)}</td>
                           <td></td>
                         </tr>
                         <tr>
                           <td colSpan={3} className={`px-2 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-zinc-500`}>{t('invoices.summary_total')}:</td>
-                          <td className="px-2 py-2 text-lg text-emerald-600 font-mono">{(items.reduce((sum, i) => sum + i.total, 0) - discount).toLocaleString()} {t('invoices.currency')}</td>
+                          <td className="px-2 py-2 text-lg text-emerald-600 font-mono">{formatNumber(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) - (Number(discount) || 0))} {t('invoices.currency')}</td>
                           <td></td>
                         </tr>
                       </tfoot>
@@ -1459,25 +1460,25 @@ export const Invoices: React.FC = () => {
                           </td>
                           <td className="px-4 py-3 font-medium text-[#18181b]">{item.product_name}</td>
                           <td className="px-4 py-3 text-[#71717a]">{item.quantity}</td>
-                          <td className="px-4 py-3 text-[#71717a]">{item.unit_price.toLocaleString()} {t('invoices.currency')}</td>
-                          <td className="px-4 py-3 font-bold text-[#18181b]">{item.total.toLocaleString()} {t('invoices.currency')}</td>
+                          <td className="px-4 py-3 text-[#71717a]">{formatNumber(item.unit_price)} {t('invoices.currency')}</td>
+                          <td className="px-4 py-3 font-bold text-[#18181b]">{formatNumber(item.total)} {t('invoices.currency')}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot className="bg-[#fafafa] font-bold text-sm">
                       <tr>
                         <td colSpan={3} className={`px-4 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-[#71717a]`}>{t('invoices.summary_subtotal')}:</td>
-                        <td className="px-4 py-2 text-[#18181b]">{viewInvoice.subtotal?.toLocaleString()} {t('invoices.currency')}</td>
+                        <td className="px-4 py-2 text-[#18181b]">{formatNumber(viewInvoice.subtotal)} {t('invoices.currency')}</td>
                       </tr>
-                      {viewInvoice.discount > 0 && (
+                      {Number(viewInvoice.discount_amount || viewInvoice.discount) > 0 && (
                         <tr>
                           <td colSpan={3} className={`px-4 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-[#71717a]`}>{t('invoices.summary_discount')}:</td>
-                          <td className="px-4 py-2 text-red-600">-{viewInvoice.discount.toLocaleString()} {t('invoices.currency')}</td>
+                          <td className="px-4 py-2 text-red-600">-{formatNumber(viewInvoice.discount_amount || viewInvoice.discount)} {t('invoices.currency')}</td>
                         </tr>
                       )}
                       <tr className="text-lg bg-[#f4f4f5]">
                         <td colSpan={3} className={`px-4 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-[#18181b]`}>{t('invoices.summary_total')}:</td>
-                        <td className="px-4 py-3 text-[#18181b]">{viewInvoice.total_amount?.toLocaleString()} {t('invoices.currency')}</td>
+                        <td className="px-4 py-3 text-[#18181b]">{formatNumber(viewInvoice.total_amount)} {t('invoices.currency')}</td>
                       </tr>
                     </tfoot>
                   </table>
