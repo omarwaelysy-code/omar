@@ -23,6 +23,7 @@ import { TransactionManager } from '../services/TransactionManager';
 import { InvoiceSchema, JournalEntrySchema } from '../lib/schemas';
 import { ExportButtons } from '../components/ExportButtons';
 import { ActivityLog } from '../types';
+import { formatNumber } from '../utils/formatUtils';
 
 export const PurchaseInvoices: React.FC = () => {
   const { user } = useAuth();
@@ -206,7 +207,7 @@ export const PurchaseInvoices: React.FC = () => {
         action: editingInvoice ? 'تعديل فاتورة مشتريات' : 'إضافة فاتورة مشتريات',
         details: editingInvoice 
           ? `تعديل فاتورة مشتريات رقم: ${invoice_number} من المورد ${supplier?.name || '...'}`
-          : `إضافة فاتورة مشتريات جديدة من المورد ${supplier?.name || '...'} بمبلغ ${total_amount.toLocaleString()}`,
+          : `إضافة فاتورة مشتريات جديدة من المورد ${supplier?.name || '...'} بمبلغ ${formatNumber(total_amount)}`,
         timestamp: new Date().toISOString()
       });
 
@@ -1017,7 +1018,7 @@ export const PurchaseInvoices: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 font-bold text-zinc-900">{inv.supplier_name}</td>
                   <td className="px-6 py-4 text-zinc-500">{inv.date}</td>
-                  <td className="px-6 py-4 font-bold text-zinc-900">{inv.total_amount.toLocaleString()} ج.م</td>
+                  <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(inv.total_amount)} ج.م</td>
                   <td className="px-6 py-4 text-left">
                     <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
@@ -1056,7 +1057,7 @@ export const PurchaseInvoices: React.FC = () => {
                   <h4 className="font-bold text-zinc-900 text-lg">{inv.supplier_name}</h4>
                 </div>
                 <div className="text-left">
-                  <p className="font-bold text-emerald-600 text-lg">{inv.total_amount.toLocaleString()} ج.م</p>
+                  <p className="font-bold text-emerald-600 text-lg">{formatNumber(inv.total_amount)} ج.م</p>
                   <span className="text-xs text-zinc-400">{inv.date}</span>
                 </div>
               </div>
@@ -1415,7 +1416,7 @@ export const PurchaseInvoices: React.FC = () => {
                                     />
                                   </td>
                                   <td className="px-3 py-1.5 font-bold text-zinc-900 text-sm font-mono text-center">
-                                    {(item.total || 0).toLocaleString()}
+                                    {formatNumber(item.total || 0)}
                                   </td>
                                   <td className="px-3 py-1.5">
                                     <button 
@@ -1432,7 +1433,7 @@ export const PurchaseInvoices: React.FC = () => {
                             <tfoot>
                               <tr className="bg-zinc-50/50 font-bold border-t border-zinc-100">
                                 <td colSpan={3} className="px-3 py-2 text-left text-zinc-500">الإجمالي الفرعي:</td>
-                                <td className="px-3 py-2 text-base text-zinc-900 font-mono text-center">{calculateSubtotal().toLocaleString()}</td>
+                                <td className="px-3 py-2 text-base text-zinc-900 font-mono text-center">{formatNumber(calculateSubtotal())}</td>
                                 <td></td>
                               </tr>
                               <tr className="bg-zinc-50/50 font-bold">
@@ -1445,13 +1446,13 @@ export const PurchaseInvoices: React.FC = () => {
                                     onChange={(e) => setInvoiceData({ ...invoiceData, discount: parseFloat(e.target.value) || 0 })}
                                   />
                                 </td>
-                                <td className="px-3 py-2 text-base text-red-600 font-mono text-center">-{invoiceData.discount.toLocaleString()}</td>
+                                <td className="px-3 py-2 text-base text-red-600 font-mono text-center">-{formatNumber(invoiceData.discount)}</td>
                                 <td></td>
                               </tr>
                               <tr className="bg-zinc-900 text-white">
                                 <td colSpan={3} className="px-6 py-4 text-left font-bold text-lg">الإجمالي الكلي:</td>
                                 <td colSpan={2} className="px-6 py-4 font-bold text-2xl text-emerald-400">
-                                  {calculateTotal().toLocaleString()} ج.م
+                                  {formatNumber(calculateTotal())} ج.م
                                 </td>
                               </tr>
                             </tfoot>
@@ -1549,25 +1550,25 @@ export const PurchaseInvoices: React.FC = () => {
                           </td>
                           <td className="px-4 py-3 font-medium text-[#18181b]">{item.product_name || item.category_name}</td>
                           <td className="px-4 py-3 text-[#71717a]">{item.quantity}</td>
-                          <td className="px-4 py-3 text-[#71717a]">{item.price?.toLocaleString() || item.cost_price?.toLocaleString()} ج.م</td>
-                          <td className="px-4 py-3 font-bold text-[#18181b]">{item.total.toLocaleString()} ج.م</td>
+                          <td className="px-4 py-3 text-[#71717a]">{formatNumber(item.price || item.cost_price || 0)} ج.م</td>
+                          <td className="px-4 py-3 font-bold text-[#18181b]">{formatNumber(item.total)} ج.م</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot className="bg-[#fafafa] font-bold">
                       <tr>
                         <td colSpan={3} className="px-4 py-2 text-left text-[#71717a]">الإجمالي الفرعي:</td>
-                        <td className="px-4 py-2 text-[#18181b]">{viewInvoice.subtotal?.toLocaleString() || viewInvoice.total_amount?.toLocaleString()} ج.م</td>
+                        <td className="px-4 py-2 text-[#18181b]">{formatNumber(viewInvoice.subtotal || viewInvoice.total_amount || 0)} ج.م</td>
                       </tr>
                       {viewInvoice.discount > 0 && (
                         <tr>
                           <td colSpan={3} className="px-4 py-2 text-left text-[#71717a]">الخصم:</td>
-                          <td className="px-4 py-2 text-red-600">-{viewInvoice.discount.toLocaleString()} ج.م</td>
+                          <td className="px-4 py-2 text-red-600">-{formatNumber(viewInvoice.discount)} ج.م</td>
                         </tr>
                       )}
                       <tr>
                         <td colSpan={3} className="px-4 py-6 text-left text-[#71717a]">الإجمالي الكلي:</td>
-                        <td className="px-4 py-6 text-3xl text-[#f97316]">{viewInvoice.total_amount.toLocaleString()} ج.م</td>
+                        <td className="px-4 py-6 text-3xl text-[#f97316]">{formatNumber(viewInvoice.total_amount)} ج.م</td>
                       </tr>
                     </tfoot>
                   </table>

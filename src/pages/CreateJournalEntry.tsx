@@ -5,6 +5,7 @@ import { dbService } from '../services/dbService';
 import { Account, Customer, Supplier, JournalEntry, JournalEntryItem } from '../types';
 import { Plus, Trash2, Save, AlertCircle, CheckCircle2, ArrowRightLeft, User, Truck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatNumber } from '../utils/formatUtils';
 
 export const CreateJournalEntry: React.FC = () => {
   const { user } = useAuth();
@@ -314,18 +315,18 @@ export const CreateJournalEntry: React.FC = () => {
             <div className="flex items-center gap-8 bg-zinc-50 px-8 py-4 rounded-3xl border border-zinc-100">
               <div className="text-center">
                 <p className="text-[10px] font-black text-zinc-400 uppercase tracking-wider mb-1">إجمالي المدين</p>
-                <p className="text-xl font-black text-emerald-600">{totalDebit.toLocaleString()}</p>
+                <p className="text-xl font-black text-emerald-600">{formatNumber(totalDebit)}</p>
               </div>
               <div className="w-px h-8 bg-zinc-200" />
               <div className="text-center">
                 <p className="text-[10px] font-black text-zinc-400 uppercase tracking-wider mb-1">إجمالي الدائن</p>
-                <p className="text-xl font-black text-red-600">{totalCredit.toLocaleString()}</p>
+                <p className="text-xl font-black text-red-600">{formatNumber(totalCredit)}</p>
               </div>
               <div className="w-px h-8 bg-zinc-200" />
               <div className="text-center">
                 <p className="text-[10px] font-black text-zinc-400 uppercase tracking-wider mb-1">الفرق</p>
                 <p className={`text-xl font-black ${difference === 0 ? 'text-emerald-500' : 'text-orange-500'}`}>
-                  {difference.toLocaleString()}
+                  {formatNumber(difference)}
                 </p>
               </div>
             </div>

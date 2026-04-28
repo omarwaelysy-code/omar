@@ -5,10 +5,10 @@ export const formatNumber = (value: number | string | undefined | null): string 
   
   if (isNaN(num)) return '0';
   
-  // Use Intl.NumberFormat for consistent formatting
+  // Use Intl.NumberFormat for consistent formatting with 0 decimal places
   return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 0,
     useGrouping: true
   }).format(num);
 };

@@ -17,6 +17,7 @@ import { ExportButtons } from '../components/ExportButtons';
 import { TransactionManager } from '../services/TransactionManager';
 import { VoucherSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog } from '../types';
+import { formatNumber } from '../utils/formatUtils';
 
 export const PaymentVouchers: React.FC = () => {
   const { user } = useAuth();
@@ -125,7 +126,7 @@ export const PaymentVouchers: React.FC = () => {
       // Preview Activity Log
       setPreviewActivityLog({
         action: 'إضافة سند صرف',
-        details: `إضافة سند صرف جديد ${voucherData.type === 'supplier' ? `للمورد ${supplier?.name || '...'}` : `لمصروف ${category?.name || '...'}`} بمبلغ ${voucherData.amount.toLocaleString()}`,
+        details: `إضافة سند صرف جديد ${voucherData.type === 'supplier' ? `للمورد ${supplier?.name || '...'}` : `لمصروف ${category?.name || '...'}`} بمبلغ ${formatNumber(voucherData.amount)}`,
         timestamp: new Date().toISOString()
       });
 
@@ -644,7 +645,7 @@ export const PaymentVouchers: React.FC = () => {
                   <p className="text-xs text-zinc-500">{voucher.date}</p>
                 </div>
                 <div className="text-left">
-                  <p className="font-bold text-zinc-900">{voucher.amount.toLocaleString()} ج.م</p>
+                  <p className="font-bold text-zinc-900">{formatNumber(voucher.amount)} ج.م</p>
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-2">
@@ -717,7 +718,7 @@ export const PaymentVouchers: React.FC = () => {
                     {voucher.type === 'supplier' ? voucher.supplier_name : voucher.category_name}
                   </td>
                   <td className="px-6 py-4 text-zinc-500">{voucher.date}</td>
-                  <td className="px-6 py-4 font-bold text-zinc-900">{voucher.amount.toLocaleString()} ج.م</td>
+                  <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(voucher.amount)} ج.م</td>
                   <td className="px-6 py-4 text-left">
                     <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity no-pdf">
                       <button 
@@ -1055,7 +1056,7 @@ export const PaymentVouchers: React.FC = () => {
                     </div>
                     <div className="text-left">
                       <p className="text-xs text-zinc-400 uppercase tracking-wider mb-1">المبلغ</p>
-                      <p className="text-2xl font-black text-emerald-600">{viewVoucher.amount.toLocaleString()} ج.م</p>
+                      <p className="text-2xl font-black text-emerald-600">{formatNumber(viewVoucher.amount)} ج.م</p>
                     </div>
                   </div>
 

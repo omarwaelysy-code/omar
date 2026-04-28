@@ -14,6 +14,7 @@ import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { ExportButtons } from '../components/ExportButtons';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
+import { formatNumber } from '../utils/formatUtils';
 import { useRef } from 'react';
 
 export const Suppliers: React.FC = () => {
@@ -299,7 +300,7 @@ export const Suppliers: React.FC = () => {
   };
 
   const formatBalance = (value: number) => {
-    const formatted = Math.abs(value).toLocaleString();
+    const formatted = formatNumber(Math.abs(value));
     if (value > 0) return `+${formatted}`;
     if (value < 0) return `-${formatted}`;
     return '0';

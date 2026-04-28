@@ -17,6 +17,7 @@ import { SmartAIInput } from '../components/SmartAIInput';
 import { TransactionManager } from '../services/TransactionManager';
 import { VoucherSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog } from '../types';
+import { formatNumber } from '../utils/formatUtils';
 
 export const Receipts: React.FC = () => {
   const { user } = useAuth();
@@ -109,7 +110,7 @@ export const Receipts: React.FC = () => {
       // Preview Activity Log
       setPreviewActivityLog({
         action: 'إضافة سند قبض',
-        details: `إضافة سند قبض جديد من العميل ${customer?.name || '...'} بمبلغ ${formData.amount.toLocaleString()}`,
+        details: `إضافة سند قبض جديد من العميل ${customer?.name || '...'} بمبلغ ${formatNumber(formData.amount)}`,
         timestamp: new Date().toISOString()
       });
 
@@ -557,7 +558,7 @@ export const Receipts: React.FC = () => {
                   )}
                 </div>
                 <div className="text-left">
-                  <p className="font-bold text-emerald-600">{receipt.amount.toLocaleString()} ج.م</p>
+                  <p className="font-bold text-emerald-600">{formatNumber(receipt.amount)} ج.م</p>
                 </div>
               </div>
               <p className="text-sm text-zinc-600 line-clamp-2">{receipt.description}</p>
@@ -624,7 +625,7 @@ export const Receipts: React.FC = () => {
                       <span className="text-xs text-zinc-400">-</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 font-bold text-emerald-600">{receipt.amount.toLocaleString()} ج.م</td>
+                  <td className="px-6 py-4 font-bold text-emerald-600">{formatNumber(receipt.amount)} ج.م</td>
                   <td className="px-6 py-4 text-zinc-500 truncate max-w-xs">{receipt.description}</td>
                   <td className="px-6 py-4 text-left">
                     <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity no-pdf">
@@ -888,7 +889,7 @@ export const Receipts: React.FC = () => {
                     </div>
                     <div className="text-left">
                       <p className="text-xs text-zinc-400 uppercase tracking-wider mb-1">المبلغ</p>
-                      <p className="text-2xl font-black text-emerald-600">{viewReceipt.amount.toLocaleString()} ج.م</p>
+                      <p className="text-2xl font-black text-emerald-600">{formatNumber(viewReceipt.amount)} ج.م</p>
                     </div>
                   </div>
 

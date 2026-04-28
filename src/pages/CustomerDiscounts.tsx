@@ -11,6 +11,7 @@ import { SmartAIInput } from '../components/SmartAIInput';
 import { TransactionManager } from '../services/TransactionManager';
 import { DiscountSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog } from '../types';
+import { formatNumber } from '../utils/formatUtils';
 
 export const CustomerDiscounts: React.FC = () => {
   const { user } = useAuth();
@@ -97,7 +98,7 @@ export const CustomerDiscounts: React.FC = () => {
       // Preview Activity Log
       setPreviewActivityLog({
         action: 'إضافة خصم عميل',
-        details: `إضافة خصم جديد للعميل ${customer?.name || '...'} بمبلغ ${discountData.amount.toLocaleString()}`,
+        details: `إضافة خصم جديد للعميل ${customer?.name || '...'} بمبلغ ${formatNumber(discountData.amount)}`,
         timestamp: new Date().toISOString()
       });
 
@@ -371,7 +372,7 @@ export const CustomerDiscounts: React.FC = () => {
                 <tr key={discount.id} className="hover:bg-[rgba(244,244,245,0.5)] transition-colors group">
                   <td className="px-6 py-4 font-bold text-zinc-900">{discount.customer_name}</td>
                   <td className="px-6 py-4 text-zinc-500">{discount.date}</td>
-                  <td className="px-6 py-4 font-bold text-emerald-600">{discount.amount.toLocaleString()} ج.م</td>
+                  <td className="px-6 py-4 font-bold text-emerald-600">{formatNumber(discount.amount)} ج.م</td>
                   <td className="px-6 py-4 text-zinc-500 text-sm">{discount.notes || '-'}</td>
                   <td className="px-6 py-4 text-left">
                     <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -414,7 +415,7 @@ export const CustomerDiscounts: React.FC = () => {
                   </div>
                 </div>
                 <div className="text-left">
-                  <div className="font-bold text-emerald-600 text-lg">{discount.amount.toLocaleString()} ج.م</div>
+                  <div className="font-bold text-emerald-600 text-lg">{formatNumber(discount.amount)} ج.م</div>
                   <div className="flex items-center justify-end gap-2 mt-2">
                     <button 
                       onClick={() => {

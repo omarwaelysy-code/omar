@@ -16,6 +16,7 @@ import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { useRef } from 'react';
 import { usePermissions } from '../hooks/usePermissions';
+import { formatNumber } from '../utils/formatUtils';
 
 export const Customers: React.FC = () => {
   const { user } = useAuth();
@@ -300,7 +301,7 @@ export const Customers: React.FC = () => {
   };
 
   const formatBalance = (value: number) => {
-    const formatted = Math.abs(value).toLocaleString();
+    const formatted = formatNumber(Math.abs(value));
     if (value > 0) return `+${formatted}`;
     if (value < 0) return `-${formatted}`;
     return '0';

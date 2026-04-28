@@ -100,10 +100,13 @@ export const ReturnSchema = BaseSchema.extend({
   notes: z.string().optional(),
 });
 
+// Purchase Invoice Schema (if distinct, currently using InvoiceSchema)
+export const PurchaseInvoiceSchema = InvoiceSchema;
+
 // Cash Transfer
 export const CashTransferSchema = BaseSchema.extend({
   date: z.string(),
-  amount: z.number().positive(),
+  amount: z.coerce.number().positive(),
   from_payment_method_id: z.string(),
   to_payment_method_id: z.string(),
   from_payment_method_name: z.string().optional(),
@@ -115,7 +118,7 @@ export const CashTransferSchema = BaseSchema.extend({
 // Discount
 export const DiscountSchema = BaseSchema.extend({
   date: z.string(),
-  amount: z.number().positive(),
+  amount: z.coerce.number().positive(),
   customer_id: z.string().optional(),
   supplier_id: z.string().optional(),
   account_id: z.string().optional(),

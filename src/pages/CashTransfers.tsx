@@ -18,6 +18,7 @@ import { InlineActivityLog } from '../components/InlineActivityLog';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
+import { formatNumber } from '../utils/formatUtils';
 import { ExportButtons } from '../components/ExportButtons';
 
 export const CashTransfers: React.FC = () => {
@@ -440,7 +441,7 @@ export const CashTransfers: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-emerald-600 font-black">{transfer.amount.toLocaleString()} ج.م</span>
+                    <span className="text-emerald-600 font-black">{formatNumber(transfer.amount)} ج.م</span>
                   </td>
                   <td className="px-6 py-4 text-zinc-500 font-medium max-w-xs truncate">{transfer.description}</td>
                   <td className="px-6 py-4">
@@ -895,7 +896,7 @@ export const CashTransfers: React.FC = () => {
                 <div className="flex items-center justify-between p-6 bg-zinc-50 rounded-3xl border border-zinc-100">
                   <div>
                     <p className="text-sm font-bold text-zinc-500 uppercase tracking-tighter mb-1">المبلغ المحول</p>
-                    <p className="text-3xl font-black text-emerald-600">{viewTransfer.amount.toLocaleString()} ج.م</p>
+                    <p className="text-3xl font-black text-emerald-600">{formatNumber(viewTransfer.amount)} ج.م</p>
                   </div>
                   <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-emerald-500 shadow-sm">
                     <ArrowLeftRight size={32} />

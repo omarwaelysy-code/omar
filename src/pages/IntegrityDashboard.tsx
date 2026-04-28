@@ -6,6 +6,7 @@ import { AccountingEngine } from '../services/AccountingEngine';
 import { JournalEntry, Account, AccountType } from '../types';
 import { ShieldAlert, CheckCircle, Activity, Database, AlertCircle, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { formatNumber } from '../utils/formatUtils';
 
 import { ScenarioTestingService } from '../services/ScenarioTestingService';
 import { useNotification } from '../contexts/NotificationContext';
@@ -146,7 +147,7 @@ export const IntegrityDashboard: React.FC = () => {
             <div className="flex justify-between text-sm">
               <span className="text-zinc-500">Difference:</span>
               <span className={`font-black ${globalBalance.isBalanced ? 'text-emerald-600' : 'text-rose-600'}`}>
-                {globalBalance.difference.toLocaleString()}
+                {formatNumber(globalBalance.difference)}
               </span>
             </div>
           </div>

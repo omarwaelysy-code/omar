@@ -12,6 +12,7 @@ import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
+import { formatNumber } from '../utils/formatUtils';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { ExportButtons } from '../components/ExportButtons';
 import { ActivityLog } from '../types';
@@ -113,7 +114,7 @@ export const Returns: React.FC = () => {
       // Preview Activity Log
       setPreviewActivityLog({
         action: 'إضافة مرتجع مبيعات',
-        details: `إضافة مرتجع مبيعات جديد للعميل ${customer?.name || '...'} بمبلغ ${total_amount.toLocaleString()}`,
+        details: `إضافة مرتجع مبيعات جديد للعميل ${customer?.name || '...'} بمبلغ ${formatNumber(total_amount)}`,
         timestamp: new Date().toISOString()
       });
 
@@ -688,7 +689,7 @@ export const Returns: React.FC = () => {
                       {ret.payment_type === 'cash' ? t('returns.payment_cash') : t('returns.payment_credit')}
                     </span>
                   </td>
-                  <td className="px-6 py-4 font-bold text-orange-600">{ret.total_amount.toLocaleString()} {t('returns.currency')}</td>
+                  <td className="px-6 py-4 font-bold text-orange-600">{formatNumber(ret.total_amount)} {t('returns.currency')}</td>
                   <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                     <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
                       <button 
@@ -745,7 +746,7 @@ export const Returns: React.FC = () => {
                   <h4 className="font-bold text-zinc-900 text-lg">{ret.customer_name}</h4>
                 </div>
                 <div className={dir === 'rtl' ? 'text-left' : 'text-right'}>
-                  <p className="font-bold text-orange-600 text-lg">{ret.total_amount.toLocaleString()} {t('returns.currency')}</p>
+                  <p className="font-bold text-orange-600 text-lg">{formatNumber(ret.total_amount)} {t('returns.currency')}</p>
                   <span className="text-xs text-zinc-400">{ret.date}</span>
                 </div>
               </div>
@@ -923,7 +924,7 @@ export const Returns: React.FC = () => {
                 <div className="bg-orange-50 rounded-2xl p-6 border border-orange-100 flex flex-col justify-center items-center text-center">
                   <span className="text-orange-600 text-sm font-bold uppercase tracking-widest mb-1">{t('returns.summary_total')}</span>
                   <span className="text-4xl font-black text-orange-700">
-                    {items.reduce((sum, item) => sum + (item.total || 0), 0).toLocaleString()} <span className="text-lg">{t('returns.currency')}</span>
+                    {formatNumber(items.reduce((sum, item) => sum + (item.total || 0), 0))} <span className="text-lg">{t('returns.currency')}</span>
                   </span>
                 </div>
               </div>
@@ -1030,7 +1031,7 @@ export const Returns: React.FC = () => {
                               onChange={(e) => updateItem(index, 'unit_price', Number(e.target.value))}
                             />
                           </td>
-                          <td className="px-4 py-3 font-bold text-zinc-900">{item.total.toLocaleString()}</td>
+                          <td className="px-4 py-3 font-bold text-zinc-900">{formatNumber(item.total)}</td>
                           <td className="px-4 py-3">
                             <button 
                               type="button"
@@ -1168,15 +1169,15 @@ export const Returns: React.FC = () => {
                           </td>
                           <td className="px-6 py-4 font-bold text-zinc-900" style={{ color: '#18181b' }}>{item.product_name}</td>
                           <td className="px-6 py-4 text-zinc-500" style={{ color: '#71717a' }}>{item.quantity}</td>
-                          <td className="px-6 py-4 text-zinc-500" style={{ color: '#71717a' }}>{item.unit_price.toLocaleString()}</td>
-                          <td className="px-6 py-4 font-bold text-zinc-900" style={{ color: '#18181b' }}>{item.total.toLocaleString()}</td>
+                          <td className="px-6 py-4 text-zinc-500" style={{ color: '#71717a' }}>{formatNumber(item.unit_price)}</td>
+                          <td className="px-6 py-4 font-bold text-zinc-900" style={{ color: '#18181b' }}>{formatNumber(item.total)}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot className="bg-zinc-50/50" style={{ backgroundColor: '#fafafa' }}>
                       <tr>
                         <td colSpan={3} className="px-6 py-4 font-bold text-zinc-500" style={{ color: '#71717a' }}>{t('returns.summary_total')}</td>
-                        <td className="px-6 py-4 font-black text-orange-600 text-lg" style={{ color: '#ea580c' }}>{viewReturn.total_amount.toLocaleString()} {t('returns.currency')}</td>
+                        <td className="px-6 py-4 font-black text-orange-600 text-lg" style={{ color: '#ea580c' }}>{formatNumber(viewReturn.total_amount)} {t('returns.currency')}</td>
                       </tr>
                     </tfoot>
                   </table>

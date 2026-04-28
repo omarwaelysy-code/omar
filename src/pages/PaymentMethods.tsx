@@ -7,6 +7,7 @@ import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
+import { formatNumber } from '../utils/formatUtils';
 
 export const PaymentMethods: React.FC = () => {
   const { user } = useAuth();
@@ -275,7 +276,7 @@ export const PaymentMethods: React.FC = () => {
                 <span className="inline-block text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg uppercase tracking-wider">{method.code}</span>
                 <div className="flex items-center gap-2 text-zinc-900 font-bold pt-3 border-t border-zinc-50 mt-2">
                   <Wallet size={16} className="text-emerald-500" />
-                  <span>الرصيد: {(method.opening_balance || 0).toLocaleString()} ج.م</span>
+                  <span>الرصيد: {formatNumber(method.opening_balance || 0)} ج.م</span>
                 </div>
               </div>
             </div>

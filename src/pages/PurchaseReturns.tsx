@@ -15,6 +15,7 @@ import { ExportButtons } from '../components/ExportButtons';
 import { TransactionManager } from '../services/TransactionManager';
 import { ReturnSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog } from '../types';
+import { formatNumber } from '../utils/formatUtils';
 
 export const PurchaseReturns: React.FC = () => {
   const { user } = useAuth();
@@ -124,7 +125,7 @@ export const PurchaseReturns: React.FC = () => {
       // Preview Activity Log
       setPreviewActivityLog({
         action: 'إضافة مرتجع مشتريات',
-        details: `إضافة مرتجع مشتريات جديد للمورد ${supplier?.name || '...'} بمبلغ ${total_amount.toLocaleString()}`,
+        details: `إضافة مرتجع مشتريات جديد للمورد ${supplier?.name || '...'} بمبلغ ${formatNumber(total_amount)}`,
         timestamp: new Date().toISOString()
       });
 
@@ -701,7 +702,7 @@ export const PurchaseReturns: React.FC = () => {
                       {ret.payment_type === 'cash' ? 'نقدي' : 'آجل'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 font-bold text-zinc-900">{ret.total_amount.toLocaleString()} ج.م</td>
+                  <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(ret.total_amount)} ج.م</td>
                   <td className="px-6 py-4 text-left">
                     <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
@@ -768,7 +769,7 @@ export const PurchaseReturns: React.FC = () => {
                     </div>
                     <span className="font-bold text-zinc-900">{ret.supplier_name}</span>
                   </div>
-                  <span className="font-bold text-red-600">{ret.total_amount.toLocaleString()} ج.م</span>
+                  <span className="font-bold text-red-600">{formatNumber(ret.total_amount)} ج.م</span>
                 </div>
                 <div className="flex items-center justify-end gap-2 pt-2">
                   <button 
@@ -1055,7 +1056,7 @@ export const PurchaseReturns: React.FC = () => {
                             />
                           </td>
                           <td className="px-6 py-4 font-bold text-zinc-900">
-                            {(item.quantity * item.cost_price).toLocaleString()} ج.م
+                            {formatNumber(item.quantity * item.cost_price)} ج.م
                           </td>
                           <td className="px-6 py-4">
                             <button 
@@ -1148,7 +1149,7 @@ export const PurchaseReturns: React.FC = () => {
                         </div>
                         <div className="flex justify-between items-center bg-zinc-50 p-3 rounded-xl">
                           <span className="text-sm text-zinc-500">الإجمالي:</span>
-                          <span className="font-bold text-zinc-900">{(item.quantity * item.cost_price).toLocaleString()} ج.م</span>
+                          <span className="font-bold text-zinc-900">{formatNumber(item.quantity * item.cost_price)} ج.م</span>
                         </div>
                       </div>
                     </div>
@@ -1158,7 +1159,7 @@ export const PurchaseReturns: React.FC = () => {
                 <div className="bg-red-500 text-white p-6 flex flex-col md:flex-row items-center justify-between gap-4">
                   <span className="font-bold text-lg">إجمالي المرتجع:</span>
                   <span className="font-bold text-3xl">
-                    {calculateTotal().toLocaleString()} ج.م
+                    {formatNumber(calculateTotal())} ج.م
                   </span>
                 </div>
               </div>
@@ -1260,15 +1261,15 @@ export const PurchaseReturns: React.FC = () => {
                           </td>
                           <td className="px-6 py-4 font-bold text-zinc-900" style={{ color: '#18181b' }}>{item.product_name}</td>
                           <td className="px-6 py-4 text-zinc-500" style={{ color: '#71717a' }}>{item.quantity}</td>
-                          <td className="px-6 py-4 text-zinc-500 hidden md:table-cell" style={{ color: '#71717a' }}>{item.price.toLocaleString()}</td>
-                          <td className="px-6 py-4 font-bold text-zinc-900" style={{ color: '#18181b' }}>{item.total.toLocaleString()}</td>
+                          <td className="px-6 py-4 text-zinc-500 hidden md:table-cell" style={{ color: '#71717a' }}>{formatNumber(item.price)}</td>
+                          <td className="px-6 py-4 font-bold text-zinc-900" style={{ color: '#18181b' }}>{formatNumber(item.total)}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot className="bg-zinc-50/50" style={{ backgroundColor: '#fafafa' }}>
                       <tr>
                         <td colSpan={window.innerWidth < 768 ? 2 : 3} className="px-6 py-4 font-bold text-zinc-500" style={{ color: '#71717a' }}>الإجمالي الكلي</td>
-                        <td className="px-6 py-4 font-black text-red-600 text-lg" style={{ color: '#dc2626' }}>{viewReturn.total_amount.toLocaleString()} ج.م</td>
+                        <td className="px-6 py-4 font-black text-red-600 text-lg" style={{ color: '#dc2626' }}>{formatNumber(viewReturn.total_amount)} ج.م</td>
                       </tr>
                     </tfoot>
                   </table>
