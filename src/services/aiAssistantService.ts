@@ -221,7 +221,7 @@ const tools: FunctionDeclaration[] = [
 
 export async function processAIRequest(prompt: string, user: User): Promise<{ text: string, operationPerformed: boolean }> {
   const ai = getAI();
-  const model = "gemini-1.5-flash";
+  const model = "gemini-2.0-flash";
   let operationPerformed = false;
 
   const systemInstruction = `أنت مساعد ذكي لنظام محاسبي متكامل. يمكنك مساعدة المستخدم في تنفيذ كافة العمليات المحاسبية وإدارة البيانات الأساسية.

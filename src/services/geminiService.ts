@@ -19,7 +19,7 @@ export const parseInvoiceText = async (text: string) => {
   try {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       contents: {
         parts: [{
           text: `Parse the following text into an invoice structure. 
@@ -67,7 +67,7 @@ export const parseInvoiceImage = async (base64Image: string) => {
     const ai = getAI();
     const imageData = base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       contents: {
         parts: [
           { inlineData: { mimeType: "image/jpeg", data: imageData } },
@@ -261,7 +261,7 @@ export const parseTransaction = async (type: string, input: { text?: string, ima
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       contents: { parts },
       config: {
         responseMimeType: "application/json",
@@ -291,7 +291,7 @@ export const parseAccountType = async (text: string) => {
   try {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       contents: {
         parts: [{
           text: `Parse the following text into an account type structure. 
@@ -331,7 +331,7 @@ export const parseAccountTypesBulk = async (text: string) => {
   try {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       contents: {
         parts: [{
           text: `Parse the following text into a list of account types. 
@@ -377,7 +377,7 @@ export const parseAccount = async (text: string) => {
   try {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       contents: {
         parts: [{
           text: `Parse the following text into an account structure. 
@@ -413,7 +413,7 @@ export const smartSearch = async (query: string, context: any) => {
   try {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       contents: {
         parts: [{
           text: `أنت مساعد محاسبي ذكي لنظام إدارة مبيعات ومخازن. 

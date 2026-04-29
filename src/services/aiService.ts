@@ -16,7 +16,7 @@ export const analyzeImage = async (base64Image: string, prompt: string) => {
     const ai = getAI();
     const imageData = base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       contents: [
         {
           parts: [
@@ -42,7 +42,7 @@ export const processVoiceCommand = async (command: string, context: any) => {
   try {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       contents: [{
         parts: [{
           text: `
