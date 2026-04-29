@@ -96,7 +96,7 @@ export const ReturnSchema = BaseSchema.extend({
   total_amount: z.coerce.number().default(0),
   payment_type: z.enum(['cash', 'credit']).default('credit'),
   payment_method_id: z.string().nullable().optional(),
-  payment_method_name: z.string().optional(),
+  payment_method_name: z.string().nullable().optional(),
   notes: z.string().optional(),
 });
 

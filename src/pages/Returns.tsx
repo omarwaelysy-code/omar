@@ -301,8 +301,8 @@ export const Returns: React.FC = () => {
       product_code: product.code,
       product_image_url: product.image_url,
       quantity: 1,
-      unit_price: product.sale_price,
-      total: product.sale_price
+      unit_price: Number(product.sale_price) || 0,
+      total: Number(product.sale_price) || 0
     }]);
   };
 
@@ -330,8 +330,8 @@ export const Returns: React.FC = () => {
         if (product) {
           item.product_name = product.name;
           item.product_image_url = product.image_url;
-          item.unit_price = product.sale_price;
-          item.total = (item.quantity || 0) * (item.unit_price || 0);
+          item.unit_price = Number(product.sale_price) || 0;
+          item.total = (Number(item.quantity) || 0) * (Number(item.unit_price) || 0);
         } else {
           item.product_name = '';
           item.product_image_url = '';
@@ -341,7 +341,7 @@ export const Returns: React.FC = () => {
       }
       
       if (field === 'quantity' || field === 'unit_price') {
-        item.total = (item.quantity || 0) * (item.unit_price || 0);
+        item.total = (Number(item.quantity) || 0) * (Number(item.unit_price) || 0);
       }
       
       newItems[index] = item;
@@ -1019,7 +1019,7 @@ export const Returns: React.FC = () => {
                               type="number"
                               min="1"
                               className="w-full px-2 py-1 bg-zinc-50 border border-zinc-200 rounded-lg text-center"
-                              value={item.quantity}
+                              value={Number(item.quantity) || 0}
                               onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
                             />
                           </td>
@@ -1027,7 +1027,8 @@ export const Returns: React.FC = () => {
                             <input 
                               type="number"
                               className="w-full px-2 py-1 bg-zinc-50 border border-zinc-200 rounded-lg text-center"
-                              value={item.unit_price}
+                              value={Number(item.unit_price) || 0}
+                              step="0.01"
                               onChange={(e) => updateItem(index, 'unit_price', Number(e.target.value))}
                             />
                           </td>
