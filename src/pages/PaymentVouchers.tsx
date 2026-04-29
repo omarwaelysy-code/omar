@@ -17,7 +17,7 @@ import { ExportButtons } from '../components/ExportButtons';
 import { TransactionManager } from '../services/TransactionManager';
 import { VoucherSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog } from '../types';
-import { formatNumber } from '../utils/formatUtils';
+import { formatNumber, formatDate } from '../utils/formatUtils';
 
 export const PaymentVouchers: React.FC = () => {
   const { user } = useAuth();
@@ -642,7 +642,7 @@ export const PaymentVouchers: React.FC = () => {
                   <h4 className="font-bold text-zinc-900">
                     {voucher.type === 'supplier' ? voucher.supplier_name : voucher.category_name}
                   </h4>
-                  <p className="text-xs text-zinc-500">{voucher.date}</p>
+                  <p className="text-xs text-zinc-500">{formatDate(voucher.date)}</p>
                 </div>
                 <div className="text-left">
                   <p className="font-bold text-zinc-900">{formatNumber(voucher.amount)} ج.م</p>
@@ -717,7 +717,7 @@ export const PaymentVouchers: React.FC = () => {
                   <td className="px-6 py-4 font-bold text-zinc-900">
                     {voucher.type === 'supplier' ? voucher.supplier_name : voucher.category_name}
                   </td>
-                  <td className="px-6 py-4 text-zinc-500">{voucher.date}</td>
+                  <td className="px-6 py-4 text-zinc-500">{formatDate(voucher.date)}</td>
                   <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(voucher.amount)} ج.م</td>
                   <td className="px-6 py-4 text-left">
                     <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity no-pdf">
@@ -1040,7 +1040,7 @@ export const PaymentVouchers: React.FC = () => {
                   <div className="flex justify-between items-start">
                     <div className="text-right">
                       <h1 className="text-3xl font-black text-emerald-600 mb-2">سند صرف</h1>
-                      <p className="text-zinc-500">التاريخ: {viewVoucher.date}</p>
+                      <p className="text-zinc-500">التاريخ: {formatDate(viewVoucher.date)}</p>
                     </div>
                     <div className="text-left">
                       <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl">

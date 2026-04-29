@@ -1,6 +1,7 @@
 import html2pdf from 'html2pdf.js';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { formatDate } from './formatUtils';
 
 interface PDFOptions {
   filename: string;
@@ -101,7 +102,7 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
           const dateContainer = clonedDoc.createElement('div');
           dateContainer.style.textAlign = 'left';
           const dateLabel = clonedDoc.createElement('p');
-          dateLabel.innerText = `تاريخ التصدير: ${new Date().toLocaleDateString('ar-EG')}`;
+          dateLabel.innerText = `تاريخ التصدير: ${formatDate(new Date())}`;
           dateLabel.style.fontSize = '14px';
           dateLabel.style.color = '#6b7280';
           dateLabel.style.margin = '0';
@@ -245,7 +246,7 @@ export const exportDataToPDF = (title: string, headers: string[], rows: any[][],
   
   doc.setFontSize(10);
   doc.setTextColor(107, 114, 128); // Gray-500
-  doc.text(`تاريخ التصدير: ${new Date().toLocaleDateString('ar-EG')}`, pageWidth - 20, 10, { align: 'right' });
+  doc.text(`تاريخ التصدير: ${formatDate(new Date())}`, pageWidth - 20, 10, { align: 'right' });
   
   // @ts-ignore
   doc.autoTable({

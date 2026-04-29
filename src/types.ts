@@ -228,6 +228,7 @@ export interface ReceiptVoucher {
 
 export interface PaymentVoucher {
   id: string;
+  voucher_number?: string;
   supplier_id?: string;
   supplier_name?: string;
   expense_category_id?: string;
@@ -314,7 +315,7 @@ export interface ActivityLog {
 
 export interface DashboardTransaction {
   id: string;
-  type: 'invoice' | 'return';
+  type: 'invoice' | 'return' | 'journal';
   number: string;
   customer_name: string;
   date: string;

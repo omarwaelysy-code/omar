@@ -23,7 +23,7 @@ import { TransactionManager } from '../services/TransactionManager';
 import { InvoiceSchema, JournalEntrySchema } from '../lib/schemas';
 import { ExportButtons } from '../components/ExportButtons';
 import { ActivityLog } from '../types';
-import { formatNumber } from '../utils/formatUtils';
+import { formatNumber, formatDate } from '../utils/formatUtils';
 
 export const PurchaseInvoices: React.FC = () => {
   const { user } = useAuth();
@@ -1017,7 +1017,7 @@ export const PurchaseInvoices: React.FC = () => {
                     <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold">{inv.invoice_number}</span>
                   </td>
                   <td className="px-6 py-4 font-bold text-zinc-900">{inv.supplier_name}</td>
-                  <td className="px-6 py-4 text-zinc-500">{inv.date}</td>
+                  <td className="px-6 py-4 text-zinc-500">{formatDate(inv.date)}</td>
                   <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(inv.total_amount)} ج.م</td>
                   <td className="px-6 py-4 text-left">
                     <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1058,7 +1058,7 @@ export const PurchaseInvoices: React.FC = () => {
                 </div>
                 <div className="text-left">
                   <p className="font-bold text-emerald-600 text-lg">{formatNumber(inv.total_amount)} ج.م</p>
-                  <span className="text-xs text-zinc-400">{inv.date}</span>
+                  <span className="text-xs text-zinc-400">{formatDate(inv.date)}</span>
                 </div>
               </div>
               <div className="flex items-center gap-2 pt-2">
@@ -1516,7 +1516,7 @@ export const PurchaseInvoices: React.FC = () => {
                   </div>
                   <div className="text-left">
                     <p className="text-xs font-bold text-[#a1a1aa] uppercase tracking-widest mb-1">التاريخ</p>
-                    <p className="text-lg font-medium text-[#18181b]">{viewInvoice.date}</p>
+                    <p className="text-lg font-medium text-[#18181b]">{formatDate(viewInvoice.date)}</p>
                   </div>
                 </div>
 

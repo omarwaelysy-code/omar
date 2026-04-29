@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ActivityLog } from '../types';
 import { dbService } from '../services/dbService';
 import { Clock, User, Activity, Calendar, History } from 'lucide-react';
+import { formatDateTime } from '../utils/formatUtils';
 
 interface InlineActivityLogProps {
   category: string;
@@ -72,11 +73,9 @@ export const InlineActivityLog: React.FC<InlineActivityLogProps> = ({ category, 
                 <div className="absolute right-1.5 top-1 w-3 h-3 rounded-full bg-white border-2 border-emerald-500 z-10 shadow-sm" />
                 
                 <div className="space-y-1.5">
-                  <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-400">
-                    <Calendar size={10} />
-                    <span>{new Date(log.timestamp).toLocaleDateString('ar-EG')}</span>
-                    <Clock size={10} className="mr-1" />
-                    <span>{new Date(log.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-400 font-mono">
+                    <Clock size={10} />
+                    <span>{formatDateTime(log.timestamp)}</span>
                   </div>
 
                   <div className="bg-white rounded-xl p-3 border border-zinc-100 shadow-sm hover:border-emerald-200 transition-colors group">

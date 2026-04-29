@@ -9,7 +9,7 @@ import { format } from 'date-fns';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { useNotification } from '../contexts/NotificationContext';
-import { formatNumber } from '../utils/formatUtils';
+import { formatNumber, formatDate } from '../utils/formatUtils';
 
 export const JournalEntries: React.FC = () => {
   const { user } = useAuth();
@@ -277,7 +277,7 @@ export const JournalEntries: React.FC = () => {
             <tbody className="divide-y divide-zinc-100">
               {filteredEntries.map((entry) => (
                 <tr key={entry.id} className="hover:bg-zinc-50/50 transition-colors group">
-                  <td className="px-6 py-4 text-sm font-bold text-zinc-900">{entry.date}</td>
+                  <td className="px-6 py-4 text-sm font-bold text-zinc-900">{formatDate(entry.date)}</td>
                   <td className="px-6 py-4 text-sm font-medium text-zinc-600 max-w-xs truncate">{entry.description}</td>
                   <td className="px-6 py-4">
                     <span className="px-3 py-1 bg-zinc-100 text-zinc-600 rounded-lg text-xs font-bold">
@@ -351,7 +351,7 @@ export const JournalEntries: React.FC = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className={`p-4 bg-zinc-50 rounded-2xl ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                     <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">{t('journal.column_date')}</p>
-                    <p className="text-sm font-bold text-zinc-900">{selectedEntry.date}</p>
+                    <p className="text-sm font-bold text-zinc-900">{formatDate(selectedEntry.date)}</p>
                   </div>
                   <div className={`p-4 bg-zinc-50 rounded-2xl ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                     <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">{t('journal.type')}</p>

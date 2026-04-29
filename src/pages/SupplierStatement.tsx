@@ -4,7 +4,7 @@ import { Supplier, PurchaseInvoice, PaymentVoucher, PurchaseReturn } from '../ty
 import { Search, Calendar, FileText, Download, User, ArrowUpRight, ArrowDownLeft, Wallet } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfUtils';
 import { dbService } from '../services/dbService';
-import { formatNumber } from '../utils/formatUtils';
+import { formatNumber, formatDate } from '../utils/formatUtils';
 
 import { utils, writeFile } from 'xlsx';
 
@@ -264,7 +264,7 @@ export const SupplierStatement: React.FC = () => {
                     </tr>
                     {statement.map((item) => (
                       <tr key={item.id} className="border-b border-zinc-50 hover:bg-zinc-50/50 transition-colors">
-                        <td className="px-4 py-3 text-sm font-mono">{item.date}</td>
+                        <td className="px-4 py-3 text-sm font-mono">{formatDate(item.date)}</td>
                         <td className="px-4 py-3 text-sm">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                             item.type === 'purchase_invoice' ? 'bg-emerald-50 text-emerald-600' :

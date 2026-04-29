@@ -7,7 +7,7 @@ import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
 import { ExportButtons } from '../components/ExportButtons';
 import { Invoice, Return, Customer, Product } from '../types';
-import { formatNumber } from '../utils/formatUtils';
+import { formatNumber, formatDate } from '../utils/formatUtils';
 
 export const SalesReport: React.FC = () => {
   const { user } = useAuth();
@@ -468,7 +468,7 @@ export const SalesReport: React.FC = () => {
                   </tr>
                 ) : transactions.map((item, index) => (
                   <tr key={index} className="hover:bg-[rgba(244,244,245,0.5)] transition-colors text-xs">
-                    <td className="px-4 py-4 font-mono">{item.date}</td>
+                    <td className="px-4 py-4 font-mono">{formatDate(item.date)}</td>
                     <td className="px-4 py-4">
                       <div className={`flex items-center gap-2 px-2 py-1 rounded-lg font-bold w-fit ${item.isReturn ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
                         {item.isReturn ? <History size={12} /> : <ShoppingBag size={12} />}

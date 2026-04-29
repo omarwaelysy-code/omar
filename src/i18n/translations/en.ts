@@ -274,6 +274,7 @@ export const en = {
   'dashboard.return': 'Return',
   'dashboard.manual_journal': 'Manual Journal',
   'dashboard.unknown_customer': 'Unknown Customer',
+  'dashboard.unknown_supplier': 'Unknown Supplier',
   'dashboard.no_answer': 'No answer found.',
   'dashboard.ai_search_error': 'AI Search Error',
   'dashboard.unknown_error': 'Unknown error',

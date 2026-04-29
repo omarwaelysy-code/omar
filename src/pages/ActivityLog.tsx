@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ActivityLog } from '../types';
 import { Search, Clock, User, Activity, Calendar } from 'lucide-react';
 import { dbService } from '../services/dbService';
+import { formatDateTime } from '../utils/formatUtils';
 
 export const ActivityLogPage: React.FC = () => {
   const { user } = useAuth();
@@ -94,13 +95,9 @@ export const ActivityLogPage: React.FC = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col text-xs text-zinc-400">
-                      <div className="flex items-center gap-1">
-                        <Calendar size={12} />
-                        <span>{new Date(log.timestamp).toLocaleDateString('ar-EG')}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 font-mono">
                         <Clock size={12} />
-                        <span>{new Date(log.timestamp).toLocaleTimeString('ar-EG')}</span>
+                        <span>{formatDateTime(log.timestamp)}</span>
                       </div>
                     </div>
                   </td>
@@ -127,14 +124,10 @@ export const ActivityLogPage: React.FC = () => {
                   </div>
                   <span className="font-bold text-zinc-900">{log.username}</span>
                 </div>
-                <div className="text-left text-[10px] text-zinc-400">
-                  <div className="flex items-center gap-1 justify-end">
-                    <Calendar size={10} />
-                    <span>{new Date(log.timestamp).toLocaleDateString('ar-EG')}</span>
-                  </div>
+                <div className="text-left text-[10px] text-zinc-400 font-mono">
                   <div className="flex items-center gap-1 justify-end">
                     <Clock size={10} />
-                    <span>{new Date(log.timestamp).toLocaleTimeString('ar-EG')}</span>
+                    <span>{formatDateTime(log.timestamp)}</span>
                   </div>
                 </div>
               </div>

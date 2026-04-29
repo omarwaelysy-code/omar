@@ -16,7 +16,7 @@ import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import DocumentChatter from '../components/DocumentChatter';
 import { ExportButtons } from '../components/ExportButtons';
 import { usePermissions } from '../hooks/usePermissions';
-import { formatNumber } from '../utils/formatUtils';
+import { formatNumber, formatDate } from '../utils/formatUtils';
 
 import { useLanguage } from '../contexts/LanguageContext';
 import { transactionManager, TransactionManager } from '../services/TransactionManager';
@@ -976,7 +976,7 @@ export const Invoices: React.FC = () => {
                     <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold">{inv.invoice_number}</span>
                   </td>
                   <td className={`px-6 py-4 font-bold text-zinc-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{inv.customer_name}</td>
-                  <td className={`px-6 py-4 text-zinc-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{inv.date}</td>
+                  <td className={`px-6 py-4 text-zinc-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(inv.date)}</td>
                   <td className={`px-6 py-4 font-bold text-zinc-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatNumber(inv.total_amount)} {t('invoices.currency')}</td>
                   <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                     <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
@@ -1039,7 +1039,7 @@ export const Invoices: React.FC = () => {
                 </div>
                 <div className={`${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                   <p className="font-bold text-emerald-600 text-lg">{formatNumber(inv.total_amount)} {t('invoices.currency')}</p>
-                  <span className="text-xs text-zinc-400">{inv.date}</span>
+                  <span className="text-xs text-zinc-400">{formatDate(inv.date)}</span>
                 </div>
               </div>
               <div className="flex items-center gap-2 pt-2">
@@ -1426,7 +1426,7 @@ export const Invoices: React.FC = () => {
                   </div>
                   <div className={dir === 'rtl' ? 'text-left' : 'text-right'}>
                     <p className="text-xs font-bold text-[#a1a1aa] uppercase tracking-widest mb-1">{t('invoices.column_date')}</p>
-                    <p className="text-lg font-medium text-[#18181b]">{viewInvoice.date}</p>
+                    <p className="text-lg font-medium text-[#18181b]">{formatDate(viewInvoice.date)}</p>
                   </div>
                 </div>
 

@@ -4,7 +4,7 @@ import { Customer, Invoice, ReceiptVoucher, Return } from '../types';
 import { Search, FileText, Download, Calendar, User, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfUtils';
 import { dbService } from '../services/dbService';
-import { formatNumber } from '../utils/formatUtils';
+import { formatNumber, formatDate } from '../utils/formatUtils';
 
 import { utils, writeFile } from 'xlsx';
 
@@ -260,7 +260,7 @@ export const CustomerStatement: React.FC = () => {
                   <tbody>
                     {entries.map((entry) => (
                       <tr key={entry.id} className="border-b border-zinc-50 hover:bg-zinc-50/50 transition-colors">
-                        <td className="px-4 py-3 text-sm font-mono">{entry.date}</td>
+                        <td className="px-4 py-3 text-sm font-mono">{formatDate(entry.date)}</td>
                         <td className="px-4 py-3 text-sm">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                             entry.type === 'invoice' ? 'bg-emerald-50 text-emerald-600' :

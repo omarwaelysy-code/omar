@@ -6,7 +6,7 @@ import { Search, Download, Wallet, Truck, ArrowDownLeft, FileSpreadsheet } from 
 import { exportToPDF } from '../utils/pdfUtils';
 import { dbService } from '../services/dbService';
 import { utils, writeFile } from 'xlsx';
-import { formatNumber } from '../utils/formatUtils';
+import { formatNumber, formatDate } from '../utils/formatUtils';
 
 export const SupplierBalances: React.FC = () => {
   const { user } = useAuth();
@@ -217,7 +217,7 @@ export const SupplierBalances: React.FC = () => {
       <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden" ref={reportRef}>
         <div className="p-6 bg-zinc-50 border-b border-zinc-100 hidden print:block">
           <h3 className="text-xl font-bold text-zinc-900">تقرير أرصدة الموردين التفصيلي</h3>
-          <p className="text-sm text-zinc-500">تاريخ التقرير: {new Date().toLocaleDateString('ar-EG')}</p>
+          <p className="text-sm text-zinc-500">تاريخ التقرير: {formatDate(new Date())}</p>
         </div>
 
         {/* Desktop Table View */}

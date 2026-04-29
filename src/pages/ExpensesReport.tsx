@@ -4,7 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { Search, Calendar, Download, Wallet, PieChart, TrendingDown } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfUtils';
 import { dbService } from '../services/dbService';
-import { formatNumber } from '../utils/formatUtils';
+import { formatNumber, formatDate } from '../utils/formatUtils';
 
 export const ExpensesReport: React.FC = () => {
   const { user } = useAuth();
@@ -144,7 +144,7 @@ export const ExpensesReport: React.FC = () => {
                   <Calendar size={20} />
                   <span className="text-sm font-bold uppercase tracking-tighter">{t('common.period')}</span>
                 </div>
-                <div className="text-sm font-bold text-zinc-900">{startDate} {t('common.to')} {endDate}</div>
+                <div className="text-sm font-bold text-zinc-900 font-mono">{formatDate(startDate)} {t('common.to')} {formatDate(endDate)}</div>
               </div>
             </div>
 

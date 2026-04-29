@@ -12,7 +12,7 @@ import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
-import { formatNumber } from '../utils/formatUtils';
+import { formatNumber, formatDate } from '../utils/formatUtils';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { ExportButtons } from '../components/ExportButtons';
 import { ActivityLog } from '../types';
@@ -683,7 +683,7 @@ export const Returns: React.FC = () => {
                     <span className="font-mono text-xs bg-zinc-100 px-2 py-1 rounded text-zinc-600">{ret.return_number}</span>
                   </td>
                   <td className="px-6 py-4 font-bold text-zinc-900">{ret.customer_name}</td>
-                  <td className="px-6 py-4 text-zinc-500">{ret.date}</td>
+                  <td className="px-6 py-4 text-zinc-500">{formatDate(ret.date)}</td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${ret.payment_type === 'cash' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-orange-50 text-orange-600 border border-orange-100'}`}>
                       {ret.payment_type === 'cash' ? t('returns.payment_cash') : t('returns.payment_credit')}
@@ -747,7 +747,7 @@ export const Returns: React.FC = () => {
                 </div>
                 <div className={dir === 'rtl' ? 'text-left' : 'text-right'}>
                   <p className="font-bold text-orange-600 text-lg">{formatNumber(ret.total_amount)} {t('returns.currency')}</p>
-                  <span className="text-xs text-zinc-400">{ret.date}</span>
+                  <span className="text-xs text-zinc-400">{formatDate(ret.date)}</span>
                 </div>
               </div>
               <div className="flex items-center gap-2 pt-2">
@@ -1123,7 +1123,7 @@ export const Returns: React.FC = () => {
                   </div>
                   <div className={dir === 'rtl' ? 'text-left' : 'text-right'}>
                     <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1" style={{ color: '#71717a' }}>{t('returns.column_date')}</p>
-                    <p className="text-lg font-bold text-zinc-900" style={{ color: '#18181b' }}>{viewReturn.date}</p>
+                    <p className="text-lg font-bold text-zinc-900" style={{ color: '#18181b' }}>{formatDate(viewReturn.date)}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-8">

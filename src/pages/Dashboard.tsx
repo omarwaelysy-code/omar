@@ -40,11 +40,16 @@ import {
 } from '../types';
 import { smartSearch } from '../services/geminiService';
 import { dbService } from '../services/dbService';
-import { formatNumber } from '../utils/formatUtils';
+import { AccountingEngine } from '../services/AccountingEngine';
+import { formatNumber, formatDate } from '../utils/formatUtils';
 
 // Global cache for dashboard stats to reduce reads on tab switches
 let statsCache: { [companyId: string]: { stats: DashboardStats, timestamp: number } } = {};
-const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
+const CACHE_DURATION = 1000 * 30; // 30 seconds (down from 5 minutes for better responsiveness)
+
+export const clearDashboardCache = () => {
+  statsCache = {};
+};
 
 export const Dashboard: React.FC = () => {
   const { user, isSuperAdmin, isCompanyAdmin } = useAuth();
@@ -73,15 +78,38 @@ export const Dashboard: React.FC = () => {
       setLoading(false);
     }
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
+
+    // Listen for database changes to refresh dashboard
+    const handleDbRefresh = () => {
+      // Clear cache for this company to force fresh fetch
+      if (user) {
+        const cacheKey = `${user.id}_${user.company_id}`;
+        delete statsCache[cacheKey];
+        fetchStats(false); // Fetch silently if possible
+      }
+    };
+
+    // Listen for window focus to refresh data
+    const handleFocus = () => {
+      fetchStats(false);
+    };
+
+    window.addEventListener('db-refresh', handleDbRefresh);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('db-refresh', handleDbRefresh);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [user, isSuperAdmin]);
 
-  const fetchStats = async () => {
+  const fetchStats = async (showLoading = true) => {
     if (!user || isSuperAdmin) return;
     const companyId = user.company_id;
     
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       
       const results = await Promise.allSettled([
         dbService.list<Invoice>('invoices', user.company_id),
@@ -103,66 +131,55 @@ export const Dashboard: React.FC = () => {
         invoices, returns, receipts, payments, customers, suppliers,
         purchaseInvoices, purchaseReturns, customerDiscounts, supplierDiscounts,
         journalEntries, accounts, accountTypes
-      ] = results.map(r => r.status === 'fulfilled' ? r.value : []);
+      ] = results.map(r => r.status === 'fulfilled' ? r.value : []) as [
+        Invoice[], Return[], ReceiptVoucher[], PaymentVoucher[], Customer[], Supplier[],
+        PurchaseInvoice[], PurchaseReturn[], CustomerDiscount[], SupplierDiscount[],
+        any[], Account[], AccountType[]
+      ];
 
-      const totalInvoicesAmount = invoices.reduce((sum: number, inv: Invoice) => sum + inv.total_amount, 0);
-      const totalReturnsAmount = returns.reduce((sum: number, ret: Return) => sum + ret.total_amount, 0);
-      const netSales = totalInvoicesAmount - totalReturnsAmount;
+      const today = new Date().toISOString().split('T')[0];
+      const startDate = '1900-01-01'; // Cumulative
 
-      const cashSalesAmount = invoices.filter((i: Invoice) => i.payment_type === 'cash').reduce((sum: number, i: Invoice) => sum + i.total_amount, 0);
-      const cashPurchasesAmount = purchaseInvoices.filter((i: PurchaseInvoice) => i.payment_type === 'cash').reduce((sum: number, i: PurchaseInvoice) => sum + i.total_amount, 0);
+      // Use Accounting Engine for core metrics to ensure consistency with reports
+      const incomeStatement = AccountingEngine.calculateIncomeStatement(
+        accounts,
+        accountTypes,
+        journalEntries,
+        '2000-01-01', // Standard start date for P&L
+        today
+      );
 
-      const totalReceipts = receipts.reduce((sum: number, r: ReceiptVoucher) => sum + r.amount, 0) + cashSalesAmount;
-      const totalExpenses = payments.reduce((sum: number, p: PaymentVoucher) => sum + p.amount, 0) + cashPurchasesAmount;
+      const balanceSheet = AccountingEngine.calculateBalanceSheet(
+        accounts,
+        accountTypes,
+        journalEntries,
+        today
+      );
 
-      // Calculate Customer Balances (Matching Balance Sheet logic)
-      const customerAccountIds = new Set([
-        ...customers.map((c: Customer) => c.account_id).filter(Boolean),
-        ...accounts.filter((a: Account) => a.name === 'عملاء' || a.name === 'العملاء' || a.name === 'حساب العملاء').map((a: Account) => a.id)
-      ]);
+      // Dashboards KPIs derived from Accounting Data
+      const netSales = incomeStatement.totalRevenues; // Total revenue from accounts
+      const totalExpensesValue = incomeStatement.totalExpenses + incomeStatement.totalCosts; // All costs + expenses
+      
+      const totalReceipts = receipts.reduce((sum: number, r: ReceiptVoucher) => sum + r.amount, 0);
+      const totalPayments = payments.reduce((sum: number, p: PaymentVoucher) => sum + p.amount, 0);
 
-      const totalCustomerBalances = accounts
-        .filter((acc: Account) => customerAccountIds.has(acc.id))
-        .reduce((sum: number, acc: Account) => {
-          const type = (accountTypes as AccountType[]).find(t => t.id === acc.type_id);
-          if (type?.classification !== 'asset') return sum;
+      // Total Customer Balance
+      const totalCustomerBalances = balanceSheet.assets
+        .filter(a => {
+          const acc = accounts.find(account => account.id === a.id);
+          return acc?.name.includes('عملاء') || acc?.name.includes('العملاء') || customers.some(c => c.account_id === a.id);
+        })
+        .reduce((sum, a) => sum + a.balance, 0);
 
-          let balance = acc.opening_balance || 0;
-          (journalEntries as any[]).forEach((je: any) => {
-            je.items?.forEach((item: any) => {
-              if (item.account_id === acc.id) {
-                balance += (item.debit || 0) - (item.credit || 0);
-              }
-            });
-          });
-          return sum + balance;
-        }, 0);
+      // Total Supplier Balance
+      const totalSupplierBalances = balanceSheet.liabilities
+        .filter(l => {
+          const acc = accounts.find(account => account.id === l.id);
+          return acc?.name.includes('موردين') || acc?.name.includes('الموردين') || suppliers.some(s => s.account_id === l.id);
+        })
+        .reduce((sum, l) => sum + l.balance, 0);
 
-      // Calculate Supplier Balances (Matching Balance Sheet logic)
-      const supplierAccountIds = new Set([
-        ...suppliers.map((s: Supplier) => s.account_id).filter(Boolean),
-        ...accounts.filter((a: Account) => a.name === 'موردين' || a.name === 'الموردين' || a.name === 'حساب الموردين').map((a: Account) => a.id)
-      ]);
-
-      const totalSupplierBalances = accounts
-        .filter((acc: Account) => supplierAccountIds.has(acc.id))
-        .reduce((sum: number, acc: Account) => {
-          const type = (accountTypes as AccountType[]).find(t => t.id === acc.type_id);
-          if (type?.classification !== 'liability_equity') return sum;
-
-          let balance = acc.opening_balance || 0;
-          (journalEntries as any[]).forEach((je: any) => {
-            je.items?.forEach((item: any) => {
-              if (item.account_id === acc.id) {
-                balance += (item.debit || 0) - (item.credit || 0);
-              }
-            });
-          });
-          // Balance Sheet logic: Liabilities are (Debit - Credit) * -1
-          return sum + (balance * -1);
-        }, 0);
-
-      // Simple sales by month calculation
+      // Simple sales by month calculation (still from documents for better visualization)
       const monthKeys = ['months.jan', 'months.feb', 'months.mar', 'months.apr', 'months.may', 'months.jun', 'months.jul', 'months.aug', 'months.sep', 'months.oct', 'months.nov', 'months.dec'];
       const salesByMonth = monthKeys.map((key, index) => {
         const monthInvoices = invoices.filter((inv: Invoice) => new Date(inv.date).getMonth() === index);
@@ -189,11 +206,29 @@ export const Dashboard: React.FC = () => {
           date: ret.date,
           total_amount: ret.total_amount
         })),
+        ...receipts.map((r: ReceiptVoucher) => ({
+          id: r.id,
+          type: 'journal' as const, // Reusing journal for display purposes or we can add 'receipt'
+          number: r.voucher_number || r.id.slice(-6),
+          customer_name: r.customer_name || t('dashboard.unknown_customer'),
+          date: r.date,
+          total_amount: r.amount
+        })),
+        ...payments.map((p: PaymentVoucher) => ({
+          id: p.id,
+          type: 'return' as const, // Use return type to show as negative/red
+          number: p.voucher_number || p.id.slice(-6),
+          customer_name: p.supplier_name || p.description || t('dashboard.unknown_supplier'),
+          date: p.date,
+          total_amount: p.amount
+        })),
         ...(journalEntries as any[]).filter((je: any) => je.reference_type === 'manual').map((je: any) => ({
           id: je.id,
-          type: 'journal' as any,
+          type: 'journal' as const,
           number: je.reference_number || `${t('journal.entry')}-${je.id.slice(-6)}`,
-          customer_name: je.items?.find((item: any) => item.customer_name)?.customer_name || je.description || t('dashboard.manual_journal'),
+          customer_name: je.items?.find((item: any) => item.customer_name || item.supplier_name)?.customer_name || 
+                        je.items?.find((item: any) => item.customer_name || item.supplier_name)?.supplier_name || 
+                        je.description || t('dashboard.manual_journal'),
           date: je.date,
           total_amount: je.total_debit
         }))
@@ -204,7 +239,7 @@ export const Dashboard: React.FC = () => {
         netSales,
         totalInvoices: invoices.length,
         totalReceipts,
-        totalExpenses,
+        totalExpenses: totalExpensesValue,
         totalCustomerBalances,
         totalSupplierBalances,
         salesByMonth,
@@ -447,7 +482,7 @@ export const Dashboard: React.FC = () => {
                         {tx.type === 'invoice' ? t('dashboard.invoice') : 
                          tx.type === 'return' ? t('dashboard.return') : 
                          t('dashboard.manual_journal')}
-                      </span> • {tx.number} • {tx.date}
+                      </span> • {tx.number} • {formatDate(tx.date)}
                     </p>
                   </div>
                 </div>

@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { AccountingEngine } from '../services/AccountingEngine';
-import { formatNumber } from '../utils/formatUtils';
+import { formatNumber, formatDate } from '../utils/formatUtils';
 
 export const GeneralLedger: React.FC = () => {
   const { user } = useAuth();
@@ -281,7 +281,7 @@ export const GeneralLedger: React.FC = () => {
                   </tr>
                   {ledgerData.map((tx, idx) => (
                     <tr key={idx} className="hover:bg-zinc-50/50 transition-colors">
-                      <td className="px-6 py-4 text-sm font-bold text-zinc-900">{tx.date}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-zinc-900">{formatDate(tx.date)}</td>
                       <td className="px-6 py-4 text-sm font-bold text-emerald-600">
                         {tx.entity_name || '-'}
                       </td>

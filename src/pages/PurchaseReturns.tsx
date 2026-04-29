@@ -15,7 +15,7 @@ import { ExportButtons } from '../components/ExportButtons';
 import { TransactionManager } from '../services/TransactionManager';
 import { ReturnSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog } from '../types';
-import { formatNumber } from '../utils/formatUtils';
+import { formatNumber, formatDate } from '../utils/formatUtils';
 
 export const PurchaseReturns: React.FC = () => {
   const { user } = useAuth();
@@ -696,7 +696,7 @@ export const PurchaseReturns: React.FC = () => {
                     <span className="font-mono text-xs bg-red-50 px-2 py-1 rounded text-red-700 font-bold">{ret.return_number}</span>
                   </td>
                   <td className="px-6 py-4 font-bold text-zinc-900">{ret.supplier_name}</td>
-                  <td className="px-6 py-4 text-zinc-500">{ret.date}</td>
+                  <td className="px-6 py-4 text-zinc-500">{formatDate(ret.date)}</td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${ret.payment_type === 'cash' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-orange-50 text-orange-600 border border-orange-100'}`}>
                       {ret.payment_type === 'cash' ? 'نقدي' : 'آجل'}
@@ -759,7 +759,7 @@ export const PurchaseReturns: React.FC = () => {
                   <span className="font-mono text-xs bg-red-50 px-2 py-1 rounded text-red-700 font-bold">{ret.return_number}</span>
                   <span className="text-xs text-zinc-500 flex items-center gap-1">
                     <Calendar size={12} />
-                    {ret.date}
+                    {formatDate(ret.date)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -1215,7 +1215,7 @@ export const PurchaseReturns: React.FC = () => {
                   </div>
                   <div className="text-left">
                     <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1" style={{ color: '#71717a' }}>التاريخ</p>
-                    <p className="text-lg font-bold text-zinc-900" style={{ color: '#18181b' }}>{viewReturn.date}</p>
+                    <p className="text-lg font-bold text-zinc-900" style={{ color: '#18181b' }}>{formatDate(viewReturn.date)}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-8">

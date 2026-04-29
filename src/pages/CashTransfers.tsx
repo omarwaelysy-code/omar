@@ -18,7 +18,7 @@ import { InlineActivityLog } from '../components/InlineActivityLog';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
-import { formatNumber } from '../utils/formatUtils';
+import { formatNumber, formatDate } from '../utils/formatUtils';
 import { ExportButtons } from '../components/ExportButtons';
 
 export const CashTransfers: React.FC = () => {
@@ -423,7 +423,7 @@ export const CashTransfers: React.FC = () => {
             <tbody className="divide-y divide-zinc-50">
               {filteredTransfers.map((transfer) => (
                 <tr key={transfer.id} className="hover:bg-zinc-50/50 transition-colors group">
-                  <td className="px-6 py-4 text-zinc-900 font-bold">{transfer.date}</td>
+                  <td className="px-6 py-4 text-zinc-900 font-bold">{formatDate(transfer.date)}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 bg-red-50 text-red-600 rounded-lg flex items-center justify-center">
@@ -917,7 +917,7 @@ export const CashTransfers: React.FC = () => {
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 text-zinc-600">
                     <Calendar size={18} className="text-zinc-400" />
-                    <span className="font-bold">التاريخ: {viewTransfer.date}</span>
+                    <span className="font-bold">التاريخ: {formatDate(viewTransfer.date)}</span>
                   </div>
                   <div className="flex items-start gap-3 text-zinc-600">
                     <FileText size={18} className="text-zinc-400 mt-1" />

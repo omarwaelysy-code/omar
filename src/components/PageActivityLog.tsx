@@ -4,6 +4,7 @@ import { ActivityLog } from '../types';
 import { dbService } from '../services/dbService';
 import { Clock, User, Activity, Calendar, History, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatDateTime } from '../utils/formatUtils';
 
 interface PageActivityLogProps {
   category: string;
@@ -103,11 +104,9 @@ export const PageActivityLog: React.FC<PageActivityLogProps> = ({ category, docu
                       
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 text-xs font-bold text-zinc-400">
-                            <Calendar size={12} />
-                            <span>{new Date(log.timestamp).toLocaleDateString('ar-EG')}</span>
-                            <Clock size={12} className="mr-1" />
-                            <span>{new Date(log.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
+                          <div className="flex items-center gap-2 text-xs font-bold text-zinc-400 font-mono">
+                            <Clock size={12} />
+                            <span>{formatDateTime(log.timestamp)}</span>
                           </div>
                         </div>
 

@@ -11,7 +11,7 @@ import { SmartAIInput } from '../components/SmartAIInput';
 import { TransactionManager } from '../services/TransactionManager';
 import { DiscountSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog } from '../types';
-import { formatNumber } from '../utils/formatUtils';
+import { formatNumber, formatDate } from '../utils/formatUtils';
 
 export const CustomerDiscounts: React.FC = () => {
   const { user } = useAuth();
@@ -371,7 +371,7 @@ export const CustomerDiscounts: React.FC = () => {
               ) : filteredDiscounts.map((discount) => (
                 <tr key={discount.id} className="hover:bg-[rgba(244,244,245,0.5)] transition-colors group">
                   <td className="px-6 py-4 font-bold text-zinc-900">{discount.customer_name}</td>
-                  <td className="px-6 py-4 text-zinc-500">{discount.date}</td>
+                  <td className="px-6 py-4 text-zinc-500">{formatDate(discount.date)}</td>
                   <td className="px-6 py-4 font-bold text-emerald-600">{formatNumber(discount.amount)} ج.م</td>
                   <td className="px-6 py-4 text-zinc-500 text-sm">{discount.notes || '-'}</td>
                   <td className="px-6 py-4 text-left">
@@ -411,7 +411,7 @@ export const CustomerDiscounts: React.FC = () => {
                   <div className="font-bold text-zinc-900 text-lg">{discount.customer_name}</div>
                   <div className="text-zinc-500 text-sm flex items-center gap-1">
                     <Calendar size={14} />
-                    {discount.date}
+                    {formatDate(discount.date)}
                   </div>
                 </div>
                 <div className="text-left">

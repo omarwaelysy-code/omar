@@ -274,6 +274,7 @@ export const ar = {
   'dashboard.return': 'مرتجع',
   'dashboard.manual_journal': 'قيد يدوي',
   'dashboard.unknown_customer': 'عميل غير معروف',
+  'dashboard.unknown_supplier': 'مورد غير معروف',
   'dashboard.no_answer': 'لم يتم العثور على إجابة.',
   'dashboard.ai_search_error': 'خطأ في معالجة البحث الذكي',
   'dashboard.unknown_error': 'خطأ غير معروف',

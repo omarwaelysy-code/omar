@@ -108,19 +108,23 @@ export const dbService = {
 
   async add<T>(collectionName: string, data: any): Promise<string> {
     const result = await apiRequest<{ id: string }>(`/${collectionName}`, 'POST', data);
+    window.dispatchEvent(new CustomEvent('db-refresh', { detail: { collection: collectionName } }));
     return result.id;
   },
 
   async addWithId<T>(collectionName: string, id: string, data: any): Promise<void> {
     await apiRequest(`/${collectionName}`, 'POST', { ...data, id });
+    window.dispatchEvent(new CustomEvent('db-refresh', { detail: { collection: collectionName } }));
   },
 
   async update(collectionName: string, id: string, data: any): Promise<void> {
     await apiRequest(`/${collectionName}/${id}`, 'PUT', data);
+    window.dispatchEvent(new CustomEvent('db-refresh', { detail: { collection: collectionName } }));
   },
 
   async delete(collectionName: string, id: string): Promise<void> {
     await apiRequest(`/${collectionName}/${id}`, 'DELETE');
+    window.dispatchEvent(new CustomEvent('db-refresh', { detail: { collection: collectionName } }));
   },
 
   async getDocsByFilter<T>(collectionName: string, companyId: string, filters: { field: string, operator: any, value: any }[]): Promise<T[]> {
@@ -202,11 +206,15 @@ export const dbService = {
   },
 
   async createJournalEntry(entry: any) {
-    return apiRequest('/journal_entries', 'POST', entry);
+    const result = await apiRequest('/journal_entries', 'POST', entry);
+    window.dispatchEvent(new CustomEvent('db-refresh', { detail: { collection: 'journal_entries' } }));
+    return result;
   },
 
   async updateJournalEntry(id: string, entry: any) {
-    return apiRequest(`/journal_entries/${id}`, 'PUT', entry);
+    const result = await apiRequest(`/journal_entries/${id}`, 'PUT', entry);
+    window.dispatchEvent(new CustomEvent('db-refresh', { detail: { collection: 'journal_entries' } }));
+    return result;
   },
 
   async deleteJournalEntryByReference(referenceId: string, companyId: string) {

@@ -17,7 +17,7 @@ import { SmartAIInput } from '../components/SmartAIInput';
 import { TransactionManager } from '../services/TransactionManager';
 import { VoucherSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog } from '../types';
-import { formatNumber } from '../utils/formatUtils';
+import { formatNumber, formatDate } from '../utils/formatUtils';
 
 export const Receipts: React.FC = () => {
   const { user } = useAuth();
@@ -550,7 +550,7 @@ export const Receipts: React.FC = () => {
               <div className="flex justify-between items-start">
                 <div>
                   <h4 className="font-bold text-zinc-900">{receipt.customer_name}</h4>
-                  <p className="text-xs text-zinc-500">{receipt.date}</p>
+                  <p className="text-xs text-zinc-500">{formatDate(receipt.date)}</p>
                   {receipt.payment_method_name && (
                     <p className="text-[10px] text-emerald-600 font-bold mt-1 bg-emerald-50 px-2 py-0.5 rounded-md inline-block">
                       {receipt.payment_method_name}
@@ -615,7 +615,7 @@ export const Receipts: React.FC = () => {
               {filteredReceipts.map((receipt) => (
                 <tr key={receipt.id} className="hover:bg-zinc-50/50 transition-colors group">
                   <td className="px-6 py-4 font-bold text-zinc-900">{receipt.customer_name}</td>
-                  <td className="px-6 py-4 text-zinc-500">{receipt.date}</td>
+                  <td className="px-6 py-4 text-zinc-500">{formatDate(receipt.date)}</td>
                   <td className="px-6 py-4">
                     {receipt.payment_method_name ? (
                       <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
@@ -873,7 +873,7 @@ export const Receipts: React.FC = () => {
                   <div className="flex justify-between items-start">
                     <div className="text-right">
                       <h1 className="text-3xl font-black text-emerald-600 mb-2">سند قبض</h1>
-                      <p className="text-zinc-500">التاريخ: {viewReceipt.date}</p>
+                      <p className="text-zinc-500">التاريخ: {formatDate(viewReceipt.date)}</p>
                     </div>
                     <div className="text-left">
                       <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl">
