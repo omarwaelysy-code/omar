@@ -93,6 +93,11 @@ export const Dashboard: React.FC = () => {
 
     // Also listen while mounted for immediate updates if the user is looking at the dashboard
     const handleDbRefresh = () => {
+      // Clear specific cache for this user to force refresh
+      if (user) {
+        const cacheKey = `${user.id}_${user.company_id}`;
+        delete statsCache[cacheKey];
+      }
       fetchStats(false);
     };
 
@@ -185,10 +190,17 @@ export const Dashboard: React.FC = () => {
       // Simple sales by month calculation (still from documents for better visualization)
       const monthKeys = ['months.jan', 'months.feb', 'months.mar', 'months.apr', 'months.may', 'months.jun', 'months.jul', 'months.aug', 'months.sep', 'months.oct', 'months.nov', 'months.dec'];
       const salesByMonth = monthKeys.map((key, index) => {
-        const monthInvoices = invoices.filter((inv: Invoice) => new Date(inv.date).getMonth() === index);
-        const monthReturns = returns.filter((ret: Return) => new Date(ret.date).getMonth() === index);
-        const total = monthInvoices.reduce((sum: number, inv: Invoice) => sum + inv.total_amount, 0) - 
-                      monthReturns.reduce((sum: number, ret: Return) => sum + ret.total_amount, 0);
+        // Use UTC date to avoid timezone shift issues on the chart
+        const monthInvoices = invoices.filter((inv: Invoice) => {
+          const d = new Date(inv.date);
+          return (d.getUTCMonth() === index) || (d.getMonth() === index);
+        });
+        const monthReturns = returns.filter((ret: Return) => {
+          const d = new Date(ret.date);
+          return (d.getUTCMonth() === index) || (d.getMonth() === index);
+        });
+        const total = monthInvoices.reduce((sum: number, inv: Invoice) => sum + (Number(inv.total_amount) || 0), 0) - 
+                      monthReturns.reduce((sum: number, ret: Return) => sum + (Number(ret.total_amount) || 0), 0);
         return { month: t(key), total };
       });
 
@@ -199,7 +211,7 @@ export const Dashboard: React.FC = () => {
           number: inv.invoice_number,
           customer_name: inv.customer_name || t('dashboard.unknown_customer'),
           date: inv.date,
-          total_amount: inv.total_amount
+          total_amount: Number(inv.total_amount) || 0
         })),
         ...returns.map((ret: Return) => ({
           id: ret.id,
@@ -207,23 +219,23 @@ export const Dashboard: React.FC = () => {
           number: ret.return_number,
           customer_name: ret.customer_name || t('dashboard.unknown_customer'),
           date: ret.date,
-          total_amount: ret.total_amount
+          total_amount: Number(ret.total_amount) || 0
         })),
         ...receipts.map((r: ReceiptVoucher) => ({
           id: r.id,
-          type: 'journal' as const, // Reusing journal for display purposes or we can add 'receipt'
+          type: 'receipt' as const,
           number: r.voucher_number || r.id.slice(-6),
           customer_name: r.customer_name || t('dashboard.unknown_customer'),
           date: r.date,
-          total_amount: r.amount
+          total_amount: Number(r.amount) || 0
         })),
         ...payments.map((p: PaymentVoucher) => ({
           id: p.id,
-          type: 'return' as const, // Use return type to show as negative/red
+          type: 'payment' as const, 
           number: p.voucher_number || p.id.slice(-6),
           customer_name: p.supplier_name || p.description || t('dashboard.unknown_supplier'),
           date: p.date,
-          total_amount: p.amount
+          total_amount: Number(p.amount) || 0
         })),
         ...(journalEntries as any[]).filter((je: any) => je.reference_type === 'manual').map((je: any) => ({
           id: je.id,
@@ -233,7 +245,7 @@ export const Dashboard: React.FC = () => {
                         je.items?.find((item: any) => item.customer_name || item.supplier_name)?.supplier_name || 
                         je.description || t('dashboard.manual_journal'),
           date: je.date,
-          total_amount: je.total_debit
+          total_amount: Number(je.total_debit) || 0
         }))
       ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
        .slice(0, 5);
@@ -467,24 +479,26 @@ export const Dashboard: React.FC = () => {
               <div key={`${tx.type}-${tx.id}`} className={`flex items-center justify-between p-4 rounded-2xl hover:bg-zinc-50 transition-colors border border-transparent hover:border-zinc-100 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                 <div className="flex items-center gap-4">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    tx.type === 'invoice' ? 'bg-emerald-50 text-emerald-600' : 
-                    tx.type === 'return' ? 'bg-rose-50 text-rose-600' : 
+                    tx.type === 'invoice' || tx.type === 'receipt' ? 'bg-emerald-50 text-emerald-600' : 
+                    tx.type === 'return' || tx.type === 'payment' ? 'bg-rose-50 text-rose-600' : 
                     'bg-blue-50 text-blue-600'
                   }`}>
-                    {tx.type === 'invoice' ? <ArrowUpRight size={18} /> : 
-                     tx.type === 'return' ? <ArrowUpRight size={18} className="rotate-180" /> :
+                    {tx.type === 'invoice' || tx.type === 'receipt' ? <ArrowUpRight size={18} /> : 
+                     tx.type === 'return' || tx.type === 'payment' ? <ArrowUpRight size={18} className="rotate-180" /> :
                      <FileText size={18} />}
                   </div>
                   <div>
                     <p className="font-bold text-zinc-900">{tx.customer_name}</p>
                     <p className="text-xs text-zinc-500">
                       <span className={
-                        tx.type === 'invoice' ? 'text-emerald-600' : 
-                        tx.type === 'return' ? 'text-rose-600' : 
+                        tx.type === 'invoice' || tx.type === 'receipt' ? 'text-emerald-600' : 
+                        tx.type === 'return' || tx.type === 'payment' ? 'text-rose-600' : 
                         'text-blue-600'
                       }>
                         {tx.type === 'invoice' ? t('dashboard.invoice') : 
                          tx.type === 'return' ? t('dashboard.return') : 
+                         tx.type === 'receipt' ? t('dashboard.receipt') : 
+                         tx.type === 'payment' ? t('dashboard.payment') : 
                          t('dashboard.manual_journal')}
                       </span> • {tx.number} • {formatDate(tx.date)}
                     </p>

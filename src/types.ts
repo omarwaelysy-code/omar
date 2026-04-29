@@ -315,7 +315,7 @@ export interface ActivityLog {
 
 export interface DashboardTransaction {
   id: string;
-  type: 'invoice' | 'return' | 'journal';
+  type: 'invoice' | 'return' | 'journal' | 'receipt' | 'payment';
   number: string;
   customer_name: string;
   date: string;

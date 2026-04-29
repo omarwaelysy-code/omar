@@ -25,12 +25,15 @@ export class AccountingEngine {
         const entryDate = new Date(entry.date);
         entry.items?.forEach(item => {
           if (item.account_id === account.id) {
+            const debit = Number(item.debit) || 0;
+            const credit = Number(item.credit) || 0;
+            
             if (entryDate < start) {
-              openingDebit += item.debit;
-              openingCredit += item.credit;
+              openingDebit += debit;
+              openingCredit += credit;
             } else if (entryDate >= start && entryDate <= end) {
-              movementDebit += item.debit;
-              movementCredit += item.credit;
+              movementDebit += debit;
+              movementCredit += credit;
             }
           }
         });
@@ -171,9 +174,9 @@ export class AccountingEngine {
     const expenses = isAccounts.filter(a => a.typeInfo?.classification === 'expense');
 
     // Sign handling: Revenue is normally Credit, Cost/Expense normally Debit
-    const totalRevenues = revenues.reduce((sum, a) => sum + (a.closing.credit - a.closing.debit), 0);
-    const totalCosts = costs.reduce((sum, a) => sum + (a.closing.debit - a.closing.credit), 0);
-    const totalExpenses = expenses.reduce((sum, a) => sum + (a.closing.debit - a.closing.credit), 0);
+    const totalRevenues = revenues.reduce((sum, a) => sum + (Number(a.closing.credit) - Number(a.closing.debit)), 0);
+    const totalCosts = costs.reduce((sum, a) => sum + (Number(a.closing.debit) - Number(a.closing.credit)), 0);
+    const totalExpenses = expenses.reduce((sum, a) => sum + (Number(a.closing.debit) - Number(a.closing.credit)), 0);
 
     const grossProfit = totalRevenues - totalCosts;
     const netProfit = grossProfit - totalExpenses;
