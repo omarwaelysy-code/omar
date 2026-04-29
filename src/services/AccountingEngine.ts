@@ -16,8 +16,8 @@ export class AccountingEngine {
     end.setHours(23, 59, 59, 999);
 
     const result = accounts.map(account => {
-      let openingDebit = account.opening_balance > 0 ? account.opening_balance : 0;
-      let openingCredit = account.opening_balance < 0 ? Math.abs(account.opening_balance) : 0;
+      let openingDebit = Number(account.opening_balance) > 0 ? Number(account.opening_balance) : 0;
+      let openingCredit = Number(account.opening_balance) < 0 ? Math.abs(Number(account.opening_balance)) : 0;
       let movementDebit = 0;
       let movementCredit = 0;
 
@@ -79,8 +79,8 @@ export class AccountingEngine {
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
 
-    let openingDebit = account.opening_balance > 0 ? account.opening_balance : 0;
-    let openingCredit = account.opening_balance < 0 ? Math.abs(account.opening_balance) : 0;
+    let openingDebit = Number(account.opening_balance) > 0 ? Number(account.opening_balance) : 0;
+    let openingCredit = Number(account.opening_balance) < 0 ? Math.abs(Number(account.opening_balance)) : 0;
     
     const relevantEntries: LedgerLine[] = [];
 
@@ -88,24 +88,27 @@ export class AccountingEngine {
       const entryDate = new Date(entry.date);
       entry.items?.forEach(item => {
         if (item.account_id === account.id) {
+          const debit = Number(item.debit) || 0;
+          const credit = Number(item.credit) || 0;
+
           // Apply entity filter if provided
           if (entityIds && entityIds.length > 0) {
             const matchesEntity = entityIds.includes(item.customer_id || '') || 
-                                entityIds.includes(item.supplier_id || '');
+                                 entityIds.includes(item.supplier_id || '');
             if (!matchesEntity) return;
           }
 
           if (entryDate < start) {
-            openingDebit += item.debit;
-            openingCredit += item.credit;
+            openingDebit += debit;
+            openingCredit += credit;
           } else if (entryDate >= start && entryDate <= end) {
             relevantEntries.push({
               id: entry.id || '',
               date: entry.date,
               reference: entry.reference_number || '',
               description: item.description || entry.description,
-              debit: item.debit,
-              credit: item.credit,
+              debit: debit,
+              credit: credit,
               balance: 0,
               entity_name: item.customer_name || item.supplier_name
             });
@@ -137,8 +140,8 @@ export class AccountingEngine {
 
     entries.forEach(entry => {
       entry.items?.forEach(item => {
-        totalDebit += item.debit;
-        totalCredit += item.credit;
+        totalDebit += Number(item.debit) || 0;
+        totalCredit += Number(item.credit) || 0;
       });
     });
 
@@ -253,10 +256,13 @@ export class AccountingEngine {
       let entryDebit = 0;
       let entryCredit = 0;
       entry.items?.forEach(item => {
-        entryDebit += item.debit;
-        entryCredit += item.credit;
-        globalDebit += item.debit;
-        globalCredit += item.credit;
+        const itemDebit = Number(item.debit) || 0;
+        const itemCredit = Number(item.credit) || 0;
+        
+        entryDebit += itemDebit;
+        entryCredit += itemCredit;
+        globalDebit += itemDebit;
+        globalCredit += itemCredit;
       });
       if (Math.abs(entryDebit - entryCredit) > 0.01) {
         unbalancedEntries.push(`${entry.description || 'Entry'} (Ref: ${entry.id.substring(0, 5)}, Diff: ${(entryDebit - entryCredit).toFixed(2)})`);
