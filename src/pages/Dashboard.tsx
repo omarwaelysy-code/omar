@@ -45,7 +45,14 @@ import { formatNumber, formatDate } from '../utils/formatUtils';
 
 // Global cache for dashboard stats to reduce reads on tab switches
 let statsCache: { [companyId: string]: { stats: DashboardStats, timestamp: number } } = {};
-const CACHE_DURATION = 1000 * 30; // 30 seconds (down from 5 minutes for better responsiveness)
+const CACHE_DURATION = 1000 * 30; // 30 seconds
+
+// Listen for database changes GLOBALLY to invalidate cache even if Dashboard is not mounted
+if (typeof window !== 'undefined') {
+  window.addEventListener('db-refresh', () => {
+    statsCache = {};
+  });
+}
 
 export const clearDashboardCache = () => {
   statsCache = {};
@@ -79,18 +86,13 @@ export const Dashboard: React.FC = () => {
     }
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
 
-    // Listen for database changes to refresh dashboard
-    const handleDbRefresh = () => {
-      // Clear cache for this company to force fresh fetch
-      if (user) {
-        const cacheKey = `${user.id}_${user.company_id}`;
-        delete statsCache[cacheKey];
-        fetchStats(false); // Fetch silently if possible
-      }
+    // Refresh when component mounts OR when it receives focus
+    const handleFocus = () => {
+      fetchStats(false);
     };
 
-    // Listen for window focus to refresh data
-    const handleFocus = () => {
+    // Also listen while mounted for immediate updates if the user is looking at the dashboard
+    const handleDbRefresh = () => {
       fetchStats(false);
     };
 
@@ -157,6 +159,7 @@ export const Dashboard: React.FC = () => {
       );
 
       // Dashboards KPIs derived from Accounting Data
+      const netProfit = incomeStatement.netProfit; // Correct net profit (Revenues - Costs - Expenses)
       const netSales = incomeStatement.totalRevenues; // Total revenue from accounts
       const totalExpensesValue = incomeStatement.totalExpenses + incomeStatement.totalCosts; // All costs + expenses
       
@@ -236,6 +239,7 @@ export const Dashboard: React.FC = () => {
        .slice(0, 5);
 
       const newStats: DashboardStats = {
+        netProfit,
         netSales,
         totalInvoices: invoices.length,
         totalReceipts,
@@ -355,7 +359,7 @@ export const Dashboard: React.FC = () => {
             </span>
           </div>
           <p className="text-zinc-500 text-[10px] md:text-sm font-medium uppercase tracking-wider">{t('dashboard.net_profit')}</p>
-          <h3 className="text-xl md:text-3xl font-bold text-zinc-900 mt-1">{formatNumber(stats?.netSales || 0)}</h3>
+          <h3 className="text-xl md:text-3xl font-bold text-zinc-900 mt-1">{formatNumber(stats?.netProfit || 0)}</h3>
           <p className="text-[10px] text-zinc-400 mt-1">{t('dashboard.after_returns')}</p>
         </div>
 

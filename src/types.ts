@@ -323,6 +323,7 @@ export interface DashboardTransaction {
 }
 
 export interface DashboardStats {
+  netProfit: number;
   netSales: number;
   totalInvoices: number;
   totalReceipts: number;
