@@ -1,15 +1,15 @@
 export const formatNumber = (value: number | string | undefined | null, decimals: number = 2): string => {
-  if (value === undefined || value === null || value === '') return '0.00';
+  if (value === undefined || value === null || value === '') return '0';
   
   const num = typeof value === 'string' ? parseFloat(value) : value;
   
-  if (isNaN(num)) return '0.00';
+  if (isNaN(num)) return '0';
   
   // Use Intl.NumberFormat for consistent formatting
   return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: decimals,
+    minimumFractionDigits: 0,
     maximumFractionDigits: decimals,
-    useGrouping: true
+    useGrouping: false
   }).format(num);
 };
 
