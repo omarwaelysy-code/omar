@@ -314,6 +314,16 @@ export const JournalEntries: React.FC = () => {
                 </tr>
               )}
             </tbody>
+            {filteredEntries.length > 0 && (
+              <tfoot className="bg-zinc-900 text-white font-black">
+                <tr>
+                  <td colSpan={3} className="px-6 py-4 text-center border-l border-zinc-700">{t('journal.total')}</td>
+                  <td className="px-6 py-4 text-center border-l border-zinc-700">{formatNumber(filteredEntries.reduce((sum, e) => sum + (Number(e.total_debit) || 0), 0))}</td>
+                  <td className="px-6 py-4 text-center border-l border-zinc-700">{formatNumber(filteredEntries.reduce((sum, e) => sum + (Number(e.total_credit) || 0), 0))}</td>
+                  <td className="px-6 py-4"></td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       </div>

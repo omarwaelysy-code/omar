@@ -524,6 +524,28 @@ const modules = [
 
 const transactionalModules = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns', 'journal_entries'];
 
+// Helper to parse JSONB fields if they are returned as strings
+function parseRow(table: string, row: any) {
+  if (!row) return row;
+  const jsonbFields = ['category', 'changes', 'items', 'settings', 'permissions', 'metadata'];
+  
+  const parsed = { ...row };
+  jsonbFields.forEach(field => {
+    if (field in parsed && typeof parsed[field] === 'string') {
+      try {
+        // Only parse if it looks like JSON
+        const val = parsed[field].trim();
+        if ((val.startsWith('{') && val.endsWith('}')) || (val.startsWith('[') && val.endsWith(']'))) {
+          parsed[field] = JSON.parse(parsed[field]);
+        }
+      } catch (e) {
+        // Not JSON or already processed
+      }
+    }
+  });
+  return parsed;
+}
+
 // Helper to sanitize data for a table by filtering out keys not in EXPECTED_SCHEMA
 function sanitizeData(table: string, data: any) {
   const allowedKeys = EXPECTED_SCHEMA[table];
@@ -532,11 +554,18 @@ function sanitizeData(table: string, data: any) {
   const sanitized: any = {};
   allowedKeys.forEach(key => {
     if (key in data) {
+      const value = data[key];
+      
       // Convert empty strings to null for IDs and decimals
-      if (data[key] === '' && (key.endsWith('_id') || key === 'amount' || key === 'price' || key === 'unit_price' || key === 'total' || key === 'subtotal')) {
+      if (value === '' && (key.endsWith('_id') || key === 'amount' || key === 'price' || key === 'unit_price' || key === 'total' || key === 'subtotal')) {
         sanitized[key] = null;
-      } else {
-        sanitized[key] = data[key];
+      } 
+      // Automatically stringify objects/arrays for JSONB columns
+      else if (value !== null && typeof value === 'object') {
+        sanitized[key] = JSON.stringify(value);
+      }
+      else {
+        sanitized[key] = value;
       }
     }
   });
@@ -596,7 +625,7 @@ modules.forEach(moduleName => {
           }
         }
       }
-      res.json(rows);
+      res.json(rows.map((row: any) => parseRow(moduleName, row)));
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -610,7 +639,7 @@ modules.forEach(moduleName => {
       if (row && transactionalModules.includes(moduleName)) {
         row.items = await fetchItems(moduleName, row.id);
       }
-      res.json(row);
+      res.json(parseRow(moduleName, row));
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

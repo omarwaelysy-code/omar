@@ -15,7 +15,8 @@ export const ActivityLogPage: React.FC = () => {
     if (user) {
       setLoading(true);
       const unsub = dbService.subscribe<ActivityLog>('activity_logs', user.company_id, (data) => {
-        setLogs(data);
+        const sortedLogs = [...data].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setLogs(sortedLogs);
         setLoading(false);
       });
       return () => unsub();

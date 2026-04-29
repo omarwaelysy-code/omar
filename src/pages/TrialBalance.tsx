@@ -67,12 +67,12 @@ export const TrialBalance: React.FC = () => {
   const globalBalance = AccountingEngine.validateGlobalBalance(entries);
 
   const totals = trialBalanceData.reduce((acc, a) => ({
-    openingDebit: acc.openingDebit + a.opening.debit,
-    openingCredit: acc.openingCredit + a.opening.credit,
-    movementDebit: acc.movementDebit + a.movement.debit,
-    movementCredit: acc.movementCredit + a.movement.credit,
-    closingDebit: acc.closingDebit + a.closing.debit,
-    closingCredit: acc.closingCredit + a.closing.credit
+    openingDebit: acc.openingDebit + (Number(a.opening.debit) || 0),
+    openingCredit: acc.openingCredit + (Number(a.opening.credit) || 0),
+    movementDebit: acc.movementDebit + (Number(a.movement.debit) || 0),
+    movementCredit: acc.movementCredit + (Number(a.movement.credit) || 0),
+    closingDebit: acc.closingDebit + (Number(a.closing.debit) || 0),
+    closingCredit: acc.closingCredit + (Number(a.closing.credit) || 0)
   }), {
     openingDebit: 0, openingCredit: 0,
     movementDebit: 0, movementCredit: 0,

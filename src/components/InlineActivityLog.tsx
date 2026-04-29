@@ -26,7 +26,7 @@ export const InlineActivityLog: React.FC<InlineActivityLogProps> = ({ category, 
               : log.category === category;
             
             // Filter by documentId if provided
-            const documentMatch = documentId ? log.document_id === documentId : false;
+            const documentMatch = documentId ? log.document_id === documentId : true;
 
             return categoryMatch && documentMatch;
           })

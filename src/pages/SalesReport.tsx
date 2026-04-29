@@ -485,9 +485,9 @@ export const SalesReport: React.FC = () => {
                 ))}
               </tbody>
               <tfoot>
-                <tr className="bg-zinc-900 text-white font-bold text-sm">
+                <tr className="bg-zinc-900 text-white font-black text-sm">
                   <td colSpan={7} className={`px-4 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('reports.total_net')}</td>
-                  <td className="px-4 py-4">{formatNumber(transactions.reduce((sum, item) => sum + item.total, 0))} {t('invoices.currency')}</td>
+                  <td className="px-4 py-4">{formatNumber(transactions.reduce((sum, item) => sum + (Number(item.total) || 0), 0))} {t('invoices.currency')}</td>
                 </tr>
               </tfoot>
             </table>
@@ -534,12 +534,12 @@ export const SalesReport: React.FC = () => {
               <tfoot>
                 <tr className="bg-zinc-900 text-white font-bold text-sm">
                   <td colSpan={2} className={`px-4 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('reports.total_overall')}</td>
-                  <td className="px-4 py-4">{formatNumber((view === 'customer' ? customerSales : productSales).reduce((sum, item) => sum + item.totalQuantity, 0))}</td>
+                  <td className="px-4 py-4">{formatNumber((view === 'customer' ? customerSales : productSales).reduce((sum, item) => sum + (Number(item.totalQuantity) || 0), 0))}</td>
                   <td className="px-4 py-4">-</td>
-                  <td className="px-4 py-4">{formatNumber((view === 'customer' ? customerSales : productSales).reduce((sum, item) => sum + item.totalSales, 0))} {t('invoices.currency')}</td>
-                  <td className="px-4 py-4">{formatNumber((view === 'customer' ? customerSales : productSales).reduce((sum, item) => sum + item.totalReturns, 0))} {t('invoices.currency')}</td>
-                  {view === 'customer' && <td className="px-4 py-4">{formatNumber(customerSales.reduce((sum, item) => sum + item.totalDiscounts, 0))} {t('invoices.currency')}</td>}
-                  <td className="px-4 py-4">{formatNumber((view === 'customer' ? customerSales : productSales).reduce((sum, item) => sum + item.net, 0))} {t('invoices.currency')}</td>
+                  <td className="px-4 py-4">{formatNumber((view === 'customer' ? customerSales : productSales).reduce((sum, item) => sum + (Number(item.totalSales) || 0), 0))} {t('invoices.currency')}</td>
+                  <td className="px-4 py-4">{formatNumber((view === 'customer' ? customerSales : productSales).reduce((sum, item) => sum + (Number(item.totalReturns) || 0), 0))} {t('invoices.currency')}</td>
+                  {view === 'customer' && <td className="px-4 py-4">{formatNumber(customerSales.reduce((sum, item) => sum + (Number(item.totalDiscounts) || 0), 0))} {t('invoices.currency')}</td>}
+                  <td className="px-4 py-4">{formatNumber((view === 'customer' ? customerSales : productSales).reduce((sum, item) => sum + (Number(item.net) || 0), 0))} {t('invoices.currency')}</td>
                 </tr>
               </tfoot>
             </table>
