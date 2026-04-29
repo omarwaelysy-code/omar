@@ -237,6 +237,24 @@ export const Suppliers: React.FC = () => {
     try {
       const supplier = suppliers.find(s => s.id === supplierToDelete);
       
+      // Check for associated transactions to prevent foreign key errors
+      const hasInvoices = invoices.some(i => i.supplier_id === supplierToDelete);
+      const hasReturns = returns.some(r => r.supplier_id === supplierToDelete);
+      const hasVouchers = vouchers.some(v => v.supplier_id === supplierToDelete);
+      const hasDiscounts = discounts.some(d => d.supplier_id === supplierToDelete);
+
+      if (hasInvoices || hasReturns || hasVouchers || hasDiscounts) {
+        showNotification(
+          language === 'ar' 
+            ? 'لا يمكن حذف المورد لوجود معاملات مالية (فواتير، مرتجعات، أو سندات) مرتبطة به.' 
+            : 'Cannot delete supplier because there are associated transactions (invoices, returns, or vouchers).',
+          'error'
+        );
+        setIsDeleteModalOpen(false);
+        setSupplierToDelete(null);
+        return;
+      }
+      
       // Delete associated journal entry first
       await dbService.deleteJournalEntryByReference(supplierToDelete, user.company_id);
       

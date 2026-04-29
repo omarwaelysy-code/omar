@@ -72,6 +72,11 @@ export const Products: React.FC = () => {
     counter_account_id: ''
   });
 
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [returns, setReturns] = useState<any[]>([]);
+  const [purchaseInvoices, setPurchaseInvoices] = useState<any[]>([]);
+  const [purchaseReturns, setPurchaseReturns] = useState<any[]>([]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -138,9 +143,18 @@ export const Products: React.FC = () => {
         setAccounts(data);
       });
 
+      const unsubscribeInvoices = dbService.subscribe<any>('invoices', user.company_id, setInvoices);
+      const unsubscribeReturns = dbService.subscribe<any>('returns', user.company_id, setReturns);
+      const unsubscribePurchaseInvoices = dbService.subscribe<any>('purchase_invoices', user.company_id, setPurchaseInvoices);
+      const unsubscribePurchaseReturns = dbService.subscribe<any>('purchase_returns', user.company_id, setPurchaseReturns);
+
       return () => {
         unsubscribe();
         unsubscribeAccounts();
+        unsubscribeInvoices();
+        unsubscribeReturns();
+        unsubscribePurchaseInvoices();
+        unsubscribePurchaseReturns();
       };
     }
   }, [user]);
@@ -261,6 +275,24 @@ export const Products: React.FC = () => {
     try {
       const product = products.find(p => p.id === productToDelete);
       
+      // Check for associated transactions
+      const hasSalesInvoices = invoices.some(i => i.items?.some((item: any) => item.product_id === productToDelete));
+      const hasSalesReturns = returns.some(r => r.items?.some((item: any) => item.product_id === productToDelete));
+      const hasPurchaseInvoices = purchaseInvoices.some(i => i.items?.some((item: any) => item.product_id === productToDelete));
+      const hasPurchaseReturns = purchaseReturns.some(r => r.items?.some((item: any) => item.product_id === productToDelete));
+
+      if (hasSalesInvoices || hasSalesReturns || hasPurchaseInvoices || hasPurchaseReturns) {
+        showNotification(
+          language === 'ar' 
+            ? 'لا يمكن حذف الصنف لوجود معاملات مرتبطة به (فواتير بيع، شراء، أو مرتجعات).' 
+            : 'Cannot delete product because it is used in transactions (sales, purchases, or returns).',
+          'error'
+        );
+        setIsDeleteModalOpen(false);
+        setProductToDelete(null);
+        return;
+      }
+
       // Delete associated journal entry first
       await dbService.deleteJournalEntryByReference(productToDelete, user.company_id);
       

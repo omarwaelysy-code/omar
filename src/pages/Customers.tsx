@@ -237,6 +237,24 @@ export const Customers: React.FC = () => {
     try {
       const customer = customers.find(c => c.id === customerToDelete);
       
+      // Check for associated transactions to prevent foreign key errors
+      const hasInvoices = invoices.some(i => i.customer_id === customerToDelete);
+      const hasReturns = returns.some(r => r.customer_id === customerToDelete);
+      const hasReceipts = receipts.some(r => r.customer_id === customerToDelete);
+      const hasDiscounts = discounts.some(d => d.customer_id === customerToDelete);
+
+      if (hasInvoices || hasReturns || hasReceipts || hasDiscounts) {
+        showNotification(
+          language === 'ar' 
+            ? 'لا يمكن حذف العميل لوجود معاملات مالية (فواتير، مرتجعات، أو سندات) مرتبطة به.' 
+            : 'Cannot delete customer because there are associated transactions (invoices, returns, or vouchers).',
+          'error'
+        );
+        setIsDeleteModalOpen(false);
+        setCustomerToDelete(null);
+        return;
+      }
+      
       // Delete associated journal entry first
       await dbService.deleteJournalEntryByReference(customerToDelete, user.company_id);
       
