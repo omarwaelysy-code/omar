@@ -26,7 +26,7 @@ export const AccountTypes: React.FC = () => {
     code: '',
     name: '',
     statement_type: 'balance_sheet' as 'income_statement' | 'balance_sheet',
-    classification: 'asset' as 'asset' | 'liability_equity' | 'revenue' | 'cost' | 'expense'
+    classification: 'asset' as 'asset' | 'liability' | 'equity' | 'liability_equity' | 'revenue' | 'cost' | 'expense'
   });
 
   useEffect(() => {
@@ -351,7 +351,9 @@ export const AccountTypes: React.FC = () => {
                     {formData.statement_type === 'balance_sheet' ? (
                       <>
                         <option value="asset">أصل</option>
-                        <option value="liability_equity">التزام / حقوق ملكية</option>
+                        <option value="liability">التزام (خصوم)</option>
+                        <option value="equity">حقوق ملكية</option>
+                        <option value="liability_equity">التزام / حقوق ملكية (مشترك)</option>
                       </>
                     ) : (
                       <>

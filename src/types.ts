@@ -348,7 +348,7 @@ export interface AccountType {
   code: string;
   name: string;
   statement_type: 'income_statement' | 'balance_sheet';
-  classification: 'asset' | 'liability_equity' | 'revenue' | 'cost' | 'expense';
+  classification: 'asset' | 'liability' | 'equity' | 'revenue' | 'cost' | 'expense' | 'liability_equity'; // liability_equity kept for backward compatibility/choice
   company_id: string;
 }
 

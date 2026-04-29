@@ -170,6 +170,7 @@ export class AccountingEngine {
     const costs = isAccounts.filter(a => a.typeInfo?.classification === 'cost');
     const expenses = isAccounts.filter(a => a.typeInfo?.classification === 'expense');
 
+    // Sign handling: Revenue is normally Credit, Cost/Expense normally Debit
     const totalRevenues = revenues.reduce((sum, a) => sum + (a.closing.credit - a.closing.debit), 0);
     const totalCosts = costs.reduce((sum, a) => sum + (a.closing.debit - a.closing.credit), 0);
     const totalExpenses = expenses.reduce((sum, a) => sum + (a.closing.debit - a.closing.credit), 0);
@@ -185,7 +186,8 @@ export class AccountingEngine {
       totalCosts,
       grossProfit,
       totalExpenses,
-      netProfit
+      netProfit,
+      isAccountsCount: isAccounts.length
     };
   }
 
@@ -198,8 +200,8 @@ export class AccountingEngine {
     entries: JournalEntry[],
     endDate: string
   ) {
-    // For Balance Sheet, we use trial balance from beginning of time until endDate
-    const startDate = '2000-01-01'; 
+    // For Balance Sheet, we use trial balance from beginning of time (or very early date) until endDate
+    const startDate = '1900-01-01'; 
     const trialBalance = this.calculateTrialBalance(accounts, entries, startDate, endDate);
 
     // Map classifications
@@ -210,25 +212,39 @@ export class AccountingEngine {
 
     const bsAccounts = mappedAccounts.filter(a => a.typeInfo?.statement_type === 'balance_sheet');
     
-    // Calculate Net Profit for the period up to targetDate
+    // Calculate Net Profit for the entire period up to targetDate (Cumulative)
     const incomeStatement = this.calculateIncomeStatement(accounts, accountTypes, entries, startDate, endDate);
     
     const assets = bsAccounts.filter(a => a.typeInfo?.classification === 'asset');
-    const liabilitiesEquity = bsAccounts.filter(a => a.typeInfo?.classification === 'liability_equity');
+    const liabilities = bsAccounts.filter(a => (a.typeInfo?.classification === 'liability' || a.typeInfo?.classification === 'liability_equity'));
+    const equity = bsAccounts.filter(a => a.typeInfo?.classification === 'equity');
 
     const totalAssets = assets.reduce((sum, a) => sum + (a.closing.debit - a.closing.credit), 0);
-    const liabilitiesEquitySum = liabilitiesEquity.reduce((sum, a) => sum + (a.closing.credit - a.closing.debit), 0);
     
-    const totalLiabilitiesEquity = liabilitiesEquitySum + incomeStatement.netProfit;
+    // Liabilities and Equity are normally Credit balances
+    const liabilitiesSum = liabilities.reduce((sum, a) => sum + (a.closing.credit - a.closing.debit), 0);
+    const equitySum = equity.reduce((sum, a) => sum + (a.closing.credit - a.closing.debit), 0);
+    
+    const totalLiabilitiesEquity = liabilitiesSum + equitySum + incomeStatement.netProfit;
 
     // Additional Diagnostics
     const entriesBeforeDate = entries.filter(e => new Date(e.date) <= new Date(endDate));
-    const globalCheck = this.validateGlobalBalance(entriesBeforeDate);
-
+    
     const unbalancedEntries: string[] = [];
-    const missingAccountEntries: string[] = [];
+    const missingAccountType: string[] = [];
+    const orphanedAccounts: string[] = [];
+    
     let globalDebit = 0;
     let globalCredit = 0;
+
+    // Check every account in the system for classification
+    mappedAccounts.forEach(a => {
+      if (!a.typeInfo) {
+        missingAccountType.push(`${a.name} (${a.code})`);
+      } else if (!a.typeInfo.statement_type) {
+        orphanedAccounts.push(`${a.name} (${a.code}) - Missing Statement Type`);
+      }
+    });
 
     entriesBeforeDate.forEach(entry => {
       let entryDebit = 0;
@@ -238,21 +254,20 @@ export class AccountingEngine {
         entryCredit += item.credit;
         globalDebit += item.debit;
         globalCredit += item.credit;
-
-        if (!accounts.find(a => a.id === item.account_id)) {
-          missingAccountEntries.push(`${entry.description || 'No Description'} (Missing Account ID: ${item.account_id})`);
-        }
       });
       if (Math.abs(entryDebit - entryCredit) > 0.01) {
-        unbalancedEntries.push(`${entry.description || 'No Description'} (Ref: ${entry.reference_number || 'N/A'}, Diff: ${entryDebit - entryCredit})`);
+        unbalancedEntries.push(`${entry.description || 'Entry'} (Ref: ${entry.id.substring(0, 5)}, Diff: ${(entryDebit - entryCredit).toFixed(2)})`);
       }
     });
 
     return {
       assets: assets.map(a => ({ id: a.id, name: a.name, balance: a.closing.debit - a.closing.credit })),
-      liabilitiesEquity: liabilitiesEquity.map(l => ({ id: l.id, name: l.name, balance: l.closing.credit - l.closing.debit })),
+      liabilities: liabilities.map(l => ({ id: l.id, name: l.name, balance: l.closing.credit - l.closing.debit })),
+      equity: equity.map(e => ({ id: e.id, name: e.name, balance: e.closing.credit - e.closing.debit })),
       netProfit: incomeStatement.netProfit,
       totalAssets,
+      totalLiabilities: liabilitiesSum,
+      totalEquity: equitySum + incomeStatement.netProfit,
       totalLiabilitiesEquity,
       isBalanced: Math.abs(totalAssets - totalLiabilitiesEquity) < 0.01,
       diagnostics: {
@@ -261,7 +276,8 @@ export class AccountingEngine {
         globalCredit,
         globalDiff: globalDebit - globalCredit,
         unbalancedEntries,
-        missingAccountEntries
+        missingAccountType,
+        orphanedAccounts
       }
     };
   }

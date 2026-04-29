@@ -53,7 +53,8 @@ export const Accounts: React.FC = () => {
   const [formData, setFormData] = useState({
     code: '',
     name: '',
-    type_id: ''
+    type_id: '',
+    opening_balance: 0
   });
 
   useEffect(() => {
@@ -78,7 +79,8 @@ export const Accounts: React.FC = () => {
         setFormData({
           code: result.code || '',
           name: result.name || '',
-          type_id: matchingType?.id || ''
+          type_id: matchingType?.id || '',
+          opening_balance: 0
         });
         showNotification(t('common.ai_parse_success'), 'success');
         setAiText('');
@@ -157,14 +159,16 @@ export const Accounts: React.FC = () => {
       setFormData({
         code: account.code,
         name: account.name,
-        type_id: account.type_id
+        type_id: account.type_id,
+        opening_balance: account.opening_balance || 0
       });
     } else {
       setEditingAccount(null);
       setFormData({
         code: '',
         name: '',
-        type_id: ''
+        type_id: '',
+        opening_balance: 0
       });
     }
     setIsModalOpen(true);
@@ -347,6 +351,22 @@ export const Accounts: React.FC = () => {
                         <option key={t.id} value={t.id}>{t.name}</option>
                       ))}
                     </select>
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}</label>
+                    <div className="relative">
+                      <Hash className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
+                      <input 
+                        required
+                        type="number" 
+                        step="0.01"
+                        className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
+                        placeholder="0.00"
+                        value={formData.opening_balance}
+                        onChange={(e) => setFormData({...formData, opening_balance: parseFloat(e.target.value) || 0})}
+                      />
+                    </div>
+                    <p className="text-[10px] text-zinc-400 mt-1">{language === 'ar' ? 'القيمة الموجبة للمدين والسالبة للدائن' : 'Positive for Debit, Negative for Credit'}</p>
                   </div>
                 </div>
                 <div className="pt-4 flex gap-3">

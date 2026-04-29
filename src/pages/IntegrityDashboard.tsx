@@ -212,19 +212,33 @@ export const IntegrityDashboard: React.FC = () => {
               <span className="text-xs font-black px-3 py-1 bg-rose-100 text-rose-700 rounded-full uppercase">Critical</span>
             </div>
           ))}
-          {balanceSheet.diagnostics.missingAccountEntries.map((err, i) => (
+          {balanceSheet.diagnostics.missingAccountType.map((err, i) => (
+            <div key={i} className="p-6 flex items-center justify-between hover:bg-zinc-50 transition-colors">
+              <div className="flex items-center gap-4">
+                <div className="w-2 h-2 rounded-full bg-rose-500" />
+                <div>
+                  <p className="font-bold text-zinc-900">Account Missing Type</p>
+                  <p className="text-sm text-zinc-500 text-rose-600 font-bold">{err}</p>
+                </div>
+              </div>
+              <span className="text-xs font-black px-3 py-1 bg-rose-100 text-rose-700 rounded-full uppercase">Critical</span>
+            </div>
+          ))}
+          {balanceSheet.diagnostics.orphanedAccounts.map((err, i) => (
             <div key={i} className="p-6 flex items-center justify-between hover:bg-zinc-50 transition-colors">
               <div className="flex items-center gap-4">
                 <div className="w-2 h-2 rounded-full bg-amber-500" />
                 <div>
-                  <p className="font-bold text-zinc-900">Dangling Reference</p>
+                  <p className="font-bold text-zinc-900">Orphaned Account (No Statement Type)</p>
                   <p className="text-sm text-zinc-500">{err}</p>
                 </div>
               </div>
               <span className="text-xs font-black px-3 py-1 bg-amber-100 text-amber-700 rounded-full uppercase">Warning</span>
             </div>
           ))}
-          {balanceSheet.diagnostics.unbalancedEntries.length === 0 && balanceSheet.diagnostics.missingAccountEntries.length === 0 && (
+          {balanceSheet.diagnostics.unbalancedEntries.length === 0 && 
+           balanceSheet.diagnostics.missingAccountType.length === 0 && 
+           balanceSheet.diagnostics.orphanedAccounts.length === 0 && (
             <div className="p-12 text-center">
               <div className="bg-emerald-100 text-emerald-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle size={32} />
