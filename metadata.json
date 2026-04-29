@@ -1,5 +1,5 @@
 {
-  "name": "Omar ERP V2",
+  "name": "Obrain ERP",
   "description": "The official enterprise-grade ERP (V2) with strict transactional integrity, migration safety, and automated health monitoring.",
   "requestFramePermissions": [
     "microphone",

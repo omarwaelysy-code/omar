@@ -194,7 +194,7 @@ export const Register: React.FC<RegisterProps> = ({ onToggle }) => {
         </div>
         
         <p className="text-center text-zinc-400 text-xs">
-          &copy; 2026 AccuSmart AI. {t('common.copyright')}
+          &copy; 2026 Obrain ERP AI. {t('common.copyright')}
         </p>
       </div>
     </div>

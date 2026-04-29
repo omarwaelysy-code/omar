@@ -624,7 +624,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 {t('common.switch_screens_hint')}
               </p>
               <p className="text-[9px] text-zinc-300 font-black text-center uppercase tracking-widest">
-                ERP V2 Baseline • v2.0.0
+                Obrain ERP V2 • v2.0.0
               </p>
             </div>
           )}
