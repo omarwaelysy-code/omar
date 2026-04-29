@@ -137,7 +137,7 @@ export const CustomerBalances: React.FC = () => {
     c.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const totalOutstanding = filteredCustomers.reduce((sum, c) => sum + c.currentBalance, 0);
+  const totalOutstanding = filteredCustomers.reduce((sum, c) => sum + (Number(c.currentBalance) || 0), 0);
 
   if (loading) {
     return (
@@ -273,12 +273,12 @@ export const CustomerBalances: React.FC = () => {
               <tfoot className="bg-zinc-900 text-white font-bold">
                 <tr>
                   <td colSpan={2} className="px-4 py-4 text-left">الإجمالي:</td>
-                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + c.openingBalance, 0))}</td>
-                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + c.totalInvoices, 0))}</td>
-                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + c.totalReturns, 0))}</td>
-                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + c.totalDiscounts, 0))}</td>
-                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + c.totalReceipts, 0))}</td>
-                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + (c.journalDebit - c.journalCredit), 0))}</td>
+                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + (Number(c.openingBalance) || 0), 0))}</td>
+                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + (Number(c.totalInvoices) || 0), 0))}</td>
+                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + (Number(c.totalReturns) || 0), 0))}</td>
+                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + (Number(c.totalDiscounts) || 0), 0))}</td>
+                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + (Number(c.totalReceipts) || 0), 0))}</td>
+                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + (Number(c.manualJournalImpact) || 0), 0))}</td>
                   <td className="px-4 py-4">{formatBalance(totalOutstanding)} ج.م</td>
                 </tr>
               </tfoot>

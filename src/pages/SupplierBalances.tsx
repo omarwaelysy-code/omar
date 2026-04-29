@@ -77,7 +77,7 @@ export const SupplierBalances: React.FC = () => {
           totalDiscounts,
           journalDebit,
           journalCredit,
-          manualJournalImpact: journalCredit - journalDebit,
+          manualJournalImpact: manualJournalCredit - manualJournalDebit,
           currentBalance
         };
       });
@@ -137,7 +137,7 @@ export const SupplierBalances: React.FC = () => {
     s.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const totalOutstanding = filteredSuppliers.reduce((sum, s) => sum + s.currentBalance, 0);
+  const totalOutstanding = filteredSuppliers.reduce((sum, s) => sum + (Number(s.currentBalance) || 0), 0);
 
   if (loading) {
     return (
@@ -273,12 +273,12 @@ export const SupplierBalances: React.FC = () => {
               <tfoot className="bg-zinc-900 text-white font-bold">
                 <tr>
                   <td colSpan={2} className="px-4 py-4 text-left">الإجمالي:</td>
-                  <td className="px-4 py-4">{formatNumber(filteredSuppliers.reduce((sum, s) => sum + s.openingBalance, 0))}</td>
-                  <td className="px-4 py-4">{formatNumber(filteredSuppliers.reduce((sum, s) => sum + s.totalInvoices, 0))}</td>
-                  <td className="px-4 py-4">{formatNumber(filteredSuppliers.reduce((sum, s) => sum + s.totalReturns, 0))}</td>
-                  <td className="px-4 py-4">{formatNumber(filteredSuppliers.reduce((sum, s) => sum + s.totalDiscounts, 0))}</td>
-                  <td className="px-4 py-4">{formatNumber(filteredSuppliers.reduce((sum, s) => sum + s.totalVouchers, 0))}</td>
-                  <td className="px-4 py-4">{formatNumber(filteredSuppliers.reduce((sum, s) => sum + (s.journalCredit - s.journalDebit), 0))}</td>
+                  <td className="px-4 py-4">{formatNumber(filteredSuppliers.reduce((sum, s) => sum + (Number(s.openingBalance) || 0), 0))}</td>
+                  <td className="px-4 py-4">{formatNumber(filteredSuppliers.reduce((sum, s) => sum + (Number(s.totalInvoices) || 0), 0))}</td>
+                  <td className="px-4 py-4">{formatNumber(filteredSuppliers.reduce((sum, s) => sum + (Number(s.totalReturns) || 0), 0))}</td>
+                  <td className="px-4 py-4">{formatNumber(filteredSuppliers.reduce((sum, s) => sum + (Number(s.totalDiscounts) || 0), 0))}</td>
+                  <td className="px-4 py-4">{formatNumber(filteredSuppliers.reduce((sum, s) => sum + (Number(s.totalVouchers) || 0), 0))}</td>
+                  <td className="px-4 py-4">{formatNumber(filteredSuppliers.reduce((sum, s) => sum + (Number(s.manualJournalImpact) || 0), 0))}</td>
                   <td className="px-4 py-4">{formatBalance(totalOutstanding)} ج.م</td>
                 </tr>
               </tfoot>
