@@ -15,10 +15,10 @@ export const JournalEntryItemSchema = z.object({
   debit: z.coerce.number().default(0),
   credit: z.coerce.number().default(0),
   description: z.string().optional(),
-  customer_id: z.string().optional(),
-  customer_name: z.string().optional(),
-  supplier_id: z.string().optional(),
-  supplier_name: z.string().optional(),
+  customer_id: z.string().nullable().optional(),
+  customer_name: z.string().nullable().optional(),
+  supplier_id: z.string().nullable().optional(),
+  supplier_name: z.string().nullable().optional(),
 });
 
 // Journal Entry (The Double Entry Core)
@@ -48,10 +48,10 @@ export const InvoiceItemSchema = z.object({
 export const InvoiceSchema = BaseSchema.extend({
   invoice_number: z.string(),
   date: z.string(),
-  customer_id: z.string().optional(),
-  customer_name: z.string().optional(),
-  supplier_id: z.string().optional(),
-  supplier_name: z.string().optional(),
+  customer_id: z.string().nullable().optional(),
+  customer_name: z.string().nullable().optional(),
+  supplier_id: z.string().nullable().optional(),
+  supplier_name: z.string().nullable().optional(),
   items: z.array(InvoiceItemSchema),
   subtotal: z.coerce.number().default(0),
   discount_amount: z.coerce.number().default(0),
@@ -70,10 +70,10 @@ export const VoucherSchema = BaseSchema.extend({
   amount: z.coerce.number().default(0),
   notes: z.string().optional(),
   description: z.string().optional(),
-  customer_id: z.string().optional(),
-  supplier_id: z.string().optional(),
-  expense_category_id: z.string().optional(),
-  payment_method_id: z.string().optional(),
+  customer_id: z.string().nullable().optional(),
+  supplier_id: z.string().nullable().optional(),
+  expense_category_id: z.string().nullable().optional(),
+  payment_method_id: z.string().nullable().optional(),
   type: z.enum(['receipt', 'payment']),
 });
 
@@ -90,8 +90,8 @@ export const AccountSchema = BaseSchema.extend({
 export const ReturnSchema = BaseSchema.extend({
   return_number: z.string(),
   date: z.string(),
-  customer_id: z.string().optional(),
-  supplier_id: z.string().optional(),
+  customer_id: z.string().nullable().optional(),
+  supplier_id: z.string().nullable().optional(),
   items: z.array(InvoiceItemSchema),
   total_amount: z.coerce.number().default(0),
   payment_type: z.enum(['cash', 'credit']).default('credit'),
@@ -119,9 +119,9 @@ export const CashTransferSchema = BaseSchema.extend({
 export const DiscountSchema = BaseSchema.extend({
   date: z.string(),
   amount: z.coerce.number().positive(),
-  customer_id: z.string().optional(),
-  supplier_id: z.string().optional(),
-  account_id: z.string().optional(),
+  customer_id: z.string().nullable().optional(),
+  supplier_id: z.string().nullable().optional(),
+  account_id: z.string().nullable().optional(),
   number: z.string().optional(),
   description: z.string().optional(),
   notes: z.string().optional(),
