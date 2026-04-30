@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Supplier } from '../types';
-import { Search, Download, Wallet, Truck, ArrowDownLeft, FileSpreadsheet } from 'lucide-react';
+import { FileSpreadsheet, Download, Search, Truck, ArrowDownLeft, Wallet } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfUtils';
+import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
-import { utils, writeFile } from 'xlsx';
-import { formatNumber, formatDate } from '../utils/formatUtils';
+import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export const SupplierBalances: React.FC = () => {
   const { user } = useAuth();
@@ -94,23 +95,26 @@ export const SupplierBalances: React.FC = () => {
     fetchData();
   }, [user]);
 
+  const { language } = useLanguage();
+
   const exportExcel = () => {
     if (suppliers.length === 0) return;
     const data = filteredSuppliers.map(s => ({
-      'كود': s.code,
-      'الاسم': s.name,
-      'رصيد أول': formatBalance(s.openingBalance),
-      'مشتريات (+)': formatBalance(s.totalInvoices),
-      'مرتجع (-)': formatBalance(-s.totalReturns),
-      'خصم (-)': formatBalance(-s.totalDiscounts),
-      'سداد (-)': formatBalance(-s.totalVouchers),
-      'قيود (+/-)': formatBalance(s.manualJournalImpact),
-      'الرصيد الحالي': formatBalance(s.currentBalance)
+      [language === 'ar' ? 'كود' : 'Code']: s.code,
+      [language === 'ar' ? 'الاسم' : 'Name']: s.name,
+      [language === 'ar' ? 'رصيد أول' : 'Opening Balance']: s.openingBalance,
+      [language === 'ar' ? 'مشتريات (+)' : 'Purchases (+)']: s.totalInvoices,
+      [language === 'ar' ? 'مرتجع (-)' : 'Returns (-)']: -s.totalReturns,
+      [language === 'ar' ? 'خصم (-)' : 'Discounts (-)']: -s.totalDiscounts,
+      [language === 'ar' ? 'سداد (-)' : 'Payments (-)']: -s.totalVouchers,
+      [language === 'ar' ? 'قيود (+/-)' : 'Adjustments (+/-)']: s.manualJournalImpact,
+      [language === 'ar' ? 'الرصيد الحالي' : 'Current Balance']: s.currentBalance
     }));
-    const ws = utils.json_to_sheet(data);
-    const wb = utils.book_new();
-    utils.book_append_sheet(wb, ws, 'أرصدة الموردين');
-    writeFile(wb, `supplier-balances-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    
+    exportToExcel(data, { 
+      filename: `supplier-balances-${new Date().toISOString().slice(0, 10)}`,
+      sheetName: language === 'ar' ? 'أرصدة الموردين' : 'Supplier Balances'
+    });
   };
 
   const formatBalance = (balance: number) => {

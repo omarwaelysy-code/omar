@@ -16,7 +16,7 @@ import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import DocumentChatter from '../components/DocumentChatter';
 import { ExportButtons } from '../components/ExportButtons';
 import { usePermissions } from '../hooks/usePermissions';
-import { formatNumber, formatDate } from '../utils/formatUtils';
+import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
 
 import { useLanguage } from '../contexts/LanguageContext';
 import { transactionManager, TransactionManager } from '../services/TransactionManager';
@@ -195,7 +195,7 @@ export const Invoices: React.FC = () => {
         action: editingInvoice ? 'تعديل فاتورة' : 'إضافة فاتورة',
         details: editingInvoice 
           ? `تعديل فاتورة رقم: ${invoice_number} للعميل ${customer?.name || '...'}`
-          : `إضافة فاتورة جديدة للعميل ${customer?.name || '...'} بمبلغ ${formatNumber(total_amount)}`,
+          : `إضافة فاتورة جديدة للعميل ${customer?.name || '...'} بمبلغ ${formatMoney(total_amount)}`,
         timestamp: new Date().toISOString()
       });
 
@@ -977,7 +977,7 @@ export const Invoices: React.FC = () => {
                   </td>
                   <td className={`px-6 py-4 font-bold text-zinc-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{inv.customer_name}</td>
                   <td className={`px-6 py-4 text-zinc-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(inv.date)}</td>
-                  <td className={`px-6 py-4 font-bold text-zinc-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatNumber(inv.total_amount)} {t('invoices.currency')}</td>
+                  <td className={`px-6 py-4 font-bold text-zinc-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatMoney(inv.total_amount)} {t('invoices.currency')}</td>
                   <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                     <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
                       <button 
@@ -1038,7 +1038,7 @@ export const Invoices: React.FC = () => {
                   <h4 className="font-bold text-zinc-900 text-lg">{inv.customer_name}</h4>
                 </div>
                 <div className={`${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                  <p className="font-bold text-emerald-600 text-lg">{formatNumber(inv.total_amount)} {t('invoices.currency')}</p>
+                  <p className="font-bold text-emerald-600 text-lg">{formatMoney(inv.total_amount)} {t('invoices.currency')}</p>
                   <span className="text-xs text-zinc-400">{formatDate(inv.date)}</span>
                 </div>
               </div>
@@ -1331,7 +1331,7 @@ export const Invoices: React.FC = () => {
                                   />
                                 </td>
                                 <td className="px-1 py-0.5 text-left font-mono font-bold text-zinc-900 text-xs">
-                                  {formatNumber(item.total)}
+                                  {formatMoney(item.total)}
                                 </td>
                                 <td className="px-1 py-0.5 text-center">
                                   <button 
@@ -1352,7 +1352,7 @@ export const Invoices: React.FC = () => {
                       <tfoot className="bg-zinc-50/50 font-bold">
                         <tr>
                           <td colSpan={3} className={`px-2 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-zinc-500`}>{t('invoices.summary_subtotal')}:</td>
-                          <td className="px-2 py-2 text-base text-zinc-900 font-mono">{formatNumber(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}</td>
+                          <td className="px-2 py-2 text-base text-zinc-900 font-mono">{formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}</td>
                           <td></td>
                         </tr>
                         <tr>
@@ -1365,12 +1365,12 @@ export const Invoices: React.FC = () => {
                               onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
                             />
                           </td>
-                          <td className="px-2 py-2 text-base text-red-600 font-mono">-{formatNumber(discount)}</td>
+                          <td className="px-2 py-2 text-base text-red-600 font-mono">-{formatMoney(discount)}</td>
                           <td></td>
                         </tr>
                         <tr>
                           <td colSpan={3} className={`px-2 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-zinc-500`}>{t('invoices.summary_total')}:</td>
-                          <td className="px-2 py-2 text-lg text-emerald-600 font-mono">{formatNumber(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) - (Number(discount) || 0))} {t('invoices.currency')}</td>
+                          <td className="px-2 py-2 text-lg text-emerald-600 font-mono">{formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) - (Number(discount) || 0))} {t('invoices.currency')}</td>
                           <td></td>
                         </tr>
                       </tfoot>
@@ -1460,25 +1460,25 @@ export const Invoices: React.FC = () => {
                           </td>
                           <td className="px-4 py-3 font-medium text-[#18181b]">{item.product_name}</td>
                           <td className="px-4 py-3 text-[#71717a]">{item.quantity}</td>
-                          <td className="px-4 py-3 text-[#71717a]">{formatNumber(item.unit_price)} {t('invoices.currency')}</td>
-                          <td className="px-4 py-3 font-bold text-[#18181b]">{formatNumber(item.total)} {t('invoices.currency')}</td>
+                          <td className="px-4 py-3 text-[#71717a]">{formatMoney(item.unit_price)} {t('invoices.currency')}</td>
+                          <td className="px-4 py-3 font-bold text-[#18181b]">{formatMoney(item.total)} {t('invoices.currency')}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot className="bg-[#fafafa] font-bold text-sm">
                       <tr>
                         <td colSpan={3} className={`px-4 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-[#71717a]`}>{t('invoices.summary_subtotal')}:</td>
-                        <td className="px-4 py-2 text-[#18181b]">{formatNumber(viewInvoice.subtotal)} {t('invoices.currency')}</td>
+                        <td className="px-4 py-2 text-[#18181b]">{formatMoney(viewInvoice.subtotal)} {t('invoices.currency')}</td>
                       </tr>
                       {Number(viewInvoice.discount_amount || viewInvoice.discount) > 0 && (
                         <tr>
                           <td colSpan={3} className={`px-4 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-[#71717a]`}>{t('invoices.summary_discount')}:</td>
-                          <td className="px-4 py-2 text-red-600">-{formatNumber(viewInvoice.discount_amount || viewInvoice.discount)} {t('invoices.currency')}</td>
+                          <td className="px-4 py-2 text-red-600">-{formatMoney(viewInvoice.discount_amount || viewInvoice.discount)} {t('invoices.currency')}</td>
                         </tr>
                       )}
                       <tr className="text-lg bg-[#f4f4f5]">
                         <td colSpan={3} className={`px-4 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-[#18181b]`}>{t('invoices.summary_total')}:</td>
-                        <td className="px-4 py-3 text-[#18181b]">{formatNumber(viewInvoice.total_amount)} {t('invoices.currency')}</td>
+                        <td className="px-4 py-3 text-[#18181b]">{formatMoney(viewInvoice.total_amount)} {t('invoices.currency')}</td>
                       </tr>
                     </tfoot>
                   </table>

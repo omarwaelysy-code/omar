@@ -7,7 +7,7 @@ import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
 import { ExportButtons } from '../components/ExportButtons';
-import { formatNumber, formatDate } from '../utils/formatUtils';
+import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
 
 interface CashTransaction {
   id: string;
@@ -45,7 +45,8 @@ export const CashReport: React.FC = () => {
     setLoading(true);
     try {
       const method = paymentMethods.find(m => m.id === selectedMethodId);
-      setOpeningBalance(method?.opening_balance || 0);
+      const opBal = Number(method?.opening_balance) || 0;
+      setOpeningBalance(opBal);
 
       const [invoices, returns, receipts, purInvoices, purReturns, vouchers, transfers, journalEntries] = await Promise.all([
         dbService.getDocsByFilter<any>('invoices', user.company_id, [{ field: 'payment_method_id', operator: '==', value: selectedMethodId }]),
@@ -133,14 +134,14 @@ export const CashReport: React.FC = () => {
       });
 
       const before = allTrans.filter(t => startDate && new Date(t.date) < new Date(startDate));
-      const balBefore = before.reduce((sum, t) => sum + (t.in - t.out), 0);
+      const balBefore = before.reduce((sum, t) => sum + (Number(t.in) - Number(t.out)), 0);
 
-      const initialBalance = (method?.opening_balance || 0) + balBefore;
+      const initialBalance = opBal + balBefore;
       setStartBalance(initialBalance);
       
       let currentBal = initialBalance;
       const finalTrans = filtered.map(t => {
-        currentBal += (t.in - t.out);
+        currentBal += (Number(t.in) - Number(t.out));
         return { ...t, balance: currentBal };
       });
 
@@ -283,9 +284,9 @@ export const CashReport: React.FC = () => {
                       <td className="px-4 py-3 text-sm"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600">{t('reports.balance')}</span></td>
                       <td className="px-4 py-3 text-sm font-mono">-</td>
                       <td className="px-4 py-3 text-sm">{t('reports.brought_forward')}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance > 0 ? formatNumber(startBalance) : '-'}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-rose-600">{startBalance < 0 ? formatNumber(Math.abs(startBalance)) : '-'}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-zinc-900">{formatNumber(startBalance)}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance > 0 ? formatMoney(startBalance) : '-'}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-rose-600">{startBalance < 0 ? formatMoney(Math.abs(startBalance)) : '-'}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-zinc-900">{formatMoney(startBalance)}</td>
                     </tr>
                     {transactions.map((t) => (
                       <tr key={t.id} className="border-b border-zinc-50 hover:bg-zinc-50/50 transition-colors">
@@ -299,9 +300,9 @@ export const CashReport: React.FC = () => {
                         </td>
                         <td className="px-4 py-3 text-sm font-mono">{t.reference}</td>
                         <td className="px-4 py-3 text-sm">{t.notes}</td>
-                        <td className="px-4 py-3 text-sm font-bold text-emerald-600">{t.in > 0 ? formatNumber(t.in) : '-'}</td>
-                        <td className="px-4 py-3 text-sm font-bold text-rose-600">{t.out > 0 ? formatNumber(t.out) : '-'}</td>
-                        <td className="px-4 py-3 text-sm font-bold text-zinc-900">{t.balance !== undefined ? formatNumber(t.balance) : '-'}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-emerald-600">{t.in > 0 ? formatMoney(t.in) : '-'}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-rose-600">{t.out > 0 ? formatMoney(t.out) : '-'}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-zinc-900">{t.balance !== undefined ? formatMoney(t.balance) : '-'}</td>
                       </tr>
                     ))}
                     {transactions.length === 0 && (
@@ -313,9 +314,9 @@ export const CashReport: React.FC = () => {
                   <tfoot>
                     <tr className="bg-zinc-900 text-white font-bold">
                       <td colSpan={4} className={`px-4 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.total')}</td>
-                      <td className="px-4 py-3">{formatNumber(transactions.reduce((sum, t) => sum + t.in, 0) + (startBalance > 0 ? startBalance : 0))}</td>
-                      <td className="px-4 py-3">{formatNumber(transactions.reduce((sum, t) => sum + t.out, 0) + (startBalance < 0 ? Math.abs(startBalance) : 0))}</td>
-                      <td className="px-4 py-3">{formatNumber(transactions.length > 0 ? (transactions[transactions.length - 1].balance ?? 0) : startBalance)}</td>
+                      <td className="px-4 py-3">{formatMoney(transactions.reduce((sum, t) => sum + Number(t.in), 0) + (startBalance > 0 ? startBalance : 0))}</td>
+                      <td className="px-4 py-3">{formatMoney(transactions.reduce((sum, t) => sum + Number(t.out), 0) + (startBalance < 0 ? Math.abs(startBalance) : 0))}</td>
+                      <td className="px-4 py-3">{formatMoney(transactions.length > 0 ? (transactions[transactions.length - 1].balance ?? 0) : startBalance)}</td>
                     </tr>
                   </tfoot>
                 </table>

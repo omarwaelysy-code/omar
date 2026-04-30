@@ -1,16 +1,20 @@
 export const formatNumber = (value: number | string | undefined | null, decimals: number = 2): string => {
-  if (value === undefined || value === null || value === '') return '0';
+  if (value === undefined || value === null || value === '') return '0.00';
   
   const num = typeof value === 'string' ? parseFloat(value) : value;
   
-  if (isNaN(num)) return '0';
+  if (isNaN(num)) return '0.00';
   
   // Use Intl.NumberFormat for consistent formatting
   return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: decimals,
-    useGrouping: false
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    useGrouping: true
   }).format(num);
+};
+
+export const formatMoney = (value: number | string | undefined | null): string => {
+  return formatNumber(value, 2);
 };
 
 export const formatDate = (date: string | Date | undefined | null): string => {

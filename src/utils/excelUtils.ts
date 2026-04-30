@@ -95,6 +95,18 @@ export const exportToExcel = (data: any[], options: ExcelOptions) => {
   // Sanitize data
   const sanitizedData = sanitizeForExcel(data);
 
+  // Function to apply number format to numeric cells in a worksheet
+  const applyNumberFormat = (ws: XLSX.WorkSheet) => {
+    Object.keys(ws).forEach(key => {
+      if (key[0] === '!') return; // Skip metadata keys
+      const cell = ws[key];
+      // If cell is numeric, apply financial format
+      if (cell.t === 'n' && typeof cell.v === 'number') {
+        cell.z = '#,##0.00';
+      }
+    });
+  };
+
   // Create workbook
   const wb = XLSX.utils.book_new();
   
@@ -106,10 +118,12 @@ export const exportToExcel = (data: any[], options: ExcelOptions) => {
     for (let i = 0; i < sanitizedData.length; i += MAX_ROWS_PER_SHEET) {
       const chunk = sanitizedData.slice(i, i + MAX_ROWS_PER_SHEET);
       const ws = XLSX.utils.json_to_sheet(chunk);
+      applyNumberFormat(ws);
       XLSX.utils.book_append_sheet(wb, ws, `${sheetName}_${Math.floor(i / MAX_ROWS_PER_SHEET) + 1}`);
     }
   } else {
     const ws = XLSX.utils.json_to_sheet(sanitizedData);
+    applyNumberFormat(ws);
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   }
   

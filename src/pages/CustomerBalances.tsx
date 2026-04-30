@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Customer } from '../types';
-import { Search, Download, Wallet, User, ArrowUpRight, FileSpreadsheet } from 'lucide-react';
+import { FileSpreadsheet, Download, Search, User, Wallet, ArrowUpRight } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfUtils';
+import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
-import { utils, writeFile } from 'xlsx';
-import { formatNumber, formatDate } from '../utils/formatUtils';
+import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export const CustomerBalances: React.FC = () => {
   const { user } = useAuth();
@@ -94,23 +95,26 @@ export const CustomerBalances: React.FC = () => {
     fetchData();
   }, [user]);
 
+  const { language } = useLanguage();
+
   const exportExcel = () => {
     if (customers.length === 0) return;
     const data = filteredCustomers.map(c => ({
-      'كود': c.code,
-      'الاسم': c.name,
-      'رصيد أول': formatBalance(c.openingBalance),
-      'مبيعات (+)': formatBalance(c.totalInvoices),
-      'مرتجع (-)': formatBalance(-c.totalReturns),
-      'خصم (-)': formatBalance(-c.totalDiscounts),
-      'تحصيل (-)': formatBalance(-c.totalReceipts),
-      'قيود (+/-)': formatBalance(c.manualJournalImpact),
-      'الرصيد الحالي': formatBalance(c.currentBalance)
+      [language === 'ar' ? 'كود' : 'Code']: c.code,
+      [language === 'ar' ? 'الاسم' : 'Name']: c.name,
+      [language === 'ar' ? 'رصيد أول' : 'Opening Balance']: c.openingBalance,
+      [language === 'ar' ? 'مبيعات (+)' : 'Total Sales (+)']: c.totalInvoices,
+      [language === 'ar' ? 'مرتجع (-)' : 'Total Returns (-)']: -c.totalReturns,
+      [language === 'ar' ? 'خصم (-)' : 'Total Discounts (-)']: -c.totalDiscounts,
+      [language === 'ar' ? 'تحصيل (-)' : 'Total Receipts (-)']: -c.totalReceipts,
+      [language === 'ar' ? 'قيود (+/-)' : 'Adjustments (+/-)']: c.manualJournalImpact,
+      [language === 'ar' ? 'الرصيد الحالي' : 'Current Balance']: c.currentBalance
     }));
-    const ws = utils.json_to_sheet(data);
-    const wb = utils.book_new();
-    utils.book_append_sheet(wb, ws, 'أرصدة العملاء');
-    writeFile(wb, `customer-balances-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    
+    exportToExcel(data, { 
+      filename: `customer-balances-${new Date().toISOString().slice(0, 10)}`,
+      sheetName: language === 'ar' ? 'أرصدة العملاء' : 'Customer Balances'
+    });
   };
 
   const formatBalance = (balance: number) => {

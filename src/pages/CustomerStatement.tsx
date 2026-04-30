@@ -3,10 +3,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { Customer, Invoice, ReceiptVoucher, Return } from '../types';
 import { Search, FileText, Download, Calendar, User, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfUtils';
+import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
-import { formatNumber, formatDate } from '../utils/formatUtils';
-
-import { utils, writeFile } from 'xlsx';
+import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface StatementEntry {
   id: string;
@@ -126,21 +126,25 @@ export const CustomerStatement: React.FC = () => {
     return balance > 0 ? `+${formatNumber(balance)}` : formatNumber(balance);
   };
 
+  const { language } = useLanguage();
+
   const handleExportExcel = () => {
     if (entries.length === 0 || !customerInfo) return;
+    
     const data = entries.map(entry => ({
-      'التاريخ': entry.date,
-      'النوع': entry.type,
-      'المرجع': entry.reference,
-      'البيان': entry.description,
-      'مدين (+)': entry.debit,
-      'دائن (-)': entry.credit,
-      'الرصيد': entry.balance
+      [language === 'ar' ? 'التاريخ' : 'Date']: entry.date,
+      [language === 'ar' ? 'النوع' : 'Type']: entry.type,
+      [language === 'ar' ? 'المرجع' : 'Reference']: entry.reference,
+      [language === 'ar' ? 'البيان' : 'Description']: entry.description,
+      [language === 'ar' ? 'مدين (+)' : 'Debit (+)']: entry.debit,
+      [language === 'ar' ? 'دائن (-)' : 'Credit (-)']: entry.credit,
+      [language === 'ar' ? 'الرصيد' : 'Balance']: entry.balance
     }));
-    const ws = utils.json_to_sheet(data);
-    const wb = utils.book_new();
-    utils.book_append_sheet(wb, ws, "Statement");
-    writeFile(wb, `statement_${customerInfo.name}_${new Date().toISOString().slice(0,10)}.xlsx`);
+    
+    exportToExcel(data, { 
+      filename: `statement_${customerInfo.name}_${new Date().toISOString().slice(0,10)}`,
+      sheetName: "Statement"
+    });
   };
 
   const handleExportPDF = async () => {

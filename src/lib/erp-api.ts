@@ -199,6 +199,17 @@ router.get('/system/export-excel', authenticateToken, authorizeRoles('super_admi
 
     const wb = XLSX.utils.book_new();
 
+    // Helper to apply number format to numeric cells
+    const applyNumberFormat = (ws: XLSX.WorkSheet) => {
+      Object.keys(ws).forEach(key => {
+        if (key[0] === '!') return;
+        const cell = ws[key];
+        if (cell.t === 'n' && typeof cell.v === 'number') {
+          cell.z = '#,##0.00';
+        }
+      });
+    };
+
     for (const table of TABLES_TO_BACKUP) {
       try {
         let query = `SELECT * FROM ${table} WHERE company_id = $1`;
@@ -208,6 +219,7 @@ router.get('/system/export-excel', authenticateToken, authorizeRoles('super_admi
         const { rows } = await pool.query(query, [companyId]).catch(() => ({ rows: [] }));
         if (rows.length > 0) {
           const ws = XLSX.utils.json_to_sheet(rows);
+          applyNumberFormat(ws);
           XLSX.utils.book_append_sheet(wb, ws, table.substring(0, 31)); // sheet names limited to 31 chars
         }
       } catch (e) {
@@ -217,7 +229,7 @@ router.get('/system/export-excel', authenticateToken, authorizeRoles('super_admi
 
     const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename=export_${companyId}.xlsx`);
+    res.setHeader('Content-Disposition', `attachment; filename=backup_${companyId}_${new Date().toISOString().split('T')[0]}.xlsx`);
     res.send(buf);
   } catch (error: any) {
     console.error('Excel Export failed:', error);

@@ -41,7 +41,7 @@ import {
 import { smartSearch } from '../services/geminiService';
 import { dbService } from '../services/dbService';
 import { AccountingEngine } from '../services/AccountingEngine';
-import { formatNumber, formatDate } from '../utils/formatUtils';
+import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
 
 // Global cache for dashboard stats to reduce reads on tab switches
 let statsCache: { [companyId: string]: { stats: DashboardStats, timestamp: number } } = {};
@@ -296,10 +296,10 @@ export const Dashboard: React.FC = () => {
   };
 
   const formatBalance = (value: number) => {
-    const formatted = formatNumber(Math.abs(value));
+    const formatted = formatMoney(Math.abs(value));
     if (value > 0) return `+${formatted}`;
     if (value < 0) return `-${formatted}`;
-    return '0';
+    return formatted;
   };
 
   if (loading) return <div className="flex items-center justify-center h-full">{t('common.loading')}</div>;
@@ -371,7 +371,7 @@ export const Dashboard: React.FC = () => {
             </span>
           </div>
           <p className="text-zinc-500 text-[10px] md:text-sm font-medium uppercase tracking-wider">{t('dashboard.net_profit')}</p>
-          <h3 className="text-xl md:text-3xl font-bold text-zinc-900 mt-1">{formatNumber(stats?.netProfit || 0)}</h3>
+          <h3 className="text-xl md:text-3xl font-bold text-zinc-900 mt-1">{formatMoney(stats?.netProfit || 0)}</h3>
           <p className="text-[10px] text-zinc-400 mt-1">{t('dashboard.after_returns')}</p>
         </div>
 
@@ -392,7 +392,7 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
           <p className="text-zinc-500 text-[10px] md:text-sm font-medium uppercase tracking-wider">{t('dashboard.receipt_vouchers')}</p>
-          <h3 className="text-xl md:text-3xl font-bold text-zinc-900 mt-1">{formatNumber(stats?.totalReceipts || 0)}</h3>
+          <h3 className="text-xl md:text-3xl font-bold text-zinc-900 mt-1">{formatMoney(stats?.totalReceipts || 0)}</h3>
         </div>
 
         <div className="bg-white p-4 md:p-6 rounded-3xl border border-zinc-100 shadow-sm hover:shadow-md transition-shadow">
@@ -402,7 +402,7 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
           <p className="text-zinc-500 text-[10px] md:text-sm font-medium uppercase tracking-wider">{t('dashboard.total_expenses')}</p>
-          <h3 className="text-xl md:text-3xl font-bold text-zinc-900 mt-1">{formatNumber(stats?.totalExpenses || 0)}</h3>
+          <h3 className="text-xl md:text-3xl font-bold text-zinc-900 mt-1">{formatMoney(stats?.totalExpenses || 0)}</h3>
         </div>
       </div>
 
@@ -505,7 +505,7 @@ export const Dashboard: React.FC = () => {
                   </div>
                 </div>
                 <p className={`font-bold ${tx.type === 'invoice' ? 'text-zinc-900' : 'text-rose-600'}`}>
-                  {tx.type === 'invoice' ? '' : '-'}{formatNumber(tx.total_amount || 0)} {t('invoices.currency')}
+                  {tx.type === 'invoice' ? '' : '-'}{formatMoney(tx.total_amount || 0)} {t('invoices.currency')}
                 </p>
               </div>
             ))}
