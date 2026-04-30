@@ -3,6 +3,7 @@ import { Sparkles, Mic, Image as ImageIcon, FileText, Send, X, Loader2, Papercli
 import { motion, AnimatePresence } from 'framer-motion';
 import { parseTransaction } from '../services/geminiService';
 import { useNotification } from '../contexts/NotificationContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface SmartAIInputProps {
   transactionType: 'sales_invoice' | 'purchase_invoice' | 'return' | 'purchase_return' | 'receipt_voucher' | 'payment_voucher' | 'cash_transfer' | 'discount';
@@ -17,6 +18,7 @@ export const SmartAIInput: React.FC<SmartAIInputProps> = ({ transactionType, onD
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const [attachedDoc, setAttachedDoc] = useState<string | null>(null);
   const { showNotification } = useNotification();
+  const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -24,7 +26,7 @@ export const SmartAIInput: React.FC<SmartAIInputProps> = ({ transactionType, onD
 
   const handleAnalyze = async () => {
     if (!text.trim() && !attachedImage && !attachedDoc) {
-      showNotification('يرجى إدخال نص أو إرفاق ملف للتحليل', 'error');
+      showNotification(t('smart_ai_input.error_empty'), 'error');
       return;
     }
 
@@ -35,12 +37,12 @@ export const SmartAIInput: React.FC<SmartAIInputProps> = ({ transactionType, onD
         image: attachedImage || undefined,
       });
       onDataExtracted(result);
-      showNotification('تم تحليل البيانات بنجاح', 'success');
+      showNotification(t('smart_ai_input.success_analyze'), 'success');
       // Clear after success? Maybe keep it for review
       // setText('');
       // setAttachedImage(null);
     } catch (error: any) {
-      showNotification(error.message || 'حدث خطأ أثناء التحليل', 'error');
+      showNotification(error.message || t('common.error'), 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -94,9 +96,9 @@ export const SmartAIInput: React.FC<SmartAIInputProps> = ({ transactionType, onD
           try {
             const result = await parseTransaction(transactionType, { audio: base64Audio });
             onDataExtracted(result);
-            showNotification('تم تحليل التسجيل الصوتي بنجاح', 'success');
+            showNotification(t('smart_ai_input.success_audio'), 'success');
           } catch (error: any) {
-            showNotification(error.message || 'حدث خطأ أثناء تحليل الصوت', 'error');
+            showNotification(error.message || t('common.error'), 'error');
           } finally {
             setIsProcessing(false);
           }
@@ -110,7 +112,7 @@ export const SmartAIInput: React.FC<SmartAIInputProps> = ({ transactionType, onD
       mediaRecorder.start();
       setIsRecording(true);
     } catch (error) {
-      showNotification('تعذر الوصول إلى الميكروفون', 'error');
+      showNotification(t('smart_ai_input.error_mic'), 'error');
     }
   };
 
@@ -125,14 +127,14 @@ export const SmartAIInput: React.FC<SmartAIInputProps> = ({ transactionType, onD
     <div className="bg-emerald-50/50 border border-emerald-100 rounded-3xl p-4 mb-6">
       <div className="flex items-center gap-2 mb-3 text-emerald-700 font-bold">
         <Sparkles size={20} className="text-emerald-500" />
-        <span>الإنشاء الذكي بالذكاء الاصطناعي</span>
+        <span>{t('smart_ai_input.title')}</span>
       </div>
 
       <div className="relative group">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder={placeholder || "اكتب أو الصق نص العملية هنا، أو استخدم الأزرار الجانبية لإرفاق ملف أو تسجيل صوتي..."}
+          placeholder={placeholder || t('smart_ai_input.placeholder')}
           className="w-full h-32 bg-white border border-emerald-100 rounded-2xl p-4 pr-12 pl-12 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all resize-none text-right"
         />
 
@@ -140,7 +142,7 @@ export const SmartAIInput: React.FC<SmartAIInputProps> = ({ transactionType, onD
           <button
             onClick={() => fileInputRef.current?.click()}
             className="p-2 bg-white border border-emerald-100 text-emerald-600 rounded-xl hover:bg-emerald-50 transition-all shadow-sm"
-            title="إرفاق صورة"
+            title={t('smart_ai_input.attachment_image')}
           >
             <ImageIcon size={20} />
           </button>
@@ -155,7 +157,7 @@ export const SmartAIInput: React.FC<SmartAIInputProps> = ({ transactionType, onD
           <button
             onClick={isRecording ? stopRecording : startRecording}
             className={`p-2 ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-white border border-emerald-100 text-emerald-600 hover:bg-emerald-50'} rounded-xl transition-all shadow-sm`}
-            title={isRecording ? "إيقاف التسجيل" : "تسجيل صوتي"}
+            title={isRecording ? t('smart_ai_input.stop_record') : t('smart_ai_input.voice_record')}
           >
             <Mic size={20} />
           </button>
@@ -163,7 +165,7 @@ export const SmartAIInput: React.FC<SmartAIInputProps> = ({ transactionType, onD
           <button
             onClick={() => docInputRef.current?.click()}
             className="p-2 bg-white border border-emerald-100 text-emerald-600 rounded-xl hover:bg-emerald-50 transition-all shadow-sm"
-            title="إرفاق مستند"
+            title={t('smart_ai_input.attachment_doc')}
           >
             <FileText size={20} />
           </button>
@@ -187,7 +189,7 @@ export const SmartAIInput: React.FC<SmartAIInputProps> = ({ transactionType, onD
             ) : (
               <Sparkles size={18} />
             )}
-            تحليل النص
+            {t('smart_ai_input.analyze')}
           </button>
         </div>
       </div>
@@ -214,7 +216,7 @@ export const SmartAIInput: React.FC<SmartAIInputProps> = ({ transactionType, onD
             {attachedDoc && (
               <div className="flex items-center gap-2 px-3 py-2 bg-white border border-emerald-100 rounded-xl text-emerald-700 text-xs font-medium">
                 <Paperclip size={14} />
-                <span>مستند مرفق</span>
+                <span>{t('smart_ai_input.attached_doc')}</span>
                 <button
                   onClick={() => setAttachedDoc(null)}
                   className="text-red-500 hover:text-red-700"

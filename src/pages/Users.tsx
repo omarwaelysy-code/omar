@@ -84,7 +84,7 @@ export const Users: React.FC = () => {
 
     // Check if user already exists in the company list
     if (users.some(u => u.email?.toLowerCase() === cleanEmail)) {
-      showNotification('هذا المستخدم موجود بالفعل في الشركة.', 'error');
+      showNotification(t('users.user_exists'), 'error');
       return;
     }
 
@@ -105,7 +105,7 @@ export const Users: React.FC = () => {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Failed to create user');
+        throw new Error(data.error || t('common.error'));
       }
 
       const newUser = await response.json();
@@ -128,12 +128,12 @@ export const Users: React.FC = () => {
         });
       }
 
-      await dbService.logActivity(currentUser.id, currentUser.username, currentUser.company_id, 'إضافة مستخدم', `إضافة مستخدم جديد: ${cleanEmail}`, 'users', newUser.id);
-      showNotification('تم إضافة المستخدم بنجاح', 'success');
+      await dbService.logActivity(currentUser.id, currentUser.username, currentUser.company_id, t('users.add_user_log'), t('users.add_user_new', { email: cleanEmail }), 'users', newUser.id);
+      showNotification(t('users.add_success'), 'success');
       closeModal();
     } catch (e: any) {
       console.error(e);
-      showNotification(e.message || 'حدث خطأ أثناء إضافة المستخدم', 'error');
+      showNotification(e.message || t('users.add_error'), 'error');
     } finally {
       setLoading(false);
     }
@@ -141,7 +141,7 @@ export const Users: React.FC = () => {
 
   const handleDelete = (id: string) => {
     if (id === currentUser?.id) {
-      showNotification("لا يمكنك حذف نفسك.", "error");
+      showNotification(t('users.delete_self_error'), "error");
       return;
     }
     setUserToDelete(id);
@@ -152,18 +152,18 @@ export const Users: React.FC = () => {
     if (!userToDelete || !currentUser) return;
     setLoading(true);
     try {
-      const user = users.find(u => u.id === userToDelete);
+      const userToDeleteObj = users.find(u => u.id === userToDelete);
       
       // 1. Delete from database
       await dbService.delete('users', userToDelete);
       
-      await dbService.logActivity(currentUser.id, currentUser.username, currentUser.company_id, 'حذف مستخدم', `حذف مستخدم: ${user?.username}`, 'users', userToDelete);
-      showNotification('تم حذف المستخدم بنجاح');
+      await dbService.logActivity(currentUser.id, currentUser.username, currentUser.company_id, t('users.delete_user_log'), t('users.delete_user_details', { username: userToDeleteObj?.username }), 'users', userToDelete);
+      showNotification(t('users.delete_success'));
       setIsDeleteModalOpen(false);
       setUserToDelete(null);
     } catch (e: any) {
       console.error(e);
-      showNotification(e.message || 'حدث خطأ أثناء حذف المستخدم', 'error');
+      showNotification(e.message || t('users.delete_error'), 'error');
     } finally {
       setLoading(false);
     }
@@ -215,17 +215,17 @@ export const Users: React.FC = () => {
         currentUser.id, 
         currentUser.username, 
         currentUser.company_id, 
-        'تعديل صلاحيات', 
-        `تعديل صلاحيات المستخدم: ${selectedUser.username}`, 
+        t('users.permissions_log'), 
+        t('users.permissions_details', { username: selectedUser.username }), 
         'users', 
         selectedUser.id
       );
       
-      showNotification('تم تحديث الصلاحيات بنجاح');
+      showNotification(t('users.permissions_success'));
       setIsPermissionsModalOpen(false);
     } catch (e: any) {
       console.error(e);
-      showNotification('حدث خطأ أثناء تحديث الصلاحيات', 'error');
+      showNotification(t('users.permissions_error'), 'error');
     } finally {
       setLoading(false);
     }
@@ -240,17 +240,17 @@ export const Users: React.FC = () => {
         currentUser.id, 
         currentUser.username, 
         currentUser.company_id, 
-        'تعديل دور المستخدم', 
-        `تعديل دور المستخدم إلى: ${newRole === 'admin' ? 'مدير' : newRole === 'manager' ? 'مشرف' : 'مستخدم'}`, 
+        t('users.role_log'), 
+        t('users.role_details', { role: newRole === 'admin' ? t('common.role_admin') : newRole === 'manager' ? t('common.manager') : t('common.role_user') }), 
         'users', 
         userId
       );
-      showNotification('تم تحديث دور المستخدم بنجاح');
+      showNotification(t('users.role_success'));
       setIsRoleModalOpen(false);
       setSelectedUser(null);
     } catch (e: any) {
       console.error(e);
-      showNotification('حدث خطأ أثناء تحديث دور المستخدم', 'error');
+      showNotification(t('users.role_error'), 'error');
     } finally {
       setLoading(false);
     }
@@ -265,14 +265,14 @@ export const Users: React.FC = () => {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">إدارة المستخدمين</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('users.title')}</h2>
           <div className="flex items-center gap-2 mt-1">
-            <p className="text-zinc-500">التحكم في الوصول إلى النظام المحاسبي.</p>
+            <p className="text-zinc-500">{t('users.subtitle')}</p>
             <div className="flex items-center gap-2 px-3 py-1 bg-zinc-100 rounded-full border border-zinc-200">
-              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter">كود الشركة:</span>
-              <code className="text-xs font-mono font-bold text-zinc-900 select-all cursor-pointer" title="انقر للنسخ" onClick={() => {
+              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter">{t('users.company_code')}</span>
+              <code className="text-xs font-mono font-bold text-zinc-900 select-all cursor-pointer" title={t('users.click_to_copy')} onClick={() => {
                 navigator.clipboard.writeText(currentUser?.company_id || '');
-                showNotification('تم نسخ كود الشركة');
+                showNotification(t('users.company_code_copied'));
               }}>{currentUser?.company_id}</code>
             </div>
           </div>
@@ -284,17 +284,17 @@ export const Users: React.FC = () => {
               setIsActivityLogOpen(true);
             }}
             className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-zinc-600 border border-zinc-200 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95"
-            title="سجل النشاط"
+            title={t('common.audit_log')}
           >
             <History size={20} />
-            <span className="hidden md:inline">سجل النشاط</span>
+            <span className="hidden md:inline">{t('common.audit_log')}</span>
           </button>
           <button 
             onClick={() => setIsModalOpen(true)}
             className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
           >
             <Plus size={20} />
-            إضافة مستخدم
+            {t('users.add_user')}
           </button>
         </div>
       </div>
@@ -306,12 +306,12 @@ export const Users: React.FC = () => {
               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${user.role === 'admin' ? 'bg-indigo-50 text-indigo-600' : user.role === 'manager' ? 'bg-blue-50 text-blue-600' : 'bg-zinc-50 text-zinc-500'}`}>
                 {user.role === 'admin' ? <Shield size={24} /> : <UserIcon size={24} />}
               </div>
-              <div>
+              <div className="text-left">
                 <h4 className="font-bold text-zinc-900">{user.username}</h4>
                 <div className="flex items-center gap-2">
-                  <p className="text-xs text-zinc-500 uppercase tracking-widest font-bold">{user.role === 'admin' ? 'مدير' : user.role === 'manager' ? 'مشرف' : 'مستخدم'}</p>
+                  <p className="text-xs text-zinc-500 uppercase tracking-widest font-bold">{user.role === 'admin' ? t('common.role_admin') : user.role === 'manager' ? t('common.manager') : t('common.role_user')}</p>
                   {user.role === 'user' && (
-                    <span className="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-md font-bold">صلاحيات مخصصة</span>
+                    <span className="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-md font-bold">{t('users.custom_permissions')}</span>
                   )}
                 </div>
                 <p className="text-[10px] text-zinc-400 font-mono">{user.email}</p>
@@ -324,7 +324,7 @@ export const Users: React.FC = () => {
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-zinc-50 text-zinc-600 rounded-xl text-xs font-bold hover:bg-zinc-100 transition-all"
               >
                 <Lock size={14} />
-                الصلاحيات
+                {t('users.permissions')}
               </button>
               <button 
                 onClick={() => {
@@ -332,7 +332,7 @@ export const Users: React.FC = () => {
                   setIsRoleModalOpen(true);
                 }}
                 className="p-2.5 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
-                title="تعديل الدور"
+                title={t('users.edit_role')}
               >
                 <Edit2 size={18} />
               </button>
@@ -346,14 +346,14 @@ export const Users: React.FC = () => {
               )}
             </div>
 
-            <div className="absolute top-6 left-6 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className={`absolute top-6 ${t('dir') === 'rtl' ? 'left-6' : 'right-6'} opacity-0 group-hover:opacity-100 transition-opacity`}>
               <button 
                 onClick={() => {
                   setActivityLogDocumentId(user.id);
                   setIsActivityLogOpen(true);
                 }}
                 className="p-2 text-zinc-300 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
-                title="سجل النشاط"
+                title={t('common.audit_log')}
               >
                 <History size={18} />
               </button>
@@ -372,8 +372,8 @@ export const Users: React.FC = () => {
                   <Lock size={24} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-zinc-900">صلاحيات المستخدم: {selectedUser.username}</h3>
-                  <p className="text-xs text-zinc-500 font-bold">حدد الإجراءات المسموح بها لكل قسم في النظام</p>
+                  <h3 className="text-xl font-black text-zinc-900">{t('users.user_permissions_title', { username: selectedUser.username })}</h3>
+                  <p className="text-xs text-zinc-500 font-bold">{t('users.permissions_desc')}</p>
                 </div>
               </div>
               <button onClick={() => setIsPermissionsModalOpen(false)} className="p-2 text-zinc-400 hover:text-zinc-600 transition-colors">
@@ -386,18 +386,18 @@ export const Users: React.FC = () => {
                 <div className="bg-indigo-50 border border-indigo-100 p-6 rounded-2xl flex items-center gap-4 text-indigo-700">
                   <Shield size={32} className="shrink-0" />
                   <div>
-                    <h4 className="font-black text-lg">هذا المستخدم لديه صلاحيات "مدير"</h4>
-                    <p className="text-sm font-bold opacity-80">المدراء لديهم وصول كامل لجميع أقسام النظام بشكل تلقائي. لا حاجة لتعديل الصلاحيات الفردية.</p>
+                    <h4 className="font-black text-lg">{t('users.admin_permissions_msg')}</h4>
+                    <p className="text-sm font-bold opacity-80">{t('users.admin_permissions_desc')}</p>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-4">
                   <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-zinc-100 rounded-xl text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-                    <div className="col-span-4">القسم / الموديول</div>
-                    <div className="col-span-2 text-center">عرض</div>
-                    <div className="col-span-2 text-center">إضافة</div>
-                    <div className="col-span-2 text-center">تعديل</div>
-                    <div className="col-span-2 text-center">حذف</div>
+                    <div className="col-span-4">{t('users.module_section')}</div>
+                    <div className="col-span-2 text-center">{t('common.view')}</div>
+                    <div className="col-span-2 text-center">{t('common.add')}</div>
+                    <div className="col-span-2 text-center">{t('common.edit')}</div>
+                    <div className="col-span-2 text-center">{t('common.delete')}</div>
                   </div>
 
                   <div className="space-y-2">
@@ -448,14 +448,14 @@ export const Users: React.FC = () => {
             <div className="p-6 border-t border-zinc-100 bg-stone-50 flex items-center justify-between">
               <div className="flex items-center gap-2 text-zinc-400">
                 <AlertCircle size={16} />
-                <span className="text-[10px] font-bold">سيتم تطبيق التغييرات فور الحفظ</span>
+                <span className="text-[10px] font-bold">{t('users.changes_applied_instantly')}</span>
               </div>
               <div className="flex gap-3">
                 <button 
                   onClick={() => setIsPermissionsModalOpen(false)}
                   className="px-6 py-3 bg-white text-zinc-600 border border-zinc-200 rounded-2xl font-bold hover:bg-zinc-100 transition-all"
                 >
-                  إلغاء
+                  {t('common.cancel')}
                 </button>
                 {selectedUser.role !== 'admin' && (
                   <button 
@@ -463,7 +463,7 @@ export const Users: React.FC = () => {
                     disabled={loading}
                     className="px-8 py-3 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
                   >
-                    {loading ? 'جاري الحفظ...' : 'حفظ الصلاحيات'}
+                    {loading ? t('common.saving') : t('users.save_permissions')}
                   </button>
                 )}
               </div>
@@ -475,14 +475,14 @@ export const Users: React.FC = () => {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-0 md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-auto md:max-w-md md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+          <div className="bg-white w-full h-full md:h-auto md:max-w-md md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col font-bold">
             <div className="p-6 border-b border-zinc-50 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-zinc-900">إضافة مستخدم جديد</h3>
+              <h3 className="text-xl font-bold text-zinc-900">{t('users.new_user_title')}</h3>
               <button onClick={closeModal} className="text-zinc-400 hover:text-zinc-600"><X size={24} /></button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 flex-1 overflow-y-auto">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 flex-1 overflow-y-auto text-left">
               <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">البريد الإلكتروني (اسم المستخدم)</label>
+                <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('users.username_label')}</label>
                 <input
                   required
                   type="email"
@@ -492,27 +492,27 @@ export const Users: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">كلمة المرور</label>
+                <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('users.password_label')}</label>
                 <input
                   required
                   type="password"
                   minLength={6}
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">الدور</label>
+                <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('users.role_label')}</label>
                 <select 
                   required
                   className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value as 'admin' | 'user' | 'manager' })}
                 >
-                  <option value="user">مستخدم</option>
-                  <option value="manager">مشرف</option>
-                  <option value="admin">مدير</option>
+                  <option value="user">{t('common.role_user')}</option>
+                  <option value="manager">{t('common.manager')}</option>
+                  <option value="admin">{t('common.role_admin')}</option>
                 </select>
               </div>
               <div className="pt-4">
@@ -521,7 +521,7 @@ export const Users: React.FC = () => {
                   disabled={loading}
                   className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
                 >
-                  {loading ? 'جاري المعالجة...' : 'إنشاء مستخدم'}
+                  {loading ? t('common.processing') : t('users.create_user')}
                 </button>
               </div>
             </form>
@@ -533,8 +533,8 @@ export const Users: React.FC = () => {
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 animate-in zoom-in-95 duration-200">
-            <h3 className="text-xl font-bold text-zinc-900 mb-4">تأكيد الحذف</h3>
-            <p className="text-zinc-500 mb-6">هل أنت متأكد من رغبتك في حذف هذا المستخدم؟ لا يمكن التراجع عن هذا الإجراء.</p>
+            <h3 className="text-xl font-bold text-zinc-900 mb-4">{t('users.delete_confirm_title')}</h3>
+            <p className="text-zinc-500 mb-6">{t('users.delete_confirm_msg')}</p>
             <div className="flex gap-4">
               <button 
                 onClick={() => {
@@ -543,13 +543,13 @@ export const Users: React.FC = () => {
                 }}
                 className="flex-1 py-3 bg-zinc-100 text-zinc-600 rounded-xl font-bold hover:bg-zinc-200 transition-all"
               >
-                إلغاء
+                {t('common.cancel')}
               </button>
               <button 
                 onClick={confirmDelete}
                 className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all shadow-lg shadow-red-500/20"
               >
-                حذف
+                {t('common.delete')}
               </button>
             </div>
           </div>
@@ -565,7 +565,7 @@ export const Users: React.FC = () => {
                 <Shield size={24} />
               </div>
               <div>
-                <h3 className="text-xl font-black text-zinc-900">تعديل دور المستخدم</h3>
+                <h3 className="text-xl font-black text-zinc-900">{t('users.edit_role_title')}</h3>
                 <p className="text-xs text-zinc-500 font-bold">{selectedUser.username}</p>
               </div>
             </div>
@@ -573,39 +573,39 @@ export const Users: React.FC = () => {
             <div className="space-y-4 mb-8">
               <button
                 onClick={() => updateRole(selectedUser.id, 'admin')}
-                className={`w-full p-4 rounded-2xl border-2 transition-all text-right flex items-center justify-between ${
+                className={`w-full p-4 rounded-2xl border-2 transition-all text-left flex items-center justify-between ${
                   selectedUser.role === 'admin' ? 'border-emerald-500 bg-emerald-50' : 'border-zinc-100 hover:border-zinc-200'
                 }`}
               >
                 <div>
-                  <p className="font-bold text-zinc-900">مدير</p>
-                  <p className="text-xs text-zinc-500">صلاحيات كاملة داخل الشركة</p>
+                  <p className="font-bold text-zinc-900">{t('common.role_admin')}</p>
+                  <p className="text-xs text-zinc-500">{t('users.role_description_admin')}</p>
                 </div>
                 {selectedUser.role === 'admin' && <Check size={16} className="text-emerald-500" />}
               </button>
 
               <button
                 onClick={() => updateRole(selectedUser.id, 'manager')}
-                className={`w-full p-4 rounded-2xl border-2 transition-all text-right flex items-center justify-between ${
+                className={`w-full p-4 rounded-2xl border-2 transition-all text-left flex items-center justify-between ${
                   selectedUser.role === 'manager' ? 'border-emerald-500 bg-emerald-50' : 'border-zinc-100 hover:border-zinc-200'
                 }`}
               >
                 <div>
-                  <p className="font-bold text-zinc-900">مشرف</p>
-                  <p className="text-xs text-zinc-500">صلاحيات متوسطة</p>
+                  <p className="font-bold text-zinc-900">{t('common.manager')}</p>
+                  <p className="text-xs text-zinc-500">{t('users.role_description_manager')}</p>
                 </div>
                 {selectedUser.role === 'manager' && <Check size={16} className="text-emerald-500" />}
               </button>
 
               <button
                 onClick={() => updateRole(selectedUser.id, 'user')}
-                className={`w-full p-4 rounded-2xl border-2 transition-all text-right flex items-center justify-between ${
+                className={`w-full p-4 rounded-2xl border-2 transition-all text-left flex items-center justify-between ${
                   selectedUser.role === 'user' ? 'border-emerald-500 bg-emerald-50' : 'border-zinc-100 hover:border-zinc-200'
                 }`}
               >
                 <div>
-                  <p className="font-bold text-zinc-900">مستخدم عادي</p>
-                  <p className="text-xs text-zinc-500">صلاحيات محدودة حسب التخصيص</p>
+                  <p className="font-bold text-zinc-900">{t('common.role_user')}</p>
+                  <p className="text-xs text-zinc-500">{t('users.role_description_user')}</p>
                 </div>
                 {selectedUser.role === 'user' && <Check size={16} className="text-emerald-500" />}
               </button>
@@ -616,9 +616,9 @@ export const Users: React.FC = () => {
                 setIsRoleModalOpen(false);
                 setSelectedUser(null);
               }}
-              className="w-full py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all"
+              className="w-full py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all font-bold"
             >
-              إلغاء
+              {t('common.cancel')}
             </button>
           </div>
         </div>

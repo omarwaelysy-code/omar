@@ -308,6 +308,7 @@ export interface ActivityLog {
   document_id?: string;
   changes?: {
     field: string;
+    label?: string;
     old_value: any;
     new_value: any;
   }[];

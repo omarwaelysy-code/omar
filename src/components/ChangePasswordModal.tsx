@@ -20,12 +20,12 @@ export const ChangePasswordModal: React.FC = () => {
     e.preventDefault();
     
     if (newPassword !== confirmPassword) {
-      showNotification('كلمات المرور غير متطابقة', 'error');
+      showNotification(t('auth.password_mismatch'), 'error');
       return;
     }
 
     if (newPassword.length < 6) {
-      showNotification('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error');
+      showNotification(t('auth.password_min_length'), 'error');
       return;
     }
 
@@ -39,7 +39,7 @@ export const ChangePasswordModal: React.FC = () => {
         temp_password: null
       });
 
-      showNotification('تم تغيير كلمة المرور بنجاح. يرجى تسجيل الدخول مجدداً.', 'success');
+      showNotification(t('auth.password_change_success'), 'success');
       
       // Delay logout slightly to show notification
       setTimeout(() => {
@@ -47,7 +47,7 @@ export const ChangePasswordModal: React.FC = () => {
       }, 2000);
     } catch (error: any) {
       console.error('Error changing password:', error);
-      showNotification(error.message || 'حدث خطأ أثناء تغيير كلمة المرور', 'error');
+      showNotification(error.message || t('auth.password_change_error'), 'error');
     } finally {
       setLoading(false);
     }
@@ -60,8 +60,8 @@ export const ChangePasswordModal: React.FC = () => {
           <div className="mx-auto w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mb-4">
             <Lock size={32} />
           </div>
-          <h3 className="text-2xl font-black text-zinc-900">تحديث كلمة المرور</h3>
-          <p className="text-sm text-zinc-500 font-bold mt-1">يجب عليك تغيير كلمة المرور المؤقتة للمتابعة</p>
+          <h3 className="text-2xl font-black text-zinc-900">{t('auth.update_password_title')}</h3>
+          <p className="text-sm text-zinc-500 font-bold mt-1">{t('auth.must_change_password_msg')}</p>
         </div>
         
         <form onSubmit={handleSubmit} className="p-8 space-y-6" dir={dir}>
@@ -71,7 +71,7 @@ export const ChangePasswordModal: React.FC = () => {
               <input
                 required
                 type={showPassword ? "text" : "password"}
-                placeholder="كلمة المرور الجديدة"
+                placeholder={t('auth.new_password')}
                 className={`w-full ${dir === 'rtl' ? 'pr-12 pl-12' : 'pl-12 pr-12'} py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold`}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
@@ -90,7 +90,7 @@ export const ChangePasswordModal: React.FC = () => {
               <input
                 required
                 type={showPassword ? "text" : "password"}
-                placeholder="تأكيد كلمة المرور"
+                placeholder={t('auth.confirm_password')}
                 className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold`}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -98,10 +98,10 @@ export const ChangePasswordModal: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-100 rounded-2xl text-blue-700">
+          <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-100 rounded-2xl text-blue-700 text-left">
             <AlertCircle size={20} className="shrink-0 mt-0.5" />
             <p className="text-xs font-bold leading-relaxed">
-              تأكد من اختيار كلمة مرور قوية تحتوي على حروف وأرقام. سيتم تسجيل خروجك بعد التغيير بنجاح لتسجيل الدخول بكلمة المرور الجديدة.
+              {t('users.temp_password_hint')}
             </p>
           </div>
 
@@ -110,7 +110,7 @@ export const ChangePasswordModal: React.FC = () => {
             disabled={loading}
             className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 shadow-xl shadow-zinc-900/20 disabled:opacity-50"
           >
-            {loading ? 'جاري التحديث...' : 'تغيير ومتابعة'}
+            {loading ? t('common.updating') : t('auth.change_and_continue')}
             <Check size={20} />
           </button>
         </form>

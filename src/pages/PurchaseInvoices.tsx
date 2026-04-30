@@ -204,10 +204,10 @@ export const PurchaseInvoices: React.FC = () => {
 
       // Preview Activity Log
       setPreviewActivityLog({
-        action: editingInvoice ? 'تعديل فاتورة مشتريات' : 'إضافة فاتورة مشتريات',
+        action: editingInvoice ? t('pi.log_edit') : t('pi.log_add'),
         details: editingInvoice 
-          ? `تعديل فاتورة مشتريات رقم: ${invoice_number} من المورد ${supplier?.name || '...'}`
-          : `إضافة فاتورة مشتريات جديدة من المورد ${supplier?.name || '...'} بمبلغ ${formatNumber(total_amount)}`,
+          ? t('pi.log_edit_details', { number: invoice_number, supplier: supplier?.name || '...' })
+          : t('pi.log_add_details', { supplier: supplier?.name || '...', amount: formatNumber(total_amount) }),
         timestamp: new Date().toISOString()
       });
 
@@ -225,9 +225,9 @@ export const PurchaseInvoices: React.FC = () => {
           debitAccountName = product?.cost_account_name || '';
           
           if (!debitAccountId) {
-            const fallbackAccount = accounts.find(a => a.name.includes('مشتريات'));
+            const fallbackAccount = accounts.find(a => a.name.includes('مشتريات') || a.name.toLowerCase().includes('purchase'));
             debitAccountId = fallbackAccount?.id || 'purchase_account_default';
-            debitAccountName = fallbackAccount?.name || 'حساب المشتريات (افتراضي)';
+            debitAccountName = fallbackAccount?.name || t('pi.purchase_account_default');
           }
         } else {
           const category = categories.find(c => c.id === item.expense_category_id);
@@ -235,9 +235,9 @@ export const PurchaseInvoices: React.FC = () => {
           debitAccountName = category?.account_name || '';
           
           if (!debitAccountId) {
-            const fallbackAccount = accounts.find(a => a.name.includes('مصروف'));
+            const fallbackAccount = accounts.find(a => a.name.includes('مصروف') || a.name.toLowerCase().includes('expense'));
             debitAccountId = fallbackAccount?.id || 'expense_account_default';
-            debitAccountName = fallbackAccount?.name || 'حساب المصروفات (افتراضي)';
+            debitAccountName = fallbackAccount?.name || t('pi.expense_account_default');
           }
         }
 
@@ -246,7 +246,7 @@ export const PurchaseInvoices: React.FC = () => {
           account_name: debitAccountName,
           debit: item.total,
           credit: 0,
-          description: `مشتريات: ${item.product_name || item.category_name} - فاتورة ${invoice_number}`
+          description: t('pi.purchase_description', { name: item.product_name || item.category_name, number: invoice_number })
         });
       });
 
@@ -261,19 +261,20 @@ export const PurchaseInvoices: React.FC = () => {
         
         if (!creditAccountId) {
           const fallbackAccount = accounts.find(a => 
-            a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق')
+            a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق') ||
+            a.name.toLowerCase().includes('cash') || a.name.toLowerCase().includes('safe') || a.name.toLowerCase().includes('fund')
           );
           creditAccountId = fallbackAccount?.id || 'cash_account_default';
-          creditAccountName = fallbackAccount?.name || 'حساب النقدية (افتراضي)';
+          creditAccountName = fallbackAccount?.name || t('pi.cash_account_default');
         }
       } else {
         creditAccountId = supplier?.account_id || '';
         creditAccountName = supplier?.account_name || '';
         
         if (!creditAccountId) {
-          const fallbackAccount = accounts.find(a => a.name.includes('موردين'));
+          const fallbackAccount = accounts.find(a => a.name.includes('موردين') || a.name.toLowerCase().includes('supplier'));
           creditAccountId = fallbackAccount?.id || 'suppliers_account_default';
-          creditAccountName = fallbackAccount?.name || 'حساب الموردين (افتراضي)';
+          creditAccountName = fallbackAccount?.name || t('pi.suppliers_account_default');
         }
       }
 
@@ -282,19 +283,20 @@ export const PurchaseInvoices: React.FC = () => {
         account_name: creditAccountName,
         debit: 0,
         credit: total_amount,
-        description: `فاتورة مشتريات رقم ${invoice_number} - ${supplier?.name || '...'}`
+        description: t('pi.invoice_description', { number: invoice_number, supplier: supplier?.name || '...' })
       });
 
       // Credit: Discount Account (if any)
       if (invoiceData.discount > 0) {
         const discountAccount = accounts.find(a => a.id === settings?.supplier_discount_account_id) || 
-                                accounts.find(a => a.name.includes('خصم مكتسب') || a.name.includes('خصم مشتريات'));
+                                accounts.find(a => a.name.includes('خصم مكتسب') || a.name.includes('خصم مشتريات') ||
+                                             a.name.toLowerCase().includes('discount earned') || a.name.toLowerCase().includes('purchase discount'));
         journalItems.push({
           account_id: discountAccount?.id || 'purchase_discount_default',
-          account_name: discountAccount?.name || 'حساب الخصم المكتسب (افتراضي)',
+          account_name: discountAccount?.name || t('pi.discount_account_default'),
           debit: 0,
           credit: invoiceData.discount,
-          description: `خصم مكتسب - فاتورة رقم ${invoice_number}`
+          description: t('pi.discount_description', { number: invoice_number })
         });
       }
 
@@ -304,7 +306,7 @@ export const PurchaseInvoices: React.FC = () => {
         reference_number: invoice_number,
         reference_id: 'preview',
         reference_type: 'purchase_invoice',
-        description: `قيد فاتورة مشتريات رقم ${invoice_number}`,
+        description: t('pi.journal_description', { number: invoice_number }),
         items: journalItems,
         total_debit: total_amount,
         total_credit: total_amount,
@@ -353,7 +355,7 @@ export const PurchaseInvoices: React.FC = () => {
   const exportToPDF = async (invoice: any) => {
     const element = invoiceRef.current;
     if (!element) {
-      showNotification('حدث خطأ أثناء تحميل الفاتورة', 'error');
+      showNotification(t('common.error_loading_invoice'), 'error');
       return;
     }
     
@@ -362,11 +364,11 @@ export const PurchaseInvoices: React.FC = () => {
         filename: `Purchase-Invoice-${invoice.invoice_number}.pdf`,
         margin: 10,
         orientation: 'portrait',
-        reportTitle: `فاتورة مشتريات رقم: ${invoice.invoice_number}`
+        reportTitle: t('pi.invoice_description', { number: invoice.invoice_number, supplier: invoice.supplier_name })
       });
     } catch (e) {
       console.error('PDF Export Error:', e);
-      showNotification('حدث خطأ أثناء تصدير PDF', 'error');
+      showNotification(t('common.error_export_pdf'), 'error');
     }
   };
 
@@ -423,7 +425,7 @@ export const PurchaseInvoices: React.FC = () => {
             account_name: selectedAccount?.name || '',
             debit: supplierFormData.opening_balance < 0 ? Math.abs(supplierFormData.opening_balance) : 0,
             credit: supplierFormData.opening_balance > 0 ? supplierFormData.opening_balance : 0,
-            description: `رصيد أول المدة - ${supplierFormData.name}`,
+            description: t('common.opening_balance_desc', { name: supplierFormData.name }),
             supplier_id: supplierId,
             supplier_name: supplierFormData.name
           },
@@ -432,7 +434,7 @@ export const PurchaseInvoices: React.FC = () => {
             account_name: counterAccount?.name || '',
             debit: supplierFormData.opening_balance > 0 ? supplierFormData.opening_balance : 0,
             credit: supplierFormData.opening_balance < 0 ? Math.abs(supplierFormData.opening_balance) : 0,
-            description: `رصيد أول المدة - ${supplierFormData.name}`,
+            description: t('common.opening_balance_desc', { name: supplierFormData.name }),
             supplier_id: supplierId,
             supplier_name: supplierFormData.name
           }
@@ -443,7 +445,7 @@ export const PurchaseInvoices: React.FC = () => {
           reference_number: `OB-${code}`,
           reference_id: supplierId,
           reference_type: 'opening_balance',
-          description: `قيد رصيد أول المدة للمورد: ${supplierFormData.name}`,
+          description: t('common.opening_balance_log', { name: supplierFormData.name }),
           items: journalItems,
           total_debit: Math.abs(supplierFormData.opening_balance),
           total_credit: Math.abs(supplierFormData.opening_balance),
@@ -454,7 +456,7 @@ export const PurchaseInvoices: React.FC = () => {
         await dbService.createJournalEntry(journalEntry);
       }
 
-      await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة مورد', `إضافة مورد جديد من فاتورة المشتريات: ${supplierFormData.name}`, ['suppliers', 'purchase_invoices']);
+      await dbService.logActivity(user.id, user.username, user.company_id, t('suppliers.add_supplier_log'), t('pi.add_supplier_log_via_pi', { name: supplierFormData.name }), ['suppliers', 'purchase_invoices']);
       
       setInvoiceData({ ...invoiceData, supplier_id: supplierId });
       setIsSupplierModalOpen(false);
@@ -468,10 +470,10 @@ export const PurchaseInvoices: React.FC = () => {
         account_id: '',
         counter_account_id: ''
       });
-      showNotification('تم إضافة المورد بنجاح');
+      showNotification(t('suppliers.add_success'));
     } catch (e) {
       console.error(e);
-      showNotification('حدث خطأ أثناء إضافة المورد', 'error');
+      showNotification(t('suppliers.add_error'), 'error');
     }
   };
 
@@ -489,7 +491,7 @@ export const PurchaseInvoices: React.FC = () => {
         company_id: user.company_id
       };
       const productId = await dbService.add('products', newProduct);
-      await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة صنف', `إضافة صنف جديد من فاتورة المشتريات: ${productFormData.name}`, ['products', 'purchase_invoices']);
+      await dbService.logActivity(user.id, user.username, user.company_id, t('products.add_item_log'), t('pi.add_product_log_via_pi', { name: productFormData.name }), ['products', 'purchase_invoices']);
       
       setIsProductModalOpen(false);
       setProductFormData({
@@ -504,10 +506,10 @@ export const PurchaseInvoices: React.FC = () => {
         revenue_account_id: '',
         cost_account_id: ''
       });
-      showNotification('تم إضافة الصنف بنجاح');
+      showNotification(t('products.add_success'));
     } catch (e) {
       console.error(e);
-      showNotification('حدث خطأ أثناء إضافة الصنف', 'error');
+      showNotification(t('products.add_error'), 'error');
     }
   };
 
@@ -524,7 +526,7 @@ export const PurchaseInvoices: React.FC = () => {
       }
 
       if (file.size > 10 * 1024 * 1024) {
-        showNotification('الصورة كبيرة جداً، سيتم ضغطها تلقائياً', 'info');
+        showNotification(t('common.image_too_large_warning'), 'info');
       }
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -570,7 +572,7 @@ export const PurchaseInvoices: React.FC = () => {
         ...expenseCategoryFormData,
         company_id: user.company_id
       });
-      await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة تصنيف مصروفات', `إضافة تصنيف جديد من فاتورة المشتريات: ${expenseCategoryFormData.name}`, ['expense_categories', 'purchase_invoices']);
+      await dbService.logActivity(user.id, user.username, user.company_id, t('pi.add_expense_category_log'), t('pi.add_expense_category_log_via_pi', { name: expenseCategoryFormData.name }), ['expense_categories', 'purchase_invoices']);
       
       setIsExpenseCategoryModalOpen(false);
       setExpenseCategoryFormData({
@@ -578,10 +580,10 @@ export const PurchaseInvoices: React.FC = () => {
         name: '',
         description: ''
       });
-      showNotification('تم إضافة تصنيف المصروفات بنجاح');
+      showNotification(t('pi.add_expense_category_success'));
     } catch (e) {
       console.error(e);
-      showNotification('حدث خطأ أثناء إضافة التصنيف', 'error');
+      showNotification(t('pi.add_expense_category_error'), 'error');
     }
   };
 
@@ -595,7 +597,7 @@ export const PurchaseInvoices: React.FC = () => {
         account_name: selectedAccount?.name || '',
         company_id: user.company_id
       });
-      await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة طريقة دفع', `إضافة طريقة دفع جديدة من فاتورة المشتريات: ${paymentMethodFormData.name}`, ['payment_methods', 'purchase_invoices'], pmId);
+      await dbService.logActivity(user.id, user.username, user.company_id, t('payment.add_method_log'), t('pi.add_payment_method_log_via_pi', { name: paymentMethodFormData.name }), ['payment_methods', 'purchase_invoices'], pmId);
       
       // Create journal entry for opening balance if not zero
       if (paymentMethodFormData.opening_balance !== 0 && paymentMethodFormData.account_id && paymentMethodFormData.counter_account_id) {
@@ -606,7 +608,7 @@ export const PurchaseInvoices: React.FC = () => {
         await dbService.add('journal_entries', {
           company_id: user.company_id,
           date: paymentMethodFormData.opening_balance_date,
-          description: `رصيد افتتاحي لطريقة الدفع: ${paymentMethodFormData.name}`,
+          description: t('common.opening_balance_log', { name: paymentMethodFormData.name }),
           reference_id: pmId,
           reference_type: 'opening_balance',
           items: [
@@ -615,14 +617,14 @@ export const PurchaseInvoices: React.FC = () => {
               account_name: selectedAccount?.name || '',
               debit: isNegative ? 0 : absBalance,
               credit: isNegative ? absBalance : 0,
-              description: 'رصيد افتتاحي'
+              description: t('common.opening_balance')
             },
             {
               account_id: paymentMethodFormData.counter_account_id,
-              account_name: counterAccount?.name || 'حساب الميزانية الافتتاحية',
+              account_name: counterAccount?.name || t('common.opening_balance_account'),
               debit: isNegative ? absBalance : 0,
               credit: isNegative ? 0 : absBalance,
-              description: `رصيد افتتاحي لطريقة الدفع: ${paymentMethodFormData.name}`
+              description: t('common.opening_balance_log', { name: paymentMethodFormData.name }),
             }
           ],
           total_debit: absBalance,
@@ -644,10 +646,10 @@ export const PurchaseInvoices: React.FC = () => {
         counter_account_id: '',
         details: ''
       });
-      showNotification('تم إضافة طريقة الدفع بنجاح');
+      showNotification(t('payment.add_success'));
     } catch (e) {
       console.error(e);
-      showNotification('حدث خطأ أثناء إضافة طريقة الدفع', 'error');
+      showNotification(t('payment.add_error'), 'error');
     }
   };
 
@@ -661,7 +663,7 @@ export const PurchaseInvoices: React.FC = () => {
     );
 
     if (validItems.length === 0) {
-      showNotification('يرجى إضافة أصناف أو بنود مكتملة للفاتورة', 'error');
+      showNotification(t('pi.error_no_items'), 'error');
       return;
     }
 
@@ -704,9 +706,9 @@ export const PurchaseInvoices: React.FC = () => {
       let supplierAccountId = supplier?.account_id || '';
       let supplierAccountName = supplier?.account_name || '';
       if (!supplierAccountId) {
-        const fallback = accounts.find(a => a.name.includes('موردين'));
+        const fallback = accounts.find(a => a.name.includes('موردين') || a.name.toLowerCase().includes('supplier'));
         supplierAccountId = fallback?.id || 'suppliers_account_default';
-        supplierAccountName = fallback?.name || 'حساب الموردين (افتراضي)';
+        supplierAccountName = fallback?.name || t('pi.suppliers_account_default');
       }
 
       journalItems.push({
@@ -714,20 +716,21 @@ export const PurchaseInvoices: React.FC = () => {
         account_name: supplierAccountName,
         debit: 0,
         credit: total_amount,
-        description: `فاتورة مشتريات رقم ${invoice_number} - ${supplier?.name}`,
+        description: t('pi.invoice_description', { number: invoice_number, supplier: supplier?.name }),
         supplier_id: invoiceData.supplier_id,
         supplier_name: supplier?.name
       });
 
       if (invoiceData.discount > 0) {
         const discountAccount = accounts.find(a => a.id === settings?.supplier_discount_account_id) || 
-                                accounts.find(a => a.name.includes('خصم مكتسب') || a.name.includes('خصم مشتريات'));
+                                accounts.find(a => a.name.includes('خصم مكتسب') || a.name.includes('خصم مشتريات') ||
+                                             a.name.toLowerCase().includes('discount earned') || a.name.toLowerCase().includes('purchase discount'));
         journalItems.push({
           account_id: discountAccount?.id || 'purchase_discount_default',
-          account_name: discountAccount?.name || 'حساب الخصم المكتسب (افتراضي)',
+          account_name: discountAccount?.name || t('pi.discount_account_default'),
           debit: 0,
           credit: invoiceData.discount,
-          description: `خصم مكتسب - فاتورة رقم ${invoice_number}`
+          description: t('pi.discount_description', { number: invoice_number })
         });
       }
 
@@ -740,18 +743,18 @@ export const PurchaseInvoices: React.FC = () => {
           debitAccountId = product?.cost_account_id || '';
           debitAccountName = product?.cost_account_name || '';
           if (!debitAccountId) {
-            const fallback = accounts.find(a => a.name.includes('مشتريات') || a.name.includes('تكلفة'));
+            const fallback = accounts.find(a => a.name.includes('مشتريات') || a.name.includes('تكلفة') || a.name.toLowerCase().includes('purchase'));
             debitAccountId = fallback?.id || 'purchase_account_default';
-            debitAccountName = fallback?.name || 'حساب المشتريات (افتراضي)';
+            debitAccountName = fallback?.name || t('pi.purchase_account_default');
           }
         } else {
           const category = categories.find(c => c.id === item.expense_category_id);
           debitAccountId = (category as any)?.account_id || '';
           debitAccountName = (category as any)?.account_name || '';
           if (!debitAccountId) {
-            const fallback = accounts.find(a => (category && a.name.includes(category.name)) || a.name.includes('مصروفات'));
+            const fallback = accounts.find(a => (category && a.name.includes(category.name)) || a.name.includes('مصروفات') || a.name.toLowerCase().includes('expense'));
             debitAccountId = fallback?.id || 'expense_account_default';
-            debitAccountName = fallback?.name || 'حساب المصروفات (افتراضي)';
+            debitAccountName = fallback?.name || t('pi.expense_account_default');
           }
         }
         journalItems.push({
@@ -759,7 +762,7 @@ export const PurchaseInvoices: React.FC = () => {
           account_name: debitAccountName,
           debit: item.total,
           credit: 0,
-          description: `مشتريات: ${item.product_name || item.category_name} - فاتورة ${invoice_number}`
+          description: t('pi.purchase_description', { name: item.product_name || item.category_name, number: invoice_number })
         });
       });
 
@@ -768,23 +771,26 @@ export const PurchaseInvoices: React.FC = () => {
         let cashAccountId = pm?.account_id || '';
         let cashAccountName = pm?.account_name || '';
         if (!cashAccountId) {
-          const fallback = accounts.find(a => a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق'));
+          const fallback = accounts.find(a => 
+            a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق') ||
+            a.name.toLowerCase().includes('cash') || a.name.toLowerCase().includes('safe') || a.name.toLowerCase().includes('fund')
+          );
           cashAccountId = fallback?.id || 'cash_account_default';
-          cashAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
+          cashAccountName = fallback?.name || t('pi.cash_account_default');
         }
         journalItems.push({
           account_id: cashAccountId,
           account_name: cashAccountName,
           debit: 0,
           credit: total_amount,
-          description: `سداد فاتورة مشتريات رقم ${invoice_number} - ${supplier?.name}`
+          description: t('pi.payment_description', { number: invoice_number, supplier: supplier?.name })
         });
         journalItems.push({
           account_id: supplierAccountId,
           account_name: supplierAccountName,
           debit: total_amount,
           credit: 0,
-          description: `تسوية فاتورة مشتريات رقم ${invoice_number} - ${supplier?.name}`,
+          description: t('pi.settlement_description', { number: invoice_number, supplier: supplier?.name }),
           supplier_id: invoiceData.supplier_id,
           supplier_name: supplier?.name
         });
@@ -797,7 +803,7 @@ export const PurchaseInvoices: React.FC = () => {
         date: invoiceData.date,
         reference_number: invoice_number,
         reference_type: 'purchase_invoice',
-        description: `قيد فاتورة مشتريات رقم ${invoice_number}`,
+        description: t('pi.journal_description', { number: invoice_number }),
         items: journalItems,
         total_debit,
         total_credit,
@@ -818,16 +824,16 @@ export const PurchaseInvoices: React.FC = () => {
         JournalEntrySchema
       );
 
-      showNotification(editingInvoice ? 'تم تعديل فاتورة المشتريات بنجاح' : 'تم حفظ فاتورة المشتريات بنجاح', 'success');
+      showNotification(editingInvoice ? t('pi.edit_success') : t('pi.add_success'), 'success');
       closeModal();
 
       if (!editingInvoice) {
-        dbService.logActivity(user.id, user.username, user.company_id, 'إضافة فاتورة مشتريات', `إضافة فاتورة مشتريات جديدة رقم: ${invoice_number}`, 'purchase_invoices');
+        dbService.logActivity(user.id, user.username, user.company_id, t('pi.log_add'), t('pi.log_add_activity', { number: invoice_number }), 'purchase_invoices');
       }
 
     } catch (e: any) {
       console.error('Save failed:', e);
-      showNotification(e.message || 'حدث خطأ أثناء حفظ الفاتورة', 'error');
+      showNotification(e.message || t('pi.save_error'), 'error');
     }
   };
 
@@ -845,7 +851,7 @@ export const PurchaseInvoices: React.FC = () => {
       await dbService.deleteJournalEntryByReference(invoiceToDelete, user.company_id);
       
       await dbService.delete('purchase_invoices', invoiceToDelete);
-      await dbService.logActivity(user.id, user.username, user.company_id, 'حذف فاتورة مشتريات', `حذف فاتورة مشتريات رقم: ${invoice?.invoice_number}`, 'purchase_invoices', invoiceToDelete);
+      await dbService.logActivity(user.id, user.username, user.company_id, t('pi.log_delete'), t('pi.log_delete_activity', { number: invoice?.invoice_number }), 'purchase_invoices', invoiceToDelete);
       showNotification(t('common.delete_success'), 'success');
       setIsDeleteModalOpen(false);
       setInvoiceToDelete(null);
@@ -912,13 +918,13 @@ export const PurchaseInvoices: React.FC = () => {
 
   const handleExportExcel = () => {
     const formattedData = formatDataForExcel(purchaseInvoices, {
-      'invoice_number': 'رقم الفاتورة',
-      'supplier_name': 'المورد',
-      'date': 'التاريخ',
-      'total_amount': 'المبلغ الإجمالي',
-      'purchase_type': 'نوع المشتريات'
+      'invoice_number': t('pi.invoice_number'),
+      'supplier_name': t('pi.supplier'),
+      'date': t('common.date'),
+      'total_amount': t('pi.total_amount'),
+      'purchase_type': t('pi.purchase_type')
     });
-    exportToExcel(formattedData, { filename: 'Purchase_Invoices_Report', sheetName: 'مشتريات' });
+    exportToExcel(formattedData, { filename: 'Purchase_Invoices_Report', sheetName: t('pi.title') });
   };
 
   const handleExportPDF = async () => {
@@ -926,7 +932,7 @@ export const PurchaseInvoices: React.FC = () => {
       await exportToPDFUtil(tableRef.current, { 
         filename: 'Purchase_Invoices_Report', 
         orientation: 'landscape',
-        reportTitle: 'قائمة فواتير المشتريات'
+        reportTitle: t('pi.report_title')
       });
     }
   };
@@ -955,17 +961,17 @@ export const PurchaseInvoices: React.FC = () => {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">فواتير المشتريات</h2>
-          <p className="text-zinc-500">إدارة مشترياتك من الموردين.</p>
+          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('pi.title')}</h2>
+          <p className="text-zinc-500">{t('pi.subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button 
             onClick={() => setIsActivityLogOpen(true)}
             className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-zinc-600 border border-zinc-200 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm"
-            title="سجل النشاط"
+            title={t('common.audit_log')}
           >
             <History size={20} />
-            <span className="hidden md:inline">سجل النشاط</span>
+            <span className="hidden md:inline">{t('common.audit_log')}</span>
           </button>
           <ExportButtons 
             onExportExcel={handleExportExcel} 
@@ -976,7 +982,7 @@ export const PurchaseInvoices: React.FC = () => {
             className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-600 text-white rounded-2xl font-bold hover:bg-orange-700 transition-all active:scale-95 shadow-lg shadow-orange-200"
           >
             <Plus size={20} />
-            مشتريات جديدة
+            {t('pi.add_invoice')}
           </button>
         </div>
       </div>
@@ -984,11 +990,11 @@ export const PurchaseInvoices: React.FC = () => {
       <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-zinc-50 flex items-center gap-4">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-3 text-zinc-400" size={18} />
+            <Search className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
             <input
               type="text"
-              placeholder="البحث عن فواتير..."
-              className="w-full pl-10 pr-4 py-2 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all"
+              placeholder={t('pi.search_placeholder')}
+              className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -996,20 +1002,20 @@ export const PurchaseInvoices: React.FC = () => {
         </div>
 
         <div ref={tableRef} id="purchase-invoices-list-table" className="overflow-x-auto hidden md:block">
-          <table className="w-full text-right">
+          <table className={`w-full ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
             <thead>
               <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                <th className="px-6 py-4 font-bold">رقم الفاتورة</th>
-                <th className="px-6 py-4 font-bold">المورد</th>
-                <th className="px-6 py-4 font-bold">التاريخ</th>
-                <th className="px-6 py-4 font-bold">المبلغ</th>
-                <th className="px-6 py-4 font-bold text-left">الإجراءات</th>
+                <th className="px-6 py-4 font-bold">{t('pi.invoice_number')}</th>
+                <th className="px-6 py-4 font-bold">{t('pi.supplier')}</th>
+                <th className="px-6 py-4 font-bold">{t('common.date')}</th>
+                <th className="px-6 py-4 font-bold">{t('pi.total_amount')}</th>
+                <th className={`px-6 py-4 font-bold ${t('dir') === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-50">
               {filteredInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 italic">لا توجد فواتير مشتريات حالياً</td>
+                  <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 italic">{t('pi.no_invoices')}</td>
                 </tr>
               ) : filteredInvoices.map((inv) => (
                 <tr key={inv.id} className="hover:bg-zinc-50/50 transition-colors group">
@@ -1018,9 +1024,9 @@ export const PurchaseInvoices: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 font-bold text-zinc-900">{inv.supplier_name}</td>
                   <td className="px-6 py-4 text-zinc-500">{formatDate(inv.date)}</td>
-                  <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(inv.total_amount)} ج.م</td>
-                  <td className="px-6 py-4 text-left">
-                    <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(inv.total_amount)} {t('common.currency')}</td>
+                  <td className={`px-6 py-4 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'}`}>
+                    <div className={`flex items-center ${t('dir') === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
                       <button 
                         onClick={() => setViewInvoice(inv)}
                         className="p-2 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50 rounded-xl transition-all no-pdf"
@@ -1056,8 +1062,8 @@ export const PurchaseInvoices: React.FC = () => {
                   <span className="font-mono text-[10px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold w-fit">{inv.invoice_number}</span>
                   <h4 className="font-bold text-zinc-900 text-lg">{inv.supplier_name}</h4>
                 </div>
-                <div className="text-left">
-                  <p className="font-bold text-emerald-600 text-lg">{formatNumber(inv.total_amount)} ج.م</p>
+                <div className={t('dir') === 'rtl' ? 'text-left' : 'text-right'}>
+                  <p className="font-bold text-emerald-600 text-lg">{formatNumber(inv.total_amount)} {t('common.currency')}</p>
                   <span className="text-xs text-zinc-400">{formatDate(inv.date)}</span>
                 </div>
               </div>
@@ -1066,13 +1072,13 @@ export const PurchaseInvoices: React.FC = () => {
                   onClick={() => setViewInvoice(inv)}
                   className="flex-1 flex items-center justify-center gap-2 py-3 bg-zinc-50 text-zinc-600 rounded-2xl text-sm font-bold border border-zinc-100 active:scale-95 transition-transform"
                 >
-                  <Eye size={18} /> عرض
+                  <Eye size={18} /> {t('common.view')}
                 </button>
                 <button 
                   onClick={() => openModal(inv)}
                   className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-50 text-blue-600 rounded-2xl text-sm font-bold border border-blue-100 active:scale-95 transition-transform"
                 >
-                  <Pencil size={18} /> تعديل
+                  <Pencil size={18} /> {t('common.edit')}
                 </button>
                 <button 
                   onClick={() => handleDelete(inv.id)}
@@ -1084,7 +1090,7 @@ export const PurchaseInvoices: React.FC = () => {
             </div>
           ))}
           {filteredInvoices.length === 0 && !loading && (
-            <div className="p-8 text-center text-zinc-500 italic">لا توجد فواتير مشتريات حالياً</div>
+            <div className="p-8 text-center text-zinc-500 italic">{t('pi.no_invoices')}</div>
           )}
         </div>
       </div>
@@ -1102,8 +1108,8 @@ export const PurchaseInvoices: React.FC = () => {
                   <ShoppingCart size={24} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-zinc-900">{editingInvoice ? 'تعديل فاتورة مشتريات' : 'إضافة فاتورة مشتريات'}</h3>
-                  <p className="text-sm text-zinc-500">أدخل تفاصيل الفاتورة والأصناف.</p>
+                  <h3 className="text-xl font-bold text-zinc-900">{editingInvoice ? t('pi.edit_invoice') : t('pi.add_invoice')}</h3>
+                  <p className="text-sm text-zinc-500">{t('pi.modal_subtitle')}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -1113,24 +1119,24 @@ export const PurchaseInvoices: React.FC = () => {
                       onClick={handleBackInvoice}
                       disabled={purchaseInvoices.findIndex(inv => inv.id === editingInvoice.id) === purchaseInvoices.length - 1}
                       className="p-2 hover:bg-zinc-200 rounded-xl transition-all disabled:opacity-30"
-                      title="السابق"
+                      title={t('common.previous')}
                     >
-                      <ArrowRight size={20} />
+                      {t('dir') === 'rtl' ? <ArrowRight size={20} /> : <ArrowLeft size={20} />}
                     </button>
                     <button
                       onClick={handleNextInvoice}
                       disabled={purchaseInvoices.findIndex(inv => inv.id === editingInvoice.id) === 0}
                       className="p-2 hover:bg-zinc-200 rounded-xl transition-all disabled:opacity-30"
-                      title="التالي"
+                      title={t('common.next')}
                     >
-                      <ArrowLeft size={20} />
+                      {t('dir') === 'rtl' ? <ArrowLeft size={20} /> : <ArrowRight size={20} />}
                     </button>
                   </div>
                 )}
                 <button 
                   onClick={() => setIsFullScreen(!isFullScreen)}
                   className="p-2 hover:bg-zinc-200 rounded-xl transition-all text-zinc-500"
-                  title={isFullScreen ? "تصغير" : "تكبير"}
+                  title={isFullScreen ? t('common.minimize') : t('common.maximize')}
                 >
                   {isFullScreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
                 </button>
@@ -1145,15 +1151,15 @@ export const PurchaseInvoices: React.FC = () => {
               <AnimatePresence>
                 {showSidePanel && (
                   <motion.div 
-                    initial={{ x: '-100%' }}
+                    initial={{ x: t('dir') === 'rtl' ? '100%' : '-100%' }}
                     animate={{ x: 0 }}
-                    exit={{ x: '-100%' }}
+                    exit={{ x: t('dir') === 'rtl' ? '100%' : '-100%' }}
                     transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    className="absolute inset-y-0 left-0 z-50 w-full lg:w-80 shadow-2xl lg:shadow-none lg:relative lg:inset-auto"
+                    className={`absolute inset-y-0 ${t('dir') === 'rtl' ? 'right-0 border-l' : 'left-0 border-r'} z-50 w-full lg:w-80 shadow-2xl lg:shadow-none lg:relative lg:inset-auto`}
                   >
-                    <div className="h-full bg-white border-r border-zinc-100 flex flex-col">
+                    <div className="h-full bg-white border-zinc-100 flex flex-col">
                       <div className="p-4 border-b border-zinc-100 flex items-center justify-between lg:hidden">
-                        <h3 className="font-bold text-zinc-900">سجل النشاط والقيد</h3>
+                        <h3 className="font-bold text-zinc-900">{t('common.audit_log')}</h3>
                         <button onClick={() => setShowSidePanel(false)} className="p-2 text-zinc-400 hover:text-zinc-600">
                           <X size={20} />
                         </button>
@@ -1188,7 +1194,7 @@ export const PurchaseInvoices: React.FC = () => {
                           className={`flex-1 py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 ${invoiceData.purchase_type === 'items' ? 'bg-zinc-900 text-white shadow-xl scale-105' : 'bg-zinc-50 text-zinc-500 border border-zinc-200 hover:bg-zinc-100'}`}
                         >
                           <Package size={20} />
-                          شراء أصناف
+                          {t('pi.purchase_items')}
                         </button>
                         <button 
                           type="button"
@@ -1199,18 +1205,18 @@ export const PurchaseInvoices: React.FC = () => {
                           className={`flex-1 py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 ${invoiceData.purchase_type === 'expenses' ? 'bg-zinc-900 text-white shadow-xl scale-105' : 'bg-zinc-50 text-zinc-500 border border-zinc-200 hover:bg-zinc-100'}`}
                         >
                           <FileText size={20} />
-                          شراء بنود مصروفات
+                          {t('pi.purchase_expenses')}
                         </button>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <div>
-                          <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">المورد</label>
+                          <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">{t('pi.supplier')}</label>
                           <div className="relative">
-                            <User className="absolute left-3 top-3 text-zinc-400" size={18} />
+                            <User className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                             <select 
                               required
-                              className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
+                              className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none`}
                               value={invoiceData.supplier_id}
                               onChange={(e) => {
                                 if (e.target.value === 'new_supplier') {
@@ -1220,21 +1226,21 @@ export const PurchaseInvoices: React.FC = () => {
                                 }
                               }}
                             >
-                              <option value="">اختر المورد...</option>
+                              <option value="">{t('pi.select_supplier')}</option>
                               {suppliers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
-                              <option value="new_supplier" className="font-bold text-emerald-600">+ إضافة مورد جديد</option>
+                              <option value="new_supplier" className="font-bold text-emerald-600">+ {t('suppliers.add_new')}</option>
                             </select>
                           </div>
                         </div>
 
                         <div>
-                          <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">التاريخ</label>
+                          <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">{t('common.date')}</label>
                           <div className="relative">
-                            <Calendar className="absolute left-3 top-3 text-zinc-400" size={18} />
+                            <Calendar className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                             <input 
                               required
                               type="date" 
-                              className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                              className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                               value={invoiceData.date}
                               onChange={(e) => setInvoiceData({...invoiceData, date: e.target.value})}
                             />
@@ -1242,33 +1248,33 @@ export const PurchaseInvoices: React.FC = () => {
                         </div>
 
                         <div>
-                          <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">نوع الدفع</label>
+                          <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">{t('pi.payment_type')}</label>
                           <div className="grid grid-cols-2 gap-2">
                             <button 
                               type="button"
                               onClick={() => setInvoiceData({...invoiceData, payment_type: 'cash'})}
                               className={`py-3 rounded-xl font-bold transition-all ${invoiceData.payment_type === 'cash' ? 'bg-zinc-900 text-white shadow-lg' : 'bg-zinc-50 text-zinc-500 border border-zinc-200 hover:bg-zinc-100'}`}
                             >
-                              نقدي
+                              {t('pi.cash')}
                             </button>
                             <button 
                               type="button"
                               onClick={() => setInvoiceData({...invoiceData, payment_type: 'credit'})}
                               className={`py-3 rounded-xl font-bold transition-all ${invoiceData.payment_type === 'credit' ? 'bg-zinc-900 text-white shadow-lg' : 'bg-zinc-50 text-zinc-500 border border-zinc-200 hover:bg-zinc-100'}`}
                             >
-                              آجل
+                              {t('pi.credit')}
                             </button>
                           </div>
                         </div>
 
                         {invoiceData.payment_type === 'cash' && (
                           <div>
-                            <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">طريقة السداد</label>
+                            <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">{t('pi.payment_method')}</label>
                             <div className="relative">
-                              <CreditCard className="absolute left-3 top-3 text-zinc-400" size={18} />
+                              <CreditCard className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                               <select 
                                 required
-                                className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
+                                className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none`}
                                 value={invoiceData.payment_method_id}
                                 onChange={(e) => {
                                   if (e.target.value === 'new_payment_method') {
@@ -1278,9 +1284,9 @@ export const PurchaseInvoices: React.FC = () => {
                                   }
                                 }}
                               >
-                                <option value="">اختر الطريقة...</option>
+                                <option value="">{t('pi.select_payment_method')}</option>
                                 {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
-                                <option value="new_payment_method" className="font-bold text-emerald-600">+ إضافة طريقة دفع جديدة</option>
+                                <option value="new_payment_method" className="font-bold text-emerald-600">+ {t('payment_methods.add_new')}</option>
                               </select>
                             </div>
                           </div>
@@ -1288,11 +1294,11 @@ export const PurchaseInvoices: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">ملاحظات</label>
+                        <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">{t('common.notes')}</label>
                         <textarea 
                           rows={2}
                           className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none"
-                          placeholder="أي ملاحظات إضافية على الفاتورة..."
+                          placeholder={t('pi.notes_placeholder')}
                           value={invoiceData.notes}
                           onChange={(e) => setInvoiceData({...invoiceData, notes: e.target.value})}
                         />
@@ -1303,7 +1309,7 @@ export const PurchaseInvoices: React.FC = () => {
                           <div className="flex items-center gap-4">
                             <h3 className="text-xl font-bold text-zinc-900 flex items-center gap-2">
                               {invoiceData.purchase_type === 'items' ? <Package size={24} className="text-emerald-500" /> : <FileText size={24} className="text-emerald-500" />}
-                              {invoiceData.purchase_type === 'items' ? 'أصناف الفاتورة' : 'بنود المصروفات'}
+                              {invoiceData.purchase_type === 'items' ? t('pi.invoice_items') : t('pi.expense_items')}
                             </h3>
                             <button 
                               type="button"
@@ -1311,7 +1317,7 @@ export const PurchaseInvoices: React.FC = () => {
                               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${showSidePanel ? 'bg-orange-50 text-orange-600 border border-orange-100' : 'bg-zinc-100 text-zinc-600 border border-zinc-200 hover:bg-zinc-200'}`}
                             >
                               <History size={14} />
-                              قيد اليومية \ سجل التعديلات
+                              {t('pi.toggle_side_panel')}
                             </button>
                           </div>
                           <button 
@@ -1320,26 +1326,26 @@ export const PurchaseInvoices: React.FC = () => {
                             className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition-all active:scale-95"
                           >
                             <Plus size={18} />
-                            إضافة {invoiceData.purchase_type === 'items' ? 'صنف' : 'بند'}
+                            {t('common.add')} {invoiceData.purchase_type === 'items' ? t('pi.item') : t('pi.expense_item')}
                           </button>
                         </div>
 
                         <div className="overflow-x-auto">
-                          <table className="w-full text-right border-collapse">
+                          <table className={`w-full ${t('dir') === 'rtl' ? 'text-right' : 'text-left'} border-collapse`}>
                             <thead>
                               <tr className="bg-zinc-50/30 border-b border-zinc-100">
-                                <th className="px-3 py-2 text-xs font-bold text-zinc-500 uppercase tracking-tighter w-12 text-center">صورة</th>
-                                <th className="px-3 py-2 text-xs font-bold text-zinc-500 uppercase tracking-tighter">{invoiceData.purchase_type === 'items' ? 'الصنف' : 'البند'}</th>
-                                <th className="px-3 py-2 text-xs font-bold text-zinc-500 uppercase tracking-tighter w-24 text-center">الكمية</th>
-                                <th className="px-3 py-2 text-xs font-bold text-zinc-500 uppercase tracking-tighter w-32 text-center">السعر</th>
-                                <th className="px-3 py-2 text-xs font-bold text-zinc-500 uppercase tracking-tighter w-32 text-center">الإجمالي</th>
+                                <th className="px-3 py-2 text-xs font-bold text-zinc-500 uppercase tracking-tighter w-12 text-center">{t('common.image')}</th>
+                                <th className="px-3 py-2 text-xs font-bold text-zinc-500 uppercase tracking-tighter">{invoiceData.purchase_type === 'items' ? t('pi.item') : t('pi.expense_item')}</th>
+                                <th className="px-3 py-2 text-xs font-bold text-zinc-500 uppercase tracking-tighter w-24 text-center">{t('pi.quantity')}</th>
+                                <th className="px-3 py-2 text-xs font-bold text-zinc-500 uppercase tracking-tighter w-32 text-center">{t('pi.price')}</th>
+                                <th className="px-3 py-2 text-xs font-bold text-zinc-500 uppercase tracking-tighter w-32 text-center">{t('pi.total')}</th>
                                 <th className="px-3 py-2 text-xs font-bold text-zinc-500 uppercase tracking-tighter w-12"></th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-50">
                               {items.length === 0 ? (
                                 <tr>
-                                  <td colSpan={6} className="px-6 py-12 text-center text-zinc-400 italic">لا توجد {invoiceData.purchase_type === 'items' ? 'أصناف' : 'بنود'} مضافة حالياً</td>
+                                  <td colSpan={6} className="px-6 py-12 text-center text-zinc-400 italic">{t('pi.no_items_added')}</td>
                                 </tr>
                               ) : items.map((item, index) => (
                                 <tr key={index} className="hover:bg-zinc-50/50 transition-colors group">
@@ -1361,7 +1367,7 @@ export const PurchaseInvoices: React.FC = () => {
                                     {invoiceData.purchase_type === 'items' ? (
                                       <select 
                                         required
-                                        className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                                        className={`w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
                                         value={item.product_id || ''}
                                         onChange={(e) => {
                                           if (e.target.value === 'new_product') {
@@ -1371,14 +1377,14 @@ export const PurchaseInvoices: React.FC = () => {
                                           }
                                         }}
                                       >
-                                        <option value="">اختر الصنف...</option>
+                                        <option value="">{t('pi.select_item')}</option>
                                         {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}
-                                        <option value="new_product" className="font-bold text-emerald-600">+ إضافة صنف جديد</option>
+                                        <option value="new_product" className="font-bold text-emerald-600">+ {t('products.add_new')}</option>
                                       </select>
                                     ) : (
                                       <select 
                                         required
-                                        className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                                        className={`w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
                                         value={item.expense_category_id || ''}
                                         onChange={(e) => {
                                           if (e.target.value === 'new_expense_category') {
@@ -1388,9 +1394,9 @@ export const PurchaseInvoices: React.FC = () => {
                                           }
                                         }}
                                       >
-                                        <option value="">اختر البند...</option>
+                                        <option value="">{t('pi.select_expense_item')}</option>
                                         {categories.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
-                                        <option value="new_expense_category" className="font-bold text-emerald-600">+ إضافة بند مصروف جديد</option>
+                                        <option value="new_expense_category" className="font-bold text-emerald-600">+ {t('expense_categories.add_new')}</option>
                                       </select>
                                     )}
                                   </td>
@@ -1432,13 +1438,13 @@ export const PurchaseInvoices: React.FC = () => {
                             </tbody>
                             <tfoot>
                               <tr className="bg-zinc-50/50 font-bold border-t border-zinc-100">
-                                <td colSpan={3} className="px-3 py-2 text-left text-zinc-500">الإجمالي الفرعي:</td>
+                                <td colSpan={3} className={`px-3 py-2 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} text-zinc-500`}>{t('pi.subtotal')}:</td>
                                 <td className="px-3 py-2 text-base text-zinc-900 font-mono text-center">{formatNumber(calculateSubtotal())}</td>
                                 <td></td>
                               </tr>
                               <tr className="bg-zinc-50/50 font-bold">
-                                <td colSpan={3} className="px-3 py-2 text-left text-zinc-500 flex items-center gap-2">
-                                  <span>الخصم:</span>
+                                <td colSpan={3} className={`px-3 py-2 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} text-zinc-500 flex items-center justify-end gap-2`}>
+                                  <span>{t('pi.discount')}:</span>
                                   <input 
                                     type="number" 
                                     className="w-24 bg-white border border-zinc-200 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-orange-500 font-mono"
@@ -1450,9 +1456,9 @@ export const PurchaseInvoices: React.FC = () => {
                                 <td></td>
                               </tr>
                               <tr className="bg-zinc-900 text-white">
-                                <td colSpan={3} className="px-6 py-4 text-left font-bold text-lg">الإجمالي الكلي:</td>
+                                <td colSpan={3} className={`px-6 py-4 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} font-bold text-lg`}>{t('pi.grand_total')}:</td>
                                 <td colSpan={2} className="px-6 py-4 font-bold text-2xl text-emerald-400">
-                                  {formatNumber(calculateTotal())} ج.م
+                                  {formatNumber(calculateTotal())} {t('common.currency')}
                                 </td>
                               </tr>
                             </tfoot>
@@ -1467,7 +1473,7 @@ export const PurchaseInvoices: React.FC = () => {
                         className="flex items-center gap-3 px-12 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-500/20 active:scale-95"
                       >
                         <Save size={24} />
-                        {editingInvoice ? 'تحديث فاتورة المشتريات' : 'حفظ فاتورة المشتريات'}
+                        {editingInvoice ? t('pi.edit_invoice') : t('pi.add_invoice')}
                       </button>
                     </div>
                   </form>
@@ -1490,7 +1496,7 @@ export const PurchaseInvoices: React.FC = () => {
         <div className="fixed inset-0 z-[60] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full h-full md:h-auto md:max-w-5xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col md:max-h-[90vh]">
             <div className="p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10">
-              <h3 className="text-lg font-bold text-zinc-900">عرض فاتورة المشتريات</h3>
+              <h3 className="text-lg font-bold text-zinc-900">{t('pi.view_invoice')}</h3>
               <button onClick={() => setViewInvoice(null)} className="p-2 text-zinc-400 hover:text-zinc-600"><X size={24} /></button>
             </div>
             
@@ -1501,34 +1507,34 @@ export const PurchaseInvoices: React.FC = () => {
                 category="purchase_invoices" 
               />
 
-              <div ref={invoiceRef} id="purchase-invoice-capture-area" className="flex-1 p-6 md:p-8 space-y-8 bg-white overflow-y-auto" style={{ color: '#18181b' }}>
-                <div className="flex justify-between items-start">
+              <div ref={invoiceRef} id="purchase-invoice-capture-area" className={`flex-1 p-6 md:p-8 space-y-8 bg-white overflow-y-auto ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`} style={{ color: '#18181b' }}>
+                <div className={`flex justify-between items-start ${t('dir') === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                   <div>
-                    <h3 className="text-2xl md:text-3xl font-bold text-[#18181b] italic serif">فاتورة مشتريات</h3>
+                    <h3 className="text-2xl md:text-3xl font-bold text-[#18181b] italic serif">{t('pi.title')}</h3>
                     <p className="text-[#71717a] font-mono text-sm md:text-base">{viewInvoice.invoice_number}</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-8">
                   <div>
-                    <p className="text-xs font-bold text-[#a1a1aa] uppercase tracking-widest mb-1">فاتورة من</p>
+                    <p className="text-xs font-bold text-[#a1a1aa] uppercase tracking-widest mb-1">{t('pi.invoice_from')}</p>
                     <p className="text-xl font-bold text-[#18181b]">{viewInvoice.supplier_name}</p>
                   </div>
-                  <div className="text-left">
-                    <p className="text-xs font-bold text-[#a1a1aa] uppercase tracking-widest mb-1">التاريخ</p>
+                  <div className={t('dir') === 'rtl' ? 'text-left' : 'text-right'}>
+                    <p className="text-xs font-bold text-[#a1a1aa] uppercase tracking-widest mb-1">{t('common.date')}</p>
                     <p className="text-lg font-medium text-[#18181b]">{formatDate(viewInvoice.date)}</p>
                   </div>
                 </div>
 
                 <div className="border border-[#f4f4f5] rounded-2xl overflow-hidden">
-                  <table className="w-full text-right text-sm">
+                  <table className={`w-full ${t('dir') === 'rtl' ? 'text-right' : 'text-left'} text-sm`}>
                     <thead className="bg-[#fafafa] text-[#71717a] uppercase text-[10px] font-bold tracking-widest">
                       <tr>
-                        <th className="px-4 py-3 w-16 text-center">صورة</th>
-                        <th className="px-4 py-3">الصنف / التصنيف</th>
-                        <th className="px-4 py-3 w-24">الكمية</th>
-                        <th className="px-4 py-3 w-32">السعر</th>
-                        <th className="px-4 py-3 w-32">الإجمالي</th>
+                        <th className="px-4 py-3 w-16 text-center">{t('common.image')}</th>
+                        <th className="px-4 py-3">{t('pi.item')} / {t('pi.expense_category')}</th>
+                        <th className="px-4 py-3 w-24">{t('pi.quantity')}</th>
+                        <th className="px-4 py-3 w-32">{t('pi.price')}</th>
+                        <th className="px-4 py-3 w-32">{t('pi.total')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#f4f4f5]">
@@ -1550,25 +1556,25 @@ export const PurchaseInvoices: React.FC = () => {
                           </td>
                           <td className="px-4 py-3 font-medium text-[#18181b]">{item.product_name || item.category_name}</td>
                           <td className="px-4 py-3 text-[#71717a]">{item.quantity}</td>
-                          <td className="px-4 py-3 text-[#71717a]">{formatNumber(item.price || item.cost_price || 0)} ج.م</td>
-                          <td className="px-4 py-3 font-bold text-[#18181b]">{formatNumber(item.total)} ج.م</td>
+                          <td className="px-4 py-3 text-[#71717a]">{formatNumber(item.price || item.cost_price || 0)} {t('common.currency')}</td>
+                          <td className="px-4 py-3 font-bold text-[#18181b]">{formatNumber(item.total)} {t('common.currency')}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot className="bg-[#fafafa] font-bold">
                       <tr>
-                        <td colSpan={3} className="px-4 py-2 text-left text-[#71717a]">الإجمالي الفرعي:</td>
-                        <td className="px-4 py-2 text-[#18181b]">{formatNumber(viewInvoice.subtotal || viewInvoice.total_amount || 0)} ج.م</td>
+                        <td colSpan={3} className={`px-4 py-2 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} text-[#71717a]`}>{t('pi.subtotal')}:</td>
+                        <td className="px-4 py-2 text-[#18181b]">{formatNumber(viewInvoice.subtotal || viewInvoice.total_amount || 0)} {t('common.currency')}</td>
                       </tr>
                       {viewInvoice.discount > 0 && (
                         <tr>
-                          <td colSpan={3} className="px-4 py-2 text-left text-[#71717a]">الخصم:</td>
-                          <td className="px-4 py-2 text-red-600">-{formatNumber(viewInvoice.discount)} ج.م</td>
+                          <td colSpan={3} className={`px-4 py-2 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} text-[#71717a]`}>{t('pi.discount')}:</td>
+                          <td className="px-4 py-2 text-red-600">-{formatNumber(viewInvoice.discount)} {t('common.currency')}</td>
                         </tr>
                       )}
                       <tr>
-                        <td colSpan={3} className="px-4 py-6 text-left text-[#71717a]">الإجمالي الكلي:</td>
-                        <td className="px-4 py-6 text-3xl text-[#f97316]">{formatNumber(viewInvoice.total_amount)} ج.م</td>
+                        <td colSpan={3} className={`px-4 py-6 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} text-[#71717a]`}>{t('pi.grand_total')}:</td>
+                        <td className="px-4 py-6 text-3xl text-[#f97316]">{formatNumber(viewInvoice.total_amount)} {t('common.currency')}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -1583,20 +1589,20 @@ export const PurchaseInvoices: React.FC = () => {
                     className="flex-1 py-4 bg-emerald-50 text-emerald-600 rounded-2xl font-bold hover:bg-emerald-100 transition-all flex items-center justify-center gap-2 border border-emerald-100"
                   >
                     <History size={20} />
-                    سجل النشاط
+                    {t('common.audit_log')}
                   </button>
                   <button 
                     onClick={() => exportToPDF(viewInvoice)}
                     className="flex-1 py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all flex items-center justify-center gap-2"
                   >
                     <Download size={20} />
-                    تحميل PDF
+                    {t('common.download_pdf')}
                   </button>
                   <button 
                     onClick={() => setViewInvoice(null)}
                     className="flex-1 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all"
                   >
-                    إغلاق
+                    {t('common.close')}
                   </button>
                 </div>
               </div>
@@ -1610,33 +1616,33 @@ export const PurchaseInvoices: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-4xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
             <div className="p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10">
-              <h3 className="text-lg md:text-xl font-bold text-zinc-900">إضافة مورد جديد</h3>
+              <h3 className="text-lg md:text-xl font-bold text-zinc-900">{t('suppliers.add_new')}</h3>
               <button onClick={() => setIsSupplierModalOpen(false)} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-xl transition-all"><X size={24} /></button>
             </div>
             
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-              <form onSubmit={handleSupplierSubmit} className="p-4 md:p-8 space-y-5 flex-1 overflow-y-auto pb-32 md:pb-8">
+              <form onSubmit={handleSupplierSubmit} className={`p-4 md:p-8 space-y-5 flex-1 overflow-y-auto pb-32 md:pb-8 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">اسم المورد</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('suppliers.name')}</label>
                     <div className="relative">
-                      <User className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <User className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                       <input
                         required
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                         value={supplierFormData.name}
                         onChange={(e) => setSupplierFormData({ ...supplierFormData, name: e.target.value })}
                       />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">رقم الهاتف</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('suppliers.phone')}</label>
                     <div className="relative">
-                      <Phone className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Phone className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                       <input
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                         value={supplierFormData.mobile}
                         onChange={(e) => setSupplierFormData({ ...supplierFormData, mobile: e.target.value })}
                       />
@@ -1644,23 +1650,23 @@ export const PurchaseInvoices: React.FC = () => {
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">البريد الإلكتروني</label>
+                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('suppliers.email')}</label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-3 text-zinc-400" size={18} />
+                    <Mail className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                     <input
                       type="email"
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                       value={supplierFormData.email}
                       onChange={(e) => setSupplierFormData({ ...supplierFormData, email: e.target.value })}
                     />
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">العنوان</label>
+                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('suppliers.address')}</label>
                   <div className="relative">
-                    <MapPin className="absolute left-3 top-3 text-zinc-400" size={18} />
+                    <MapPin className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                     <textarea
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                       rows={2}
                       value={supplierFormData.address}
                       onChange={(e) => setSupplierFormData({ ...supplierFormData, address: e.target.value })}
@@ -1669,38 +1675,38 @@ export const PurchaseInvoices: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">رصيد أول المدة</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('suppliers.opening_balance')}</label>
                     <div className="relative">
-                      <Wallet className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Wallet className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                       <input 
                         type="number" 
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                         value={supplierFormData.opening_balance}
                         onChange={(e) => setSupplierFormData({ ...supplierFormData, opening_balance: Number(e.target.value) })}
                       />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">تاريخ الرصيد</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('suppliers.balance_date')}</label>
                     <div className="relative">
-                      <Calendar className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Calendar className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                       <input 
                         type="date" 
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                         value={supplierFormData.opening_balance_date}
                         onChange={(e) => setSupplierFormData({ ...supplierFormData, opening_balance_date: e.target.value })}
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">الحساب المحاسبي</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('suppliers.accounting_account')}</label>
                     <select
                       required
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
                       value={supplierFormData.account_id}
                       onChange={(e) => setSupplierFormData({ ...supplierFormData, account_id: e.target.value })}
                     >
-                      <option value="">اختر الحساب...</option>
+                      <option value="">{t('suppliers.select_account')}</option>
                       {accounts.map(account => (
                         <option key={account.id} value={account.id}>
                           {account.code} - {account.name}
@@ -1710,21 +1716,21 @@ export const PurchaseInvoices: React.FC = () => {
                   </div>
                   {supplierFormData.opening_balance !== 0 && (
                     <div className="animate-in slide-in-from-top-2 duration-200">
-                      <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">حساب مقابل رصيد أول المدة</label>
+                      <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('suppliers.opening_balance_counter_account')}</label>
                       <select
                         required
-                        className="w-full px-4 py-3 bg-orange-50 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                        className={`w-full px-4 py-3 bg-orange-50 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
                         value={supplierFormData.counter_account_id}
                         onChange={(e) => setSupplierFormData({ ...supplierFormData, counter_account_id: e.target.value })}
                       >
-                        <option value="">اختر الحساب المقابل...</option>
+                        <option value="">{t('common.select_counter_account')}</option>
                         {accounts.map(account => (
                           <option key={account.id} value={account.id}>
                             {account.code} - {account.name}
                           </option>
                         ))}
                       </select>
-                      <p className="text-[10px] text-orange-600 mt-1 font-medium">يستخدم هذا الحساب لإنشاء قيد رصيد أول المدة (مثلاً: رأس المال أو الأرباح المرحلة)</p>
+                      <p className="text-[10px] text-orange-600 mt-1 font-medium">{t('suppliers.counter_account_note')}</p>
                     </div>
                   )}
                 </div>
@@ -1733,14 +1739,14 @@ export const PurchaseInvoices: React.FC = () => {
                     type="submit"
                     className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
                   >
-                    حفظ المورد
+                    {t('suppliers.save')}
                   </button>
                   <button 
                     type="button"
                     onClick={() => setIsSupplierModalOpen(false)}
                     className="px-8 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all active:scale-95"
                   >
-                    إلغاء
+                    {t('common.cancel')}
                   </button>
                 </div>
               </form>
@@ -1754,34 +1760,34 @@ export const PurchaseInvoices: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-4xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
             <div className="p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10">
-              <h3 className="text-lg md:text-xl font-bold text-zinc-900">إضافة صنف جديد</h3>
+              <h3 className="text-lg md:text-xl font-bold text-zinc-900">{t('products.add_new')}</h3>
               <button onClick={() => setIsProductModalOpen(false)} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-xl transition-all"><X size={24} /></button>
             </div>
             
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-              <form onSubmit={handleProductSubmit} className="p-4 md:p-8 space-y-5 flex-1 overflow-y-auto pb-32 md:pb-8">
+              <form onSubmit={handleProductSubmit} className={`p-4 md:p-8 space-y-5 flex-1 overflow-y-auto pb-32 md:pb-8 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">كود الصنف</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.code')}</label>
                     <div className="relative">
-                      <Hash className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Hash className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                       <input
                         required
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
+                        className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono`}
                         value={productFormData.code}
                         onChange={(e) => setProductFormData({ ...productFormData, code: e.target.value })}
                       />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">اسم الصنف</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.name')}</label>
                     <div className="relative">
-                      <Package className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Package className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                       <input
                         required
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                         value={productFormData.name}
                         onChange={(e) => setProductFormData({ ...productFormData, name: e.target.value })}
                       />
@@ -1790,46 +1796,46 @@ export const PurchaseInvoices: React.FC = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">نوع الصنف</label>
+                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.type')}</label>
                   <div className="relative">
-                    <Layers className="absolute left-3 top-3 text-zinc-400" size={18} />
+                    <Layers className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                     <select
                       required
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
+                      className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
                       value={productFormData.type}
                       onChange={(e) => setProductFormData({ ...productFormData, type: e.target.value as any })}
                     >
-                      <option value="product">منتج</option>
-                      <option value="service">خدمة</option>
-                      <option value="commodity">سلعة</option>
+                      <option value="product">{t('products.product')}</option>
+                      <option value="service">{t('products.service')}</option>
+                      <option value="commodity">{t('products.commodity')}</option>
                     </select>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">سعر البيع</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.sale_price')}</label>
                     <div className="relative">
-                      <Tag className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Tag className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                       <input
                         required
                         type="number"
                         step="0.01"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                         value={productFormData.sale_price}
                         onChange={(e) => setProductFormData({ ...productFormData, sale_price: Number(e.target.value) })}
                       />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">سعر التكلفة</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.cost_price')}</label>
                     <div className="relative">
-                      <Tag className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Tag className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                       <input
                         required
                         type="number"
                         step="0.01"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                         value={productFormData.cost_price}
                         onChange={(e) => setProductFormData({ ...productFormData, cost_price: Number(e.target.value) })}
                       />
@@ -1838,9 +1844,9 @@ export const PurchaseInvoices: React.FC = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">الوصف</label>
+                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.description')}</label>
                   <textarea
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
                     rows={2}
                     value={productFormData.description}
                     onChange={(e) => setProductFormData({ ...productFormData, description: e.target.value })}
@@ -1849,7 +1855,7 @@ export const PurchaseInvoices: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">المرفق (صورة أو PDF)</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.attachment')}</label>
                     <div className="relative group">
                       <input
                         type="file"
@@ -1864,7 +1870,7 @@ export const PurchaseInvoices: React.FC = () => {
                       >
                         <Paperclip size={18} className="text-zinc-400 group-hover:text-emerald-500" />
                         <span className="text-sm text-zinc-500 group-hover:text-emerald-900 font-bold">
-                          {productFormData.image_url ? 'تغيير المرفق' : 'اختر ملفاً...'}
+                          {productFormData.image_url ? t('products.change_attachment') : t('products.select_file')}
                         </span>
                       </label>
                     </div>
@@ -1873,7 +1879,7 @@ export const PurchaseInvoices: React.FC = () => {
                         <button 
                           type="button"
                           onClick={() => setProductFormData({ ...productFormData, image_url: '' })}
-                          className="absolute top-1 right-1 text-red-500 hover:bg-red-50 p-1 rounded-full bg-white/80 backdrop-blur-sm shadow-sm z-10"
+                          className={`absolute top-1 ${t('dir') === 'rtl' ? 'left-1' : 'right-1'} text-red-500 hover:bg-red-50 p-1 rounded-full bg-white/80 backdrop-blur-sm shadow-sm z-10`}
                         >
                           <X size={14} />
                         </button>
@@ -1894,12 +1900,12 @@ export const PurchaseInvoices: React.FC = () => {
                     )}
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">الباركود (اختياري)</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.barcode')}</label>
                     <div className="relative">
-                      <Hash className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Hash className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                       <input
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                         value={productFormData.barcode}
                         onChange={(e) => setProductFormData({ ...productFormData, barcode: e.target.value })}
                       />
@@ -1909,14 +1915,14 @@ export const PurchaseInvoices: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">حساب الإيرادات</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.revenue_account')}</label>
                     <select
                       required
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
                       value={productFormData.revenue_account_id}
                       onChange={(e) => setProductFormData({ ...productFormData, revenue_account_id: e.target.value })}
                     >
-                      <option value="">اختر الحساب...</option>
+                      <option value="">{t('suppliers.select_account')}</option>
                       {accounts.map(account => (
                         <option key={account.id} value={account.id}>
                           {account.code} - {account.name}
@@ -1925,14 +1931,14 @@ export const PurchaseInvoices: React.FC = () => {
                     </select>
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">حساب التكلفة</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.cost_account')}</label>
                     <select
                       required
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
                       value={productFormData.cost_account_id}
                       onChange={(e) => setProductFormData({ ...productFormData, cost_account_id: e.target.value })}
                     >
-                      <option value="">اختر الحساب...</option>
+                      <option value="">{t('suppliers.select_account')}</option>
                       {accounts.map(account => (
                         <option key={account.id} value={account.id}>
                           {account.code} - {account.name}
@@ -1946,14 +1952,14 @@ export const PurchaseInvoices: React.FC = () => {
                     type="submit"
                     className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
                   >
-                    حفظ الصنف
+                    {t('products.save')}
                   </button>
                   <button 
                     type="button"
                     onClick={() => setIsProductModalOpen(false)}
                     className="px-8 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all active:scale-95"
                   >
-                    إلغاء
+                    {t('common.cancel')}
                   </button>
                 </div>
               </form>
@@ -1967,34 +1973,34 @@ export const PurchaseInvoices: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-4xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
             <div className="p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10">
-              <h3 className="text-lg md:text-xl font-bold text-zinc-900">إضافة تصنيف مصروفات جديد</h3>
+              <h3 className="text-lg md:text-xl font-bold text-zinc-900">{t('expense_categories.add_new')}</h3>
               <button onClick={() => setIsExpenseCategoryModalOpen(false)} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-xl transition-all"><X size={24} /></button>
             </div>
             
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-              <form onSubmit={handleExpenseCategorySubmit} className="p-4 md:p-8 space-y-5 flex-1 overflow-y-auto pb-32 md:pb-8">
+              <form onSubmit={handleExpenseCategorySubmit} className={`p-4 md:p-8 space-y-5 flex-1 overflow-y-auto pb-32 md:pb-8 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">كود التصنيف</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('expense_categories.code')}</label>
                     <div className="relative">
-                      <Hash className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Hash className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                       <input
                         required
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
+                        className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono`}
                         value={expenseCategoryFormData.code}
                         onChange={(e) => setExpenseCategoryFormData({ ...expenseCategoryFormData, code: e.target.value })}
                       />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">اسم التصنيف</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('expense_categories.name')}</label>
                     <div className="relative">
-                      <Layers className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Layers className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                       <input
                         required
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                         value={expenseCategoryFormData.name}
                         onChange={(e) => setExpenseCategoryFormData({ ...expenseCategoryFormData, name: e.target.value })}
                       />
@@ -2002,11 +2008,11 @@ export const PurchaseInvoices: React.FC = () => {
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">الوصف</label>
+                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('expense_categories.description')}</label>
                   <div className="relative">
-                    <FileText className="absolute left-3 top-3 text-zinc-400" size={18} />
+                    <FileText className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                     <textarea
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                       rows={3}
                       value={expenseCategoryFormData.description}
                       onChange={(e) => setExpenseCategoryFormData({ ...expenseCategoryFormData, description: e.target.value })}
@@ -2018,14 +2024,14 @@ export const PurchaseInvoices: React.FC = () => {
                     type="submit"
                     className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
                   >
-                    حفظ التصنيف
+                    {t('expense_categories.save')}
                   </button>
                   <button 
                     type="button"
                     onClick={() => setIsExpenseCategoryModalOpen(false)}
                     className="px-8 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all active:scale-95"
                   >
-                    إلغاء
+                    {t('common.cancel')}
                   </button>
                 </div>
               </form>
@@ -2039,34 +2045,34 @@ export const PurchaseInvoices: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-6xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
             <div className="p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10">
-              <h3 className="text-lg md:text-xl font-bold text-zinc-900">إضافة طريقة دفع جديدة</h3>
+              <h3 className="text-lg md:text-xl font-bold text-zinc-900">{t('payment_methods.add_new')}</h3>
               <button onClick={() => setIsPaymentMethodModalOpen(false)} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-xl transition-all"><X size={24} /></button>
             </div>
             
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-              <form onSubmit={handlePaymentMethodSubmit} className="p-4 md:p-8 space-y-5 flex-1 overflow-y-auto pb-32 md:pb-8">
+              <form onSubmit={handlePaymentMethodSubmit} className={`p-4 md:p-8 space-y-5 flex-1 overflow-y-auto pb-32 md:pb-8 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">كود الطريقة</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('payment_methods.code')}</label>
                     <div className="relative">
-                      <Hash className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Hash className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                       <input
                         required
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                         value={paymentMethodFormData.code}
                         onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, code: e.target.value })}
                       />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">اسم الطريقة</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('payment_methods.name')}</label>
                     <div className="relative">
-                      <Wallet className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Wallet className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                       <input
                         required
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                         value={paymentMethodFormData.name}
                         onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, name: e.target.value })}
                       />
@@ -2075,29 +2081,29 @@ export const PurchaseInvoices: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">النوع</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('payment_methods.type')}</label>
                     <div className="relative">
-                      <Layers className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Layers className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                       <select
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
+                        className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
                         value={paymentMethodFormData.type}
                         onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, type: e.target.value as any })}
                       >
-                        <option value="cash">نقدي (خزينة)</option>
-                        <option value="bank">بنكي</option>
-                        <option value="wallet">محفظة إلكترونية</option>
+                        <option value="cash">{t('payment_methods.cash_box')}</option>
+                        <option value="bank">{t('payment_methods.bank')}</option>
+                        <option value="wallet">{t('payment_methods.wallet')}</option>
                       </select>
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">الحساب المحاسبي</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('payment_methods.accounting_account')}</label>
                     <select
                       required
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
                       value={paymentMethodFormData.account_id}
                       onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, account_id: e.target.value })}
                     >
-                      <option value="">اختر الحساب...</option>
+                      <option value="">{t('suppliers.select_account')}</option>
                       {accounts.map(account => (
                         <option key={account.id} value={account.id}>
                           {account.code} - {account.name}
@@ -2109,24 +2115,24 @@ export const PurchaseInvoices: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">الرصيد الافتتاحي</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('payment_methods.opening_balance')}</label>
                     <div className="relative">
-                      <Wallet className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Wallet className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                       <input 
                         type="number" 
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                         value={paymentMethodFormData.opening_balance}
                         onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, opening_balance: Number(e.target.value) })}
                       />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">تاريخ الرصيد</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('payment_methods.balance_date')}</label>
                     <div className="relative">
-                      <Calendar className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Calendar className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                       <input 
                         type="date" 
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                         value={paymentMethodFormData.opening_balance_date}
                         onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, opening_balance_date: e.target.value })}
                       />
@@ -2137,14 +2143,14 @@ export const PurchaseInvoices: React.FC = () => {
                 {paymentMethodFormData.opening_balance !== 0 && (
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">حساب الطرف الآخر (للرصيد الافتتاحي)</label>
+                      <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('payment_methods.counter_account')}</label>
                       <select
                         required
-                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all border-emerald-200 bg-emerald-50/30"
+                        className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all border-emerald-200 bg-emerald-50/30 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
                         value={paymentMethodFormData.counter_account_id}
                         onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, counter_account_id: e.target.value })}
                       >
-                        <option value="">اختر حساب الطرف الآخر...</option>
+                        <option value="">{t('common.select_counter_account')}</option>
                         {accounts.map(account => (
                           <option key={account.id} value={account.id}>
                             {account.code} - {account.name}
@@ -2154,19 +2160,19 @@ export const PurchaseInvoices: React.FC = () => {
                     </div>
                     {paymentMethodFormData.counter_account_id && paymentMethodFormData.account_id && (
                       <JournalEntryPreview 
-                        title="معاينة قيد الرصيد الافتتاحي"
+                        title={t('payment_methods.opening_balance_preview')}
                         items={[
                           {
-                            account_name: accounts.find(a => a.id === paymentMethodFormData.account_id)?.name || 'حساب طريقة الدفع',
+                            account_name: accounts.find(a => a.id === paymentMethodFormData.account_id)?.name || t('payment_methods.payment_method_account'),
                             debit: paymentMethodFormData.opening_balance > 0 ? paymentMethodFormData.opening_balance : 0,
                             credit: paymentMethodFormData.opening_balance < 0 ? Math.abs(paymentMethodFormData.opening_balance) : 0,
-                            description: 'رصيد افتتاحي'
+                            description: t('payment_methods.opening_balance')
                           },
                           {
-                            account_name: accounts.find(a => a.id === paymentMethodFormData.counter_account_id)?.name || 'حساب الطرف الآخر',
+                            account_name: accounts.find(a => a.id === paymentMethodFormData.counter_account_id)?.name || t('payment_methods.counter_account_placeholder'),
                             debit: paymentMethodFormData.opening_balance < 0 ? Math.abs(paymentMethodFormData.opening_balance) : 0,
                             credit: paymentMethodFormData.opening_balance > 0 ? paymentMethodFormData.opening_balance : 0,
-                            description: `رصيد افتتاحي لطريقة الدفع: ${paymentMethodFormData.name}`
+                            description: t('payment_methods.opening_balance_method_desc', { name: paymentMethodFormData.name })
                           }
                         ]}
                       />
@@ -2175,11 +2181,11 @@ export const PurchaseInvoices: React.FC = () => {
                 )}
 
                 <div className="space-y-1">
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">تفاصيل إضافية</label>
+                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('payment_methods.additional_details')}</label>
                   <div className="relative">
-                    <FileText className="absolute left-3 top-3 text-zinc-400" size={18} />
+                    <FileText className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                     <textarea
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                       rows={3}
                       value={paymentMethodFormData.details}
                       onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, details: e.target.value })}
@@ -2191,14 +2197,14 @@ export const PurchaseInvoices: React.FC = () => {
                     type="submit"
                     className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
                   >
-                    حفظ الطريقة
+                    {t('payment_methods.save')}
                   </button>
                   <button 
                     type="button"
                     onClick={() => setIsPaymentMethodModalOpen(false)}
                     className="px-8 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all active:scale-95"
                   >
-                    إلغاء
+                    {t('common.cancel')}
                   </button>
                 </div>
               </form>
@@ -2214,8 +2220,8 @@ export const PurchaseInvoices: React.FC = () => {
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 animate-in zoom-in-95 duration-200">
-            <h3 className="text-xl font-bold text-zinc-900 mb-4">تأكيد الحذف</h3>
-            <p className="text-zinc-500 mb-6">هل أنت متأكد من رغبتك في حذف هذه الفاتورة؟ لا يمكن التراجع عن هذا الإجراء.</p>
+            <h3 className={`text-xl font-bold text-zinc-900 mb-4 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>{t('pi.confirm_delete_title')}</h3>
+            <p className={`text-zinc-500 mb-6 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>{t('pi.confirm_delete_desc')}</p>
             <div className="flex gap-4">
               <button 
                 onClick={() => {
@@ -2224,13 +2230,13 @@ export const PurchaseInvoices: React.FC = () => {
                 }}
                 className="flex-1 py-3 bg-zinc-100 text-zinc-600 rounded-xl font-bold hover:bg-zinc-200 transition-all"
               >
-                إلغاء
+                {t('common.cancel')}
               </button>
               <button 
                 onClick={confirmDelete}
                 className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all shadow-lg shadow-red-500/20"
               >
-                حذف
+                {t('common.delete')}
               </button>
             </div>
           </div>

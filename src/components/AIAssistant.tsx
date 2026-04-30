@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { processAIRequest } from '../services/aiAssistantService';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -18,9 +19,10 @@ interface AIAssistantProps {
 export const AIAssistant: React.FC<AIAssistantProps> = ({ onNavigate, isMobileFloating }) => {
   const { user } = useAuth();
   const { addPersistentNotification } = useNotification();
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'مرحباً! أنا مساعدك الذكي. كيف يمكنني مساعدتك اليوم؟ يمكنك أن تطلب مني إضافة عملاء، موردين، أصناف، أو حتى إنشاء فواتير وسندات.' }
+    { role: 'assistant', content: t('dashboard.ai_welcome_msg') }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -45,7 +47,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ onNavigate, isMobileFl
     try {
       const result = await processAIRequest(userMessage, user);
       
-      let finalResponse = result.text || 'عذراً، لم أستطع معالجة طلبك.';
+      let finalResponse = result.text || t('common.error');
       let navigationPage = null;
 
       // Check for navigation commands in the response (e.g., [NAVIGATE:page])
@@ -57,7 +59,10 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ onNavigate, isMobileFl
         }
       }
 
-      setMessages(prev => [...prev, { role: 'assistant', content: finalResponse || (navigationPage ? 'تم الانتقال إلى الصفحة المطلوبة.' : 'عذراً، لم أستطع معالجة طلبك.') }]);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: finalResponse || (navigationPage ? t('dashboard.ai_navigate_msg') : t('common.error')) 
+      }]);
       
       if (navigationPage && onNavigate) {
         onNavigate(navigationPage);
@@ -66,7 +71,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ onNavigate, isMobileFl
       // Add persistent notification only if an operation was performed
       if (result.operationPerformed) {
         addPersistentNotification({
-          title: 'عملية ذكاء اصطناعي',
+          title: t('common.audit_log'),
           message: finalResponse.length > 100 ? finalResponse.substring(0, 100) + '...' : finalResponse,
           type: 'success',
           category: 'ai'
@@ -75,7 +80,10 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ onNavigate, isMobileFl
     } catch (error: any) {
       console.error('AI Error:', error);
       const errorMessage = error.message || 'Unknown error';
-      setMessages(prev => [...prev, { role: 'assistant', content: `حدث خطأ أثناء معالجة طلبك: ${errorMessage}. يرجى المحاولة مرة أخرى.` }]);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: t('dashboard.ai_error_msg', { error: errorMessage }) 
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -88,7 +96,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ onNavigate, isMobileFl
         <button
           onClick={() => setIsOpen(true)}
           className="w-full h-full flex items-center justify-center text-white"
-          title="المساعد الذكي"
+          title={t('dashboard.ai_assistant')}
         >
           <Sparkles size={24} />
         </button>
@@ -96,7 +104,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ onNavigate, isMobileFl
         <button
           onClick={() => setIsOpen(true)}
           className="fixed bottom-6 left-6 z-50 p-4 bg-emerald-600 text-white rounded-full shadow-2xl hover:bg-emerald-700 transition-all hover:scale-110 active:scale-95 group"
-          title="المساعد الذكي"
+          title={t('dashboard.ai_assistant')}
         >
           <Sparkles className="group-hover:animate-pulse" size={24} />
         </button>
@@ -116,7 +124,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ onNavigate, isMobileFl
             <div className="p-4 bg-emerald-600 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Bot size={24} />
-                <span className="font-bold">المساعد الذكي</span>
+                <span className="font-bold">{t('dashboard.ai_assistant')}</span>
               </div>
               <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-white/20 rounded-lg transition-colors">
                 <X size={20} />
@@ -148,7 +156,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ onNavigate, isMobileFl
                 <div className="flex justify-start">
                   <div className="bg-white p-3 rounded-2xl shadow-sm border border-zinc-100 rounded-tl-none flex items-center gap-2">
                     <Loader2 className="animate-spin text-emerald-600" size={16} />
-                    <span className="text-sm text-zinc-500">جاري التفكير...</span>
+                    <span className="text-sm text-zinc-500">{t('dashboard.ai_thinking')}</span>
                   </div>
                 </div>
               )}
@@ -167,7 +175,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ onNavigate, isMobileFl
                       handleSend();
                     }
                   }}
-                  placeholder="اكتب طلبك هنا... (مثال: أضف عميل جديد باسم أحمد)"
+                  placeholder={t('dashboard.ai_placeholder')}
                   className="w-full p-3 pr-12 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none text-sm"
                   rows={2}
                 />
@@ -180,7 +188,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ onNavigate, isMobileFl
                 </button>
               </div>
               <p className="mt-2 text-[10px] text-zinc-400 text-center">
-                يمكنني مساعدتك في تنفيذ العمليات المحاسبية وإضافة البيانات الأساسية.
+                {t('dashboard.ai_help_text')}
               </p>
             </div>
           </motion.div>

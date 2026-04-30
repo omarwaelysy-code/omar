@@ -1,6 +1,7 @@
 import React from 'react';
 import { FileText } from 'lucide-react';
 import { formatNumber } from '../utils/formatUtils';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface JournalEntryItem {
   account_name: string;
@@ -14,7 +15,10 @@ interface JournalEntryPreviewProps {
   title?: string;
 }
 
-export const JournalEntryPreview: React.FC<JournalEntryPreviewProps> = ({ items, title = 'معاينة قيد اليومية' }) => {
+export const JournalEntryPreview: React.FC<JournalEntryPreviewProps> = ({ items, title }) => {
+  const { t } = useLanguage();
+  const displayTitle = title || t('journal.preview_title');
+
   if (items.length === 0) return null;
 
   const totalDebit = items.reduce((sum, item) => sum + item.debit, 0);
@@ -24,15 +28,15 @@ export const JournalEntryPreview: React.FC<JournalEntryPreviewProps> = ({ items,
     <div className="bg-zinc-50 rounded-2xl border border-zinc-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
       <div className="px-4 py-3 bg-zinc-100/50 border-b border-zinc-100 flex items-center gap-2">
         <FileText size={16} className="text-zinc-400" />
-        <span className="text-xs font-black text-zinc-600 uppercase tracking-widest">{title}</span>
+        <span className="text-xs font-black text-zinc-600 uppercase tracking-widest">{displayTitle}</span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs text-right">
           <thead>
-            <tr className="text-zinc-400 border-b border-zinc-100">
-              <th className="px-4 py-2 font-bold">الحساب</th>
-              <th className="px-4 py-2 font-bold text-left">مدين</th>
-              <th className="px-4 py-2 font-bold text-left">دائن</th>
+            <tr className="text-zinc-400 border-b border-zinc-100 italic">
+              <th className="px-4 py-2 font-bold">{t('common.account')}</th>
+              <th className="px-4 py-2 font-bold text-left">{t('common.debit')}</th>
+              <th className="px-4 py-2 font-bold text-left">{t('common.credit')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100">
@@ -53,7 +57,7 @@ export const JournalEntryPreview: React.FC<JournalEntryPreviewProps> = ({ items,
           </tbody>
           <tfoot>
             <tr className="bg-zinc-100/30 font-black border-t border-zinc-200">
-              <td className="px-4 py-2 text-zinc-600">الإجمالي</td>
+              <td className="px-4 py-2 text-zinc-600">{t('common.total')}</td>
               <td className="px-4 py-2 text-left font-mono text-emerald-700">{formatNumber(totalDebit)}</td>
               <td className="px-4 py-2 text-left font-mono text-rose-700">{formatNumber(totalCredit)}</td>
             </tr>
@@ -62,7 +66,7 @@ export const JournalEntryPreview: React.FC<JournalEntryPreviewProps> = ({ items,
       </div>
       {Math.abs(totalDebit - totalCredit) > 0.01 && (
         <div className="px-4 py-2 bg-rose-50 text-rose-600 text-[10px] font-bold text-center border-t border-rose-100">
-          تنبيه: القيد غير متزن!
+          {t('journal.unbalanced_warning')}
         </div>
       )}
     </div>

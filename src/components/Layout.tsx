@@ -882,7 +882,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                       <div>
                         <p className="font-black text-zinc-900">{user?.username}</p>
                         <p className="text-xs text-emerald-600 font-bold">
-                          {isSuperAdmin ? t('common.role_super_admin') : isCompanyAdmin ? t('common.role_admin') : isManager ? 'مشرف' : t('common.role_user')}
+                          {isSuperAdmin ? t('common.role_super_admin') : isCompanyAdmin ? t('common.role_admin') : isManager ? t('common.manager') : t('common.role_user')}
                         </p>
                       </div>
                     </div>
