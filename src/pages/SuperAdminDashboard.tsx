@@ -101,7 +101,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
       setUsers(allUsers);
       setLogs(filteredLogs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
       setConfig(sysConfig);
-      setAuditLogs(v2AuditLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+      setAuditLogs(v2AuditLogs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
     } catch (error) {
       console.error('Error fetching super admin data:', error);
     } finally {
@@ -147,7 +147,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
       user_id: 'system',
       username: 'Super Admin',
       company_id: user.company_id,
-      timestamp: new Date().toISOString(),
+      created_at: new Date().toISOString(),
       action: 'إعادة إرسال بريد الترحيب',
       details: `تم إعادة إرسال بيانات الدخول للمستخدم ${user.email}`
     });
@@ -168,7 +168,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
       user_id: 'system',
       username: 'Super Admin',
       company_id: user.company_id,
-      timestamp: new Date().toISOString(),
+      created_at: new Date().toISOString(),
       action: 'إعادة تعيين كلمة المرور المؤقتة',
       details: `تم إنشاء كلمة مرور مؤقتة جديدة للمستخدم ${user.email}`
     });
@@ -985,7 +985,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                             <td className="px-4 py-4 font-mono text-[11px] text-stone-400">
                                <div className="flex items-center gap-2">
                                  <Clock size={12} />
-                                 {new Date(alog.timestamp).toLocaleString()}
+                                 {new Date(alog.created_at).toLocaleString()}
                                </div>
                             </td>
                             <td className="px-4 py-4">

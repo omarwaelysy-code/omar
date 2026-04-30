@@ -619,7 +619,7 @@ modules.forEach(moduleName => {
           return res.status(400).json({ error: 'company_id is required' });
         }
 
-        query += ' ORDER BY timestamp DESC LIMIT 500';
+        query += ' ORDER BY created_at DESC LIMIT 500';
         const queryResult = await pool.query(query, params);
         rows = queryResult.rows;
       } else {

@@ -106,6 +106,6 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'id', 'maintenance_mode', 'maintenance_message', 'allowed_users', 'min_client_version', 'updated_at', 'updated_by'
   ],
   audit_logs: [
-    'id', 'company_id', 'user_id', 'user_email', 'action', 'resource', 'resource_id', 'changes', 'severity', 'ip_address', 'timestamp'
+    'id', 'company_id', 'user_id', 'user_email', 'action', 'resource', 'resource_id', 'changes', 'severity', 'ip_address', 'created_at'
   ]
 };
