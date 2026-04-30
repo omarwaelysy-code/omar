@@ -99,7 +99,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
       
       setCompanies(allCompanies);
       setUsers(allUsers);
-      setLogs(filteredLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+      setLogs(filteredLogs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
       setConfig(sysConfig);
       setAuditLogs(v2AuditLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
     } catch (error) {
@@ -826,7 +826,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                             {companies.find(c => c.id === log.company_id)?.name || 'نظام'}
                           </span>
                         </div>
-                        <span className="text-xs text-stone-400">{new Date(log.timestamp).toLocaleString('ar-EG')}</span>
+                        <span className="text-xs text-stone-400">{new Date(log.created_at).toLocaleString('ar-EG')}</span>
                       </div>
                       <p className="text-sm text-stone-600 mt-1">{log.details}</p>
                       <div className="flex items-center gap-4 mt-2">

@@ -33,7 +33,7 @@ export const PageActivityLog: React.FC<PageActivityLogProps> = ({ category, docu
 
             return categoryMatch && documentMatch;
           })
-          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         setLogs(filtered);
         setLoading(false);
       });
@@ -106,7 +106,7 @@ export const PageActivityLog: React.FC<PageActivityLogProps> = ({ category, docu
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2 text-xs font-bold text-zinc-400 font-mono">
                             <Clock size={12} />
-                            <span>{formatDateTime(log.timestamp)}</span>
+                            <span>{formatDateTime(log.created_at)}</span>
                           </div>
                         </div>
 

@@ -37,7 +37,7 @@ export const TransactionSidePanel: React.FC<TransactionSidePanelProps> = ({
               : log.category === category;
             return categoryMatch && log.document_id === documentId;
           })
-          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         setLogs(filtered);
       });
 
@@ -209,7 +209,7 @@ export const TransactionSidePanel: React.FC<TransactionSidePanelProps> = ({
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-400">
                       <Clock size={10} />
-                      <span>{new Date(log.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span>{new Date(log.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
                       <span className="mx-1 text-zinc-200">•</span>
                       <span className="text-zinc-500">{log.username}</span>
                     </div>

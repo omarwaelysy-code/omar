@@ -111,7 +111,7 @@ export const Receipts: React.FC = () => {
       setPreviewActivityLog({
         action: 'إضافة سند قبض',
         details: `إضافة سند قبض جديد من العميل ${customer?.name || '...'} بمبلغ ${formatNumber(formData.amount)}`,
-        timestamp: new Date().toISOString()
+        created_at: new Date().toISOString()
       });
 
       // Preview Journal Entry

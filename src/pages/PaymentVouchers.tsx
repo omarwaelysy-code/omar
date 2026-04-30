@@ -127,7 +127,7 @@ export const PaymentVouchers: React.FC = () => {
       setPreviewActivityLog({
         action: 'إضافة سند صرف',
         details: `إضافة سند صرف جديد ${voucherData.type === 'supplier' ? `للمورد ${supplier?.name || '...'}` : `لمصروف ${category?.name || '...'}`} بمبلغ ${formatNumber(voucherData.amount)}`,
-        timestamp: new Date().toISOString()
+        created_at: new Date().toISOString()
       });
 
       // Preview Journal Entry

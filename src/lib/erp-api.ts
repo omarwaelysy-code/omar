@@ -28,9 +28,9 @@ async function logActivity(
 ) {
   try {
     await pool.query(
-      `INSERT INTO activity_logs (company_id, user_id, username, action, details, category, document_id, changes, ip_address) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [company_id, user_id, username, action, details, JSON.stringify(category), document_id, JSON.stringify(changes), ip_address]
+      `INSERT INTO activity_logs (company_id, user_id, username, action, details, category, document_id, changes, ip_address, created_at) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [company_id, user_id, username, action, details, JSON.stringify(category), document_id, JSON.stringify(changes), ip_address, new Date()]
     );
   } catch (error) {
     console.error('Failed to log server activity:', error);
@@ -590,12 +590,8 @@ modules.forEach(moduleName => {
     try {
       let rows;
       if (moduleName === 'activity_logs') {
-        const companyId = req.query.company_id;
         const isSuperAdmin = req.user?.role === 'super_admin';
-        
-        if (!companyId && !isSuperAdmin) {
-          return res.status(400).json({ error: 'company_id is required for non-super-admins' });
-        }
+        const companyId = isSuperAdmin ? req.query.company_id : req.user?.company_id;
         
         let query = 'SELECT * FROM activity_logs';
         let params: any[] = [];
@@ -605,7 +601,7 @@ modules.forEach(moduleName => {
           params.push(companyId);
         }
         
-        query += ' ORDER BY timestamp DESC LIMIT 500';
+        query += ' ORDER BY created_at DESC LIMIT 500';
         
         const queryResult = await pool.query(query, params);
         rows = queryResult.rows;

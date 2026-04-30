@@ -171,7 +171,7 @@ export const PaymentMethods: React.FC = () => {
         code: method.code,
         name: method.name,
         opening_balance: method.opening_balance,
-        opening_balance_date: method.opening_balance_date || new Date().toISOString().slice(0, 10),
+        opening_balance_date: method.opening_balance_date ? new Date(method.opening_balance_date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
         account_id: method.account_id || '',
         counter_account_id: method.counter_account_id || ''
       });
@@ -273,10 +273,18 @@ export const PaymentMethods: React.FC = () => {
 
               <div className="space-y-2">
                 <h3 className="text-xl font-bold text-zinc-900">{method.name}</h3>
-                <span className="inline-block text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg uppercase tracking-wider">{method.code}</span>
+                <div className="flex items-center justify-between">
+                  <span className="inline-block text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg uppercase tracking-wider">{method.code}</span>
+                  {method.opening_balance_date && (
+                    <div className="flex items-center gap-1 text-[10px] text-zinc-400 font-mono">
+                      <Calendar size={10} />
+                      <span>{method.opening_balance_date}</span>
+                    </div>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 text-zinc-900 font-bold pt-3 border-t border-zinc-50 mt-2">
                   <Wallet size={16} className="text-emerald-500" />
-                  <span>الرصيد: {formatNumber(method.opening_balance || 0)} ج.م</span>
+                  <span>الرصيد الافتتاحي: {formatNumber(method.opening_balance || 0)} ج.م</span>
                 </div>
               </div>
             </div>

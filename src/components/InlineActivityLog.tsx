@@ -30,7 +30,7 @@ export const InlineActivityLog: React.FC<InlineActivityLogProps> = ({ category, 
 
             return categoryMatch && documentMatch;
           })
-          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         setLogs(filtered);
         setLoading(false);
       });
@@ -75,7 +75,7 @@ export const InlineActivityLog: React.FC<InlineActivityLogProps> = ({ category, 
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-400 font-mono">
                     <Clock size={10} />
-                    <span>{formatDateTime(log.timestamp)}</span>
+                    <span>{formatDateTime(log.created_at)}</span>
                   </div>
 
                   <div className="bg-white rounded-xl p-3 border border-zinc-100 shadow-sm hover:border-emerald-200 transition-colors group">

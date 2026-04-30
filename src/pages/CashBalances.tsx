@@ -93,15 +93,20 @@ export const CashBalances: React.FC = () => {
           let movIn = 0;
           let movOut = 0;
 
-          const processTrans = (trans: any[], type: 'in' | 'out') => {
+          const opDate = method.opening_balance_date ? new Date(method.opening_balance_date) : new Date(0);
+
+          const processTrans = (trans: any[], direction: 'in' | 'out') => {
             trans.filter(t => t.payment_method_id === method.id).forEach(t => {
               const d = new Date(t.date);
+              // Skip transactions on or before opening balance date as they are already in opening_balance
+              if (d <= opDate) return;
+
               const amount = t.total_amount || t.amount || 0;
               if (d < startDate) {
-                if (type === 'in') opIn += amount;
+                if (direction === 'in') opIn += amount;
                 else opOut += amount;
               } else if (d >= startDate && d <= endDate) {
-                if (type === 'in') movIn += amount;
+                if (direction === 'in') movIn += amount;
                 else movOut += amount;
               }
             });
@@ -117,6 +122,8 @@ export const CashBalances: React.FC = () => {
           // Handle transfers
           transfers.forEach(tr => {
             const d = new Date(tr.date);
+            if (d <= opDate) return;
+
             const amount = tr.amount;
             
             if (tr.from_payment_method_id === method.id) {
@@ -137,6 +144,8 @@ export const CashBalances: React.FC = () => {
                 je.items?.forEach((item: any) => {
                   if (item.account_id === method.account_id) {
                     const d = new Date(je.date);
+                    if (d <= opDate) return;
+
                     if (d < startDate) {
                       opIn += item.debit || 0;
                       opOut += item.credit || 0;

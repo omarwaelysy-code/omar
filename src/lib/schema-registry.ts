@@ -30,7 +30,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'current_stock', 'is_service', 'counter_account_id'
   ],
   accounts: [
-    'id', 'company_id', 'type_id', 'parent_id', 'code', 'name', 'opening_balance', 'is_active'
+    'id', 'company_id', 'type_id', 'parent_id', 'code', 'name', 'opening_balance', 'opening_balance_date', 'is_active'
   ],
   invoices: [
     'id', 'company_id', 'customer_id', 'customer_name', 'invoice_number', 'date', 'due_date', 'subtotal',
@@ -97,7 +97,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   activity_logs: [
     'id', 'company_id', 'user_id', 'username', 'action', 'details', 'ip_address', 
-    'timestamp', 'category', 'document_id', 'changes'
+    'created_at', 'category', 'document_id', 'changes'
   ],
   settings: [
     'id', 'company_id', 'type', 'key', 'value', 'customer_discount_account_id', 'supplier_discount_account_id', 'updated_at', 'created_at'

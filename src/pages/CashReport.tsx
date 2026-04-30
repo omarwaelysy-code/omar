@@ -125,7 +125,13 @@ export const CashReport: React.FC = () => {
 
       allTrans.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-      const filtered = allTrans.filter(t => {
+      // Filter transactions that are after opening_balance_date
+      const opDate = method?.opening_balance_date || '1970-01-01';
+      const opDateObj = new Date(opDate);
+      
+      const transAfterOpDate = allTrans.filter(t => new Date(t.date) > opDateObj);
+
+      const filtered = transAfterOpDate.filter(t => {
         const d = new Date(t.date);
         const s = startDate ? new Date(startDate) : new Date(0);
         const e = endDate ? new Date(endDate) : new Date();
@@ -133,7 +139,7 @@ export const CashReport: React.FC = () => {
         return d >= s && d <= e;
       });
 
-      const before = allTrans.filter(t => startDate && new Date(t.date) < new Date(startDate));
+      const before = transAfterOpDate.filter(t => startDate && new Date(t.date) < new Date(startDate));
       const balBefore = before.reduce((sum, t) => sum + (Number(t.in) - Number(t.out)), 0);
 
       const initialBalance = opBal + balBefore;
@@ -280,7 +286,7 @@ export const CashReport: React.FC = () => {
                   <tbody>
                     {/* Opening Balance Row */}
                     <tr className="border-b border-zinc-50 bg-zinc-50/30">
-                      <td className="px-4 py-3 text-sm font-mono">{startDate || '-'}</td>
+                      <td className="px-4 py-3 text-sm font-mono">{startDate || (paymentMethods.find(m => m.id === selectedMethodId)?.opening_balance_date) || '-'}</td>
                       <td className="px-4 py-3 text-sm"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600">{t('reports.balance')}</span></td>
                       <td className="px-4 py-3 text-sm font-mono">-</td>
                       <td className="px-4 py-3 text-sm">{t('reports.brought_forward')}</td>

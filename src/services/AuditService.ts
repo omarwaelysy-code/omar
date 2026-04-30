@@ -20,7 +20,7 @@ export class AuditService {
       resource_id: params.resourceId,
       changes: params.changes,
       severity: params.severity || 'info',
-      timestamp: new Date().toISOString(),
+      created_at: new Date().toISOString(),
       company_id: params.companyId
     };
 

@@ -110,7 +110,7 @@ export async function initDatabase() {
         "action" VARCHAR(100) NOT NULL,
         "details" TEXT,
         "ip_address" VARCHAR(45),
-        "timestamp" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         "category" JSONB,
         "document_id" VARCHAR(36),
         "changes" JSONB
@@ -500,7 +500,7 @@ export async function initDatabase() {
     await client.query(`
       CREATE INDEX IF NOT EXISTS "idx_users_email" ON "users"("email");
       CREATE INDEX IF NOT EXISTS "idx_users_company_id" ON "users"("company_id");
-      CREATE INDEX IF NOT EXISTS "idx_activity_logs_company_timestamp" ON "activity_logs"("company_id", "timestamp" DESC);
+      CREATE INDEX IF NOT EXISTS "idx_activity_logs_company_created_at" ON "activity_logs"("company_id", "created_at" DESC);
       CREATE INDEX IF NOT EXISTS "idx_audit_logs_company_timestamp" ON "audit_logs"("company_id", "timestamp" DESC);
       CREATE INDEX IF NOT EXISTS "idx_journal_entries_company_date" ON "journal_entries"("company_id", "date" DESC);
       CREATE INDEX IF NOT EXISTS "idx_invoices_company_date" ON "invoices"("company_id", "date" DESC);

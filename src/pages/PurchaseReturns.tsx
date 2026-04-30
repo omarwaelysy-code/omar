@@ -126,7 +126,7 @@ export const PurchaseReturns: React.FC = () => {
       setPreviewActivityLog({
         action: 'إضافة مرتجع مشتريات',
         details: `إضافة مرتجع مشتريات جديد للمورد ${supplier?.name || '...'} بمبلغ ${formatNumber(total_amount)}`,
-        timestamp: new Date().toISOString()
+        created_at: new Date().toISOString()
       });
 
       // Preview Journal Entry

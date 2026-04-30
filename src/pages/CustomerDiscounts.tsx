@@ -99,7 +99,7 @@ export const CustomerDiscounts: React.FC = () => {
       setPreviewActivityLog({
         action: 'إضافة خصم عميل',
         details: `إضافة خصم جديد للعميل ${customer?.name || '...'} بمبلغ ${formatNumber(discountData.amount)}`,
-        timestamp: new Date().toISOString()
+        created_at: new Date().toISOString()
       });
 
       // Preview Journal Entry

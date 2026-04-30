@@ -99,7 +99,7 @@ export const SupplierDiscounts: React.FC = () => {
       setPreviewActivityLog({
         action: 'إضافة خصم مورد',
         details: `إضافة خصم جديد من المورد ${supplier?.name || '...'} بمبلغ ${formatNumber(discountData.amount)}`,
-        timestamp: new Date().toISOString()
+        created_at: new Date().toISOString()
       });
 
       // Preview Journal Entry

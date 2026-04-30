@@ -147,7 +147,7 @@ export const dbService = {
         category,
         document_id: documentId,
         changes,
-        timestamp: new Date().toISOString()
+        created_at: new Date().toISOString()
       });
       // Trigger immediate refresh for subscribers
       window.dispatchEvent(new CustomEvent('db-refresh', { detail: { collection: 'activity_logs' } }));

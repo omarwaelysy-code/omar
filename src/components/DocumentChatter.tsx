@@ -24,7 +24,7 @@ const DocumentChatter: React.FC<DocumentChatterProps> = ({ documentId, collectio
       const unsub = dbService.subscribe<ActivityLog>('activity_logs', user.company_id, (data) => {
         const filtered = data
           .filter(log => log.document_id === documentId)
-          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         setLogs(filtered);
         setLoading(false);
       });
@@ -72,7 +72,7 @@ const DocumentChatter: React.FC<DocumentChatterProps> = ({ documentId, collectio
                       <User className="w-3 h-3" />
                       <span>{log.username}</span>
                     </div>
-                    <span>{format(new Date(log.timestamp), 'dd MMM yyyy HH:mm', { locale: language === 'ar' ? ar : enUS })}</span>
+                    <span>{format(new Date(log.created_at), 'dd MMM yyyy HH:mm', { locale: language === 'ar' ? ar : enUS })}</span>
                   </div>
 
                   <div className="flex items-center gap-2 mt-1">

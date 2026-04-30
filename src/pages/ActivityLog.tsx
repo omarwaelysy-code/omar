@@ -15,8 +15,7 @@ export const ActivityLogPage: React.FC = () => {
     if (user) {
       setLoading(true);
       const unsub = dbService.subscribe<ActivityLog>('activity_logs', user.company_id, (data) => {
-        const sortedLogs = [...data].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-        setLogs(sortedLogs);
+        setLogs(data);
         setLoading(false);
       });
       return () => unsub();
@@ -24,9 +23,9 @@ export const ActivityLogPage: React.FC = () => {
   }, [user]);
 
   const filteredLogs = logs.filter(log => 
-    log.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.details.toLowerCase().includes(searchTerm.toLowerCase())
+    (log.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (log.action || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (log.details || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -98,7 +97,7 @@ export const ActivityLogPage: React.FC = () => {
                     <div className="flex flex-col text-xs text-zinc-400">
                       <div className="flex items-center gap-1 font-mono">
                         <Clock size={12} />
-                        <span>{formatDateTime(log.timestamp)}</span>
+                        <span>{formatDateTime(log.created_at)}</span>
                       </div>
                     </div>
                   </td>
@@ -128,7 +127,7 @@ export const ActivityLogPage: React.FC = () => {
                 <div className="text-left text-[10px] text-zinc-400 font-mono">
                   <div className="flex items-center gap-1 justify-end">
                     <Clock size={10} />
-                    <span>{formatDateTime(log.timestamp)}</span>
+                    <span>{formatDateTime(log.created_at)}</span>
                   </div>
                 </div>
               </div>

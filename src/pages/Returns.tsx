@@ -115,7 +115,7 @@ export const Returns: React.FC = () => {
       setPreviewActivityLog({
         action: 'إضافة مرتجع مبيعات',
         details: `إضافة مرتجع مبيعات جديد للعميل ${customer?.name || '...'} بمبلغ ${formatNumber(total_amount)}`,
-        timestamp: new Date().toISOString()
+        created_at: new Date().toISOString()
       });
 
       // Preview Journal Entry

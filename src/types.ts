@@ -38,7 +38,7 @@ export interface AuditLog {
   };
   severity: 'info' | 'warning' | 'critical';
   ip_address?: string;
-  timestamp: string;
+  created_at: string;
   company_id: string;
 }
 
@@ -301,7 +301,7 @@ export interface ActivityLog {
   user_id: string;
   username: string;
   company_id: string;
-  timestamp: string;
+  created_at: string;
   action: string;
   details: string;
   category?: string | string[];

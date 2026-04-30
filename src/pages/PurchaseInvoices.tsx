@@ -208,7 +208,7 @@ export const PurchaseInvoices: React.FC = () => {
         details: editingInvoice 
           ? t('pi.log_edit_details', { number: invoice_number, supplier: supplier?.name || '...' })
           : t('pi.log_add_details', { supplier: supplier?.name || '...', amount: formatNumber(total_amount) }),
-        timestamp: new Date().toISOString()
+        created_at: new Date().toISOString()
       });
 
       // Preview Journal Entry
