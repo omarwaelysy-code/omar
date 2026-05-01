@@ -4,14 +4,14 @@
   "version": "2.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server/index.ts",
-    "clean": "rm -rf dist dist-server",
+    "dev": "tsx server.ts",
+    "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "ci": "npm run lint && npm run test",
-    "build": "npm run ci && vite build && tsup",
-    "start": "node dist-server/index.js"
+    "build": "npm run ci && vite build",
+    "start": "node server.ts"
   },
   "dependencies": {
     "@google/genai": "^1.45.0",
@@ -59,7 +59,6 @@
     "autoprefixer": "^10.4.21",
     "jsdom": "^29.0.2",
     "tailwindcss": "^4.1.14",
-    "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",

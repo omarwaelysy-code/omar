@@ -114,7 +114,7 @@ router.get('/system/check', authenticateToken, authorizeRoles('super_admin'), as
     });
 
     // 2. Check Migrations
-    const dbDir = path.join(process.cwd(), 'server', 'db');
+    const dbDir = path.join(process.cwd(), 'src', 'db');
     const masterMigrationPath = path.join(dbDir, 'master-migration.sql');
     const migrationsDir = path.join(dbDir, 'migrations');
 

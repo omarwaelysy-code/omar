@@ -307,30 +307,25 @@ export const Dashboard: React.FC = () => {
   return (
     <div className="space-y-8 animate-in fade-in duration-500" dir={dir}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="flex items-start md:items-center gap-4">
-          <div className="bg-white rounded-2xl p-2 shadow-xl shadow-emerald-500/10 flex items-center justify-center h-14 w-14 md:h-16 md:w-16 shrink-0 border border-zinc-100">
-            <img src="/logo.jpg" alt="OBrain Logo" className="w-full h-full object-contain mix-blend-multiply" />
-          </div>
-          <div>
-            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('dashboard.title')}</h2>
-            <div className="flex items-center gap-4 mt-1">
-              <div className="flex items-center gap-2 text-zinc-500">
-                <Clock size={14} className="text-emerald-500" />
-                <p className="text-xs md:text-sm font-medium">
-                  {currentTime.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })} | 
-                  <span className="text-zinc-900 ml-1 font-mono">{currentTime.toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}</span>
-                </p>
-              </div>
-              {isCompanyAdmin && (
-                <div className="flex items-center gap-2 px-3 py-1 bg-zinc-100 rounded-full border border-zinc-200">
-                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter">{t('dashboard.company_code')}</span>
-                  <code className="text-xs font-mono font-bold text-zinc-900 select-all cursor-pointer" title={t('dashboard.click_to_copy')} onClick={() => {
-                    navigator.clipboard.writeText(user.company_id);
-                    setAiResponse(t('dashboard.copied'));
-                  }}>{user.company_id}</code>
-                </div>
-              )}
+        <div>
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('dashboard.title')}</h2>
+          <div className="flex items-center gap-4 mt-1">
+            <div className="flex items-center gap-2 text-zinc-500">
+              <Clock size={14} className="text-emerald-500" />
+              <p className="text-xs md:text-sm font-medium">
+                {currentTime.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })} | 
+                <span className="text-zinc-900 ml-1 font-mono">{currentTime.toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+              </p>
             </div>
+            {isCompanyAdmin && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-zinc-100 rounded-full border border-zinc-200">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter">{t('dashboard.company_code')}</span>
+                <code className="text-xs font-mono font-bold text-zinc-900 select-all cursor-pointer" title={t('dashboard.click_to_copy')} onClick={() => {
+                  navigator.clipboard.writeText(user.company_id);
+                  setAiResponse(t('dashboard.copied'));
+                }}>{user.company_id}</code>
+              </div>
+            )}
           </div>
         </div>
         

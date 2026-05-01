@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import pool from './postgres';
+import pool from '../lib/postgres';
 
 export async function runMigrations() {
   console.log('🔄 Running Database Migrations...');
@@ -31,7 +31,7 @@ export async function runMigrations() {
       END $$;
     `);
 
-    const dbDir = path.join(process.cwd(), 'server', 'db');
+    const dbDir = path.join(process.cwd(), 'src', 'db');
     const masterMigrationPath = path.join(dbDir, 'master-migration.sql');
     const migrationsDir = path.join(dbDir, 'migrations');
 
