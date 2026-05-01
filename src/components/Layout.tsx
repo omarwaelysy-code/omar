@@ -365,10 +365,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       {/* Desktop Top Navigation */}
       <header className="hidden md:flex sticky top-0 z-30 bg-zinc-900 text-white h-20 items-center px-8 shadow-2xl border-b border-white/5">
         <div className={`flex items-center gap-4 ${dir === 'rtl' ? 'ml-12' : 'mr-12'}`}>
-          <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-emerald-500/20">
-            {t('common.app_name')[0]}
+          <div className="bg-white rounded-xl p-1.5 shadow-lg shadow-emerald-500/20 flex items-center justify-center h-10">
+            <img src="/logo.jpg" alt="Logo" className="h-6 object-contain" />
           </div>
-          <h1 className="text-xl font-black tracking-tight whitespace-nowrap">{t('common.app_name')}</h1>
         </div>
 
         <nav className="flex items-center gap-1 flex-1">
@@ -635,10 +634,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           {/* Mobile Header */}
           <header className="md:hidden sticky top-0 z-30 bg-white/70 backdrop-blur-2xl border-b border-zinc-200/50 p-5 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center text-white font-black shadow-xl shadow-emerald-500/20">
-                {t('common.app_name')[0]}
+              <div className="bg-white rounded-2xl p-1.5 shadow-xl shadow-emerald-500/20 flex items-center justify-center h-10">
+                <img src="/logo.jpg" alt="Logo" className="h-6 object-contain mix-blend-multiply" />
               </div>
-              <h1 className="text-xl font-black text-zinc-900 tracking-tight">{t('common.app_name')}</h1>
             </div>
             <div className="flex items-center gap-2">
               <button 
@@ -769,10 +767,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 >
                   <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-stone-50">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-emerald-500/20">
-                        {t('common.app_name')[0]}
+                      <div className="bg-white rounded-xl p-1.5 shadow-lg shadow-emerald-500/20 flex items-center justify-center h-10">
+                        <img src="/logo.jpg" alt="Logo" className="h-6 object-contain mix-blend-multiply" />
                       </div>
-                      <span className="font-black text-xl text-zinc-900">{t('common.app_name')}</span>
                     </div>
                     <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-zinc-400 hover:text-zinc-900 transition-colors">
                       <X size={24} />

@@ -1,5 +1,5 @@
 
-import pool from './src/lib/postgres';
+import pool from './server/postgres';
 
 async function checkLogs() {
   try {

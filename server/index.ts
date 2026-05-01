@@ -6,8 +6,8 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import cors from "cors";
 import fs from "fs";
-import { initDatabase } from "./src/lib/init-db";
-import erpRouter from "./src/lib/erp-api";
+import { initDatabase } from "./init-db";
+import erpRouter from "./erp-api";
 
 async function startServer() {
   // Initialize PostgreSQL FIRST
