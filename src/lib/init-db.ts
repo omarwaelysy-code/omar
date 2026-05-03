@@ -514,6 +514,22 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS "idx_journal_entry_lines_company" ON "journal_entry_lines"("company_id");
     `);
 
+    await client.query(`
+      -- Critical Column Sync for existing tables
+      DO $$ 
+      BEGIN 
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='receipt_vouchers' AND column_name='account_id') THEN
+              ALTER TABLE receipt_vouchers ADD COLUMN account_id VARCHAR(36) REFERENCES accounts(id);
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='payment_vouchers' AND column_name='account_id') THEN
+              ALTER TABLE payment_vouchers ADD COLUMN account_id VARCHAR(36) REFERENCES accounts(id);
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='activity_logs' AND column_name='entity') THEN
+              ALTER TABLE activity_logs ADD COLUMN entity JSONB;
+          END IF;
+      END $$;
+    `);
+
     await client.query('COMMIT');
     console.log('✅ Base Schema Guardrails active.');
 
