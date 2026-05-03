@@ -49,15 +49,20 @@ export const CashReport: React.FC = () => {
       setOpeningBalance(opBal);
 
       const [invoices, returns, receipts, purInvoices, purReturns, vouchers, transfers, journalEntries] = await Promise.all([
-        dbService.getDocsByFilter<any>('invoices', user.company_id, [{ field: 'payment_method_id', operator: '==', value: selectedMethodId }]),
-        dbService.getDocsByFilter<any>('returns', user.company_id, [{ field: 'payment_method_id', operator: '==', value: selectedMethodId }]),
-        dbService.getDocsByFilter<any>('receipt_vouchers', user.company_id, [{ field: 'payment_method_id', operator: '==', value: selectedMethodId }]),
-        dbService.getDocsByFilter<any>('purchase_invoices', user.company_id, [{ field: 'payment_method_id', operator: '==', value: selectedMethodId }]),
-        dbService.getDocsByFilter<any>('purchase_returns', user.company_id, [{ field: 'payment_method_id', operator: '==', value: selectedMethodId }]),
-        dbService.getDocsByFilter<any>('payment_vouchers', user.company_id, [{ field: 'payment_method_id', operator: '==', value: selectedMethodId }]),
+        dbService.list<any>('invoices', user.company_id),
+        dbService.list<any>('returns', user.company_id),
+        dbService.list<any>('receipt_vouchers', user.company_id),
+        dbService.list<any>('purchase_invoices', user.company_id),
+        dbService.list<any>('purchase_returns', user.company_id),
+        dbService.list<any>('payment_vouchers', user.company_id),
         dbService.list<any>('cash_transfers', user.company_id),
         dbService.list<any>('journal_entries', user.company_id)
       ]);
+
+      console.log('--- TEST DATA FETCH WITHOUT FILTER ---');
+      console.log('Invoices:', invoices);
+      console.log('Receipts:', receipts);
+      console.log('Payment Vouchers:', vouchers);
 
       const allTrans: CashTransaction[] = [];
 
