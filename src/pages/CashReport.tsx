@@ -48,7 +48,7 @@ export const CashReport: React.FC = () => {
       const opBal = Number(method?.opening_balance) || 0;
       setOpeningBalance(opBal);
 
-      const [invoices, returns, receipts, purInvoices, purReturns, vouchers, transfers, journalEntries] = await Promise.all([
+      const [allInvoices, allReturns, allReceipts, allPurInvoices, allPurReturns, allVouchers, transfers, journalEntries] = await Promise.all([
         dbService.list<any>('invoices', user.company_id),
         dbService.list<any>('returns', user.company_id),
         dbService.list<any>('receipt_vouchers', user.company_id),
@@ -59,10 +59,23 @@ export const CashReport: React.FC = () => {
         dbService.list<any>('journal_entries', user.company_id)
       ]);
 
-      console.log('--- TEST DATA FETCH WITHOUT FILTER ---');
-      console.log('Invoices:', invoices);
-      console.log('Receipts:', receipts);
-      console.log('Payment Vouchers:', vouchers);
+      const invoices = allInvoices.filter((doc: any) => doc.payment_method_id === selectedMethodId);
+      const returns = allReturns.filter((doc: any) => doc.payment_method_id === selectedMethodId);
+      
+      // Get all journal entries related to this account
+      const accountJournalEntries = journalEntries.filter((je: any) => 
+        je.items?.some((item: any) => item.account_id === method?.account_id)
+      );
+
+      // A receipt belongs to this cash box if its payment_method_id matches, 
+      // OR if its journal entry hit this method's account_id (for backward compatibility)
+      const receipts = allReceipts.filter((doc: any) => {
+        if (doc.payment_method_id === selectedMethodId) return true;
+        return accountJournalEntries.some((je: any) => je.reference_id === doc.id || je.reference_number === doc.voucher_number);
+      });
+      const purInvoices = allPurInvoices.filter((doc: any) => doc.payment_method_id === selectedMethodId);
+      const purReturns = allPurReturns.filter((doc: any) => doc.payment_method_id === selectedMethodId);
+      const vouchers = allVouchers.filter((doc: any) => doc.payment_method_id === selectedMethodId);
 
       const allTrans: CashTransaction[] = [];
 
@@ -73,7 +86,7 @@ export const CashReport: React.FC = () => {
         allTrans.push({ id: `ret-${ret.id}`, date: ret.date, type: t('returns.title'), reference: ret.return_number, in: 0, out: Number(ret.total_amount) || 0, notes: '' });
       });
       receipts.forEach((rec: any) => {
-        allTrans.push({ id: `rec-${rec.id}`, date: rec.date, type: t('vouchers.receipt'), reference: `${t('vouchers.voucher')}-${rec.id.slice(-6)}`, in: Number(rec.amount) || 0, out: 0, notes: rec.description || '' });
+        allTrans.push({ id: `rec-${rec.id}`, date: rec.date, type: t('vouchers.receipt'), reference: rec.voucher_number || `${t('vouchers.voucher')}-${rec.id.slice(-6)}`, in: Number(rec.amount) || 0, out: 0, notes: rec.description || '' });
       });
       purInvoices.forEach((pinv: any) => {
         allTrans.push({ id: `pinv-${pinv.id}`, date: pinv.date, type: t('purchase_invoices.title'), reference: pinv.invoice_number, in: 0, out: Number(pinv.total_amount) || 0, notes: '' });
@@ -130,11 +143,11 @@ export const CashReport: React.FC = () => {
 
       allTrans.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-      // Filter transactions that are after opening_balance_date
+      // Filter transactions that are after or on opening_balance_date
       const opDate = method?.opening_balance_date || '1970-01-01';
       const opDateObj = new Date(opDate);
       
-      const transAfterOpDate = allTrans.filter(t => new Date(t.date) > opDateObj);
+      const transAfterOpDate = allTrans.filter(t => new Date(t.date) >= opDateObj);
 
       const filtered = transAfterOpDate.filter(t => {
         const d = new Date(t.date);

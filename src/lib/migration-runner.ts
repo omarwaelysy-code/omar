@@ -31,6 +31,16 @@ export async function runMigrations() {
       END $$;
     `);
 
+    // Fix for activity_logs timestamp column
+    await client.query(`
+      DO $$ 
+      BEGIN 
+        IF EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'activity_logs' AND column_name = 'timestamp') THEN
+          ALTER TABLE activity_logs RENAME COLUMN "timestamp" TO created_at;
+        END IF;
+      END $$;
+    `);
+
     const dbDir = path.join(process.cwd(), 'src', 'db');
     const masterMigrationPath = path.join(dbDir, 'master-migration.sql');
     const migrationsDir = path.join(dbDir, 'migrations');
