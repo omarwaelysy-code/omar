@@ -62,9 +62,14 @@ export const CashReport: React.FC = () => {
       const allTrans: CashTransaction[] = [];
 
       // Process Data
-      const isMatch = (t: any) => t.payment_method_id === selectedMethodId || (method?.account_id && t.account_id === method.account_id);
+      const isMatch = (t: any) => {
+        if (!t) return false;
+        const matchesMethod = t.payment_method_id === selectedMethodId;
+        const matchesAccount = method?.account_id && t.account_id === method.account_id;
+        return matchesMethod || matchesAccount;
+      };
 
-      invoices.filter(isMatch).forEach((inv: any) => {
+      invoices.filter(inv => isMatch(inv) && inv.payment_status === 'paid').forEach((inv: any) => {
         allTrans.push({ id: `inv-${inv.id}`, date: inv.date, type: t('invoices.title'), reference: inv.invoice_number, in: Number(inv.total_amount) || 0, out: 0, notes: '' });
       });
       returns.filter(isMatch).forEach((ret: any) => {
@@ -73,7 +78,7 @@ export const CashReport: React.FC = () => {
       receipts.filter(isMatch).forEach((rec: any) => {
         allTrans.push({ id: `rec-${rec.id}`, date: rec.date, type: t('vouchers.receipt'), reference: `${t('vouchers.voucher')}-${rec.id.slice(-6)}`, in: Number(rec.amount) || 0, out: 0, notes: rec.description || '' });
       });
-      purInvoices.filter(isMatch).forEach((pinv: any) => {
+      purInvoices.filter(pinv => isMatch(pinv) && pinv.payment_status === 'paid').forEach((pinv: any) => {
         allTrans.push({ id: `pinv-${pinv.id}`, date: pinv.date, type: t('purchase_invoices.title'), reference: pinv.invoice_number, in: 0, out: Number(pinv.total_amount) || 0, notes: '' });
       });
       purReturns.filter(isMatch).forEach((pret: any) => {
@@ -82,12 +87,17 @@ export const CashReport: React.FC = () => {
       vouchers.filter(isMatch).forEach((vou: any) => {
         allTrans.push({ id: `vou-${vou.id}`, date: vou.date, type: t('vouchers.payment'), reference: `${t('vouchers.voucher')}-${vou.id.slice(-6)}`, in: 0, out: Number(vou.amount) || 0, notes: vou.description || '' });
       });
+      const methodMap = new Map(paymentMethods.map(m => [m.id, m.account_id]));
+
       transfers.forEach((tr: any) => {
         const amount = Number(tr.amount) || 0;
-        if (tr.from_payment_method_id === selectedMethodId) {
+        const fromAccountId = methodMap.get(tr.from_payment_method_id);
+        const toAccountId = methodMap.get(tr.to_payment_method_id);
+
+        if (tr.from_payment_method_id === selectedMethodId || (method?.account_id && fromAccountId === method.account_id)) {
           allTrans.push({ id: `tr-out-${tr.id}`, date: tr.date, type: t('cash_transfers.outgoing'), reference: `${t('cash_transfers.transfer')}-${tr.id.slice(-6)}`, in: 0, out: amount, notes: `${t('common.to')} ${tr.to_payment_method_name}: ${tr.description}` });
         }
-        if (tr.to_payment_method_id === selectedMethodId) {
+        if (tr.to_payment_method_id === selectedMethodId || (method?.account_id && toAccountId === method.account_id)) {
           allTrans.push({ id: `tr-in-${tr.id}`, date: tr.date, type: t('cash_transfers.incoming'), reference: `${t('cash_transfers.transfer')}-${tr.id.slice(-6)}`, in: amount, out: 0, notes: `${t('common.from')} ${tr.from_payment_method_name}: ${tr.description}` });
         }
       });
