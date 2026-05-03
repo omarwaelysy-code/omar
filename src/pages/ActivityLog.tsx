@@ -12,14 +12,20 @@ export const ActivityLogPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    if (user) {
+    const fetchLogs = async () => {
+      if (!user) return;
       setLoading(true);
-      const unsub = dbService.subscribe<ActivityLog>('activity_logs', user.company_id, (data) => {
+      try {
+        const data = await dbService.list<ActivityLog>('activity_logs', user.company_id);
         setLogs(data);
+      } catch (error) {
+        console.error('Failed to fetch activity logs:', error);
+      } finally {
         setLoading(false);
-      });
-      return () => unsub();
-    }
+      }
+    };
+
+    fetchLogs();
   }, [user]);
 
   const filteredLogs = logs.filter(log => 
