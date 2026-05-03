@@ -149,7 +149,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
       company_id: user.company_id,
       created_at: new Date().toISOString(),
       action: 'إعادة إرسال بريد الترحيب',
-      details: `تم إعادة إرسال بيانات الدخول للمستخدم ${user.email}`
+      details: `تم إعادة إرسال بيانات الدخول للمستخدم ${user.email}`,
+      entity: 'users'
     });
   };
 
@@ -170,7 +171,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
       company_id: user.company_id,
       created_at: new Date().toISOString(),
       action: 'إعادة تعيين كلمة المرور المؤقتة',
-      details: `تم إنشاء كلمة مرور مؤقتة جديدة للمستخدم ${user.email}`
+      details: `تم إنشاء كلمة مرور مؤقتة جديدة للمستخدم ${user.email}`,
+      entity: 'users'
     });
     
     fetchData();

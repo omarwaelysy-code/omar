@@ -196,7 +196,8 @@ export const Invoices: React.FC = () => {
         details: editingInvoice 
           ? `تعديل فاتورة رقم: ${invoice_number} للعميل ${customer?.name || '...'}`
           : `إضافة فاتورة جديدة للعميل ${customer?.name || '...'} بمبلغ ${formatMoney(total_amount)}`,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        entity: 'invoices'
       });
 
       // Preview Journal Entry

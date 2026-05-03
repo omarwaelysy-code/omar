@@ -32,10 +32,10 @@ export const TransactionSidePanel: React.FC<TransactionSidePanelProps> = ({
       const unsubLogs = dbService.subscribe<ActivityLog>('activity_logs', user.company_id, (data) => {
         const filtered = data
           .filter(log => {
-            const categoryMatch = Array.isArray(log.category) 
-              ? log.category.includes(category) 
-              : log.category === category;
-            return categoryMatch && log.document_id === documentId;
+            const entityMatch = Array.isArray(log.entity) 
+              ? log.entity.includes(category) 
+              : log.entity === category;
+            return entityMatch && log.document_id === documentId;
           })
           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         setLogs(filtered);

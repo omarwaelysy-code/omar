@@ -136,7 +136,7 @@ export const dbService = {
     return apiRequest<T[]>(`/${collectionName}?${params.toString()}`);
   },
 
-  async logActivity(userId: string, username: string, companyId: string, action: string, details: string, category?: string | string[], documentId?: string, changes?: any[]) {
+  async logActivity(userId: string, username: string, companyId: string, action: string, details: string, entity?: string | string[], documentId?: string, changes?: any[]) {
     try {
       await apiRequest('/activity_logs', 'POST', {
         user_id: userId,
@@ -144,7 +144,7 @@ export const dbService = {
         company_id: companyId,
         action,
         details,
-        category,
+        entity,
         document_id: documentId,
         changes,
         created_at: new Date().toISOString()
@@ -181,7 +181,7 @@ export const dbService = {
     newData: any, 
     user: { id: string, username: string, company_id: string },
     actionLabel: string,
-    category: string | string[],
+    entity: string | string[],
     fieldsToTrack: { field: string, label: string }[]
   ): Promise<void> {
     const oldData = await dbService.get<any>(collectionName, id);
@@ -198,7 +198,7 @@ export const dbService = {
         user.company_id, 
         actionLabel, 
         `${actionLabel} رقم: ${newData.invoice_number || newData.number || id}`,
-        category,
+        entity,
         id,
         changes
       );

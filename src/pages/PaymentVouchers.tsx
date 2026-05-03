@@ -394,6 +394,7 @@ export const PaymentVouchers: React.FC = () => {
         category_name: category?.name || '',
         payment_method_id: voucherData.payment_method_id,
         payment_method_name: paymentMethod?.name || '',
+        account_id: paymentMethod?.account_id || null,
         type: 'payment' as const,
         company_id: user.company_id,
         created_at: new Date().toISOString(),

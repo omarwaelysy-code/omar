@@ -57,8 +57,9 @@ export const CustomerStatement: React.FC = () => {
       // Add all journal entries related to this customer's account
       journalEntries.forEach((je: any) => {
         je.items?.forEach((item: any) => {
-          // Only count lines that have the customer_id
-          if (item.customer_id === selectedCustomerId) {
+          // Only count lines that have the customer_id AND match the customer's ledger account
+          // This prevents double entries if customer_id was accidentally set on both sides of a transaction
+          if (item.customer_id === selectedCustomerId && item.account_id === customer?.account_id) {
             allEntries.push({
               id: `je-${je.id}-${Math.random()}`,
               date: je.date,

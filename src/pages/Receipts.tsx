@@ -111,7 +111,8 @@ export const Receipts: React.FC = () => {
       setPreviewActivityLog({
         action: 'إضافة سند قبض',
         details: `إضافة سند قبض جديد من العميل ${customer?.name || '...'} بمبلغ ${formatNumber(formData.amount)}`,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        entity: 'receipts'
       });
 
       // Preview Journal Entry
@@ -331,6 +332,7 @@ export const Receipts: React.FC = () => {
         customer_name: customer?.name || '',
         payment_method_id: formData.payment_method_id || null,
         payment_method_name: paymentMethod?.name || '',
+        account_id: paymentMethod?.account_id || null,
         type: 'receipt' as const,
         company_id: user.company_id,
         created_at: new Date().toISOString(),

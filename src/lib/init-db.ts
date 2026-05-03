@@ -111,7 +111,7 @@ export async function initDatabase() {
         "details" TEXT,
         "ip_address" VARCHAR(45),
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        "category" JSONB,
+        "entity" JSONB,
         "document_id" VARCHAR(36),
         "changes" JSONB
       );
@@ -344,6 +344,7 @@ export async function initDatabase() {
         "amount" DECIMAL(18, 4) NOT NULL,
         "description" TEXT,
         "payment_method_id" VARCHAR(36) REFERENCES "payment_methods"("id"),
+        "account_id" VARCHAR(36) REFERENCES "accounts"("id"),
         "customer_name" VARCHAR(255),
         "payment_method_name" VARCHAR(255),
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -358,6 +359,7 @@ export async function initDatabase() {
         "amount" DECIMAL(18, 4) NOT NULL,
         "description" TEXT,
         "payment_method_id" VARCHAR(36) REFERENCES "payment_methods"("id"),
+        "account_id" VARCHAR(36) REFERENCES "accounts"("id"),
         "supplier_name" VARCHAR(255),
         "category_name" VARCHAR(255),
         "payment_method_name" VARCHAR(255),

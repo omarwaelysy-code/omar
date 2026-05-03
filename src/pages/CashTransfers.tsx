@@ -132,7 +132,7 @@ export const CashTransfers: React.FC = () => {
       setPreviewActivityLog({
         action: editingTransfer ? 'تعديل تحويل نقدية' : 'إضافة تحويل نقدية',
         details: `تحويل مبلغ ${formData.amount} من ${fromPM.name} إلى ${toPM.name}`,
-        category: ['cash_transfers', 'journal_entries']
+        entity: ['cash_transfers', 'journal_entries']
       });
     };
 

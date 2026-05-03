@@ -20,15 +20,15 @@ export const InlineActivityLog: React.FC<InlineActivityLogProps> = ({ category, 
       const unsub = dbService.subscribe<ActivityLog>('activity_logs', user.company_id, (data) => {
         const filtered = data
           .filter(log => {
-            // Filter by category
-            const categoryMatch = Array.isArray(log.category) 
-              ? log.category.includes(category) 
-              : log.category === category;
+            // Filter by entity
+            const entityMatch = Array.isArray(log.entity) 
+              ? log.entity.includes(category) 
+              : log.entity === category;
             
             // Filter by documentId if provided
             const documentMatch = documentId ? log.document_id === documentId : true;
 
-            return categoryMatch && documentMatch;
+            return entityMatch && documentMatch;
           })
           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         setLogs(filtered);

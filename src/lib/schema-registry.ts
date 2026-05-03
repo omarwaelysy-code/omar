@@ -64,11 +64,11 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   receipt_vouchers: [
     'id', 'company_id', 'customer_id', 'customer_name', 'voucher_number', 'date', 'amount', 'description', 
-    'payment_method_id', 'payment_method_name'
+    'payment_method_id', 'payment_method_name', 'account_id'
   ],
   payment_vouchers: [
     'id', 'company_id', 'supplier_id', 'supplier_name', 'expense_category_id', 'category_name', 'date', 'amount', 
-    'description', 'payment_method_id', 'payment_method_name'
+    'description', 'payment_method_id', 'payment_method_name', 'account_id'
   ],
   customer_discounts: [
     'id', 'company_id', 'customer_id', 'customer_name', 'date', 'amount', 'description'
@@ -97,7 +97,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   activity_logs: [
     'id', 'company_id', 'user_id', 'username', 'action', 'details', 'ip_address', 
-    'created_at', 'category', 'document_id', 'changes'
+    'created_at', 'entity', 'document_id', 'changes'
   ],
   settings: [
     'id', 'company_id', 'type', 'key', 'value', 'customer_discount_account_id', 'supplier_discount_account_id', 'updated_at', 'created_at'

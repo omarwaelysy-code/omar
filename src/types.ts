@@ -224,6 +224,7 @@ export interface ReceiptVoucher {
   description: string;
   payment_method_id?: string;
   payment_method_name?: string;
+  account_id?: string;
 }
 
 export interface PaymentVoucher {
@@ -238,6 +239,7 @@ export interface PaymentVoucher {
   description: string;
   payment_method_id: string;
   payment_method_name?: string;
+  account_id?: string;
 }
 
 export interface Return {
@@ -304,7 +306,7 @@ export interface ActivityLog {
   created_at: string;
   action: string;
   details: string;
-  category?: string | string[];
+  entity?: string | string[];
   document_id?: string;
   changes?: {
     field: string;

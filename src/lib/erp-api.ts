@@ -21,16 +21,16 @@ async function logActivity(
   username: string,
   action: string,
   details: string,
-  category?: string | string[],
+  entity?: string | string[],
   document_id?: string,
   changes?: any,
   ip_address?: string
 ) {
   try {
     await pool.query(
-      `INSERT INTO activity_logs (company_id, user_id, username, action, details, category, document_id, changes, ip_address, created_at) 
+      `INSERT INTO activity_logs (company_id, user_id, username, action, details, entity, document_id, changes, ip_address, created_at) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-      [company_id, user_id, username, action, details, JSON.stringify(category), document_id, JSON.stringify(changes), ip_address, new Date()]
+      [company_id, user_id, username, action, details, JSON.stringify(entity), document_id, JSON.stringify(changes), ip_address, new Date()]
     );
   } catch (error) {
     console.error('Failed to log server activity:', error);
@@ -539,15 +539,17 @@ const transactionalModules = ['invoices', 'returns', 'purchase_invoices', 'purch
 // Helper to parse JSONB fields if they are returned as strings
 function parseRow(table: string, row: any) {
   if (!row) return row;
-  const jsonbFields = ['category', 'changes', 'items', 'settings', 'permissions', 'metadata'];
+  const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features'];
   
   const parsed = { ...row };
   jsonbFields.forEach(field => {
     if (field in parsed && typeof parsed[field] === 'string') {
       try {
-        // Only parse if it looks like JSON
         const val = parsed[field].trim();
-        if ((val.startsWith('{') && val.endsWith('}')) || (val.startsWith('[') && val.endsWith(']'))) {
+        // If it starts with " it's a JSON string, otherwise if it's { or [ it's object/array
+        if ((val.startsWith('{') && val.endsWith('}')) || 
+            (val.startsWith('[') && val.endsWith(']')) ||
+            (val.startsWith('"') && val.endsWith('"'))) {
           parsed[field] = JSON.parse(parsed[field]);
         }
       } catch (e) {
@@ -564,6 +566,8 @@ function sanitizeData(table: string, data: any) {
   if (!allowedKeys) return data;
   
   const sanitized: any = {};
+  const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features', 'value'];
+
   allowedKeys.forEach(key => {
     if (key in data) {
       const value = data[key];
@@ -572,8 +576,8 @@ function sanitizeData(table: string, data: any) {
       if (value === '' && (key.endsWith('_id') || key === 'amount' || key === 'price' || key === 'unit_price' || key === 'total' || key === 'subtotal')) {
         sanitized[key] = null;
       } 
-      // Automatically stringify objects/arrays for JSONB columns
-      else if (value !== null && typeof value === 'object') {
+      // Automatically stringify for JSONB columns
+      else if (jsonbFields.includes(key) && value !== null) {
         sanitized[key] = JSON.stringify(value);
       }
       else {
