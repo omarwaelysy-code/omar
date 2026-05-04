@@ -47,14 +47,24 @@ export async function runMigrations() {
     ];
 
     for (const item of columnsToSync) {
-      const { rows } = await client.query(`
+      // First ensure the table exists
+      const { rows: tableRows } = await client.query(`
+        SELECT 1 FROM information_schema.tables WHERE table_name = $1
+      `, [item.table]);
+
+      if (tableRows.length === 0) {
+        console.warn(`  ⚠️ Skipping column sync for ${item.table} as it does not exist yet.`);
+        continue;
+      }
+
+      const { rows: colRows } = await client.query(`
         SELECT 1 FROM information_schema.columns 
         WHERE table_name = $1 AND column_name = $2
       `, [item.table, item.column]);
 
-      if (rows.length === 0) {
+      if (colRows.length === 0) {
         console.log(`🚀 Adding missing column: ${item.table}.${item.column}...`);
-        await client.query(`ALTER TABLE ${item.table} ADD COLUMN ${item.column} ${item.type}`);
+        await client.query(`ALTER TABLE ${item.table} ADD COLUMN IF NOT EXISTS ${item.column} ${item.type}`);
         console.log(`✅ Column ${item.table}.${item.column} added.`);
         appliedCount++;
       }

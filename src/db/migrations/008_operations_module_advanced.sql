@@ -16,6 +16,26 @@ BEGIN
         );
     END IF;
 
+    -- 1.1 Ensure operations table exists
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'operations') THEN
+        CREATE TABLE operations (
+            id VARCHAR(36) PRIMARY KEY,
+            company_id VARCHAR(36) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    END IF;
+
+    -- 1.2 Ensure operation_fields table exists
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'operation_fields') THEN
+        CREATE TABLE operation_fields (
+            id VARCHAR(36) PRIMARY KEY,
+            company_id VARCHAR(36) NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            type VARCHAR(50) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    END IF;
+
     -- 2. Create cost_centers table
     IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'cost_centers') THEN
         CREATE TABLE cost_centers (

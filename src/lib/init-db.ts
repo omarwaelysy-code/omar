@@ -515,6 +515,94 @@ export async function initDatabase() {
       );
     `, 'settings table');
 
+    // Phase 7: Flexible Operations System
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "departments" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id"),
+        "code" VARCHAR(50) UNIQUE,
+        "name" VARCHAR(255) NOT NULL,
+        "description" TEXT,
+        "parent_id" VARCHAR(36) REFERENCES "departments"("id"),
+        "manager_user_id" VARCHAR(36),
+        "is_active" BOOLEAN DEFAULT true,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'departments table');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "cost_centers" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id"),
+        "department_id" VARCHAR(36) REFERENCES "departments"("id"),
+        "code" VARCHAR(50) UNIQUE,
+        "name" VARCHAR(255) NOT NULL,
+        "description" TEXT,
+        "budget" DECIMAL(18, 4),
+        "currency" VARCHAR(10),
+        "is_active" BOOLEAN DEFAULT true,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'cost_centers table');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "operation_categories" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id"),
+        "name" VARCHAR(255) NOT NULL,
+        "parent_id" VARCHAR(36) REFERENCES "operation_categories"("id"),
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'operation_categories table');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "operation_fields" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id"),
+        "category_id" VARCHAR(36) REFERENCES "operation_categories"("id"),
+        "name" VARCHAR(255) NOT NULL,
+        "label" VARCHAR(255),
+        "code" VARCHAR(50) UNIQUE,
+        "description" TEXT,
+        "type" VARCHAR(50) NOT NULL,
+        "unit" VARCHAR(50),
+        "default_value" TEXT,
+        "is_required" BOOLEAN DEFAULT false,
+        "options" JSONB,
+        "sort_order" INTEGER DEFAULT 0,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'operation_fields table');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "operations" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id"),
+        "category_id" VARCHAR(36) REFERENCES "operation_categories"("id"),
+        "department_id" VARCHAR(36) REFERENCES "departments"("id"),
+        "cost_center_id" VARCHAR(36) REFERENCES "cost_centers"("id"),
+        "operation_number" VARCHAR(50) UNIQUE,
+        "operation_date" DATE,
+        "customer_id" VARCHAR(36),
+        "customer_name" VARCHAR(255),
+        "description" TEXT,
+        "status" VARCHAR(20) DEFAULT 'pending',
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'operations table');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "operation_field_values" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "operation_id" VARCHAR(36) REFERENCES "operations"("id") ON DELETE CASCADE,
+        "field_id" VARCHAR(36) REFERENCES "operation_fields"("id") ON DELETE CASCADE,
+        "value" TEXT,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'operation_field_values table');
+
     // 2. Safe Indices
     console.log('  - Securing Indices...');
 
