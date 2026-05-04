@@ -35,6 +35,29 @@ export async function runMigrations() {
     const masterMigrationPath = path.join(dbDir, 'master-migration.sql');
     const migrationsDir = path.join(dbDir, 'migrations');
 
+    // 0. Programmatic Column Migrations (Requested by User)
+    console.log('🛠️ Checking for required columns...');
+    const columnsToSync = [
+      { table: 'receipt_vouchers', column: 'account_id', type: 'VARCHAR(36) REFERENCES accounts(id)' },
+      { table: 'payment_vouchers', column: 'account_id', type: 'VARCHAR(36) REFERENCES accounts(id)' },
+      { table: 'activity_logs', column: 'account_id', type: 'VARCHAR(36) REFERENCES accounts(id)' },
+      { table: 'activity_logs', column: 'entity', type: 'JSONB' }
+    ];
+
+    for (const item of columnsToSync) {
+      const { rows } = await client.query(`
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = $1 AND column_name = $2
+      `, [item.table, item.column]);
+
+      if (rows.length === 0) {
+        console.log(`🚀 Adding missing column: ${item.table}.${item.column}...`);
+        await client.query(`ALTER TABLE ${item.table} ADD COLUMN ${item.column} ${item.type}`);
+        console.log(`✅ Column ${item.table}.${item.column} added.`);
+        appliedCount++;
+      }
+    }
+
     // 1. Run Master Migration
     if (fs.existsSync(masterMigrationPath)) {
       console.log('📦 Checking Master Migration...');

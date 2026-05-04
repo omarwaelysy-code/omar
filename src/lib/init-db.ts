@@ -101,21 +101,6 @@ export async function initDatabase() {
         "updated_by" VARCHAR(36)
       );
 
-      CREATE TABLE IF NOT EXISTS "activity_logs" (
-        "id" BIGSERIAL PRIMARY KEY,
-        "company_id" VARCHAR(36),
-        "user_id" VARCHAR(36),
-        "username" VARCHAR(100),
-        "action" VARCHAR(100) NOT NULL,
-        "details" TEXT,
-        "ip_address" VARCHAR(45),
-        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        "entity" JSONB,
-        "account_id" VARCHAR(36) REFERENCES "accounts"("id"),
-        "document_id" VARCHAR(36),
-        "changes" JSONB
-      );
-
       CREATE TABLE IF NOT EXISTS "audit_logs" (
         "id" VARCHAR(36) PRIMARY KEY,
         "company_id" VARCHAR(36),
@@ -154,6 +139,21 @@ export async function initDatabase() {
         "opening_balance" DECIMAL(18, 4) DEFAULT 0,
         "is_active" BOOLEAN DEFAULT TRUE,
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS "activity_logs" (
+        "id" BIGSERIAL PRIMARY KEY,
+        "company_id" VARCHAR(36),
+        "user_id" VARCHAR(36),
+        "username" VARCHAR(100),
+        "action" VARCHAR(100) NOT NULL,
+        "details" TEXT,
+        "ip_address" VARCHAR(45),
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "entity" JSONB,
+        "account_id" VARCHAR(36) REFERENCES "accounts"("id"),
+        "document_id" VARCHAR(36),
+        "changes" JSONB
       );
 
       CREATE TABLE IF NOT EXISTS "expense_categories" (
