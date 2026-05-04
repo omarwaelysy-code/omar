@@ -9,23 +9,27 @@ import { apiRequest } from '../services/dbService';
 
 interface Operation {
   id: string;
+  operation_number: string;
   customer_id: string;
   customer_name: string;
   category_id: string;
+  department_id: string;
+  cost_center_id: string;
   description: string;
   date: string;
+  operation_date: string;
   status: string;
   created_at: string;
-  [key: string]: any; // For dynamic fields
 }
 
 interface OperationField {
   id: string;
   name: string;
   label: string;
-  type: 'text' | 'number' | 'date' | 'select' | 'boolean';
+  type: 'text' | 'number' | 'date' | 'currency' | 'percentage' | 'select' | 'boolean';
   is_required: boolean;
   options: string[] | null;
+  unit: string;
 }
 
 interface Category {
@@ -38,12 +42,24 @@ interface Customer {
   name: string;
 }
 
+interface Department {
+  id: string;
+  name: string;
+}
+
+interface CostCenter {
+  id: string;
+  name: string;
+}
+
 export function Operations() {
   const { t, dir } = useLanguage();
   const { user } = useAuth();
   const [operations, setOperations] = useState<Operation[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
@@ -54,7 +70,11 @@ export function Operations() {
     customer_id: '',
     description: '',
     date: new Date().toISOString().split('T')[0],
-    status: 'pending'
+    operation_date: new Date().toISOString().split('T')[0],
+    status: 'pending',
+    department_id: '',
+    cost_center_id: '',
+    operation_number: ''
   });
 
   useEffect(() => {
@@ -72,14 +92,18 @@ export function Operations() {
   const fetchInitialData = async () => {
     try {
       const companyId = user?.company_id || '';
-      const [ops, cats, custs] = await Promise.all([
+      const [ops, cats, custs, depts, ccs] = await Promise.all([
         dbService.list<Operation>('operations', companyId),
         dbService.list<Category>('operation_categories', companyId),
-        dbService.list<Customer>('customers', companyId)
+        dbService.list<Customer>('customers', companyId),
+        dbService.list<Department>('departments', companyId),
+        dbService.list<CostCenter>('cost_centers', companyId)
       ]);
       setOperations(ops);
       setCategories(cats);
       setCustomers(custs);
+      setDepartments(depts);
+      setCostCenters(ccs);
     } catch (error) {
       toast.error('Failed to fetch data');
     } finally {
@@ -101,11 +125,19 @@ export function Operations() {
     if (!user) return;
 
     const customer = customers.find(c => c.id === formData.customer_id);
+    
+    // Extract dynamic fields
+    const field_values = dynamicFields.map(f => ({
+      field_id: f.id,
+      value: formData[f.id] || formData[f.name] || ''
+    }));
+
     const payload = {
       ...formData,
       company_id: user.company_id,
       customer_name: customer?.name || '',
-      category_id: selectedCategory
+      category_id: selectedCategory,
+      field_values
     };
 
     try {
@@ -113,7 +145,7 @@ export function Operations() {
         await dbService.update('operations', editingOperation.id, payload);
         toast.success(t('common.updated_successfully'));
       } else {
-        await dbService.create('operations', payload);
+        await apiRequest('/operations/complex', 'POST', payload);
         toast.success(t('common.created_successfully'));
       }
       setIsModalOpen(false);
@@ -131,19 +163,30 @@ export function Operations() {
       customer_id: '',
       description: '',
       date: new Date().toISOString().split('T')[0],
-      status: 'pending'
+      operation_date: new Date().toISOString().split('T')[0],
+      status: 'pending',
+      department_id: '',
+      cost_center_id: '',
+      operation_number: ''
     });
   };
 
   const renderDynamicField = (field: OperationField) => {
-    const value = formData[field.name] || '';
-    const onChange = (val: any) => setFormData({ ...formData, [field.name]: val });
+    const value = formData[field.id] || formData[field.name] || '';
+    const onChange = (val: any) => setFormData({ ...formData, [field.id]: val, [field.name]: val });
 
     const inputClass = "w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold";
 
     switch (field.type) {
       case 'number':
-        return <input type="number" className={inputClass} value={value} onChange={e => onChange(e.target.value)} required={field.is_required} />;
+      case 'currency':
+      case 'percentage':
+        return (
+          <div className="relative">
+            <input type="number" className={inputClass} value={value} onChange={e => onChange(e.target.value)} required={field.is_required} />
+            {field.unit && <span className="absolute left-3 top-3 text-zinc-400 text-xs">{field.unit}</span>}
+          </div>
+        );
       case 'date':
         return <input type="date" className={inputClass} value={value} onChange={e => onChange(e.target.value)} required={field.is_required} />;
       case 'select':
@@ -169,8 +212,8 @@ export function Operations() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900">إدارة العمليات والخدمات</h1>
-          <p className="text-zinc-500">متابعة كافة العمليات الخدمية والتشغيلية</p>
+          <h1 className="text-2xl font-bold text-zinc-900">نظام العمليات المرن</h1>
+          <p className="text-zinc-500">إدارة المشروعات والعمليات التشغيلية (Construction / Services / Trade)</p>
         </div>
         <button
           onClick={() => {
@@ -197,40 +240,68 @@ export function Operations() {
               className="bg-white border border-zinc-200 rounded-3xl p-6 hover:shadow-xl hover:border-emerald-200 transition-all group"
             >
               <div className="flex items-start justify-between mb-4">
-                <div className="bg-emerald-50 text-emerald-700 p-3 rounded-2xl">
+                <div className="bg-emerald-50 text-emerald-700 p-3 rounded-2xl flex flex-col items-center">
                   <Layers size={24} />
+                  <span className="text-[10px] font-mono font-bold mt-1 uppercase">{op.operation_number}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       setEditingOperation(op);
-                      setFormData(op);
+                      setFormData({ ...op });
                       setSelectedCategory(op.category_id);
+                      // Fetch current values
+                      const values = await apiRequest<any[]>(`/operations/${op.id}/values`);
+                      const extraFormData: any = {};
+                      values.forEach(v => {
+                        extraFormData[v.field_id] = v.value;
+                      });
+                      setFormData((prev: any) => ({ ...prev, ...extraFormData }));
                       setIsModalOpen(true);
                     }}
                     className="p-2 text-zinc-400 hover:text-emerald-600 transition-colors"
                   >
                     <Edit2 size={18} />
                   </button>
-                  <button className="p-2 text-zinc-400 hover:text-rose-600 transition-colors">
+                  <button 
+                    onClick={async () => {
+                      if (window.confirm(t('common.confirm_delete'))) {
+                        await dbService.delete('operations', op.id);
+                        fetchInitialData();
+                      }
+                    }}
+                    className="p-2 text-zinc-400 hover:text-rose-600 transition-colors"
+                  >
                     <Trash2 size={18} />
                   </button>
                 </div>
               </div>
 
               <div className="space-y-3 text-right" dir="rtl">
-                <div className="font-bold text-lg text-zinc-900">{op.customer_name}</div>
-                <div className="inline-flex px-2 py-1 bg-zinc-100 text-zinc-600 rounded-lg text-xs font-medium mb-2">
-                  {categories.find(c => c.id === op.category_id)?.name || 'بدون تصنيف'}
+                <div className="font-bold text-lg text-zinc-900">{op.customer_name || 'بدون اسم عميل'}</div>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  <span className="px-2 py-1 bg-zinc-100 text-zinc-600 rounded-lg text-xs font-bold ring-1 ring-zinc-200">
+                    {categories.find(c => c.id === op.category_id)?.name || 'بدون تصنيف'}
+                  </span>
+                  {op.department_id && (
+                    <span className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-bold ring-1 ring-emerald-100">
+                      {departments.find(d => d.id === op.department_id)?.name}
+                    </span>
+                  )}
+                  {op.cost_center_id && (
+                    <span className="px-2 py-1 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold ring-1 ring-amber-100">
+                      {costCenters.find(c => c.id === op.cost_center_id)?.name}
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm text-zinc-500 line-clamp-2 min-h-[2.5rem]">
                   {op.description || 'لا يوجد وصف...'}
                 </p>
 
                 <div className="pt-4 border-t border-zinc-50 flex items-center justify-between text-xs text-zinc-400">
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 font-bold">
                     <Calendar size={14} />
-                    <span>{new Date(op.date).toLocaleDateString(dir === 'rtl' ? 'ar-EG' : 'en-US')}</span>
+                    <span>{new Date(op.operation_date || op.date).toLocaleDateString(dir === 'rtl' ? 'ar-EG' : 'en-US')}</span>
                   </div>
                   <div className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
                     op.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
@@ -254,14 +325,14 @@ export function Operations() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
-              className="bg-zinc-50 rounded-[2.5rem] w-full max-w-2xl overflow-hidden shadow-2xl relative my-8"
+              className="bg-zinc-50 rounded-[2.5rem] w-full max-w-3xl overflow-hidden shadow-2xl relative my-8"
             >
               <div className="p-8 bg-white border-b border-zinc-100 flex items-center justify-between">
                 <div>
                   <h2 className="text-2xl font-bold text-zinc-900">
-                    {editingOperation ? 'تعديل بيانات العملية' : 'تسجيل عملية جديدة'}
+                    {editingOperation ? `تعديل العملية: ${formData.operation_number}` : 'تسجيل عملية جديدة'}
                   </h2>
-                  <p className="text-sm text-zinc-500 mt-1">أدخل البيانات المطلوبة بدقة للحفاظ على جودة السجلات</p>
+                  <p className="text-sm text-zinc-500 mt-1">نظام العمليات المرن المتكامل</p>
                 </div>
                 <button 
                   onClick={() => setIsModalOpen(false)}
@@ -274,27 +345,54 @@ export function Operations() {
               <form onSubmit={handleSubmit} className="p-8 space-y-6 text-right" dir="rtl">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-2">العميل المستفيد</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-2">الإدارة المختصة</label>
                     <select
                       required
+                      value={formData.department_id}
+                      onChange={e => setFormData({ ...formData, department_id: e.target.value })}
+                      className="w-full p-4 bg-white border border-zinc-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236B7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-[position:left_1rem_center] bg-no-repeat"
+                    >
+                      <option value="">اختر الإدارة...</option>
+                      {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-700 mb-2">مركز التكلفة</label>
+                    <select
+                      required
+                      value={formData.cost_center_id}
+                      onChange={e => setFormData({ ...formData, cost_center_id: e.target.value })}
+                      className="w-full p-4 bg-white border border-zinc-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236B7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-[position:left_1rem_center] bg-no-repeat"
+                    >
+                      <option value="">اختر مركز التكلفة...</option>
+                      {costCenters.map(cc => <option key={cc.id} value={cc.id}>{cc.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-700 mb-2">العميل</label>
+                    <select
                       value={formData.customer_id}
                       onChange={e => setFormData({ ...formData, customer_id: e.target.value })}
                       className="w-full p-4 bg-white border border-zinc-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236B7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-[position:left_1rem_center] bg-no-repeat"
                     >
-                      <option value="">اختر العميل...</option>
+                      <option value="">اختر العميل (اختياري)...</option>
                       {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-2">نوع العملية (التصنيف)</label>
+                    <label className="block text-sm font-bold text-zinc-700 mb-2">تصنيف العملية</label>
                     <select
                       required
                       value={selectedCategory}
                       onChange={e => setSelectedCategory(e.target.value)}
                       className="w-full p-4 bg-white border border-zinc-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236B7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-[position:left_1rem_center] bg-no-repeat"
                     >
-                      <option value="">حدد نوع العملية...</option>
+                      <option value="">حدد نوع العملية لإظهار الحقول...</option>
                       {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </div>
@@ -306,8 +404,8 @@ export function Operations() {
                     <input
                       type="date"
                       required
-                      value={formData.date}
-                      onChange={e => setFormData({ ...formData, date: e.target.value })}
+                      value={formData.operation_date}
+                      onChange={e => setFormData({ ...formData, operation_date: e.target.value, date: e.target.value })}
                       className="w-full p-4 bg-white border border-zinc-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold"
                     />
                   </div>
@@ -332,16 +430,18 @@ export function Operations() {
                     <motion.div
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: 'auto', opacity: 1 }}
-                      className="bg-emerald-50/50 p-6 rounded-3xl border border-emerald-100"
+                      className="bg-zinc-100 p-6 rounded-[2rem] border border-zinc-200"
                     >
                       <div className="flex items-center gap-2 mb-4 text-emerald-800">
                         <Info size={16} />
-                        <span className="text-sm font-bold">حقول بيانات مخصصة لهذا التصنيف:</span>
+                        <span className="text-sm font-bold">الحقول الديناميكية (Dynamic Specification):</span>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {dynamicFields.map(field => (
                           <div key={field.id}>
-                            <label className="block text-[11px] font-bold text-emerald-700 mb-1 ml-1 uppercase">{field.label}</label>
+                            <label className="block text-xs font-bold text-zinc-600 mb-1.5 ml-1">
+                              {field.label} {field.is_required && <span className="text-rose-500">*</span>}
+                            </label>
                             {renderDynamicField(field)}
                           </div>
                         ))}
@@ -351,17 +451,17 @@ export function Operations() {
                 </AnimatePresence>
 
                 <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-2">ملاحظات إضافية (اختياري)</label>
+                  <label className="block text-sm font-bold text-zinc-700 mb-2">وصف العملية / ملاحظات</label>
                   <textarea
                     value={formData.description}
                     onChange={e => setFormData({ ...formData, description: e.target.value })}
                     rows={3}
                     className="w-full p-4 bg-white border border-zinc-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                    placeholder="اكتب أي تفاصيل أخرى هنا..."
+                    placeholder="اكتب وصفاً مفصلاً للعملية..."
                   />
                 </div>
 
-                <div className="flex items-center gap-4 pt-4">
+                <div className="flex items-center gap-4 pt-4 border-t border-zinc-100">
                   <button
                     type="submit"
                     className="flex-1 bg-emerald-600 text-white h-14 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 active:scale-[0.98]"

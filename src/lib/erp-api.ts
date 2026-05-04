@@ -531,7 +531,8 @@ const modules = [
   'invoices', 'invoice_items', 'journal_entries', 'journal_entry_lines', 'activity_logs',
   'returns', 'return_items', 'purchase_invoices', 'purchase_returns', 
   'customer_discounts', 'supplier_discounts', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers',
-  'system_config', 'audit_logs', 'operation_categories', 'operations', 'operation_fields'
+  'system_config', 'audit_logs', 'operation_categories', 'operations', 'operation_fields',
+  'departments', 'cost_centers', 'operation_field_values'
 ];
 
 // --- Flexible Operations Logic ---
@@ -1257,6 +1258,80 @@ router.post('/auth/update-password', authenticateToken, async (req: AuthRequest,
   } catch (error) {
     console.error('Update password error:', error);
     res.status(500).json({ error: 'Failed to update password' });
+  }
+});
+
+// --- Complex Operations Logic ---
+router.post('/operations/complex', authenticateToken, async (req: AuthRequest, res) => {
+  const client = await pool.connect();
+  try {
+    const companyId = req.user?.company_id;
+    if (!companyId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { field_values, ...rawOpData } = req.body;
+    const opData = sanitizeData('operations', rawOpData);
+    
+    await client.query('BEGIN');
+
+    // 1. Generate Operation Number if not provided
+    if (!opData.operation_number) {
+      const { rows } = await client.query(
+        'SELECT operation_number FROM operations WHERE company_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [companyId]
+      );
+      let nextNum = 1;
+      if (rows.length > 0) {
+        const lastNum = parseInt(rows[0].operation_number.split('-')[1]);
+        if (!isNaN(lastNum)) nextNum = lastNum + 1;
+      }
+      opData.operation_number = `OP-${nextNum.toString().padStart(5, '0')}`;
+    }
+
+    // 2. Create Operation
+    const opId = uuidv4();
+    const finalOpData = { ...opData, id: opId, company_id: companyId };
+    const opKeys = Object.keys(finalOpData);
+    const opPlaceholders = opKeys.map((_, i) => `$${i + 1}`).join(', ');
+    
+    await client.query(
+      `INSERT INTO operations (${opKeys.join(', ')}) VALUES (${opPlaceholders})`,
+      Object.values(finalOpData)
+    );
+
+    // 3. Create Field Values
+    if (field_values && Array.isArray(field_values)) {
+      for (const fv of field_values) {
+        const fvId = uuidv4();
+        await client.query(
+          'INSERT INTO operation_field_values (id, operation_id, field_id, value) VALUES ($1, $2, $3, $4)',
+          [fvId, opId, fv.field_id, fv.value]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ id: opId, operation_number: opData.operation_number });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Complex Operation creation failed:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+router.get('/operations/:id/values', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await pool.query(`
+      SELECT fv.*, f.name, f.label, f.type, f.unit 
+      FROM operation_field_values fv
+      JOIN operation_fields f ON fv.field_id = f.id
+      WHERE fv.operation_id = $1
+    `, [id]);
+    res.json(rows);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
   }
 });
 

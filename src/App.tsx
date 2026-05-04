@@ -55,6 +55,8 @@ import { Toaster } from 'react-hot-toast';
 import { OperationCategories } from './pages/OperationCategories';
 import { OperationFields } from './pages/OperationFields';
 import { Operations } from './pages/Operations';
+import { Departments } from './pages/Departments';
+import { CostCenters } from './pages/CostCenters';
 
 export default function App() {
   const { t, dir } = useLanguage();
@@ -175,6 +177,8 @@ export default function App() {
       case 'operation_categories': return <OperationCategories />;
       case 'operation_fields': return <OperationFields />;
       case 'operations': return <Operations />;
+      case 'departments': return <Departments />;
+      case 'cost_centers': return <CostCenters />;
       case 'system_check': return <SystemCheck />;
       default: return <Dashboard />;
     }

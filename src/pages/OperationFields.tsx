@@ -9,13 +9,17 @@ import { toast } from 'react-hot-toast';
 interface OperationField {
   id: string;
   company_id: string;
+  code: string;
   name: string;
   label: string;
-  type: 'text' | 'number' | 'date' | 'select' | 'boolean';
+  description: string;
+  type: 'text' | 'number' | 'date' | 'currency' | 'percentage' | 'select' | 'boolean';
   category_id: string | null;
   sort_order: number;
   is_required: boolean;
   options: string[] | null;
+  unit: string;
+  default_value: string;
 }
 
 interface Category {
@@ -32,13 +36,17 @@ export function OperationFields() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingField, setEditingField] = useState<OperationField | null>(null);
   const [formData, setFormData] = useState({
+    code: '',
     name: '',
     label: '',
+    description: '',
     type: 'text' as OperationField['type'],
     category_id: '' as string | null,
     sort_order: 0,
     is_required: false,
-    options: '' as string // Store as comma-separated in form
+    options: '' as string,
+    unit: '',
+    default_value: ''
   });
 
   useEffect(() => {
@@ -96,6 +104,8 @@ export function OperationFields() {
       case 'date': return <Calendar size={16} />;
       case 'select': return <List size={16} />;
       case 'boolean': return <CheckSquare size={16} />;
+      case 'currency': return <Hash size={16} className="text-emerald-600" />;
+      case 'percentage': return <Type size={16} className="text-amber-600" />;
       default: return <Settings size={16} />;
     }
   };
@@ -104,27 +114,31 @@ export function OperationFields() {
     <div className="p-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900">حقول البيانات المخصصة</h1>
-          <p className="text-zinc-500">تعريف الحقول المطلوبة لكل تصنيف عملية</p>
+          <h1 className="text-2xl font-bold text-zinc-900">تعريف حقول العمليات</h1>
+          <p className="text-zinc-500">إدارة الحقول الديناميكية للنظام المرن</p>
         </div>
         <button
           onClick={() => {
             setEditingField(null);
             setFormData({
+              code: '',
               name: '',
               label: '',
+              description: '',
               type: 'text',
               category_id: null,
               sort_order: 0,
               is_required: false,
-              options: ''
+              options: '',
+              unit: '',
+              default_value: ''
             });
             setIsModalOpen(true);
           }}
           className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
         >
           <Plus size={20} />
-          <span>إضافة حقل</span>
+          <span>إضافة تعريف حقل</span>
         </button>
       </div>
 
@@ -137,11 +151,10 @@ export function OperationFields() {
           <table className="w-full">
             <thead className="bg-zinc-50 border-b border-zinc-100">
               <tr>
-                <th className="px-6 py-4 font-medium text-zinc-500 text-sm">العنوان (Label)</th>
-                <th className="px-6 py-4 font-medium text-zinc-500 text-sm">التصنيف</th>
-                <th className="px-6 py-4 font-medium text-zinc-500 text-sm">النوع</th>
+                <th className="px-6 py-4 font-medium text-zinc-500 text-sm">كود/اسم</th>
+                <th className="px-6 py-4 font-medium text-zinc-500 text-sm">العنوان</th>
+                <th className="px-6 py-4 font-medium text-zinc-500 text-sm">النوع/الوحدة</th>
                 <th className="px-6 py-4 font-medium text-zinc-500 text-sm text-center">مطلوب</th>
-                <th className="px-6 py-4 font-medium text-zinc-500 text-sm text-center">الترتيب</th>
                 <th className="px-6 py-4 font-medium text-zinc-500 text-sm">الإجراءات</th>
               </tr>
             </thead>
@@ -149,34 +162,22 @@ export function OperationFields() {
               {fields.sort((a,b) => (a.sort_order || 0) - (b.sort_order || 0)).map((field) => (
                 <tr key={field.id} className="hover:bg-zinc-50/50 transition-colors group">
                   <td className="px-6 py-4">
-                    <div className="font-medium text-zinc-900">{field.label}</div>
+                    <div className="font-mono text-xs text-emerald-600 font-bold">{field.code || '-'}</div>
                     <div className="text-[10px] text-zinc-400 font-mono uppercase">{field.name}</div>
                   </td>
+                  <td className="px-6 py-4 font-bold text-zinc-900">{field.label}</td>
                   <td className="px-6 py-4">
-                    {field.category_id ? (
-                      <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-medium">
-                        <Layers size={12} />
-                        {categories.find(c => c.id === field.category_id)?.name || 'غير معروف'}
-                      </span>
-                    ) : (
-                      <span className="text-zinc-400 text-xs italic">عام لكافة العمليات</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2 text-zinc-600 text-sm">
+                    <div className="flex items-center gap-2 text-zinc-600 text-sm font-bold">
                       {getFieldIcon(field.type)}
-                      <span>{field.type}</span>
+                      <span>{field.type} {field.unit && `(${field.unit})`}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center">
                     {field.is_required ? (
-                      <span className="text-rose-500 text-xs font-bold">نعم</span>
+                      <span className="text-rose-500 text-xs font-bold bg-rose-50 px-2 py-0.5 rounded-full">إجباري</span>
                     ) : (
                       <span className="text-zinc-300 text-xs">-</span>
                     )}
-                  </td>
-                  <td className="px-6 py-4 text-center font-mono text-xs text-zinc-500">
-                    {field.sort_order}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -184,13 +185,17 @@ export function OperationFields() {
                         onClick={() => {
                           setEditingField(field);
                           setFormData({
+                            code: field.code || '',
                             name: field.name,
                             label: field.label,
+                            description: field.description || '',
                             type: field.type,
                             category_id: field.category_id,
                             sort_order: field.sort_order,
                             is_required: field.is_required,
-                            options: Array.isArray(field.options) ? field.options.join(', ') : ''
+                            options: Array.isArray(field.options) ? field.options.join(', ') : '',
+                            unit: field.unit || '',
+                            default_value: field.default_value || ''
                           });
                           setIsModalOpen(true);
                         }}
@@ -221,46 +226,57 @@ export function OperationFields() {
       {/* Modal */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl"
+              className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl my-8"
             >
               <div className="p-6 border-b border-zinc-100">
                 <h2 className="text-xl font-bold text-zinc-900">
-                  {editingField ? 'تعديل حقل' : 'إضافة حقل جديد'}
+                  {editingField ? 'تعديل تعريف الحقل' : 'إضافة حقل جديد للنظام'}
                 </h2>
               </div>
               <form onSubmit={handleSubmit} className="p-6 space-y-4 text-right" dir="rtl">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-zinc-700 mb-1">اسم الحقل (System Name)</label>
+                    <label className="block text-sm font-medium text-zinc-700 mb-1">كود الحقل (Unique Code)</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.code}
+                      onChange={e => setFormData({ ...formData, code: e.target.value.toUpperCase().replace(/\s+/g, '_') })}
+                      className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono font-bold"
+                      placeholder="e.g. F001"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 mb-1">الاسم لغرض البرمجة (Slug)</label>
                     <input
                       type="text"
                       required
                       value={formData.name}
                       onChange={e => setFormData({ ...formData, name: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
                       className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
-                      placeholder="e.g. site_address"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 mb-1">تسمية الحقل (Display Label)</label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.label}
-                      onChange={e => setFormData({ ...formData, label: e.target.value })}
-                      className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                      placeholder="مثال: عنوان الموقع"
+                      placeholder="e.g. construction_depth"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                   <div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 mb-1">التسمية العربية (Label)</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.label}
+                      onChange={e => setFormData({ ...formData, label: e.target.value })}
+                      className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold"
+                      placeholder="مثال: المساحة الإجمالية"
+                    />
+                  </div>
+                  <div>
                     <label className="block text-sm font-medium text-zinc-700 mb-1">نوع البيانات</label>
                     <select
                       required
@@ -268,25 +284,35 @@ export function OperationFields() {
                       onChange={e => setFormData({ ...formData, type: e.target.value as any })}
                       className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold"
                     >
-                      <option value="text font-bold">نص (Text)</option>
-                      <option value="number font-bold">رقم (Number)</option>
-                      <option value="date font-bold">تاريخ (Date)</option>
-                      <option value="select font-bold">قائمة منسدلة (Select/Dropdown)</option>
-                      <option value="boolean font-bold">خيار نعم/لا (Checkbox)</option>
+                      <option value="text">نص (Text)</option>
+                      <option value="number">رقم (Number)</option>
+                      <option value="date">تاريخ (Date)</option>
+                      <option value="currency">عملة (Currency)</option>
+                      <option value="percentage">نسبة مئوية (%)</option>
+                      <option value="select">قائمة منسدلة (Dropdown)</option>
+                      <option value="boolean">خيار نعم/لا</option>
                     </select>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-zinc-700 mb-1">يرتبط بتصنيف</label>
-                    <select
-                      value={formData.category_id || ''}
-                      onChange={e => setFormData({ ...formData, category_id: e.target.value || null })}
-                      className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                    >
-                      <option value="">عام (لكافة العمليات)</option>
-                      {categories.map(cat => (
-                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                      ))}
-                    </select>
+                    <label className="block text-sm font-medium text-zinc-700 mb-1">الوحدة (مثل: متر، كجم، $)</label>
+                    <input
+                      type="text"
+                      value={formData.unit}
+                      onChange={e => setFormData({ ...formData, unit: e.target.value })}
+                      className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 mb-1">الترتيب</label>
+                    <input
+                      type="number"
+                      value={formData.sort_order}
+                      onChange={e => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
+                      className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
+                    />
                   </div>
                 </div>
 
@@ -298,23 +324,24 @@ export function OperationFields() {
                       required
                       value={formData.options}
                       onChange={e => setFormData({ ...formData, options: e.target.value })}
-                      className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                      placeholder="خيار 1, خيار 2, خيار 3..."
+                      className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold"
+                      placeholder="خيار 1, خيار 2..."
                     />
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 mb-1">الترتيب</label>
-                    <input
-                      type="number"
-                      value={formData.sort_order}
-                      onChange={e => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
-                      className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
-                    />
-                  </div>
-                  <div className="flex items-end pb-3">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">وصف الحقل / تعليمات للمستخدم</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={e => setFormData({ ...formData, description: e.target.value })}
+                    rows={2}
+                    className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                  />
+                </div>
+
+                <div className="flex items-center gap-3 mt-8">
+                  <div className="flex-1">
                     <label className="flex items-center gap-3 cursor-pointer group">
                       <input
                         type="checkbox"
@@ -322,12 +349,12 @@ export function OperationFields() {
                         onChange={e => setFormData({ ...formData, is_required: e.target.checked })}
                         className="w-5 h-5 rounded-lg border-zinc-300 text-emerald-600 focus:ring-emerald-500 transition-all"
                       />
-                      <span className="text-zinc-700 font-medium group-hover:text-amber-600 transition-colors underline decoration-dotted">حقل مطلوب إجباري</span>
+                      <span className="text-zinc-700 font-bold group-hover:text-rose-600 transition-colors">هذا الحقل إجباري</span>
                     </label>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 mt-8">
+                <div className="flex items-center gap-3 mt-4">
                   <button
                     type="submit"
                     className="flex-1 bg-emerald-600 text-white h-12 rounded-xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"

@@ -211,6 +211,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       icon: Layers,
       subItems: [
         { id: 'operations', label: 'العمليات', icon: List },
+        { id: 'departments', label: 'الإدارات والهيكل', icon: Building2 },
+        { id: 'cost_centers', label: 'مراكز التكلفة', icon: PieChart },
         { id: 'operation_categories', label: 'تصنيفات العمليات', icon: Folder },
         { id: 'operation_fields', label: 'حقول البيانات', icon: Settings },
       ]

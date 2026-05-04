@@ -94,11 +94,20 @@ export const EXPECTED_SCHEMA: TableSchema = {
   operation_categories: [
     'id', 'name', 'parent_id', 'company_id', 'created_at', 'updated_at'
   ],
+  departments: [
+    'id', 'code', 'name', 'description', 'parent_id', 'manager_user_id', 'company_id', 'is_active', 'created_at'
+  ],
+  cost_centers: [
+    'id', 'code', 'name', 'description', 'department_id', 'company_id', 'budget', 'currency', 'is_active', 'created_at'
+  ],
   operations: [
-    'id', 'company_id', 'customer_id', 'customer_name', 'description', 'date', 'status', 'category_id', 'created_at'
+    'id', 'company_id', 'customer_id', 'customer_name', 'description', 'date', 'status', 'category_id', 'operation_number', 'department_id', 'cost_center_id', 'operation_date', 'created_at'
   ],
   operation_fields: [
-    'id', 'company_id', 'name', 'label', 'type', 'category_id', 'department_id', 'sort_order', 'is_required', 'options', 'created_at'
+    'id', 'company_id', 'name', 'label', 'type', 'category_id', 'department_id', 'sort_order', 'is_required', 'options', 'code', 'description', 'unit', 'default_value', 'created_at'
+  ],
+  operation_field_values: [
+    'id', 'operation_id', 'field_id', 'value', 'created_at'
   ],
   payment_methods: [
     'id', 'company_id', 'account_id', 'account_name', 'code', 'name', 'type', 'opening_balance', 
