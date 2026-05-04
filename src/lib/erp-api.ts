@@ -27,11 +27,26 @@ async function logActivity(
   ip_address?: string
 ) {
   try {
-    await pool.query(
-      `INSERT INTO activity_logs (company_id, user_id, username, action, details, entity, document_id, changes, ip_address, created_at) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-      [company_id, user_id, username, action, details, JSON.stringify(entity), document_id, JSON.stringify(changes), ip_address, new Date()]
-    );
+    // Check if created_at exists for safe insertion
+    const colCheck = await pool.query(`
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_name = 'activity_logs' AND column_name = 'created_at'
+    `);
+    const hasCreatedAt = colCheck.rows.length > 0;
+
+    if (hasCreatedAt) {
+      await pool.query(
+        `INSERT INTO activity_logs (company_id, user_id, username, action, details, entity, document_id, changes, ip_address, created_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [company_id, user_id, username, action, details, JSON.stringify(entity), document_id, JSON.stringify(changes), ip_address, new Date()]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO activity_logs (company_id, user_id, username, action, details, entity, document_id, changes, ip_address) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [company_id, user_id, username, action, details, JSON.stringify(entity), document_id, JSON.stringify(changes), ip_address]
+      );
+    }
   } catch (error) {
     console.error('Failed to log server activity:', error);
   }
@@ -656,7 +671,14 @@ modules.forEach(moduleName => {
           params.push(companyId);
         }
         
-        query += ' ORDER BY created_at DESC LIMIT 500';
+        const colCheck = await pool.query(`
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'activity_logs' AND column_name = 'created_at'
+        `);
+        const hasCreatedAt = colCheck.rows.length > 0;
+        const orderBy = hasCreatedAt ? 'created_at DESC' : 'id DESC';
+        
+        query += ` ORDER BY ${orderBy} LIMIT 500`;
         
         const queryResult = await pool.query(query, params);
         rows = queryResult.rows;
@@ -674,7 +696,14 @@ modules.forEach(moduleName => {
           return res.status(400).json({ error: 'company_id is required' });
         }
 
-        query += ' ORDER BY created_at DESC LIMIT 500';
+        const colCheck = await pool.query(`
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'audit_logs' AND column_name = 'created_at'
+        `);
+        const hasCreatedAt = colCheck.rows.length > 0;
+        const orderBy = hasCreatedAt ? 'created_at DESC' : 'id DESC';
+
+        query += ` ORDER BY ${orderBy} LIMIT 500`;
         const queryResult = await pool.query(query, params);
         rows = queryResult.rows;
       } else {
@@ -1275,8 +1304,16 @@ router.post('/operations/complex', authenticateToken, async (req: AuthRequest, r
 
     // 1. Generate Operation Number if not provided
     if (!opData.operation_number) {
+      // Check if created_at exists for safe ordering
+      const colCheck = await client.query(`
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'operations' AND column_name = 'created_at'
+      `);
+      const hasCreatedAt = colCheck.rows.length > 0;
+      const orderBy = hasCreatedAt ? 'created_at DESC' : 'id DESC';
+
       const { rows } = await client.query(
-        'SELECT operation_number FROM operations WHERE company_id = $1 ORDER BY created_at DESC LIMIT 1',
+        `SELECT operation_number FROM operations WHERE company_id = $1 ORDER BY ${orderBy} LIMIT 1`,
         [companyId]
       );
       let nextNum = 1;

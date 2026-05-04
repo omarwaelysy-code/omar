@@ -18,24 +18,24 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   customers: [
     'id', 'company_id', 'account_id', 'account_name', 'code', 'name', 'email', 'mobile', 'address', 
-    'tax_number', 'opening_balance', 'opening_balance_date', 'counter_account_id'
+    'tax_number', 'opening_balance', 'opening_balance_date', 'counter_account_id', 'created_at'
   ],
   suppliers: [
     'id', 'company_id', 'account_id', 'account_name', 'name', 'code', 'email', 'mobile', 'address', 
-    'tax_number', 'opening_balance', 'opening_balance_date', 'counter_account_id'
+    'tax_number', 'opening_balance', 'opening_balance_date', 'counter_account_id', 'created_at'
   ],
   products: [
     'id', 'company_id', 'revenue_account_id', 'cost_account_id', 'revenue_account_name', 'cost_account_name', 'name', 'code', 'barcode',
     'type', 'description', 'image_url', 'category', 'unit', 'cost_price', 'sale_price', 'stock', 'min_stock', 
-    'current_stock', 'is_service', 'counter_account_id'
+    'current_stock', 'is_service', 'counter_account_id', 'created_at'
   ],
   accounts: [
-    'id', 'company_id', 'type_id', 'parent_id', 'code', 'name', 'opening_balance', 'opening_balance_date', 'is_active'
+    'id', 'company_id', 'type_id', 'parent_id', 'code', 'name', 'opening_balance', 'opening_balance_date', 'is_active', 'created_at'
   ],
   invoices: [
     'id', 'company_id', 'customer_id', 'customer_name', 'invoice_number', 'date', 'due_date', 'subtotal',
     'tax_amount', 'discount_amount', 'total_amount', 'status', 'payment_type', 
-    'payment_method_id', 'payment_method_name', 'notes', 'created_by'
+    'payment_method_id', 'payment_method_name', 'notes', 'created_by', 'created_at'
   ],
   invoice_items: [
     'id', 'invoice_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
@@ -43,7 +43,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   returns: [
     'id', 'company_id', 'customer_id', 'customer_name', 'return_number', 'date', 'total_amount', 
-    'payment_type', 'payment_method_id', 'payment_method_name', 'notes'
+    'payment_type', 'payment_method_id', 'payment_method_name', 'notes', 'created_at'
   ],
   return_items: [
     'id', 'return_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
@@ -52,7 +52,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   purchase_invoices: [
     'id', 'company_id', 'supplier_id', 'supplier_name', 'invoice_number', 'date', 'due_date', 'subtotal',
     'tax_amount', 'discount_amount', 'total_amount', 'status', 'payment_type', 
-    'payment_method_id', 'payment_method_name', 'notes'
+    'payment_method_id', 'payment_method_name', 'notes', 'created_at'
   ],
   purchase_invoice_items: [
     'id', 'invoice_id', 'product_id', 'expense_category_id', 'description', 'quantity', 'unit_price', 'total',
@@ -60,15 +60,15 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   purchase_returns: [
     'id', 'company_id', 'supplier_id', 'supplier_name', 'return_number', 'date', 'total_amount', 
-    'payment_type', 'payment_method_id', 'payment_method_name', 'notes'
+    'payment_type', 'payment_method_id', 'payment_method_name', 'notes', 'created_at'
   ],
   receipt_vouchers: [
     'id', 'company_id', 'customer_id', 'customer_name', 'voucher_number', 'date', 'amount', 'description', 
-    'payment_method_id', 'payment_method_name', 'account_id'
+    'payment_method_id', 'payment_method_name', 'account_id', 'created_at'
   ],
   payment_vouchers: [
     'id', 'company_id', 'supplier_id', 'supplier_name', 'expense_category_id', 'category_name', 'date', 'amount', 
-    'description', 'payment_method_id', 'payment_method_name', 'account_id'
+    'description', 'payment_method_id', 'payment_method_name', 'account_id', 'created_at'
   ],
   customer_discounts: [
     'id', 'company_id', 'customer_id', 'customer_name', 'date', 'amount', 'description'
@@ -85,7 +85,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   journal_entries: [
     'id', 'company_id', 'date', 'description', 'reference_id', 'reference_type', 
-    'reference_number', 'total_debit', 'total_credit', 'status'
+    'reference_number', 'total_debit', 'total_credit', 'status', 'created_at'
   ],
   journal_entry_lines: [
     'id', 'journal_entry_id', 'account_id', 'account_name', 'description', 'debit', 'credit',
