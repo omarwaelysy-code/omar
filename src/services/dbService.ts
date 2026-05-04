@@ -56,18 +56,21 @@ export const dbService = {
     return apiRequest<T[]>(`/${collectionName}`);
   },
 
-  async list<T>(collectionName: string, options: string | { company_id: string; [key: string]: any }): Promise<T[]> {
+  async list<T>(collectionName: string, options?: string | { company_id?: string; [key: string]: any }): Promise<T[]> {
     const params = new URLSearchParams();
-    if (typeof options === 'string') {
-      params.append('company_id', options);
-    } else {
-      Object.entries(options).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          params.append(key, value.toString());
-        }
-      });
+    if (options) {
+      if (typeof options === 'string') {
+        params.append('company_id', options);
+      } else {
+        Object.entries(options).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            params.append(key, value.toString());
+          }
+        });
+      }
     }
-    return apiRequest<T[]>(`/${collectionName}?${params.toString()}`);
+    const queryString = params.toString();
+    return apiRequest<T[]>(`/${collectionName}${queryString ? '?' + queryString : ''}`);
   },
 
   subscribe<T>(collectionName: string, options: string | { company_id: string; [key: string]: any }, callback: (data: T[]) => void, onError?: (error: Error) => void) {

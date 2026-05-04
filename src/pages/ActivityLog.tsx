@@ -16,8 +16,19 @@ export const ActivityLogPage: React.FC = () => {
       if (!user) return;
       setLoading(true);
       try {
-        const data = await dbService.list<ActivityLog>('activity_logs', user.company_id);
-        setLogs(data);
+        console.log('Fetching logs for user company:', user.company_id);
+        // Fetch all logs to avoid backend filtering issues
+        const data = await dbService.listAll<ActivityLog>('activity_logs');
+        console.log('Total logs received from API:', data.length);
+        
+        // Filter locally to be sure we match the user's company
+        const userLogs = data.filter(log => {
+          // Flexible matching for company_id (UUID vs other formats)
+          return String(log.company_id) === String(user.company_id);
+        });
+        
+        console.log('Logs after local filtering:', userLogs.length);
+        setLogs(userLogs);
       } catch (error) {
         console.error('Failed to fetch activity logs:', error);
       } finally {
@@ -85,7 +96,7 @@ export const ActivityLogPage: React.FC = () => {
                       <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
                         <User size={16} />
                       </div>
-                      <span className="font-bold text-zinc-900">{log.username}</span>
+                      <span className="font-bold text-zinc-900">{log.username || '-'}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -96,7 +107,7 @@ export const ActivityLogPage: React.FC = () => {
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-sm text-zinc-500 max-w-md truncate group-hover:whitespace-normal group-hover:overflow-visible transition-all">
-                      {log.details}
+                      {log.details || '-'}
                     </p>
                   </td>
                   <td className="px-6 py-4">
@@ -128,7 +139,7 @@ export const ActivityLogPage: React.FC = () => {
                   <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
                     <User size={16} />
                   </div>
-                  <span className="font-bold text-zinc-900">{log.username}</span>
+                  <span className="font-bold text-zinc-900">{log.username || '-'}</span>
                 </div>
                 <div className="text-left text-[10px] text-zinc-400 font-mono">
                   <div className="flex items-center gap-1 justify-end">
@@ -142,7 +153,7 @@ export const ActivityLogPage: React.FC = () => {
                 <span className="font-medium">{log.action}</span>
               </div>
               <div className="bg-zinc-50 p-3 rounded-xl text-xs text-zinc-500 italic">
-                {log.details}
+                {log.details || '-'}
               </div>
             </div>
           ))}
