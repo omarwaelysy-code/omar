@@ -531,8 +531,58 @@ const modules = [
   'invoices', 'invoice_items', 'journal_entries', 'journal_entry_lines', 'activity_logs',
   'returns', 'return_items', 'purchase_invoices', 'purchase_returns', 
   'customer_discounts', 'supplier_discounts', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers',
-  'system_config', 'audit_logs'
+  'system_config', 'audit_logs', 'operation_categories', 'operations', 'operation_fields'
 ];
+
+// --- Flexible Operations Logic ---
+router.get('/operation_fields/by-category/:categoryId', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { categoryId } = req.params;
+    const companyId = req.user?.company_id;
+
+    if (!companyId) return res.status(401).json({ error: 'Unauthorized' });
+
+    // 1. Get the category and its parents (recursive query)
+    const categoryQuery = `
+      WITH RECURSIVE category_tree AS (
+        SELECT id, parent_id FROM operation_categories WHERE id = $1 AND company_id = $2
+        UNION ALL
+        SELECT c.id, c.parent_id FROM operation_categories c
+        INNER JOIN category_tree ct ON c.id = ct.parent_id
+      )
+      SELECT id FROM category_tree;
+    `;
+    
+    // If categoryId is 'null' or empty, we just look for general fields
+    let categoryIds: string[] = [];
+    if (categoryId && categoryId !== 'null' && categoryId !== 'undefined') {
+      const { rows: treeRows } = await pool.query(categoryQuery, [categoryId, companyId]);
+      categoryIds = treeRows.map(r => r.id);
+    }
+
+    // 2. Fetch fields: 
+    // - Specific to selected category or its parents
+    // - OR General fields (category_id IS NULL)
+    let fieldsQuery = `
+      SELECT * FROM operation_fields 
+      WHERE (company_id = $1)
+      AND (category_id IS NULL
+    `;
+
+    const params: any[] = [companyId];
+    if (categoryIds.length > 0) {
+      fieldsQuery += ` OR category_id = ANY($2)`;
+      params.push(categoryIds);
+    }
+    fieldsQuery += `) ORDER BY sort_order ASC, name ASC`;
+
+    const { rows: fields } = await pool.query(fieldsQuery, params);
+    res.json(fields.map(f => parseRow('operation_fields', f)));
+  } catch (error: any) {
+    console.error('Error fetching fields by category:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 const transactionalModules = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns', 'journal_entries'];
 

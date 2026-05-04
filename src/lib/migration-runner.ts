@@ -41,7 +41,9 @@ export async function runMigrations() {
       { table: 'receipt_vouchers', column: 'account_id', type: 'VARCHAR(36) REFERENCES accounts(id)' },
       { table: 'payment_vouchers', column: 'account_id', type: 'VARCHAR(36) REFERENCES accounts(id)' },
       { table: 'activity_logs', column: 'account_id', type: 'VARCHAR(36) REFERENCES accounts(id)' },
-      { table: 'activity_logs', column: 'entity', type: 'JSONB' }
+      { table: 'activity_logs', column: 'entity', type: 'JSONB' },
+      { table: 'operations', column: 'category_id', type: 'VARCHAR(36) REFERENCES operation_categories(id)' },
+      { table: 'operation_fields', column: 'category_id', type: 'VARCHAR(36) REFERENCES operation_categories(id)' }
     ];
 
     for (const item of columnsToSync) {

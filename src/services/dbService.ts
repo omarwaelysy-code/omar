@@ -10,7 +10,7 @@ export enum OperationType {
 
 const API_BASE = '/api/erp';
 
-async function apiRequest<T>(path: string, method: string = 'GET', body?: any, timeoutMs: number = 30000): Promise<T> {
+export async function apiRequest<T>(path: string, method: string = 'GET', body?: any, timeoutMs: number = 30000): Promise<T> {
   const token = localStorage.getItem('auth_token');
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -113,6 +113,10 @@ export const dbService = {
     const result = await apiRequest<{ id: string }>(`/${collectionName}`, 'POST', data);
     window.dispatchEvent(new CustomEvent('db-refresh', { detail: { collection: collectionName } }));
     return result.id;
+  },
+
+  async create<T>(collectionName: string, data: any): Promise<string> {
+    return this.add(collectionName, data);
   },
 
   async addWithId<T>(collectionName: string, id: string, data: any): Promise<void> {

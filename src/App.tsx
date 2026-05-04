@@ -51,6 +51,10 @@ import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
 import { SystemCheck } from './pages/SystemCheck';
 import { MaintenanceModeGuard } from './components/MaintenanceModeGuard';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
+import { Toaster } from 'react-hot-toast';
+import { OperationCategories } from './pages/OperationCategories';
+import { OperationFields } from './pages/OperationFields';
+import { Operations } from './pages/Operations';
 
 export default function App() {
   const { t, dir } = useLanguage();
@@ -168,6 +172,9 @@ export default function App() {
       case 'backup_restore': return <BackupRestore />;
       case 'integrity_dashboard': return <IntegrityDashboard />;
       case 'activity_log': return <ActivityLogPage />;
+      case 'operation_categories': return <OperationCategories />;
+      case 'operation_fields': return <OperationFields />;
+      case 'operations': return <Operations />;
       case 'system_check': return <SystemCheck />;
       default: return <Dashboard />;
     }
@@ -175,6 +182,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-stone-50">
+      <Toaster position="top-center" />
       <MaintenanceModeGuard>
         <ChangePasswordModal />
         <Layout onNavigate={setCurrentPage} currentPage={currentPage}>

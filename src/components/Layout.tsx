@@ -24,6 +24,9 @@ import {
   CreditCard,
   History,
   Tags,
+  Folder,
+  List,
+  Layers,
   ArrowDownToLine,
   ArrowUpFromLine,
   BookOpen,
@@ -200,6 +203,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         { id: 'receipts', label: t('nav.receipts'), icon: Receipt },
         { id: 'payment_vouchers', label: t('nav.payment_vouchers'), icon: CreditCard },
         { id: 'cash_transfers', label: t('nav.cash_transfers'), icon: ArrowLeftRight },
+      ]
+    },
+    {
+      id: 'flexible_operations',
+      label: 'نظام العمليات',
+      icon: Layers,
+      subItems: [
+        { id: 'operations', label: 'العمليات', icon: List },
+        { id: 'operation_categories', label: 'تصنيفات العمليات', icon: Folder },
+        { id: 'operation_fields', label: 'حقول البيانات', icon: Settings },
       ]
     },
     { 

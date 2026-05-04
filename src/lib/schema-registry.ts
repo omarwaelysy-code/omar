@@ -91,6 +91,15 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'id', 'journal_entry_id', 'account_id', 'account_name', 'description', 'debit', 'credit',
     'customer_id', 'supplier_id', 'customer_name', 'supplier_name'
   ],
+  operation_categories: [
+    'id', 'name', 'parent_id', 'company_id', 'created_at', 'updated_at'
+  ],
+  operations: [
+    'id', 'company_id', 'customer_id', 'customer_name', 'description', 'date', 'status', 'category_id', 'created_at'
+  ],
+  operation_fields: [
+    'id', 'company_id', 'name', 'label', 'type', 'category_id', 'department_id', 'sort_order', 'is_required', 'options', 'created_at'
+  ],
   payment_methods: [
     'id', 'company_id', 'account_id', 'account_name', 'code', 'name', 'type', 'opening_balance', 
     'opening_balance_date', 'counter_account_id'
