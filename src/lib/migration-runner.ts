@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import pool from '../lib/postgres';
+import pool from './postgres';
 
 export async function runMigrations() {
   console.log('🔄 Running Database Migrations...');

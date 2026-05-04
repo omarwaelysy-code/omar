@@ -17,4 +17,8 @@ BEGIN
             ALTER TABLE activity_logs ADD COLUMN entity JSONB;
         END IF;
     END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='activity_logs' AND column_name='account_id') THEN
+        ALTER TABLE activity_logs ADD COLUMN account_id VARCHAR(36) REFERENCES accounts(id);
+    END IF;
 END $$;

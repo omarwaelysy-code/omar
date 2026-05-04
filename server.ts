@@ -7,14 +7,16 @@ import { createServer as createViteServer } from "vite";
 import cors from "cors";
 import fs from "fs";
 import { initDatabase } from "./src/lib/init-db";
+import { runMigrations } from "./src/lib/migration-runner";
 import erpRouter from "./src/lib/erp-api";
 
 async function startServer() {
   // Initialize PostgreSQL FIRST
   try {
     await initDatabase();
+    await runMigrations();
   } catch (err) {
-    console.error("❌ CRITICAL: Failed to initialize PostgreSQL database. Server will start but may be degraded.");
+    console.error("❌ CRITICAL: Failed to initialize PostgreSQL database or run migrations. Server will start but may be degraded.");
   }
   
   const app = express();
