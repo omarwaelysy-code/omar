@@ -39,6 +39,24 @@ async function startServer() {
     res.send("<h1>Server is Alive</h1><script>document.body.style.backgroundColor = 'lime';</script>");
   });
 
+  // Global Error Handler
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
+    
+    console.error(`[ERROR] ${req.method} ${req.url}:`, {
+      message,
+      stack: process.env.NODE_ENV === 'production' ? '🥞' : err.stack,
+      status
+    });
+
+    res.status(status).json({
+      error: message,
+      status,
+      timestamp: new Date().toISOString()
+    });
+  });
+
   // Root test
   app.get("/", (req, res, next) => {
     if (req.query.test === 'true') {

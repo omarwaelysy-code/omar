@@ -602,24 +602,40 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
 
 const transactionalModules = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns', 'journal_entries'];
 
+// Helper to validate UUID format
+function isUUID(id: any): boolean {
+  if (typeof id !== 'string') return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
+}
+
+// Helper for better error responses
+function sendError(res: any, status: number, message: string, details?: any) {
+  return res.status(status).json({
+    error: message,
+    status,
+    details: details || null,
+    timestamp: new Date().toISOString()
+  });
+}
+
 // Helper to parse JSONB fields if they are returned as strings
 function parseRow(table: string, row: any) {
   if (!row) return row;
-  const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features'];
+  const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features', 'options'];
   
   const parsed = { ...row };
   jsonbFields.forEach(field => {
-    if (field in parsed && typeof parsed[field] === 'string') {
+    if (field in parsed && parsed[field] !== null && typeof parsed[field] === 'string') {
       try {
         const val = parsed[field].trim();
-        // If it starts with " it's a JSON string, otherwise if it's { or [ it's object/array
+        // If it looks like JSON, try to parse it
         if ((val.startsWith('{') && val.endsWith('}')) || 
-            (val.startsWith('[') && val.endsWith(']')) ||
-            (val.startsWith('"') && val.endsWith('"'))) {
-          parsed[field] = JSON.parse(parsed[field]);
+            (val.startsWith('[') && val.endsWith(']'))) {
+          parsed[field] = JSON.parse(val);
         }
       } catch (e) {
-        // Not JSON or already processed
+        // Not JSON, keep as string
       }
     }
   });
@@ -632,18 +648,30 @@ function sanitizeData(table: string, data: any) {
   if (!allowedKeys) return data;
   
   const sanitized: any = {};
-  const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features', 'value'];
+  const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features', 'value', 'options'];
 
   allowedKeys.forEach(key => {
     if (key in data) {
-      const value = data[key];
+      let value = data[key];
       
       // Convert empty strings to null for IDs and decimals
       if (value === '' && (key.endsWith('_id') || key === 'amount' || key === 'price' || key === 'unit_price' || key === 'total' || key === 'subtotal')) {
-        sanitized[key] = null;
+        value = null;
       } 
+      
+      // Strict UUID validation for ID fields (except those known to be BIGSERIAL or VARCHAR)
+      const isIdField = key === 'id' || key.endsWith('_id');
+      const isUUIDTable = !['activity_logs', 'migrations'].includes(table);
+      // specific excludes for non-uuid foreign keys
+      const charIdFields = ['user_id', 'company_id']; 
+      
+      if (isIdField && isUUIDTable && !charIdFields.includes(key) && value !== null && !isUUID(value)) {
+        console.warn(`[WARN] Invalid UUID for field ${table}.${key}: ${value}. Setting to null.`);
+        value = null;
+      }
+
       // Automatically stringify for JSONB columns
-      else if (jsonbFields.includes(key) && value !== null) {
+      if (jsonbFields.includes(key) && value !== null && typeof value !== 'string') {
         sanitized[key] = JSON.stringify(value);
       }
       else {
@@ -661,8 +689,11 @@ modules.forEach(moduleName => {
       let rows;
       if (moduleName === 'activity_logs') {
         const isSuperAdmin = req.user?.role === 'super_admin';
-        const companyId = isSuperAdmin ? req.query.company_id : req.user?.company_id;
+        const companyId = isSuperAdmin ? req.query.company_id : (req.query.company_id || req.user?.company_id);
         
+        // Basic validation for company_id if provided (though it's VARCHAR(36) in activity_logs, usually matches user's company_id)
+        if (companyId && typeof companyId !== 'string') return sendError(res, 400, 'Invalid company_id format');
+
         let query = 'SELECT * FROM activity_logs';
         let params: any[] = [];
         
@@ -683,8 +714,12 @@ modules.forEach(moduleName => {
         const queryResult = await pool.query(query, params);
         rows = queryResult.rows;
       } else if (moduleName === 'audit_logs') {
-        const companyId = req.query.company_id;
+        const companyId = req.query.company_id || req.user?.company_id;
         const isSuperAdmin = req.user?.role === 'super_admin';
+
+        if (!companyId && !isSuperAdmin) {
+          return sendError(res, 400, 'company_id is required');
+        }
 
         let query = 'SELECT * FROM audit_logs';
         let params: any[] = [];
@@ -692,8 +727,6 @@ modules.forEach(moduleName => {
         if (companyId) {
           query += ' WHERE company_id = $1';
           params.push(companyId);
-        } else if (!isSuperAdmin) {
-          return res.status(400).json({ error: 'company_id is required' });
         }
 
         const colCheck = await pool.query(`
@@ -707,7 +740,13 @@ modules.forEach(moduleName => {
         const queryResult = await pool.query(query, params);
         rows = queryResult.rows;
       } else {
-        rows = await getList(moduleName, req.query);
+        // For other tables, we apply company_id filter by default if present in schema
+        const queryFilters = { ...req.query } as any;
+        if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && !queryFilters.company_id && req.user?.company_id) {
+          queryFilters.company_id = req.user.company_id;
+        }
+
+        rows = await getList(moduleName, queryFilters);
 
         // Fetch sub-items for relevant modules
         if (transactionalModules.includes(moduleName)) {
@@ -719,21 +758,36 @@ modules.forEach(moduleName => {
       }
       res.json(rows.map((row: any) => parseRow(moduleName, row)));
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error(`[CRASH PREVENTED] Error in GET /${moduleName}:`, error);
+      sendError(res, 500, `Failed to list ${moduleName}`, error.message);
     }
   });
 
   // Get Single
   router.get(`/${moduleName}/:id`, authenticateToken, async (req, res) => {
     try {
-      const { rows }: any = await pool.query(`SELECT * FROM ${moduleName} WHERE id = $1`, [req.params.id]);
+      const { id } = req.params;
+      
+      // UUID validation for single item GET
+      const isUUIDTable = !['activity_logs', 'migrations'].includes(moduleName);
+      if (isUUIDTable && !isUUID(id)) {
+        return sendError(res, 400, `Invalid ID format for ${moduleName}`);
+      }
+
+      const { rows }: any = await pool.query(`SELECT * FROM ${moduleName} WHERE id = $1`, [id]);
       const row = rows[0] || null;
-      if (row && transactionalModules.includes(moduleName)) {
+      
+      if (!row) {
+        return sendError(res, 404, `${moduleName} not found`);
+      }
+
+      if (transactionalModules.includes(moduleName)) {
         row.items = await fetchItems(moduleName, row.id);
       }
       res.json(parseRow(moduleName, row));
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error(`[CRASH PREVENTED] Error in GET /${moduleName}/:id:`, error);
+      sendError(res, 500, `Failed to get ${moduleName}`, error.message);
     }
   });
 
@@ -768,8 +822,11 @@ modules.forEach(moduleName => {
 
   // Create
   if (!transactionalModules.includes(moduleName)) {
-    router.post(`/${moduleName}`, authenticateToken, async (req, res) => {
+    router.post(`/${moduleName}`, authenticateToken, async (req: AuthRequest, res) => {
       try {
+        const companyId = req.user?.company_id;
+        if (!companyId && moduleName !== 'companies') return sendError(res, 401, 'Unauthorized');
+
         // Special case for users: handle password/temp_password hashing
         if (moduleName === 'users') {
           if (req.body.password) {
@@ -777,16 +834,17 @@ modules.forEach(moduleName => {
             delete req.body.password;
           }
           if (req.body.temp_password) {
-            // Also hash temp_password into password_hash for backward compatibility
-            // but keep the temp_password for display in admin panel
             req.body.password_hash = await bcrypt.hash(req.body.temp_password, 10);
           }
         }
 
         const sanitizedData = sanitizeData(moduleName, req.body);
         const data = { ...sanitizedData };
-        // Most tables use UUIDs, but activity_logs uses BIGSERIAL
-        if (!data.id && moduleName !== 'activity_logs') {
+        if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && !data.company_id) {
+          data.company_id = companyId;
+        }
+
+        if (!data.id && moduleName !== 'activity_logs' && moduleName !== 'audit_logs') {
           data.id = uuidv4();
         }
         
@@ -798,67 +856,101 @@ modules.forEach(moduleName => {
           `INSERT INTO ${moduleName} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`,
           values
         );
-        res.status(201).json(result.rows[0] || data);
+        res.status(201).json(parseRow(moduleName, result.rows[0] || data));
       } catch (error: any) {
         console.error(`Error in POST /${moduleName}:`, error);
-        res.status(500).json({ error: error.message });
+        sendError(res, 500, `Failed to create ${moduleName}`, error.message);
       }
     });
 
     // Update
-    router.put(`/${moduleName}/:id`, authenticateToken, async (req, res) => {
+    router.put(`/${moduleName}/:id`, authenticateToken, async (req: AuthRequest, res) => {
       try {
-        // Special case for users: handle password/temp_password hashing
-        if (moduleName === 'users') {
-          if (req.body.password) {
-            req.body.password_hash = await bcrypt.hash(req.body.password, 10);
-            delete req.body.password;
-            // When password is set, we usually want to clear temp_password
-            req.body.temp_password = null;
-            req.body.must_change_password = false;
-          }
-          if (req.body.temp_password) {
-            // Also hash temp_password into password_hash for backward compatibility
-            req.body.password_hash = await bcrypt.hash(req.body.temp_password, 10);
-          }
+        const { id } = req.params;
+        const companyId = req.user?.company_id;
+
+        if (!isUUID(id) && !['activity_logs', 'migrations'].includes(moduleName)) {
+          return sendError(res, 400, 'Invalid ID format');
+        }
+
+        // Special case for users
+        if (moduleName === 'users' && req.body.password) {
+          req.body.password_hash = await bcrypt.hash(req.body.password, 10);
+          delete req.body.password;
+          req.body.temp_password = null;
+          req.body.must_change_password = false;
         }
 
         const sanitizedData = sanitizeData(moduleName, req.body);
+        delete (sanitizedData as any).id;
+        if (moduleName !== 'companies') delete (sanitizedData as any).company_id;
+
         const keys = Object.keys(sanitizedData);
         const values = Object.values(sanitizedData);
+        if (keys.length === 0) return sendError(res, 400, 'No valid fields for update');
+
         const setClause = keys.map((key, index) => `${key} = $${index + 1}`).join(', ');
-        
-        await pool.query(
-          `UPDATE ${moduleName} SET ${setClause} WHERE id = $${keys.length + 1}`,
-          [...values, req.params.id]
-        );
+        let query = `UPDATE ${moduleName} SET ${setClause} WHERE id = $${keys.length + 1}`;
+        let params = [...values, id];
+
+        if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies') {
+          query += ` AND company_id = $${keys.length + 2}`;
+          params.push(companyId);
+        }
+
+        const result = await pool.query(query, params);
+        if (result.rowCount === 0) return sendError(res, 404, 'Not found or permission denied');
         res.json({ success: true });
       } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        console.error(`Error in PUT /${moduleName}:`, error);
+        sendError(res, 500, `Failed to update ${moduleName}`, error.message);
       }
     });
   }
 
-  // Delete
-  router.delete(`/${moduleName}/:id`, authenticateToken, async (req, res) => {
+  router.delete(`/${moduleName}/:id`, authenticateToken, async (req: AuthRequest, res) => {
     try {
-      await pool.query(`DELETE FROM ${moduleName} WHERE id = $1`, [req.params.id]);
+      const { id } = req.params;
+      const companyId = req.user?.company_id;
+
+      if (!isUUID(id) && !['activity_logs', 'migrations'].includes(moduleName)) {
+        return sendError(res, 400, 'Invalid ID format');
+      }
+
+      let query = `DELETE FROM ${moduleName} WHERE id = $1`;
+      let params = [id];
+
+      if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies') {
+        query += ` AND company_id = $2`;
+        params.push(companyId);
+      }
+
+      const result = await pool.query(query, params);
+      if (result.rowCount === 0) return sendError(res, 404, 'Not found or permission denied');
       res.json({ success: true });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error(`Error in DELETE /${moduleName}:`, error);
+      sendError(res, 500, `Failed to delete ${moduleName}`, error.message);
     }
   });
 });
 
 // --- Invoices with Items (Transaction) ---
-router.post('/invoices', authenticateToken, async (req, res) => {
+router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
   const client = await pool.connect();
   try {
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
     await client.query('BEGIN');
     const { items, ...rawInvoiceData } = req.body;
     const invoiceData = sanitizeData('invoices', rawInvoiceData);
-    const invoiceId = invoiceData.id || uuidv4();
     
+    // Ensure company_id
+    if (!invoiceData.company_id) invoiceData.company_id = companyId;
+    const invoiceId = invoiceData.id || uuidv4();
+    if (!isUUID(invoiceId)) return sendError(res, 400, 'Invalid Invoice ID format');
+
     // Insert Invoice
     const invData = { ...invoiceData, id: invoiceId };
     const invKeys = Object.keys(invData);
@@ -871,10 +963,12 @@ router.post('/invoices', authenticateToken, async (req, res) => {
     );
 
     // Insert Items
-    for (const item of items) {
+    for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('invoice_items', item);
       const itemId = uuidv4();
       const itemData = { ...sanitizedItem, id: itemId, invoice_id: invoiceId };
+      if (invData.company_id) itemData.company_id = invData.company_id;
+
       const itemKeys = Object.keys(itemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       
@@ -888,29 +982,40 @@ router.post('/invoices', authenticateToken, async (req, res) => {
     res.status(201).json({ id: invoiceId });
   } catch (error: any) {
     await client.query('ROLLBACK');
-    console.error('Invoice creation error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('[CRASH PREVENTED] Invoice creation error:', error);
+    sendError(res, 500, 'Failed to create invoice', error.message);
   } finally {
     client.release();
   }
 });
 
-router.put('/invoices/:id', authenticateToken, async (req, res) => {
+router.put('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => {
   const client = await pool.connect();
   try {
+    const invoiceId = req.params.id;
+    const companyId = req.user?.company_id;
+    if (!isUUID(invoiceId)) return sendError(res, 400, 'Invalid Invoice ID format');
+
     await client.query('BEGIN');
     const { items, id: bodyId, ...rawInvoiceData } = req.body;
     const invoiceData = sanitizeData('invoices', rawInvoiceData);
-    const invoiceId = req.params.id;
     
     const invKeys = Object.keys(invoiceData);
     const invValues = Object.values(invoiceData);
     const invSetClause = invKeys.map((key, i) => `${key} = $${i + 1}`).join(', ');
     
-    await client.query(
-      `UPDATE invoices SET ${invSetClause} WHERE id = $${invKeys.length + 1}`,
-      [...invValues, invoiceId]
-    );
+    let query = `UPDATE invoices SET ${invSetClause} WHERE id = $${invKeys.length + 1}`;
+    let params = [...invValues, invoiceId];
+    if (companyId) {
+      query += ` AND company_id = $${invKeys.length + 2}`;
+      params.push(companyId);
+    }
+
+    const result = await client.query(query, params);
+    if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return sendError(res, 404, 'Invoice not found or permission denied');
+    }
 
     // Sync Items
     await client.query('DELETE FROM invoice_items WHERE invoice_id = $1', [invoiceId]);
@@ -919,6 +1024,8 @@ router.put('/invoices/:id', authenticateToken, async (req, res) => {
       const itemData = sanitizeData('invoice_items', itemDataRaw);
       const itemId = uuidv4();
       const finalItemData = { ...itemData, id: itemId, invoice_id: invoiceId };
+      if (companyId) finalItemData.company_id = companyId;
+
       const itemKeys = Object.keys(finalItemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       await client.query(
@@ -930,21 +1037,28 @@ router.put('/invoices/:id', authenticateToken, async (req, res) => {
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
-    await client.query('ROLLBACK');
-    res.status(500).json({ error: error.message });
+    if (client) await client.query('ROLLBACK');
+    console.error('[CRASH PREVENTED] Invoice update error:', error);
+    sendError(res, 500, 'Failed to update invoice', error.message);
   } finally {
     client.release();
   }
 });
 
 // --- Sales Returns with Items (Transaction) ---
-router.post('/returns', authenticateToken, async (req, res) => {
+router.post('/returns', authenticateToken, async (req: AuthRequest, res) => {
   const client = await pool.connect();
   try {
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
     await client.query('BEGIN');
     const { items, ...rawReturnData } = req.body;
     const returnData = sanitizeData('returns', rawReturnData);
+    if (!returnData.company_id) returnData.company_id = companyId;
+
     const returnId = returnData.id || uuidv4();
+    if (!isUUID(returnId)) return sendError(res, 400, 'Invalid Return ID format');
     
     // Insert Return
     const rData = { ...returnData, id: returnId };
@@ -957,10 +1071,12 @@ router.post('/returns', authenticateToken, async (req, res) => {
     );
 
     // Insert Items
-    for (const item of items) {
+    for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('return_items', item);
       const itemId = uuidv4();
       const itemData = { ...sanitizedItem, id: itemId, return_id: returnId };
+      if (rData.company_id) itemData.company_id = rData.company_id;
+
       const itemKeys = Object.keys(itemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       
@@ -973,30 +1089,41 @@ router.post('/returns', authenticateToken, async (req, res) => {
     await client.query('COMMIT');
     res.status(201).json({ id: returnId });
   } catch (error: any) {
-    await client.query('ROLLBACK');
-    console.error('Return creation error:', error);
-    res.status(500).json({ error: error.message });
+    if (client) await client.query('ROLLBACK');
+    console.error('[CRASH PREVENTED] Return creation error:', error);
+    sendError(res, 500, 'Failed to create return', error.message);
   } finally {
     client.release();
   }
 });
 
-router.put('/returns/:id', authenticateToken, async (req, res) => {
+router.put('/returns/:id', authenticateToken, async (req: AuthRequest, res) => {
   const client = await pool.connect();
   try {
+    const returnId = req.params.id;
+    const companyId = req.user?.company_id;
+    if (!isUUID(returnId)) return sendError(res, 400, 'Invalid Return ID format');
+
     await client.query('BEGIN');
     const { items, id: bodyId, ...rawReturnData } = req.body;
     const returnData = sanitizeData('returns', rawReturnData);
-    const returnId = req.params.id;
     
     const rKeys = Object.keys(returnData);
     const rValues = Object.values(returnData);
     const rSetClause = rKeys.map((key, i) => `${key} = $${i + 1}`).join(', ');
     
-    await client.query(
-      `UPDATE returns SET ${rSetClause} WHERE id = $${rKeys.length + 1}`,
-      [...rValues, returnId]
-    );
+    let query = `UPDATE returns SET ${rSetClause} WHERE id = $${rKeys.length + 1}`;
+    let params = [...rValues, returnId];
+    if (companyId) {
+      query += ` AND company_id = $${rKeys.length + 2}`;
+      params.push(companyId);
+    }
+
+    const result = await client.query(query, params);
+    if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return sendError(res, 404, 'Return not found or permission denied');
+    }
 
     await client.query('DELETE FROM return_items WHERE return_id = $1', [returnId]);
     for (const item of (items || [])) {
@@ -1004,6 +1131,8 @@ router.put('/returns/:id', authenticateToken, async (req, res) => {
       const sanitizedItem = sanitizeData('return_items', itemRawData);
       const itemId = uuidv4();
       const finalItemData = { ...sanitizedItem, id: itemId, return_id: returnId };
+      if (companyId) finalItemData.company_id = companyId;
+
       const itemKeys = Object.keys(finalItemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       await client.query(
@@ -1015,21 +1144,28 @@ router.put('/returns/:id', authenticateToken, async (req, res) => {
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
-    await client.query('ROLLBACK');
-    res.status(500).json({ error: error.message });
+    if (client) await client.query('ROLLBACK');
+    console.error('[CRASH PREVENTED] Return update error:', error);
+    sendError(res, 500, 'Failed to update return', error.message);
   } finally {
     client.release();
   }
 });
 
 // --- Purchase Invoices with Items (Transaction) ---
-router.post('/purchase_invoices', authenticateToken, async (req, res) => {
+router.post('/purchase_invoices', authenticateToken, async (req: AuthRequest, res) => {
   const client = await pool.connect();
   try {
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
     await client.query('BEGIN');
     const { items, ...rawInvoiceData } = req.body;
     const invoiceData = sanitizeData('purchase_invoices', rawInvoiceData);
+    if (!invoiceData.company_id) invoiceData.company_id = companyId;
+
     const invoiceId = invoiceData.id || uuidv4();
+    if (!isUUID(invoiceId)) return sendError(res, 400, 'Invalid Invoice ID format');
     
     // Insert Purchase Invoice
     const invData = { ...invoiceData, id: invoiceId };
@@ -1043,10 +1179,12 @@ router.post('/purchase_invoices', authenticateToken, async (req, res) => {
     );
 
     // Insert Items
-    for (const item of items) {
+    for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('purchase_invoice_items', item);
       const itemId = uuidv4();
       const itemData = { ...sanitizedItem, id: itemId, invoice_id: invoiceId };
+      if (invData.company_id) itemData.company_id = invData.company_id;
+
       const itemKeys = Object.keys(itemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       
@@ -1059,30 +1197,41 @@ router.post('/purchase_invoices', authenticateToken, async (req, res) => {
     await client.query('COMMIT');
     res.status(201).json({ id: invoiceId });
   } catch (error: any) {
-    await client.query('ROLLBACK');
-    console.error('Purchase invoice creation error:', error);
-    res.status(500).json({ error: error.message });
+    if (client) await client.query('ROLLBACK');
+    console.error('[CRASH PREVENTED] Purchase invoice creation error:', error);
+    sendError(res, 500, 'Failed to create purchase invoice', error.message);
   } finally {
     client.release();
   }
 });
 
-router.put('/purchase_invoices/:id', authenticateToken, async (req, res) => {
+router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest, res) => {
   const client = await pool.connect();
   try {
+    const invoiceId = req.params.id;
+    const companyId = req.user?.company_id;
+    if (!isUUID(invoiceId)) return sendError(res, 400, 'Invalid Invoice ID format');
+
     await client.query('BEGIN');
     const { items, id: bodyId, ...rawInvoiceData } = req.body;
     const invoiceData = sanitizeData('purchase_invoices', rawInvoiceData);
-    const invoiceId = req.params.id;
     
     const invKeys = Object.keys(invoiceData);
     const invValues = Object.values(invoiceData);
     const invSetClause = invKeys.map((key, i) => `${key} = $${i + 1}`).join(', ');
     
-    await client.query(
-      `UPDATE purchase_invoices SET ${invSetClause} WHERE id = $${invKeys.length + 1}`,
-      [...invValues, invoiceId]
-    );
+    let query = `UPDATE purchase_invoices SET ${invSetClause} WHERE id = $${invKeys.length + 1}`;
+    let params = [...invValues, invoiceId];
+    if (companyId) {
+      query += ` AND company_id = $${invKeys.length + 2}`;
+      params.push(companyId);
+    }
+
+    const result = await client.query(query, params);
+    if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return sendError(res, 404, 'Purchase Invoice not found or permission denied');
+    }
 
     await client.query('DELETE FROM purchase_invoice_items WHERE invoice_id = $1', [invoiceId]);
     for (const item of (items || [])) {
@@ -1090,6 +1239,8 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req, res) => {
       const sanitizedItem = sanitizeData('purchase_invoice_items', itemRawData);
       const itemId = uuidv4();
       const finalItemData = { ...sanitizedItem, id: itemId, invoice_id: invoiceId };
+      if (companyId) finalItemData.company_id = companyId;
+
       const itemKeys = Object.keys(finalItemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       await client.query(
@@ -1101,21 +1252,28 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req, res) => {
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
-    await client.query('ROLLBACK');
-    res.status(500).json({ error: error.message });
+    if (client) await client.query('ROLLBACK');
+    console.error('[CRASH PREVENTED] Purchase invoice update error:', error);
+    sendError(res, 500, 'Failed to update purchase invoice', error.message);
   } finally {
     client.release();
   }
 });
 
 // --- Purchase Returns with Items (Transaction) ---
-router.post('/purchase_returns', authenticateToken, async (req, res) => {
+router.post('/purchase_returns', authenticateToken, async (req: AuthRequest, res) => {
   const client = await pool.connect();
   try {
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
     await client.query('BEGIN');
     const { items, ...rawReturnData } = req.body;
     const returnData = sanitizeData('purchase_returns', rawReturnData);
+    if (!returnData.company_id) returnData.company_id = companyId;
+
     const returnId = returnData.id || uuidv4();
+    if (!isUUID(returnId)) return sendError(res, 400, 'Invalid Return ID format');
     
     // Insert Purchase Return
     const rData = { ...returnData, id: returnId };
@@ -1128,10 +1286,12 @@ router.post('/purchase_returns', authenticateToken, async (req, res) => {
     );
 
     // Insert Items
-    for (const item of items) {
+    for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('purchase_return_items', item);
       const itemId = uuidv4();
       const itemData = { ...sanitizedItem, id: itemId, return_id: returnId };
+      if (rData.company_id) itemData.company_id = rData.company_id;
+
       const itemKeys = Object.keys(itemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       
@@ -1144,30 +1304,41 @@ router.post('/purchase_returns', authenticateToken, async (req, res) => {
     await client.query('COMMIT');
     res.status(201).json({ id: returnId });
   } catch (error: any) {
-    await client.query('ROLLBACK');
-    console.error('Purchase return creation error:', error);
-    res.status(500).json({ error: error.message });
+    if (client) await client.query('ROLLBACK');
+    console.error('[CRASH PREVENTED] Purchase return creation error:', error);
+    sendError(res, 500, 'Failed to create purchase return', error.message);
   } finally {
     client.release();
   }
 });
 
-router.put('/purchase_returns/:id', authenticateToken, async (req, res) => {
+router.put('/purchase_returns/:id', authenticateToken, async (req: AuthRequest, res) => {
   const client = await pool.connect();
   try {
+    const returnId = req.params.id;
+    const companyId = req.user?.company_id;
+    if (!isUUID(returnId)) return sendError(res, 400, 'Invalid Return ID format');
+
     await client.query('BEGIN');
     const { items, id: bodyId, ...rawReturnData } = req.body;
     const returnData = sanitizeData('purchase_returns', rawReturnData);
-    const returnId = req.params.id;
     
     const rKeys = Object.keys(returnData);
     const rValues = Object.values(returnData);
     const rSetClause = rKeys.map((key, i) => `${key} = $${i + 1}`).join(', ');
     
-    await client.query(
-      `UPDATE purchase_returns SET ${rSetClause} WHERE id = $${rKeys.length + 1}`,
-      [...rValues, returnId]
-    );
+    let query = `UPDATE purchase_returns SET ${rSetClause} WHERE id = $${rKeys.length + 1}`;
+    let params = [...rValues, returnId];
+    if (companyId) {
+      query += ` AND company_id = $${rKeys.length + 2}`;
+      params.push(companyId);
+    }
+
+    const result = await client.query(query, params);
+    if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return sendError(res, 404, 'Purchase Return not found or permission denied');
+    }
 
     await client.query('DELETE FROM purchase_return_items WHERE return_id = $1', [returnId]);
     for (const item of (items || [])) {
@@ -1175,6 +1346,8 @@ router.put('/purchase_returns/:id', authenticateToken, async (req, res) => {
       const sanitizedItem = sanitizeData('purchase_return_items', itemRawData);
       const itemId = uuidv4();
       const finalItemData = { ...sanitizedItem, id: itemId, return_id: returnId };
+      if (companyId) finalItemData.company_id = companyId;
+
       const itemKeys = Object.keys(finalItemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       await client.query(
@@ -1186,21 +1359,28 @@ router.put('/purchase_returns/:id', authenticateToken, async (req, res) => {
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
-    await client.query('ROLLBACK');
-    res.status(500).json({ error: error.message });
+    if (client) await client.query('ROLLBACK');
+    console.error('[CRASH PREVENTED] Purchase return update error:', error);
+    sendError(res, 500, 'Failed to update purchase return', error.message);
   } finally {
     client.release();
   }
 });
 
 // --- Journal Entries (Accounting Transaction) ---
-router.post('/journal_entries', authenticateToken, async (req, res) => {
+router.post('/journal_entries', authenticateToken, async (req: AuthRequest, res) => {
   const client = await pool.connect();
   try {
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
     await client.query('BEGIN');
     const { items, ...rawEntryData } = req.body;
     const entryData = sanitizeData('journal_entries', rawEntryData);
+    if (!entryData.company_id) entryData.company_id = companyId;
+
     const entryId = entryData.id || uuidv4();
+    if (!isUUID(entryId)) return sendError(res, 400, 'Invalid Entry ID format');
 
     const finalEntryData = { ...entryData, id: entryId };
     const keys = Object.keys(finalEntryData);
@@ -1210,10 +1390,12 @@ router.post('/journal_entries', authenticateToken, async (req, res) => {
       Object.values(finalEntryData)
     );
 
-    for (const item of items) {
+    for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('journal_entry_lines', item);
       const itemId = uuidv4();
       const itemData = { ...sanitizedItem, id: itemId, journal_entry_id: entryId };
+      if (finalEntryData.company_id) itemData.company_id = finalEntryData.company_id;
+
       const itemKeys = Object.keys(itemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       await client.query(
@@ -1225,34 +1407,48 @@ router.post('/journal_entries', authenticateToken, async (req, res) => {
     await client.query('COMMIT');
     res.status(201).json({ id: entryId });
   } catch (error: any) {
-    await client.query('ROLLBACK');
-    res.status(500).json({ error: error.message });
+    if (client) await client.query('ROLLBACK');
+    console.error('[CRASH PREVENTED] Journal entry creation error:', error);
+    sendError(res, 500, 'Failed to create journal entry', error.message);
   } finally {
     client.release();
   }
 });
 
-router.put('/journal_entries/:id', authenticateToken, async (req, res) => {
+router.put('/journal_entries/:id', authenticateToken, async (req: AuthRequest, res) => {
   const client = await pool.connect();
   try {
+    const entryId = req.params.id;
+    const companyId = req.user?.company_id;
+    if (!isUUID(entryId)) return sendError(res, 400, 'Invalid Entry ID format');
+
     await client.query('BEGIN');
     const { items, id: bodyId, ...rawEntryData } = req.body;
     const entryData = sanitizeData('journal_entries', rawEntryData);
-    const entryId = req.params.id;
-
+    
     const keys = Object.keys(entryData);
     const setClause = keys.map((key, i) => `${key} = $${i + 1}`).join(', ');
     
-    await client.query(
-      `UPDATE journal_entries SET ${setClause} WHERE id = $${keys.length + 1}`,
-      [...Object.values(entryData), entryId]
-    );
+    let query = `UPDATE journal_entries SET ${setClause} WHERE id = $${keys.length + 1}`;
+    let params = [...Object.values(entryData), entryId];
+    if (companyId) {
+      query += ` AND company_id = $${keys.length + 2}`;
+      params.push(companyId);
+    }
+
+    const result = await client.query(query, params);
+    if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return sendError(res, 404, 'Journal Entry not found or permission denied');
+    }
 
     await client.query('DELETE FROM journal_entry_lines WHERE journal_entry_id = $1', [entryId]);
     for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('journal_entry_lines', item);
       const itemId = uuidv4();
       const itemData = { ...sanitizedItem, id: itemId, journal_entry_id: entryId };
+      if (companyId) itemData.company_id = companyId;
+
       const itemKeys = Object.keys(itemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       await client.query(
@@ -1264,8 +1460,9 @@ router.put('/journal_entries/:id', authenticateToken, async (req, res) => {
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
-    await client.query('ROLLBACK');
-    res.status(500).json({ error: error.message });
+    if (client) await client.query('ROLLBACK');
+    console.error('[CRASH PREVENTED] Journal entry update error:', error);
+    sendError(res, 500, 'Failed to update journal entry', error.message);
   } finally {
     client.release();
   }
@@ -1295,16 +1492,15 @@ router.post('/operations/complex', authenticateToken, async (req: AuthRequest, r
   const client = await pool.connect();
   try {
     const companyId = req.user?.company_id;
-    if (!companyId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
 
-    const { field_values, ...rawOpData } = req.body;
+    const { field_values, id: bodyId, ...rawOpData } = req.body;
     const opData = sanitizeData('operations', rawOpData);
     
     await client.query('BEGIN');
 
     // 1. Generate Operation Number if not provided
     if (!opData.operation_number) {
-      // Check if created_at exists for safe ordering
       const colCheck = await client.query(`
         SELECT 1 FROM information_schema.columns 
         WHERE table_name = 'operations' AND column_name = 'created_at'
@@ -1317,8 +1513,9 @@ router.post('/operations/complex', authenticateToken, async (req: AuthRequest, r
         [companyId]
       );
       let nextNum = 1;
-      if (rows.length > 0) {
-        const lastNum = parseInt(rows[0].operation_number.split('-')[1]);
+      if (rows.length > 0 && rows[0].operation_number) {
+        const parts = rows[0].operation_number.split('-');
+        const lastNum = parts.length > 1 ? parseInt(parts[1]) : NaN;
         if (!isNaN(lastNum)) nextNum = lastNum + 1;
       }
       opData.operation_number = `OP-${nextNum.toString().padStart(5, '0')}`;
@@ -1328,20 +1525,22 @@ router.post('/operations/complex', authenticateToken, async (req: AuthRequest, r
     const opId = uuidv4();
     const finalOpData = { ...opData, id: opId, company_id: companyId };
     const opKeys = Object.keys(finalOpData);
+    const opValues = Object.values(finalOpData);
     const opPlaceholders = opKeys.map((_, i) => `$${i + 1}`).join(', ');
     
     await client.query(
       `INSERT INTO operations (${opKeys.join(', ')}) VALUES (${opPlaceholders})`,
-      Object.values(finalOpData)
+      opValues
     );
 
     // 3. Create Field Values
     if (field_values && Array.isArray(field_values)) {
       for (const fv of field_values) {
+        if (!fv.field_id || !isUUID(fv.field_id)) continue;
         const fvId = uuidv4();
         await client.query(
-          'INSERT INTO operation_field_values (id, operation_id, field_id, value) VALUES ($1, $2, $3, $4)',
-          [fvId, opId, fv.field_id, fv.value]
+          'INSERT INTO operation_field_values (id, operation_id, field_id, value, company_id) VALUES ($1, $2, $3, $4, $5)',
+          [fvId, opId, fv.field_id, fv.value, companyId]
         );
       }
     }
@@ -1349,9 +1548,9 @@ router.post('/operations/complex', authenticateToken, async (req: AuthRequest, r
     await client.query('COMMIT');
     res.status(201).json({ id: opId, operation_number: opData.operation_number });
   } catch (error: any) {
-    await client.query('ROLLBACK');
-    console.error('Complex Operation creation failed:', error);
-    res.status(500).json({ error: error.message });
+    if (client) await client.query('ROLLBACK');
+    console.error('[CRASH PREVENTED] Complex Operation creation failed:', error);
+    sendError(res, 500, 'Failed to create complex operation', error.message);
   } finally {
     client.release();
   }
@@ -1360,15 +1559,20 @@ router.post('/operations/complex', authenticateToken, async (req: AuthRequest, r
 router.get('/operations/:id/values', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
+    const companyId = req.user?.company_id;
+    if (!isUUID(id)) return sendError(res, 400, 'Invalid Operation ID format');
+
     const { rows } = await pool.query(`
       SELECT fv.*, f.name, f.label, f.type, f.unit 
       FROM operation_field_values fv
       JOIN operation_fields f ON fv.field_id = f.id
-      WHERE fv.operation_id = $1
-    `, [id]);
+      JOIN operations o ON fv.operation_id = o.id
+      WHERE fv.operation_id = $1 AND o.company_id = $2
+    `, [id, companyId]);
     res.json(rows);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error(`[CRASH PREVENTED] Error in GET /operations/:id/values:`, error);
+    sendError(res, 500, 'Failed to fetch operation values', error.message);
   }
 });
 

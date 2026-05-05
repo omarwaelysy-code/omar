@@ -31,6 +31,34 @@ const pool = new Pool({
 // Debug connection info
 console.log(`PostgreSQL Pool created for host: ${process.env.DB_HOST || 'localhost'} (port: ${process.env.DB_PORT || '5432'})`);
 
+// Enhanced query function with logging and error handling
+const originalQuery = pool.query.bind(pool);
+
+// Wrap pool.query to log all database interactions
+pool.query = (async (text: any, params: any) => {
+  const start = Date.now();
+  try {
+    const res = await originalQuery(text, params);
+    const duration = Date.now() - start;
+    
+    // Low-level query logging (excluding heavy queries if needed)
+    if (process.env.NODE_ENV !== 'production' || duration > 100) {
+      const sqlSnippet = typeof text === 'string' ? text.substring(0, 100).replace(/\n/g, ' ') : 'Complex Query';
+      console.log(`[DB] Query (${duration}ms): ${sqlSnippet}...`);
+    }
+    
+    return res;
+  } catch (error: any) {
+    const duration = Date.now() - start;
+    console.error(`[DB ERROR] Query failed after ${duration}ms:`, {
+      text: typeof text === 'string' ? text : 'Object Query',
+      params: params ? JSON.stringify(params) : 'none',
+      message: error.message
+    });
+    throw error;
+  }
+}) as any;
+
 export default pool;
 
 export async function query(text: string, params?: any[]) {
