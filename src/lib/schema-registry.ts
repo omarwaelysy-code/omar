@@ -107,7 +107,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'id', 'company_id', 'name', 'label', 'type', 'category_id', 'department_id', 'sort_order', 'is_required', 'options', 'code', 'description', 'unit', 'default_value', 'created_at'
   ],
   operation_field_values: [
-    'id', 'operation_id', 'field_id', 'value', 'created_at'
+    'id', 'operation_id', 'field_id', 'value', 'company_id', 'created_at'
   ],
   payment_methods: [
     'id', 'company_id', 'account_id', 'account_name', 'code', 'name', 'type', 'opening_balance', 

@@ -41,11 +41,26 @@ async function logActivity(
         [company_id, user_id, username, action, details, JSON.stringify(entity), document_id, JSON.stringify(changes), ip_address, new Date()]
       );
     } else {
-      await pool.query(
-        `INSERT INTO activity_logs (company_id, user_id, username, action, details, entity, document_id, changes, ip_address) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [company_id, user_id, username, action, details, JSON.stringify(entity), document_id, JSON.stringify(changes), ip_address]
-      );
+      // Fallback to timestamp if created_at is missing (legacy)
+      const colCheckTs = await pool.query(`
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'activity_logs' AND column_name = 'timestamp'
+      `);
+      const hasTimestamp = colCheckTs.rows.length > 0;
+      
+      if (hasTimestamp) {
+        await pool.query(
+          `INSERT INTO activity_logs (company_id, user_id, username, action, details, entity, document_id, changes, ip_address, timestamp) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [company_id, user_id, username, action, details, JSON.stringify(entity), document_id, JSON.stringify(changes), ip_address, new Date()]
+        );
+      } else {
+        await pool.query(
+          `INSERT INTO activity_logs (company_id, user_id, username, action, details, entity, document_id, changes, ip_address) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [company_id, user_id, username, action, details, JSON.stringify(entity), document_id, JSON.stringify(changes), ip_address]
+        );
+      }
     }
   } catch (error) {
     console.error('Failed to log server activity:', error);
@@ -1524,6 +1539,10 @@ router.post('/operations/complex', authenticateToken, async (req: AuthRequest, r
     // 2. Create Operation
     const opId = uuidv4();
     const finalOpData = { ...opData, id: opId, company_id: companyId };
+    
+    // Log final data for debugging
+    console.log('[DEBUG] Creating operation with data:', JSON.stringify(finalOpData));
+    
     const opKeys = Object.keys(finalOpData);
     const opValues = Object.values(finalOpData);
     const opPlaceholders = opKeys.map((_, i) => `$${i + 1}`).join(', ');
@@ -1535,8 +1554,12 @@ router.post('/operations/complex', authenticateToken, async (req: AuthRequest, r
 
     // 3. Create Field Values
     if (field_values && Array.isArray(field_values)) {
+      console.log(`[DEBUG] Inserting ${field_values.length} field values for operation ${opId}`);
       for (const fv of field_values) {
-        if (!fv.field_id || !isUUID(fv.field_id)) continue;
+        if (!fv.field_id || !isUUID(fv.field_id)) {
+          console.warn('[WARN] Skipping invalid field_id:', fv.field_id);
+          continue;
+        }
         const fvId = uuidv4();
         await client.query(
           'INSERT INTO operation_field_values (id, operation_id, field_id, value, company_id) VALUES ($1, $2, $3, $4, $5)',
