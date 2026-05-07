@@ -302,6 +302,7 @@ export interface ActivityLog {
   id: string;
   user_id: string;
   username: string;
+  user_email?: string;
   company_id: string;
   created_at: string;
   module: string;

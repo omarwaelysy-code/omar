@@ -10,6 +10,7 @@ BEGIN
             company_id VARCHAR(36),
             user_id VARCHAR(36),
             username VARCHAR(255),
+            user_email VARCHAR(255),
             action VARCHAR(100) NOT NULL,
             module VARCHAR(100) NOT NULL,
             details TEXT,
@@ -19,6 +20,11 @@ BEGIN
             metadata JSONB DEFAULT '{}'::jsonb,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
+    END IF;
+
+    -- Add user_email column if it doesn't exist (for existing tables)
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_logs' AND column_name='user_email') THEN
+        ALTER TABLE audit_logs ADD COLUMN user_email VARCHAR(255);
     END IF;
 
     -- 2. Add performance indexes

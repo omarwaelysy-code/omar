@@ -24,6 +24,7 @@ async function logAudit(params: {
   company_id?: string;
   user_id?: string;
   username?: string;
+  user_email?: string;
   action: string;
   module: string;
   details?: string;
@@ -33,15 +34,15 @@ async function logAudit(params: {
   metadata?: any;
 }) {
   const {
-    company_id, user_id, username, action, module, 
+    company_id, user_id, username, user_email, action, module, 
     details, entity_type, entity_id, ip_address, metadata
   } = params;
   
   // Non-blocking fire-and-forget query
   pool.query(
-    `INSERT INTO audit_logs (company_id, user_id, username, action, module, details, entity_type, entity_id, ip_address, metadata)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-    [company_id, user_id, username, action, module, details, entity_type, entity_id, ip_address || 'unknown', JSON.stringify(metadata || {})]
+    `INSERT INTO audit_logs (company_id, user_id, username, user_email, action, module, details, entity_type, entity_id, ip_address, metadata)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [company_id, user_id, username, user_email, action, module, details, entity_type, entity_id, ip_address || 'unknown', JSON.stringify(metadata || {})]
   ).catch(err => {
     // Fail silently in the background but log to console
     console.error('[DATABASE] Audit Log Failed:', err.message);
@@ -488,7 +489,8 @@ router.post('/auth/register', async (req, res) => {
     logAudit({
       company_id,
       user_id: id,
-      username,
+      username: username || email,
+      user_email: email,
       action: 'REGISTER',
       module: 'AUTH',
       details: `New user registration: ${username}`,
@@ -534,17 +536,24 @@ router.post('/auth/login', async (req, res) => {
     logAudit({
       company_id: user.company_id,
       user_id: user.id,
-      username: user.username,
+      username: user.username || user.name || user.email,
+      user_email: user.email,
       action: 'LOGIN',
       module: 'AUTH',
-      details: `User logged in: ${user.username}`,
+      details: `User logged in: ${user.username || user.email}`,
       entity_type: 'auth',
       entity_id: user.id,
       ip_address: getIp(req)
     });
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, company_id: user.company_id, role: user.role, username: user.username },
+      { 
+        id: user.id, 
+        email: user.email, 
+        company_id: user.company_id, 
+        role: user.role, 
+        username: user.username || user.name || user.email 
+      },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -904,7 +913,8 @@ modules.forEach(moduleName => {
         logAudit({
           company_id: req.user?.company_id,
           user_id: req.user?.id,
-          username: (req.user as any)?.username,
+          username: (req.user as any)?.username || req.user?.email,
+          user_email: req.user?.email,
           action: 'CREATE',
           module: moduleName.toUpperCase(),
           details: `Created ${moduleName}: ${data.name || data.id}`,
@@ -963,7 +973,8 @@ modules.forEach(moduleName => {
         logAudit({
           company_id: req.user?.company_id,
           user_id: req.user?.id,
-          username: (req.user as any)?.username,
+          username: (req.user as any)?.username || req.user?.email,
+          user_email: req.user?.email,
           action: 'UPDATE',
           module: moduleName.toUpperCase(),
           details: `Updated ${moduleName}: ${id}`,
@@ -1005,7 +1016,8 @@ modules.forEach(moduleName => {
       logAudit({
         company_id: req.user?.company_id,
         user_id: req.user?.id,
-        username: (req.user as any)?.username,
+        username: (req.user as any)?.username || req.user?.email,
+        user_email: req.user?.email,
         action: 'DELETE',
         module: moduleName.toUpperCase(),
         details: `Deleted ${moduleName}: ${id}`,
@@ -1071,7 +1083,8 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
     logAudit({
       company_id: req.user?.company_id,
       user_id: req.user?.id,
-      username: (req.user as any)?.username,
+      username: (req.user as any)?.username || req.user?.email,
+      user_email: req.user?.email,
       action: 'CREATE',
       module: 'INVOICES',
       details: `Created invoice: ${invoiceData.invoice_number || invoiceId}`,
@@ -1512,7 +1525,8 @@ router.post('/journal_entries', authenticateToken, async (req: AuthRequest, res)
     logAudit({
       company_id: req.user?.company_id,
       user_id: req.user?.id,
-      username: (req.user as any)?.username,
+      username: (req.user as any)?.username || req.user?.email,
+      user_email: req.user?.email,
       action: 'CREATE',
       module: 'JOURNAL_ENTRIES',
       details: `Created journal entry: ${finalEntryData.reference_number || entryId}`,
@@ -1676,7 +1690,8 @@ router.post('/operations/complex', authenticateToken, async (req: AuthRequest, r
     logAudit({
       company_id: req.user?.company_id,
       user_id: req.user?.id,
-      username: (req.user as any)?.username,
+      username: (req.user as any)?.username || req.user?.email,
+      user_email: req.user?.email,
       action: 'CREATE',
       module: 'OPERATIONS',
       details: `Created complex operation: ${opData.operation_number || opId}`,

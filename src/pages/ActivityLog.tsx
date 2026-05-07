@@ -172,7 +172,8 @@ export const ActivityLogPage: React.FC = () => {
                       </div>
                       <div className="flex flex-col">
                         <span className="font-bold text-zinc-900">{log.username || '-'}</span>
-                        <span className="text-[10px] text-zinc-400 font-mono italic">ID: {log.user_id?.substring(0, 8)}...</span>
+                        {log.user_email && <span className="text-[10px] text-zinc-400 font-mono tracking-tight">{log.user_email}</span>}
+                        <span className="text-[10px] text-zinc-400 font-mono italic opacity-50">ID: {log.user_id?.substring(0, 8)}...</span>
                       </div>
                     </div>
                   </td>
