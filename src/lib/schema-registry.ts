@@ -92,7 +92,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'customer_id', 'supplier_id', 'customer_name', 'supplier_name'
   ],
   operation_categories: [
-    'id', 'name', 'parent_id', 'company_id', 'created_at', 'updated_at'
+    'id', 'name', 'code', 'parent_id', 'is_final', 'level', 'full_path', 'description', 'company_id', 'created_at', 'updated_at'
   ],
   departments: [
     'id', 'code', 'name', 'description', 'parent_id', 'manager_user_id', 'company_id', 'is_active', 'created_at'

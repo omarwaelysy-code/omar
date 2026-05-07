@@ -110,6 +110,20 @@ export interface Supplier {
   counter_account_id?: string;
 }
 
+export interface OperationCategory {
+  id: string;
+  name: string;
+  code?: string;
+  parent_id: string | null;
+  is_final?: boolean;
+  level?: number;
+  full_path?: string;
+  description?: string;
+  company_id: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface ExpenseCategory {
   id: string;
   code: string;
