@@ -14,7 +14,54 @@ import multer from 'multer';
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
-// Helper to log activity
+// Helper to get remote IP safely
+function getIp(req: any): string {
+  return req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+}
+
+// Centralized Audit Log Helper (Non-blocking)
+async function logAudit(params: {
+  company_id?: string;
+  user_id?: string;
+  username?: string;
+  action: string;
+  module: string;
+  details?: string;
+  entity_type?: string;
+  entity_id?: string;
+  ip_address?: string;
+  metadata?: any;
+}) {
+  const {
+    company_id, user_id, username, action, module, 
+    details, entity_type, entity_id, ip_address, metadata
+  } = params;
+  
+  // Non-blocking fire-and-forget query
+  pool.query(
+    `INSERT INTO audit_logs (company_id, user_id, username, action, module, details, entity_type, entity_id, ip_address, metadata)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    [company_id, user_id, username, action, module, details, entity_type, entity_id, ip_address || 'unknown', JSON.stringify(metadata || {})]
+  ).catch(err => {
+    // Fail silently in the background but log to console
+    console.error('[DATABASE] Audit Log Failed:', err.message);
+  });
+
+  // Backward compatibility: Log to old activity_logs table too
+  logActivity(
+    company_id || '',
+    user_id || '',
+    username || '',
+    `${module}:${action}`,
+    details || '',
+    entity_type,
+    entity_id,
+    metadata,
+    ip_address
+  );
+}
+
+// Helper to log activity (Old version, kept for compatibility)
 async function logActivity(
   company_id: string,
   user_id: string,
@@ -27,43 +74,16 @@ async function logActivity(
   ip_address?: string
 ) {
   try {
-    // Check if created_at exists for safe insertion
-    const colCheck = await pool.query(`
-      SELECT 1 FROM information_schema.columns 
-      WHERE table_name = 'activity_logs' AND column_name = 'created_at'
-    `);
-    const hasCreatedAt = colCheck.rows.length > 0;
-
-    if (hasCreatedAt) {
-      await pool.query(
-        `INSERT INTO activity_logs (company_id, user_id, username, action, details, entity, document_id, changes, ip_address, created_at) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-        [company_id, user_id, username, action, details, JSON.stringify(entity), document_id, JSON.stringify(changes), ip_address, new Date()]
-      );
-    } else {
-      // Fallback to timestamp if created_at is missing (legacy)
-      const colCheckTs = await pool.query(`
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'activity_logs' AND column_name = 'timestamp'
-      `);
-      const hasTimestamp = colCheckTs.rows.length > 0;
-      
-      if (hasTimestamp) {
-        await pool.query(
-          `INSERT INTO activity_logs (company_id, user_id, username, action, details, entity, document_id, changes, ip_address, timestamp) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-          [company_id, user_id, username, action, details, JSON.stringify(entity), document_id, JSON.stringify(changes), ip_address, new Date()]
-        );
-      } else {
-        await pool.query(
-          `INSERT INTO activity_logs (company_id, user_id, username, action, details, entity, document_id, changes, ip_address) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-          [company_id, user_id, username, action, details, JSON.stringify(entity), document_id, JSON.stringify(changes), ip_address]
-        );
-      }
-    }
+    // Asynchronous non-blocking call
+    pool.query(
+      `INSERT INTO activity_logs (company_id, user_id, username, action, details, entity, document_id, changes, ip_address) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [company_id, user_id, username, action, details, JSON.stringify(entity), document_id, JSON.stringify(changes), ip_address]
+    ).catch(err => {
+      // Intentionally ignore missing column errors here to stay backward compatible
+    });
   } catch (error) {
-    console.error('Failed to log server activity:', error);
+    console.error('Activity Log Error:', error);
   }
 }
 
@@ -465,15 +485,17 @@ router.post('/auth/register', async (req, res) => {
     );
     
     // Log registration
-    await logActivity(
+    logAudit({
       company_id,
-      id,
+      user_id: id,
       username,
-      'إنشاء مستخدم',
-      `تم إنشاء مستخدم جديد: ${username} ببريد: ${email}`,
-      'users',
-      id
-    );
+      action: 'REGISTER',
+      module: 'AUTH',
+      details: `New user registration: ${username}`,
+      entity_type: 'users',
+      entity_id: id,
+      ip_address: getIp(req)
+    });
 
     res.status(201).json({ id, username, name: name || username, email, role: role || 'user' });
   } catch (error: any) {
@@ -499,24 +521,30 @@ router.post('/auth/login', async (req, res) => {
     }
 
     if (!isPasswordValid) {
+      logAudit({
+        action: 'LOGIN_FAILED',
+        module: 'AUTH',
+        details: `Login failure for: ${email}`,
+        ip_address: getIp(req)
+      });
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     // Log login activity
-    await logActivity(
-      user.company_id,
-      user.id,
-      user.username,
-      'تسجيل الدخول',
-      `تم تسجيل دخول المستخدم: ${user.username}`,
-      'auth',
-      user.id,
-      null,
-      req.ip
-    );
+    logAudit({
+      company_id: user.company_id,
+      user_id: user.id,
+      username: user.username,
+      action: 'LOGIN',
+      module: 'AUTH',
+      details: `User logged in: ${user.username}`,
+      entity_type: 'auth',
+      entity_id: user.id,
+      ip_address: getIp(req)
+    });
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, company_id: user.company_id, role: user.role },
+      { id: user.id, email: user.email, company_id: user.company_id, role: user.role, username: user.username },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -871,6 +899,21 @@ modules.forEach(moduleName => {
           `INSERT INTO ${moduleName} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`,
           values
         );
+
+        // Audit Log
+        logAudit({
+          company_id: req.user?.company_id,
+          user_id: req.user?.id,
+          username: (req.user as any)?.username,
+          action: 'CREATE',
+          module: moduleName.toUpperCase(),
+          details: `Created ${moduleName}: ${data.name || data.id}`,
+          entity_type: moduleName,
+          entity_id: data.id,
+          ip_address: getIp(req),
+          metadata: data
+        });
+
         res.status(201).json(parseRow(moduleName, result.rows[0] || data));
       } catch (error: any) {
         console.error(`Error in POST /${moduleName}:`, error);
@@ -915,6 +958,21 @@ modules.forEach(moduleName => {
 
         const result = await pool.query(query, params);
         if (result.rowCount === 0) return sendError(res, 404, 'Not found or permission denied');
+
+        // Audit Log
+        logAudit({
+          company_id: req.user?.company_id,
+          user_id: req.user?.id,
+          username: (req.user as any)?.username,
+          action: 'UPDATE',
+          module: moduleName.toUpperCase(),
+          details: `Updated ${moduleName}: ${id}`,
+          entity_type: moduleName,
+          entity_id: id,
+          ip_address: getIp(req),
+          metadata: sanitizedData
+        });
+
         res.json({ success: true });
       } catch (error: any) {
         console.error(`Error in PUT /${moduleName}:`, error);
@@ -942,6 +1000,20 @@ modules.forEach(moduleName => {
 
       const result = await pool.query(query, params);
       if (result.rowCount === 0) return sendError(res, 404, 'Not found or permission denied');
+
+      // Audit Log
+      logAudit({
+        company_id: req.user?.company_id,
+        user_id: req.user?.id,
+        username: (req.user as any)?.username,
+        action: 'DELETE',
+        module: moduleName.toUpperCase(),
+        details: `Deleted ${moduleName}: ${id}`,
+        entity_type: moduleName,
+        entity_id: id,
+        ip_address: getIp(req)
+      });
+
       res.json({ success: true });
     } catch (error: any) {
       console.error(`Error in DELETE /${moduleName}:`, error);
@@ -994,6 +1066,21 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
     }
 
     await client.query('COMMIT');
+
+    // Audit Log
+    logAudit({
+      company_id: req.user?.company_id,
+      user_id: req.user?.id,
+      username: (req.user as any)?.username,
+      action: 'CREATE',
+      module: 'INVOICES',
+      details: `Created invoice: ${invoiceData.invoice_number || invoiceId}`,
+      entity_type: 'invoices',
+      entity_id: invoiceId,
+      ip_address: getIp(req),
+      metadata: { invoiceData, itemCount: (items || []).length }
+    });
+
     res.status(201).json({ id: invoiceId });
   } catch (error: any) {
     await client.query('ROLLBACK');
@@ -1420,6 +1507,21 @@ router.post('/journal_entries', authenticateToken, async (req: AuthRequest, res)
     }
 
     await client.query('COMMIT');
+
+    // Audit Log
+    logAudit({
+      company_id: req.user?.company_id,
+      user_id: req.user?.id,
+      username: (req.user as any)?.username,
+      action: 'CREATE',
+      module: 'JOURNAL_ENTRIES',
+      details: `Created journal entry: ${finalEntryData.reference_number || entryId}`,
+      entity_type: 'journal_entries',
+      entity_id: entryId,
+      ip_address: getIp(req),
+      metadata: { entryData: finalEntryData, itemCount: (items || []).length }
+    });
+
     res.status(201).json({ id: entryId });
   } catch (error: any) {
     if (client) await client.query('ROLLBACK');
@@ -1569,6 +1671,21 @@ router.post('/operations/complex', authenticateToken, async (req: AuthRequest, r
     }
 
     await client.query('COMMIT');
+
+    // Audit Log
+    logAudit({
+      company_id: req.user?.company_id,
+      user_id: req.user?.id,
+      username: (req.user as any)?.username,
+      action: 'CREATE',
+      module: 'OPERATIONS',
+      details: `Created complex operation: ${opData.operation_number || opId}`,
+      entity_type: 'operations',
+      entity_id: opId,
+      ip_address: getIp(req),
+      metadata: { opData, fieldValuesCount: (field_values || []).length }
+    });
+
     res.status(201).json({ id: opId, operation_number: opData.operation_number });
   } catch (error: any) {
     if (client) await client.query('ROLLBACK');

@@ -304,8 +304,14 @@ export interface ActivityLog {
   username: string;
   company_id: string;
   created_at: string;
+  module: string;
   action: string;
   details: string;
+  entity_type?: string;
+  entity_id?: string;
+  metadata?: any;
+  ip_address?: string;
+  // Backward compatibility fields
   entity?: string | string[];
   document_id?: string;
   changes?: {
