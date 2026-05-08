@@ -6,32 +6,13 @@ import { Plus, Edit2, Trash2, Settings, List, CheckSquare, Type, Hash, Calendar,
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
 
-interface OperationField {
-  id: string;
-  company_id: string;
-  code: string;
-  name: string;
-  label: string;
-  description: string;
-  type: 'text' | 'number' | 'date' | 'currency' | 'percentage' | 'select' | 'boolean';
-  category_id: string | null;
-  sort_order: number;
-  is_required: boolean;
-  options: string[] | null;
-  unit: string;
-  default_value: string;
-}
-
-interface Category {
-  id: string;
-  name: string;
-}
+import { OperationField, OperationCategory } from '../types';
 
 export function OperationFields() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const [fields, setFields] = useState<OperationField[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<OperationCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingField, setEditingField] = useState<OperationField | null>(null);
@@ -57,7 +38,7 @@ export function OperationFields() {
     try {
       const [fieldsData, catsData] = await Promise.all([
         dbService.list<OperationField>('operation_fields', user?.company_id || ''),
-        dbService.list<Category>('operation_categories', user?.company_id || '')
+        dbService.list<OperationCategory>('operation_categories', user?.company_id || '')
       ]);
       setFields(fieldsData);
       setCategories(catsData);

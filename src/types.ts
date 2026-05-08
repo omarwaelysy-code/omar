@@ -124,6 +124,24 @@ export interface OperationCategory {
   updated_at?: string;
 }
 
+export interface OperationField {
+  id: string;
+  company_id: string;
+  code: string;
+  name: string;
+  label: string;
+  description?: string;
+  type: 'text' | 'number' | 'date' | 'currency' | 'percentage' | 'select' | 'boolean';
+  category_id: string | null;
+  department_id?: string | null;
+  sort_order?: number;
+  is_required?: boolean;
+  options?: string[] | null;
+  unit?: string;
+  default_value?: string;
+  created_at?: string;
+}
+
 export interface ExpenseCategory {
   id: string;
   code: string;
