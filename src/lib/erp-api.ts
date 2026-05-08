@@ -1728,6 +1728,73 @@ router.post('/operations/complex', authenticateToken, async (req: AuthRequest, r
   }
 });
 
+router.put('/operations/complex/:id', authenticateToken, async (req: AuthRequest, res) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+    if (!isUUID(id)) return sendError(res, 400, 'Invalid ID format');
+
+    const { field_values, id: bodyId, company_id: bodyCompanyId, ...rawOpData } = req.body;
+    const opData = sanitizeData('operations', rawOpData);
+    
+    await client.query('BEGIN');
+
+    // 1. Update Operation
+    const keys = Object.keys(opData);
+    const values = Object.values(opData);
+    if (keys.length > 0) {
+      const setClause = keys.map((key, index) => `${key} = $${index + 1}`).join(', ');
+      await client.query(
+        `UPDATE operations SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${keys.length + 1} AND company_id = $${keys.length + 2}`,
+        [...values, id, companyId]
+      );
+    }
+
+    // 2. Update Field Values (Delete and Re-insert for atomicity)
+    if (field_values && Array.isArray(field_values)) {
+      // First delete old ones for this operation (strictly filtered by company_id via Join or indirect if needed)
+      // Since we know the operation ID and verified company ownership above, we can delete them.
+      await client.query('DELETE FROM operation_field_values WHERE operation_id = $1', [id]);
+
+      for (const fv of field_values) {
+        if (!fv.field_id || !isUUID(fv.field_id)) continue;
+        const fvId = uuidv4();
+        await client.query(
+          'INSERT INTO operation_field_values (id, operation_id, field_id, value, company_id) VALUES ($1, $2, $3, $4, $5)',
+          [fvId, id, fv.field_id, fv.value, companyId]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+
+    // Audit Log
+    logAudit({
+      company_id: companyId,
+      user_id: req.user?.id,
+      username: (req.user as any)?.username || req.user?.email,
+      user_email: req.user?.email,
+      action: 'UPDATE',
+      module: 'OPERATIONS',
+      details: `Updated complex operation: ${id}`,
+      entity_type: 'operations',
+      entity_id: id,
+      ip_address: getIp(req),
+      metadata: { opData, fieldValuesCount: (field_values || []).length }
+    });
+
+    res.json({ success: true });
+  } catch (error: any) {
+    if (client) await client.query('ROLLBACK');
+    console.error('[CRASH PREVENTED] Complex Operation update failed:', error);
+    sendError(res, 500, 'Failed to update complex operation', error.message);
+  } finally {
+    client.release();
+  }
+});
+
 router.get('/operations/:id/values', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;

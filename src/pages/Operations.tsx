@@ -99,7 +99,7 @@ export function Operations() {
 
     try {
       if (editingOperation) {
-        await dbService.update('operations', editingOperation.id, payload);
+        await apiRequest(`/operations/complex/${editingOperation.id}`, 'PUT', payload);
         toast.success(t('common.updated_successfully'));
       } else {
         await apiRequest('/operations/complex', 'POST', payload);

@@ -55,6 +55,10 @@ export async function runMigrations() {
       { table: 'operation_categories', column: 'level', type: 'INT DEFAULT 0' },
       { table: 'operation_categories', column: 'full_path', type: 'TEXT' },
       { table: 'operation_categories', column: 'description', type: 'TEXT' },
+      { table: 'operation_fields', column: 'code', type: 'VARCHAR(50)' },
+      { table: 'operation_fields', column: 'description', type: 'TEXT' },
+      { table: 'operation_fields', column: 'unit', type: 'VARCHAR(50)' },
+      { table: 'operation_fields', column: 'default_value', type: 'TEXT' },
       { table: 'operation_field_values', column: 'company_id', type: 'VARCHAR(36)' }
     ];
 

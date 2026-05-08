@@ -550,11 +550,26 @@ export async function initDatabase() {
         "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         "company_id" VARCHAR(36) REFERENCES "companies"("id"),
         "name" VARCHAR(255) NOT NULL,
+        "code" VARCHAR(50),
         "parent_id" UUID REFERENCES "operation_categories"("id"),
+        "is_final" BOOLEAN DEFAULT FALSE,
+        "level" INT DEFAULT 0,
+        "full_path" TEXT,
+        "description" TEXT,
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `, 'operation_categories table');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "field_operation_categories" (
+        "field_id" UUID REFERENCES "operation_fields"("id") ON DELETE CASCADE,
+        "category_id" UUID REFERENCES "operation_categories"("id") ON DELETE CASCADE,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id"),
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY ("field_id", "category_id")
+      );
+    `, 'field_operation_categories table');
 
     await safeQuery(`
       CREATE TABLE IF NOT EXISTS "operation_fields" (
@@ -599,6 +614,7 @@ export async function initDatabase() {
         "operation_id" UUID REFERENCES "operations"("id") ON DELETE CASCADE,
         "field_id" UUID REFERENCES "operation_fields"("id") ON DELETE CASCADE,
         "value" TEXT,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id"),
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `, 'operation_field_values table');
