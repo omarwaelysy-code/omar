@@ -85,7 +85,6 @@ export function OperationCategories() {
         ...formData,
         level: currentLevel,
         company_id: user.company_id,
-        // Optional: calculate full_path if needed
         full_path: parent ? `${parent.full_path || parent.name} > ${formData.name}` : formData.name
       };
 
@@ -99,8 +98,9 @@ export function OperationCategories() {
       setIsModalOpen(false);
       resetForm();
       fetchCategories();
-    } catch (error) {
-      toast.error('Operation failed');
+    } catch (error: any) {
+      console.error('Category error:', error);
+      toast.error(error.message || 'Operation failed');
     }
   };
 
@@ -121,14 +121,20 @@ export function OperationCategories() {
       await dbService.delete('operation_categories', id);
       toast.success(t('common.deleted_successfully'));
       fetchCategories();
-    } catch (error) {
-      toast.error('Delete failed');
+    } catch (error: any) {
+      toast.error(error.message || 'Delete failed');
     }
   };
 
   const renderTreeNode = (parentId: string | null = null, level = 0) => {
-    const children = categories.filter(c => c.parent_id === parentId);
+    let children = categories.filter(c => c.parent_id === parentId);
     
+    // If we are at root and no children found with parentId=null, 
+    // but we have categories, try to find "orphans" (those with invalid or missing parents)
+    if (parentId === null && children.length === 0 && categories.length > 0) {
+      children = categories.filter(c => !c.parent_id || !categories.some(pc => pc.id === c.parent_id));
+    }
+
     // Apply search filter if searching
     const filteredChildren = searchTerm 
       ? children.filter(c => 
@@ -138,10 +144,11 @@ export function OperationCategories() {
       : children;
 
     if (children.length === 0 && parentId !== null) return null;
+    if (children.length === 0 && parentId === null && categories.length === 0) return null;
 
     return (
       <div className={`${level > 0 ? "mr-4 md:mr-8 border-r-2 border-zinc-100 pr-2 md:pr-4" : ""} space-y-2`}>
-        {children.map(category => {
+        {(searchTerm ? filteredChildren : children).map(category => {
           const isExpanded = expandedNodes.has(category.id);
           const hasChildren = categories.some(c => c.parent_id === category.id);
           

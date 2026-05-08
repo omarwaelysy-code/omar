@@ -926,8 +926,13 @@ modules.forEach(moduleName => {
 
         res.status(201).json(parseRow(moduleName, result.rows[0] || data));
       } catch (error: any) {
-        console.error(`Error in POST /${moduleName}:`, error);
-        sendError(res, 500, `Failed to create ${moduleName}`, error.message);
+        console.error(`[CRITICAL] Error in POST /${moduleName}:`, {
+          message: error.message,
+          stack: error.stack,
+          body: req.body,
+          user: req.user?.email
+        });
+        sendError(res, 500, `Failed to create ${moduleName}. ${error.message}`, error.message);
       }
     });
 
@@ -958,7 +963,7 @@ modules.forEach(moduleName => {
         if (keys.length === 0) return sendError(res, 400, 'No valid fields for update');
 
         const setClause = keys.map((key, index) => `${key} = $${index + 1}`).join(', ');
-        let query = `UPDATE ${moduleName} SET ${setClause} WHERE id = $${keys.length + 1}`;
+        let query = `UPDATE ${moduleName} SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${keys.length + 1}`;
         let params = [...values, id];
 
         if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies') {
@@ -986,8 +991,14 @@ modules.forEach(moduleName => {
 
         res.json({ success: true });
       } catch (error: any) {
-        console.error(`Error in PUT /${moduleName}:`, error);
-        sendError(res, 500, `Failed to update ${moduleName}`, error.message);
+        console.error(`[CRITICAL] Error in PUT /${moduleName}:`, {
+          message: error.message,
+          stack: error.stack,
+          id: req.params.id,
+          body: req.body,
+          user: req.user?.email
+        });
+        sendError(res, 500, `Failed to update ${moduleName}. ${error.message}`, error.message);
       }
     });
   }

@@ -50,6 +50,11 @@ export async function runMigrations() {
       { table: 'operations', column: 'status', type: "VARCHAR(50) DEFAULT 'draft'" },
       { table: 'operation_fields', column: 'category_id', type: 'UUID REFERENCES operation_categories(id)' },
       { table: 'operation_fields', column: 'label', type: 'VARCHAR(255)' },
+      { table: 'operation_categories', column: 'code', type: 'VARCHAR(50)' },
+      { table: 'operation_categories', column: 'is_final', type: 'BOOLEAN DEFAULT FALSE' },
+      { table: 'operation_categories', column: 'level', type: 'INT DEFAULT 0' },
+      { table: 'operation_categories', column: 'full_path', type: 'TEXT' },
+      { table: 'operation_categories', column: 'description', type: 'TEXT' },
       { table: 'operation_field_values', column: 'company_id', type: 'VARCHAR(36)' }
     ];
 
