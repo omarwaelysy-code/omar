@@ -270,45 +270,52 @@ export function OperationFields() {
       {/* Modal */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 md:p-4 transition-all">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl my-8"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-[2rem] w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
             >
-              <div className="p-6 border-b border-zinc-100">
+              <div className="p-6 border-b border-zinc-100 flex items-center justify-between shrink-0 bg-white">
                 <h2 className="text-xl font-bold text-zinc-900">
                   {editingField ? 'تعديل تعريف الحقل' : 'إضافة حقل جديد للنظام'}
                 </h2>
+                <button 
+                  onClick={() => setIsModalOpen(false)}
+                  className="p-2 hover:bg-zinc-100 rounded-full transition-colors text-zinc-400"
+                >
+                  <Plus className="rotate-45" size={24} />
+                </button>
               </div>
-              <form onSubmit={handleSubmit} className="p-6 space-y-4 text-right" dir="rtl">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 mb-1">كود الحقل (Unique Code)</label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.code}
-                      onChange={e => setFormData({ ...formData, code: e.target.value.toUpperCase().replace(/\s+/g, '_') })}
-                      className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono font-bold"
-                      placeholder="e.g. F001"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 mb-1">الاسم لغرض البرمجة (Slug)</label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.name}
-                      onChange={e => setFormData({ ...formData, name: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
-                      className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
-                      placeholder="e.g. construction_depth"
-                    />
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4">
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+                <form id="fieldForm" onSubmit={handleSubmit} className="space-y-6 text-right" dir="rtl">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 mb-1">كود الحقل (Unique Code)</label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.code}
+                        onChange={e => setFormData({ ...formData, code: e.target.value.toUpperCase().replace(/\s+/g, '_') })}
+                        className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono font-bold"
+                        placeholder="e.g. F001"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 mb-1">الاسم لغرض البرمجة (Slug)</label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.name}
+                        onChange={e => setFormData({ ...formData, name: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
+                        className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
+                        placeholder="e.g. construction_depth"
+                      />
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-zinc-700 mb-1">التسمية العربية (Label)</label>
                     <input
@@ -316,27 +323,30 @@ export function OperationFields() {
                       required
                       value={formData.label}
                       onChange={e => setFormData({ ...formData, label: e.target.value })}
-                      className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold"
+                      className="w-full p-4 bg-zinc-50 border border-zinc-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold text-lg"
                       placeholder="مثال: المساحة الإجمالية"
                     />
                   </div>
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-zinc-700 mb-2">نوع البيانات</label>
+
+                  <div className="space-y-4">
+                    <label className="block text-sm font-bold text-zinc-900 mb-2">نوع البيانات</label>
                     
                     {/* Advanced Field Type Selector */}
-                    <div className="space-y-3">
-                      <div className="relative">
-                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
-                        <input
-                          type="text"
-                          placeholder="ابحث عن نوع الحقل (مثلاً: رقم، تاريخ، صورة)..."
-                          value={typeSearch}
-                          onChange={(e) => setTypeSearch(e.target.value)}
-                          className="w-full pr-10 pl-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm"
-                        />
+                    <div className="border border-zinc-200 rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all bg-zinc-50/30">
+                      <div className="sticky top-0 z-10 bg-white border-b border-zinc-100 p-3">
+                        <div className="relative">
+                          <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
+                          <input
+                            type="text"
+                            placeholder="ابحث عن نوع الحقل (مثلاً: رقم، تاريخ، صورة)..."
+                            value={typeSearch}
+                            onChange={(e) => setTypeSearch(e.target.value)}
+                            className="w-full pr-10 pl-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:border-emerald-500 transition-all text-sm"
+                          />
+                        </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto p-1 custom-scrollbar">
+                      <div className="grid grid-cols-1 gap-6 p-4 max-h-[350px] overflow-y-auto custom-scrollbar">
                         {FIELD_CATEGORIES.map(category => {
                           const catTypes = FIELD_TYPES.filter(t => 
                             t.category === category.id && 
@@ -346,12 +356,12 @@ export function OperationFields() {
                           if (catTypes.length === 0) return null;
 
                           return (
-                            <div key={category.id} className="space-y-2">
-                              <div className={`flex items-center gap-2 text-xs font-bold uppercase tracking-wider ${category.color}`}>
+                            <div key={category.id} className="space-y-3">
+                              <div className={`sticky top-0 z-[5] py-1 bg-zinc-50/90 backdrop-blur-sm flex items-center gap-2 text-xs font-black uppercase tracking-wider ${category.color}`}>
                                 <category.icon size={14} />
                                 <span>{category.label_ar}</span>
                               </div>
-                              <div className="grid gap-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {catTypes.map(fieldType => {
                                   const Icon = fieldType.icon;
                                   const isSelected = formData.type === fieldType.id;
@@ -360,23 +370,20 @@ export function OperationFields() {
                                       key={fieldType.id}
                                       type="button"
                                       onClick={() => setFormData({ ...formData, type: fieldType.id as any })}
-                                      className={`flex items-start gap-3 p-3 rounded-xl border transition-all text-right group ${
+                                      className={`flex items-start gap-3 p-3 rounded-xl border transition-all text-right group relative ${
                                         isSelected 
-                                          ? 'border-emerald-600 bg-emerald-50 shadow-sm' 
-                                          : 'border-zinc-100 bg-white hover:border-emerald-200 hover:bg-zinc-50'
+                                          ? 'border-emerald-600 bg-emerald-50 ring-1 ring-emerald-600 shadow-sm' 
+                                          : 'border-white bg-white hover:border-emerald-200 hover:shadow-md'
                                       }`}
                                     >
-                                      <div className={`p-2 rounded-lg transition-colors ${
+                                      <div className={`p-2 shrink-0 rounded-lg transition-colors ${
                                         isSelected ? 'bg-emerald-600 text-white' : 'bg-zinc-100 text-zinc-500 group-hover:bg-emerald-100 group-hover:text-emerald-600'
                                       }`}>
                                         <Icon size={18} />
                                       </div>
                                       <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between">
-                                          <span className="font-bold text-sm text-zinc-900">{fieldType.label_ar}</span>
-                                          {isSelected && (
-                                            <div className="w-2 h-2 rounded-full bg-emerald-600"></div>
-                                          )}
+                                          <span className="font-bold text-sm text-zinc-900 truncate">{fieldType.label_ar}</span>
                                         </div>
                                         <div className="text-[10px] text-zinc-500 line-clamp-1 mt-0.5">{fieldType.description_ar}</div>
                                       </div>
@@ -391,136 +398,146 @@ export function OperationFields() {
 
                       {/* Selected Field Type Info */}
                       {formData.type && (
-                        <motion.div 
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 flex items-start gap-4"
-                        >
-                          <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg">
-                            <Info size={20} />
-                          </div>
-                          <div>
-                            <div className="text-sm font-bold text-emerald-900">
-                              مثال الاستخدام: <span className="font-mono text-emerald-600">{FIELD_TYPES.find(t => t.id === formData.type)?.example_ar}</span>
+                        <div className="border-t border-zinc-100 p-4 bg-white">
+                          <motion.div 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 flex items-start gap-4"
+                          >
+                            <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg shrink-0">
+                              <Info size={20} />
                             </div>
-                            <div className="text-xs text-emerald-700/80 mt-1">
-                              {FIELD_TYPES.find(t => t.id === formData.type)?.description_ar}
+                            <div className="min-w-0">
+                              <div className="text-sm font-bold text-emerald-900 truncate">
+                                مثال الاستخدام: <span className="font-mono text-emerald-600">{FIELD_TYPES.find(t => t.id === formData.type)?.example_ar}</span>
+                              </div>
+                              <div className="text-xs text-emerald-700/80 mt-1 leading-relaxed">
+                                {FIELD_TYPES.find(t => t.id === formData.type)?.description_ar}
+                              </div>
                             </div>
-                          </div>
-                        </motion.div>
+                          </motion.div>
+                        </div>
                       )}
                     </div>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-zinc-700 mb-1">
-                      المستويات النهائية المرتبطة (Multi-Select Leaf Categories Only)
+                  <div className="space-y-4">
+                    <label className="block text-sm font-bold text-zinc-900 mb-1">
+                      المستويات النهائية المرتبطة
                     </label>
-                    <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl max-h-48 overflow-y-auto space-y-1">
-                      {finalCategories.length === 0 ? (
-                        <p className="text-zinc-400 text-xs text-center py-4 italic">لا يوجد تصنيفات نهائية متاحة. تأكد من تفعيل "مستوى نهائي" لبعض التصنيفات.</p>
-                      ) : (
-                        finalCategories.sort((a, b) => (a.full_path || a.name).localeCompare(b.full_path || b.name)).map(cat => (
-                          <label key={cat.id} className="flex items-center gap-3 p-2 hover:bg-white rounded-lg transition-colors cursor-pointer border border-transparent hover:border-zinc-100">
-                            <input 
-                              type="checkbox"
-                              checked={formData.category_ids.includes(cat.id)}
-                              onChange={(e) => {
-                                const next = e.target.checked 
-                                  ? [...formData.category_ids, cat.id]
-                                  : formData.category_ids.filter(id => id !== cat.id);
-                                setFormData({ ...formData, category_ids: next });
-                              }}
-                              className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
-                            />
-                            <span className="text-sm text-zinc-700 font-medium">
-                              {cat.full_path || cat.name}
-                            </span>
-                          </label>
-                        ))
-                      )}
+                    <div className="p-1 bg-zinc-100 border border-zinc-200 rounded-2xl overflow-hidden">
+                      <div className="max-h-48 overflow-y-auto custom-scrollbar p-2 bg-zinc-50/50 rounded-xl space-y-1">
+                        {finalCategories.length === 0 ? (
+                          <p className="text-zinc-400 text-xs text-center py-4 italic">لا يوجد تصنيفات نهائية متاحة.</p>
+                        ) : (
+                          finalCategories.sort((a, b) => (a.full_path || a.name).localeCompare(b.full_path || b.name)).map(cat => (
+                            <label key={cat.id} className="flex items-center gap-3 p-3 hover:bg-white rounded-xl transition-all cursor-pointer border border-transparent hover:border-zinc-200 hover:shadow-sm">
+                              <input 
+                                type="checkbox"
+                                checked={formData.category_ids.includes(cat.id)}
+                                onChange={(e) => {
+                                  const next = e.target.checked 
+                                    ? [...formData.category_ids, cat.id]
+                                    : formData.category_ids.filter(id => id !== cat.id);
+                                  setFormData({ ...formData, category_ids: next });
+                                }}
+                                className="w-5 h-5 rounded-lg text-emerald-600 focus:ring-emerald-500 border-zinc-300"
+                              />
+                              <div>
+                                <span className="text-sm text-zinc-800 font-bold block">
+                                  {cat.name}
+                                </span>
+                                {cat.full_path && (
+                                  <span className="text-[10px] text-zinc-400 font-mono">{cat.full_path}</span>
+                                )}
+                              </div>
+                            </label>
+                          ))
+                        )}
+                      </div>
                     </div>
-                    <p className="text-[10px] text-zinc-400 mt-1">يتم اختيار التصنيفات النهائية فقط. التصنيفات الأب لا تظهر هنا.</p>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 mb-1">الوحدة (مثل: متر، كجم، $)</label>
+                      <input
+                        type="text"
+                        value={formData.unit}
+                        onChange={e => setFormData({ ...formData, unit: e.target.value })}
+                        className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold"
+                        placeholder="e.g. m, kg, $"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 mb-1">الترتيب</label>
+                      <input
+                        type="number"
+                        value={formData.sort_order}
+                        onChange={e => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
+                        className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {formData.type === 'select' && (
+                    <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}>
+                      <label className="block text-sm font-medium text-zinc-700 mb-1">خيارات القائمة (مفصولة بفاصلة)</label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.options}
+                        onChange={e => setFormData({ ...formData, options: e.target.value })}
+                        className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold"
+                        placeholder="خيار 1, خيار 2..."
+                      />
+                    </motion.div>
+                  )}
+
                   <div>
-                    <label className="block text-sm font-medium text-zinc-700 mb-1">الوحدة (مثل: متر، كجم، $)</label>
-                    <input
-                      type="text"
-                      value={formData.unit}
-                      onChange={e => setFormData({ ...formData, unit: e.target.value })}
-                      className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold"
+                    <label className="block text-sm font-medium text-zinc-700 mb-1">وصف الحقل / تعليمات للمستخدم</label>
+                    <textarea
+                      value={formData.description}
+                      onChange={e => setFormData({ ...formData, description: e.target.value })}
+                      rows={2}
+                      className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                      placeholder="اشرح للموظف كيف يستخدم هذا الحقل..."
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 mb-1">الترتيب</label>
-                    <input
-                      type="number"
-                      value={formData.sort_order}
-                      onChange={e => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
-                      className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
-                    />
-                  </div>
-                </div>
 
-                {formData.type === 'select' && (
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 mb-1">خيارات القائمة (مفصولة بفاصلة)</label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.options}
-                      onChange={e => setFormData({ ...formData, options: e.target.value })}
-                      className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold"
-                      placeholder="خيار 1, خيار 2..."
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">وصف الحقل / تعليمات للمستخدم</label>
-                  <textarea
-                    value={formData.description}
-                    onChange={e => setFormData({ ...formData, description: e.target.value })}
-                    rows={2}
-                    className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                  />
-                </div>
-
-                <div className="flex items-center gap-3 mt-8">
-                  <div className="flex-1">
+                  <div className="p-4 bg-rose-50/30 border border-rose-100 rounded-2xl">
                     <label className="flex items-center gap-3 cursor-pointer group">
                       <input
                         type="checkbox"
                         checked={formData.is_required}
                         onChange={e => setFormData({ ...formData, is_required: e.target.checked })}
-                        className="w-5 h-5 rounded-lg border-zinc-300 text-emerald-600 focus:ring-emerald-500 transition-all"
+                        className="w-6 h-6 rounded-lg border-zinc-300 text-emerald-600 focus:ring-emerald-500 transition-all"
                       />
-                      <span className="text-zinc-700 font-bold group-hover:text-rose-600 transition-colors">هذا الحقل إجباري</span>
+                      <div>
+                        <span className="text-zinc-900 font-black block">إلزام المستخدم بالإدخال</span>
+                        <span className="text-xs text-zinc-500">لن يسمح النظام بحفظ العملية بدون تعبئة هذا الحقل</span>
+                      </div>
                     </label>
                   </div>
-                </div>
+                </form>
+              </div>
 
-                <div className="flex items-center gap-3 mt-4">
-                  <button
-                    type="submit"
-                    className="flex-1 bg-emerald-600 text-white h-12 rounded-xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
-                  >
-                    {t('common.save')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="flex-1 bg-zinc-100 text-zinc-600 h-12 rounded-xl font-bold hover:bg-zinc-200 transition-colors"
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              </form>
+              <div className="p-6 bg-zinc-50 border-t border-zinc-100 shrink-0 flex items-center gap-3">
+                <button
+                  type="submit"
+                  form="fieldForm"
+                  className="flex-1 bg-emerald-600 text-white h-14 rounded-2xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20 text-lg"
+                >
+                  {t('common.save')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="flex-[0.5] bg-white border border-zinc-200 text-zinc-600 h-14 rounded-2xl font-bold hover:bg-zinc-50 transition-colors"
+                >
+                  إلغاء
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
