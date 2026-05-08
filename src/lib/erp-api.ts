@@ -629,20 +629,26 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
     }
 
     // 2. Fetch fields: 
-    // - Specific to selected category or its parents
-    // - OR General fields (category_id IS NULL)
+    // - Linked to selected category or its parents via field_operation_categories
+    // - OR Direct category_id match (backward compatibility)
+    // - OR General fields (both category_id is null AND no links found - though usually general is null)
     let fieldsQuery = `
-      SELECT * FROM operation_fields 
-      WHERE (company_id = $1)
-      AND (category_id IS NULL
+      SELECT DISTINCT f.* FROM operation_fields f
+      LEFT JOIN field_operation_categories fc ON f.id = fc.field_id
+      WHERE (f.company_id = $1)
+      AND (
+        (f.category_id IS NULL AND NOT EXISTS (SELECT 1 FROM field_operation_categories WHERE field_id = f.id))
     `;
 
     const params: any[] = [companyId];
     if (categoryIds.length > 0) {
-      fieldsQuery += ` OR category_id = ANY($2)`;
+      fieldsQuery += ` 
+        OR f.category_id = ANY($2)
+        OR fc.category_id = ANY($2)
+      `;
       params.push(categoryIds);
     }
-    fieldsQuery += `) ORDER BY sort_order ASC, name ASC`;
+    fieldsQuery += `) ORDER BY f.sort_order ASC, f.name ASC`;
 
     const { rows: fields } = await pool.query(fieldsQuery, params);
     res.json(fields.map(f => parseRow('operation_fields', f)));

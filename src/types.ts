@@ -131,8 +131,14 @@ export interface OperationField {
   name: string;
   label: string;
   description?: string;
-  type: 'text' | 'number' | 'date' | 'currency' | 'percentage' | 'select' | 'boolean';
+  type: 'text' | 'number' | 'date' | 'currency' | 'percentage' | 'select' | 'boolean' | 
+        'textarea' | 'rich_text' | 'tags' | 'url' | 'email' | 'phone' | 
+        'auto_number' | 'formula' | 'time' | 'datetime' | 'multi_select' | 
+        'radio' | 'user' | 'customer' | 'supplier' | 'product' | 'category' | 
+        'record_link' | 'file' | 'image' | 'barcode' | 'qr' | 'signature' | 
+        'gps' | 'address' | 'city' | 'country';
   category_id: string | null;
+  category_ids?: string[];
   department_id?: string | null;
   sort_order?: number;
   is_required?: boolean;
@@ -472,4 +478,45 @@ export interface LedgerLine {
   credit: number;
   balance: number;
   entity_name?: string;
+}
+
+export interface Department {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  parent_id: string | null;
+  manager_user_id: string | null;
+  company_id: string;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface CostCenter {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  department_id?: string;
+  company_id: string;
+  budget?: number;
+  currency?: string;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface Operation {
+  id: string;
+  company_id: string;
+  customer_id: string;
+  customer_name?: string;
+  description?: string;
+  date: string;
+  operation_date?: string;
+  operation_number?: string;
+  status: string;
+  category_id: string;
+  department_id?: string;
+  cost_center_id?: string;
+  created_at?: string;
 }

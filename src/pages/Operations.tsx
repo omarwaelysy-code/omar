@@ -7,56 +7,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
 import { apiRequest } from '../services/dbService';
 
-interface Operation {
-  id: string;
-  operation_number: string;
-  customer_id: string;
-  customer_name: string;
-  category_id: string;
-  department_id: string;
-  cost_center_id: string;
-  description: string;
-  date: string;
-  operation_date: string;
-  status: string;
-  created_at: string;
-}
-
-interface OperationField {
-  id: string;
-  name: string;
-  label: string;
-  type: 'text' | 'number' | 'date' | 'currency' | 'percentage' | 'select' | 'boolean';
-  is_required: boolean;
-  options: string[] | null;
-  unit: string;
-}
-
-interface Category {
-  id: string;
-  name: string;
-}
-
-interface Customer {
-  id: string;
-  name: string;
-}
-
-interface Department {
-  id: string;
-  name: string;
-}
-
-interface CostCenter {
-  id: string;
-  name: string;
-}
+import { Operation, OperationField, OperationCategory, Customer, Department, CostCenter } from '../types';
 
 export function Operations() {
   const { t, dir } = useLanguage();
   const { user } = useAuth();
   const [operations, setOperations] = useState<Operation[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<OperationCategory[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
@@ -94,7 +51,7 @@ export function Operations() {
       const companyId = user?.company_id || '';
       const [ops, cats, custs, depts, ccs] = await Promise.all([
         dbService.list<Operation>('operations', companyId),
-        dbService.list<Category>('operation_categories', companyId),
+        dbService.list<OperationCategory>('operation_categories', companyId),
         dbService.list<Customer>('customers', companyId),
         dbService.list<Department>('departments', companyId),
         dbService.list<CostCenter>('cost_centers', companyId)
@@ -393,7 +350,11 @@ export function Operations() {
                       className="w-full p-4 bg-white border border-zinc-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236B7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-[position:left_1rem_center] bg-no-repeat"
                     >
                       <option value="">حدد نوع العملية لإظهار الحقول...</option>
-                      {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      {categories.sort((a,b) => (a.full_path || a.name).localeCompare(b.full_path || b.name)).map(c => (
+                        <option key={c.id} value={c.id} disabled={!c.is_final} className={c.is_final ? "font-bold" : "text-zinc-400 italic"}>
+                          {c.is_final ? '📄 ' : '📁 '} {c.full_path || c.name} {!c.is_final && '(مستوى رئيسي)'}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
