@@ -59,7 +59,8 @@ export async function runMigrations() {
       { table: 'operation_fields', column: 'description', type: 'TEXT' },
       { table: 'operation_fields', column: 'unit', type: 'VARCHAR(50)' },
       { table: 'operation_fields', column: 'default_value', type: 'TEXT' },
-      { table: 'operation_field_values', column: 'company_id', type: 'VARCHAR(36)' }
+      { table: 'operation_field_values', column: 'company_id', type: 'VARCHAR(36)' },
+      { table: 'field_operation_categories', column: 'id', type: 'UUID DEFAULT gen_random_uuid() PRIMARY KEY' }
     ];
 
     for (const item of columnsToSync) {

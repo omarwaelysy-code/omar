@@ -599,7 +599,7 @@ const modules = [
   'returns', 'return_items', 'purchase_invoices', 'purchase_returns', 
   'customer_discounts', 'supplier_discounts', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers',
   'system_config', 'audit_logs', 'operation_categories', 'operations', 'operation_fields',
-  'departments', 'cost_centers', 'operation_field_values'
+  'departments', 'cost_centers', 'operation_field_values', 'field_operation_categories'
 ];
 
 // --- Flexible Operations Logic ---
@@ -719,7 +719,7 @@ function sanitizeData(table: string, data: any) {
       
       // Strict UUID validation for ID fields (except those known to be BIGSERIAL or VARCHAR)
       const isIdField = key === 'id' || key.endsWith('_id');
-      const isUUIDTable = !['activity_logs', 'migrations'].includes(table);
+      const isUUIDTable = !['activity_logs', 'migrations', 'system_config', 'field_operation_categories'].includes(table);
       // specific excludes for non-uuid foreign keys
       const charIdFields = ['user_id', 'company_id']; 
       
@@ -741,11 +741,16 @@ function sanitizeData(table: string, data: any) {
 }
 
 modules.forEach(moduleName => {
-  // List with filters
-  router.get(`/${moduleName}`, authenticateToken, async (req: AuthRequest, res) => {
-    try {
-      let rows;
-      if (moduleName === 'activity_logs') {
+  const hyphenName = moduleName.replace(/_/g, '-');
+  const routeNames = [moduleName];
+  if (hyphenName !== moduleName) routeNames.push(hyphenName);
+
+  routeNames.forEach(rn => {
+    // List with filters
+    router.get(`/${rn}`, authenticateToken, async (req: AuthRequest, res) => {
+      try {
+        let rows;
+        if (moduleName === 'activity_logs') {
         const isSuperAdmin = req.user?.role === 'super_admin';
         const companyId = isSuperAdmin ? req.query.company_id : (req.query.company_id || req.user?.company_id);
         
@@ -820,33 +825,36 @@ modules.forEach(moduleName => {
       sendError(res, 500, `Failed to list ${moduleName}`, error.message);
     }
   });
+});
 
-  // Get Single
-  router.get(`/${moduleName}/:id`, authenticateToken, async (req, res) => {
-    try {
-      const { id } = req.params;
-      
-      // UUID validation for single item GET
-      const isUUIDTable = !['activity_logs', 'migrations'].includes(moduleName);
-      if (isUUIDTable && !isUUID(id)) {
-        return sendError(res, 400, `Invalid ID format for ${moduleName}`);
-      }
+// Get Single
+  routeNames.forEach(rn => {
+    router.get(`/${rn}/:id`, authenticateToken, async (req, res) => {
+      try {
+        const { id } = req.params;
+        
+        // UUID validation for single item GET
+        const isUUIDTable = !['activity_logs', 'migrations', 'system_config', 'field_operation_categories'].includes(moduleName);
+        if (isUUIDTable && !isUUID(id)) {
+          return sendError(res, 400, `Invalid ID format for ${moduleName}`);
+        }
 
-      const { rows }: any = await pool.query(`SELECT * FROM ${moduleName} WHERE id = $1`, [id]);
-      const row = rows[0] || null;
-      
-      if (!row) {
-        return sendError(res, 404, `${moduleName} not found`);
-      }
+        const { rows }: any = await pool.query(`SELECT * FROM ${moduleName} WHERE id = $1`, [id]);
+        const row = rows[0] || null;
+        
+        if (!row) {
+          return sendError(res, 404, `${moduleName} not found`);
+        }
 
-      if (transactionalModules.includes(moduleName)) {
-        row.items = await fetchItems(moduleName, row.id);
+        if (transactionalModules.includes(moduleName)) {
+          row.items = await fetchItems(moduleName, row.id);
+        }
+        res.json(parseRow(moduleName, row));
+      } catch (error: any) {
+        console.error(`[CRASH PREVENTED] Error in GET /${moduleName}/:id:`, error);
+        sendError(res, 500, `Failed to get ${moduleName}`, error.message);
       }
-      res.json(parseRow(moduleName, row));
-    } catch (error: any) {
-      console.error(`[CRASH PREVENTED] Error in GET /${moduleName}/:id:`, error);
-      sendError(res, 500, `Failed to get ${moduleName}`, error.message);
-    }
+    });
   });
 
   // Helper to fetch items
@@ -880,100 +888,154 @@ modules.forEach(moduleName => {
 
   // Create
   if (!transactionalModules.includes(moduleName)) {
-    router.post(`/${moduleName}`, authenticateToken, async (req: AuthRequest, res) => {
-      try {
-        const companyId = req.user?.company_id;
-        if (!companyId && moduleName !== 'companies') return sendError(res, 401, 'Unauthorized');
+    routeNames.forEach(rn => {
+      router.post(`/${rn}`, authenticateToken, async (req: AuthRequest, res) => {
+        try {
+          const companyId = req.user?.company_id;
+          if (!companyId && moduleName !== 'companies') return sendError(res, 401, 'Unauthorized');
 
-        // Special case for users: handle password/temp_password hashing
-        if (moduleName === 'users') {
-          if (req.body.password) {
-            req.body.password_hash = await bcrypt.hash(req.body.password, 10);
-            delete req.body.password;
+          // Special case for users: handle password/temp_password hashing
+          if (moduleName === 'users') {
+            if (req.body.password) {
+              req.body.password_hash = await bcrypt.hash(req.body.password, 10);
+              delete req.body.password;
+            }
+            if (req.body.temp_password) {
+              req.body.password_hash = await bcrypt.hash(req.body.temp_password, 10);
+            }
           }
-          if (req.body.temp_password) {
-            req.body.password_hash = await bcrypt.hash(req.body.temp_password, 10);
+
+          const sanitizedData = sanitizeData(moduleName, req.body);
+          const data = { ...sanitizedData };
+          if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && !data.company_id) {
+            data.company_id = companyId;
           }
+
+          if (!data.id && moduleName !== 'activity_logs' && moduleName !== 'audit_logs') {
+            data.id = uuidv4();
+          }
+          
+          const keys = Object.keys(data);
+          const values = Object.values(data);
+          const placeholders = keys.map((_, index) => `$${index + 1}`).join(', ');
+          
+          const result = await pool.query(
+            `INSERT INTO ${moduleName} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`,
+            values
+          );
+
+          // Audit Log
+          logAudit({
+            company_id: req.user?.company_id,
+            user_id: req.user?.id,
+            username: (req.user as any)?.username || req.user?.email,
+            user_email: req.user?.email,
+            action: 'CREATE',
+            module: moduleName.toUpperCase(),
+            details: `Created ${moduleName}: ${data.name || data.id}`,
+            entity_type: moduleName,
+            entity_id: data.id,
+            ip_address: getIp(req),
+            metadata: data
+          });
+
+          res.status(201).json(parseRow(moduleName, result.rows[0] || data));
+        } catch (error: any) {
+          console.error(`[CRITICAL] Error in POST /${moduleName}:`, {
+            message: error.message,
+            stack: error.stack,
+            body: req.body,
+            user: req.user?.email
+          });
+          sendError(res, 500, `Failed to create ${moduleName}. ${error.message}`, error.message);
         }
-
-        const sanitizedData = sanitizeData(moduleName, req.body);
-        const data = { ...sanitizedData };
-        if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && !data.company_id) {
-          data.company_id = companyId;
-        }
-
-        if (!data.id && moduleName !== 'activity_logs' && moduleName !== 'audit_logs') {
-          data.id = uuidv4();
-        }
-        
-        const keys = Object.keys(data);
-        const values = Object.values(data);
-        const placeholders = keys.map((_, index) => `$${index + 1}`).join(', ');
-        
-        const result = await pool.query(
-          `INSERT INTO ${moduleName} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`,
-          values
-        );
-
-        // Audit Log
-        logAudit({
-          company_id: req.user?.company_id,
-          user_id: req.user?.id,
-          username: (req.user as any)?.username || req.user?.email,
-          user_email: req.user?.email,
-          action: 'CREATE',
-          module: moduleName.toUpperCase(),
-          details: `Created ${moduleName}: ${data.name || data.id}`,
-          entity_type: moduleName,
-          entity_id: data.id,
-          ip_address: getIp(req),
-          metadata: data
-        });
-
-        res.status(201).json(parseRow(moduleName, result.rows[0] || data));
-      } catch (error: any) {
-        console.error(`[CRITICAL] Error in POST /${moduleName}:`, {
-          message: error.message,
-          stack: error.stack,
-          body: req.body,
-          user: req.user?.email
-        });
-        sendError(res, 500, `Failed to create ${moduleName}. ${error.message}`, error.message);
-      }
+      });
     });
 
     // Update
-    router.put(`/${moduleName}/:id`, authenticateToken, async (req: AuthRequest, res) => {
+    routeNames.forEach(rn => {
+      router.put(`/${rn}/:id`, authenticateToken, async (req: AuthRequest, res) => {
+        try {
+          const { id } = req.params;
+          const companyId = req.user?.company_id;
+
+          if (!isUUID(id) && !['activity_logs', 'migrations', 'system_config', 'field_operation_categories'].includes(moduleName)) {
+            return sendError(res, 400, 'Invalid ID format');
+          }
+
+          // Special case for users
+          if (moduleName === 'users' && req.body.password) {
+            req.body.password_hash = await bcrypt.hash(req.body.password, 10);
+            delete req.body.password;
+            req.body.temp_password = null;
+            req.body.must_change_password = false;
+          }
+
+          const sanitizedData = sanitizeData(moduleName, req.body);
+          delete (sanitizedData as any).id;
+          if (moduleName !== 'companies') delete (sanitizedData as any).company_id;
+
+          const keys = Object.keys(sanitizedData);
+          const values = Object.values(sanitizedData);
+          if (keys.length === 0) return sendError(res, 400, 'No valid fields for update');
+
+          const setClause = keys.map((key, index) => `${key} = $${index + 1}`).join(', ');
+          let query = `UPDATE ${moduleName} SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${keys.length + 1}`;
+          let params = [...values, id];
+
+          if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies') {
+            query += ` AND company_id = $${keys.length + 2}`;
+            params.push(companyId);
+          }
+
+          const result = await pool.query(query, params);
+          if (result.rowCount === 0) return sendError(res, 404, 'Not found or permission denied');
+
+          // Audit Log
+          logAudit({
+            company_id: req.user?.company_id,
+            user_id: req.user?.id,
+            username: (req.user as any)?.username || req.user?.email,
+            user_email: req.user?.email,
+            action: 'UPDATE',
+            module: moduleName.toUpperCase(),
+            details: `Updated ${moduleName}: ${id}`,
+            entity_type: moduleName,
+            entity_id: id,
+            ip_address: getIp(req),
+            metadata: sanitizedData
+          });
+
+          res.json({ success: true });
+        } catch (error: any) {
+          console.error(`[CRITICAL] Error in PUT /${moduleName}:`, {
+            message: error.message,
+            stack: error.stack,
+            id: req.params.id,
+            body: req.body,
+            user: req.user?.email
+          });
+          sendError(res, 500, `Failed to update ${moduleName}. ${error.message}`, error.message);
+        }
+      });
+    });
+  }
+
+  routeNames.forEach(rn => {
+    router.delete(`/${rn}/:id`, authenticateToken, async (req: AuthRequest, res) => {
       try {
         const { id } = req.params;
         const companyId = req.user?.company_id;
 
-        if (!isUUID(id) && !['activity_logs', 'migrations'].includes(moduleName)) {
+        if (!isUUID(id) && !['activity_logs', 'migrations', 'system_config', 'field_operation_categories'].includes(moduleName)) {
           return sendError(res, 400, 'Invalid ID format');
         }
 
-        // Special case for users
-        if (moduleName === 'users' && req.body.password) {
-          req.body.password_hash = await bcrypt.hash(req.body.password, 10);
-          delete req.body.password;
-          req.body.temp_password = null;
-          req.body.must_change_password = false;
-        }
-
-        const sanitizedData = sanitizeData(moduleName, req.body);
-        delete (sanitizedData as any).id;
-        if (moduleName !== 'companies') delete (sanitizedData as any).company_id;
-
-        const keys = Object.keys(sanitizedData);
-        const values = Object.values(sanitizedData);
-        if (keys.length === 0) return sendError(res, 400, 'No valid fields for update');
-
-        const setClause = keys.map((key, index) => `${key} = $${index + 1}`).join(', ');
-        let query = `UPDATE ${moduleName} SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${keys.length + 1}`;
-        let params = [...values, id];
+        let query = `DELETE FROM ${moduleName} WHERE id = $1`;
+        let params = [id];
 
         if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies') {
-          query += ` AND company_id = $${keys.length + 2}`;
+          query += ` AND company_id = $2`;
           params.push(companyId);
         }
 
@@ -986,68 +1048,20 @@ modules.forEach(moduleName => {
           user_id: req.user?.id,
           username: (req.user as any)?.username || req.user?.email,
           user_email: req.user?.email,
-          action: 'UPDATE',
+          action: 'DELETE',
           module: moduleName.toUpperCase(),
-          details: `Updated ${moduleName}: ${id}`,
+          details: `Deleted ${moduleName}: ${id}`,
           entity_type: moduleName,
           entity_id: id,
-          ip_address: getIp(req),
-          metadata: sanitizedData
+          ip_address: getIp(req)
         });
 
         res.json({ success: true });
       } catch (error: any) {
-        console.error(`[CRITICAL] Error in PUT /${moduleName}:`, {
-          message: error.message,
-          stack: error.stack,
-          id: req.params.id,
-          body: req.body,
-          user: req.user?.email
-        });
-        sendError(res, 500, `Failed to update ${moduleName}. ${error.message}`, error.message);
+        console.error(`Error in DELETE /${moduleName}:`, error);
+        sendError(res, 500, `Failed to delete ${moduleName}`, error.message);
       }
     });
-  }
-
-  router.delete(`/${moduleName}/:id`, authenticateToken, async (req: AuthRequest, res) => {
-    try {
-      const { id } = req.params;
-      const companyId = req.user?.company_id;
-
-      if (!isUUID(id) && !['activity_logs', 'migrations'].includes(moduleName)) {
-        return sendError(res, 400, 'Invalid ID format');
-      }
-
-      let query = `DELETE FROM ${moduleName} WHERE id = $1`;
-      let params = [id];
-
-      if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies') {
-        query += ` AND company_id = $2`;
-        params.push(companyId);
-      }
-
-      const result = await pool.query(query, params);
-      if (result.rowCount === 0) return sendError(res, 404, 'Not found or permission denied');
-
-      // Audit Log
-      logAudit({
-        company_id: req.user?.company_id,
-        user_id: req.user?.id,
-        username: (req.user as any)?.username || req.user?.email,
-        user_email: req.user?.email,
-        action: 'DELETE',
-        module: moduleName.toUpperCase(),
-        details: `Deleted ${moduleName}: ${id}`,
-        entity_type: moduleName,
-        entity_id: id,
-        ip_address: getIp(req)
-      });
-
-      res.json({ success: true });
-    } catch (error: any) {
-      console.error(`Error in DELETE /${moduleName}:`, error);
-      sendError(res, 500, `Failed to delete ${moduleName}`, error.message);
-    }
   });
 });
 
