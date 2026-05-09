@@ -82,26 +82,30 @@ export const CustomerStatement: React.FC = () => {
       });
 
       // Calculate balance forward for date filtering
-      let balanceForward = 0;
+      const customerOpBal = Number(customer?.opening_balance || 0);
+      let balanceForward = customerOpBal;
       let filteredEntries = allEntries;
 
       if (startDate) {
         const entriesBefore = allEntries.filter(e => e.date < startDate);
-        balanceForward = entriesBefore.reduce((sum, e) => sum + (e.debit - e.credit), 0);
+        balanceForward = customerOpBal + entriesBefore.reduce((sum, e) => sum + (Number(e.debit || 0) - Number(e.credit || 0)), 0);
         filteredEntries = allEntries.filter(e => e.date >= startDate);
+      } else {
+        // If no start date, opening balance is just the customerOpBal
+        balanceForward = customerOpBal;
       }
 
-      // Add Balance Forward entry if filtering by date OR if it's the start
+      // Add Balance Forward entry
       const finalAllEntries = [];
-      if (startDate) {
+      if (balanceForward !== 0 || startDate) {
         finalAllEntries.push({
           id: 'balance-forward',
-          date: startDate,
+          date: startDate || allEntries[0]?.date || new Date().toISOString().slice(0, 10),
           type: 'opening_balance',
           reference: '-',
-          description: 'رصيد منقول',
+          description: startDate ? 'رصيد منقول' : 'رصيد افتتاحي',
           debit: balanceForward > 0 ? balanceForward : 0,
-          credit: balanceForward < 0 ? -balanceForward : 0,
+          credit: balanceForward < 0 ? Math.abs(balanceForward) : 0,
           balance: balanceForward
         });
       }
@@ -302,9 +306,9 @@ export const CustomerStatement: React.FC = () => {
                   <tfoot>
                     <tr className="bg-zinc-900 text-white font-bold">
                       <td colSpan={4} className="px-4 py-3 text-left">الرصيد الختامي</td>
-                      <td className="px-4 py-3">{formatNumber(entries.filter(e => e.id !== 'balance-forward').reduce((sum, e) => sum + e.debit, 0) + (entries.find(e => e.id === 'balance-forward')?.debit || 0))}</td>
-                      <td className="px-4 py-3">{formatNumber(entries.filter(e => e.id !== 'balance-forward').reduce((sum, e) => sum + e.credit, 0) + (entries.find(e => e.id === 'balance-forward')?.credit || 0))}</td>
-                      <td className="px-4 py-3">{formatBalance(entries[entries.length - 1]?.balance)}</td>
+                      <td className="px-4 py-3">{formatNumber(entries.reduce((sum, e) => sum + (Number(e.debit) || 0), 0))}</td>
+                      <td className="px-4 py-3">{formatNumber(entries.reduce((sum, e) => sum + (Number(e.credit) || 0), 0))}</td>
+                      <td className="px-4 py-3">{formatBalance(entries[entries.length - 1]?.balance || 0)}</td>
                     </tr>
                   </tfoot>
                 </table>

@@ -92,8 +92,9 @@ export const SupplierStatement: React.FC = () => {
       });
 
       // Calculate balance forward
+      const supplierOpBal = Number(supplier?.opening_balance || 0);
       const itemsBefore = allItems.filter(item => startDate && new Date(item.date) < new Date(startDate));
-      const balanceBefore = itemsBefore.reduce((sum, item) => sum + (item.credit - item.debit), 0);
+      const balanceBefore = supplierOpBal + itemsBefore.reduce((sum, item) => sum + (Number(item.credit || 0) - Number(item.debit || 0)), 0);
       
       const initialBalance = balanceBefore;
       setStartBalance(initialBalance);
@@ -261,8 +262,8 @@ export const SupplierStatement: React.FC = () => {
                       <td className="px-4 py-3 text-sm"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600">رصيد</span></td>
                       <td className="px-4 py-3 text-sm font-mono">-</td>
                       <td className="px-4 py-3 text-sm">رصيد منقول</td>
-                      <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance > 0 ? formatNumber(startBalance) : '-'}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-rose-600">{startBalance < 0 ? formatNumber(Math.abs(startBalance)) : '-'}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance < 0 ? formatNumber(Math.abs(startBalance)) : '-'}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-rose-600">{startBalance > 0 ? formatNumber(startBalance) : '-'}</td>
                       <td className="px-4 py-3 text-sm font-bold text-zinc-900">{formatBalance(startBalance)}</td>
                     </tr>
                     {statement.map((item) => (
@@ -301,8 +302,8 @@ export const SupplierStatement: React.FC = () => {
                   <tfoot>
                     <tr className="bg-zinc-900 text-white font-bold">
                       <td colSpan={4} className="px-4 py-3 text-left">الرصيد الختامي</td>
-                      <td className="px-4 py-3">{formatNumber(statement.reduce((sum, e) => sum + e.debit, 0) + (startBalance > 0 ? startBalance : 0))}</td>
-                      <td className="px-4 py-3">{formatNumber(statement.reduce((sum, e) => sum + e.credit, 0) + (startBalance < 0 ? Math.abs(startBalance) : 0))}</td>
+                      <td className="px-4 py-3">{formatNumber(statement.reduce((sum, e) => sum + (Number(e.debit) || 0), 0) + (startBalance < 0 ? Math.abs(startBalance) : 0))}</td>
+                      <td className="px-4 py-3">{formatNumber(statement.reduce((sum, e) => sum + (Number(e.credit) || 0), 0) + (startBalance > 0 ? startBalance : 0))}</td>
                       <td className="px-4 py-3">{formatBalance(statement.length > 0 ? (statement[statement.length - 1].balance || 0) : startBalance)}</td>
                     </tr>
                   </tfoot>
