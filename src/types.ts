@@ -133,8 +133,8 @@ export interface OperationField {
   description?: string;
   type: 'text' | 'number' | 'date' | 'currency' | 'percentage' | 'select' | 'boolean' | 
         'textarea' | 'rich_text' | 'tags' | 'url' | 'email' | 'phone' | 
-        'auto_number' | 'formula' | 'time' | 'datetime' | 'multi_select' | 
-        'radio' | 'user' | 'customer' | 'supplier' | 'product' | 'category' | 
+        'auto_number' | 'formula' | 'time' | 'datetime' | 'multi_select' | 'multiselect' | 
+        'radio' | 'checkbox' | 'user' | 'customer' | 'supplier' | 'product' | 'category' | 
         'record_link' | 'file' | 'image' | 'barcode' | 'qr' | 'signature' | 
         'gps' | 'address' | 'city' | 'country';
   category_id: string | null;

@@ -261,6 +261,17 @@ export const FIELD_TYPES: FieldTypeDefinition[] = [
     example_en: 'Option 1, Option 2'
   },
   {
+    id: 'multiselect',
+    category: 'choice',
+    label_ar: 'Multi Select (V2)',
+    label_en: 'Multi Select (V2)',
+    icon: CheckSquare,
+    description_ar: 'اختيار أكثر من قيمة من القائمة (نسخة بديلة).',
+    description_en: 'Select multiple values from a list (alternative).',
+    example_ar: 'خيار 1، خيار 2',
+    example_en: 'Option 1, Option 2'
+  },
+  {
     id: 'boolean',
     category: 'choice',
     label_ar: 'نعم / لا',
@@ -270,6 +281,17 @@ export const FIELD_TYPES: FieldTypeDefinition[] = [
     description_en: 'Boolean toggle between two states.',
     example_ar: 'نعم',
     example_en: 'Yes'
+  },
+  {
+    id: 'checkbox',
+    category: 'choice',
+    label_ar: 'مربع اختيار (Checkbox)',
+    label_en: 'Checkbox',
+    icon: CheckSquare,
+    description_ar: 'مربع اختيار منطقي نعم أو لا.',
+    description_en: 'Logical checkbox for yes or no.',
+    example_ar: 'تم التنفيذ',
+    example_en: 'Done'
   },
   {
     id: 'radio',
