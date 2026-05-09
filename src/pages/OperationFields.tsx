@@ -143,8 +143,8 @@ export function OperationFields() {
     <div className="p-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">تعريف حقول العمليات</h1>
-          <p className="text-zinc-500 dark:text-zinc-400">إدارة الحقول الديناميكية للنظام المرن</p>
+          <h1 className="text-2xl font-bold text-slate-900">تعريف حقول العمليات</h1>
+          <p className="text-slate-500 font-medium">إدارة الحقول الديناميكية للنظام المرن</p>
         </div>
         <button
           onClick={() => {
@@ -165,10 +165,10 @@ export function OperationFields() {
             });
             setIsModalOpen(true);
           }}
-          className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
+          className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
         >
           <Plus size={20} />
-          <span>إضافة تعريف حقل</span>
+          <span className="font-bold">إضافة تعريف حقل</span>
         </button>
       </div>
 
@@ -177,45 +177,45 @@ export function OperationFields() {
           <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
         </div>
       ) : (
-        <div className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-white/5 rounded-3xl overflow-hidden overflow-x-auto text-right shadow-premium" dir="rtl">
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto text-right shadow-sm" dir="rtl">
           <table className="w-full">
-            <thead className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-white/5">
+            <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-6 py-4 font-medium text-zinc-500 dark:text-zinc-400 text-sm">كود/اسم</th>
-                <th className="px-6 py-4 font-medium text-zinc-500 dark:text-zinc-400 text-sm">العنوان</th>
-                <th className="px-6 py-4 font-medium text-zinc-500 dark:text-zinc-400 text-sm">النوع/الوحدة</th>
-                <th className="px-6 py-4 font-medium text-zinc-500 dark:text-zinc-400 text-sm text-center">مطلوب</th>
-                <th className="px-6 py-4 font-medium text-zinc-500 dark:text-zinc-400 text-sm">الإجراءات</th>
+                <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider">كود/اسم</th>
+                <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider">العنوان</th>
+                <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider">النوع/الوحدة</th>
+                <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider text-center">مطلوب</th>
+                <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider">الإجراءات</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-50 dark:divide-white/5">
+            <tbody className="divide-y divide-slate-100">
               {fields.sort((a,b) => (a.sort_order || 0) - (b.sort_order || 0)).map((field) => (
-                <tr key={field.id} className="hover:bg-zinc-50/50 dark:hover:bg-white/5 transition-colors group">
+                <tr key={field.id} className="hover:bg-slate-50/80 transition-colors group">
                   <td className="px-6 py-4">
-                    <div className="font-mono text-xs text-emerald-600 dark:text-emerald-400 font-bold">{field.code || '-'}</div>
-                    <div className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono uppercase">{field.name}</div>
+                    <div className="font-mono text-xs text-emerald-600 font-bold">{field.code || '-'}</div>
+                    <div className="text-[10px] text-slate-400 font-bold font-mono uppercase">{field.name}</div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="font-bold text-zinc-900 dark:text-zinc-100">{field.label}</div>
+                    <div className="font-bold text-slate-900">{field.label}</div>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {getFieldCategories(field.id).map(cat => (
-                        <span key={cat.id} className="text-[10px] bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded font-medium border border-blue-100 dark:border-blue-500/20">
+                        <span key={cat.id} className="text-[9px] bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded font-bold border border-sky-100">
                           {cat.full_path || cat.name}
                         </span>
                       ))}
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 text-sm font-bold">
+                    <div className="flex items-center gap-2 text-slate-600 text-sm font-bold">
                       {getFieldIcon(field.type)}
-                      <span>{getFieldLabel(field.type)} {field.unit && `(${field.unit})`}</span>
+                      <span className="text-xs">{getFieldLabel(field.type)} {field.unit && `(${field.unit})`}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center">
                     {field.is_required ? (
-                      <span className="text-rose-500 text-xs font-bold bg-rose-50 dark:bg-rose-500/10 px-2 py-0.5 rounded-full">إجباري</span>
+                      <span className="text-rose-600 text-[10px] font-bold bg-rose-50 px-2.5 py-1 rounded-full border border-rose-100">إجباري</span>
                     ) : (
-                      <span className="text-zinc-300 dark:text-zinc-600 text-xs">-</span>
+                      <span className="text-slate-300 text-xs">-</span>
                     )}
                   </td>
                   <td className="px-6 py-4">
@@ -243,7 +243,7 @@ export function OperationFields() {
                           });
                           setIsModalOpen(true);
                         }}
-                        className="p-1.5 text-zinc-400 hover:text-emerald-600 transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
                       >
                         <Edit2 size={16} />
                       </button>
@@ -254,7 +254,7 @@ export function OperationFields() {
                             fetchData();
                           }
                         }}
-                        className="p-1.5 text-zinc-400 hover:text-rose-600 transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
                       >
                         <Trash2 size={16} />
                       </button>
@@ -270,30 +270,30 @@ export function OperationFields() {
       {/* Modal */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 md:p-4 transition-all">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-2 md:p-4 transition-all">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.98, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white dark:bg-zinc-900 rounded-[2rem] w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+              exit={{ opacity: 0, scale: 0.98, y: 10 }}
+              className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200"
             >
-              <div className="p-6 border-b border-zinc-100 dark:border-white/5 flex items-center justify-between shrink-0 bg-white dark:bg-zinc-900">
-                <h2 className="text-xl font-bold text-zinc-900 dark:text-white">
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
+                <h2 className="text-xl font-bold text-slate-900">
                   {editingField ? 'تعديل تعريف الحقل' : 'إضافة حقل جديد للنظام'}
                 </h2>
                 <button 
                   onClick={() => setIsModalOpen(false)}
-                  className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors text-zinc-400"
+                  className="p-2 hover:bg-slate-50 rounded-full transition-colors text-slate-400"
                 >
                   <Plus className="rotate-45" size={24} />
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-zinc-50/20 dark:bg-zinc-800/10">
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-slate-50/50">
                 <form id="fieldForm" onSubmit={handleSubmit} className="space-y-8 text-right" dir="rtl">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-1">
-                      <label className="block text-xs font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-1">كود الحقل (Unique Code)</label>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">كود الحقل (Unique Code)</label>
                       <input
                         type="text"
                         required
@@ -304,52 +304,51 @@ export function OperationFields() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="block text-xs font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-1">الاسم لغرض البرمجة (Slug)</label>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">الاسم لغرض البرمجة (Slug)</label>
                       <input
                         type="text"
                         required
                         value={formData.name}
                         onChange={e => setFormData({ ...formData, name: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
-                        className="premium-input font-mono"
+                        className="premium-input font-mono text-xs"
                         placeholder="e.g. construction_depth"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-xs font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-1">التسمية العربية (Label)</label>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">التسمية العربية (Label)</label>
                     <input
                       type="text"
                       required
                       value={formData.label}
                       onChange={e => setFormData({ ...formData, label: e.target.value })}
-                      className="premium-input text-lg font-black"
+                      className="premium-input font-bold"
                       placeholder="مثال: المساحة الإجمالية"
                     />
                   </div>
 
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">نوع البيانات المتقدم</label>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">نوع البيانات المتقدم</label>
                       <span className="text-[10px] bg-brand-primary/10 text-brand-primary px-2 py-0.5 rounded-full font-bold">إلزامي</span>
                     </div>
                     
-                    {/* Improved Advanced Field Type Selector */}
-                    <div className="border border-zinc-200 dark:border-white/5 rounded-[2rem] overflow-hidden focus-within:ring-4 focus-within:ring-brand-primary/5 transition-all bg-white dark:bg-zinc-900 shadow-premium">
-                      <div className="sticky top-0 z-10 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-b border-zinc-100 dark:border-white/5 p-4">
+                    <div className="border border-slate-200 rounded-2xl overflow-hidden focus-within:ring-4 focus-within:ring-brand-primary/5 transition-all bg-white shadow-sm">
+                      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-md border-b border-slate-100 p-4">
                         <div className="relative group">
-                          <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-primary transition-colors" size={20} />
+                          <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-primary transition-colors" size={18} />
                           <input
                             type="text"
                             placeholder="ابحث عن نوع الحقل..."
                             value={typeSearch}
                             onChange={(e) => setTypeSearch(e.target.value)}
-                            className="w-full pr-12 pl-5 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-white/5 rounded-2xl focus:outline-none focus:border-brand-primary transition-all text-sm font-bold dark:text-white dark:placeholder:text-zinc-600"
+                            className="w-full pr-10 pl-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-brand-primary transition-all text-sm font-bold text-slate-900 placeholder:text-slate-400"
                           />
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 gap-8 p-6 max-h-[400px] overflow-y-auto custom-scrollbar">
+                      <div className="grid grid-cols-1 gap-6 p-6 max-h-[400px] overflow-y-auto custom-scrollbar">
                         {FIELD_CATEGORIES.map(category => {
                           const catTypes = FIELD_TYPES.filter(t => 
                             t.category === category.id && 
@@ -359,12 +358,12 @@ export function OperationFields() {
                           if (catTypes.length === 0) return null;
 
                           return (
-                            <div key={category.id} className="space-y-4">
-                              <div className={`sticky top-0 z-[5] py-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] ${category.color} border-b border-current/10`}>
-                                <category.icon size={16} />
+                            <div key={category.id} className="space-y-3">
+                              <div className={`sticky top-0 z-[5] py-2 bg-white/95 backdrop-blur-sm flex items-center gap-2 text-[9px] font-bold uppercase tracking-wider ${category.color} border-b border-current/10`}>
+                                <category.icon size={14} />
                                 <span>{category.label_ar}</span>
                               </div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {catTypes.map(fieldType => {
                                   const Icon = fieldType.icon;
                                   const isSelected = formData.type === fieldType.id;
@@ -373,25 +372,25 @@ export function OperationFields() {
                                       key={fieldType.id}
                                       type="button"
                                       onClick={() => setFormData({ ...formData, type: fieldType.id as any })}
-                                      className={`flex items-start gap-4 p-4 rounded-2xl border-2 transition-all text-right group relative ${
+                                      className={`flex items-start gap-3 p-3 rounded-xl border-2 transition-all text-right group relative ${
                                         isSelected 
-                                          ? 'border-brand-primary bg-brand-primary/5 shadow-lg shadow-brand-primary/10' 
-                                          : 'border-zinc-50 dark:border-white/5 bg-white dark:bg-zinc-900/40 hover:border-zinc-200 dark:hover:border-white/20 hover:shadow-md'
+                                          ? 'border-brand-primary bg-brand-primary/5' 
+                                          : 'border-slate-50 bg-white hover:border-slate-200 hover:shadow-sm'
                                       }`}
                                     >
-                                      <div className={`w-12 h-12 flex items-center justify-center shrink-0 rounded-xl transition-all ${
-                                        isSelected ? 'bg-brand-primary text-white shadow-glow' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 group-hover:bg-brand-primary/10 group-hover:text-brand-primary'
+                                      <div className={`w-10 h-10 flex items-center justify-center shrink-0 rounded-lg transition-all ${
+                                        isSelected ? 'bg-brand-primary text-white shadow-sm' : 'bg-slate-100 text-slate-400 group-hover:bg-brand-primary/10 group-hover:text-brand-primary'
                                       }`}>
-                                        <Icon size={22} />
+                                        <Icon size={18} />
                                       </div>
-                                      <div className="flex-1 min-w-0 pt-1">
+                                      <div className="flex-1 min-w-0 pt-0.5">
                                         <div className="flex items-center justify-between">
-                                          <span className={`font-black text-sm tracking-tight ${isSelected ? 'text-brand-primary' : 'text-zinc-900 dark:text-white'}`}>{fieldType.label_ar}</span>
+                                          <span className={`font-bold text-xs tracking-tight ${isSelected ? 'text-brand-primary' : 'text-slate-900'}`}>{fieldType.label_ar}</span>
                                           {isSelected && (
-                                            <motion.div layoutId="check" className="w-2 h-2 rounded-full bg-brand-primary shadow-glow" />
+                                            <div className="w-1.5 h-1.5 rounded-full bg-brand-primary shadow-sm" />
                                           )}
                                         </div>
-                                        <div className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold line-clamp-1 mt-1 uppercase tracking-tighter opacity-60 group-hover:opacity-100 transition-opacity">{fieldType.description_ar}</div>
+                                        <div className="text-[9px] text-slate-400 font-medium line-clamp-1 mt-0.5 uppercase tracking-tight opacity-70 group-hover:opacity-100 transition-opacity">{fieldType.description_ar}</div>
                                       </div>
                                     </button>
                                   );
@@ -409,20 +408,20 @@ export function OperationFields() {
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
-                            className="border-t border-zinc-100 dark:border-white/5 p-6 bg-zinc-50/50 dark:bg-zinc-800/50"
+                            className="border-t border-slate-100 p-6 bg-slate-50"
                           >
-                            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/5 rounded-[1.5rem] p-5 flex items-start gap-5 shadow-sm">
-                              <div className="w-12 h-12 bg-brand-primary/10 text-brand-primary rounded-xl shrink-0 flex items-center justify-center shadow-inner">
-                                <Info size={24} />
+                            <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-start gap-4 shadow-sm">
+                              <div className="w-10 h-10 bg-brand-primary/10 text-brand-primary rounded-lg shrink-0 flex items-center justify-center">
+                                <Info size={20} />
                               </div>
-                              <div className="min-w-0 pt-1">
-                                <div className="text-sm font-black text-zinc-900 dark:text-white flex items-center gap-2">
+                              <div className="min-w-0 pt-0.5">
+                                <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
                                   مثال الاستخدام: 
-                                  <span className="font-mono text-brand-primary bg-brand-primary/5 px-2 py-0.5 rounded-lg text-xs">
+                                  <span className="font-mono text-brand-primary bg-brand-primary/5 px-2 py-0.5 rounded-md text-[10px]">
                                     {FIELD_TYPES.find(t => t.id === formData.type)?.example_ar}
                                   </span>
                                 </div>
-                                <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium mt-2 leading-relaxed">
+                                <div className="text-[11px] text-slate-500 font-medium mt-1.5 leading-relaxed">
                                   {FIELD_TYPES.find(t => t.id === formData.type)?.description_ar}
                                 </div>
                               </div>
@@ -434,19 +433,19 @@ export function OperationFields() {
                   </div>
 
                   <div className="space-y-4">
-                    <label className="block text-xs font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                       المستويات النهائية المرتبطة (Operation Categories)
                     </label>
-                    <div className="p-1 bg-zinc-100/50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-white/5 rounded-[2rem] overflow-hidden shadow-inner">
+                    <div className="p-1 bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                       <div className="max-h-56 overflow-y-auto custom-scrollbar p-3 space-y-2">
                         {finalCategories.length === 0 ? (
-                          <div className="flex flex-col items-center justify-center py-10 opacity-30 dark:opacity-10">
-                            <Layers size={32} className="mb-2 dark:text-white" />
-                            <p className="text-[10px] font-black uppercase tracking-widest dark:text-white">{t('common.no_data_available')}</p>
+                          <div className="flex flex-col items-center justify-center py-10 opacity-20">
+                            <Layers size={32} className="mb-2 text-slate-400" />
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('common.no_data_available')}</p>
                           </div>
                         ) : (
                           finalCategories.sort((a, b) => (a.full_path || a.name).localeCompare(b.full_path || b.name)).map(cat => (
-                            <label key={cat.id} className={`flex items-center gap-4 p-4 rounded-2xl transition-all cursor-pointer border-2 shadow-sm ${formData.category_ids.includes(cat.id) ? 'bg-brand-primary/5 border-brand-primary' : 'bg-white dark:bg-zinc-900 border-transparent hover:border-zinc-200 dark:hover:border-white/10'}`}>
+                            <label key={cat.id} className={`flex items-center gap-4 p-3 rounded-xl transition-all cursor-pointer border-2 shadow-sm ${formData.category_ids.includes(cat.id) ? 'bg-brand-primary/5 border-brand-primary' : 'bg-white border-transparent hover:border-slate-100'}`}>
                               <input 
                                 type="checkbox"
                                 checked={formData.category_ids.includes(cat.id)}
@@ -456,14 +455,14 @@ export function OperationFields() {
                                     : formData.category_ids.filter(id => id !== cat.id);
                                   setFormData({ ...formData, category_ids: next });
                                 }}
-                                className="w-6 h-6 rounded-lg text-brand-primary focus:ring-brand-primary border-zinc-300 dark:border-white/10 dark:bg-zinc-800 transition-all cursor-pointer"
+                                className="w-5 h-5 rounded-md text-brand-primary focus:ring-brand-primary border-slate-200 transition-all cursor-pointer"
                               />
                                <div className="flex-1 min-w-0">
-                                <span className="text-sm text-zinc-900 dark:text-white font-black block tracking-tight">
+                                <span className="text-sm text-slate-900 font-bold block tracking-tight">
                                   {cat.name}
                                 </span>
                                 {cat.full_path && (
-                                  <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold uppercase tracking-tighter block mt-0.5 opacity-60">{cat.full_path}</span>
+                                  <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tight block mt-0.5 opacity-70">{cat.full_path}</span>
                                 )}
                               </div>
                             </label>
@@ -475,7 +474,7 @@ export function OperationFields() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-1">
-                      <label className="block text-xs font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-1">الوحدة (Unit)</label>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">الوحدة (Unit)</label>
                       <input
                         type="text"
                         value={formData.unit}
@@ -485,12 +484,12 @@ export function OperationFields() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="block text-xs font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-1">الترتيب (Sort Order)</label>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">الترتيب (Sort Order)</label>
                       <input
                         type="number"
                         value={formData.sort_order}
                         onChange={e => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
-                        className="premium-input font-mono font-black"
+                        className="premium-input font-mono font-bold"
                       />
                     </div>
                   </div>
@@ -501,7 +500,7 @@ export function OperationFields() {
                       animate={{ opacity: 1, y: 0 }}
                       className="space-y-1"
                     >
-                      <label className="block text-xs font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-1">خيارات القائمة (مفصولة بفاصلة)</label>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">خيارات القائمة (مفصولة بفاصلة)</label>
                       <input
                         type="text"
                         required
@@ -514,47 +513,47 @@ export function OperationFields() {
                   )}
 
                   <div className="space-y-1">
-                    <label className="block text-xs font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-1">وصف الحقل / تعليمات المستخدم</label>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">وصف الحقل / تعليمات المستخدم</label>
                     <textarea
                       value={formData.description}
                       onChange={e => setFormData({ ...formData, description: e.target.value })}
                       rows={3}
-                      className="premium-input min-h-[100px] resize-none"
+                      className="premium-input min-h-[100px] resize-none text-sm"
                       placeholder="اشرح للموظف كيف يستخدم هذا الحقل..."
                     />
                   </div>
 
-                  <div className="p-6 bg-rose-50/50 dark:bg-rose-500/5 border-2 border-rose-100 dark:border-rose-500/20 rounded-[2rem] group hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
+                  <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl group hover:bg-slate-100 transition-colors">
                     <label className="flex items-center gap-4 cursor-pointer">
                       <div className="relative">
                         <input
                           type="checkbox"
                           checked={formData.is_required}
                           onChange={e => setFormData({ ...formData, is_required: e.target.checked })}
-                          className="w-8 h-8 rounded-xl border-zinc-300 dark:border-white/10 dark:bg-zinc-800 text-rose-500 focus:ring-rose-500 transition-all cursor-pointer"
+                          className="w-6 h-6 rounded-lg border-slate-300 text-rose-500 focus:ring-rose-500 transition-all cursor-pointer"
                         />
                       </div>
                       <div className="flex-1">
-                        <span className="text-zinc-900 dark:text-white font-black block tracking-tight">إلزام المستخدم بالإدخال (Required)</span>
-                        <span className="text-xs text-rose-600/70 dark:text-rose-400/60 font-bold">لن يسمح النظام بحفظ العملية بدون تعبئة هذا الحقل</span>
+                        <span className="text-slate-900 font-bold block text-sm tracking-tight">إلزام المستخدم بالإدخال (Required)</span>
+                        <span className="text-[10px] text-slate-400 font-medium">لن يسمح النظام بحفظ العملية بدون تعبئة هذا الحقل</span>
                       </div>
                     </label>
                   </div>
                 </form>
               </div>
 
-              <div className="p-6 bg-zinc-50 dark:bg-zinc-800/50 border-t border-zinc-100 dark:border-white/5 shrink-0 flex items-center gap-3">
+              <div className="p-6 bg-white border-t border-slate-100 shrink-0 flex items-center gap-3">
                 <button
                   type="submit"
                   form="fieldForm"
-                  className="flex-1 bg-emerald-600 text-white h-14 rounded-2xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20 text-lg"
+                  className="flex-1 bg-emerald-600 text-white h-12 rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 text-sm active:scale-95"
                 >
                   {t('common.save')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="flex-[0.5] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/5 text-zinc-600 dark:text-zinc-400 h-14 rounded-2xl font-bold hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                  className="flex-[0.4] bg-slate-50 border border-slate-200 text-slate-600 h-12 rounded-xl font-bold hover:bg-slate-100 transition-all text-sm"
                 >
                   إلغاء
                 </button>

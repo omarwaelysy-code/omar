@@ -344,15 +344,20 @@ export const Customers: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('customers.title')}</h2>
-          <p className="text-zinc-500">{t('customers.subtitle')}</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 bg-emerald-600 text-white rounded-3xl flex items-center justify-center shadow-xl shadow-emerald-500/20">
+            <User size={28} />
+          </div>
+          <div>
+            <h2 className="text-3xl font-black tracking-tight text-slate-900 italic serif">{t('customers.title')}</h2>
+            <p className="text-slate-500 font-medium">{t('customers.subtitle')}</p>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           <button 
             onClick={() => setIsActivityLogOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-zinc-600 border border-zinc-200 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm"
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
             title={language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
           >
             <History size={20} />
@@ -365,7 +370,7 @@ export const Customers: React.FC = () => {
           {canCreate && (
             <button 
               onClick={() => openModal()}
-              className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-600 to-orange-500 text-white rounded-2xl font-bold hover:from-orange-700 hover:to-orange-600 transition-all active:scale-95 shadow-lg shadow-orange-200 border border-orange-400/20"
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95 border border-emerald-500/50"
             >
               <Plus size={20} />
               {t('customers.add')}
@@ -374,14 +379,14 @@ export const Customers: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-zinc-50 flex items-center gap-4">
-          <div className="relative flex-1">
-            <Search className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 text-zinc-400`} size={18} />
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100 flex items-center gap-4 bg-slate-50/30">
+          <div className="relative flex-1 group">
+            <Search className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
             <input
               type="text"
               placeholder={t('customers.search_placeholder')}
-              className={`w-full ${dir === 'rtl' ? 'pl-10 pr-4' : 'pr-10 pl-4'} py-2 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all`}
+              className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none transition-all font-bold text-slate-900 placeholder:text-slate-400`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -391,45 +396,45 @@ export const Customers: React.FC = () => {
         <div className="overflow-x-auto hidden md:block">
           <table ref={tableRef} className="w-full">
             <thead>
-              <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_code')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_name')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_mobile')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_email')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_address')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_opening_balance')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_current_balance')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
+              <tr className="bg-slate-50/50 text-slate-500 text-[10px] uppercase tracking-widest border-b border-slate-100">
+                <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_code')}</th>
+                <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_name')}</th>
+                <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_mobile')}</th>
+                <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_email')}</th>
+                <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_address')}</th>
+                <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_opening_balance')}</th>
+                <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_current_balance')}</th>
+                <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-50">
+            <tbody className="divide-y divide-slate-100">
               {filteredCustomers.map((customer) => (
-                <tr key={customer.id} className="hover:bg-zinc-50/50 transition-colors group">
+                <tr key={customer.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    <span className="font-mono text-xs bg-zinc-100 px-2 py-1 rounded text-zinc-600">{customer.code}</span>
+                    <span className="font-mono text-[10px] bg-slate-100 px-2.5 py-1 rounded-lg text-slate-500 font-bold border border-slate-200">{customer.code}</span>
                   </td>
-                  <td className={`px-6 py-4 font-bold text-zinc-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{customer.name}</td>
-                  <td className={`px-6 py-4 text-zinc-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{customer.mobile}</td>
-                  <td className={`px-6 py-4 text-zinc-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{customer.email}</td>
-                  <td className={`px-6 py-4 text-zinc-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{customer.address}</td>
+                  <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{customer.name}</td>
+                  <td className={`px-6 py-4 text-slate-500 font-medium ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{customer.mobile}</td>
+                  <td className={`px-6 py-4 text-slate-400 text-xs truncate max-w-[150px] ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={customer.email || undefined}>{customer.email}</td>
+                  <td className={`px-6 py-4 text-slate-400 text-xs truncate max-w-[200px] ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={customer.address || undefined}>{customer.address}</td>
                   <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    <span className={`font-medium ${customer.opening_balance >= 0 ? 'text-zinc-600' : 'text-rose-500'}`}>
+                    <span className={`font-bold text-sm ${customer.opening_balance >= 0 ? 'text-slate-600' : 'text-rose-500'}`}>
                       {formatBalance(customer.opening_balance || 0)}
                     </span>
                   </td>
                   <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    <span className={`font-black ${getCustomerBalance(customer.id) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    <span className={`font-black text-sm px-3 py-1 rounded-full ${getCustomerBalance(customer.id) >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                       {formatBalance(getCustomerBalance(customer.id))}
                     </span>
                   </td>
                   <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                    <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity no-pdf`}>
+                    <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-all no-pdf`}>
                       <button 
                         onClick={() => {
                           setActivityLogDocumentId(customer.id);
                           setIsActivityLogOpen(true);
                         }}
-                        className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
+                        className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
                         title="سجل النشاط"
                       >
                         <History size={18} />
@@ -437,7 +442,7 @@ export const Customers: React.FC = () => {
                       {canEdit && (
                         <button 
                           onClick={() => openModal(customer)}
-                          className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                          className="p-2.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-xl transition-all"
                         >
                           <Edit2 size={18} />
                         </button>
@@ -445,7 +450,7 @@ export const Customers: React.FC = () => {
                       {canDelete && (
                         <button 
                           onClick={() => handleDelete(customer.id)}
-                          className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                          className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
                         >
                           <Trash2 size={18} />
                         </button>
@@ -456,7 +461,14 @@ export const Customers: React.FC = () => {
               ))}
               {filteredCustomers.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-zinc-500">لا يوجد عملاء.</td>
+                  <td colSpan={8} className="px-6 py-20 text-center">
+                    <div className="flex flex-col items-center gap-2">
+                       <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mb-2">
+                          <User size={32} />
+                       </div>
+                       <p className="text-slate-400 font-bold">{language === 'ar' ? 'لا يوجد عملاء حالياً' : 'No customers found'}</p>
+                    </div>
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -464,19 +476,19 @@ export const Customers: React.FC = () => {
         </div>
 
         {/* Mobile List View */}
-        <div className="md:hidden divide-y divide-zinc-50">
+        <div className="md:hidden divide-y divide-slate-100">
           {filteredCustomers.map((customer) => (
-            <div key={customer.id} className="p-4 space-y-4">
+            <div key={customer.id} className="p-5 space-y-4">
               <div className="flex justify-between items-start">
-                <div className="flex flex-col gap-1">
-                  <span className="font-mono text-[10px] bg-zinc-100 px-2 py-1 rounded text-zinc-600 font-bold w-fit">{customer.code}</span>
-                  <h4 className="font-bold text-zinc-900 text-lg">{customer.name}</h4>
+                <div className="flex flex-col gap-1 flex-1">
+                  <span className="font-mono text-[10px] bg-slate-100 px-2.5 py-1 rounded-lg text-slate-500 font-black w-fit border border-slate-200">{customer.code}</span>
+                  <h4 className="font-bold text-slate-900 text-xl tracking-tight mt-1">{customer.name}</h4>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 shrink-0">
                   {canEdit && (
                     <button 
                       onClick={() => openModal(customer)}
-                      className="p-3 text-emerald-500 bg-emerald-50 rounded-2xl border border-emerald-100 active:scale-95 transition-transform"
+                      className="p-3 text-sky-600 bg-sky-50 rounded-2xl border border-sky-100 active:scale-95 transition-transform"
                     >
                       <Edit2 size={18} />
                     </button>
@@ -484,27 +496,27 @@ export const Customers: React.FC = () => {
                   {canDelete && (
                     <button 
                       onClick={() => handleDelete(customer.id)}
-                      className="p-3 text-red-500 bg-red-50 rounded-2xl border border-red-100 active:scale-95 transition-transform"
+                      className="p-3 text-rose-600 bg-rose-50 rounded-2xl border border-rose-100 active:scale-95 transition-transform"
                     >
                       <Trash2 size={18} />
                     </button>
                   )}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4 pt-2">
+              <div className="grid grid-cols-2 gap-4 pt-2 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
                 <div className="space-y-1">
-                  <p className="text-zinc-400 text-[10px] uppercase font-bold tracking-wider">رقم الهاتف</p>
-                  <p className="text-zinc-700 font-medium">{customer.mobile || '---'}</p>
+                  <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">رقم الهاتف</p>
+                  <p className="text-slate-900 font-bold text-sm tracking-tight">{customer.mobile || '---'}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-zinc-400 text-[10px] uppercase font-bold tracking-wider">رصيد أول</p>
-                  <p className={`font-bold ${customer.opening_balance >= 0 ? 'text-zinc-600' : 'text-rose-500'}`}>
+                  <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">رصيد أول</p>
+                  <p className={`font-bold text-sm ${customer.opening_balance >= 0 ? 'text-slate-600' : 'text-rose-500'}`}>
                     {formatBalance(customer.opening_balance || 0)}
                   </p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-zinc-400 text-[10px] uppercase font-bold tracking-wider">الرصيد الحالي</p>
-                  <p className={`font-black ${getCustomerBalance(customer.id) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-slate-200/50">
+                  <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">الرصيد الحالي</p>
+                  <p className={`font-black text-lg tracking-tighter ${getCustomerBalance(customer.id) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                     {formatBalance(getCustomerBalance(customer.id))}
                   </p>
                 </div>
@@ -512,59 +524,71 @@ export const Customers: React.FC = () => {
             </div>
           ))}
           {filteredCustomers.length === 0 && !loading && (
-            <div className="p-8 text-center text-zinc-500 italic">لا يوجد عملاء حالياً</div>
+            <div className="p-12 text-center text-slate-400 font-bold italic tracking-tight">لا يوجد عملاء حالياً</div>
           )}
         </div>
       </div>
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-6xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
-            <div className={`p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-              <h3 className="text-lg md:text-xl font-bold text-zinc-900">{editingCustomer ? t('customers.edit') : t('customers.add')}</h3>
-              <button onClick={closeModal} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-xl transition-all"><X size={24} /></button>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full h-full md:h-auto md:max-h-[95vh] md:max-w-6xl md:rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col border border-slate-200">
+            <div className={`p-6 md:p-8 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white z-10 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                   <User size={24} />
+                </div>
+                <div>
+                   <h3 className="text-2xl font-black text-slate-900 tracking-tight">{editingCustomer ? t('customers.edit') : t('customers.add')}</h3>
+                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t('customers.subtitle')}</p>
+                </div>
+              </div>
+              <button onClick={closeModal} className="text-slate-400 hover:text-slate-900 p-2.5 hover:bg-slate-50 rounded-full transition-all"><X size={24} /></button>
             </div>
             
-            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-              <form onSubmit={handleSubmit} className="p-4 md:p-8 space-y-5 flex-1 overflow-y-auto pb-32 md:pb-8" dir={dir}>
-                <div className="space-y-5">
-                  {editingCustomer && (
-                    <div>
-                      <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_code')}</label>
-                      <div className="relative">
-                        <Hash className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
-                        <input
-                          disabled
-                          type="text"
-                          className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-100 border border-zinc-200 rounded-xl text-zinc-500 cursor-not-allowed font-mono`}
-                          value={editingCustomer.code}
-                        />
-                      </div>
-                    </div>
-                  )}
-                  <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_name')}</label>
-                    <div className="relative">
-                      <User className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-slate-50/10">
+              <form onSubmit={handleSubmit} className="p-6 md:p-10 space-y-6 flex-1 overflow-y-auto pb-32 md:pb-10 custom-scrollbar" dir={dir}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="md:col-span-2">
+                    <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_name')}</label>
+                    <div className="relative group">
+                      <User className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
                       <input
                         required
                         type="text"
-                        className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
+                        placeholder="John Doe / شركة السلام"
+                        className="premium-input font-bold"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       />
                     </div>
                   </div>
+
+                  {editingCustomer && (
+                    <div>
+                      <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_code')}</label>
+                      <div className="relative">
+                        <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-300`} size={20} />
+                        <input
+                          disabled
+                          type="text"
+                          className="premium-input bg-slate-50 text-slate-400 cursor-not-allowed font-mono font-black"
+                          value={editingCustomer.code}
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_mobile')}</label>
-                    <div className="relative">
-                      <Phone className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
+                    <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_mobile')}</label>
+                    <div className="relative group">
+                      <Phone className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
                       <input
                         required
                         type="tel"
                         maxLength={11}
-                        className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
+                        placeholder="01234567890"
+                        className="premium-input font-bold tracking-widest"
                         value={formData.mobile}
                         onChange={(e) => {
                           const value = e.target.value.replace(/\D/g, '');
@@ -573,126 +597,143 @@ export const Customers: React.FC = () => {
                       />
                     </div>
                   </div>
+
                   <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_email')}</label>
-                    <div className="relative">
-                      <Mail className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
+                    <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_email')}</label>
+                    <div className="relative group">
+                      <Mail className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
                       <input
                         type="email"
-                        className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
+                        placeholder="customer@example.com"
+                        className="premium-input font-bold"
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_address')}</label>
-                    <div className="relative">
-                      <MapPin className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
+
+                  <div className="md:col-span-2">
+                    <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_address')}</label>
+                    <div className="relative group">
+                      <MapPin className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
                       <textarea
-                        className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
+                        placeholder="العنوان التفصيلي للعميل"
+                        className="premium-input font-bold min-h-[80px]"
                         rows={2}
                         value={formData.address}
                         onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_opening_balance')}</label>
-                      <div className="relative">
-                        <Wallet className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
-                        <input 
-                          type="number" 
-                          className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
-                          value={formData.opening_balance}
-                          onChange={(e) => setFormData({ ...formData, opening_balance: Number(e.target.value) })}
-                        />
-                      </div>
+
+                  <div>
+                    <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_opening_balance')}</label>
+                    <div className="relative group">
+                      <Wallet className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                      <input 
+                        type="number" 
+                        className="premium-input font-black"
+                        value={formData.opening_balance}
+                        onChange={(e) => setFormData({ ...formData, opening_balance: Number(e.target.value) })}
+                      />
                     </div>
-                    <div>
-                      <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_balance_date')}</label>
-                      <div className="relative">
-                        <Calendar className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
-                        <input 
-                          type="date" 
-                          className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
-                          value={formData.opening_balance_date}
-                          onChange={(e) => setFormData({ ...formData, opening_balance_date: e.target.value })}
-                        />
-                      </div>
+                  </div>
+
+                  <div>
+                    <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_balance_date')}</label>
+                    <div className="relative group">
+                      <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                      <input 
+                        type="date" 
+                        className="premium-input font-bold"
+                        value={formData.opening_balance_date}
+                        onChange={(e) => setFormData({ ...formData, opening_balance_date: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_account')}</label>
+                    <div className="relative group">
+                       <Box className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                       <select
+                        required
+                        className="premium-input font-bold pr-12 appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGZpbGw9Im5vbmUiIHZpZXdCb3g9IjAgMCAyNCAyNCIgc3Ryb2tlPSIjOTRhM2I4IiBzdHJva2Utd2lkdGg9IjIiPjxwYXRoIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZD0iTTE5IDlsLTcgNy03LTciLz48L3N2Zz4=')] bg-[8px_center] bg-[length:16px] bg-no-repeat"
+                        value={formData.account_id}
+                        onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
+                      >
+                        <option value="">{language === 'ar' ? 'اختر الحساب المحاسبي المرتبط...' : 'Select associated account...'}</option>
+                        {accounts.map(account => (
+                          <option key={account.id} value={account.id}>
+                            {account.code} - {account.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
                   {formData.opening_balance !== 0 && (
-                    <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                      <p className="text-xs font-black text-emerald-800 uppercase tracking-widest">{language === 'ar' ? 'إعدادات الرصيد الافتتاحي' : 'Opening Balance Settings'}</p>
-                      <div>
-                        <label className={`block text-sm font-bold text-emerald-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_counter_account')}</label>
-                        <select
-                          required
-                          className="w-full px-4 py-3 bg-white border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                          value={formData.counter_account_id}
-                          onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}
-                        >
-                          <option value="">{language === 'ar' ? 'اختر حساب الطرف الآخر...' : 'Select counter account...'}</option>
-                          {accounts.map(account => (
-                            <option key={account.id} value={account.id}>
-                              {account.code} - {account.name}
-                            </option>
-                          ))}
-                        </select>
-                        <p className="text-[10px] text-emerald-600 mt-1 font-medium italic">{language === 'ar' ? 'سيتم إنشاء قيد يومية آلي لموازنة الرصيد الافتتاحي.' : 'An automatic journal entry will be created to balance the opening balance.'}</p>
+                    <div className="md:col-span-2 p-6 bg-emerald-50/50 rounded-3xl border border-emerald-100/50 space-y-6 animate-in slide-in-from-top-4 duration-300">
+                      <div className="flex items-center gap-3">
+                         <div className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                            <Wallet size={20} />
+                         </div>
+                         <h4 className="text-sm font-black text-emerald-800 uppercase tracking-widest">{language === 'ar' ? 'إعدادات الرصيد الافتتاحي' : 'Opening Balance Settings'}</h4>
                       </div>
-                      {formData.counter_account_id && (
-                        <JournalEntryPreview 
-                          title={language === 'ar' ? 'معاينة قيد الرصيد الافتتاحي' : 'Opening Balance Entry Preview'}
-                          items={[
-                            {
-                              account_name: accounts.find(a => a.id === formData.account_id)?.name || (language === 'ar' ? 'حساب العميل' : 'Customer Account'),
-                              debit: formData.opening_balance > 0 ? formData.opening_balance : 0,
-                              credit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
-                              description: language === 'ar' ? 'رصيد افتتاحي' : 'Opening Balance'
-                            },
-                            {
-                              account_name: accounts.find(a => a.id === formData.counter_account_id)?.name || (language === 'ar' ? 'حساب الطرف الآخر' : 'Counter Account'),
-                              debit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
-                              credit: formData.opening_balance > 0 ? formData.opening_balance : 0,
-                              description: language === 'ar' ? `رصيد افتتاحي للعميل: ${formData.name}` : `Opening balance for customer: ${formData.name}`
-                            }
-                          ]}
-                        />
-                      )}
+
+                      <div className="space-y-4">
+                        <div>
+                          <label className={`block text-[10px] font-black text-emerald-700/60 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_counter_account')}</label>
+                          <select
+                            required
+                            className="premium-input border-emerald-200 focus:border-emerald-500 focus:ring-emerald-500/10 font-bold"
+                            value={formData.counter_account_id}
+                            onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}
+                          >
+                            <option value="">{language === 'ar' ? 'اختر حساب الطرف الآخر...' : 'Select counter account...'}</option>
+                            {accounts.map(account => (
+                              <option key={account.id} value={account.id}>
+                                {account.code} - {account.name}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="text-[10px] text-emerald-600/70 mt-2 font-bold italic bg-white/50 px-3 py-1.5 rounded-lg w-fit border border-emerald-100">{language === 'ar' ? 'سيتم إنشاء قيد يومية آلي لموازنة الرصيد الافتتاحي.' : 'An automatic journal entry will be created to balance the opening balance.'}</p>
+                        </div>
+                        {formData.counter_account_id && (
+                          <JournalEntryPreview 
+                            title={language === 'ar' ? 'معاينة قيد الرصيد الافتتاحي' : 'Opening Balance Entry Preview'}
+                            items={[
+                              {
+                                account_name: accounts.find(a => a.id === formData.account_id)?.name || (language === 'ar' ? 'حساب العميل' : 'Customer Account'),
+                                debit: formData.opening_balance > 0 ? formData.opening_balance : 0,
+                                credit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
+                                description: language === 'ar' ? 'رصيد افتتاحي' : 'Opening Balance'
+                              },
+                              {
+                                account_name: accounts.find(a => a.id === formData.counter_account_id)?.name || (language === 'ar' ? 'حساب الطرف الآخر' : 'Counter Account'),
+                                debit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
+                                credit: formData.opening_balance > 0 ? formData.opening_balance : 0,
+                                description: language === 'ar' ? `رصيد افتتاحي للعميل: ${formData.name}` : `Opening balance for customer: ${formData.name}`
+                              }
+                            ]}
+                          />
+                        )}
+                      </div>
                     </div>
                   )}
-                  <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_account')}</label>
-                    <select
-                      required
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                      value={formData.account_id}
-                      onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
-                    >
-                      <option value="">{language === 'ar' ? 'اختر الحساب...' : 'Select account...'}</option>
-                      {accounts.map(account => (
-                        <option key={account.id} value={account.id}>
-                          {account.code} - {account.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
                 </div>
-                <div className="pt-4 flex gap-3">
+
+                <div className="pt-10 flex gap-4 sticky bottom-0 bg-white/80 backdrop-blur-md pb-4">
                   <button 
                     type="submit"
-                    className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+                    className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-lg hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95 border border-emerald-500/50"
                   >
-                    {editingCustomer ? (language === 'ar' ? 'تحديث العميل' : 'Update Customer') : (language === 'ar' ? 'حفظ العميل' : 'Save Customer')}
+                    {editingCustomer ? (language === 'ar' ? 'تحديث بيانات العميل' : 'Update Customer') : (language === 'ar' ? 'إضافة عميل جديد' : 'Add New Customer')}
                   </button>
                   <button 
                     type="button"
                     onClick={closeModal}
-                    className="px-8 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all active:scale-95"
+                    className="px-8 py-4 bg-slate-50 text-slate-500 rounded-2xl font-black hover:bg-slate-100 transition-all active:scale-95 border border-slate-200"
                   >
                     {language === 'ar' ? 'إلغاء' : 'Cancel'}
                   </button>
@@ -700,7 +741,13 @@ export const Customers: React.FC = () => {
               </form>
 
               {editingCustomer && (
-                <div className="hidden md:block w-80 border-r border-zinc-100 bg-zinc-50/30">
+                <div className="hidden md:block w-96 border-r border-slate-100 bg-slate-50/20 shadow-inner overflow-y-auto custom-scrollbar">
+                  <div className="p-4 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
+                    <div className="flex items-center gap-2">
+                       <History size={16} className="text-slate-400" />
+                       <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">سجل نشاط العميل</span>
+                    </div>
+                  </div>
                   <InlineActivityLog category="customers" documentId={editingCustomer.id} />
                 </div>
               )}
@@ -711,25 +758,28 @@ export const Customers: React.FC = () => {
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 animate-in zoom-in-95 duration-200" dir={dir}>
-            <h3 className="text-xl font-bold text-zinc-900 mb-4">{t('common.delete_confirm')}</h3>
-            <p className="text-zinc-500 mb-6">{language === 'ar' ? 'هل أنت متأكد من رغبتك في حذف هذا العميل؟ لا يمكن التراجع عن هذا الإجراء.' : 'Are you sure you want to delete this customer? This action cannot be undone.'}</p>
-            <div className="flex gap-4">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" dir={dir}>
+          <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 duration-200 border border-slate-200 text-center">
+            <div className="w-20 h-20 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+               <Trash2 size={32} />
+            </div>
+            <h3 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">{t('common.delete_confirm')}</h3>
+            <p className="text-slate-500 mb-8 font-medium leading-relaxed">{language === 'ar' ? 'هل أنت متأكد من رغبتك في حذف هذا العميل؟ سيتم إزالة كافة البيانات المرتبطة ولن نتمكن من التراجع.' : 'Are you sure you want to delete this customer? All associated data will be removed and this cannot be undone.'}</p>
+            <div className="flex gap-3">
               <button 
                 onClick={() => {
                   setIsDeleteModalOpen(false);
                   setCustomerToDelete(null);
                 }}
-                className="flex-1 py-3 bg-zinc-100 text-zinc-600 rounded-xl font-bold hover:bg-zinc-200 transition-all"
+                className="flex-1 py-4 bg-slate-50 text-slate-600 rounded-2xl font-bold hover:bg-slate-100 transition-all active:scale-95 border border-slate-200"
               >
                 {language === 'ar' ? 'إلغاء' : 'Cancel'}
               </button>
               <button 
                 onClick={confirmDelete}
-                className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all shadow-lg shadow-red-500/20"
+                className="flex-1 py-4 bg-rose-600 text-white rounded-2xl font-bold hover:bg-rose-700 transition-all shadow-xl shadow-rose-500/20 active:scale-95"
               >
-                {language === 'ar' ? 'حذف' : 'Delete'}
+                {language === 'ar' ? 'تأكيد الحذف' : 'Delete Now'}
               </button>
             </div>
           </div>

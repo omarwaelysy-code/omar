@@ -187,18 +187,23 @@ export const Accounts: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('accounts.title')}</h2>
-          <p className="text-zinc-500 text-sm">{t('accounts.subtitle')}</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 bg-emerald-600 text-white rounded-3xl flex items-center justify-center shadow-xl shadow-emerald-500/20">
+            <BookOpen size={28} />
+          </div>
+          <div>
+            <h2 className="text-3xl font-black tracking-tight text-slate-900 italic serif">{t('accounts.title')}</h2>
+            <p className="text-slate-500 font-medium">{t('accounts.subtitle')}</p>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           <button 
             onClick={() => {
               setActivityLogDocumentId(undefined);
               setIsActivityLogOpen(true);
             }}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-zinc-600 border border-zinc-200 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm"
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
             title={language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
           >
             <History size={20} />
@@ -210,7 +215,7 @@ export const Accounts: React.FC = () => {
           />
           <button 
             onClick={() => openModal()}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-2xl font-bold hover:from-orange-600 hover:to-orange-700 transition-all active:scale-95 shadow-lg shadow-orange-200"
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95 border border-emerald-500/50"
           >
             <Plus size={20} />
             {t('accounts.add')}
@@ -218,175 +223,215 @@ export const Accounts: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-3xl border border-zinc-100 shadow-sm flex items-center gap-4">
-        <div className="relative flex-1">
-          <Search className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 text-zinc-400`} size={20} />
+      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-4 bg-slate-50/30">
+        <div className="relative flex-1 group">
+          <Search className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
           <input 
             type="text" 
             placeholder={t('accounts.search_placeholder')}
-            className={`w-full ${dir === 'rtl' ? 'pl-10 pr-4' : 'pr-10 pl-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
+            className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none transition-all font-bold text-slate-900 placeholder:text-slate-400`}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {loading ? (
-          [1,2,3].map(i => <div key={i} className="h-20 bg-zinc-100 animate-pulse rounded-2xl" />)
+          [1,2,3,4,5,6].map(i => <div key={i} className="h-24 bg-slate-100 animate-pulse rounded-3xl border border-slate-200" />)
         ) : filteredAccounts.map(account => (
-          <div key={account.id} className="group bg-white p-4 rounded-2xl border border-zinc-100 shadow-sm hover:shadow-md hover:border-emerald-100 transition-all duration-300 flex items-center justify-between gap-4" dir={dir}>
-            <div className={`flex items-center gap-4 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse text-left'}`}>
-              <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold shadow-lg shadow-emerald-500/20">
-                <BookOpen size={20} />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-zinc-900">{account.name}</h3>
-                <div className={`flex items-center gap-2 mt-1 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                  <span className="inline-block text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md uppercase tracking-wider">{account.code}</span>
-                  <span className="inline-block text-[10px] font-bold text-zinc-500 bg-zinc-50 px-2 py-0.5 rounded-md uppercase tracking-wider">
-                    {account.type_name}
-                  </span>
-                </div>
+          <div key={account.id} className="group bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 hover:border-emerald-200 transition-all duration-300 flex flex-col justify-between gap-4" dir={dir}>
+            <div className="flex items-start justify-between gap-4">
+               <div className={`flex items-center gap-3 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse text-left'}`}>
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold border border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300 shadow-sm">
+                    <BookOpen size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900 tracking-tight leading-tight group-hover:text-emerald-700 transition-colors">{account.name}</h3>
+                    <div className={`flex items-center gap-2 mt-1.5 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                      <span className="font-mono text-[10px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md uppercase tracking-wider border border-slate-200">{account.code}</span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        {account.type_name}
+                      </span>
+                    </div>
+                  </div>
+               </div>
+               
+               <div className={`flex gap-1 no-pdf opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                <button 
+                  onClick={() => {
+                    setActivityLogDocumentId(account.id);
+                    setIsActivityLogOpen(true);
+                  }}
+                  className="p-2 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                  title={language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
+                >
+                  <History size={16} />
+                </button>
+                <button onClick={() => openModal(account)} className="p-2 text-slate-300 hover:text-sky-600 hover:bg-sky-50 rounded-xl transition-all">
+                  <Edit2 size={16} />
+                </button>
+                <button onClick={() => handleDelete(account.id)} className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
+                  <Trash2 size={16} />
+                </button>
               </div>
             </div>
             
-            <div className={`flex gap-1 no-pdf ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-              <button 
-                onClick={() => {
-                  setActivityLogDocumentId(account.id);
-                  setIsActivityLogOpen(true);
-                }}
-                className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
-                title={language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
-              >
-                <History size={18} />
-              </button>
-              <button onClick={() => openModal(account)} className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all">
-                <Edit2 size={18} />
-              </button>
-              <button onClick={() => handleDelete(account.id)} className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
-                <Trash2 size={18} />
-              </button>
+            <div className="pt-3 border-t border-slate-50 flex items-center justify-between">
+               <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter italic">Accounting Balance</span>
+               <div className="w-2 h-2 rounded-full bg-slate-200 group-hover:bg-emerald-500 transition-all duration-500 group-hover:scale-125" />
             </div>
           </div>
         ))}
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-auto md:max-w-6xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
-            <div className={`p-6 border-b border-zinc-50 flex items-center justify-between bg-zinc-50/50 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-              <h3 className="text-xl font-bold text-zinc-900">{editingAccount ? t('accounts.edit') : t('accounts.add')}</h3>
-              <button onClick={closeModal} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-full transition-all">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full h-full md:h-auto md:max-h-[95vh] md:max-w-6xl md:rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col border border-slate-200">
+            <div className={`p-6 md:p-8 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white z-10 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                   <BookOpen size={24} />
+                </div>
+                <div>
+                   <h3 className="text-2xl font-black text-slate-900 tracking-tight">{editingAccount ? t('accounts.edit') : t('accounts.add')}</h3>
+                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">General Ledger Account</p>
+                </div>
+              </div>
+              <button onClick={closeModal} className="text-slate-400 hover:text-slate-900 p-2.5 hover:bg-slate-50 rounded-full transition-all">
                 <X size={24} />
               </button>
             </div>
             
-            <div className="p-6 bg-emerald-50/50 border-b border-emerald-100" dir={dir}>
-              <div className={`flex items-center gap-2 mb-3 text-emerald-700 font-bold text-sm ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                <Sparkles size={18} />
+            <div className="p-6 md:p-10 bg-emerald-50/30 border-b border-emerald-100/50" dir={dir}>
+              <div className={`flex items-center gap-3 mb-4 text-emerald-800 font-black text-xs uppercase tracking-widest ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse text-right'}`}>
+                <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                   <Sparkles size={16} />
+                </div>
                 <span>{t('accounts.ai_input')}</span>
               </div>
-              <div className={`flex gap-2 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+              <div className={`flex flex-col md:flex-row gap-3 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                 <input 
                   type="text"
                   placeholder={t('accounts.ai_placeholder')}
-                  className={`flex-1 px-4 py-2 bg-white border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
+                  className={`flex-1 px-6 py-4 bg-white border border-emerald-200 rounded-[1.25rem] focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none font-bold text-slate-900 placeholder:text-slate-400 shadow-sm ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
                   value={aiText}
                   onChange={(e) => setAiText(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleAiParse()}
                 />
                 <button 
-                  onClick={handleAiParse}
-                  disabled={isAiParsing || !aiText.trim()}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 disabled:opacity-50 transition-all flex items-center gap-2"
+                   onClick={handleAiParse}
+                   disabled={isAiParsing || !aiText.trim()}
+                   className="px-8 py-4 bg-emerald-600 text-white rounded-[1.25rem] font-black text-sm hover:bg-emerald-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 border border-emerald-500/50 active:scale-95"
                 >
-                  {isAiParsing ? t('accounts.ai_analyzing') : t('accounts.ai_analyze')}
+                  {isAiParsing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      {t('accounts.ai_analyzing')}
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={18} />
+                      {t('accounts.ai_analyze')}
+                    </>
+                  )}
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-              <form onSubmit={handleSubmit} className="p-8 space-y-5 flex-1 overflow-y-auto" dir={dir}>
-                <div className="space-y-5">
-                  <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.form_code')}</label>
-                    <div className="relative">
-                      <Hash className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-slate-50/10">
+              <form onSubmit={handleSubmit} className="p-6 md:p-10 space-y-6 flex-1 overflow-y-auto pb-32 md:pb-10 custom-scrollbar" dir={dir}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="md:col-span-2">
+                    <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.form_name')}</label>
+                    <div className="relative group">
+                      <FileText className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
                       <input 
                         required
                         type="text" 
-                        className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
-                        placeholder={language === 'ar' ? 'مثال: 1101، 1201، 2101' : 'e.g., 1101, 1201, 2101'}
-                        value={formData.code}
-                        onChange={(e) => setFormData({...formData, code: e.target.value})}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.form_name')}</label>
-                    <div className="relative">
-                      <FileText className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
-                      <input 
-                        required
-                        type="text" 
-                        className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
+                        className="premium-input font-bold"
                         placeholder={language === 'ar' ? 'مثال: البنك الأهلي، الموردين، المبيعات' : 'e.g., National Bank, Suppliers, Sales'}
                         value={formData.name}
                         onChange={(e) => setFormData({...formData, name: e.target.value})}
                       />
                     </div>
                   </div>
+
                   <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.form_type')}</label>
-                    <select 
-                      required
-                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                      value={formData.type_id}
-                      onChange={(e) => setFormData({...formData, type_id: e.target.value})}
-                    >
-                      <option value="">{language === 'ar' ? 'اختر النوع...' : 'Select type...'}</option>
-                      {types.map(t => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                      ))}
-                    </select>
+                    <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.form_code')}</label>
+                    <div className="relative group">
+                      <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                      <input 
+                        required
+                        type="text" 
+                        className="premium-input font-mono font-bold tracking-widest"
+                        placeholder={language === 'ar' ? 'مثال: 1101، 1201، 2101' : 'e.g., 1101, 1201, 2101'}
+                        value={formData.code}
+                        onChange={(e) => setFormData({...formData, code: e.target.value})}
+                      />
+                    </div>
                   </div>
+
                   <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}</label>
-                    <div className="relative">
-                      <Hash className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
+                    <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.form_type')}</label>
+                    <div className="relative group">
+                       <BookOpen className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                       <select 
+                        required
+                        className="premium-input font-bold pr-12 appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGZpbGw9Im5vbmUiIHZpZXdCb3g9IjAgMCAyNCAyNCIgc3Ryb2tlPSIjOTRhM2I4IiBzdHJva2Utd2lkdGg9IjIiPjxwYXRoIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZD0iTTE5IDlsLTcgNy03LTciLz48L3N2Zz4=')] bg-[8px_center] bg-[length:16px] bg-no-repeat"
+                        value={formData.type_id}
+                        onChange={(e) => setFormData({...formData, type_id: e.target.value})}
+                      >
+                        <option value="">{language === 'ar' ? 'اختر النوع...' : 'Select type...'}</option>
+                        {types.map(t => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}</label>
+                    <div className="relative group">
+                      <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
                       <input 
                         required
                         type="number" 
                         step="0.01"
-                        className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
+                        className="premium-input font-black"
                         placeholder="0.00"
                         value={formData.opening_balance}
                         onChange={(e) => setFormData({...formData, opening_balance: parseFloat(e.target.value) || 0})}
                       />
                     </div>
-                    <p className="text-[10px] text-zinc-400 mt-1">{language === 'ar' ? 'القيمة الموجبة للمدين والسالبة للدائن' : 'Positive for Debit, Negative for Credit'}</p>
+                    <p className="text-[10px] text-slate-400 mt-3 font-bold italic px-4 py-2 bg-slate-100 rounded-xl w-fit border border-slate-200">{language === 'ar' ? 'القيمة الموجبة للمدين والسالبة للدائن' : 'Positive for Debit, Negative for Credit'}</p>
                   </div>
                 </div>
-                <div className="pt-4 flex gap-3">
+
+                <div className="pt-10 flex gap-4 sticky bottom-0 bg-white/80 backdrop-blur-md pb-4">
                   <button 
                     type="submit"
-                    className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+                    className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-lg hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95 border border-emerald-500/50"
                   >
-                    {editingAccount ? (language === 'ar' ? 'تحديث البيانات' : 'Update Data') : (language === 'ar' ? 'حفظ الحساب' : 'Save Account')}
+                    {editingAccount ? (language === 'ar' ? 'تحديث بيانات الحساب' : 'Update Data') : (language === 'ar' ? 'تأكيد وحفظ الحساب' : 'Confirm & Save Account')}
                   </button>
                   <button 
                     type="button"
                     onClick={closeModal}
-                    className="px-8 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all active:scale-95"
+                    className="px-8 py-4 bg-slate-50 text-slate-500 rounded-2xl font-black hover:bg-slate-100 transition-all active:scale-95 border border-slate-200"
                   >
                     {language === 'ar' ? 'إلغاء' : 'Cancel'}
                   </button>
                 </div>
               </form>
 
-              <div className="hidden md:block w-80 border-r border-zinc-100 bg-zinc-50/30">
+              <div className="hidden md:block w-96 border-r border-slate-100 bg-slate-50/20 shadow-inner overflow-y-auto custom-scrollbar">
+                <div className="p-4 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
+                   <div className="flex items-center gap-2">
+                       <History size={16} className="text-slate-400" />
+                       <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">سجل نشاط الحساب</span>
+                    </div>
+                </div>
                 <InlineActivityLog category="accounts" documentId={editingAccount?.id} />
               </div>
             </div>
@@ -396,25 +441,28 @@ export const Accounts: React.FC = () => {
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 animate-in zoom-in-95 duration-200" dir={dir}>
-            <h3 className="text-xl font-bold text-zinc-900 mb-4">{t('common.delete_confirm')}</h3>
-            <p className="text-zinc-500 mb-6">{language === 'ar' ? 'هل أنت متأكد من رغبتك في حذف هذا الحساب؟ لا يمكن التراجع عن هذا الإجراء.' : 'Are you sure you want to delete this account? This action cannot be undone.'}</p>
-            <div className="flex gap-4">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" dir={dir}>
+          <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 duration-200 border border-slate-200 text-center">
+            <div className="w-20 h-20 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+               <Trash2 size={32} />
+            </div>
+            <h3 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">{t('common.delete_confirm')}</h3>
+            <p className="text-slate-500 mb-8 font-medium leading-relaxed">{language === 'ar' ? 'هل أنت متأكد من رغبتك في حذف هذا الحساب؟ ستفقد كافة البيانات المرتبطة بالحركات المالية لهذا الحساب.' : 'Are you sure you want to delete this account? You will lose all data associated with the financial movements of this account.'}</p>
+            <div className="flex gap-3">
               <button 
                 onClick={() => {
                   setIsDeleteModalOpen(false);
                   setAccountToDelete(null);
                 }}
-                className="flex-1 py-3 bg-zinc-100 text-zinc-600 rounded-xl font-bold hover:bg-zinc-200 transition-all"
+                className="flex-1 py-4 bg-slate-50 text-slate-600 rounded-2xl font-bold hover:bg-slate-100 transition-all active:scale-95 border border-slate-200"
               >
                 {language === 'ar' ? 'إلغاء' : 'Cancel'}
               </button>
               <button 
                 onClick={confirmDelete}
-                className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all shadow-lg shadow-red-500/20"
+                className="flex-1 py-4 bg-rose-600 text-white rounded-2xl font-bold hover:bg-rose-700 transition-all shadow-xl shadow-rose-500/20 active:scale-95"
               >
-                {language === 'ar' ? 'حذف' : 'Delete'}
+                {language === 'ar' ? 'تأكيد الحذف' : 'Delete Now'}
               </button>
             </div>
           </div>

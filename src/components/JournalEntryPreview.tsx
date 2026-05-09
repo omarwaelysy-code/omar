@@ -25,26 +25,26 @@ export const JournalEntryPreview: React.FC<JournalEntryPreviewProps> = ({ items,
   const totalCredit = items.reduce((sum, item) => sum + item.credit, 0);
 
   return (
-    <div className="bg-zinc-50 rounded-2xl border border-zinc-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
-      <div className="px-4 py-3 bg-zinc-100/50 border-b border-zinc-100 flex items-center gap-2">
-        <FileText size={16} className="text-zinc-400" />
-        <span className="text-xs font-black text-zinc-600 uppercase tracking-widest">{displayTitle}</span>
+    <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
+      <div className="px-4 py-3 bg-slate-100/50 border-b border-slate-100 flex items-center gap-2">
+        <FileText size={16} className="text-slate-400" />
+        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{displayTitle}</span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs text-right">
           <thead>
-            <tr className="text-zinc-400 border-b border-zinc-100 italic">
+            <tr className="text-slate-400 border-b border-slate-100">
               <th className="px-4 py-2 font-bold">{t('common.account')}</th>
               <th className="px-4 py-2 font-bold text-left">{t('common.debit')}</th>
               <th className="px-4 py-2 font-bold text-left">{t('common.credit')}</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-100">
+          <tbody className="divide-y divide-slate-100">
             {items.map((item, idx) => (
               <tr key={idx} className="hover:bg-white transition-colors">
                 <td className="px-4 py-2">
-                  <div className="font-bold text-zinc-900">{item.account_name}</div>
-                  <div className="text-[10px] text-zinc-400 italic">{item.description}</div>
+                  <div className="font-bold text-slate-900">{item.account_name}</div>
+                  <div className="text-[10px] text-slate-400">{item.description}</div>
                 </td>
                 <td className="px-4 py-2 text-left font-mono font-bold text-emerald-600">
                   {item.debit > 0 ? formatNumber(item.debit) : '-'}
@@ -56,8 +56,8 @@ export const JournalEntryPreview: React.FC<JournalEntryPreviewProps> = ({ items,
             ))}
           </tbody>
           <tfoot>
-            <tr className="bg-zinc-100/30 font-black border-t border-zinc-200">
-              <td className="px-4 py-2 text-zinc-600">{t('common.total')}</td>
+            <tr className="bg-slate-100/30 font-bold border-t border-slate-200">
+              <td className="px-4 py-2 text-slate-600">{t('common.total')}</td>
               <td className="px-4 py-2 text-left font-mono text-emerald-700">{formatNumber(totalDebit)}</td>
               <td className="px-4 py-2 text-left font-mono text-rose-700">{formatNumber(totalCredit)}</td>
             </tr>

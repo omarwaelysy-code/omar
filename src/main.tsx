@@ -6,7 +6,6 @@ import { AuthProvider } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { NavigationProvider } from './contexts/NavigationContext';
 import { LanguageProvider } from './contexts/LanguageContext';
-import { ThemeProvider } from './contexts/ThemeContext';
 
 class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean, error: any}> {
   constructor(props: {children: ReactNode}) {
@@ -49,15 +48,13 @@ class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean,
 createRoot(document.getElementById('root')!).render(
   <ErrorBoundary>
     <LanguageProvider>
-      <ThemeProvider>
-        <AuthProvider>
-          <NavigationProvider>
-            <NotificationProvider>
-              <App />
-            </NotificationProvider>
-          </NavigationProvider>
-        </AuthProvider>
-      </ThemeProvider>
+      <AuthProvider>
+        <NavigationProvider>
+          <NotificationProvider>
+            <App />
+          </NotificationProvider>
+        </NavigationProvider>
+      </AuthProvider>
     </LanguageProvider>
   </ErrorBoundary>
 );

@@ -903,8 +903,8 @@ export const Invoices: React.FC = () => {
 
   if (!canView) {
     return (
-      <div className="flex flex-col items-center justify-center h-[60vh] text-zinc-500 gap-4">
-        <div className="w-20 h-20 bg-zinc-100 rounded-full flex items-center justify-center text-zinc-400">
+      <div className="flex flex-col items-center justify-center h-[60vh] text-slate-500 gap-4">
+        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
           <Lock size={40} />
         </div>
         <h3 className="text-xl font-bold">عذراً، ليس لديك صلاحية للوصول إلى هذه الصفحة</h3>
@@ -917,13 +917,13 @@ export const Invoices: React.FC = () => {
     <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('invoices.title')}</h2>
-          <p className="text-zinc-500">{t('invoices.subtitle')}</p>
+          <h2 className="text-3xl font-bold tracking-tight text-slate-900 italic serif">{t('invoices.title')}</h2>
+          <p className="text-slate-500">{t('invoices.subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button 
             onClick={() => setIsActivityLogOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-zinc-600 border border-zinc-200 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm"
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
             title={t('common.activity_log')}
           >
             <History size={20} />
@@ -936,7 +936,7 @@ export const Invoices: React.FC = () => {
           {canCreate && (
             <button 
               onClick={openModal}
-              className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
             >
               <Plus size={20} />
               {t('invoices.add_invoice')}
@@ -945,14 +945,14 @@ export const Invoices: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-zinc-50 flex items-center gap-4">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100 flex items-center gap-4">
           <div className="relative flex-1">
-            <Search className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 text-zinc-400`} size={18} />
+            <Search className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 text-slate-400`} size={18} />
             <input
               type="text"
               placeholder={t('invoices.search_placeholder')}
-              className={`w-full ${dir === 'rtl' ? 'pl-10 pr-4' : 'pr-10 pl-4'} py-2 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all`}
+              className={`w-full ${dir === 'rtl' ? 'pl-10 pr-4' : 'pr-10 pl-4'} py-2 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -962,23 +962,23 @@ export const Invoices: React.FC = () => {
         <div ref={tableRef} id="invoices-list-table" className="overflow-x-auto hidden md:block">
           <table className="w-full">
             <thead>
-              <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_number')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_customer')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_date')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_amount')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
+              <tr className="bg-slate-50/50 text-slate-500 text-[10px] uppercase tracking-widest font-bold">
+                <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_number')}</th>
+                <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_customer')}</th>
+                <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_date')}</th>
+                <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_amount')}</th>
+                <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-50">
+            <tbody className="divide-y divide-slate-100">
               {filteredInvoices.map((inv) => (
-                <tr key={inv.id} className="hover:bg-zinc-50/50 transition-colors group">
+                <tr key={inv.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold">{inv.invoice_number}</span>
+                    <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100">{inv.invoice_number}</span>
                   </td>
-                  <td className={`px-6 py-4 font-bold text-zinc-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{inv.customer_name}</td>
-                  <td className={`px-6 py-4 text-zinc-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(inv.date)}</td>
-                  <td className={`px-6 py-4 font-bold text-zinc-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatMoney(inv.total_amount)} {t('invoices.currency')}</td>
+                  <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{inv.customer_name}</td>
+                  <td className={`px-6 py-4 text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(inv.date)}</td>
+                  <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatMoney(inv.total_amount)} {t('invoices.currency')}</td>
                   <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                     <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
                       <button 
@@ -986,14 +986,14 @@ export const Invoices: React.FC = () => {
                           setActivityLogDocumentId(inv.id);
                           setIsActivityLogOpen(true);
                         }}
-                        className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
+                        className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
                         title={t('common.activity_log')}
                       >
                         <History size={18} />
                       </button>
                       <button 
                         onClick={() => handleViewInvoice(inv)}
-                        className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
+                        className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
                         title={t('common.view')}
                       >
                         <Eye size={18} />
@@ -1001,7 +1001,7 @@ export const Invoices: React.FC = () => {
                       {canEdit && (
                         <button 
                           onClick={() => openEditModal(inv)}
-                          className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
+                          className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
                           title={t('common.edit')}
                         >
                           <Pencil size={18} />
@@ -1010,7 +1010,7 @@ export const Invoices: React.FC = () => {
                       {canDelete && (
                         <button 
                           onClick={() => handleDelete(inv.id)}
-                          className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
+                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
                           title={t('common.delete')}
                         >
                           <Trash2 size={18} />
@@ -1022,7 +1022,7 @@ export const Invoices: React.FC = () => {
               ))}
               {filteredInvoices.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-zinc-500 italic">{t('common.no_data')}</td>
+                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500 italic font-medium">{t('common.no_data')}</td>
                 </tr>
               )}
             </tbody>
@@ -1030,23 +1030,23 @@ export const Invoices: React.FC = () => {
         </div>
 
         {/* Mobile List View */}
-        <div className="md:hidden divide-y divide-zinc-50">
+        <div className="md:hidden divide-y divide-slate-100">
           {filteredInvoices.map((inv) => (
             <div key={inv.id} className="p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex flex-col gap-1">
-                  <span className="font-mono text-[10px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold w-fit">{inv.invoice_number}</span>
-                  <h4 className="font-bold text-zinc-900 text-lg">{inv.customer_name}</h4>
+                  <span className="font-mono text-[10px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
+                  <h4 className="font-bold text-slate-900 text-lg">{inv.customer_name}</h4>
                 </div>
                 <div className={`${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                   <p className="font-bold text-emerald-600 text-lg">{formatMoney(inv.total_amount)} {t('invoices.currency')}</p>
-                  <span className="text-xs text-zinc-400">{formatDate(inv.date)}</span>
+                  <span className="text-xs text-slate-400">{formatDate(inv.date)}</span>
                 </div>
               </div>
               <div className="flex items-center gap-2 pt-2">
                 <button 
                   onClick={() => handleViewInvoice(inv)}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-zinc-50 text-zinc-600 rounded-2xl text-sm font-bold border border-zinc-100 active:scale-95 transition-transform"
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-600 rounded-2xl text-sm font-bold border border-slate-100 active:scale-95 transition-transform"
                 >
                   <Eye size={18} /> عرض
                 </button>
@@ -1074,17 +1074,17 @@ export const Invoices: React.FC = () => {
 
       {/* Create Modal */}
       {isModalOpen && (
-        <div className={`fixed inset-0 z-[60] flex items-center justify-center ${isFullScreen ? 'p-0' : 'md:p-4'} bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200`}>
-          <div className={`bg-white w-full h-full ${isFullScreen ? 'md:h-full md:max-w-none md:rounded-none' : 'md:h-auto md:max-w-6xl md:rounded-3xl'} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col ${isFullScreen ? 'md:max-h-none' : 'md:max-h-[90vh]'}`}>
-            <div className="p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10">
+        <div className={`fixed inset-0 z-[60] flex items-center justify-center ${isFullScreen ? 'p-0' : 'md:p-4'} bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200`}>
+          <div className={`bg-white w-full h-full ${isFullScreen ? 'md:h-full md:max-w-none md:rounded-none' : 'md:h-auto md:max-w-6xl md:rounded-3xl'} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col ${isFullScreen ? 'md:max-h-none' : 'md:max-h-[90vh] border border-slate-200'}`}>
+            <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
               <div className="flex items-center gap-4">
-                <h3 className="text-lg md:text-xl font-bold text-zinc-900">{editingInvoice ? 'تعديل الفاتورة' : 'إنشاء فاتورة جديدة'}</h3>
+                <h3 className="text-lg md:text-xl font-bold text-slate-900">{editingInvoice ? 'تعديل الفاتورة' : 'إنشاء فاتورة جديدة'}</h3>
                 {editingInvoice && (
-                  <div className="flex items-center gap-2 bg-zinc-100 p-1 rounded-xl">
+                  <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
                     <button 
                       type="button"
                       onClick={handlePrevInvoice}
-                      className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-lg transition-all text-zinc-600 disabled:opacity-30 text-xs font-bold"
+                      className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-lg transition-all text-slate-600 disabled:opacity-30 text-xs font-bold"
                       disabled={invoices.findIndex(inv => inv.id === editingInvoice.id) === 0}
                     >
                       <ChevronRight size={16} />
@@ -1093,7 +1093,7 @@ export const Invoices: React.FC = () => {
                     <button 
                       type="button"
                       onClick={handleNextInvoice}
-                      className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-lg transition-all text-zinc-600 disabled:opacity-30 text-xs font-bold"
+                      className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-lg transition-all text-slate-600 disabled:opacity-30 text-xs font-bold"
                       disabled={invoices.findIndex(inv => inv.id === editingInvoice.id) === invoices.length - 1}
                     >
                       التالي
@@ -1104,20 +1104,20 @@ export const Invoices: React.FC = () => {
                 <button 
                   type="button"
                   onClick={() => setIsFullScreen(!isFullScreen)}
-                  className="hidden md:flex p-2 hover:bg-zinc-100 rounded-xl transition-all text-zinc-600"
+                  className="hidden md:flex p-2 hover:bg-slate-100 rounded-xl transition-all text-slate-600"
                 >
                   {isFullScreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
                 </button>
                 <button 
                   type="button"
                   onClick={() => setShowSidePanel(!showSidePanel)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${showSidePanel ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-zinc-100 text-zinc-600 border border-zinc-200 hover:bg-zinc-200'}`}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${showSidePanel ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'}`}
                 >
                   <History size={14} />
                   قيد اليومية \ سجل التعديلات
                 </button>
               </div>
-              <button onClick={closeModal} className="p-2 text-zinc-400 hover:text-zinc-600"><X size={24} /></button>
+              <button onClick={closeModal} className="p-2 text-slate-400 hover:text-slate-600"><X size={24} /></button>
             </div>
             
             <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full relative">
@@ -1131,10 +1131,10 @@ export const Invoices: React.FC = () => {
                     transition={{ type: 'spring', damping: 25, stiffness: 200 }}
                     className="absolute inset-y-0 left-0 z-50 w-full lg:w-80 shadow-2xl lg:shadow-none lg:relative lg:inset-auto"
                   >
-                    <div className="h-full bg-white border-r border-zinc-100 flex flex-col">
-                      <div className="p-4 border-b border-zinc-100 flex items-center justify-between lg:hidden">
-                        <h3 className="font-bold text-zinc-900">سجل النشاط والقيد</h3>
-                        <button onClick={() => setShowSidePanel(false)} className="p-2 text-zinc-400 hover:text-zinc-600">
+                    <div className="h-full bg-white border-r border-slate-100 flex flex-col">
+                      <div className="p-4 border-b border-slate-100 flex items-center justify-between lg:hidden">
+                        <h3 className="font-bold text-slate-900">سجل النشاط والقيد</h3>
+                        <button onClick={() => setShowSidePanel(false)} className="p-2 text-slate-400 hover:text-slate-600">
                           <X size={20} />
                         </button>
                       </div>
@@ -1162,20 +1162,20 @@ export const Invoices: React.FC = () => {
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
                       <div>
-                        <label className="block text-xs md:text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('invoices.column_number')}</label>
+                        <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">{t('invoices.column_number')}</label>
                         <input
                           required
                           type="text"
-                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base font-mono"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base font-mono"
                           value={invoiceNumber}
                           onChange={(e) => setInvoiceNumber(e.target.value)}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs md:text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('invoices.form_customer')}</label>
+                        <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">{t('invoices.form_customer')}</label>
                         <select 
                           required
-                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base"
                           value={selectedCustomerId}
                           onChange={(e) => {
                             if (e.target.value === 'new_customer') {
@@ -1191,11 +1191,11 @@ export const Invoices: React.FC = () => {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs md:text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('invoices.form_date')}</label>
+                        <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">{t('invoices.form_date')}</label>
                         <input
                           required
                           type="date"
-                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base"
                           value={date}
                           onChange={(e) => setDate(e.target.value)}
                         />
@@ -1204,19 +1204,19 @@ export const Invoices: React.FC = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                       <div>
-                        <label className="block text-xs md:text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('invoices.form_payment_type')}</label>
+                        <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">{t('invoices.form_payment_type')}</label>
                         <div className="grid grid-cols-2 gap-2">
                           <button 
                             type="button"
                             onClick={() => setPaymentType('cash')}
-                            className={`py-3 rounded-xl font-bold transition-all ${paymentType === 'cash' ? 'bg-zinc-900 text-white shadow-lg' : 'bg-zinc-50 text-zinc-500 border border-zinc-200 hover:bg-zinc-100'}`}
+                            className={`py-3 rounded-xl font-bold transition-all ${paymentType === 'cash' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'}`}
                           >
                             {t('invoices.payment_cash')}
                           </button>
                           <button 
                             type="button"
                             onClick={() => setPaymentType('credit')}
-                            className={`py-3 rounded-xl font-bold transition-all ${paymentType === 'credit' ? 'bg-zinc-900 text-white shadow-lg' : 'bg-zinc-50 text-zinc-500 border border-zinc-200 hover:bg-zinc-100'}`}
+                            className={`py-3 rounded-xl font-bold transition-all ${paymentType === 'credit' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'}`}
                           >
                             {t('invoices.payment_credit')}
                           </button>
@@ -1225,10 +1225,10 @@ export const Invoices: React.FC = () => {
 
                       {paymentType === 'cash' && (
                         <div>
-                          <label className="block text-xs md:text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('invoices.form_payment_method')}</label>
+                          <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">{t('invoices.form_payment_method')}</label>
                           <select 
                             required
-                            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base"
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base"
                             value={paymentMethodId}
                             onChange={(e) => {
                               if (e.target.value === 'new_payment_method') {
@@ -1248,7 +1248,7 @@ export const Invoices: React.FC = () => {
 
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <h4 className="font-bold text-zinc-900 text-lg">{t('invoices.form_items')}</h4>
+                        <h4 className="font-bold text-slate-900 text-lg">{t('invoices.form_items')}</h4>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
@@ -1259,7 +1259,7 @@ export const Invoices: React.FC = () => {
                             {t('invoices.add_item')}
                           </button>
                           <select 
-                            className="px-4 py-2 bg-zinc-100 rounded-xl text-sm font-bold text-zinc-600 outline-none"
+                            className="px-4 py-2 bg-slate-100 rounded-xl text-sm font-bold text-slate-600 outline-none border border-slate-200"
                             onChange={(e) => {
                               if (e.target.value === 'new_product') {
                                 setIsProductModalOpen(true);
@@ -1276,38 +1276,38 @@ export const Invoices: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="border border-zinc-100 rounded-2xl overflow-hidden overflow-x-auto">
+                      <div className="border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto">
                         <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'} text-sm min-w-[400px]`}>
-                          <thead className="bg-zinc-50 text-zinc-500 uppercase text-[9px] font-bold tracking-widest">
+                          <thead className="bg-slate-50 text-slate-500 uppercase text-[9px] font-bold tracking-widest">
                             <tr>
-                              <th className="px-1 py-1 w-12 text-center">{t('products.column_image')}</th>
-                              <th className="px-1 py-1">{t('invoices.column_product')}</th>
-                              <th className="px-1 py-1 w-16 text-center">{t('invoices.column_quantity')}</th>
-                              <th className="px-1 py-1 w-24 text-center">{t('invoices.column_price')}</th>
-                              <th className={`px-1 py-1 w-24 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_total')}</th>
-                              <th className="px-1 py-1 w-8"></th>
+                              <th className="px-4 py-2 w-12 text-center">{t('products.column_image')}</th>
+                              <th className="px-4 py-2">{t('invoices.column_product')}</th>
+                              <th className="px-4 py-2 w-16 text-center">{t('invoices.column_quantity')}</th>
+                              <th className="px-4 py-2 w-24 text-center">{t('invoices.column_price')}</th>
+                              <th className={`px-4 py-2 w-24 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_total')}</th>
+                              <th className="px-4 py-2 w-8"></th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-zinc-50">
+                          <tbody className="divide-y divide-slate-100">
                             {items.map((item, index) => (
-                              <tr key={index} className="hover:bg-zinc-50/50 transition-colors group">
-                                <td className="px-1 py-0.5 text-center">
+                              <tr key={index} className="hover:bg-slate-50/50 transition-colors group">
+                                <td className="px-4 py-2 text-center">
                                   {item.product_image_url ? (
                                     <img 
                                       src={item.product_image_url} 
                                       alt={item.product_name} 
-                                      className="w-8 h-8 object-cover rounded-lg mx-auto border border-zinc-100"
+                                      className="w-10 h-10 object-cover rounded-lg mx-auto border border-slate-100"
                                       referrerPolicy="no-referrer"
                                     />
                                   ) : (
-                                    <div className="w-8 h-8 bg-zinc-50 rounded-lg flex items-center justify-center mx-auto border border-zinc-100">
-                                      <Box size={14} className="text-zinc-300" />
+                                    <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center mx-auto border border-slate-100">
+                                      <Box size={16} className="text-slate-300" />
                                     </div>
                                   )}
                                 </td>
-                                <td className="px-1 py-0.5">
+                                <td className="px-4 py-2">
                                   <select 
-                                    className="w-full bg-transparent outline-none font-bold text-zinc-900 appearance-none cursor-pointer text-xs"
+                                    className="w-full bg-transparent outline-none font-bold text-slate-900 appearance-none cursor-pointer text-sm"
                                     value={item.product_id}
                                     onChange={(e) => updateItem(index, 'product_id', e.target.value)}
                                   >
@@ -1315,81 +1315,81 @@ export const Invoices: React.FC = () => {
                                     {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                                   </select>
                                 </td>
-                                <td className="px-1 py-0.5">
+                                <td className="px-4 py-2">
                                   <input 
                                     type="number" 
-                                    className="w-full bg-zinc-50 border border-zinc-100 rounded focus:ring-1 focus:ring-emerald-500 px-1 py-0.5 text-xs outline-none text-center font-mono"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg focus:ring-1 focus:ring-emerald-500 px-2 py-1 text-sm outline-none text-center font-mono"
                                     value={isNaN(Number(item.quantity)) ? '' : Number(item.quantity)}
                                     onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
                                   />
                                 </td>
-                                <td className="px-1 py-0.5">
+                                <td className="px-4 py-2">
                                   <input 
                                     type="number" 
-                                    className="w-full bg-zinc-50 border border-zinc-100 rounded focus:ring-1 focus:ring-emerald-500 px-1 py-0.5 text-xs outline-none text-center font-mono"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg focus:ring-1 focus:ring-emerald-500 px-2 py-1 text-sm outline-none text-center font-mono"
                                     value={isNaN(Number(item.unit_price)) ? '' : Number(item.unit_price)}
                                     onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
                                   />
                                 </td>
-                                <td className="px-1 py-0.5 text-left font-mono font-bold text-zinc-900 text-xs">
+                                <td className="px-4 py-2 text-left font-mono font-bold text-slate-900 text-sm">
                                   {formatMoney(item.total)}
                                 </td>
-                                <td className="px-1 py-0.5 text-center">
+                                <td className="px-4 py-2 text-center">
                                   <button 
                                     onClick={() => removeItem(index)}
-                                    className="p-1 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded transition-all opacity-0 group-hover:opacity-100"
+                                    className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                                   >
-                                    <Trash2 size={12} />
+                                    <Trash2 size={14} />
                                   </button>
                                 </td>
                               </tr>
                             ))}
                             {items.length === 0 && (
                               <tr>
-                                <td colSpan={5} className="px-4 py-8 text-center text-zinc-400 italic">لا توجد أصناف مضافة بعد.</td>
+                                <td colSpan={6} className="px-4 py-8 text-center text-slate-400 italic">لا توجد أصناف مضافة بعد.</td>
                               </tr>
                             )}
                           </tbody>
-                      <tfoot className="bg-zinc-50/50 font-bold">
-                        <tr>
-                          <td colSpan={3} className={`px-2 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-zinc-500`}>{t('invoices.summary_subtotal')}:</td>
-                          <td className="px-2 py-2 text-base text-zinc-900 font-mono">{formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}</td>
-                          <td></td>
-                        </tr>
-                        <tr>
-                          <td colSpan={3} className={`px-2 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-zinc-500 flex items-center gap-2`}>
-                            <span>{t('invoices.summary_discount')}:</span>
-                            <input 
-                              type="number" 
-                              className="w-24 bg-white border border-zinc-200 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
-                              value={Number(discount)}
-                              onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
-                            />
-                          </td>
-                          <td className="px-2 py-2 text-base text-red-600 font-mono">-{formatMoney(discount)}</td>
-                          <td></td>
-                        </tr>
-                        <tr>
-                          <td colSpan={3} className={`px-2 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-zinc-500`}>{t('invoices.summary_total')}:</td>
-                          <td className="px-2 py-2 text-lg text-emerald-600 font-mono">{formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) - (Number(discount) || 0))} {t('invoices.currency')}</td>
-                          <td></td>
-                        </tr>
-                      </tfoot>
+                        <tfoot className="bg-slate-50/50 font-bold border-t border-slate-200">
+                          <tr>
+                            <td colSpan={4} className={`px-4 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-slate-500`}>{t('invoices.summary_subtotal')}:</td>
+                            <td className="px-4 py-3 text-base text-slate-900 font-mono">{formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}</td>
+                            <td></td>
+                          </tr>
+                          <tr>
+                            <td colSpan={4} className={`px-4 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-slate-500 flex items-center justify-end gap-2`}>
+                              <span>{t('invoices.summary_discount')}:</span>
+                              <input 
+                                type="number" 
+                                className="w-24 bg-white border border-slate-200 rounded-lg px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
+                                value={Number(discount)}
+                                onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                              />
+                            </td>
+                            <td className="px-4 py-3 text-base text-red-600 font-mono">-{formatMoney(discount)}</td>
+                            <td></td>
+                          </tr>
+                          <tr className="bg-emerald-50">
+                            <td colSpan={4} className={`px-4 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-emerald-900`}>{t('invoices.summary_total')}:</td>
+                            <td className="px-4 py-3 text-xl text-emerald-600 font-mono font-black">{formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) - (Number(discount) || 0))} {t('invoices.currency')}</td>
+                            <td></td>
+                          </tr>
+                        </tfoot>
                         </table>
                       </div>
                     </div>
 
-                    <div className="pt-4 flex gap-4 sticky bottom-0 bg-white pb-4 md:pb-0">
+                    <div className="pt-6 flex gap-4 sticky bottom-0 bg-white pb-4 md:pb-0">
                       <button 
                         type="button"
                         onClick={closeModal}
-                        className="flex-1 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all"
+                        className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all border border-slate-200"
                       >
                         {t('common.cancel')}
                       </button>
                       <button 
                         type="submit"
-                        className="flex-[2] py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
+                        className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
                       >
                         {editingInvoice ? t('common.save') : t('common.save')}
                       </button>
@@ -1404,11 +1404,11 @@ export const Invoices: React.FC = () => {
 
       {/* View Modal */}
       {viewInvoice && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-auto md:max-w-6xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col md:max-h-[90vh]">
-            <div className="p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10">
-              <h3 className="text-lg font-bold text-zinc-900">{t('invoices.view_invoice')}</h3>
-              <button onClick={() => setViewInvoice(null)} className="p-2 text-zinc-400 hover:text-zinc-600"><X size={24} /></button>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center md:p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full h-full md:h-auto md:max-w-6xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col md:max-h-[90vh] border border-slate-200">
+            <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+              <h3 className="text-lg md:text-xl font-bold text-slate-900">{t('invoices.view_invoice')}</h3>
+              <button onClick={() => setViewInvoice(null)} className="p-2 text-slate-400 hover:text-slate-600"><X size={24} /></button>
             </div>
             
             <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full">
@@ -1486,23 +1486,23 @@ export const Invoices: React.FC = () => {
                 </div>
               </div>
 
-              <div className="hidden lg:block w-80 border-r border-zinc-100 bg-zinc-50/30">
+              <div className="hidden lg:block w-80 border-r border-slate-100 bg-slate-50/30">
                 <InlineActivityLog category="invoices" documentId={viewInvoice.id} />
               </div>
             </div>
             
-            <div className="p-4 md:p-6 border-t border-zinc-50 flex items-center justify-between bg-zinc-50/50">
+            <div className="p-4 md:p-6 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
               <div className="flex gap-2">
                 <button 
                   onClick={handlePrint}
-                  className="flex items-center gap-2 px-6 py-3 bg-white text-zinc-700 border border-zinc-200 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm"
+                  className="flex items-center gap-2 px-6 py-3 bg-white text-slate-700 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
                 >
                   <Printer size={20} />
                   طباعة
                 </button>
                 <button 
                   onClick={() => handleExportInvoicePDF(viewInvoice)}
-                  className="flex items-center gap-2 px-6 py-3 bg-white text-zinc-700 border border-zinc-200 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm"
+                  className="flex items-center gap-2 px-6 py-3 bg-white text-slate-700 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
                 >
                   <Download size={20} />
                   PDF
@@ -1510,7 +1510,7 @@ export const Invoices: React.FC = () => {
               </div>
               <button 
                 onClick={() => setViewInvoice(null)}
-                className="px-8 py-3 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all active:scale-95 shadow-lg shadow-zinc-200"
+                className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200"
               >
                 إغلاق
               </button>
@@ -1521,59 +1521,59 @@ export const Invoices: React.FC = () => {
 
       {/* Add Customer Modal */}
       {isCustomerModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-4xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
-            <div className="p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10">
-              <h3 className="text-lg md:text-xl font-bold text-zinc-900">إضافة عميل جديد</h3>
-              <button onClick={() => setIsCustomerModalOpen(false)} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-xl transition-all"><X size={24} /></button>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center md:p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-4xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col border border-slate-200">
+            <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+              <h3 className="text-lg md:text-xl font-bold text-slate-900">إضافة عميل جديد</h3>
+              <button onClick={() => setIsCustomerModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-xl transition-all"><X size={24} /></button>
             </div>
             
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
               <form onSubmit={handleCustomerSubmit} className="p-4 md:p-8 space-y-5 flex-1 overflow-y-auto pb-32 md:pb-8">
                 <div className="space-y-5">
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">اسم العميل</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">اسم العميل</label>
                     <div className="relative">
-                      <Search className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Search className="absolute left-3 top-3 text-slate-400" size={18} />
                       <input
                         required
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                         value={customerFormData.name}
                         onChange={(e) => setCustomerFormData({ ...customerFormData, name: e.target.value })}
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">رقم الهاتف</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">رقم الهاتف</label>
                     <div className="relative">
-                      <Phone className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Phone className="absolute left-3 top-3 text-slate-400" size={18} />
                       <input
                         required
                         type="tel"
                         pattern="[0-9]{11,}"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-left"
+                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-left"
                         value={customerFormData.mobile}
                         onChange={(e) => setCustomerFormData({ ...customerFormData, mobile: e.target.value })}
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">البريد الإلكتروني</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">البريد الإلكتروني</label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Mail className="absolute left-3 top-3 text-slate-400" size={18} />
                       <input
                         type="email"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-left"
+                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-left"
                         value={customerFormData.email}
                         onChange={(e) => setCustomerFormData({ ...customerFormData, email: e.target.value })}
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">العنوان</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">العنوان</label>
                     <textarea
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                       rows={2}
                       value={customerFormData.address}
                       onChange={(e) => setCustomerFormData({ ...customerFormData, address: e.target.value })}
@@ -1581,24 +1581,24 @@ export const Invoices: React.FC = () => {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">رصيد أول</label>
+                      <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">رصيد أول</label>
                       <div className="relative">
-                        <Wallet className="absolute left-3 top-3 text-zinc-400" size={18} />
+                        <Wallet className="absolute left-3 top-3 text-slate-400" size={18} />
                         <input 
                           type="number" 
-                          className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                          className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                           value={customerFormData.opening_balance}
                           onChange={(e) => setCustomerFormData({ ...customerFormData, opening_balance: Number(e.target.value) })}
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">تاريخ الرصيد</label>
+                      <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">تاريخ الرصيد</label>
                       <div className="relative">
-                        <Calendar className="absolute left-3 top-3 text-zinc-400" size={18} />
+                        <Calendar className="absolute left-3 top-3 text-slate-400" size={18} />
                         <input 
                           type="date" 
-                          className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                          className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
                           value={customerFormData.opening_balance_date}
                           onChange={(e) => setCustomerFormData({ ...customerFormData, opening_balance_date: e.target.value })}
                         />
@@ -1606,10 +1606,10 @@ export const Invoices: React.FC = () => {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">الحساب المحاسبي</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">الحساب المحاسبي</label>
                     <select
                       required
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                       value={customerFormData.account_id}
                       onChange={(e) => setCustomerFormData({ ...customerFormData, account_id: e.target.value })}
                     >
@@ -1622,11 +1622,11 @@ export const Invoices: React.FC = () => {
                     </select>
                   </div>
                   {customerFormData.opening_balance !== 0 && (
-                    <div className="animate-in slide-in-from-top-2 duration-200">
-                      <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">حساب مقابل رصيد أول المدة</label>
+                    <div className="animate-in slide-in-from-top-2 duration-200 p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                      <label className="block text-sm font-bold text-emerald-900 mb-1 uppercase tracking-tighter">حساب مقابل رصيد أول المدة</label>
                       <select
                         required
-                        className="w-full px-4 py-3 bg-orange-50 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                        className="w-full px-4 py-3 bg-white border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                         value={customerFormData.counter_account_id}
                         onChange={(e) => setCustomerFormData({ ...customerFormData, counter_account_id: e.target.value })}
                       >
@@ -1637,21 +1637,21 @@ export const Invoices: React.FC = () => {
                           </option>
                         ))}
                       </select>
-                      <p className="text-[10px] text-orange-600 mt-1 font-medium">يستخدم هذا الحساب لإنشاء قيد رصيد أول المدة (مثلاً: رأس المال أو الأرباح المرحلة)</p>
+                      <p className="text-[10px] text-emerald-600 mt-1 font-medium">يستخدم هذا الحساب لإنشاء قيد رصيد أول المدة (مثلاً: رأس المال أو الأرباح المرحلة)</p>
                     </div>
                   )}
                 </div>
-                <div className="pt-4 flex gap-3">
+                <div className="pt-8 flex gap-3">
                   <button 
                     type="submit"
-                    className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+                    className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
                   >
                     حفظ العميل
                   </button>
                   <button 
                     type="button"
                     onClick={() => setIsCustomerModalOpen(false)}
-                    className="px-8 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all active:scale-95"
+                    className="px-8 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95 border border-slate-200"
                   >
                     إلغاء
                   </button>
@@ -1664,37 +1664,37 @@ export const Invoices: React.FC = () => {
 
       {/* Add Product Modal */}
       {isProductModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-4xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
-            <div className="p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10">
-              <h3 className="text-lg md:text-xl font-bold text-zinc-900">إضافة صنف جديد</h3>
-              <button onClick={() => setIsProductModalOpen(false)} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-xl transition-all"><X size={24} /></button>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center md:p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-4xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col border border-slate-200">
+            <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+              <h3 className="text-lg md:text-xl font-bold text-slate-900">إضافة صنف جديد</h3>
+              <button onClick={() => setIsProductModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-xl transition-all"><X size={24} /></button>
             </div>
             
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
               <form onSubmit={handleProductSubmit} className="p-4 md:p-8 space-y-5 flex-1 overflow-y-auto pb-32 md:pb-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">كود الصنف</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">كود الصنف</label>
                     <div className="relative">
-                      <Hash className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Hash className="absolute left-3 top-3 text-slate-400" size={18} />
                       <input
                         required
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
+                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
                         value={productFormData.code}
                         onChange={(e) => setProductFormData({ ...productFormData, code: e.target.value })}
                       />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">اسم الصنف</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">اسم الصنف</label>
                     <div className="relative">
-                      <Package className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Package className="absolute left-3 top-3 text-slate-400" size={18} />
                       <input
                         required
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                         value={productFormData.name}
                         onChange={(e) => setProductFormData({ ...productFormData, name: e.target.value })}
                       />
@@ -1703,12 +1703,12 @@ export const Invoices: React.FC = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">نوع الصنف</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">نوع الصنف</label>
                   <div className="relative">
-                    <Layers className="absolute left-3 top-3 text-zinc-400" size={18} />
+                    <Layers className="absolute left-3 top-3 text-slate-400" size={18} />
                     <select
                       required
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
+                      className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
                       value={productFormData.type}
                       onChange={(e) => setProductFormData({ ...productFormData, type: e.target.value as any })}
                     >
@@ -1721,28 +1721,28 @@ export const Invoices: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">سعر البيع</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">سعر البيع</label>
                     <div className="relative">
-                      <Tag className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Tag className="absolute left-3 top-3 text-slate-400" size={18} />
                       <input
                         required
                         type="number"
                         step="0.01"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
                         value={productFormData.sale_price}
                         onChange={(e) => setProductFormData({ ...productFormData, sale_price: Number(e.target.value) })}
                       />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">سعر التكلفة</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">سعر التكلفة</label>
                     <div className="relative">
-                      <Tag className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Tag className="absolute left-3 top-3 text-slate-400" size={18} />
                       <input
                         required
                         type="number"
                         step="0.01"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
                         value={productFormData.cost_price}
                         onChange={(e) => setProductFormData({ ...productFormData, cost_price: Number(e.target.value) })}
                       />
@@ -1751,9 +1751,9 @@ export const Invoices: React.FC = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">الوصف</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">الوصف</label>
                   <textarea
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                     rows={2}
                     value={productFormData.description}
                     onChange={(e) => setProductFormData({ ...productFormData, description: e.target.value })}
@@ -1762,7 +1762,7 @@ export const Invoices: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">المرفق (صورة أو PDF)</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">المرفق (صورة أو PDF)</label>
                     <div className="relative group">
                       <input
                         type="file"
@@ -1773,16 +1773,16 @@ export const Invoices: React.FC = () => {
                       />
                       <label 
                         htmlFor="invoice-product-attachment"
-                        className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-zinc-50 border border-zinc-200 border-dashed rounded-xl cursor-pointer hover:bg-zinc-100 hover:border-emerald-500 transition-all"
+                        className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-slate-50 border border-slate-200 border-dashed rounded-xl cursor-pointer hover:bg-slate-100 hover:border-emerald-500 transition-all font-bold text-slate-500"
                       >
-                        <Paperclip size={18} className="text-zinc-400 group-hover:text-emerald-500" />
-                        <span className="text-sm text-zinc-500 group-hover:text-emerald-900 font-bold">
+                        <Paperclip size={18} className="text-slate-400 group-hover:text-emerald-500" />
+                        <span className="text-sm group-hover:text-emerald-900">
                           {productFormData.image_url ? 'تغيير المرفق' : 'اختر ملفاً...'}
                         </span>
                       </label>
                     </div>
                     {productFormData.image_url && (
-                      <div className="mt-2 relative flex justify-center bg-white p-2 rounded-lg border border-zinc-100 overflow-hidden">
+                      <div className="mt-2 relative flex justify-center bg-white p-2 rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                         <button 
                           type="button"
                           onClick={() => setProductFormData({ ...productFormData, image_url: '' })}
@@ -1793,7 +1793,7 @@ export const Invoices: React.FC = () => {
                         {productFormData.image_url.startsWith('data:application/pdf') ? (
                           <div className="flex flex-col items-center gap-1">
                             <FileText size={24} className="text-red-500" />
-                            <span className="text-[10px] font-bold text-zinc-500">PDF</span>
+                            <span className="text-[10px] font-bold text-slate-500">PDF</span>
                           </div>
                         ) : (
                           <img 
@@ -1807,18 +1807,18 @@ export const Invoices: React.FC = () => {
                     )}
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">الباركود (اختياري)</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">الباركود (اختياري)</label>
                     <div className="relative">
-                      <Hash className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Hash className="absolute left-3 top-3 text-slate-400" size={18} />
                       <input
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
                         value={productFormData.barcode}
                         onChange={(e) => setProductFormData({ ...productFormData, barcode: e.target.value })}
                       />
                     </div>
                     {productFormData.barcode && (
-                      <div className="mt-2 flex justify-center bg-white p-2 rounded-lg border border-zinc-100 overflow-hidden">
+                      <div className="mt-2 flex justify-center bg-white p-2 rounded-xl border border-slate-100 overflow-hidden shadow-sm">
                         <Barcode 
                           value={productFormData.barcode} 
                           width={1} 
@@ -1833,10 +1833,10 @@ export const Invoices: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">حساب الإيرادات</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">حساب الإيرادات</label>
                     <select
                       required
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                       value={productFormData.revenue_account_id}
                       onChange={(e) => setProductFormData({ ...productFormData, revenue_account_id: e.target.value })}
                     >
@@ -1849,10 +1849,10 @@ export const Invoices: React.FC = () => {
                     </select>
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">حساب التكلفة</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">حساب التكلفة</label>
                     <select
                       required
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                       value={productFormData.cost_account_id}
                       onChange={(e) => setProductFormData({ ...productFormData, cost_account_id: e.target.value })}
                     >
@@ -1866,17 +1866,17 @@ export const Invoices: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="pt-4 flex gap-3">
+                <div className="pt-8 flex gap-3">
                   <button 
                     type="submit"
-                    className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+                    className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
                   >
                     حفظ الصنف
                   </button>
                   <button 
                     type="button"
                     onClick={() => setIsProductModalOpen(false)}
-                    className="px-8 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all active:scale-95"
+                    className="px-8 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95 border border-slate-200"
                   >
                     إلغاء
                   </button>
@@ -1889,37 +1889,37 @@ export const Invoices: React.FC = () => {
 
       {/* Add Payment Method Modal */}
       {isPaymentMethodModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-6xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
-            <div className="p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10">
-              <h3 className="text-lg md:text-xl font-bold text-zinc-900">إضافة طريقة دفع جديدة</h3>
-              <button onClick={() => setIsPaymentMethodModalOpen(false)} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-xl transition-all"><X size={24} /></button>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center md:p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-6xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col border border-slate-200">
+            <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+              <h3 className="text-lg md:text-xl font-bold text-slate-900">إضافة طريقة دفع جديدة</h3>
+              <button onClick={() => setIsPaymentMethodModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-xl transition-all"><X size={24} /></button>
             </div>
             
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
               <form onSubmit={handlePaymentMethodSubmit} className="p-4 md:p-8 space-y-5 flex-1 overflow-y-auto pb-32 md:pb-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">كود الطريقة</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">كود الطريقة</label>
                     <div className="relative">
-                      <Hash className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Hash className="absolute left-3 top-3 text-slate-400" size={18} />
                       <input
                         required
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
                         value={paymentMethodFormData.code}
                         onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, code: e.target.value })}
                       />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">اسم الطريقة</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">اسم الطريقة</label>
                     <div className="relative">
-                      <Wallet className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Wallet className="absolute left-3 top-3 text-slate-400" size={18} />
                       <input
                         required
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                         value={paymentMethodFormData.name}
                         onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, name: e.target.value })}
                       />
@@ -1928,11 +1928,11 @@ export const Invoices: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">النوع</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">النوع</label>
                     <div className="relative">
-                      <Layers className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Layers className="absolute left-3 top-3 text-slate-400" size={18} />
                       <select
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
+                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
                         value={paymentMethodFormData.type}
                         onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, type: e.target.value as any })}
                       >
@@ -1943,10 +1943,10 @@ export const Invoices: React.FC = () => {
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">الحساب المحاسبي</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">الحساب المحاسبي</label>
                     <select
                       required
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                       value={paymentMethodFormData.account_id}
                       onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, account_id: e.target.value })}
                     >
@@ -1962,24 +1962,24 @@ export const Invoices: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">الرصيد الافتتاحي</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">الرصيد الافتتاحي</label>
                     <div className="relative">
-                      <Wallet className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Wallet className="absolute left-3 top-3 text-slate-400" size={18} />
                       <input 
                         type="number" 
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
                         value={paymentMethodFormData.opening_balance}
                         onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, opening_balance: Number(e.target.value) })}
                       />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">تاريخ الرصيد</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">تاريخ الرصيد</label>
                     <div className="relative">
-                      <Calendar className="absolute left-3 top-3 text-zinc-400" size={18} />
+                      <Calendar className="absolute left-3 top-3 text-slate-400" size={18} />
                       <input 
                         type="date" 
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
                         value={paymentMethodFormData.opening_balance_date}
                         onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, opening_balance_date: e.target.value })}
                       />
@@ -1988,12 +1988,12 @@ export const Invoices: React.FC = () => {
                 </div>
 
                 {paymentMethodFormData.opening_balance !== 0 && (
-                  <div className="space-y-4">
+                  <div className="space-y-4 p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
                     <div>
-                      <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">حساب الطرف الآخر (للرصيد الافتتاحي)</label>
+                      <label className="block text-sm font-bold text-emerald-900 mb-1 uppercase tracking-tighter">حساب الطرف الآخر (للرصيد الافتتاحي)</label>
                       <select
                         required
-                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all border-emerald-200 bg-emerald-50/30"
+                        className="w-full px-4 py-3 bg-white border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                         value={paymentMethodFormData.counter_account_id}
                         onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, counter_account_id: e.target.value })}
                       >
@@ -2028,34 +2028,34 @@ export const Invoices: React.FC = () => {
                 )}
 
                 <div className="space-y-1">
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">تفاصيل إضافية</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">تفاصيل إضافية</label>
                   <div className="relative">
-                    <FileText className="absolute left-3 top-3 text-zinc-400" size={18} />
+                    <FileText className="absolute left-3 top-3 text-slate-400" size={18} />
                     <textarea
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                       rows={3}
                       value={paymentMethodFormData.details}
                       onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, details: e.target.value })}
                     />
                   </div>
                 </div>
-                <div className="pt-4 flex gap-3">
+                <div className="pt-8 flex gap-3">
                   <button 
                     type="submit"
-                    className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+                    className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
                   >
                     حفظ الطريقة
                   </button>
                   <button 
                     type="button"
                     onClick={() => setIsPaymentMethodModalOpen(false)}
-                    className="px-8 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all active:scale-95"
+                    className="px-8 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95 border border-slate-200"
                   >
                     إلغاء
                   </button>
                 </div>
               </form>
-              <div className="hidden md:block w-80 border-r border-zinc-100 bg-zinc-50/30">
+              <div className="hidden md:block w-80 border-r border-slate-100 bg-slate-50/30">
                 <InlineActivityLog category="payment_methods" documentId={undefined} />
               </div>
             </div>
@@ -2065,25 +2065,28 @@ export const Invoices: React.FC = () => {
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 animate-in zoom-in-95 duration-200">
-            <h3 className="text-xl font-bold text-zinc-900 mb-4">تأكيد الحذف</h3>
-            <p className="text-zinc-500 mb-6">هل أنت متأكد من رغبتك في حذف هذه الفاتورة؟ لا يمكن التراجع عن هذا الإجراء.</p>
-            <div className="flex gap-4">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-8 animate-in zoom-in-95 duration-200 border border-slate-200">
+            <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mb-6 mx-auto">
+              <Trash2 className="text-red-500" size={32} />
+            </div>
+            <h3 className="text-2xl font-bold text-slate-900 mb-2 text-center">تأكيد الحذف</h3>
+            <p className="text-slate-500 mb-8 text-center leading-relaxed">هل أنت متأكد من رغبتك في حذف هذه الفاتورة؟ لا يمكن التراجع عن هذا الإجراء وسيتم إلغاء كافة القيود المحاسبية المرتبطة بها.</p>
+            <div className="flex gap-3">
               <button 
                 onClick={() => {
                   setIsDeleteModalOpen(false);
                   setInvoiceToDelete(null);
                 }}
-                className="flex-1 py-3 bg-zinc-100 text-zinc-600 rounded-xl font-bold hover:bg-zinc-200 transition-all"
+                className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95 border border-slate-200"
               >
                 إلغاء
               </button>
               <button 
                 onClick={confirmDelete}
-                className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all shadow-lg shadow-red-500/20"
+                className="flex-1 py-4 bg-red-500 text-white rounded-2xl font-bold hover:bg-red-600 transition-all shadow-lg shadow-red-500/20 active:scale-95"
               >
-                حذف
+                تأكيد الحذف
               </button>
             </div>
           </div>

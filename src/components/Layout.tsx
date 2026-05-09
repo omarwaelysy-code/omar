@@ -43,7 +43,6 @@ import {
   Moon
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { notificationService } from '../services/notificationService';
 import { dbService } from '../services/dbService';
@@ -61,7 +60,6 @@ import { useNavigation } from '../contexts/NavigationContext';
 
 export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPage }) => {
   const { language, setLanguage, t, dir } = useLanguage();
-  const { theme, toggleTheme } = useTheme();
   const { logout, user, userMemberships, switchCompany, isSuperAdmin, isCompanyAdmin, isManager, isStandardUser, hasPermission } = useAuth();
   const { unreadCount, setIsCenterOpen, addPersistentNotification, showNotification } = useNotification();
   const { openTabs, activeTabId, openTab, closeTab, setActiveTab } = useNavigation();
@@ -307,18 +305,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
   };
 
   return (
-    <div className={`min-h-screen bg-stone-100 dark:bg-zinc-950 flex flex-col overflow-hidden font-sans selection:bg-emerald-500/30 ${language === 'en' ? 'font-sans' : ''}`} dir={dir}>
+    <div className={`min-h-screen bg-[#f8fafc] flex flex-col overflow-hidden font-sans selection:bg-brand-primary/20 ${language === 'en' ? 'font-sans' : ''}`} dir={dir}>
       {/* Change Password Modal */}
       {showChangePasswordModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-zinc-900/80 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className={`p-8 border-b border-zinc-100 dark:border-white/5 bg-stone-50 dark:bg-zinc-800/50 flex items-center gap-4 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-              <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-200">
+            <div className={`p-8 border-b border-slate-100 bg-slate-50/50 flex items-center gap-4 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+              <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
                 <Lock size={24} />
               </div>
               <div className={dir === 'rtl' ? 'text-right' : 'text-left'}>
-                <h3 className="text-xl font-black text-zinc-900">{t('common.change_password')}</h3>
-                <p className="text-xs text-zinc-500 font-bold">{t('common.must_change_password_hint')}</p>
+                <h3 className="text-xl font-bold text-slate-900">{t('common.change_password')}</h3>
+                <p className="text-xs text-slate-500 font-medium">{t('common.must_change_password_hint')}</p>
               </div>
             </div>
             
@@ -332,31 +330,31 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
               <div className="space-y-4">
                 <div className="relative">
-                  <Lock className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-zinc-400`} size={20} />
+                  <Lock className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-400`} size={20} />
                   <input
                     required
                     type={showNewPassword ? "text" : "password"}
                     placeholder={t('common.new_password')}
-                    className={`w-full ${dir === 'rtl' ? 'pr-12 pl-12' : 'pl-12 pr-12'} py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
+                    className={`w-full ${dir === 'rtl' ? 'pr-12 pl-12' : 'pl-12 pr-12'} py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                   />
                   <button
                     type="button"
                     onClick={() => setShowNewPassword(!showNewPassword)}
-                    className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-4 text-zinc-400 hover:text-zinc-600`}
+                    className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-4 text-slate-400 hover:text-slate-600`}
                   >
                     {showNewPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
 
                 <div className="relative">
-                  <Lock className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-zinc-400`} size={20} />
+                  <Lock className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-400`} size={20} />
                   <input
                     required
                     type={showNewPassword ? "text" : "password"}
                     placeholder={t('common.confirm_password')}
-                    className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
+                    className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                   />
@@ -366,7 +364,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
               <button
                 type="submit"
                 disabled={passwordLoading}
-                className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-xl disabled:opacity-50"
+                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-xl disabled:opacity-50"
               >
                 {passwordLoading ? t('common.loading') : t('common.update_password_and_continue')}
               </button>
@@ -374,7 +372,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
               <button
                 type="button"
                 onClick={logout}
-                className="w-full py-3 text-zinc-400 text-xs font-bold hover:text-red-500 transition-colors"
+                className="w-full py-3 text-slate-400 text-xs font-bold hover:text-red-500 transition-colors"
               >
                 {t('common.logout_and_return_later')}
               </button>
@@ -384,9 +382,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       )}
 
       {/* Desktop Top Navigation */}
-      <header className="hidden md:flex sticky top-0 z-30 bg-zinc-950 text-white h-20 items-center px-8 shadow-2xl border-b border-white/5">
-        <div className={`flex items-center gap-4 ${dir === 'rtl' ? 'ml-12' : 'mr-12'}`}>
-          <Logo variant="full" color="white" className="h-10" />
+      <header className="hidden md:flex sticky top-0 z-30 bg-white border-b border-slate-200 h-16 items-center px-8 shadow-sm">
+        <div className={`flex items-center gap-4 ${dir === 'rtl' ? 'ml-10' : 'mr-10'}`}>
+          <Logo variant="full" className="h-8" />
         </div>
 
         <nav className="flex items-center gap-1 flex-1">
@@ -397,34 +395,34 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             
             if (item.subItems) {
               return (
-                <div key={item.id} className="relative group px-1">
+                <div key={item.id} className="relative group px-0.5">
                   <button
                     className={`
-                      flex items-center gap-2 px-4 py-2 rounded-xl transition-all font-bold text-sm
-                      ${isActive ? 'bg-emerald-500 text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}
+                      flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all font-semibold text-sm
+                      ${isActive ? 'bg-brand-primary/10 text-brand-primary' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                     `}
                   >
-                    <item.icon size={18} />
+                    <item.icon size={16} />
                     <span>{item.label}</span>
                     <ChevronDown size={14} className="opacity-50 group-hover:rotate-180 transition-transform" />
                   </button>
                   
                   {/* Dropdown */}
-                  <div className={`absolute top-full ${dir === 'rtl' ? 'right-0' : 'left-0'} pt-2 opacity-0 translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-200 z-[70]`}>
-                    <div className="bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl p-2 min-w-[220px]">
+                  <div className={`absolute top-full ${dir === 'rtl' ? 'right-0' : 'left-0'} pt-2 opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-200 z-[70]`}>
+                    <div className="bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 min-w-[200px]">
                       {item.subItems.map((sub: any) => (
                         <button
                           key={sub.id}
                           onClick={() => handleNavClick(sub.id, sub.label, sub.path)}
                           className={`
-                            w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}
+                            w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}
                             ${currentPage === sub.id 
-                              ? 'bg-emerald-500/10 text-emerald-400' 
-                              : 'text-zinc-400 hover:bg-white/5 hover:text-white'}
+                              ? 'bg-brand-primary text-white shadow-sm' 
+                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                           `}
                         >
                           <sub.icon size={16} />
-                          <span className="text-sm font-bold">{sub.label}</span>
+                          <span className="text-sm font-semibold">{sub.label}</span>
                         </button>
                       ))}
                     </div>
@@ -438,56 +436,34 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 key={item.id}
                 onClick={() => handleNavClick(item.id, item.label, item.path)}
                 className={`
-                  flex items-center gap-2 px-4 py-2 rounded-xl transition-all font-bold text-sm
-                  ${currentPage === item.id ? 'bg-emerald-500 text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}
+                  flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all font-semibold text-sm
+                  ${currentPage === item.id ? 'bg-brand-primary text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                 `}
               >
-                <item.icon size={18} />
+                <item.icon size={16} />
                 <span>{item.label}</span>
               </button>
             );
           })}
         </nav>
 
-        <div className={`flex items-center gap-4 ${dir === 'rtl' ? 'mr-auto' : 'ml-auto'}`}>
-          <button 
-            onClick={toggleTheme}
-            className="p-2.5 bg-white/5 hover:bg-white/10 text-white rounded-xl transition-all group relative overflow-hidden"
-            title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-          >
-            <motion.div
-              initial={false}
-              animate={{ y: theme === 'dark' ? 0 : 40 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            >
-              <Sun size={20} className="text-amber-400" />
-            </motion.div>
-            <motion.div
-              initial={false}
-              animate={{ y: theme === 'dark' ? -40 : -20 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="absolute left-1/2 -translate-x-1/2"
-            >
-              <Moon size={20} className="text-zinc-400" />
-            </motion.div>
-          </button>
-
+        <div className={`flex items-center gap-3 ${dir === 'rtl' ? 'mr-auto' : 'ml-auto'}`}>
           <button 
             onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
-            className="p-2.5 bg-white/5 hover:bg-white/10 text-white rounded-xl transition-all group flex items-center gap-2"
+            className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-all group flex items-center gap-2"
             title={language === 'ar' ? 'English' : 'العربية'}
           >
-            <Languages size={20} />
+            <Languages size={18} />
             <span className="text-xs font-bold">{language === 'ar' ? 'EN' : 'AR'}</span>
           </button>
 
           <button 
             onClick={() => setIsCenterOpen(true)}
-            className="relative p-2.5 bg-white/5 hover:bg-white/10 text-white rounded-xl transition-all group"
+            className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-all group"
           >
-            <Bell size={20} className="group-hover:rotate-12 transition-transform" />
+            <Bell size={18} />
             {unreadCount > 0 && (
-              <span className={`absolute -top-1 ${dir === 'rtl' ? '-right-1' : '-left-1'} w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-zinc-900`}>
+              <span className={`absolute top-1 ${dir === 'rtl' ? 'right-1' : 'left-1'} w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white`}>
                 {unreadCount}
               </span>
             )}
@@ -500,13 +476,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             <div className="relative">
               <button
                 onClick={() => setIsCompanyMenuOpen(!isCompanyMenuOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-xl transition-all border border-white/5"
+                className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all border border-slate-200 shadow-sm"
               >
-                <Building2 size={16} className="text-emerald-500" />
-                <span className="text-xs font-bold text-zinc-300 truncate max-w-[120px]">
+                <Building2 size={16} className="text-emerald-600" />
+                <span className="text-xs font-bold text-slate-600 truncate max-w-[120px]">
                   {user?.company_name || t('common.switch_company')}
                 </span>
-                <ChevronDown size={14} className={`text-zinc-500 transition-transform ${isCompanyMenuOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown size={14} className={`text-slate-400 transition-transform ${isCompanyMenuOpen ? 'rotate-180' : ''}`} />
               </button>
 
               <AnimatePresence>
@@ -520,9 +496,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 10 }}
-                      className={`absolute top-full ${dir === 'rtl' ? 'left-0' : 'right-0'} mt-2 w-64 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl p-2 z-[70]`}
+                      className={`absolute top-full ${dir === 'rtl' ? 'left-0' : 'right-0'} mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-[70]`}
                     >
-                      <p className="text-[10px] font-black text-zinc-500 px-3 py-2 uppercase tracking-widest">{t('common.switch_company')}</p>
+                      <p className="text-[10px] font-black text-slate-400 px-3 py-2 uppercase tracking-widest">{t('common.switch_company')}</p>
                       <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar">
                         {userMemberships.map((membership) => (
                           <button
@@ -534,8 +510,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                             className={`
                               w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}
                               ${user?.company_id === membership.company_id 
-                                ? 'bg-emerald-500/10 text-emerald-400' 
-                                : 'text-zinc-400 hover:bg-white/5 hover:text-white'}
+                                ? 'bg-emerald-50 text-emerald-600' 
+                                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}
                             `}
                           >
                             <Building2 size={16} />
@@ -558,22 +534,22 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
           <div className="flex items-center gap-3">
             <div className={dir === 'rtl' ? 'text-left' : 'text-right'}>
-              <p className="font-black text-sm text-white leading-none">{user?.username}</p>
-              <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest mt-1">
+              <p className="font-bold text-sm text-slate-800 leading-none">{user?.username}</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
                 {isSuperAdmin ? t('common.role_super_admin') : isCompanyAdmin ? t('common.role_company_admin') : t('common.role_user')}
               </p>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center font-black text-white shadow-lg shadow-emerald-500/20">
+            <div className="w-8 h-8 rounded-lg bg-brand-primary/10 flex items-center justify-center font-bold text-brand-primary shadow-sm">
               {user?.username[0].toUpperCase()}
             </div>
           </div>
 
           <button 
             onClick={logout}
-            className="p-2.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-500 rounded-xl transition-all group border border-white/5"
+            className="p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-all group"
             title={t('common.logout')}
           >
-            <LogOut size={20} />
+            <LogOut size={18} />
           </button>
         </div>
       </header>
@@ -582,41 +558,41 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         {/* Desktop Sidebar for Open Tabs */}
         <aside 
           className={`
-            hidden md:flex flex-col bg-zinc-950/95 backdrop-blur-3xl ${dir === 'rtl' ? 'border-l' : 'border-r'} border-white/5 shadow-2xl z-20 transition-all duration-300
-            ${isSidebarCollapsed ? 'w-20' : 'w-72'}
+            hidden md:flex flex-col bg-white ${dir === 'rtl' ? 'border-l' : 'border-r'} border-slate-200 z-20 transition-all duration-300
+            ${isSidebarCollapsed ? 'w-16' : 'w-64'}
           `}
         >
-          <div className="p-6 border-b border-white/5 flex items-center justify-between mb-2">
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
             {!isSidebarCollapsed && (
               <motion.h2 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="font-black text-white flex items-center gap-3 whitespace-nowrap"
+                className="font-bold text-slate-900 text-sm flex items-center gap-2 whitespace-nowrap"
               >
-                <div className="w-8 h-8 rounded-lg bg-brand-primary/10 flex items-center justify-center">
-                  <RotateCcw size={18} className="text-brand-primary" />
+                <div className="w-7 h-7 rounded bg-slate-50 flex items-center justify-center border border-slate-100">
+                  <RotateCcw size={14} className="text-slate-400" />
                 </div>
                 <span>{t('common.open_screens')}</span>
               </motion.h2>
             )}
             <button 
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="p-2 hover:bg-white/10 rounded-xl text-zinc-500 transition-all active:scale-95"
+              className="p-1.5 hover:bg-slate-50 rounded text-slate-400 transition-all"
             >
-              {isSidebarCollapsed ? <Menu size={20} /> : <X size={20} />}
+              {isSidebarCollapsed ? <Menu size={16} /> : <X size={16} />}
             </button>
           </div>
           
-          <div className="flex-1 overflow-y-auto px-3 space-y-1 custom-scrollbar overflow-x-hidden">
+          <div className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5 custom-scrollbar overflow-x-hidden">
             {openTabs.map((tab) => (
               <div 
                 key={tab.id}
                 className={`
-                  group relative flex items-center gap-3 px-5 py-4 rounded-2xl transition-all cursor-pointer
+                  group relative flex items-center gap-2 px-3 py-2 rounded-lg transition-all cursor-pointer
                   ${activeTabId === tab.id 
-                    ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/30' 
-                    : 'text-zinc-500 hover:bg-white/5 hover:text-white'}
-                  ${isSidebarCollapsed ? 'justify-center px-0 mx-2' : ''}
+                    ? 'bg-slate-100 text-slate-900 shadow-sm' 
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}
+                  ${isSidebarCollapsed ? 'justify-center' : ''}
                 `}
                 onClick={() => setActiveTab(tab.id)}
                 title={isSidebarCollapsed ? tab.label : ''}
@@ -624,7 +600,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 {!isSidebarCollapsed ? (
                   <>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold truncate tracking-tight">{tab.label}</p>
+                      <p className="text-sm font-semibold truncate">{tab.label}</p>
                     </div>
                     
                     {tab.id !== 'dashboard' && (
@@ -634,18 +610,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                           closeTab(tab.id);
                         }}
                         className={`
-                          p-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100
-                          ${activeTabId === tab.id 
-                            ? 'hover:bg-white/20 text-white/70 hover:text-white' 
-                            : 'hover:bg-white/10 text-zinc-500 hover:text-white'}
+                          p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-all opacity-0 group-hover:opacity-100
+                          ${activeTabId === tab.id ? 'opacity-50' : ''}
                         `}
                       >
-                        <X size={14} />
+                        <X size={12} />
                       </button>
                     )}
                   </>
                 ) : (
-                  <div className={`w-10 h-10 rounded-xl ${activeTabId === tab.id ? 'bg-white/20' : 'bg-white/5'} flex items-center justify-center font-black text-xs`}>
+                  <div className={`w-8 h-8 rounded-lg ${activeTabId === tab.id ? 'bg-slate-200' : 'bg-slate-100'} flex items-center justify-center font-bold text-xs text-slate-600`}>
                     {tab.label[0]}
                   </div>
                 )}
@@ -653,7 +627,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 {activeTabId === tab.id && !isSidebarCollapsed && (
                   <motion.div 
                     layoutId="active-tab-indicator"
-                    className="absolute right-0 top-1/4 bottom-1/4 w-1 bg-white rounded-l-full shadow-glow"
+                    className={`absolute ${dir === 'rtl' ? 'right-0' : 'left-0'} top-2 bottom-2 w-1 bg-brand-primary rounded-full`}
                   />
                 )}
               </div>
@@ -661,16 +635,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           </div>
 
           {!isSidebarCollapsed && (
-            <div className="p-6 border-t border-white/5 bg-zinc-900/50 space-y-2">
-              <p className="text-[10px] text-zinc-600 font-bold text-center">
-                {t('common.switch_screens_hint')}
-              </p>
-              <div className="flex justify-center">
-                <div className="px-3 py-1 bg-white/5 rounded-full">
-                  <span className="text-[9px] text-zinc-500 font-black tracking-widest uppercase">
-                    Obrain ERP • v2.0
-                  </span>
-                </div>
+            <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+              <div className="px-3 py-1 bg-white border border-slate-200 rounded-lg shadow-sm text-center">
+                <span className="text-[9px] text-slate-400 font-bold tracking-widest uppercase">
+                  Obrain ERP • v2.0
+                </span>
               </div>
             </div>
           )}
@@ -679,63 +648,55 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
           {/* Mobile Header */}
-          <header className="md:hidden sticky top-0 z-30 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl border-b border-zinc-200/50 dark:border-white/5 p-5 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Logo variant="full" className="h-10" />
+          <header className="md:hidden sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200 p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Logo variant="full" className="h-8" />
             </div>
             <div className="flex items-center gap-2">
               <button 
-                onClick={toggleTheme}
-                className="p-3 text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-2xl transition-all active:scale-90 relative overflow-hidden"
-              >
-                <div className="flex flex-col items-center">
-                   {theme === 'dark' ? <Sun size={24} className="text-amber-500" /> : <Moon size={24} className="text-zinc-500" />}
-                </div>
-              </button>
-              <button 
                 onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
-                className="p-3 text-zinc-900 bg-zinc-100 hover:bg-zinc-200 rounded-2xl transition-all active:scale-90"
+                className="p-2.5 text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all"
               >
-                <Languages size={24} />
+                <Languages size={20} />
               </button>
               <button 
                 onClick={() => setIsCenterOpen(true)}
-                className="relative p-3 text-zinc-900 bg-zinc-100 hover:bg-zinc-200 rounded-2xl transition-all active:scale-90"
+                className="relative p-2.5 text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all"
               >
-                <Bell size={24} />
+                <Bell size={20} />
                 {unreadCount > 0 && (
-                  <span className={`absolute top-2 ${dir === 'rtl' ? 'right-2' : 'left-2'} w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white`}>
+                  <span className={`absolute top-2 ${dir === 'rtl' ? 'right-2' : 'left-2'} w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white`}>
                     {unreadCount}
                   </span>
                 )}
               </button>
               <button 
                 onClick={() => setIsMobileMenuOpen(true)}
-                className="p-3 text-zinc-900 bg-zinc-100 hover:bg-zinc-200 rounded-2xl transition-all active:scale-90"
+                className="p-2.5 text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all"
               >
-                <Menu size={28} />
+                <Menu size={24} />
               </button>
             </div>
           </header>
 
           {/* Mobile Tabs Bar */}
-          <div className="md:hidden flex overflow-x-auto bg-white dark:bg-zinc-900 border-b border-zinc-100 dark:border-white/5 p-2 gap-2 custom-scrollbar">
+          <div className="md:hidden flex overflow-x-auto bg-white border-b border-slate-100 p-2 gap-2 custom-scrollbar">
             {openTabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`
-                  flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap text-xs font-bold transition-all
+                  flex items-center gap-2 px-4 py-1.5 rounded-full whitespace-nowrap text-xs font-semibold transition-all
                   ${activeTabId === tab.id 
-                    ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20' 
-                    : 'bg-stone-100 text-zinc-500'}
+                    ? 'bg-brand-primary text-white shadow-sm' 
+                    : 'bg-slate-50 text-slate-500'}
                 `}
               >
                 <span>{tab.label}</span>
                 {tab.id !== 'dashboard' && (
                   <X 
-                    size={12} 
-                    className="opacity-50 hover:opacity-100" 
+                    size={10} 
+                    className="opacity-60" 
                     onClick={(e) => {
                       e.stopPropagation();
                       closeTab(tab.id);
@@ -754,45 +715,45 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           </div>
 
           {/* Mobile Bottom Navigation - Floating Pill */}
-          <div className="md:hidden fixed bottom-8 left-0 right-0 px-8 z-40">
-            <nav className="bg-zinc-950/90 backdrop-blur-3xl border border-white/10 px-6 py-4 flex items-center justify-between rounded-[2.5rem] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]">
+          <div className="md:hidden fixed bottom-6 left-0 right-0 px-6 z-40">
+            <nav className="bg-white border border-slate-200 px-6 py-3 flex items-center justify-between rounded-full shadow-xl">
               <button 
                 onClick={() => handleNavClick('dashboard', t('nav.dashboard'))}
-                className={`flex flex-col items-center gap-1.5 transition-all duration-300 ${currentPage === 'dashboard' ? 'text-emerald-400 scale-110' : 'text-zinc-500'}`}
+                className={`flex flex-col items-center gap-1 transition-all duration-300 ${currentPage === 'dashboard' ? 'text-brand-primary scale-105' : 'text-slate-400'}`}
               >
-                <LayoutDashboard size={24} />
-                <span className="text-[10px] font-black tracking-tighter">{t('common.home')}</span>
+                <LayoutDashboard size={20} />
+                <span className="text-[9px] font-bold uppercase">{t('common.home')}</span>
               </button>
               
               <button 
                 onClick={() => handleNavClick('receipts', t('nav.receipts'))}
-                className={`flex flex-col items-center gap-1.5 transition-all duration-300 ${currentPage === 'receipts' ? 'text-emerald-400 scale-110' : 'text-zinc-500'}`}
+                className={`flex flex-col items-center gap-1 transition-all duration-300 ${currentPage === 'receipts' ? 'text-brand-primary scale-105' : 'text-slate-400'}`}
               >
-                <Receipt size={24} />
-                <span className="text-[10px] font-black tracking-tighter">{t('common.bonds')}</span>
+                <Receipt size={20} />
+                <span className="text-[9px] font-bold uppercase">{t('common.bonds')}</span>
               </button>
               
-              <div className="relative -top-12">
-                <div className="absolute inset-0 bg-emerald-500 blur-3xl opacity-40 rounded-full scale-150 animate-pulse"></div>
-                <div className="relative bg-gradient-to-br from-emerald-400 to-emerald-600 p-2 rounded-full shadow-[0_0_40px_rgba(16,185,129,0.5)] ring-[8px] ring-zinc-950/50">
+              <div className="relative -top-10">
+                <div className="absolute inset-0 bg-brand-primary blur-2xl opacity-20 rounded-full scale-150 animate-pulse"></div>
+                <div className="relative bg-brand-primary p-2.5 rounded-full shadow-lg shadow-brand-primary/30 ring-4 ring-white">
                   <AIAssistant onNavigate={onNavigate} isMobileFloating={true} />
                 </div>
               </div>
 
               <button 
                 onClick={() => handleNavClick('reports', t('nav.reports'))}
-                className={`flex flex-col items-center gap-1.5 transition-all duration-300 ${currentPage === 'reports' ? 'text-emerald-400 scale-110' : 'text-zinc-500'}`}
+                className={`flex flex-col items-center gap-1 transition-all duration-300 ${currentPage === 'reports' ? 'text-brand-primary scale-105' : 'text-slate-400'}`}
               >
-                <BarChart3 size={24} />
-                <span className="text-[10px] font-black tracking-tighter">{t('nav.reports')}</span>
+                <BarChart3 size={20} />
+                <span className="text-[9px] font-bold uppercase">{t('nav.reports')}</span>
               </button>
               
               <button 
                 onClick={() => setIsMobileMenuOpen(true)}
-                className="flex flex-col items-center gap-1.5 text-zinc-500 active:scale-110 transition-all duration-300"
+                className="flex flex-col items-center gap-1 text-slate-400 active:scale-105 transition-all duration-300"
               >
-                <Menu size={24} />
-                <span className="text-[10px] font-black tracking-tighter">{t('common.more')}</span>
+                <Menu size={20} />
+                <span className="text-[9px] font-bold uppercase">{t('common.more')}</span>
               </button>
             </nav>
           </div>
@@ -810,22 +771,22 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="fixed inset-0 bg-zinc-950/60 backdrop-blur-sm z-[60] md:hidden"
+                  className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] md:hidden"
                 />
                 <motion.div
                   initial={{ x: '100%' }}
                   animate={{ x: 0 }}
                   exit={{ x: '100%' }}
-                  className="fixed inset-y-0 right-0 w-[85%] max-w-sm bg-white dark:bg-zinc-900 z-[70] md:hidden flex flex-col shadow-2xl"
+                  className="fixed inset-y-0 right-0 w-[85%] max-w-sm bg-white z-[70] md:hidden flex flex-col shadow-2xl"
                 >
-                  <div className="p-6 border-b border-zinc-100 dark:border-white/5 flex items-center justify-between bg-stone-50 dark:bg-zinc-800/50">
+                  <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-emerald-500/20">
+                      <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-emerald-600/20">
                         {t('common.app_name')[0]}
                       </div>
-                      <span className="font-black text-xl text-zinc-900">{t('common.app_name')}</span>
+                      <span className="font-bold text-xl text-slate-900">{t('common.app_name')}</span>
                     </div>
-                    <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-zinc-400 hover:text-zinc-900 transition-colors">
+                    <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-slate-400 hover:text-slate-900 transition-colors">
                       <X size={24} />
                     </button>
                   </div>
@@ -839,7 +800,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                               onClick={() => toggleMenu(item.id)}
                               className={`
                                 w-full flex items-center justify-between p-4 rounded-2xl transition-all font-bold
-                                ${item.subItems.some((s: any) => s.id === currentPage) ? 'bg-emerald-500/10 text-emerald-600' : 'text-zinc-600 hover:bg-stone-100'}
+                                ${item.subItems.some((s: any) => s.id === currentPage) ? 'bg-emerald-50 text-emerald-600' : 'text-slate-600 hover:bg-slate-50'}
                               `}
                             >
                               <div className="flex items-center gap-3">
@@ -855,7 +816,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                                   initial={{ height: 0, opacity: 0 }}
                                   animate={{ height: 'auto', opacity: 1 }}
                                   exit={{ height: 0, opacity: 0 }}
-                                  className="overflow-hidden mr-4 border-r-2 border-zinc-100 pr-4 space-y-1"
+                                  className="overflow-hidden mr-4 border-r-2 border-slate-100 pr-4 space-y-1"
                                 >
                                   {item.subItems.map((sub: any) => (
                                     <button
@@ -863,7 +824,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                                       onClick={() => handleNavClick(sub.id, sub.label, sub.path)}
                                       className={`
                                         w-full flex items-center gap-3 p-3 rounded-xl transition-all text-right font-bold text-sm
-                                        ${currentPage === sub.id ? 'text-emerald-600 bg-emerald-50' : 'text-zinc-500 hover:bg-stone-50'}
+                                        ${currentPage === sub.id ? 'text-emerald-600 bg-emerald-50' : 'text-slate-500 hover:bg-slate-50'}
                                       `}
                                     >
                                       <sub.icon size={16} />
@@ -879,7 +840,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                             onClick={() => handleNavClick(item.id, item.label, item.path)}
                             className={`
                               w-full flex items-center gap-3 p-4 rounded-2xl transition-all font-bold
-                              ${currentPage === item.id ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-zinc-600 hover:bg-stone-100'}
+                              ${currentPage === item.id ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-600 hover:bg-slate-50'}
                             `}
                           >
                             <item.icon size={20} />
@@ -890,11 +851,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                     ))}
                   </div>
 
-                  <div className="p-6 border-t border-zinc-100 bg-stone-50">
+                  <div className="p-6 border-t border-slate-100 bg-slate-50">
                     {/* Mobile Company Switcher */}
                     {!isSuperAdmin && userMemberships.length > 1 && (
                       <div className="mb-6 space-y-2">
-                        <p className="text-[10px] font-black text-zinc-400 px-1 uppercase tracking-widest">{t('common.switch_company')}</p>
+                        <p className="text-[10px] font-black text-slate-400 px-1 uppercase tracking-widest">{t('common.switch_company')}</p>
                         <div className="flex flex-col gap-2">
                           {userMemberships.map((membership) => (
                             <button
@@ -906,40 +867,40 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                               className={`
                                 w-full flex items-center gap-4 p-4 rounded-2xl transition-all text-right border
                                 ${user?.company_id === membership.company_id 
-                                  ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/20' 
-                                  : 'bg-white border-zinc-100 text-zinc-600 hover:bg-stone-50'}
+                                  ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-600/20' 
+                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'}
                               `}
                             >
-                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${user?.company_id === membership.company_id ? 'bg-white/20 text-white' : 'bg-stone-100 text-zinc-400'}`}>
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${user?.company_id === membership.company_id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-400'}`}>
                                 <Building2 size={20} />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="font-black truncate">{membership.company_name}</p>
-                                <p className={`text-[10px] font-bold ${user?.company_id === membership.company_id ? 'text-white/70' : 'text-zinc-400'}`}>
+                                <p className="font-bold truncate">{membership.company_name}</p>
+                                <p className={`text-[10px] font-bold ${user?.company_id === membership.company_id ? 'text-white/70' : 'text-slate-400'}`}>
                                   {membership.role === 'admin' ? t('common.role_admin') : t('common.role_user')}
                                 </p>
                               </div>
                             </button>
                           ))}
                         </div>
-                        <div className="h-px bg-zinc-100 my-4" />
+                        <div className="h-px bg-slate-200 my-4" />
                       </div>
                     )}
 
                     <div className="flex items-center gap-4 mb-6">
-                      <div className="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center font-black text-white shadow-lg shadow-emerald-500/20 text-xl">
+                      <div className="w-12 h-12 rounded-2xl bg-emerald-600 flex items-center justify-center font-black text-white shadow-lg shadow-emerald-600/20 text-xl font-mono">
                         {user?.username[0].toUpperCase()}
                       </div>
                       <div>
-                        <p className="font-black text-zinc-900">{user?.username}</p>
-                        <p className="text-xs text-emerald-600 font-bold">
+                        <p className="font-bold text-slate-900">{user?.username}</p>
+                        <p className="text-xs text-emerald-600 font-bold uppercase tracking-tighter">
                           {isSuperAdmin ? t('common.role_super_admin') : isCompanyAdmin ? t('common.role_admin') : isManager ? t('common.manager') : t('common.role_user')}
                         </p>
                       </div>
                     </div>
                     <button 
                       onClick={logout}
-                      className="w-full flex items-center justify-center gap-3 p-4 bg-red-50 text-red-600 rounded-2xl font-bold hover:bg-red-100 transition-all"
+                      className="w-full flex items-center justify-center gap-3 p-4 bg-red-50 text-red-600 rounded-2xl font-bold hover:bg-red-100 transition-all border border-red-100"
                     >
                       <LogOut size={20} />
                       <span>{t('common.logout')}</span>
