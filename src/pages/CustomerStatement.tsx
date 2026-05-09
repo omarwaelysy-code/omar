@@ -91,23 +91,44 @@ export const CustomerStatement: React.FC = () => {
         balanceForward = customerOpBal + entriesBefore.reduce((sum, e) => sum + (Number(e.debit || 0) - Number(e.credit || 0)), 0);
         filteredEntries = allEntries.filter(e => e.date >= startDate);
       } else {
-        // If no start date, opening balance is just the customerOpBal
-        balanceForward = customerOpBal;
+        // If no start date, we show all entries.
+        // We don't start from balanceForward because the opening balance might be one of the entries.
+        balanceForward = 0;
       }
 
-      // Add Balance Forward entry
+      // Add Balance Forward entry OR Opening Balance from profile if not in entries
       const finalAllEntries = [];
-      if (balanceForward !== 0 || startDate) {
+      const hasOpeningBalanceInEntries = allEntries.some(e => e.type === 'opening_balance' || e.description === 'رصيد افتتاحي');
+
+      if (startDate) {
+        // Always add balance forward (as "carried over" balance)
         finalAllEntries.push({
           id: 'balance-forward',
-          date: startDate || allEntries[0]?.date || new Date().toISOString().slice(0, 10),
+          date: startDate,
           type: 'opening_balance',
           reference: '-',
-          description: startDate ? 'رصيد منقول' : 'رصيد افتتاحي',
+          description: 'رصيد منقول',
           debit: balanceForward > 0 ? balanceForward : 0,
           credit: balanceForward < 0 ? Math.abs(balanceForward) : 0,
           balance: balanceForward
         });
+      } else if (customerOpBal !== 0 && !hasOpeningBalanceInEntries) {
+        // If no start date, only add manual opening balance if it's NOT already in the transaction list
+        finalAllEntries.push({
+          id: 'balance-forward',
+          date: allEntries[0]?.date || new Date().toISOString().slice(0, 10),
+          type: 'opening_balance',
+          reference: '-',
+          description: 'رصيد افتتاحي',
+          debit: customerOpBal > 0 ? customerOpBal : 0,
+          credit: customerOpBal < 0 ? Math.abs(customerOpBal) : 0,
+          balance: customerOpBal
+        });
+        balanceForward = customerOpBal;
+      } else {
+        // No start date, and either no opening balance OR it's already in the entries.
+        // If it's already in entries, the first entry will set the starting point correctly.
+        balanceForward = 0;
       }
 
       // Calculate running balance

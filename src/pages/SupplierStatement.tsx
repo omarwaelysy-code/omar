@@ -93,8 +93,15 @@ export const SupplierStatement: React.FC = () => {
 
       // Calculate balance forward
       const supplierOpBal = Number(supplier?.opening_balance || 0);
-      const itemsBefore = allItems.filter(item => startDate && new Date(item.date) < new Date(startDate));
-      const balanceBefore = supplierOpBal + itemsBefore.reduce((sum, item) => sum + (Number(item.credit || 0) - Number(item.debit || 0)), 0);
+      const hasOpeningBalanceInItems = allItems.some(item => item.type === 'opening_balance' || item.notes === 'رصيد افتتاحي');
+      
+      let balanceBefore = 0;
+      if (startDate) {
+        const itemsBefore = allItems.filter(item => new Date(item.date) < new Date(startDate));
+        balanceBefore = supplierOpBal + itemsBefore.reduce((sum, item) => sum + (Number(item.credit || 0) - Number(item.debit || 0)), 0);
+      } else if (!hasOpeningBalanceInItems) {
+        balanceBefore = supplierOpBal;
+      }
       
       const initialBalance = balanceBefore;
       setStartBalance(initialBalance);
@@ -257,15 +264,17 @@ export const SupplierStatement: React.FC = () => {
                   </thead>
                   <tbody>
                     {/* Opening Balance Row */}
-                    <tr className="border-b border-zinc-50 bg-zinc-50/30">
-                      <td className="px-4 py-3 text-sm font-mono">{startDate || '-'}</td>
-                      <td className="px-4 py-3 text-sm"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600">رصيد</span></td>
-                      <td className="px-4 py-3 text-sm font-mono">-</td>
-                      <td className="px-4 py-3 text-sm">رصيد منقول</td>
-                      <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance < 0 ? formatNumber(Math.abs(startBalance)) : '-'}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-rose-600">{startBalance > 0 ? formatNumber(startBalance) : '-'}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-zinc-900">{formatBalance(startBalance)}</td>
-                    </tr>
+                    {(startBalance !== 0 || startDate) && (
+                      <tr className="border-b border-zinc-50 bg-zinc-50/30">
+                        <td className="px-4 py-3 text-sm font-mono">{startDate || '-'}</td>
+                        <td className="px-4 py-3 text-sm"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600">رصيد</span></td>
+                        <td className="px-4 py-3 text-sm font-mono">-</td>
+                        <td className="px-4 py-3 text-sm">{startDate ? 'رصيد منقول' : 'رصيد افتتاحي'}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-rose-600">{startBalance > 0 ? formatNumber(startBalance) : '-'}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance < 0 ? formatNumber(Math.abs(startBalance)) : '-'}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-zinc-900">{formatBalance(startBalance)}</td>
+                      </tr>
+                    )}
                     {statement.map((item) => (
                       <tr key={item.id} className="border-b border-zinc-50 hover:bg-zinc-50/50 transition-colors">
                         <td className="px-4 py-3 text-sm font-mono">{formatDate(item.date)}</td>
