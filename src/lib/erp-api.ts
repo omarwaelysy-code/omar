@@ -616,10 +616,10 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
     // 1. Get the category and its parents (recursive query)
     const categoryQuery = `
       WITH RECURSIVE category_tree AS (
-        SELECT id, parent_id FROM operation_categories WHERE id = $1 AND company_id = $2
+        SELECT id::text, parent_id::text FROM operation_categories WHERE id::text = $1 AND company_id = $2
         UNION ALL
-        SELECT c.id, c.parent_id FROM operation_categories c
-        INNER JOIN category_tree ct ON c.id = ct.parent_id
+        SELECT c.id::text, c.parent_id::text FROM operation_categories c
+        INNER JOIN category_tree ct ON c.id::text = ct.parent_id::text
       )
       SELECT id FROM category_tree;
     `;
@@ -641,18 +641,18 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
     // - OR General fields (both category_id is null AND no links found)
     let fieldsQuery = `
       SELECT DISTINCT f.* FROM operation_fields f
-      LEFT JOIN field_operation_categories fc ON f.id = fc.field_id
+      LEFT JOIN field_operation_categories fc ON f.id::text = fc.field_id::text
       WHERE (f.company_id = $1)
       AND (
-        (f.category_id IS NULL AND f.operation_category_id IS NULL AND NOT EXISTS (SELECT 1 FROM field_operation_categories WHERE field_id = f.id))
+        (f.category_id IS NULL AND f.operation_category_id IS NULL AND NOT EXISTS (SELECT 1 FROM field_operation_categories WHERE field_id::text = f.id::text))
     `;
 
     const params: any[] = [companyId];
     if (categoryIds.length > 0) {
       fieldsQuery += ` 
-        OR f.category_id = ANY($2)
-        OR f.operation_category_id = ANY($2)
-        OR fc.category_id = ANY($2)
+        OR f.category_id::text = ANY($2)
+        OR f.operation_category_id::text = ANY($2)
+        OR fc.category_id::text = ANY($2)
       `;
       params.push(categoryIds);
     }
