@@ -38,13 +38,18 @@ import {
   EyeOff,
   AlertCircle,
   Bell,
-  Languages
+  Languages,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { notificationService } from '../services/notificationService';
 import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
+
+import { Logo } from './Logo';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -56,6 +61,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 
 export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPage }) => {
   const { language, setLanguage, t, dir } = useLanguage();
+  const { theme, toggleTheme } = useTheme();
   const { logout, user, userMemberships, switchCompany, isSuperAdmin, isCompanyAdmin, isManager, isStandardUser, hasPermission } = useAuth();
   const { unreadCount, setIsCenterOpen, addPersistentNotification, showNotification } = useNotification();
   const { openTabs, activeTabId, openTab, closeTab, setActiveTab } = useNavigation();
@@ -301,12 +307,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
   };
 
   return (
-    <div className={`min-h-screen bg-stone-100 flex flex-col overflow-hidden font-sans selection:bg-emerald-500/30 ${language === 'en' ? 'font-sans' : ''}`} dir={dir}>
+    <div className={`min-h-screen bg-stone-100 dark:bg-zinc-950 flex flex-col overflow-hidden font-sans selection:bg-emerald-500/30 ${language === 'en' ? 'font-sans' : ''}`} dir={dir}>
       {/* Change Password Modal */}
       {showChangePasswordModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-zinc-900/80 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className={`p-8 border-b border-zinc-100 bg-stone-50 flex items-center gap-4 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+          <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className={`p-8 border-b border-zinc-100 dark:border-white/5 bg-stone-50 dark:bg-zinc-800/50 flex items-center gap-4 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
               <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
                 <Lock size={24} />
               </div>
@@ -378,12 +384,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       )}
 
       {/* Desktop Top Navigation */}
-      <header className="hidden md:flex sticky top-0 z-30 bg-zinc-900 text-white h-20 items-center px-8 shadow-2xl border-b border-white/5">
+      <header className="hidden md:flex sticky top-0 z-30 bg-zinc-950 text-white h-20 items-center px-8 shadow-2xl border-b border-white/5">
         <div className={`flex items-center gap-4 ${dir === 'rtl' ? 'ml-12' : 'mr-12'}`}>
-          <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-emerald-500/20">
-            {t('common.app_name')[0]}
-          </div>
-          <h1 className="text-xl font-black tracking-tight whitespace-nowrap">{t('common.app_name')}</h1>
+          <Logo variant="full" color="white" className="h-10" />
         </div>
 
         <nav className="flex items-center gap-1 flex-1">
@@ -447,6 +450,28 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         </nav>
 
         <div className={`flex items-center gap-4 ${dir === 'rtl' ? 'mr-auto' : 'ml-auto'}`}>
+          <button 
+            onClick={toggleTheme}
+            className="p-2.5 bg-white/5 hover:bg-white/10 text-white rounded-xl transition-all group relative overflow-hidden"
+            title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+          >
+            <motion.div
+              initial={false}
+              animate={{ y: theme === 'dark' ? 0 : 40 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            >
+              <Sun size={20} className="text-amber-400" />
+            </motion.div>
+            <motion.div
+              initial={false}
+              animate={{ y: theme === 'dark' ? -40 : -20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="absolute left-1/2 -translate-x-1/2"
+            >
+              <Moon size={20} className="text-zinc-400" />
+            </motion.div>
+          </button>
+
           <button 
             onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
             className="p-2.5 bg-white/5 hover:bg-white/10 text-white rounded-xl transition-all group flex items-center gap-2"
@@ -557,39 +582,41 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         {/* Desktop Sidebar for Open Tabs */}
         <aside 
           className={`
-            hidden md:flex flex-col bg-white ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200 shadow-sm z-20 transition-all duration-300
-            ${isSidebarCollapsed ? 'w-16' : 'w-64'}
+            hidden md:flex flex-col bg-zinc-950/95 backdrop-blur-3xl ${dir === 'rtl' ? 'border-l' : 'border-r'} border-white/5 shadow-2xl z-20 transition-all duration-300
+            ${isSidebarCollapsed ? 'w-20' : 'w-72'}
           `}
         >
-          <div className="p-4 border-b border-zinc-100 flex items-center justify-between bg-stone-50/50 overflow-hidden">
+          <div className="p-6 border-b border-white/5 flex items-center justify-between mb-2">
             {!isSidebarCollapsed && (
               <motion.h2 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="font-black text-zinc-900 flex items-center gap-2 whitespace-nowrap"
+                className="font-black text-white flex items-center gap-3 whitespace-nowrap"
               >
-                <RotateCcw size={18} className="text-emerald-500" />
+                <div className="w-8 h-8 rounded-lg bg-brand-primary/10 flex items-center justify-center">
+                  <RotateCcw size={18} className="text-brand-primary" />
+                </div>
                 <span>{t('common.open_screens')}</span>
               </motion.h2>
             )}
             <button 
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="p-1 hover:bg-zinc-100 rounded-md text-zinc-400 transition-colors"
+              className="p-2 hover:bg-white/10 rounded-xl text-zinc-500 transition-all active:scale-95"
             >
               {isSidebarCollapsed ? <Menu size={20} /> : <X size={20} />}
             </button>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar overflow-x-hidden">
+          <div className="flex-1 overflow-y-auto px-3 space-y-1 custom-scrollbar overflow-x-hidden">
             {openTabs.map((tab) => (
               <div 
                 key={tab.id}
                 className={`
-                  group relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all cursor-pointer
+                  group relative flex items-center gap-3 px-5 py-4 rounded-2xl transition-all cursor-pointer
                   ${activeTabId === tab.id 
-                    ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' 
-                    : 'text-zinc-500 hover:bg-stone-100'}
-                  ${isSidebarCollapsed ? 'justify-center px-0' : ''}
+                    ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/30' 
+                    : 'text-zinc-500 hover:bg-white/5 hover:text-white'}
+                  ${isSidebarCollapsed ? 'justify-center px-0 mx-2' : ''}
                 `}
                 onClick={() => setActiveTab(tab.id)}
                 title={isSidebarCollapsed ? tab.label : ''}
@@ -597,7 +624,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 {!isSidebarCollapsed ? (
                   <>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold truncate">{tab.label}</p>
+                      <p className="text-sm font-bold truncate tracking-tight">{tab.label}</p>
                     </div>
                     
                     {tab.id !== 'dashboard' && (
@@ -607,10 +634,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                           closeTab(tab.id);
                         }}
                         className={`
-                          p-1 rounded-md transition-all
+                          p-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100
                           ${activeTabId === tab.id 
                             ? 'hover:bg-white/20 text-white/70 hover:text-white' 
-                            : 'hover:bg-zinc-200 text-zinc-400 hover:text-zinc-600'}
+                            : 'hover:bg-white/10 text-zinc-500 hover:text-white'}
                         `}
                       >
                         <X size={14} />
@@ -618,7 +645,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                     )}
                   </>
                 ) : (
-                  <div className="w-8 h-8 rounded-lg bg-current opacity-10 flex items-center justify-center font-black text-[10px]">
+                  <div className={`w-10 h-10 rounded-xl ${activeTabId === tab.id ? 'bg-white/20' : 'bg-white/5'} flex items-center justify-center font-black text-xs`}>
                     {tab.label[0]}
                   </div>
                 )}
@@ -626,7 +653,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 {activeTabId === tab.id && !isSidebarCollapsed && (
                   <motion.div 
                     layoutId="active-tab-indicator"
-                    className="absolute right-0 top-1/4 bottom-1/4 w-1 bg-white rounded-l-full"
+                    className="absolute right-0 top-1/4 bottom-1/4 w-1 bg-white rounded-l-full shadow-glow"
                   />
                 )}
               </div>
@@ -634,13 +661,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           </div>
 
           {!isSidebarCollapsed && (
-            <div className="p-4 border-t border-zinc-100 bg-stone-50/50 space-y-1">
-              <p className="text-[10px] text-zinc-400 font-bold text-center">
+            <div className="p-6 border-t border-white/5 bg-zinc-900/50 space-y-2">
+              <p className="text-[10px] text-zinc-600 font-bold text-center">
                 {t('common.switch_screens_hint')}
               </p>
-              <p className="text-[9px] text-zinc-300 font-black text-center uppercase tracking-widest">
-                Obrain ERP V2 • v2.0.0
-              </p>
+              <div className="flex justify-center">
+                <div className="px-3 py-1 bg-white/5 rounded-full">
+                  <span className="text-[9px] text-zinc-500 font-black tracking-widest uppercase">
+                    Obrain ERP • v2.0
+                  </span>
+                </div>
+              </div>
             </div>
           )}
         </aside>
@@ -648,14 +679,19 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
           {/* Mobile Header */}
-          <header className="md:hidden sticky top-0 z-30 bg-white/70 backdrop-blur-2xl border-b border-zinc-200/50 p-5 flex items-center justify-between">
+          <header className="md:hidden sticky top-0 z-30 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl border-b border-zinc-200/50 dark:border-white/5 p-5 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center text-white font-black shadow-xl shadow-emerald-500/20">
-                {t('common.app_name')[0]}
-              </div>
-              <h1 className="text-xl font-black text-zinc-900 tracking-tight">{t('common.app_name')}</h1>
+              <Logo variant="full" className="h-10" />
             </div>
             <div className="flex items-center gap-2">
+              <button 
+                onClick={toggleTheme}
+                className="p-3 text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-2xl transition-all active:scale-90 relative overflow-hidden"
+              >
+                <div className="flex flex-col items-center">
+                   {theme === 'dark' ? <Sun size={24} className="text-amber-500" /> : <Moon size={24} className="text-zinc-500" />}
+                </div>
+              </button>
               <button 
                 onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
                 className="p-3 text-zinc-900 bg-zinc-100 hover:bg-zinc-200 rounded-2xl transition-all active:scale-90"
@@ -683,7 +719,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           </header>
 
           {/* Mobile Tabs Bar */}
-          <div className="md:hidden flex overflow-x-auto bg-white border-b border-zinc-100 p-2 gap-2 custom-scrollbar">
+          <div className="md:hidden flex overflow-x-auto bg-white dark:bg-zinc-900 border-b border-zinc-100 dark:border-white/5 p-2 gap-2 custom-scrollbar">
             {openTabs.map((tab) => (
               <button
                 key={tab.id}
@@ -780,9 +816,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                   initial={{ x: '100%' }}
                   animate={{ x: 0 }}
                   exit={{ x: '100%' }}
-                  className="fixed inset-y-0 right-0 w-[85%] max-w-sm bg-white z-[70] md:hidden flex flex-col shadow-2xl"
+                  className="fixed inset-y-0 right-0 w-[85%] max-w-sm bg-white dark:bg-zinc-900 z-[70] md:hidden flex flex-col shadow-2xl"
                 >
-                  <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-stone-50">
+                  <div className="p-6 border-b border-zinc-100 dark:border-white/5 flex items-center justify-between bg-stone-50 dark:bg-zinc-800/50">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-emerald-500/20">
                         {t('common.app_name')[0]}

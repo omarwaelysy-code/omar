@@ -58,9 +58,12 @@ import { Operations } from './pages/Operations';
 import { Departments } from './pages/Departments';
 import { CostCenters } from './pages/CostCenters';
 
+import { LoadingScreen } from './components/LoadingScreen';
+import { AnimatePresence } from 'framer-motion';
+
 export default function App() {
   const { t, dir } = useLanguage();
-  const { isAuthenticated, loading: authLoading, isSuperAdmin, isCompanyAdmin, isStandardUser } = useAuth();
+  const { isAuthenticated, loading: authLoading, isSuperAdmin } = useAuth();
   const { currentPage, setCurrentPage, openTabs, activeTabId } = useNavigation();
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(true);
@@ -79,7 +82,8 @@ export default function App() {
         setDbError(err.message || 'Network error while connecting to database');
       } finally {
         if (!authLoading) {
-          setLoading(false);
+          // Add a slight delay for smooth transition
+          setTimeout(() => setLoading(false), 500);
         }
       }
     };
@@ -91,37 +95,48 @@ export default function App() {
     return <DatabaseError error={dbError} />;
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-stone-50 flex flex-col items-center justify-center p-4" dir={dir}>
-        <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <h2 className="text-xl font-medium text-stone-600">{t('common.loading')}</h2>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    // Check for custom super admin route even when not authenticated
-    if (window.location.pathname === '/super-admin@m@r2020') {
-      return (
-        <div className="min-h-screen bg-stone-50 flex items-center justify-center">
-          <Login onToggle={() => setAuthMode('register')} />
-        </div>
-      );
-    }
-
-    return (
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
-        {authMode === 'login' ? (
-          <Login onToggle={() => setAuthMode('register')} />
+  return (
+    <div className={`min-h-screen ${dir === 'rtl' ? 'font-sans' : 'font-sans'}`} dir={dir}>
+      <Toaster position="top-center" />
+      <AnimatePresence mode="wait">
+        {loading ? (
+          <LoadingScreen key="loading" />
         ) : (
-          <Register onToggle={() => setAuthMode('login')} />
+          <MaintenanceModeGuard key="app">
+            <ChangePasswordModal />
+            {!isAuthenticated ? (
+              <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4">
+                {authMode === 'login' ? (
+                  <Login onToggle={() => setAuthMode('register')} />
+                ) : (
+                  <Register onToggle={() => setAuthMode('login')} />
+                )}
+              </div>
+            ) : (
+              <Layout onNavigate={setCurrentPage} currentPage={currentPage}>
+                <div className="relative w-full h-full">
+                  {window.location.pathname === '/super-admin@m@r2020' && isSuperAdmin ? (
+                    <SuperAdminDashboard />
+                  ) : (
+                    openTabs.map((tab) => (
+                      <div 
+                        key={tab.id} 
+                        className={activeTabId === tab.id ? 'block' : 'hidden'}
+                      >
+                        {getPageComponent(tab.id)}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </Layout>
+            )}
+          </MaintenanceModeGuard>
         )}
-      </div>
-    );
-  }
+      </AnimatePresence>
+    </div>
+  );
 
-  const getPageComponent = (id: string) => {
+  function getPageComponent(id: string) {
     // Role-based access control for pages
     // Super Admin should NEVER see regular tenant pages
     if (isSuperAdmin) {
@@ -131,8 +146,6 @@ export default function App() {
       if (id === 'system_check') return <SuperAdminDashboard initialTab="system" />;
       if (id === 'activity_log' || id === 'audit_logs') return <SuperAdminDashboard initialTab="audit" />;
       
-      // If Super Admin tries to access any regular page, show Super Admin Dashboard
-      // This prevents them from seeing company-specific widgets/pages
       return <SuperAdminDashboard />;
     }
 
@@ -182,31 +195,6 @@ export default function App() {
       case 'system_check': return <SystemCheck />;
       default: return <Dashboard />;
     }
-  };
-
-  return (
-    <div className="min-h-screen bg-stone-50">
-      <Toaster position="top-center" />
-      <MaintenanceModeGuard>
-        <ChangePasswordModal />
-        <Layout onNavigate={setCurrentPage} currentPage={currentPage}>
-          <div className="relative w-full h-full">
-            {window.location.pathname === '/super-admin@m@r2020' && isSuperAdmin ? (
-              <SuperAdminDashboard />
-            ) : (
-              openTabs.map((tab) => (
-                <div 
-                  key={tab.id} 
-                  className={activeTabId === tab.id ? 'block' : 'hidden'}
-                >
-                  {getPageComponent(tab.id)}
-                </div>
-              ))
-            )}
-          </div>
-        </Layout>
-      </MaintenanceModeGuard>
-    </div>
-  );
+  }
 }
 

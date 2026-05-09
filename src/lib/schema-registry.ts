@@ -104,10 +104,10 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'id', 'code', 'name', 'description', 'department_id', 'company_id', 'budget', 'currency', 'is_active', 'created_at'
   ],
   operations: [
-    'id', 'company_id', 'customer_id', 'customer_name', 'description', 'date', 'status', 'category_id', 'operation_number', 'department_id', 'cost_center_id', 'operation_date', 'created_at'
+    'id', 'company_id', 'customer_id', 'customer_name', 'description', 'date', 'status', 'category_id', 'operation_category_id', 'operation_number', 'department_id', 'cost_center_id', 'operation_date', 'created_at'
   ],
   operation_fields: [
-    'id', 'company_id', 'name', 'label', 'type', 'category_id', 'department_id', 'sort_order', 'is_required', 'options', 'code', 'description', 'unit', 'default_value', 'created_at'
+    'id', 'company_id', 'name', 'label', 'type', 'category_id', 'operation_category_id', 'department_id', 'sort_order', 'is_required', 'options', 'code', 'description', 'unit', 'default_value', 'created_at'
   ],
   operation_field_values: [
     'id', 'operation_id', 'field_id', 'value', 'company_id', 'created_at'

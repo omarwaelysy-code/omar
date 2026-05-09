@@ -447,6 +447,8 @@ const getList = async (table: string, filters: any) => {
   let paramIndex = 1;
   Object.keys(filters).forEach((key) => {
     const value = filters[key];
+    const cast = isUUIDColumn(table, key) ? '::uuid' : '';
+    
     if (key === 'date_from') {
       conditions.push(`date >= $${paramIndex++}`);
       values.push(value);
@@ -454,7 +456,7 @@ const getList = async (table: string, filters: any) => {
       conditions.push(`date <= $${paramIndex++}`);
       values.push(value);
     } else {
-      conditions.push(`${key} = $${paramIndex++}`);
+      conditions.push(`${key} = $${paramIndex++}${cast}`);
       values.push(value);
     }
   });
@@ -613,7 +615,7 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
     // 1. Get the category and its parents (recursive query)
     const categoryQuery = `
       WITH RECURSIVE category_tree AS (
-        SELECT id, parent_id FROM operation_categories WHERE id = $1 AND company_id = $2
+        SELECT id, parent_id FROM operation_categories WHERE id = $1::uuid AND company_id = $2
         UNION ALL
         SELECT c.id, c.parent_id FROM operation_categories c
         INNER JOIN category_tree ct ON c.id = ct.parent_id
@@ -623,7 +625,7 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
     
     // If categoryId is 'null' or empty, we just look for general fields
     let categoryIds: string[] = [];
-    if (categoryId && categoryId !== 'null' && categoryId !== 'undefined') {
+    if (categoryId && categoryId !== 'null' && categoryId !== 'undefined' && isUUID(categoryId)) {
       const { rows: treeRows } = await pool.query(categoryQuery, [categoryId, companyId]);
       categoryIds = treeRows.map(r => r.id);
     }
@@ -643,8 +645,8 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
     const params: any[] = [companyId];
     if (categoryIds.length > 0) {
       fieldsQuery += ` 
-        OR f.category_id = ANY($2)
-        OR fc.category_id = ANY($2)
+        OR f.category_id = ANY($2::uuid[])
+        OR fc.category_id = ANY($2::uuid[])
       `;
       params.push(categoryIds);
     }
@@ -657,6 +659,28 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
     res.status(500).json({ error: error.message });
   }
 });
+
+// UUID tables for strict validation and casting
+const UUID_TABLES = [
+  'operation_categories', 'operations', 'operation_fields', 
+  'operation_field_values', 'field_operation_categories',
+  'departments', 'cost_centers'
+];
+
+// Helper to check if a column should be cast to UUID
+function isUUIDColumn(table: string, column: string): boolean {
+  if (column === 'id' && UUID_TABLES.includes(table)) return true;
+  const uuidRefs: { [key: string]: string[] } = {
+    operation_fields: ['category_id', 'operation_category_id', 'department_id'],
+    operations: ['category_id', 'operation_category_id', 'department_id', 'cost_center_id'],
+    operation_field_values: ['operation_id', 'field_id'],
+    field_operation_categories: ['field_id', 'category_id'],
+    departments: ['parent_id'],
+    cost_centers: ['department_id'],
+    operation_categories: ['parent_id']
+  };
+  return uuidRefs[table]?.includes(column) || false;
+}
 
 const transactionalModules = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns', 'journal_entries'];
 
@@ -719,7 +743,8 @@ function sanitizeData(table: string, data: any) {
       
       // Strict UUID validation for ID fields (except those known to be BIGSERIAL or VARCHAR)
       const isIdField = key === 'id' || key.endsWith('_id');
-      const isUUIDTable = !['activity_logs', 'migrations', 'system_config', 'field_operation_categories'].includes(table);
+      const excludedFromUUIDCheck = ['activity_logs', 'migrations', 'system_config'];
+      const isUUIDTable = !excludedFromUUIDCheck.includes(table);
       // specific excludes for non-uuid foreign keys
       const charIdFields = ['user_id', 'company_id']; 
       
@@ -834,12 +859,14 @@ modules.forEach(moduleName => {
         const { id } = req.params;
         
         // UUID validation for single item GET
-        const isUUIDTable = !['activity_logs', 'migrations', 'system_config', 'field_operation_categories'].includes(moduleName);
+        const excludedFromUUIDCheck = ['activity_logs', 'migrations', 'system_config'];
+        const isUUIDTable = !excludedFromUUIDCheck.includes(moduleName);
         if (isUUIDTable && !isUUID(id)) {
           return sendError(res, 400, `Invalid ID format for ${moduleName}`);
         }
 
-        const { rows }: any = await pool.query(`SELECT * FROM ${moduleName} WHERE id = $1`, [id]);
+        const cast = UUID_TABLES.includes(moduleName) ? '::uuid' : '';
+        const { rows }: any = await pool.query(`SELECT * FROM ${moduleName} WHERE id = $1${cast}`, [id]);
         const row = rows[0] || null;
         
         if (!row) {
@@ -979,8 +1006,13 @@ modules.forEach(moduleName => {
           const values = Object.values(sanitizedData);
           if (keys.length === 0) return sendError(res, 400, 'No valid fields for update');
 
-          const setClause = keys.map((key, index) => `${key} = $${index + 1}`).join(', ');
-          let query = `UPDATE ${moduleName} SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${keys.length + 1}`;
+          const setClause = keys.map((key, index) => {
+            const cast = isUUIDColumn(moduleName, key) ? '::uuid' : '';
+            return `${key} = $${index + 1}${cast}`;
+          }).join(', ');
+          
+          const castId = UUID_TABLES.includes(moduleName) ? '::uuid' : '';
+          let query = `UPDATE ${moduleName} SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${keys.length + 1}${castId}`;
           let params = [...values, id];
 
           if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies') {
@@ -1027,11 +1059,13 @@ modules.forEach(moduleName => {
         const { id } = req.params;
         const companyId = req.user?.company_id;
 
-        if (!isUUID(id) && !['activity_logs', 'migrations', 'system_config', 'field_operation_categories'].includes(moduleName)) {
+        const excludedFromUUIDCheck = ['activity_logs', 'migrations', 'system_config'];
+        if (!isUUID(id) && !excludedFromUUIDCheck.includes(moduleName)) {
           return sendError(res, 400, 'Invalid ID format');
         }
 
-        let query = `DELETE FROM ${moduleName} WHERE id = $1`;
+        const cast = UUID_TABLES.includes(moduleName) ? '::uuid' : '';
+        let query = `DELETE FROM ${moduleName} WHERE id = $1${cast}`;
         let params = [id];
 
         if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies') {
