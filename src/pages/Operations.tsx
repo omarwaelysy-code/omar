@@ -70,7 +70,9 @@ export function Operations() {
 
   const fetchFields = async (categoryId: string) => {
     try {
+      console.log('Fetching fields for category:', categoryId);
       const data = await apiRequest<OperationField[]>(`/operation_fields/by-category/${categoryId}`);
+      console.log('Fields received from API:', data);
       setDynamicFields(data);
     } catch (error) {
       console.error('Failed to fetch fields:', error);
@@ -386,30 +388,32 @@ export function Operations() {
                 </div>
 
                 {/* DYNAMIC FIELDS SECTION */}
-                <AnimatePresence>
-                  {dynamicFields.length > 0 && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      className="bg-zinc-100 p-6 rounded-[2rem] border border-zinc-200"
-                    >
-                      <div className="flex items-center gap-2 mb-4 text-emerald-800">
-                        <Info size={16} />
-                        <span className="text-sm font-bold">الحقول الديناميكية (Dynamic Specification):</span>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {dynamicFields.map(field => (
-                          <div key={field.id}>
-                            <label className="block text-xs font-bold text-zinc-600 mb-1.5 ml-1">
-                              {field.label} {field.is_required && <span className="text-rose-500">*</span>}
-                            </label>
-                            {renderDynamicField(field)}
-                          </div>
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                {dynamicFields.length > 0 && (
+                  <div className="bg-zinc-100 p-6 rounded-[2rem] border border-zinc-200">
+                    <div className="flex items-center gap-2 mb-4 text-emerald-800">
+                      <Info size={16} />
+                      <span className="text-sm font-bold">الحقول الديناميكية (Dynamic Specification):</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {dynamicFields.map(field => {
+                        try {
+                          console.log('Attempting to render field:', field.name, field.type);
+                          return (
+                            <div key={field.id} id={`field-container-${field.id}`}>
+                              <label className="block text-xs font-bold text-zinc-600 mb-1.5 ml-1">
+                                {field.label} {field.is_required && <span className="text-rose-500">*</span>}
+                              </label>
+                              {renderDynamicField(field)}
+                            </div>
+                          );
+                        } catch (e) {
+                          console.error('Error rendering dynamic field:', field.name, e);
+                          return <div key={field.id} className="text-rose-500 text-xs">Error rendering {field.label}</div>;
+                        }
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-bold text-zinc-700 mb-2">وصف العملية / ملاحظات</label>

@@ -626,38 +626,46 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
     
     // If categoryId is 'null' or empty, we just look for general fields
     let categoryIds: string[] = [];
-    if (categoryId && categoryId !== 'null' && categoryId !== 'undefined') {
+    if (categoryId && categoryId !== 'null' && categoryId !== 'undefined' && categoryId !== '') {
       const { rows: treeRows } = await pool.query(categoryQuery, [categoryId, companyId]);
       categoryIds = treeRows.map(r => r.id);
-      console.log(`[DEBUG] Category IDs (including parents): ${categoryIds.join(', ')}`);
+      console.log(`[DEBUG] Category IDs found in tree for ${categoryId}:`, categoryIds);
     } else {
-      console.log(`[DEBUG] No category selected, fetching general fields.`);
+      console.log(`[DEBUG] No category selected or categoryId invalid: ${categoryId}`);
     }
 
     // 2. Fetch fields: 
     // - Linked to selected category or its parents via field_operation_categories
     // - OR Direct category_id match
+    // - OR Direct operation_category_id match (fallback)
     // - OR General fields (both category_id is null AND no links found)
     let fieldsQuery = `
       SELECT DISTINCT f.* FROM operation_fields f
       LEFT JOIN field_operation_categories fc ON f.id = fc.field_id
       WHERE (f.company_id = $1)
       AND (
-        (f.category_id IS NULL AND NOT EXISTS (SELECT 1 FROM field_operation_categories WHERE field_id = f.id))
+        (f.category_id IS NULL AND f.operation_category_id IS NULL AND NOT EXISTS (SELECT 1 FROM field_operation_categories WHERE field_id = f.id))
     `;
 
     const params: any[] = [companyId];
     if (categoryIds.length > 0) {
       fieldsQuery += ` 
         OR f.category_id = ANY($2)
+        OR f.operation_category_id = ANY($2)
         OR fc.category_id = ANY($2)
       `;
       params.push(categoryIds);
     }
     fieldsQuery += `) ORDER BY f.sort_order ASC, f.name ASC`;
 
+    console.log(`[DEBUG] Fields Query:`, fieldsQuery);
+    console.log(`[DEBUG] Params:`, JSON.stringify(params));
+
     const { rows: fields } = await pool.query(fieldsQuery, params);
-    console.log(`[DEBUG] Found ${fields.length} fields for this category.`);
+    console.log(`[DEBUG] Found ${fields.length} dynamic fields.`);
+    if (fields.length > 0) {
+      console.log(`[DEBUG] First field sample:`, JSON.stringify(fields[0]));
+    }
     res.json(fields.map(f => parseRow('operation_fields', f)));
   } catch (error: any) {
     console.error('Error fetching fields by category:', error);
