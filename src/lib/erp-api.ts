@@ -615,7 +615,7 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
     // 1. Get the category and its parents (recursive query)
     const categoryQuery = `
       WITH RECURSIVE category_tree AS (
-        SELECT id, parent_id FROM operation_categories WHERE id = $1::uuid AND company_id = $2
+        SELECT id, parent_id FROM operation_categories WHERE id = CAST($1 AS UUID) AND company_id = $2
         UNION ALL
         SELECT c.id, c.parent_id FROM operation_categories c
         INNER JOIN category_tree ct ON c.id = ct.parent_id
@@ -632,19 +632,20 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
 
     // 2. Fetch fields: 
     // - Linked to selected category or its parents via field_operation_categories
-    // - OR Direct category_id match (backward compatibility)
-    // - OR General fields (both category_id is null AND no links found - though usually general is null)
+    // - OR Direct operation_category_id match
+    // - OR General fields (both operation_category_id is null AND no links found)
     let fieldsQuery = `
       SELECT DISTINCT f.* FROM operation_fields f
       LEFT JOIN field_operation_categories fc ON f.id = fc.field_id
       WHERE (f.company_id = $1)
       AND (
-        (f.category_id IS NULL AND NOT EXISTS (SELECT 1 FROM field_operation_categories WHERE field_id = f.id))
+        (f.operation_category_id IS NULL AND NOT EXISTS (SELECT 1 FROM field_operation_categories WHERE field_id = f.id))
     `;
 
     const params: any[] = [companyId];
     if (categoryIds.length > 0) {
       fieldsQuery += ` 
+        OR f.operation_category_id = ANY($2::uuid[])
         OR f.category_id = ANY($2::uuid[])
         OR fc.category_id = ANY($2::uuid[])
       `;
@@ -944,7 +945,10 @@ modules.forEach(moduleName => {
           
           const keys = Object.keys(data);
           const values = Object.values(data);
-          const placeholders = keys.map((_, index) => `$${index + 1}`).join(', ');
+          const placeholders = keys.map((key, index) => {
+            const cast = isUUIDColumn(moduleName, key) ? '::uuid' : '';
+            return `$${index + 1}${cast}`;
+          }).join(', ');
           
           const result = await pool.query(
             `INSERT INTO ${moduleName} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`,
@@ -986,7 +990,7 @@ modules.forEach(moduleName => {
           const { id } = req.params;
           const companyId = req.user?.company_id;
 
-          if (!isUUID(id) && !['activity_logs', 'migrations', 'system_config', 'field_operation_categories'].includes(moduleName)) {
+          if (!isUUID(id) && !['activity_logs', 'migrations', 'system_config'].includes(moduleName)) {
             return sendError(res, 400, 'Invalid ID format');
           }
 
@@ -1726,7 +1730,10 @@ router.post('/operations/complex', authenticateToken, async (req: AuthRequest, r
     
     const opKeys = Object.keys(finalOpData);
     const opValues = Object.values(finalOpData);
-    const opPlaceholders = opKeys.map((_, i) => `$${i + 1}`).join(', ');
+    const opPlaceholders = opKeys.map((key, i) => {
+      const cast = isUUIDColumn('operations', key) ? '::uuid' : '';
+      return `$${i + 1}${cast}`;
+    }).join(', ');
     
     await client.query(
       `INSERT INTO operations (${opKeys.join(', ')}) VALUES (${opPlaceholders})`,
@@ -1743,7 +1750,7 @@ router.post('/operations/complex', authenticateToken, async (req: AuthRequest, r
         }
         const fvId = uuidv4();
         await client.query(
-          'INSERT INTO operation_field_values (id, operation_id, field_id, value, company_id) VALUES ($1, $2, $3, $4, $5)',
+          'INSERT INTO operation_field_values (id, operation_id, field_id, value, company_id) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5)',
           [fvId, opId, fv.field_id, fv.value, companyId]
         );
       }
@@ -1793,9 +1800,12 @@ router.put('/operations/complex/:id', authenticateToken, async (req: AuthRequest
     const keys = Object.keys(opData);
     const values = Object.values(opData);
     if (keys.length > 0) {
-      const setClause = keys.map((key, index) => `${key} = $${index + 1}`).join(', ');
+      const setClause = keys.map((key, index) => {
+        const cast = isUUIDColumn('operations', key) ? '::uuid' : '';
+        return `${key} = $${index + 1}${cast}`;
+      }).join(', ');
       await client.query(
-        `UPDATE operations SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${keys.length + 1} AND company_id = $${keys.length + 2}`,
+        `UPDATE operations SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = CAST($${keys.length + 1} AS UUID) AND company_id = $${keys.length + 2}`,
         [...values, id, companyId]
       );
     }
@@ -1804,13 +1814,13 @@ router.put('/operations/complex/:id', authenticateToken, async (req: AuthRequest
     if (field_values && Array.isArray(field_values)) {
       // First delete old ones for this operation (strictly filtered by company_id via Join or indirect if needed)
       // Since we know the operation ID and verified company ownership above, we can delete them.
-      await client.query('DELETE FROM operation_field_values WHERE operation_id = $1', [id]);
+      await client.query('DELETE FROM operation_field_values WHERE operation_id = CAST($1 AS UUID)', [id]);
 
       for (const fv of field_values) {
         if (!fv.field_id || !isUUID(fv.field_id)) continue;
         const fvId = uuidv4();
         await client.query(
-          'INSERT INTO operation_field_values (id, operation_id, field_id, value, company_id) VALUES ($1, $2, $3, $4, $5)',
+          'INSERT INTO operation_field_values (id, operation_id, field_id, value, company_id) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5)',
           [fvId, id, fv.field_id, fv.value, companyId]
         );
       }
@@ -1854,7 +1864,7 @@ router.get('/operations/:id/values', authenticateToken, async (req: AuthRequest,
       FROM operation_field_values fv
       JOIN operation_fields f ON fv.field_id = f.id
       JOIN operations o ON fv.operation_id = o.id
-      WHERE fv.operation_id = $1 AND o.company_id = $2
+      WHERE fv.operation_id = CAST($1 AS UUID) AND o.company_id = $2
     `, [id, companyId]);
     res.json(rows);
   } catch (error: any) {
