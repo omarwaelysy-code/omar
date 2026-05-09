@@ -87,16 +87,26 @@ export const CashBalances: React.FC = () => {
         const endDate = new Date(dateRange.end);
         endDate.setHours(23, 59, 59, 999);
 
+        const methodMap = new Map(paymentMethods.map(m => [m.id, m.account_id]));
+
         const calculatedBalances = paymentMethods.map(method => {
-          let opIn = method.opening_balance > 0 ? method.opening_balance : 0;
-          let opOut = method.opening_balance < 0 ? Math.abs(method.opening_balance) : 0;
+          let opIn = Number(method.opening_balance) > 0 ? Number(method.opening_balance) : 0;
+          let opOut = Number(method.opening_balance) < 0 ? Math.abs(Number(method.opening_balance)) : 0;
           let movIn = 0;
           let movOut = 0;
 
           const opDate = method.opening_balance_date ? new Date(method.opening_balance_date) : new Date(0);
 
           const processTrans = (trans: any[], direction: 'in' | 'out') => {
-            trans.filter(t => t.payment_method_id === method.id).forEach(t => {
+            trans.filter(t => {
+              const matchesMethod = t.payment_method_id === method.id;
+              const matchesAccount = method.account_id && t.account_id === method.account_id;
+              
+              // Only count invoices/purchase invoices if they are paid (cash transactions)
+              const isPaid = !t.status || t.status === 'paid' || t.payment_status === 'paid';
+              
+              return (matchesMethod || matchesAccount) && isPaid;
+            }).forEach(t => {
               const d = new Date(t.date);
               d.setHours(0, 0, 0, 0);
               // Skip transactions before opening balance date. Transactions ON the date are movements.
@@ -104,11 +114,11 @@ export const CashBalances: React.FC = () => {
 
               const amount = Number(t.total_amount || t.amount || 0);
               if (d < startDate) {
-                if (direction === 'in') opIn += amount;
-                else opOut += amount;
+                if (direction === 'in') opIn = Number(opIn) + amount;
+                else opOut = Number(opOut) + amount;
               } else if (d >= startDate && d <= endDate) {
-                if (direction === 'in') movIn += amount;
-                else movOut += amount;
+                if (direction === 'in') movIn = Number(movIn) + amount;
+                else movOut = Number(movOut) + amount;
               }
             });
           };
@@ -127,15 +137,19 @@ export const CashBalances: React.FC = () => {
             if (d < opDate) return;
 
             const amount = Number(tr.amount);
+            const fromMatches = tr.from_payment_method_id === method.id || 
+                               (method.account_id && methodMap.get(tr.from_payment_method_id) === method.account_id);
+            const toMatches = tr.to_payment_method_id === method.id || 
+                             (method.account_id && methodMap.get(tr.to_payment_method_id) === method.account_id);
             
-            if (tr.from_payment_method_id === method.id) {
-              if (d < startDate) opOut += amount;
-              else if (d >= startDate && d <= endDate) movOut += amount;
+            if (fromMatches) {
+              if (d < startDate) opOut = Number(opOut) + amount;
+              else if (d >= startDate && d <= endDate) movOut = Number(movOut) + amount;
             }
             
-            if (tr.to_payment_method_id === method.id) {
-              if (d < startDate) opIn += amount;
-              else if (d >= startDate && d <= endDate) movIn += amount;
+            if (toMatches) {
+              if (d < startDate) opIn = Number(opIn) + amount;
+              else if (d >= startDate && d <= endDate) movIn = Number(movIn) + amount;
             }
           });
 
@@ -150,11 +164,11 @@ export const CashBalances: React.FC = () => {
                     if (d < opDate) return;
 
                     if (d < startDate) {
-                      opIn += item.debit || 0;
-                      opOut += item.credit || 0;
+                      opIn = Number(opIn) + Number(item.debit || 0);
+                      opOut = Number(opOut) + Number(item.credit || 0);
                     } else if (d >= startDate && d <= endDate) {
-                      movIn += item.debit || 0;
-                      movOut += item.credit || 0;
+                      movIn = Number(movIn) + Number(item.debit || 0);
+                      movOut = Number(movOut) + Number(item.credit || 0);
                     }
                   }
                 });
@@ -198,13 +212,13 @@ export const CashBalances: React.FC = () => {
   }, [user, paymentMethods, dateRange]);
 
   const totals = balances.reduce((acc, b) => ({
-    opIn: acc.opIn + b.opening.in,
-    opOut: acc.opOut + b.opening.out,
-    movIn: acc.movIn + b.movement.in,
-    movOut: acc.movOut + b.movement.out,
-    clIn: acc.clIn + b.closing.in,
-    clOut: acc.clOut + b.closing.out,
-    clBal: acc.clBal + b.closing.balance
+    opIn: Number(acc.opIn) + Number(b.opening.in),
+    opOut: Number(acc.opOut) + Number(b.opening.out),
+    movIn: Number(acc.movIn) + Number(b.movement.in),
+    movOut: Number(acc.movOut) + Number(b.movement.out),
+    clIn: Number(acc.clIn) + Number(b.closing.in),
+    clOut: Number(acc.clOut) + Number(b.closing.out),
+    clBal: Number(acc.clBal) + Number(b.closing.balance)
   }), { opIn: 0, opOut: 0, movIn: 0, movOut: 0, clIn: 0, clOut: 0, clBal: 0 });
 
   const handleExportPDF = async () => {
