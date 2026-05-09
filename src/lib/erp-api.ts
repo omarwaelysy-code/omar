@@ -447,7 +447,6 @@ const getList = async (table: string, filters: any) => {
   let paramIndex = 1;
   Object.keys(filters).forEach((key) => {
     const value = filters[key];
-    const cast = isUUIDColumn(table, key) ? '::uuid' : '';
     
     if (key === 'date_from') {
       conditions.push(`date >= $${paramIndex++}`);
@@ -456,7 +455,7 @@ const getList = async (table: string, filters: any) => {
       conditions.push(`date <= $${paramIndex++}`);
       values.push(value);
     } else {
-      conditions.push(`${key} = $${paramIndex++}${cast}`);
+      conditions.push(`${key} = $${paramIndex++}`);
       values.push(value);
     }
   });
@@ -615,7 +614,7 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
     // 1. Get the category and its parents (recursive query)
     const categoryQuery = `
       WITH RECURSIVE category_tree AS (
-        SELECT id, parent_id FROM operation_categories WHERE id = CAST($1 AS UUID) AND company_id = $2
+        SELECT id, parent_id FROM operation_categories WHERE id = $1 AND company_id = $2
         UNION ALL
         SELECT c.id, c.parent_id FROM operation_categories c
         INNER JOIN category_tree ct ON c.id = ct.parent_id
@@ -625,7 +624,7 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
     
     // If categoryId is 'null' or empty, we just look for general fields
     let categoryIds: string[] = [];
-    if (categoryId && categoryId !== 'null' && categoryId !== 'undefined' && isUUID(categoryId)) {
+    if (categoryId && categoryId !== 'null' && categoryId !== 'undefined') {
       const { rows: treeRows } = await pool.query(categoryQuery, [categoryId, companyId]);
       categoryIds = treeRows.map(r => r.id);
     }
@@ -645,9 +644,9 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
     const params: any[] = [companyId];
     if (categoryIds.length > 0) {
       fieldsQuery += ` 
-        OR f.operation_category_id = ANY($2::uuid[])
-        OR f.category_id = ANY($2::uuid[])
-        OR fc.category_id = ANY($2::uuid[])
+        OR f.operation_category_id = ANY($2)
+        OR f.category_id = ANY($2)
+        OR fc.category_id = ANY($2)
       `;
       params.push(categoryIds);
     }
@@ -661,35 +660,11 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
   }
 });
 
-// UUID tables for strict validation and casting
-const UUID_TABLES = [
-  'operation_categories', 'operations', 'operation_fields', 
-  'operation_field_values', 'field_operation_categories',
-  'departments', 'cost_centers'
-];
-
-// Helper to check if a column should be cast to UUID
-function isUUIDColumn(table: string, column: string): boolean {
-  if (column === 'id' && UUID_TABLES.includes(table)) return true;
-  const uuidRefs: { [key: string]: string[] } = {
-    operation_fields: ['category_id', 'operation_category_id', 'department_id'],
-    operations: ['category_id', 'operation_category_id', 'department_id', 'cost_center_id'],
-    operation_field_values: ['operation_id', 'field_id'],
-    field_operation_categories: ['field_id', 'category_id'],
-    departments: ['parent_id'],
-    cost_centers: ['department_id'],
-    operation_categories: ['parent_id']
-  };
-  return uuidRefs[table]?.includes(column) || false;
-}
-
 const transactionalModules = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns', 'journal_entries'];
 
-// Helper to validate UUID format
+// Helper to validate UUID/string format (simplified to check string)
 function isUUID(id: any): boolean {
-  if (typeof id !== 'string') return false;
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(id);
+  return typeof id === 'string' && id.length > 0;
 }
 
 // Helper for better error responses
@@ -742,16 +717,15 @@ function sanitizeData(table: string, data: any) {
         value = null;
       } 
       
-      // Strict UUID validation for ID fields (except those known to be BIGSERIAL or VARCHAR)
+      // Strict VARCHAR validation for ID fields (except those known to be BIGSERIAL)
       const isIdField = key === 'id' || key.endsWith('_id');
-      const excludedFromUUIDCheck = ['activity_logs', 'migrations', 'system_config'];
-      const isUUIDTable = !excludedFromUUIDCheck.includes(table);
-      // specific excludes for non-uuid foreign keys
-      const charIdFields = ['user_id', 'company_id']; 
+      const excludedFromCheck = ['activity_logs', 'migrations'];
+      const isVarcharTable = !excludedFromCheck.includes(table);
       
-      if (isIdField && isUUIDTable && !charIdFields.includes(key) && value !== null && !isUUID(value)) {
-        console.warn(`[WARN] Invalid UUID for field ${table}.${key}: ${value}. Setting to null.`);
-        value = null;
+      if (isIdField && isVarcharTable && value !== null && typeof value !== 'string') {
+        console.warn(`[WARN] Invalid format for field ${table}.${key}: ${value}. Expected string.`);
+        // Note: we don't nullify here if it's already a non-string, 
+        // but Postgres will fail if type mismatch.
       }
 
       // Automatically stringify for JSONB columns
@@ -859,15 +833,12 @@ modules.forEach(moduleName => {
       try {
         const { id } = req.params;
         
-        // UUID validation for single item GET
-        const excludedFromUUIDCheck = ['activity_logs', 'migrations', 'system_config'];
-        const isUUIDTable = !excludedFromUUIDCheck.includes(moduleName);
-        if (isUUIDTable && !isUUID(id)) {
+        // ID validation for single item GET
+        if (!id || typeof id !== 'string') {
           return sendError(res, 400, `Invalid ID format for ${moduleName}`);
         }
 
-        const cast = UUID_TABLES.includes(moduleName) ? '::uuid' : '';
-        const { rows }: any = await pool.query(`SELECT * FROM ${moduleName} WHERE id = $1${cast}`, [id]);
+        const { rows }: any = await pool.query(`SELECT * FROM ${moduleName} WHERE id = $1`, [id]);
         const row = rows[0] || null;
         
         if (!row) {
@@ -945,10 +916,7 @@ modules.forEach(moduleName => {
           
           const keys = Object.keys(data);
           const values = Object.values(data);
-          const placeholders = keys.map((key, index) => {
-            const cast = isUUIDColumn(moduleName, key) ? '::uuid' : '';
-            return `$${index + 1}${cast}`;
-          }).join(', ');
+          const placeholders = keys.map((_, index) => `$${index + 1}`).join(', ');
           
           const result = await pool.query(
             `INSERT INTO ${moduleName} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`,
@@ -990,18 +958,6 @@ modules.forEach(moduleName => {
           const { id } = req.params;
           const companyId = req.user?.company_id;
 
-          if (!isUUID(id) && !['activity_logs', 'migrations', 'system_config'].includes(moduleName)) {
-            return sendError(res, 400, 'Invalid ID format');
-          }
-
-          // Special case for users
-          if (moduleName === 'users' && req.body.password) {
-            req.body.password_hash = await bcrypt.hash(req.body.password, 10);
-            delete req.body.password;
-            req.body.temp_password = null;
-            req.body.must_change_password = false;
-          }
-
           const sanitizedData = sanitizeData(moduleName, req.body);
           delete (sanitizedData as any).id;
           if (moduleName !== 'companies') delete (sanitizedData as any).company_id;
@@ -1011,12 +967,10 @@ modules.forEach(moduleName => {
           if (keys.length === 0) return sendError(res, 400, 'No valid fields for update');
 
           const setClause = keys.map((key, index) => {
-            const cast = isUUIDColumn(moduleName, key) ? '::uuid' : '';
-            return `${key} = $${index + 1}${cast}`;
+            return `${key} = $${index + 1}`;
           }).join(', ');
           
-          const castId = UUID_TABLES.includes(moduleName) ? '::uuid' : '';
-          let query = `UPDATE ${moduleName} SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${keys.length + 1}${castId}`;
+          let query = `UPDATE ${moduleName} SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${keys.length + 1}`;
           let params = [...values, id];
 
           if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies') {
@@ -1063,13 +1017,12 @@ modules.forEach(moduleName => {
         const { id } = req.params;
         const companyId = req.user?.company_id;
 
-        const excludedFromUUIDCheck = ['activity_logs', 'migrations', 'system_config'];
-        if (!isUUID(id) && !excludedFromUUIDCheck.includes(moduleName)) {
+        const excludedFromCheck = ['activity_logs', 'migrations'];
+        if (!id || typeof id !== 'string') {
           return sendError(res, 400, 'Invalid ID format');
         }
 
-        const cast = UUID_TABLES.includes(moduleName) ? '::uuid' : '';
-        let query = `DELETE FROM ${moduleName} WHERE id = $1${cast}`;
+        let query = `DELETE FROM ${moduleName} WHERE id = $1`;
         let params = [id];
 
         if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies') {
@@ -1730,10 +1683,7 @@ router.post('/operations/complex', authenticateToken, async (req: AuthRequest, r
     
     const opKeys = Object.keys(finalOpData);
     const opValues = Object.values(finalOpData);
-    const opPlaceholders = opKeys.map((key, i) => {
-      const cast = isUUIDColumn('operations', key) ? '::uuid' : '';
-      return `$${i + 1}${cast}`;
-    }).join(', ');
+    const opPlaceholders = opKeys.map((_, i) => `$${i + 1}`).join(', ');
     
     await client.query(
       `INSERT INTO operations (${opKeys.join(', ')}) VALUES (${opPlaceholders})`,
@@ -1744,13 +1694,13 @@ router.post('/operations/complex', authenticateToken, async (req: AuthRequest, r
     if (field_values && Array.isArray(field_values)) {
       console.log(`[DEBUG] Inserting ${field_values.length} field values for operation ${opId}`);
       for (const fv of field_values) {
-        if (!fv.field_id || !isUUID(fv.field_id)) {
+        if (!fv.field_id) {
           console.warn('[WARN] Skipping invalid field_id:', fv.field_id);
           continue;
         }
         const fvId = uuidv4();
         await client.query(
-          'INSERT INTO operation_field_values (id, operation_id, field_id, value, company_id) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5)',
+          'INSERT INTO operation_field_values (id, operation_id, field_id, value, company_id) VALUES ($1, $2, $3, $4, $5)',
           [fvId, opId, fv.field_id, fv.value, companyId]
         );
       }
@@ -1801,11 +1751,10 @@ router.put('/operations/complex/:id', authenticateToken, async (req: AuthRequest
     const values = Object.values(opData);
     if (keys.length > 0) {
       const setClause = keys.map((key, index) => {
-        const cast = isUUIDColumn('operations', key) ? '::uuid' : '';
-        return `${key} = $${index + 1}${cast}`;
+        return `${key} = $${index + 1}`;
       }).join(', ');
       await client.query(
-        `UPDATE operations SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = CAST($${keys.length + 1} AS UUID) AND company_id = $${keys.length + 2}`,
+        `UPDATE operations SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${keys.length + 1} AND company_id = $${keys.length + 2}`,
         [...values, id, companyId]
       );
     }
@@ -1814,13 +1763,13 @@ router.put('/operations/complex/:id', authenticateToken, async (req: AuthRequest
     if (field_values && Array.isArray(field_values)) {
       // First delete old ones for this operation (strictly filtered by company_id via Join or indirect if needed)
       // Since we know the operation ID and verified company ownership above, we can delete them.
-      await client.query('DELETE FROM operation_field_values WHERE operation_id = CAST($1 AS UUID)', [id]);
+      await client.query('DELETE FROM operation_field_values WHERE operation_id = $1', [id]);
 
       for (const fv of field_values) {
-        if (!fv.field_id || !isUUID(fv.field_id)) continue;
+        if (!fv.field_id) continue;
         const fvId = uuidv4();
         await client.query(
-          'INSERT INTO operation_field_values (id, operation_id, field_id, value, company_id) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5)',
+          'INSERT INTO operation_field_values (id, operation_id, field_id, value, company_id) VALUES ($1, $2, $3, $4, $5)',
           [fvId, id, fv.field_id, fv.value, companyId]
         );
       }
@@ -1864,7 +1813,7 @@ router.get('/operations/:id/values', authenticateToken, async (req: AuthRequest,
       FROM operation_field_values fv
       JOIN operation_fields f ON fv.field_id = f.id
       JOIN operations o ON fv.operation_id = o.id
-      WHERE fv.operation_id = CAST($1 AS UUID) AND o.company_id = $2
+      WHERE fv.operation_id = $1 AND o.company_id = $2
     `, [id, companyId]);
     res.json(rows);
   } catch (error: any) {

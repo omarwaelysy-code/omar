@@ -518,12 +518,12 @@ export async function initDatabase() {
     // Phase 7: Flexible Operations System
     await safeQuery(`
       CREATE TABLE IF NOT EXISTS "departments" (
-        "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "id" VARCHAR(36) PRIMARY KEY,
         "company_id" VARCHAR(36) REFERENCES "companies"("id"),
         "code" VARCHAR(50) UNIQUE,
         "name" VARCHAR(255) NOT NULL,
         "description" TEXT,
-        "parent_id" UUID REFERENCES "departments"("id"),
+        "parent_id" VARCHAR(36) REFERENCES "departments"("id"),
         "manager_user_id" VARCHAR(36),
         "is_active" BOOLEAN DEFAULT true,
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -532,9 +532,9 @@ export async function initDatabase() {
 
     await safeQuery(`
       CREATE TABLE IF NOT EXISTS "cost_centers" (
-        "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "id" VARCHAR(36) PRIMARY KEY,
         "company_id" VARCHAR(36) REFERENCES "companies"("id"),
-        "department_id" UUID REFERENCES "departments"("id"),
+        "department_id" VARCHAR(36) REFERENCES "departments"("id"),
         "code" VARCHAR(50) UNIQUE,
         "name" VARCHAR(255) NOT NULL,
         "description" TEXT,
@@ -547,11 +547,11 @@ export async function initDatabase() {
 
     await safeQuery(`
       CREATE TABLE IF NOT EXISTS "operation_categories" (
-        "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "id" VARCHAR(36) PRIMARY KEY,
         "company_id" VARCHAR(36) REFERENCES "companies"("id"),
         "name" VARCHAR(255) NOT NULL,
         "code" VARCHAR(50),
-        "parent_id" UUID REFERENCES "operation_categories"("id"),
+        "parent_id" VARCHAR(36) REFERENCES "operation_categories"("id"),
         "is_final" BOOLEAN DEFAULT FALSE,
         "level" INT DEFAULT 0,
         "full_path" TEXT,
@@ -563,8 +563,8 @@ export async function initDatabase() {
 
     await safeQuery(`
       CREATE TABLE IF NOT EXISTS "field_operation_categories" (
-        "field_id" UUID REFERENCES "operation_fields"("id") ON DELETE CASCADE,
-        "category_id" UUID REFERENCES "operation_categories"("id") ON DELETE CASCADE,
+        "field_id" VARCHAR(36) REFERENCES "operation_fields"("id") ON DELETE CASCADE,
+        "category_id" VARCHAR(36) REFERENCES "operation_categories"("id") ON DELETE CASCADE,
         "company_id" VARCHAR(36) REFERENCES "companies"("id"),
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY ("field_id", "category_id")
@@ -573,10 +573,10 @@ export async function initDatabase() {
 
     await safeQuery(`
       CREATE TABLE IF NOT EXISTS "operation_fields" (
-        "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "id" VARCHAR(36) PRIMARY KEY,
         "company_id" VARCHAR(36) REFERENCES "companies"("id"),
-        "category_id" UUID REFERENCES "operation_categories"("id"),
-        "operation_category_id" UUID,
+        "category_id" VARCHAR(36) REFERENCES "operation_categories"("id"),
+        "operation_category_id" VARCHAR(36),
         "name" VARCHAR(255) NOT NULL,
         "label" VARCHAR(255),
         "code" VARCHAR(50) UNIQUE,
@@ -593,12 +593,12 @@ export async function initDatabase() {
 
     await safeQuery(`
       CREATE TABLE IF NOT EXISTS "operations" (
-        "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "id" VARCHAR(36) PRIMARY KEY,
         "company_id" VARCHAR(36) REFERENCES "companies"("id"),
-        "category_id" UUID REFERENCES "operation_categories"("id"),
-        "operation_category_id" UUID,
-        "department_id" UUID REFERENCES "departments"("id"),
-        "cost_center_id" UUID REFERENCES "cost_centers"("id"),
+        "category_id" VARCHAR(36) REFERENCES "operation_categories"("id"),
+        "operation_category_id" VARCHAR(36),
+        "department_id" VARCHAR(36) REFERENCES "departments"("id"),
+        "cost_center_id" VARCHAR(36) REFERENCES "cost_centers"("id"),
         "operation_number" VARCHAR(50) UNIQUE,
         "operation_date" DATE,
         "customer_id" VARCHAR(36),
@@ -612,9 +612,9 @@ export async function initDatabase() {
 
     await safeQuery(`
       CREATE TABLE IF NOT EXISTS "operation_field_values" (
-        "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        "operation_id" UUID REFERENCES "operations"("id") ON DELETE CASCADE,
-        "field_id" UUID REFERENCES "operation_fields"("id") ON DELETE CASCADE,
+        "id" VARCHAR(36) PRIMARY KEY,
+        "operation_id" VARCHAR(36) REFERENCES "operations"("id") ON DELETE CASCADE,
+        "field_id" VARCHAR(36) REFERENCES "operation_fields"("id") ON DELETE CASCADE,
         "value" TEXT,
         "company_id" VARCHAR(36) REFERENCES "companies"("id"),
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
