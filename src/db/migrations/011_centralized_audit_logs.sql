@@ -33,11 +33,11 @@ BEGIN
     END IF;
 
     IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_audit_logs_module') THEN
-        CREATE INDEX idx_audit_logs_module(module);
+        CREATE INDEX idx_audit_logs_module ON audit_logs(module);
     END IF;
 
     IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_audit_logs_action') THEN
-        CREATE INDEX idx_audit_logs_action(action);
+        CREATE INDEX idx_audit_logs_action ON audit_logs(action);
     END IF;
 
     IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_audit_logs_created_at') THEN

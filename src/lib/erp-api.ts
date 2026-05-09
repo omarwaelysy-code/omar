@@ -662,7 +662,7 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
 
 const transactionalModules = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns', 'journal_entries'];
 
-// Helper to validate UUID/string format (simplified to check string)
+// Helper to validate ID format (simplified to check string)
 function isUUID(id: any): boolean {
   return typeof id === 'string' && id.length > 0;
 }

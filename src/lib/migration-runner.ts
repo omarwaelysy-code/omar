@@ -42,13 +42,13 @@ export async function runMigrations() {
       { table: 'payment_vouchers', column: 'account_id', type: 'VARCHAR(36) REFERENCES accounts(id)' },
       { table: 'activity_logs', column: 'account_id', type: 'VARCHAR(36) REFERENCES accounts(id)' },
       { table: 'activity_logs', column: 'entity', type: 'JSONB' },
-      { table: 'operations', column: 'category_id', type: 'UUID REFERENCES operation_categories(id)' },
-      { table: 'operations', column: 'customer_id', type: 'UUID' },
+      { table: 'operations', column: 'category_id', type: 'VARCHAR(36) REFERENCES operation_categories(id)' },
+      { table: 'operations', column: 'customer_id', type: 'VARCHAR(36)' },
       { table: 'operations', column: 'customer_name', type: 'VARCHAR(255)' },
       { table: 'operations', column: 'description', type: 'TEXT' },
       { table: 'operations', column: 'date', type: 'DATE' },
       { table: 'operations', column: 'status', type: "VARCHAR(50) DEFAULT 'draft'" },
-      { table: 'operation_fields', column: 'category_id', type: 'UUID REFERENCES operation_categories(id)' },
+      { table: 'operation_fields', column: 'category_id', type: 'VARCHAR(36) REFERENCES operation_categories(id)' },
       { table: 'operation_fields', column: 'label', type: 'VARCHAR(255)' },
       { table: 'operation_categories', column: 'code', type: 'VARCHAR(50)' },
       { table: 'operation_categories', column: 'is_final', type: 'BOOLEAN DEFAULT FALSE' },
@@ -60,7 +60,7 @@ export async function runMigrations() {
       { table: 'operation_fields', column: 'unit', type: 'VARCHAR(50)' },
       { table: 'operation_fields', column: 'default_value', type: 'TEXT' },
       { table: 'operation_field_values', column: 'company_id', type: 'VARCHAR(36)' },
-      { table: 'field_operation_categories', column: 'id', type: 'UUID DEFAULT gen_random_uuid() PRIMARY KEY' }
+      { table: 'field_operation_categories', column: 'id', type: 'VARCHAR(36) PRIMARY KEY' }
     ];
 
     for (const item of columnsToSync) {
