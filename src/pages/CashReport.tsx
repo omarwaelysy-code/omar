@@ -45,208 +45,55 @@ export const CashReport: React.FC = () => {
     setLoading(true);
     try {
       const method = paymentMethods.find(m => m.id === selectedMethodId);
-      const opBal = Number(method?.opening_balance) || 0;
-      setOpeningBalance(opBal);
+      if (!method?.account_id) {
+        setTransactions([]);
+        setStartBalance(0);
+        return;
+      }
 
-      const [invoices, returns, receipts, purInvoices, purReturns, vouchers, transfers, journalEntries] = await Promise.all([
-        dbService.list<any>('invoices', user.company_id),
-        dbService.list<any>('returns', user.company_id),
-        dbService.list<any>('receipt_vouchers', user.company_id),
-        dbService.list<any>('purchase_invoices', user.company_id),
-        dbService.list<any>('purchase_returns', user.company_id),
-        dbService.list<any>('payment_vouchers', user.company_id),
-        dbService.list<any>('cash_transfers', user.company_id),
-        dbService.list<any>('journal_entries', user.company_id)
-      ]);
+      const journalEntries = await dbService.list<JournalEntry>('journal_entries', user.company_id);
 
       const allTrans: CashTransaction[] = [];
 
-      // Process Data
-      const isMatch = (t: any) => {
-        if (!t) return false;
-        const matchesMethod = t.payment_method_id === selectedMethodId;
-        const matchesAccount = method?.account_id && t.account_id === method.account_id;
-        return matchesMethod || matchesAccount;
-      };
-
-      invoices.filter(inv => isMatch(inv) && (inv.payment_status === 'paid' || inv.payment_status === 'partially_paid')).forEach((inv: any) => {
-        allTrans.push({ 
-          id: `inv-${inv.id}`, 
-          date: inv.date, 
-          type: t('invoices.title'), 
-          reference: inv.invoice_number, 
-          in: Number(inv.paid_amount || inv.total_amount) || 0, 
-          out: 0, 
-          notes: '' 
-        });
-      });
-      returns.filter(isMatch).forEach((ret: any) => {
-        allTrans.push({ 
-          id: `ret-${ret.id}`, 
-          date: ret.date, 
-          type: t('returns.title'), 
-          reference: ret.return_number || ret.id.slice(-6), 
-          in: 0, 
-          out: Number(ret.total_amount) || 0, 
-          notes: '' 
-        });
-      });
-      receipts.filter(isMatch).forEach((rec: any) => {
-        allTrans.push({ 
-          id: `rec-${rec.id}`, 
-          date: rec.date, 
-          type: t('vouchers.receipt'), 
-          reference: rec.voucher_number || rec.number || `${t('vouchers.voucher')}-${rec.id.slice(-6)}`, 
-          in: Number(rec.amount) || 0, 
-          out: 0, 
-          notes: rec.description || '' 
-        });
-      });
-      purInvoices.filter(pinv => isMatch(pinv) && (pinv.payment_status === 'paid' || pinv.payment_status === 'partially_paid')).forEach((pinv: any) => {
-        allTrans.push({ 
-          id: `pinv-${pinv.id}`, 
-          date: pinv.date, 
-          type: t('purchase_invoices.title'), 
-          reference: pinv.invoice_number, 
-          in: 0, 
-          out: Number(pinv.paid_amount || pinv.total_amount) || 0, 
-          notes: '' 
-        });
-      });
-      purReturns.filter(isMatch).forEach((pret: any) => {
-        allTrans.push({ 
-          id: `pret-${pret.id}`, 
-          date: pret.date, 
-          type: t('purchase_returns.title'), 
-          reference: pret.return_number || pret.id.slice(-6), 
-          in: Number(pret.total_amount) || 0, 
-          out: 0, 
-          notes: '' 
-        });
-      });
-      vouchers.filter(isMatch).forEach((vou: any) => {
-        allTrans.push({ 
-          id: `vou-${vou.id}`, 
-          date: vou.date, 
-          type: t('vouchers.payment'), 
-          reference: vou.voucher_number || vou.number || `${t('vouchers.voucher')}-${vou.id.slice(-6)}`, 
-          in: 0, 
-          out: Number(vou.amount) || 0, 
-          notes: vou.description || '' 
-        });
-      });
-      const methodMap = new Map(paymentMethods.map(m => [m.id, m.account_id]));
-
-      transfers.forEach((tr: any) => {
-        const amount = Number(tr.amount) || 0;
-        const fromAccountId = methodMap.get(tr.from_payment_method_id);
-        const toAccountId = methodMap.get(tr.to_payment_method_id);
-
-        if (tr.from_payment_method_id === selectedMethodId || (method?.account_id && fromAccountId === method.account_id)) {
-          allTrans.push({ id: `tr-out-${tr.id}`, date: tr.date, type: t('cash_transfers.outgoing'), reference: `${t('cash_transfers.transfer')}-${tr.id.slice(-6)}`, in: 0, out: amount, notes: `${t('common.to')} ${tr.to_payment_method_name}: ${tr.description}` });
-        }
-        if (tr.to_payment_method_id === selectedMethodId || (method?.account_id && toAccountId === method.account_id)) {
-          allTrans.push({ id: `tr-in-${tr.id}`, date: tr.date, type: t('cash_transfers.incoming'), reference: `${t('cash_transfers.transfer')}-${tr.id.slice(-6)}`, in: amount, out: 0, notes: `${t('common.from')} ${tr.from_payment_method_name}: ${tr.description}` });
-        }
-      });
-
-      // Add manual journal entries that affect this account
-      if (method?.account_id) {
-        journalEntries.forEach((je: any) => {
-          if (je.reference_type === 'manual') {
-            je.items?.forEach((item: any) => {
-              if (item.account_id === method.account_id) {
-                if (item.debit > 0) {
-                  allTrans.push({ 
-                    id: `je-in-${je.id}-${item.account_id}`, 
-                    date: je.date, 
-                    type: `${t('journal.manual')} (${t('reports.in')})`, 
-                    reference: je.reference_number || `${t('journal.entry')}-${je.id.slice(-6)}`, 
-                    in: item.debit, 
-                    out: 0, 
-                    notes: je.description 
-                  });
-                }
-                if (item.credit > 0) {
-                  allTrans.push({ 
-                    id: `je-out-${je.id}-${item.account_id}`, 
-                    date: je.date, 
-                    type: `${t('journal.manual')} (${t('reports.out')})`, 
-                    reference: je.reference_number || `${t('journal.entry')}-${je.id.slice(-6)}`, 
-                    in: 0, 
-                    out: item.credit, 
-                    notes: je.description 
-                  });
-                }
-              }
+      journalEntries.forEach(je => {
+        je.items?.forEach((item: any) => {
+          if (item.account_id === method.account_id) {
+            allTrans.push({
+              id: `${je.id}-${item.account_id}`,
+              date: je.date,
+              type: je.reference_type === 'manual' ? t('journal.manual') : (t(`reference_types.${je.reference_type}`) || je.reference_type),
+              reference: je.reference_number || je.id.slice(-6),
+              in: Number(item.debit) || 0,
+              out: Number(item.credit) || 0,
+              notes: item.description || je.description || ''
             });
           }
         });
-      }
-
-      allTrans.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-      // Filter transactions that are after opening_balance_date
-      const opDate = method?.opening_balance_date || '1970-01-01';
-      const opDateObj = new Date(opDate);
-      opDateObj.setHours(0, 0, 0, 0);
-      
-      const transAfterOpDate = allTrans.filter(t => {
-        const transDate = new Date(t.date);
-        transDate.setHours(0, 0, 0, 0);
-        return transDate >= opDateObj;
       });
 
-      const filtered = transAfterOpDate.filter(t => {
+      allTrans.sort((a, b) => {
+        const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+        if (dateDiff !== 0) return dateDiff;
+        return a.id.localeCompare(b.id);
+      });
+
+      const startD = startDate ? new Date(startDate) : new Date(0);
+      startD.setHours(0, 0, 0, 0);
+      const endD = endDate ? new Date(endDate) : new Date();
+      endD.setHours(23, 59, 59, 999);
+
+      const before = allTrans.filter(t => new Date(t.date) < startD);
+      const during = allTrans.filter(t => {
         const d = new Date(t.date);
-        d.setHours(0, 0, 0, 0);
-        const s = startDate ? new Date(startDate) : new Date(0);
-        s.setHours(0, 0, 0, 0);
-        const e = endDate ? new Date(endDate) : new Date();
-        e.setHours(23, 59, 59, 999);
-        return d >= s && d <= e;
+        return d >= startD && d <= endD;
       });
 
-      const before = transAfterOpDate.filter(t => {
-        if (!startDate) return false;
-        const d = new Date(t.date);
-        d.setHours(0, 0, 0, 0);
-        const s = new Date(startDate);
-        s.setHours(0, 0, 0, 0);
-        return d < s;
-      });
-      const balBefore = before.reduce((sum, t) => sum + (Number(t.in) - Number(t.out)), 0);
+      const balBefore = before.reduce((sum, t) => sum + (t.in - t.out), 0);
+      setStartBalance(balBefore);
 
-      const startDateObj = startDate ? new Date(startDate) : new Date(0);
-      startDateObj.setHours(0, 0, 0, 0);
-      const endDateObj = endDate ? new Date(endDate) : new Date();
-      endDateObj.setHours(23, 59, 59, 999);
-
-      let initialBalance = balBefore;
-      if (opDateObj < startDateObj) {
-        initialBalance += opBal;
-      }
-      setStartBalance(initialBalance);
-      
-      let currentBal = initialBalance;
-      
-      // Merge with opening balance if it falls within the period
-      let transactionsToDisplay = [...filtered];
-      if (opBal !== 0 && opDateObj >= startDateObj && opDateObj <= endDateObj) {
-        transactionsToDisplay.push({
-          id: 'opening-balance-movement',
-          date: opDate,
-          type: t('reports.opening_balance'),
-          reference: '-',
-          in: opBal > 0 ? opBal : 0,
-          out: opBal < 0 ? Math.abs(opBal) : 0,
-          notes: ''
-        });
-        transactionsToDisplay.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      }
-
-      const finalTrans = transactionsToDisplay.map(t => {
-        currentBal += (Number(t.in) - Number(t.out));
+      let currentBal = balBefore;
+      const finalTrans = during.map(t => {
+        currentBal += (t.in - t.out);
         return { ...t, balance: currentBal };
       });
 

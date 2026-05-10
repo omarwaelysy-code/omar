@@ -72,125 +72,41 @@ export const CashBalances: React.FC = () => {
       setError(null);
       setLoading(true);
       try {
-        const [invoices, returns, receipts, purInvoices, purReturns, vouchers, transfers, journalEntries] = await Promise.all([
-          dbService.list<any>('invoices', user.company_id),
-          dbService.list<any>('returns', user.company_id),
-          dbService.list<any>('receipt_vouchers', user.company_id),
-          dbService.list<any>('purchase_invoices', user.company_id),
-          dbService.list<any>('purchase_returns', user.company_id),
-          dbService.list<any>('payment_vouchers', user.company_id),
-          dbService.list<any>('cash_transfers', user.company_id),
-          dbService.list<any>('journal_entries', user.company_id)
+        const [paymentMethodsData, journalEntries] = await Promise.all([
+          dbService.list<PaymentMethod>('payment_methods', user.company_id),
+          dbService.list<JournalEntry>('journal_entries', user.company_id)
         ]);
 
         const startDate = new Date(dateRange.start);
         const endDate = new Date(dateRange.end);
         endDate.setHours(23, 59, 59, 999);
 
-        const methodMap = new Map(paymentMethods.map(m => [m.id, m.account_id]));
-
-        const calculatedBalances = paymentMethods.map(method => {
+        const calculatedBalances = paymentMethodsData.map(method => {
           let opIn = 0;
           let opOut = 0;
           let movIn = 0;
           let movOut = 0;
 
-          const opDate = method.opening_balance_date ? new Date(method.opening_balance_date) : new Date(0);
-          opDate.setHours(0, 0, 0, 0);
-
-          const initialBalance = Number(method.opening_balance || 0);
-          if (initialBalance !== 0) {
-            if (opDate < startDate) {
-              if (initialBalance > 0) opIn += initialBalance;
-              else opOut += Math.abs(initialBalance);
-            } else if (opDate >= startDate && opDate <= endDate) {
-              if (initialBalance > 0) movIn += initialBalance;
-              else movOut += Math.abs(initialBalance);
-            }
-          }
-
-          const processTrans = (trans: any[], direction: 'in' | 'out') => {
-            trans.forEach(t => {
-              if (!t) return;
-              const matchesMethod = t.payment_method_id === method.id;
-              const matchesAccount = method.account_id && t.account_id === method.account_id;
-              
-              if (!(matchesMethod || matchesAccount)) return;
-
-              // Only count invoices/purchase invoices if they are paid (cash transactions)
-              const isPaid = !t.status || t.status === 'paid' || t.payment_status === 'paid' || t.payment_status === 'partially_paid';
-              if (!isPaid && (t.invoice_number || t.return_number)) return;
-
-              const d = new Date(t.date);
-              d.setHours(0, 0, 0, 0);
-              // Skip transactions before opening balance date. Transactions ON the date are movements.
-              if (d < opDate) return;
-
-              const amount = Number(t.paid_amount || t.amount || t.total_amount || 0);
-              if (amount === 0) return;
-
-              if (d < startDate) {
-                if (direction === 'in') opIn = Number(opIn) + amount;
-                else opOut = Number(opOut) + amount;
-              } else if (d >= startDate && d <= endDate) {
-                if (direction === 'in') movIn = Number(movIn) + amount;
-                else movOut = Number(movOut) + amount;
-              }
-            });
-          };
-
-          processTrans(invoices, 'in');
-          processTrans(receipts, 'in');
-          processTrans(purReturns, 'in');
-          processTrans(returns, 'out');
-          processTrans(purInvoices, 'out');
-          processTrans(vouchers, 'out');
-
-          // Handle transfers
-          transfers.forEach(tr => {
-            const d = new Date(tr.date);
+          // Process ALL journal entries for this method's account
+          journalEntries.forEach(je => {
+            const d = new Date(je.date);
             d.setHours(0, 0, 0, 0);
-            if (d < opDate) return;
 
-            const amount = Number(tr.amount);
-            const fromMatches = tr.from_payment_method_id === method.id || 
-                               (method.account_id && methodMap.get(tr.from_payment_method_id) === method.account_id);
-            const toMatches = tr.to_payment_method_id === method.id || 
-                             (method.account_id && methodMap.get(tr.to_payment_method_id) === method.account_id);
-            
-            if (fromMatches) {
-              if (d < startDate) opOut = Number(opOut) + amount;
-              else if (d >= startDate && d <= endDate) movOut = Number(movOut) + amount;
-            }
-            
-            if (toMatches) {
-              if (d < startDate) opIn = Number(opIn) + amount;
-              else if (d >= startDate && d <= endDate) movIn = Number(movIn) + amount;
-            }
-          });
+            je.items?.forEach((item: any) => {
+              if (item.account_id === method.account_id) {
+                const amountDebit = Number(item.debit || 0);
+                const amountCredit = Number(item.credit || 0);
 
-          // Handle manual journal entries
-          if (method.account_id) {
-            journalEntries.forEach(je => {
-              if (je.reference_type === 'manual') {
-                je.items?.forEach((item: any) => {
-                  if (item.account_id === method.account_id) {
-                    const d = new Date(je.date);
-                    d.setHours(0, 0, 0, 0);
-                    if (d < opDate) return;
-
-                    if (d < startDate) {
-                      opIn = Number(opIn) + Number(item.debit || 0);
-                      opOut = Number(opOut) + Number(item.credit || 0);
-                    } else if (d >= startDate && d <= endDate) {
-                      movIn = Number(movIn) + Number(item.debit || 0);
-                      movOut = Number(movOut) + Number(item.credit || 0);
-                    }
-                  }
-                });
+                if (d < startDate) {
+                  opIn += amountDebit;
+                  opOut += amountCredit;
+                } else if (d >= startDate && d <= endDate) {
+                  movIn += amountDebit;
+                  movOut += amountCredit;
+                }
               }
             });
-          }
+          });
 
           const opBalance = opIn - opOut;
           const clBalance = opBalance + (movIn - movOut);

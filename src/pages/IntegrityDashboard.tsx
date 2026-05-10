@@ -28,6 +28,70 @@ export const IntegrityDashboard: React.FC = () => {
 
   // ... existing logic ...
 
+  const [isReposting, setIsReposting] = useState(false);
+
+  const handleRepostAll = async () => {
+    if (!user) return;
+    setIsReposting(true);
+    try {
+      const [invoices, receipts, vouchers, returns, purchaseInvoices, purchaseReturns, transfers, customers, suppliers, products, accounts, paymentMethods] = await Promise.all([
+        dbService.list<any>('invoices', user.company_id),
+        dbService.list<any>('receipt_vouchers', user.company_id),
+        dbService.list<any>('payment_vouchers', user.company_id),
+        dbService.list<any>('returns', user.company_id),
+        dbService.list<any>('purchase_invoices', user.company_id),
+        dbService.list<any>('purchase_returns', user.company_id),
+        dbService.list<any>('cash_transfers', user.company_id),
+        dbService.list<any>('customers', user.company_id),
+        dbService.list<any>('suppliers', user.company_id),
+        dbService.list<any>('products', user.company_id),
+        dbService.list<any>('accounts', user.company_id),
+        dbService.list<any>('payment_methods', user.company_id)
+      ]);
+
+      const dependencies = { customers, suppliers, products, accounts, paymentMethods };
+      let count = 0;
+
+      const { PostingService } = await import('../services/PostingService');
+
+      for (const inv of invoices) {
+        await PostingService.repostDocument('invoices', inv, user.company_id, dependencies);
+        count++;
+      }
+      for (const rec of receipts) {
+        await PostingService.repostDocument('receipt_vouchers', rec, user.company_id, dependencies);
+        count++;
+      }
+      for (const vou of vouchers) {
+        await PostingService.repostDocument('payment_vouchers', vou, user.company_id, dependencies);
+        count++;
+      }
+      for (const ret of returns) {
+        await PostingService.repostDocument('returns', ret, user.company_id, dependencies);
+        count++;
+      }
+      for (const pinv of purchaseInvoices) {
+        await PostingService.repostDocument('purchase_invoices', pinv, user.company_id, dependencies);
+        count++;
+      }
+      for (const pret of purchaseReturns) {
+        await PostingService.repostDocument('purchase_returns', pret, user.company_id, dependencies);
+        count++;
+      }
+      for (const tr of transfers) {
+        await PostingService.repostDocument('cash_transfers', tr, user.company_id, dependencies);
+        count++;
+      }
+
+      showNotification(`Successfully re-posted ${count} documents.`, 'success');
+      window.location.reload();
+    } catch (e: any) {
+      showNotification(e.message, 'error');
+    } finally {
+      setIsReposting(false);
+    }
+  };
+
   const handleCreateSnapshot = async () => {
     if (!user) return;
     try {
@@ -115,6 +179,10 @@ export const IntegrityDashboard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <button onClick={handleSeed} disabled={isSeeding} className="p-4 bg-zinc-100 hover:bg-zinc-200 rounded-2xl font-bold transition-all">
           Seed Scenario
+        </button>
+        <button onClick={handleRepostAll} disabled={isReposting} className="p-4 bg-emerald-600 text-white hover:bg-emerald-700 rounded-2xl font-bold transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
+          {isReposting ? <RefreshCw className="animate-spin" size={20} /> : <Database size={20} />}
+          Repledge All (Sync Ledger)
         </button>
         <button onClick={handleLoadTest} disabled={isTesting} className="p-4 bg-zinc-100 hover:bg-zinc-200 rounded-2xl font-bold transition-all text-rose-600">
           Run Load Test
