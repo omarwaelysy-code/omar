@@ -107,15 +107,28 @@ export const Expenses: React.FC = () => {
     }
   };
 
-  const openModal = (category?: ExpenseCategory) => {
+  const openModal = async (category?: ExpenseCategory) => {
     if (category) {
-      setEditingCategory(category);
-      setFormData({
-        code: category.code,
-        name: category.name,
-        description: category.description || '',
-        account_id: category.account_id || ''
-      });
+      console.log('[EDIT] Opening edit modal for expense category ID:', category.id);
+      try {
+        const fullData = await dbService.get<ExpenseCategory>('expense_categories', category.id);
+        console.log('[EDIT] Expense category details from API:', fullData);
+        
+        if (!fullData) throw new Error('Category not found');
+
+        setEditingCategory(fullData);
+        setFormData({
+          code: fullData.code,
+          name: fullData.name,
+          description: fullData.description || '',
+          account_id: fullData.account_id || ''
+        });
+        console.log('[EDIT] Form updated with expense category:', fullData.id);
+      } catch (error: any) {
+        console.error('[EDIT] Error loading expense category:', error);
+        showNotification('فشل تحميل بيانات بند المصروف', 'error');
+        return;
+      }
     } else {
       setEditingCategory(null);
       setFormData({

@@ -88,6 +88,7 @@ export const Invoices: React.FC = () => {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [discount, setDiscount] = useState<number>(0);
+  const [description, setDescription] = useState<string>('');
   const [paymentType, setPaymentType] = useState<'cash' | 'credit'>('credit');
   const [paymentMethodId, setPaymentMethodId] = useState<string | ''>('');
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
@@ -382,6 +383,7 @@ export const Invoices: React.FC = () => {
         customer_id: selectedCustomerId, 
         customer_name: customer?.name || '',
         date, 
+        description,
         items: validItems.map(i => ({
           product_id: i.product_id,
           product_name: i.product_name,
@@ -845,6 +847,7 @@ export const Invoices: React.FC = () => {
     setDate(newDate);
     setInvoiceNumber(generateInvoiceNumber(newDate));
     setItems([]);
+    setDescription('');
     setPaymentType('credit');
     setPaymentMethodId('');
     setIsModalOpen(true);
@@ -855,17 +858,38 @@ export const Invoices: React.FC = () => {
     setViewInvoice(invoice);
   };
 
-  const openEditModal = (invoice: Invoice) => {
-    setEditingInvoice(invoice);
-    setSelectedCustomerId(invoice.customer_id);
-    setDate(invoice.date);
-    setInvoiceNumber(invoice.invoice_number);
-    setItems(invoice.items || []);
-    setDiscount(invoice.discount || 0);
-    setPaymentType(invoice.payment_type || 'credit');
-    setPaymentMethodId(invoice.payment_method_id || '');
-    setIsModalOpen(true);
-    setIsFullScreen(false);
+  const openEditModal = async (invoice: Invoice) => {
+    console.log('[EDIT] Opening Edit Modal for ID:', invoice.id);
+    try {
+      // Fetch latest full data to be sure we have everything including items
+      const fullData = await dbService.get<Invoice>('invoices', invoice.id);
+      console.log('[EDIT] Full data received from API:', fullData);
+      
+      if (!fullData) throw new Error('Could not fetch invoice details');
+
+      setEditingInvoice(fullData);
+      setSelectedCustomerId(fullData.customer_id);
+      setDate(fullData.date.slice(0, 10));
+      setInvoiceNumber(fullData.invoice_number);
+      setItems(fullData.items || []);
+      setDiscount(fullData.discount_amount || fullData.discount || 0);
+      setDescription(fullData.description || '');
+      setPaymentType(fullData.payment_type || 'credit');
+      setPaymentMethodId(fullData.payment_method_id || '');
+      setIsModalOpen(true);
+      setIsFullScreen(false);
+      
+      console.log('[EDIT] Form state updated with:', {
+        id: fullData.id,
+        customer_id: fullData.customer_id,
+        date: fullData.date.slice(0, 10),
+        items: (fullData.items || []).length,
+        payment_type: fullData.payment_type
+      });
+    } catch (error: any) {
+      console.error('[EDIT] Error opening edit modal:', error);
+      showNotification('فشل تحميل بيانات الفاتورة: ' + error.message, 'error');
+    }
   };
 
   const handleNextInvoice = () => {
@@ -891,6 +915,7 @@ export const Invoices: React.FC = () => {
     setDate(new Date().toISOString().slice(0, 10));
     setItems([]);
     setDiscount(0);
+    setDescription('');
     setPaymentType('credit');
     setPaymentMethodId('');
     setIsFullScreen(false);
@@ -966,6 +991,7 @@ export const Invoices: React.FC = () => {
                 <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_number')}</th>
                 <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_customer')}</th>
                 <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_date')}</th>
+                <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.form_payment_type')}</th>
                 <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_amount')}</th>
                 <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
               </tr>
@@ -978,6 +1004,15 @@ export const Invoices: React.FC = () => {
                   </td>
                   <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{inv.customer_name}</td>
                   <td className={`px-6 py-4 text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(inv.date)}</td>
+                  <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                      inv.payment_type === 'cash' 
+                        ? 'bg-emerald-100 text-emerald-700' 
+                        : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {inv.payment_type === 'cash' ? 'نقدي' : 'آجل'}
+                    </span>
+                  </td>
                   <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatMoney(inv.total_amount)} {t('invoices.currency')}</td>
                   <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                     <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
@@ -1035,7 +1070,16 @@ export const Invoices: React.FC = () => {
             <div key={inv.id} className="p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex flex-col gap-1">
-                  <span className="font-mono text-[10px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider ${
+                      inv.payment_type === 'cash' 
+                        ? 'bg-emerald-100 text-emerald-700' 
+                        : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {inv.payment_type === 'cash' ? 'نقدي' : 'آجل'}
+                    </span>
+                  </div>
                   <h4 className="font-bold text-slate-900 text-lg">{inv.customer_name}</h4>
                 </div>
                 <div className={`${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
@@ -1200,6 +1244,16 @@ export const Invoices: React.FC = () => {
                           onChange={(e) => setDate(e.target.value)}
                         />
                       </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">وصف الفاتورة</label>
+                      <textarea
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base min-h-[100px]"
+                        placeholder="أدخل وصفاً للفاتورة (اختياري)..."
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                      />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
@@ -1428,8 +1482,22 @@ export const Invoices: React.FC = () => {
                   <div className={dir === 'rtl' ? 'text-left' : 'text-right'}>
                     <p className="text-xs font-bold text-[#a1a1aa] uppercase tracking-widest mb-1">{t('invoices.column_date')}</p>
                     <p className="text-lg font-medium text-[#18181b]">{formatDate(viewInvoice.date)}</p>
+                    <span className={`inline-block mt-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                      viewInvoice.payment_type === 'cash' 
+                        ? 'bg-emerald-100 text-emerald-700' 
+                        : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {viewInvoice.payment_type === 'cash' ? 'طريقة الدفع: نقدي' : 'طريقة الدفع: آجل'}
+                    </span>
                   </div>
                 </div>
+
+                {viewInvoice.description && (
+                  <div className="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">وصف الفاتورة</p>
+                    <p className="text-slate-700 whitespace-pre-wrap">{viewInvoice.description}</p>
+                  </div>
+                )}
 
                 <div className="border border-[#f4f4f5] rounded-2xl overflow-hidden">
                   <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'} text-sm`}>

@@ -269,20 +269,33 @@ export const Suppliers: React.FC = () => {
     }
   };
 
-  const openModal = (supplier?: Supplier) => {
+  const openModal = async (supplier?: Supplier) => {
     if (supplier) {
-      setEditingSupplier(supplier);
-      setFormData({
-        name: supplier.name,
-        mobile: supplier.mobile,
-        email: supplier.email || '',
-        address: supplier.address || '',
-        opening_balance: supplier.opening_balance,
-        opening_balance_date: supplier.opening_balance_date || new Date().toISOString().slice(0, 10),
-        account_id: supplier.account_id || '',
-        account_name: supplier.account_name || '',
-        counter_account_id: supplier.counter_account_id || ''
-      });
+      console.log('[EDIT] Opening edit modal for supplier ID:', supplier.id);
+      try {
+        const fullData = await dbService.get<Supplier>('suppliers', supplier.id);
+        console.log('[EDIT] Supplier details from API:', fullData);
+        
+        if (!fullData) throw new Error('Supplier not found');
+
+        setEditingSupplier(fullData);
+        setFormData({
+          name: fullData.name,
+          mobile: fullData.mobile,
+          email: fullData.email || '',
+          address: fullData.address || '',
+          opening_balance: fullData.opening_balance,
+          opening_balance_date: (fullData.opening_balance_date || new Date().toISOString()).slice(0, 10),
+          account_id: fullData.account_id || '',
+          account_name: fullData.account_name || '',
+          counter_account_id: fullData.counter_account_id || ''
+        });
+        console.log('[EDIT] Form updated with supplier:', fullData.id);
+      } catch (error: any) {
+        console.error('[EDIT] Error loading supplier:', error);
+        showNotification('فشل تحميل بيانات المورد', 'error');
+        return;
+      }
     } else {
       setEditingSupplier(null);
       setFormData({

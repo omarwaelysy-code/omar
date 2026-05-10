@@ -529,14 +529,27 @@ export const Returns: React.FC = () => {
     }
   };
 
-  const openModal = (ret?: Return) => {
+  const openModal = async (ret?: Return) => {
     if (ret) {
-      setEditingReturn(ret);
-      setSelectedCustomerId(ret.customer_id);
-      setDate(ret.date);
-      setPaymentType(ret.payment_type);
-      setPaymentMethodId(ret.payment_method_id || '');
-      setItems(ret.items);
+      console.log('[EDIT] Opening edit modal for sales return ID:', ret.id);
+      try {
+        const fullData = await dbService.get<Return>('returns', ret.id);
+        console.log('[EDIT] Sales return details from API:', fullData);
+        
+        if (!fullData) throw new Error('Return details not found');
+
+        setEditingReturn(fullData);
+        setSelectedCustomerId(fullData.customer_id);
+        setDate(fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10));
+        setPaymentType(fullData.payment_type);
+        setPaymentMethodId(fullData.payment_method_id || '');
+        setItems(fullData.items || []);
+        console.log('[EDIT] Form updated with sales return:', fullData.id);
+      } catch (error: any) {
+        console.error('[EDIT] Error loading return:', error);
+        showNotification('فشل تحميل بيانات المرتجع', 'error');
+        return;
+      }
     } else {
       setEditingReturn(null);
       setSelectedCustomerId('');

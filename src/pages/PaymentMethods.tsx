@@ -164,17 +164,30 @@ export const PaymentMethods: React.FC = () => {
     }
   };
 
-  const openModal = (method?: PaymentMethod) => {
+  const openModal = async (method?: PaymentMethod) => {
     if (method) {
-      setEditingMethod(method);
-      setFormData({
-        code: method.code,
-        name: method.name,
-        opening_balance: method.opening_balance,
-        opening_balance_date: method.opening_balance_date ? new Date(method.opening_balance_date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
-        account_id: method.account_id || '',
-        counter_account_id: method.counter_account_id || ''
-      });
+      console.log('[EDIT] Opening edit modal for payment method ID:', method.id);
+      try {
+        const fullData = await dbService.get<PaymentMethod>('payment_methods', method.id);
+        console.log('[EDIT] Payment method details from API:', fullData);
+        
+        if (!fullData) throw new Error('Payment method not found');
+
+        setEditingMethod(fullData);
+        setFormData({
+          code: fullData.code,
+          name: fullData.name,
+          opening_balance: fullData.opening_balance,
+          opening_balance_date: fullData.opening_balance_date ? new Date(fullData.opening_balance_date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+          account_id: fullData.account_id || '',
+          counter_account_id: fullData.counter_account_id || ''
+        });
+        console.log('[EDIT] Form updated with payment method:', fullData.id);
+      } catch (error: any) {
+        console.error('[EDIT] Error loading payment method:', error);
+        showNotification('فشل تحميل بيانات طريقة السداد', 'error');
+        return;
+      }
     } else {
       setEditingMethod(null);
       setFormData({

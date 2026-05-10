@@ -60,7 +60,14 @@ export async function runMigrations() {
       { table: 'operation_fields', column: 'unit', type: 'VARCHAR(50)' },
       { table: 'operation_fields', column: 'default_value', type: 'TEXT' },
       { table: 'operation_field_values', column: 'company_id', type: 'VARCHAR(36)' },
-      { table: 'field_operation_categories', column: 'id', type: 'VARCHAR(36) PRIMARY KEY' }
+      { table: 'field_operation_categories', column: 'id', type: 'VARCHAR(36) PRIMARY KEY' },
+      { table: 'invoices', column: 'payment_type', type: "VARCHAR(20) DEFAULT 'cash'" },
+      { table: 'invoices', column: 'description', type: 'TEXT' },
+      { table: 'returns', column: 'description', type: 'TEXT' },
+      { table: 'purchase_invoices', column: 'description', type: 'TEXT' },
+      { table: 'purchase_returns', column: 'description', type: 'TEXT' },
+      { table: 'customers', column: 'created_at', type: 'TIMESTAMP DEFAULT NOW()' },
+      { table: 'customers', column: 'updated_at', type: 'TIMESTAMP DEFAULT NOW()' }
     ];
 
     for (const item of columnsToSync) {
@@ -85,6 +92,12 @@ export async function runMigrations() {
         console.log(`✅ Column ${item.table}.${item.column} added.`);
         appliedCount++;
       }
+    }
+
+    // Add Index for payment_type
+    const tablesWithPaymentType = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns'];
+    for (const table of tablesWithPaymentType) {
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_${table}_payment_type ON ${table}(payment_type)`);
     }
 
     // 1. Run Master Migration

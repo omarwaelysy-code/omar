@@ -438,16 +438,28 @@ export const Receipts: React.FC = () => {
     }
   };
 
-  const openEditModal = (receipt: ReceiptVoucher) => {
-    setEditingReceipt(receipt);
-    setFormData({
-      customer_id: receipt.customer_id,
-      date: receipt.date,
-      amount: receipt.amount,
-      description: receipt.description,
-      payment_method_id: receipt.payment_method_id || ''
-    });
-    setIsModalOpen(true);
+  const openEditModal = async (receipt: ReceiptVoucher) => {
+    console.log('[EDIT] Opening edit modal for receipt ID:', receipt.id);
+    try {
+      const fullData = await dbService.get<ReceiptVoucher>('receipt_vouchers', receipt.id);
+      console.log('[EDIT] Receipt details from API:', fullData);
+      
+      if (!fullData) throw new Error('Receipt not found');
+
+      setEditingReceipt(fullData);
+      setFormData({
+        customer_id: fullData.customer_id,
+        date: fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        amount: fullData.amount,
+        description: fullData.description,
+        payment_method_id: fullData.payment_method_id || ''
+      });
+      setIsModalOpen(true);
+      console.log('[EDIT] Form updated with receipt:', fullData.id);
+    } catch (error: any) {
+      console.error('[EDIT] Error loading receipt:', error);
+      showNotification('فشل تحميل بيانات سند القبض', 'error');
+    }
   };
 
   const handleViewReceipt = (receipt: ReceiptVoucher) => {

@@ -269,20 +269,33 @@ export const Customers: React.FC = () => {
     }
   };
 
-  const openModal = (customer: Customer | null = null) => {
+  const openModal = async (customer: Customer | null = null) => {
     if (customer) {
-      setEditingCustomer(customer);
-      setFormData({ 
-        name: customer.name, 
-        mobile: customer.mobile,
-        email: customer.email || '',
-        address: customer.address || '',
-        opening_balance: customer.opening_balance || 0,
-        opening_balance_date: customer.opening_balance_date || new Date().toISOString().slice(0, 10),
-        account_id: customer.account_id || '',
-        account_name: customer.account_name || '',
-        counter_account_id: customer.counter_account_id || ''
-      });
+      console.log('[EDIT] Opening edit modal for customer ID:', customer.id);
+      try {
+        const fullData = await dbService.get<Customer>('customers', customer.id);
+        console.log('[EDIT] Customer details from API:', fullData);
+        
+        if (!fullData) throw new Error('Customer not found');
+
+        setEditingCustomer(fullData);
+        setFormData({ 
+          name: fullData.name, 
+          mobile: fullData.mobile,
+          email: fullData.email || '',
+          address: fullData.address || '',
+          opening_balance: fullData.opening_balance || 0,
+          opening_balance_date: (fullData.opening_balance_date || new Date().toISOString()).slice(0, 10),
+          account_id: fullData.account_id || '',
+          account_name: fullData.account_name || '',
+          counter_account_id: fullData.counter_account_id || ''
+        });
+        console.log('[EDIT] Form updated with customer:', fullData.id);
+      } catch (error: any) {
+        console.error('[EDIT] Error loading customer:', error);
+        showNotification('فشل تحميل بيانات العميل', 'error');
+        return;
+      }
     } else {
       setEditingCustomer(null);
       setFormData({ 

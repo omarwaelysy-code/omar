@@ -460,7 +460,7 @@ export const CashTransfers: React.FC = () => {
                         onClick={() => {
                           setEditingTransfer(transfer);
                           setFormData({
-                            date: transfer.date,
+                            date: transfer.date ? transfer.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
                             amount: transfer.amount,
                             from_payment_method_id: transfer.from_payment_method_id,
                             to_payment_method_id: transfer.to_payment_method_id,

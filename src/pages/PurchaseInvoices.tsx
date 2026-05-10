@@ -861,28 +861,41 @@ export const PurchaseInvoices: React.FC = () => {
     }
   };
 
-  const openModal = (invoice?: any) => {
+  const openModal = async (invoice?: any) => {
     if (invoice) {
-      setEditingInvoice(invoice);
-      setInvoiceData({
-        supplier_id: invoice.supplier_id.toString(),
-        date: invoice.date,
-        payment_type: invoice.payment_type || 'cash',
-        payment_method_id: invoice.payment_method_id?.toString() || '',
-        notes: invoice.notes || '',
-        discount: invoice.discount || 0,
-        purchase_type: invoice.items?.[0]?.product_id ? 'items' : 'expenses'
-      });
-      setItems(invoice.items.map((item: any) => ({
-        product_id: item.product_id?.toString(),
-        expense_category_id: item.expense_category_id?.toString(),
-        product_name: item.product_name,
-        category_name: item.category_name,
-        quantity: item.quantity,
-        cost_price: item.price,
-        total: item.total
-      })));
-      setInvoiceNumber(invoice.invoice_number);
+      console.log('[EDIT] Opening edit modal for purchase invoice ID:', invoice.id);
+      try {
+        const fullData = await dbService.get<any>('purchase_invoices', invoice.id);
+        console.log('[EDIT] Purchase invoice details from API:', fullData);
+        
+        if (!fullData) throw new Error('Purchase invoice not found');
+
+        setEditingInvoice(fullData);
+        setInvoiceData({
+          supplier_id: fullData.supplier_id.toString(),
+          date: fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+          payment_type: fullData.payment_type || 'cash',
+          payment_method_id: fullData.payment_method_id?.toString() || '',
+          notes: fullData.notes || '',
+          discount: fullData.discount || 0,
+          purchase_type: fullData.items?.[0]?.product_id ? 'items' : 'expenses'
+        });
+        setItems((fullData.items || []).map((item: any) => ({
+          product_id: item.product_id?.toString(),
+          expense_category_id: item.expense_category_id?.toString(),
+          product_name: item.product_name,
+          category_name: item.category_name,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total: item.total
+        })));
+        setInvoiceNumber(fullData.invoice_number);
+        console.log('[EDIT] Form updated with purchase invoice:', fullData.id);
+      } catch (error: any) {
+        console.error('[EDIT] Error loading purchase invoice:', error);
+        showNotification('فشل تحميل بيانات فاتورة الشراء', 'error');
+        return;
+      }
     } else {
       setEditingInvoice(null);
       setInvoiceData({

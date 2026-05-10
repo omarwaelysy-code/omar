@@ -60,6 +60,7 @@ export const InvoiceSchema = BaseSchema.extend({
   payment_method_id: z.string().nullable().optional(),
   payment_method_name: z.string().nullable().optional(),
   status: z.string().optional(),
+  description: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -97,6 +98,7 @@ export const ReturnSchema = BaseSchema.extend({
   payment_type: z.enum(['cash', 'credit']).default('credit'),
   payment_method_id: z.string().nullable().optional(),
   payment_method_name: z.string().nullable().optional(),
+  description: z.string().optional(),
   notes: z.string().optional(),
 });
 

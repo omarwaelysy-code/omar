@@ -214,6 +214,7 @@ export interface Invoice {
   customer_name?: string;
   date: string;
   due_date?: string;
+  description?: string;
   subtotal?: number;
   discount?: number;
   discount_amount?: number;
@@ -231,6 +232,7 @@ export interface PurchaseInvoice {
   supplier_id: string;
   supplier_name?: string;
   date: string;
+  description?: string;
   subtotal?: number;
   discount?: number;
   total_amount: number;
@@ -286,6 +288,7 @@ export interface Return {
   customer_id: string;
   customer_name?: string;
   date: string;
+  description?: string;
   total_amount: number;
   payment_type: 'credit' | 'cash';
   payment_method_id?: string;
@@ -299,6 +302,7 @@ export interface PurchaseReturn {
   supplier_id: string;
   supplier_name?: string;
   date: string;
+  description?: string;
   total_amount: number;
   payment_type: 'credit' | 'cash';
   payment_method_id?: string;

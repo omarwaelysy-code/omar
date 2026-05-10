@@ -307,26 +307,40 @@ export const Products: React.FC = () => {
     }
   };
 
-  const openModal = (product: Product | null = null) => {
+  const openModal = async (product: Product | null = null) => {
     if (product) {
-      setEditingProduct(product);
-      setFormData({ 
-        code: product.code, 
-        name: product.name, 
-        type: product.type || 'product',
-        category: product.category || '',
-        unit: product.unit || 'قطعة',
-        sale_price: product.sale_price, 
-        cost_price: product.cost_price, 
-        description: product.description || '',
-        image_url: product.image_url || '',
-        barcode: product.barcode || '',
-        stock: product.stock || 0,
-        min_stock: product.min_stock || 0,
-        revenue_account_id: product.revenue_account_id || '',
-        cost_account_id: product.cost_account_id || '',
-        counter_account_id: product.counter_account_id || ''
-      });
+      console.log('[EDIT] Opening edit modal for product ID:', product.id);
+      try {
+        const fullData = await dbService.get<Product>('products', product.id);
+        console.log('[EDIT] Product details from API:', fullData);
+        
+        if (!fullData) throw new Error('Product not found');
+
+        setEditingProduct(fullData);
+        setFormData({ 
+          code: fullData.code, 
+          name: fullData.name, 
+          type: fullData.type || 'product',
+          category: fullData.category || '',
+          unit: fullData.unit || 'قطعة',
+          sale_price: fullData.sale_price, 
+          cost_price: fullData.cost_price, 
+          description: fullData.description || '',
+          image_url: fullData.image_url || '',
+          barcode: fullData.barcode || '',
+          stock: fullData.stock || 0,
+          min_stock: fullData.min_stock || 0,
+          revenue_account_id: fullData.revenue_account_id || '',
+          cost_account_id: fullData.cost_account_id || '',
+          counter_account_id: fullData.counter_account_id || ''
+        });
+        
+        console.log('[EDIT] Form updated with product:', fullData.id);
+      } catch (error: any) {
+        console.error('[EDIT] Error loading product:', error);
+        showNotification('فشل تحميل بيانات المنتج', 'error');
+        return;
+      }
     } else {
       setEditingProduct(null);
       setFormData({ 

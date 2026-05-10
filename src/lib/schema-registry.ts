@@ -35,7 +35,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   invoices: [
     'id', 'company_id', 'customer_id', 'customer_name', 'invoice_number', 'date', 'due_date', 'subtotal',
     'tax_amount', 'discount_amount', 'total_amount', 'status', 'payment_type', 
-    'payment_method_id', 'payment_method_name', 'notes', 'created_by', 'created_at'
+    'payment_method_id', 'payment_method_name', 'description', 'notes', 'created_by', 'created_at'
   ],
   invoice_items: [
     'id', 'invoice_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
@@ -43,7 +43,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   returns: [
     'id', 'company_id', 'customer_id', 'customer_name', 'return_number', 'date', 'total_amount', 
-    'payment_type', 'payment_method_id', 'payment_method_name', 'notes', 'created_at'
+    'payment_type', 'payment_method_id', 'payment_method_name', 'description', 'notes', 'created_at'
   ],
   return_items: [
     'id', 'return_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
@@ -52,7 +52,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   purchase_invoices: [
     'id', 'company_id', 'supplier_id', 'supplier_name', 'invoice_number', 'date', 'due_date', 'subtotal',
     'tax_amount', 'discount_amount', 'total_amount', 'status', 'payment_type', 
-    'payment_method_id', 'payment_method_name', 'notes', 'created_at'
+    'payment_method_id', 'payment_method_name', 'description', 'notes', 'created_at'
   ],
   purchase_invoice_items: [
     'id', 'invoice_id', 'product_id', 'expense_category_id', 'description', 'quantity', 'unit_price', 'total',
@@ -60,7 +60,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   purchase_returns: [
     'id', 'company_id', 'supplier_id', 'supplier_name', 'return_number', 'date', 'total_amount', 
-    'payment_type', 'payment_method_id', 'payment_method_name', 'notes', 'created_at'
+    'payment_type', 'payment_method_id', 'payment_method_name', 'description', 'notes', 'created_at'
   ],
   receipt_vouchers: [
     'id', 'company_id', 'customer_id', 'customer_name', 'voucher_number', 'date', 'amount', 'description', 

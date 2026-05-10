@@ -563,18 +563,30 @@ export const PaymentVouchers: React.FC = () => {
     }
   };
 
-  const openEditModal = (voucher: any) => {
-    setEditingVoucher(voucher);
-    setVoucherData({
-      type: voucher.type as 'supplier' | 'expense',
-      supplier_id: voucher.supplier_id?.toString() || '',
-      expense_category_id: voucher.expense_category_id?.toString() || '',
-      amount: voucher.amount,
-      payment_method_id: voucher.payment_method_id.toString(),
-      date: voucher.date,
-      notes: voucher.description || ''
-    });
-    setIsModalOpen(true);
+  const openEditModal = async (voucher: any) => {
+    console.log('[EDIT] Opening edit modal for payment voucher ID:', voucher.id);
+    try {
+      const fullData = await dbService.get<any>('payment_vouchers', voucher.id);
+      console.log('[EDIT] Payment voucher details from API:', fullData);
+      
+      if (!fullData) throw new Error('Payment voucher not found');
+
+      setEditingVoucher(fullData);
+      setVoucherData({
+        type: fullData.type as 'supplier' | 'expense',
+        supplier_id: fullData.supplier_id?.toString() || '',
+        expense_category_id: fullData.expense_category_id?.toString() || '',
+        amount: fullData.amount,
+        payment_method_id: fullData.payment_method_id?.toString() || '',
+        date: fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        notes: fullData.description || ''
+      });
+      setIsModalOpen(true);
+      console.log('[EDIT] Form updated with payment voucher:', fullData.id);
+    } catch (error: any) {
+      console.error('[EDIT] Error loading payment voucher:', error);
+      showNotification('فشل تحميل بيانات السند', 'error');
+    }
   };
 
   const filteredVouchers = vouchers.filter(v => 

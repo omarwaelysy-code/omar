@@ -540,21 +540,33 @@ export const PurchaseReturns: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  const handleEdit = (ret: any) => {
-    setEditingReturn(ret);
-    setReturnData({
-      supplier_id: ret.supplier_id,
-      date: ret.date,
-      payment_type: ret.payment_type || 'credit',
-      payment_method_id: ret.payment_method_id || '',
-      notes: ret.notes || ''
-    });
-    setItems(ret.items.map((item: any) => ({
-      product_id: item.product_id,
-      quantity: item.quantity,
-      cost_price: item.price
-    })));
-    setIsModalOpen(true);
+  const handleEdit = async (ret: any) => {
+    console.log('[EDIT] Opening edit modal for purchase return ID:', ret.id);
+    try {
+      const fullData = await dbService.get<any>('purchase_returns', ret.id);
+      console.log('[EDIT] Purchase return details from API:', fullData);
+      
+      if (!fullData) throw new Error('Return details not found');
+
+      setEditingReturn(fullData);
+      setReturnData({
+        supplier_id: fullData.supplier_id,
+        date: fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        payment_type: fullData.payment_type || 'credit',
+        payment_method_id: fullData.payment_method_id || '',
+        notes: fullData.notes || ''
+      });
+      setItems((fullData.items || []).map((item: any) => ({
+        product_id: item.product_id,
+        quantity: item.quantity,
+        cost_price: item.price
+      })));
+      setIsModalOpen(true);
+      console.log('[EDIT] Form updated with purchase return:', fullData.id);
+    } catch (error: any) {
+      console.error('[EDIT] Error loading purchase return:', error);
+      showNotification('فشل تحميل بيانات المرتجع', 'error');
+    }
   };
 
   const handleDelete = (id: string) => {
