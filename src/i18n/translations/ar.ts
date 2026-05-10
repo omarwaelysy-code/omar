@@ -303,6 +303,12 @@ export const ar = {
   'transfers.add': 'إضافة تحويل',
   'transfers.from_account': 'من حساب',
   'transfers.to_account': 'إلى حساب',
+  'vouchers.receipt': 'سند قبض',
+  'vouchers.payment': 'سند صرف',
+  'vouchers.voucher': 'سند',
+  'cash_transfers.outgoing': 'تحويل صادر',
+  'cash_transfers.incoming': 'تحويل وارد',
+  'cash_transfers.transfer': 'تحويل',
 
   // Dashboard
   'dashboard.title': 'لوحة التحكم',

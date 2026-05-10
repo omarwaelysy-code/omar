@@ -303,6 +303,12 @@ export const en = {
   'transfers.add': 'Add Transfer',
   'transfers.from_account': 'From Account',
   'transfers.to_account': 'To Account',
+  'vouchers.receipt': 'Receipt Voucher',
+  'vouchers.payment': 'Payment Voucher',
+  'vouchers.voucher': 'Voucher',
+  'cash_transfers.outgoing': 'Outgoing Transfer',
+  'cash_transfers.incoming': 'Incoming Transfer',
+  'cash_transfers.transfer': 'Transfer',
 
   // Dashboard
   'dashboard.title': 'Dashboard',
