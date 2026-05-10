@@ -2,7 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Invoice, Customer, Product, InvoiceItem, Account, JournalEntry, JournalEntryItem, ActivityLog } from '../types';
-import { Search, Plus, Trash2, X, Eye, Download, Sparkles, Mic, Image as ImageIcon, FileText, Pencil, History, Printer, ChevronLeft, ChevronRight, Maximize2, Minimize2, Hash, Wallet, Calendar, Package, Tag, Layers, Box, Paperclip, Phone, Mail, Lock } from 'lucide-react';
+import { 
+  Search, Plus, Trash2, X, Eye, Download, Sparkles, Mic, 
+  Image as ImageIcon, FileText, Pencil, History, Printer, 
+  ChevronLeft, ChevronRight, Maximize2, Minimize2, Hash, 
+  Wallet, Calendar, Package, Tag, Layers, Box, Paperclip, 
+  Phone, Mail, Lock, LayoutGrid, List 
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Barcode from 'react-barcode';
 import { SmartAIInput } from '../components/SmartAIInput';
@@ -21,9 +27,10 @@ import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { transactionManager, TransactionManager } from '../services/TransactionManager';
 import { InvoiceSchema, JournalEntrySchema } from '../lib/schemas';
+import { useViewPreference } from '../hooks/useViewPreference';
 
 export const Invoices: React.FC = () => {
-  const { t, dir } = useLanguage();
+  const { t, dir, language } = useLanguage();
   const { user } = useAuth();
   const { canView, canCreate, canEdit, canDelete } = usePermissions('invoices');
   const { showNotification } = useNotification();
@@ -94,6 +101,7 @@ export const Invoices: React.FC = () => {
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [settings, setSettings] = useState<any>(null);
+  const [view, setView] = useViewPreference('invoices', 'table');
 
   useEffect(() => {
     if (user) {
@@ -982,87 +990,180 @@ export const Invoices: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <div className="flex bg-slate-100 p-1 rounded-xl">
+            <button
+              onClick={() => setView('table')}
+              className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
+            >
+              <List size={18} />
+            </button>
+            <button
+              onClick={() => setView('card')}
+              className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
+            >
+              <LayoutGrid size={18} />
+            </button>
+          </div>
         </div>
 
-        <div ref={tableRef} id="invoices-list-table" className="overflow-x-auto hidden md:block">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-slate-50/50 text-slate-500 text-[10px] uppercase tracking-widest font-bold">
-                <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_number')}</th>
-                <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_customer')}</th>
-                <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_date')}</th>
-                <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.form_payment_type')}</th>
-                <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_amount')}</th>
-                <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredInvoices.map((inv) => (
-                <tr key={inv.id} className="hover:bg-slate-50/50 transition-colors group">
-                  <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100">{inv.invoice_number}</span>
-                  </td>
-                  <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{inv.customer_name}</td>
-                  <td className={`px-6 py-4 text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(inv.date)}</td>
-                  <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+        {view === 'table' ? (
+          <div ref={tableRef} id="invoices-list-table" className="overflow-x-auto hidden md:block">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-slate-50/50 text-slate-500 text-[10px] uppercase tracking-widest font-bold">
+                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_number')}</th>
+                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_customer')}</th>
+                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_date')}</th>
+                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.form_payment_type')}</th>
+                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_amount')}</th>
+                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredInvoices.map((inv) => (
+                  <tr key={inv.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100">{inv.invoice_number}</span>
+                    </td>
+                    <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{inv.customer_name}</td>
+                    <td className={`px-6 py-4 text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(inv.date)}</td>
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                        inv.payment_type === 'cash' 
+                          ? 'bg-emerald-100 text-emerald-700' 
+                          : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {inv.payment_type === 'cash' ? 'نقدي' : 'آجل'}
+                      </span>
+                    </td>
+                    <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatMoney(inv.total_amount)} {t('invoices.currency')}</td>
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                      <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                        <button 
+                          onClick={() => {
+                            setActivityLogDocumentId(inv.id);
+                            setIsActivityLogOpen(true);
+                          }}
+                          className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
+                          title={t('common.activity_log')}
+                        >
+                          <History size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleViewInvoice(inv)}
+                          className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
+                          title={t('common.view')}
+                        >
+                          <Eye size={18} />
+                        </button>
+                        {canEdit && (
+                          <button 
+                            onClick={() => openEditModal(inv)}
+                            className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
+                            title={t('common.edit')}
+                          >
+                            <Pencil size={18} />
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button 
+                            onClick={() => handleDelete(inv.id)}
+                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
+                            title={t('common.delete')}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredInvoices.length === 0 && !loading && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500 italic font-medium">{t('common.no_data')}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredInvoices.map((inv) => (
+              <div key={inv.id} className="p-6 bg-slate-50/50 rounded-3xl border border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden">
+                <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={() => handleViewInvoice(inv)}
+                    className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
+                  >
+                    <Eye size={16} />
+                  </button>
+                  {canEdit && (
+                    <button 
+                      onClick={() => openEditModal(inv)}
+                      className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button 
+                      onClick={() => handleDelete(inv.id)}
+                      className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex justify-between items-start">
+                  <div className="flex flex-col gap-1">
+                    <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
+                    <h4 className="font-bold text-slate-900 group-hover:text-emerald-700 transition-colors text-xl mt-1 tracking-tight">{inv.customer_name}</h4>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200/50 mt-4">
+                  <div className="space-y-1">
+                    <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">التاريخ</p>
+                    <p className="text-slate-900 font-bold text-sm tracking-tight">{formatDate(inv.date)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">الحالة</p>
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider ${
                       inv.payment_type === 'cash' 
                         ? 'bg-emerald-100 text-emerald-700' 
                         : 'bg-amber-100 text-amber-700'
                     }`}>
                       {inv.payment_type === 'cash' ? 'نقدي' : 'آجل'}
                     </span>
-                  </td>
-                  <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatMoney(inv.total_amount)} {t('invoices.currency')}</td>
-                  <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                    <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
-                      <button 
-                        onClick={() => {
-                          setActivityLogDocumentId(inv.id);
-                          setIsActivityLogOpen(true);
-                        }}
-                        className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
-                        title={t('common.activity_log')}
-                      >
-                        <History size={18} />
-                      </button>
-                      <button 
-                        onClick={() => handleViewInvoice(inv)}
-                        className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
-                        title={t('common.view')}
-                      >
-                        <Eye size={18} />
-                      </button>
-                      {canEdit && (
-                        <button 
-                          onClick={() => openEditModal(inv)}
-                          className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
-                          title={t('common.edit')}
-                        >
-                          <Pencil size={18} />
-                        </button>
-                      )}
-                      {canDelete && (
-                        <button 
-                          onClick={() => handleDelete(inv.id)}
-                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
-                          title={t('common.delete')}
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      )}
+                  </div>
+                  <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-slate-200/50 flex justify-between items-end">
+                    <div>
+                      <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">إجمالي المبلغ</p>
+                      <p className="font-black text-2xl tracking-tighter text-emerald-600">
+                        {formatMoney(inv.total_amount)} <span className="text-sm font-bold">{t('invoices.currency')}</span>
+                      </p>
                     </div>
-                  </td>
-                </tr>
-              ))}
-              {filteredInvoices.length === 0 && !loading && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500 italic font-medium">{t('common.no_data')}</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                    <button 
+                      onClick={() => {
+                        setActivityLogDocumentId(inv.id);
+                        setIsActivityLogOpen(true);
+                      }}
+                      className="p-2 text-slate-400 hover:text-emerald-500 bg-white border border-slate-100 rounded-xl transition-all"
+                      title={t('common.activity_log')}
+                    >
+                      <History size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {filteredInvoices.length === 0 && !loading && (
+              <div className="col-span-full p-12 text-center text-slate-500 font-bold italic">{t('common.no_data')}</div>
+            )}
+          </div>
+        )}
 
         {/* Mobile List View */}
         <div className="md:hidden divide-y divide-slate-100">

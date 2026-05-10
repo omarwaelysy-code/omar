@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Supplier, ExpenseCategory, PaymentMethod, JournalEntry, JournalEntryItem, Account } from '../types';
-import { Search, Plus, Trash2, X, Wallet, User, CreditCard, Calendar, Hash, FileText, Save, Pencil, Eye, Download, History, Printer, Phone, Mail, MapPin, Layers } from 'lucide-react';
+import { 
+  Search, Plus, Trash2, X, Wallet, User, CreditCard, Calendar, 
+  Hash, FileText, Save, Pencil, Eye, Download, History, Printer, 
+  Phone, Mail, MapPin, Layers, LayoutGrid, List 
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
@@ -16,8 +19,9 @@ import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { ExportButtons } from '../components/ExportButtons';
 import { TransactionManager } from '../services/TransactionManager';
 import { VoucherSchema, JournalEntrySchema } from '../lib/schemas';
-import { ActivityLog } from '../types';
+import { ActivityLog, Supplier, ExpenseCategory, PaymentMethod, JournalEntry, JournalEntryItem, Account } from '../types';
 import { formatNumber, formatDate } from '../utils/formatUtils';
+import { useViewPreference } from '../hooks/useViewPreference';
 
 export const PaymentVouchers: React.FC = () => {
   const { user } = useAuth();
@@ -45,6 +49,7 @@ export const PaymentVouchers: React.FC = () => {
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
   const [previewJournalEntry, setPreviewJournalEntry] = useState<JournalEntry | null>(null);
   const [previewActivityLog, setPreviewActivityLog] = useState<Partial<ActivityLog> | null>(null);
+  const [view, setView] = useViewPreference('payment_vouchers', 'table');
 
   const [supplierFormData, setSupplierFormData] = useState({
     name: '',
@@ -625,150 +630,177 @@ export const PaymentVouchers: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden no-pdf">
         <div className="p-6 border-b border-zinc-50 flex items-center gap-4">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-3 text-zinc-400" size={18} />
+            <Search className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
             <input
               type="text"
-              placeholder="البحث عن سندات..."
-              className="w-full pl-10 pr-4 py-2 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-zinc-900 transition-all"
+              placeholder={language === 'ar' ? "البحث عن سندات..." : "Search vouchers..."}
+              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-zinc-900 transition-all`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <div className="flex bg-zinc-100 p-1 rounded-xl">
+            <button
+              onClick={() => setView('table')}
+              className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+              title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
+            >
+              <List size={18} />
+            </button>
+            <button
+              onClick={() => setView('card')}
+              className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+              title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
+            >
+              <LayoutGrid size={18} />
+            </button>
+          </div>
         </div>
 
-        <div className="md:hidden divide-y divide-zinc-100">
-          {filteredVouchers.map((voucher) => (
-            <div key={voucher.id} className="p-4 space-y-3">
-              <div className="flex justify-between items-start">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] bg-zinc-100 px-1.5 py-0.5 rounded text-zinc-700 font-bold">{voucher.voucher_number}</span>
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                      voucher.type === 'supplier' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'
+        {view === 'table' ? (
+          <div ref={tableRef} id="payment-vouchers-list-table" className="hidden md:block overflow-x-auto">
+            <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+              <thead>
+                <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
+                  <th className="px-6 py-4 font-bold">رقم السند</th>
+                  <th className="px-6 py-4 font-bold">النوع</th>
+                  <th className="px-6 py-4 font-bold">المستفيد / الفئة</th>
+                  <th className="px-6 py-4 font-bold">التاريخ</th>
+                  <th className="px-6 py-4 font-bold">المبلغ</th>
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-50">
+                {filteredVouchers.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-zinc-400 italic">لا توجد سندات صرف حالياً</td>
+                  </tr>
+                ) : filteredVouchers.map((voucher) => (
+                  <tr key={voucher.id} className="hover:bg-zinc-50/50 transition-colors group">
+                    <td className="px-6 py-4">
+                      <span className="font-mono text-xs bg-zinc-100 px-2 py-1 rounded text-zinc-700 font-bold">{voucher.voucher_number}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
+                        voucher.type === 'supplier' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'
+                      }`}>
+                        {voucher.type === 'supplier' ? 'مورد' : 'مصروف'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 font-bold text-zinc-900">
+                      {voucher.type === 'supplier' ? voucher.supplier_name : voucher.category_name}
+                    </td>
+                    <td className="px-6 py-4 text-zinc-500">{formatDate(voucher.date)}</td>
+                    <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(voucher.amount)} {t('common.currency')}</td>
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                      <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity no-pdf`}>
+                        <button 
+                          onClick={() => {
+                            setActivityLogDocumentId(voucher.id);
+                            setIsActivityLogOpen(true);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all"
+                          title="سجل النشاط"
+                        >
+                          <History size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleViewVoucher(voucher.id)}
+                          className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
+                        >
+                          <Eye size={18} />
+                        </button>
+                        <button 
+                          onClick={() => openEditModal(voucher)}
+                          className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
+                        >
+                          <Pencil size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(voucher.id)}
+                          className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredVouchers.map((voucher) => (
+              <div key={voucher.id} className="p-6 bg-zinc-50/50 rounded-3xl border border-zinc-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden">
+                <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={() => handleViewVoucher(voucher.id)}
+                    className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
+                  >
+                    <Eye size={16} />
+                  </button>
+                  <button 
+                    onClick={() => openEditModal(voucher)}
+                    className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(voucher.id)}
+                    className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+
+                <div className="flex justify-between items-start">
+                  <div className="flex flex-col gap-1">
+                    <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{voucher.voucher_number}</span>
+                    <h4 className="font-bold text-zinc-900 group-hover:text-emerald-700 transition-colors text-xl mt-1 tracking-tight">
+                      {voucher.type === 'supplier' ? voucher.supplier_name : voucher.category_name}
+                    </h4>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold w-fit ${
+                      voucher.type === 'supplier' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
                     }`}>
                       {voucher.type === 'supplier' ? 'مورد' : 'مصروف'}
                     </span>
                   </div>
-                  <h4 className="font-bold text-zinc-900">
-                    {voucher.type === 'supplier' ? voucher.supplier_name : voucher.category_name}
-                  </h4>
-                  <p className="text-xs text-zinc-500">{formatDate(voucher.date)}</p>
                 </div>
-                <div className="text-left">
-                  <p className="font-bold text-zinc-900">{formatNumber(voucher.amount)} ج.م</p>
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-200/50 mt-4">
+                  <div className="space-y-1">
+                    <p className="text-zinc-400 text-[10px] uppercase font-black tracking-widest">{t('common.date')}</p>
+                    <p className="text-zinc-900 font-bold text-sm tracking-tight">{formatDate(voucher.date)}</p>
+                  </div>
+                  <div className="space-y-1 text-left">
+                    <p className="text-zinc-400 text-[10px] uppercase font-black tracking-widest">المبلغ</p>
+                    <p className="font-black text-2xl tracking-tighter text-emerald-600">
+                      {formatNumber(voucher.amount)} <span className="text-sm font-bold">{t('common.currency')}</span>
+                    </p>
+                  </div>
+                  <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-zinc-200/50 flex justify-end">
+                    <button 
+                      onClick={() => {
+                        setActivityLogDocumentId(voucher.id);
+                        setIsActivityLogOpen(true);
+                      }}
+                      className="p-2 text-zinc-400 hover:text-emerald-500 bg-white border border-zinc-100 rounded-xl transition-all"
+                      title="سجل النشاط"
+                    >
+                      <History size={16} />
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button 
-                  onClick={() => {
-                    setActivityLogDocumentId(voucher.id);
-                    setIsActivityLogOpen(true);
-                  }}
-                  className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all"
-                  title="سجل النشاط"
-                >
-                  <History size={18} />
-                </button>
-                <button 
-                  onClick={() => handleViewVoucher(voucher.id)}
-                  className="p-2 text-emerald-500 bg-emerald-50 rounded-xl transition-all"
-                >
-                  <Eye size={18} />
-                </button>
-                <button 
-                  onClick={() => openEditModal(voucher)}
-                  className="p-2 text-blue-500 bg-blue-50 rounded-xl transition-all"
-                >
-                  <Pencil size={18} />
-                </button>
-                <button 
-                  onClick={() => handleDelete(voucher.id)}
-                  className="p-2 text-red-500 bg-red-50 rounded-xl transition-all"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            </div>
-          ))}
-          {filteredVouchers.length === 0 && !loading && (
-            <div className="p-8 text-center text-zinc-400 italic">لا توجد سندات صرف حالياً</div>
-          )}
-        </div>
-
-        <div ref={tableRef} id="payment-vouchers-list-table" className="hidden md:block overflow-x-auto">
-          <table className="w-full text-right">
-            <thead>
-              <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                <th className="px-6 py-4 font-bold">رقم السند</th>
-                <th className="px-6 py-4 font-bold">النوع</th>
-                <th className="px-6 py-4 font-bold">المستفيد / الفئة</th>
-                <th className="px-6 py-4 font-bold">التاريخ</th>
-                <th className="px-6 py-4 font-bold">المبلغ</th>
-                <th className="px-6 py-4 font-bold text-left">الإجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-50">
-              {filteredVouchers.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-zinc-400 italic">لا توجد سندات صرف حالياً</td>
-                </tr>
-              ) : filteredVouchers.map((voucher) => (
-                <tr key={voucher.id} className="hover:bg-zinc-50/50 transition-colors group">
-                  <td className="px-6 py-4">
-                    <span className="font-mono text-xs bg-zinc-100 px-2 py-1 rounded text-zinc-700 font-bold">{voucher.voucher_number}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
-                      voucher.type === 'supplier' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'
-                    }`}>
-                      {voucher.type === 'supplier' ? 'مورد' : 'مصروف'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 font-bold text-zinc-900">
-                    {voucher.type === 'supplier' ? voucher.supplier_name : voucher.category_name}
-                  </td>
-                  <td className="px-6 py-4 text-zinc-500">{formatDate(voucher.date)}</td>
-                  <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(voucher.amount)} ج.م</td>
-                  <td className="px-6 py-4 text-left">
-                    <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity no-pdf">
-                      <button 
-                        onClick={() => {
-                          setActivityLogDocumentId(voucher.id);
-                          setIsActivityLogOpen(true);
-                        }}
-                        className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all"
-                        title="سجل النشاط"
-                      >
-                        <History size={18} />
-                      </button>
-                      <button 
-                        onClick={() => handleViewVoucher(voucher.id)}
-                        className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
-                      >
-                        <Eye size={18} />
-                      </button>
-                      <button 
-                        onClick={() => openEditModal(voucher)}
-                        className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
-                      >
-                        <Pencil size={18} />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(voucher.id)}
-                        className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+            {filteredVouchers.length === 0 && (
+              <div className="col-span-full p-12 text-center text-zinc-500 font-bold italic">لا توجد سندات صرف حالياً</div>
+            )}
+          </div>
+        )}
       </div>
 
       {isModalOpen && (

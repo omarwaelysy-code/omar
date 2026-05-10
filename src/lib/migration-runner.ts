@@ -67,7 +67,9 @@ export async function runMigrations() {
       { table: 'purchase_invoices', column: 'description', type: 'TEXT' },
       { table: 'purchase_returns', column: 'description', type: 'TEXT' },
       { table: 'customers', column: 'created_at', type: 'TIMESTAMP DEFAULT NOW()' },
-      { table: 'customers', column: 'updated_at', type: 'TIMESTAMP DEFAULT NOW()' }
+      { table: 'customers', column: 'updated_at', type: 'TIMESTAMP DEFAULT NOW()' },
+      { table: 'products', column: 'created_at', type: 'TIMESTAMP DEFAULT NOW()' },
+      { table: 'products', column: 'updated_at', type: 'TIMESTAMP DEFAULT NOW()' }
     ];
 
     for (const item of columnsToSync) {

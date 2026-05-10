@@ -3,10 +3,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { ExpenseCategory, Account } from '../types';
-import { Search, Plus, Trash2, Edit2, X, Wallet, FileText, Hash, History } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, X, Wallet, FileText, Hash, History, LayoutGrid, List } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
+import { useViewPreference } from '../hooks/useViewPreference';
 
 export const Expenses: React.FC = () => {
   const { user } = useAuth();
@@ -22,6 +23,7 @@ export const Expenses: React.FC = () => {
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
+  const [view, setView] = useViewPreference('expenses', 'card');
 
   const [formData, setFormData] = useState({
     code: '',
@@ -188,49 +190,124 @@ export const Expenses: React.FC = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        <div className="flex bg-zinc-100 p-1 rounded-xl">
+          <button
+            onClick={() => setView('table')}
+            className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+            title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
+          >
+            <List size={20} />
+          </button>
+          <button
+            onClick={() => setView('card')}
+            className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+            title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
+          >
+            <LayoutGrid size={20} />
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {loading ? (
-          [1,2,3].map(i => <div key={i} className="h-40 bg-zinc-100 animate-pulse rounded-3xl" />)
-        ) : filteredCategories.map(category => (
-          <div key={category.id} className="group bg-white p-6 rounded-3xl border border-zinc-100 shadow-sm hover:shadow-xl hover:border-emerald-100 transition-all duration-300 relative overflow-hidden" dir={dir}>
-            <div className="relative">
-              <div className={`flex justify-between items-start mb-4 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                <div className="w-12 h-12 rounded-2xl bg-zinc-100 text-zinc-900 flex items-center justify-center font-bold text-lg shadow-sm">
-                  <Wallet size={24} className="text-emerald-500" />
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1,2,3].map(i => <div key={i} className="h-40 bg-zinc-100 animate-pulse rounded-3xl" />)}
+        </div>
+      ) : view === 'table' ? (
+        <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
+                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('expenses.form_code')}</th>
+                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('expenses.form_name')}</th>
+                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('expenses.form_account')}</th>
+                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-50">
+              {filteredCategories.map((category) => (
+                <tr key={category.id} className="hover:bg-zinc-50/50 transition-colors group">
+                  <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                    <span className="font-mono text-xs bg-zinc-100 px-2 py-1 rounded text-zinc-600">{category.code}</span>
+                  </td>
+                  <td className={`px-6 py-4 font-bold text-zinc-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{category.name}</td>
+                  <td className={`px-6 py-4 text-zinc-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{category.account_name}</td>
+                  <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                    <div className="flex items-center gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => {
+                          setActivityLogDocumentId(category.id);
+                          setIsActivityLogOpen(true);
+                        }}
+                        className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
+                      >
+                        <History size={18} />
+                      </button>
+                      <button 
+                        onClick={() => openModal(category)}
+                        className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                      >
+                        <Edit2 size={18} />
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(category.id)}
+                        className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredCategories.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-6 py-12 text-center text-zinc-500 italic">{language === 'ar' ? 'لا توجد تصنيفات.' : 'No categories found.'}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredCategories.map(category => (
+            <div key={category.id} className="group bg-white p-6 rounded-3xl border border-zinc-100 shadow-sm hover:shadow-xl hover:border-emerald-100 transition-all duration-300 relative overflow-hidden" dir={dir}>
+              <div className="relative">
+                <div className={`flex justify-between items-start mb-4 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                  <div className="w-12 h-12 rounded-2xl bg-zinc-100 text-zinc-900 flex items-center justify-center font-bold text-lg shadow-sm">
+                    <Wallet size={24} className="text-emerald-500" />
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => {
+                        setActivityLogDocumentId(category.id);
+                        setIsActivityLogOpen(true);
+                      }}
+                      className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all"
+                      title={language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
+                    >
+                      <History size={18} />
+                    </button>
+                    <button onClick={() => openModal(category)} className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all">
+                      <Edit2 size={18} />
+                    </button>
+                    <button onClick={() => handleDelete(category.id)} className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => {
-                      setActivityLogDocumentId(category.id);
-                      setIsActivityLogOpen(true);
-                    }}
-                    className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all"
-                    title={language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
-                  >
-                    <History size={18} />
-                  </button>
-                  <button onClick={() => openModal(category)} className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all">
-                    <Edit2 size={18} />
-                  </button>
-                  <button onClick={() => handleDelete(category.id)} className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              </div>
 
-              <div className={`space-y-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                <h3 className="text-xl font-bold text-zinc-900">{category.name}</h3>
-                <span className="inline-block text-xs font-bold text-zinc-500 bg-zinc-100 px-2 py-1 rounded-lg uppercase tracking-wider">{category.code}</span>
-                {category.description && (
-                  <p className="text-sm text-zinc-500 line-clamp-2 pt-2">{category.description}</p>
-                )}
+                <div className={`space-y-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                  <h3 className="text-xl font-bold text-zinc-900">{category.name}</h3>
+                  <span className="inline-block text-xs font-bold text-zinc-500 bg-zinc-100 px-2 py-1 rounded-lg uppercase tracking-wider">{category.code}</span>
+                  {category.description && (
+                    <p className="text-sm text-zinc-500 line-clamp-2 pt-2">{category.description}</p>
+                  )}
+                  <p className="text-xs text-zinc-400 pt-2 border-t border-zinc-50">{category.account_name}</p>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">

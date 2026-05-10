@@ -7,7 +7,8 @@ import {
   Search, Plus, Trash2, X, ShoppingCart, User, CreditCard, 
   Calendar, Hash, Package, Save, FileText, Pencil, Download, 
   Eye, History, Printer, ArrowRight, ArrowLeft, Minimize2, 
-  Maximize2, Phone, Mail, MapPin, Wallet, Layers, Paperclip, Tag, Box
+  Maximize2, Phone, Mail, MapPin, Wallet, Layers, Paperclip, 
+  Tag, Box, LayoutGrid, List
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartAIInput } from '../components/SmartAIInput';
@@ -24,6 +25,7 @@ import { InvoiceSchema, JournalEntrySchema } from '../lib/schemas';
 import { ExportButtons } from '../components/ExportButtons';
 import { ActivityLog } from '../types';
 import { formatNumber, formatDate } from '../utils/formatUtils';
+import { useViewPreference } from '../hooks/useViewPreference';
 
 export const PurchaseInvoices: React.FC = () => {
   const { user } = useAuth();
@@ -54,6 +56,7 @@ export const PurchaseInvoices: React.FC = () => {
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
   const [previewJournalEntry, setPreviewJournalEntry] = useState<JournalEntry | null>(null);
   const [previewActivityLog, setPreviewActivityLog] = useState<Partial<ActivityLog> | null>(null);
+  const [view, setView] = useViewPreference('purchase_invoices', 'table');
 
   const [supplierFormData, setSupplierFormData] = useState({
     name: '',
@@ -1012,59 +1015,148 @@ export const PurchaseInvoices: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <div className="flex bg-zinc-100 p-1 rounded-xl">
+            <button
+              onClick={() => setView('table')}
+              className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+              title={t('dir') === 'rtl' ? 'عرض الجدول' : 'Table View'}
+            >
+              <List size={18} />
+            </button>
+            <button
+              onClick={() => setView('card')}
+              className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+              title={t('dir') === 'rtl' ? 'عرض الكروت' : 'Card View'}
+            >
+              <LayoutGrid size={18} />
+            </button>
+          </div>
         </div>
 
-        <div ref={tableRef} id="purchase-invoices-list-table" className="overflow-x-auto hidden md:block">
-          <table className={`w-full ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
-            <thead>
-              <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                <th className="px-6 py-4 font-bold">{t('pi.invoice_number')}</th>
-                <th className="px-6 py-4 font-bold">{t('pi.supplier')}</th>
-                <th className="px-6 py-4 font-bold">{t('common.date')}</th>
-                <th className="px-6 py-4 font-bold">{t('pi.total_amount')}</th>
-                <th className={`px-6 py-4 font-bold ${t('dir') === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.actions')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-50">
-              {filteredInvoices.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 italic">{t('pi.no_invoices')}</td>
+        {view === 'table' ? (
+          <div ref={tableRef} id="purchase-invoices-list-table" className="overflow-x-auto hidden md:block">
+            <table className={`w-full ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
+              <thead>
+                <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
+                  <th className="px-6 py-4 font-bold">{t('pi.invoice_number')}</th>
+                  <th className="px-6 py-4 font-bold">{t('pi.supplier')}</th>
+                  <th className="px-6 py-4 font-bold">{t('common.date')}</th>
+                  <th className="px-6 py-4 font-bold">{t('pi.total_amount')}</th>
+                  <th className={`px-6 py-4 font-bold ${t('dir') === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.actions')}</th>
                 </tr>
-              ) : filteredInvoices.map((inv) => (
-                <tr key={inv.id} className="hover:bg-zinc-50/50 transition-colors group">
-                  <td className="px-6 py-4">
-                    <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold">{inv.invoice_number}</span>
-                  </td>
-                  <td className="px-6 py-4 font-bold text-zinc-900">{inv.supplier_name}</td>
-                  <td className="px-6 py-4 text-zinc-500">{formatDate(inv.date)}</td>
-                  <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(inv.total_amount)} {t('common.currency')}</td>
-                  <td className={`px-6 py-4 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'}`}>
-                    <div className={`flex items-center ${t('dir') === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
-                      <button 
-                        onClick={() => setViewInvoice(inv)}
-                        className="p-2 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50 rounded-xl transition-all no-pdf"
-                      >
-                        <Eye size={18} />
-                      </button>
-                      <button 
-                        onClick={() => openModal(inv)}
-                        className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all no-pdf"
-                      >
-                        <Pencil size={18} />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(inv.id)}
-                        className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all no-pdf"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-zinc-50">
+                {filteredInvoices.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 italic">{t('pi.no_invoices')}</td>
+                  </tr>
+                ) : filteredInvoices.map((inv) => (
+                  <tr key={inv.id} className="hover:bg-zinc-50/50 transition-colors group">
+                    <td className="px-6 py-4">
+                      <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold">{inv.invoice_number}</span>
+                    </td>
+                    <td className="px-6 py-4 font-bold text-zinc-900">{inv.supplier_name}</td>
+                    <td className="px-6 py-4 text-zinc-500">{formatDate(inv.date)}</td>
+                    <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(inv.total_amount)} {t('common.currency')}</td>
+                    <td className={`px-6 py-4 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'}`}>
+                      <div className={`flex items-center ${t('dir') === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                        <button 
+                          onClick={() => {
+                            setActivityLogDocumentId(inv.id);
+                            setIsActivityLogOpen(true);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
+                          title={t('common.activity_log')}
+                        >
+                          <History size={18} />
+                        </button>
+                        <button 
+                          onClick={() => setViewInvoice(inv)}
+                          className="p-2 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50 rounded-xl transition-all no-pdf"
+                        >
+                          <Eye size={18} />
+                        </button>
+                        <button 
+                          onClick={() => openModal(inv)}
+                          className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all no-pdf"
+                        >
+                          <Pencil size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(inv.id)}
+                          className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all no-pdf"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredInvoices.map((inv) => (
+              <div key={inv.id} className="p-6 bg-zinc-50/50 rounded-3xl border border-zinc-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden">
+                <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={() => setViewInvoice(inv)}
+                    className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
+                  >
+                    <Eye size={16} />
+                  </button>
+                  <button 
+                    onClick={() => openModal(inv)}
+                    className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(inv.id)}
+                    className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+
+                <div className="flex justify-between items-start">
+                  <div className="flex flex-col gap-1">
+                    <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
+                    <h4 className="font-bold text-zinc-900 group-hover:text-emerald-700 transition-colors text-xl mt-1 tracking-tight">{inv.supplier_name}</h4>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-200/50 mt-4">
+                  <div className="space-y-1">
+                    <p className="text-zinc-400 text-[10px] uppercase font-black tracking-widest">{t('common.date')}</p>
+                    <p className="text-zinc-900 font-bold text-sm tracking-tight">{formatDate(inv.date)}</p>
+                  </div>
+                  <div className="space-y-1 text-left">
+                    <p className="text-zinc-400 text-[10px] uppercase font-black tracking-widest">{t('pi.total_amount')}</p>
+                    <p className="font-black text-2xl tracking-tighter text-emerald-600">
+                      {formatNumber(inv.total_amount)} <span className="text-sm font-bold">{t('common.currency')}</span>
+                    </p>
+                  </div>
+                  <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-zinc-200/50 flex justify-end">
+                    <button 
+                      onClick={() => {
+                        setActivityLogDocumentId(inv.id);
+                        setIsActivityLogOpen(true);
+                      }}
+                      className="p-2 text-zinc-400 hover:text-emerald-500 bg-white border border-zinc-100 rounded-xl transition-all"
+                      title={t('common.activity_log')}
+                    >
+                      <History size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {filteredInvoices.length === 0 && (
+              <div className="col-span-full p-12 text-center text-zinc-500 font-bold italic">{t('pi.no_invoices')}</div>
+            )}
+          </div>
+        )}
 
         {/* Mobile List View */}
         <div className="md:hidden divide-y divide-zinc-50">

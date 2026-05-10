@@ -5,7 +5,8 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { Supplier, Account, JournalEntry } from '../types';
 import { 
   Search, Plus, Trash2, Edit2, X, Truck, Phone, Mail, MapPin, 
-  Wallet, Calendar, History, FileText, User, Hash, Box 
+  Wallet, Calendar, History, FileText, User, Hash, Box,
+  LayoutGrid, List
 } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
@@ -16,6 +17,7 @@ import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { formatNumber } from '../utils/formatUtils';
 import { useRef } from 'react';
+import { useViewPreference } from '../hooks/useViewPreference';
 
 export const Suppliers: React.FC = () => {
   const { user } = useAuth();
@@ -33,6 +35,7 @@ export const Suppliers: React.FC = () => {
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
   const tableRef = useRef<HTMLTableElement>(null);
+  const [view, setView] = useViewPreference('suppliers', 'table');
 
   const handleExportExcel = () => {
     const headers = {
@@ -384,79 +387,158 @@ export const Suppliers: React.FC = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        <div className="flex bg-zinc-100 p-1 rounded-xl">
+          <button
+            onClick={() => setView('table')}
+            className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+            title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
+          >
+            <List size={20} />
+          </button>
+          <button
+            onClick={() => setView('card')}
+            className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+            title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
+          >
+            <LayoutGrid size={20} />
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto hidden md:block">
-          <table ref={tableRef} className="w-full">
-            <thead>
-              <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_code')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_name')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_mobile')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_email')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_address')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_opening_balance')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_current_balance')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-50">
-              {filteredSuppliers.map((supplier) => (
-                <tr key={supplier.id} className="hover:bg-zinc-50/50 transition-colors group">
-                  <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    <span className="font-mono text-xs bg-zinc-100 px-2 py-1 rounded text-zinc-600">{supplier.code}</span>
-                  </td>
-                  <td className={`px-6 py-4 font-bold text-zinc-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{supplier.name}</td>
-                  <td className={`px-6 py-4 text-zinc-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{supplier.mobile}</td>
-                  <td className={`px-6 py-4 text-zinc-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{supplier.email}</td>
-                  <td className={`px-6 py-4 text-zinc-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{supplier.address}</td>
-                  <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    <span className={`font-medium ${supplier.opening_balance >= 0 ? 'text-zinc-600' : 'text-rose-500'}`}>
+        {view === 'table' ? (
+          <div className="overflow-x-auto hidden md:block">
+            <table ref={tableRef} className="w-full">
+              <thead>
+                <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_code')}</th>
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_name')}</th>
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_mobile')}</th>
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_email')}</th>
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_address')}</th>
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_opening_balance')}</th>
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_current_balance')}</th>
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-50">
+                {filteredSuppliers.map((supplier) => (
+                  <tr key={supplier.id} className="hover:bg-zinc-50/50 transition-colors group">
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span className="font-mono text-xs bg-zinc-100 px-2 py-1 rounded text-zinc-600">{supplier.code}</span>
+                    </td>
+                    <td className={`px-6 py-4 font-bold text-zinc-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{supplier.name}</td>
+                    <td className={`px-6 py-4 text-zinc-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{supplier.mobile}</td>
+                    <td className={`px-6 py-4 text-zinc-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{supplier.email}</td>
+                    <td className={`px-6 py-4 text-zinc-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{supplier.address}</td>
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span className={`font-medium ${supplier.opening_balance >= 0 ? 'text-zinc-600' : 'text-rose-500'}`}>
+                        {formatBalance(supplier.opening_balance || 0)}
+                      </span>
+                    </td>
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span className={`font-black ${getSupplierBalance(supplier.id) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {formatBalance(getSupplierBalance(supplier.id))}
+                      </span>
+                    </td>
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                      <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity no-pdf`}>
+                        <button 
+                          onClick={() => {
+                            setActivityLogDocumentId(supplier.id);
+                            setIsActivityLogOpen(true);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
+                          title="سجل النشاط"
+                        >
+                          <History size={18} />
+                        </button>
+                        <button 
+                          onClick={() => openModal(supplier)}
+                          className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                        >
+                          <Edit2 size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(supplier.id)}
+                          className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredSuppliers.length === 0 && !loading && (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-12 text-center text-zinc-500">لا يوجد موردين.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredSuppliers.map((supplier) => (
+              <div key={supplier.id} className="p-6 bg-zinc-50/50 rounded-3xl border border-zinc-100 hover:border-orange-200 hover:shadow-xl hover:shadow-orange-500/5 transition-all group relative overflow-hidden">
+                <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={() => openModal(supplier)}
+                    className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
+                  >
+                    <Edit2 size={16} />
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(supplier.id)}
+                    className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+
+                <div className="flex justify-between items-start">
+                  <div className="flex flex-col gap-1">
+                    <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-zinc-600 font-bold w-fit border border-zinc-200">{supplier.code}</span>
+                    <h4 className="font-bold text-zinc-900 group-hover:text-orange-700 transition-colors text-xl mt-1 tracking-tight">{supplier.name}</h4>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-200/50 mt-4">
+                  <div className="space-y-1">
+                    <p className="text-zinc-400 text-[10px] uppercase font-black tracking-widest">رقم الهاتف</p>
+                    <p className="text-zinc-900 font-bold text-sm tracking-tight">{supplier.mobile || '---'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-zinc-400 text-[10px] uppercase font-black tracking-widest">رصيد أول</p>
+                    <p className={`font-bold text-sm ${supplier.opening_balance >= 0 ? 'text-zinc-600' : 'text-rose-500'}`}>
                       {formatBalance(supplier.opening_balance || 0)}
-                    </span>
-                  </td>
-                  <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    <span className={`font-black ${getSupplierBalance(supplier.id) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {formatBalance(getSupplierBalance(supplier.id))}
-                    </span>
-                  </td>
-                  <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                    <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity no-pdf`}>
-                      <button 
-                        onClick={() => {
-                          setActivityLogDocumentId(supplier.id);
-                          setIsActivityLogOpen(true);
-                        }}
-                        className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
-                        title="سجل النشاط"
-                      >
-                        <History size={18} />
-                      </button>
-                      <button 
-                        onClick={() => openModal(supplier)}
-                        className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-                      >
-                        <Edit2 size={18} />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(supplier.id)}
-                        className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                    </p>
+                  </div>
+                  <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-zinc-200/50 flex justify-between items-end">
+                    <div>
+                      <p className="text-zinc-400 text-[10px] uppercase font-black tracking-widest">الرصيد الحالي</p>
+                      <p className={`font-black text-2xl tracking-tighter ${getSupplierBalance(supplier.id) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {formatBalance(getSupplierBalance(supplier.id))}
+                      </p>
                     </div>
-                  </td>
-                </tr>
-              ))}
-              {filteredSuppliers.length === 0 && !loading && (
-                <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-zinc-500">لا يوجد موردين.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                    <button 
+                      onClick={() => {
+                        setActivityLogDocumentId(supplier.id);
+                        setIsActivityLogOpen(true);
+                      }}
+                      className="p-2 text-zinc-400 hover:text-emerald-500 bg-white border border-zinc-100 rounded-xl transition-all"
+                      title="سجل النشاط"
+                    >
+                      <History size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {filteredSuppliers.length === 0 && !loading && (
+              <div className="col-span-full p-12 text-center text-zinc-500 font-bold italic">لا يوجد موردين حالياً</div>
+            )}
+          </div>
+        )}
 
         {/* Mobile List View */}
         <div className="md:hidden divide-y divide-zinc-50">

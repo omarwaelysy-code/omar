@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Product, Account } from '../types';
-import { Search, Plus, Edit2, Trash2, X, Package, History, FileText, Paperclip, Lock } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, X, Package, History, FileText, Paperclip, Lock, LayoutGrid, List } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
@@ -15,6 +15,7 @@ import { useRef } from 'react';
 import Barcode from 'react-barcode';
 import { usePermissions } from '../hooks/usePermissions';
 import { formatNumber } from '../utils/formatUtils';
+import { useViewPreference } from '../hooks/useViewPreference';
 
 export const Products: React.FC = () => {
   const { user } = useAuth();
@@ -32,6 +33,7 @@ export const Products: React.FC = () => {
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
   const tableRef = useRef<HTMLTableElement>(null);
+  const [view, setView] = useViewPreference('products', 'table');
 
   const handleExportExcel = () => {
     const headers = {
@@ -430,96 +432,190 @@ export const Products: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <div className="flex bg-zinc-100 p-1 rounded-xl">
+            <button
+              onClick={() => setView('table')}
+              className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+              title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
+            >
+              <List size={20} />
+            </button>
+            <button
+              onClick={() => setView('card')}
+              className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+              title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
+            >
+              <LayoutGrid size={20} />
+            </button>
+          </div>
         </div>
 
-        <div className="overflow-x-auto hidden md:block">
-          <table ref={tableRef} className="w-full">
-            <thead>
-              <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_code')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_name')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_type')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_sale_price')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_cost_price')}</th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-50">
-              {filteredProducts.map((product) => (
-                <tr key={product.id} className="hover:bg-zinc-50/50 transition-colors group">
-                  <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    <span className="font-mono text-xs bg-zinc-100 px-2 py-1 rounded text-zinc-600">{product.code}</span>
-                  </td>
-                  <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    <div className={`flex items-center gap-3 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse justify-end'}`}>
-                      <div className="w-10 h-10 rounded-lg bg-zinc-100 text-zinc-400 flex items-center justify-center overflow-hidden border border-zinc-50">
-                        {product.image_url ? (
-                          product.image_url.startsWith('data:application/pdf') ? (
-                            <FileText size={20} className="text-red-500" />
+        {view === 'table' ? (
+          <div className="overflow-x-auto hidden md:block">
+            <table ref={tableRef} className="w-full">
+              <thead>
+                <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_code')}</th>
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_name')}</th>
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_type')}</th>
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_sale_price')}</th>
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_cost_price')}</th>
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-50">
+                {filteredProducts.map((product) => (
+                  <tr key={product.id} className="hover:bg-zinc-50/50 transition-colors group">
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span className="font-mono text-xs bg-zinc-100 px-2 py-1 rounded text-zinc-600">{product.code}</span>
+                    </td>
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <div className={`flex items-center gap-3 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse justify-end'}`}>
+                        <div className="w-10 h-10 rounded-lg bg-zinc-100 text-zinc-400 flex items-center justify-center overflow-hidden border border-zinc-50">
+                          {product.image_url ? (
+                            product.image_url.startsWith('data:application/pdf') ? (
+                              <FileText size={20} className="text-red-500" />
+                            ) : (
+                              <img 
+                                src={product.image_url} 
+                                alt={product.name} 
+                                className="w-full h-full object-cover"
+                                referrerPolicy="no-referrer"
+                              />
+                            )
                           ) : (
-                            <img 
-                              src={product.image_url} 
-                              alt={product.name} 
-                              className="w-full h-full object-cover"
-                              referrerPolicy="no-referrer"
-                            />
-                          )
-                        ) : (
-                          <Package size={20} />
+                            <Package size={20} />
+                          )}
+                        </div>
+                        <span className="font-bold text-zinc-900">{product.name}</span>
+                      </div>
+                    </td>
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span className="text-xs font-bold text-zinc-500 bg-zinc-100 px-2 py-1 rounded-lg">
+                        {product.type === 'service' ? t('products.type_service') : product.type === 'commodity' ? t('products.type_commodity') : t('products.type_product')}
+                      </span>
+                    </td>
+                    <td className={`px-6 py-4 font-bold text-emerald-600 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatNumber(Number(product.sale_price) || 0)} {t('invoices.currency')}</td>
+                    <td className={`px-6 py-4 text-zinc-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatNumber(Number(product.cost_price) || 0)} {t('invoices.currency')}</td>
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                      <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity no-pdf`}>
+                        <button 
+                          onClick={() => {
+                            setActivityLogDocumentId(product.id);
+                            setIsActivityLogOpen(true);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
+                          title={language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
+                        >
+                          <History size={18} />
+                        </button>
+                        {canEdit && (
+                          <button 
+                            onClick={() => openModal(product)}
+                            className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                          >
+                            <Edit2 size={18} />
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button 
+                            onClick={() => handleDelete(product.id)}
+                            className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                          >
+                            <Trash2 size={18} />
+                          </button>
                         )}
                       </div>
-                      <span className="font-bold text-zinc-900">{product.name}</span>
-                    </div>
-                  </td>
-                  <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    <span className="text-xs font-bold text-zinc-500 bg-zinc-100 px-2 py-1 rounded-lg">
+                    </td>
+                  </tr>
+                ))}
+                {filteredProducts.length === 0 && !loading && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-zinc-500 italic">{language === 'ar' ? 'لا توجد أصناف.' : 'No products found.'}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-6 md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 space-y-4 md:space-y-0">
+            {filteredProducts.map((product) => (
+              <div key={product.id} className="bg-zinc-50/50 rounded-3xl p-6 border border-zinc-100 hover:border-emerald-200 transition-all group flex flex-col gap-4 relative overflow-hidden">
+                <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                   {canEdit && (
+                    <button 
+                      onClick={() => openModal(product)}
+                      className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button 
+                      onClick={() => handleDelete(product.id)}
+                      className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-white text-zinc-400 flex items-center justify-center overflow-hidden border border-zinc-100 shadow-sm">
+                    {product.image_url ? (
+                      product.image_url.startsWith('data:application/pdf') ? (
+                        <FileText size={28} className="text-red-500" />
+                      ) : (
+                        <img 
+                          src={product.image_url} 
+                          alt={product.name} 
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      )
+                    ) : (
+                      <Package size={28} />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-zinc-500 border border-zinc-100 font-bold mb-1 inline-block">{product.code}</span>
+                    <h4 className="font-bold text-zinc-900 group-hover:text-emerald-700 transition-colors truncate">{product.name}</h4>
+                    <span className="text-[10px] font-bold text-zinc-400 bg-zinc-200/50 px-2 py-0.5 rounded-full uppercase">
                       {product.type === 'service' ? t('products.type_service') : product.type === 'commodity' ? t('products.type_commodity') : t('products.type_product')}
                     </span>
-                  </td>
-                  <td className={`px-6 py-4 font-bold text-emerald-600 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatNumber(Number(product.sale_price) || 0)} {t('invoices.currency')}</td>
-                  <td className={`px-6 py-4 text-zinc-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatNumber(Number(product.cost_price) || 0)} {t('invoices.currency')}</td>
-                  <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                    <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity no-pdf`}>
-                      <button 
-                        onClick={() => {
-                          setActivityLogDocumentId(product.id);
-                          setIsActivityLogOpen(true);
-                        }}
-                        className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
-                        title={language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
-                      >
-                        <History size={18} />
-                      </button>
-                      {canEdit && (
-                        <button 
-                          onClick={() => openModal(product)}
-                          className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-                        >
-                          <Edit2 size={18} />
-                        </button>
-                      )}
-                      {canDelete && (
-                        <button 
-                          onClick={() => handleDelete(product.id)}
-                          className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filteredProducts.length === 0 && !loading && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-zinc-500 italic">{language === 'ar' ? 'لا توجد أصناف.' : 'No products found.'}</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                </div>
 
-        {/* Mobile List View */}
+                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-zinc-100">
+                  <div className="space-y-1">
+                    <p className="text-zinc-400 text-[10px] uppercase font-bold tracking-wider">{t('products.column_sale_price')}</p>
+                    <p className="font-bold text-emerald-600">{formatNumber(Number(product.sale_price) || 0)} {t('invoices.currency')}</p>
+                  </div>
+                  <div className={`space-y-1 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                    <p className="text-zinc-400 text-[10px] uppercase font-bold tracking-wider">{t('products.column_cost_price')}</p>
+                    <p className="font-bold text-zinc-700">{formatNumber(Number(product.cost_price) || 0)} {t('invoices.currency')}</p>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => {
+                    setActivityLogDocumentId(product.id);
+                    setIsActivityLogOpen(true);
+                  }}
+                  className="mt-2 w-full py-2 bg-white text-zinc-400 text-[10px] font-bold uppercase tracking-widest rounded-xl border border-zinc-100 hover:bg-zinc-100 hover:text-emerald-600 transition-all flex items-center justify-center gap-2"
+                >
+                  <History size={14} />
+                  {language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
+                </button>
+              </div>
+            ))}
+            {filteredProducts.length === 0 && !loading && (
+              <div className="col-span-full py-12 text-center text-zinc-500 italic">{language === 'ar' ? 'لا توجد أصناف.' : 'No products found.'}</div>
+            )}
+          </div>
+        )}
+
+        {/* Mobile List View - This is essentially a Card view already, but we can wrap it or unify it */}
         <div className="md:hidden divide-y divide-zinc-50">
           {filteredProducts.map((product) => (
             <div key={product.id} className="p-4 space-y-4" dir={dir}>

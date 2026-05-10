@@ -5,7 +5,8 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { Customer, Account, JournalEntry } from '../types';
 import { 
   Search, Plus, Edit2, Trash2, X, History, FileText, User, 
-  Hash, Box, Wallet, Calendar, Phone, Mail, MapPin, Lock 
+  Hash, Box, Wallet, Calendar, Phone, Mail, MapPin, Lock,
+  LayoutGrid, List
 } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
@@ -17,6 +18,7 @@ import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { useRef } from 'react';
 import { usePermissions } from '../hooks/usePermissions';
 import { formatNumber } from '../utils/formatUtils';
+import { useViewPreference } from '../hooks/useViewPreference';
 
 export const Customers: React.FC = () => {
   const { user } = useAuth();
@@ -35,6 +37,7 @@ export const Customers: React.FC = () => {
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
   const tableRef = useRef<HTMLTableElement>(null);
+  const [view, setView] = useViewPreference('customers', 'table');
 
   const handleExportExcel = () => {
     const headers = {
@@ -404,89 +407,172 @@ export const Customers: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200">
+            <button
+              onClick={() => setView('table')}
+              className={`p-2 rounded-xl transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
+            >
+              <List size={22} />
+            </button>
+            <button
+              onClick={() => setView('card')}
+              className={`p-2 rounded-xl transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
+            >
+              <LayoutGrid size={22} />
+            </button>
+          </div>
         </div>
 
-        <div className="overflow-x-auto hidden md:block">
-          <table ref={tableRef} className="w-full">
-            <thead>
-              <tr className="bg-slate-50/50 text-slate-500 text-[10px] uppercase tracking-widest border-b border-slate-100">
-                <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_code')}</th>
-                <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_name')}</th>
-                <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_mobile')}</th>
-                <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_email')}</th>
-                <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_address')}</th>
-                <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_opening_balance')}</th>
-                <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_current_balance')}</th>
-                <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredCustomers.map((customer) => (
-                <tr key={customer.id} className="hover:bg-slate-50/50 transition-colors group">
-                  <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    <span className="font-mono text-[10px] bg-slate-100 px-2.5 py-1 rounded-lg text-slate-500 font-bold border border-slate-200">{customer.code}</span>
-                  </td>
-                  <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{customer.name}</td>
-                  <td className={`px-6 py-4 text-slate-500 font-medium ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{customer.mobile}</td>
-                  <td className={`px-6 py-4 text-slate-400 text-xs truncate max-w-[150px] ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={customer.email || undefined}>{customer.email}</td>
-                  <td className={`px-6 py-4 text-slate-400 text-xs truncate max-w-[200px] ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={customer.address || undefined}>{customer.address}</td>
-                  <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    <span className={`font-bold text-sm ${customer.opening_balance >= 0 ? 'text-slate-600' : 'text-rose-500'}`}>
+        {view === 'table' ? (
+          <div className="overflow-x-auto hidden md:block">
+            <table ref={tableRef} className="w-full">
+              <thead>
+                <tr className="bg-slate-50/50 text-slate-500 text-[10px] uppercase tracking-widest border-b border-slate-100">
+                  <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_code')}</th>
+                  <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_name')}</th>
+                  <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_mobile')}</th>
+                  <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_email')}</th>
+                  <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_address')}</th>
+                  <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_opening_balance')}</th>
+                  <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_current_balance')}</th>
+                  <th className={`px-6 py-5 font-black ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredCustomers.map((customer) => (
+                  <tr key={customer.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span className="font-mono text-[10px] bg-slate-100 px-2.5 py-1 rounded-lg text-slate-500 font-bold border border-slate-200">{customer.code}</span>
+                    </td>
+                    <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{customer.name}</td>
+                    <td className={`px-6 py-4 text-slate-500 font-medium ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{customer.mobile}</td>
+                    <td className={`px-6 py-4 text-slate-400 text-xs truncate max-w-[150px] ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={customer.email || undefined}>{customer.email}</td>
+                    <td className={`px-6 py-4 text-slate-400 text-xs truncate max-w-[200px] ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={customer.address || undefined}>{customer.address}</td>
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span className={`font-bold text-sm ${customer.opening_balance >= 0 ? 'text-slate-600' : 'text-rose-500'}`}>
+                        {formatBalance(customer.opening_balance || 0)}
+                      </span>
+                    </td>
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span className={`font-black text-sm px-3 py-1 rounded-full ${getCustomerBalance(customer.id) >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                        {formatBalance(getCustomerBalance(customer.id))}
+                      </span>
+                    </td>
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                      <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-all no-pdf`}>
+                        <button 
+                          onClick={() => {
+                            setActivityLogDocumentId(customer.id);
+                            setIsActivityLogOpen(true);
+                          }}
+                          className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                          title="سجل النشاط"
+                        >
+                          <History size={18} />
+                        </button>
+                        {canEdit && (
+                          <button 
+                            onClick={() => openModal(customer)}
+                            className="p-2.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-xl transition-all"
+                          >
+                            <Edit2 size={18} />
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button 
+                            onClick={() => handleDelete(customer.id)}
+                            className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredCustomers.length === 0 && !loading && (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-20 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mb-2">
+                            <User size={32} />
+                        </div>
+                        <p className="text-slate-400 font-bold">{language === 'ar' ? 'لا يوجد عملاء حالياً' : 'No customers found'}</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredCustomers.map((customer) => (
+              <div key={customer.id} className="p-6 space-y-4 bg-slate-50/50 rounded-3xl border border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden">
+                <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {canEdit && (
+                    <button 
+                      onClick={() => openModal(customer)}
+                      className="p-2 bg-white text-sky-600 rounded-xl border border-sky-50 shadow-sm hover:bg-sky-50 transition-all font-bold"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button 
+                      onClick={() => handleDelete(customer.id)}
+                      className="p-2 bg-white text-rose-600 rounded-xl border border-rose-50 shadow-sm hover:bg-rose-50 transition-all font-bold"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex justify-between items-start">
+                  <div className="flex flex-col gap-1 flex-1">
+                    <span className="font-mono text-[10px] bg-white px-2.5 py-1 rounded-lg text-slate-500 font-black w-fit border border-slate-200">{customer.code}</span>
+                    <h4 className="font-bold text-slate-900 group-hover:text-emerald-700 transition-colors text-xl tracking-tight mt-1">{customer.name}</h4>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200/50">
+                  <div className="space-y-1">
+                    <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">رقم الهاتف</p>
+                    <p className="text-slate-900 font-bold text-sm tracking-tight">{customer.mobile || '---'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">رصيد أول</p>
+                    <p className={`font-bold text-sm ${customer.opening_balance >= 0 ? 'text-slate-600' : 'text-rose-500'}`}>
                       {formatBalance(customer.opening_balance || 0)}
-                    </span>
-                  </td>
-                  <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    <span className={`font-black text-sm px-3 py-1 rounded-full ${getCustomerBalance(customer.id) >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                      {formatBalance(getCustomerBalance(customer.id))}
-                    </span>
-                  </td>
-                  <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                    <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-all no-pdf`}>
-                      <button 
-                        onClick={() => {
-                          setActivityLogDocumentId(customer.id);
-                          setIsActivityLogOpen(true);
-                        }}
-                        className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
-                        title="سجل النشاط"
-                      >
-                        <History size={18} />
-                      </button>
-                      {canEdit && (
-                        <button 
-                          onClick={() => openModal(customer)}
-                          className="p-2.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-xl transition-all"
-                        >
-                          <Edit2 size={18} />
-                        </button>
-                      )}
-                      {canDelete && (
-                        <button 
-                          onClick={() => handleDelete(customer.id)}
-                          className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      )}
+                    </p>
+                  </div>
+                  <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-slate-200/50 flex justify-between items-end">
+                    <div>
+                      <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">الرصيد الحالي</p>
+                      <p className={`font-black text-2xl tracking-tighter ${getCustomerBalance(customer.id) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {formatBalance(getCustomerBalance(customer.id))}
+                      </p>
                     </div>
-                  </td>
-                </tr>
-              ))}
-              {filteredCustomers.length === 0 && !loading && (
-                <tr>
-                  <td colSpan={8} className="px-6 py-20 text-center">
-                    <div className="flex flex-col items-center gap-2">
-                       <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mb-2">
-                          <User size={32} />
-                       </div>
-                       <p className="text-slate-400 font-bold">{language === 'ar' ? 'لا يوجد عملاء حالياً' : 'No customers found'}</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                    <button 
+                      onClick={() => {
+                        setActivityLogDocumentId(customer.id);
+                        setIsActivityLogOpen(true);
+                      }}
+                      className="p-2 text-slate-400 hover:text-emerald-600 bg-white border border-slate-100 rounded-xl transition-all"
+                      title="سجل النشاط"
+                    >
+                      <History size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {filteredCustomers.length === 0 && !loading && (
+              <div className="col-span-full p-12 text-center text-slate-400 font-bold italic tracking-tight">لا يوجد عملاء حالياً</div>
+            )}
+          </div>
+        )}
 
         {/* Mobile List View */}
         <div className="md:hidden divide-y divide-slate-100">

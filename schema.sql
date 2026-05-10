@@ -72,7 +72,9 @@ CREATE TABLE IF NOT EXISTS customers (
     email VARCHAR(100),
     mobile VARCHAR(20),
     address TEXT,
-    tax_number VARCHAR(50)
+    tax_number VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 7. Suppliers
@@ -85,7 +87,9 @@ CREATE TABLE IF NOT EXISTS suppliers (
     email VARCHAR(100),
     mobile VARCHAR(20),
     address TEXT,
-    tax_number VARCHAR(50)
+    tax_number VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 8. Products
@@ -110,7 +114,9 @@ CREATE TABLE IF NOT EXISTS products (
     min_stock DECIMAL(18, 4) DEFAULT 0,
     current_stock DECIMAL(18, 4) DEFAULT 0,
     is_service BOOLEAN DEFAULT FALSE,
-    counter_account_id VARCHAR(36)
+    counter_account_id VARCHAR(36),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 9. Invoices
