@@ -73,14 +73,14 @@ export const CashBalances: React.FC = () => {
       setLoading(true);
       try {
         const [invoices, returns, receipts, purInvoices, purReturns, vouchers, transfers, journalEntries] = await Promise.all([
-          dbService.list<any>('invoices', { company_id: user.company_id, date_to: dateRange.end }),
-          dbService.list<any>('returns', { company_id: user.company_id, date_to: dateRange.end }),
-          dbService.list<any>('receipt_vouchers', { company_id: user.company_id, date_to: dateRange.end }),
-          dbService.list<any>('purchase_invoices', { company_id: user.company_id, date_to: dateRange.end }),
-          dbService.list<any>('purchase_returns', { company_id: user.company_id, date_to: dateRange.end }),
-          dbService.list<any>('payment_vouchers', { company_id: user.company_id, date_to: dateRange.end }),
-          dbService.list<any>('cash_transfers', { company_id: user.company_id, date_to: dateRange.end }),
-          dbService.list<any>('journal_entries', { company_id: user.company_id, date_to: dateRange.end })
+          dbService.list<any>('invoices', user.company_id),
+          dbService.list<any>('returns', user.company_id),
+          dbService.list<any>('receipt_vouchers', user.company_id),
+          dbService.list<any>('purchase_invoices', user.company_id),
+          dbService.list<any>('purchase_returns', user.company_id),
+          dbService.list<any>('payment_vouchers', user.company_id),
+          dbService.list<any>('cash_transfers', user.company_id),
+          dbService.list<any>('journal_entries', user.company_id)
         ]);
 
         const startDate = new Date(dateRange.start);
@@ -98,21 +98,25 @@ export const CashBalances: React.FC = () => {
           const opDate = method.opening_balance_date ? new Date(method.opening_balance_date) : new Date(0);
 
           const processTrans = (trans: any[], direction: 'in' | 'out') => {
-            trans.filter(t => {
+            trans.forEach(t => {
+              if (!t) return;
               const matchesMethod = t.payment_method_id === method.id;
               const matchesAccount = method.account_id && t.account_id === method.account_id;
               
+              if (!(matchesMethod || matchesAccount)) return;
+
               // Only count invoices/purchase invoices if they are paid (cash transactions)
-              const isPaid = !t.status || t.status === 'paid' || t.payment_status === 'paid';
-              
-              return (matchesMethod || matchesAccount) && isPaid;
-            }).forEach(t => {
+              const isPaid = !t.status || t.status === 'paid' || t.payment_status === 'paid' || t.payment_status === 'partially_paid';
+              if (!isPaid && (t.invoice_number || t.return_number)) return;
+
               const d = new Date(t.date);
               d.setHours(0, 0, 0, 0);
               // Skip transactions before opening balance date. Transactions ON the date are movements.
               if (d < opDate) return;
 
-              const amount = Number(t.total_amount || t.amount || 0);
+              const amount = Number(t.paid_amount || t.amount || t.total_amount || 0);
+              if (amount === 0) return;
+
               if (d < startDate) {
                 if (direction === 'in') opIn = Number(opIn) + amount;
                 else opOut = Number(opOut) + amount;

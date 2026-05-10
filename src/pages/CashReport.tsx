@@ -69,23 +69,71 @@ export const CashReport: React.FC = () => {
         return matchesMethod || matchesAccount;
       };
 
-      invoices.filter(inv => isMatch(inv) && inv.payment_status === 'paid').forEach((inv: any) => {
-        allTrans.push({ id: `inv-${inv.id}`, date: inv.date, type: t('invoices.title'), reference: inv.invoice_number, in: Number(inv.total_amount) || 0, out: 0, notes: '' });
+      invoices.filter(inv => isMatch(inv) && (inv.payment_status === 'paid' || inv.payment_status === 'partially_paid')).forEach((inv: any) => {
+        allTrans.push({ 
+          id: `inv-${inv.id}`, 
+          date: inv.date, 
+          type: t('invoices.title'), 
+          reference: inv.invoice_number, 
+          in: Number(inv.paid_amount || inv.total_amount) || 0, 
+          out: 0, 
+          notes: '' 
+        });
       });
       returns.filter(isMatch).forEach((ret: any) => {
-        allTrans.push({ id: `ret-${ret.id}`, date: ret.date, type: t('returns.title'), reference: ret.return_number || ret.id.slice(-6), in: 0, out: Number(ret.total_amount) || 0, notes: '' });
+        allTrans.push({ 
+          id: `ret-${ret.id}`, 
+          date: ret.date, 
+          type: t('returns.title'), 
+          reference: ret.return_number || ret.id.slice(-6), 
+          in: 0, 
+          out: Number(ret.total_amount) || 0, 
+          notes: '' 
+        });
       });
       receipts.filter(isMatch).forEach((rec: any) => {
-        allTrans.push({ id: `rec-${rec.id}`, date: rec.date, type: t('vouchers.receipt'), reference: rec.voucher_number || `${t('vouchers.voucher')}-${rec.id.slice(-6)}`, in: Number(rec.amount) || 0, out: 0, notes: rec.description || '' });
+        allTrans.push({ 
+          id: `rec-${rec.id}`, 
+          date: rec.date, 
+          type: t('vouchers.receipt'), 
+          reference: rec.voucher_number || rec.number || `${t('vouchers.voucher')}-${rec.id.slice(-6)}`, 
+          in: Number(rec.amount) || 0, 
+          out: 0, 
+          notes: rec.description || '' 
+        });
       });
-      purInvoices.filter(pinv => isMatch(pinv) && pinv.payment_status === 'paid').forEach((pinv: any) => {
-        allTrans.push({ id: `pinv-${pinv.id}`, date: pinv.date, type: t('purchase_invoices.title'), reference: pinv.invoice_number, in: 0, out: Number(pinv.total_amount) || 0, notes: '' });
+      purInvoices.filter(pinv => isMatch(pinv) && (pinv.payment_status === 'paid' || pinv.payment_status === 'partially_paid')).forEach((pinv: any) => {
+        allTrans.push({ 
+          id: `pinv-${pinv.id}`, 
+          date: pinv.date, 
+          type: t('purchase_invoices.title'), 
+          reference: pinv.invoice_number, 
+          in: 0, 
+          out: Number(pinv.paid_amount || pinv.total_amount) || 0, 
+          notes: '' 
+        });
       });
       purReturns.filter(isMatch).forEach((pret: any) => {
-        allTrans.push({ id: `pret-${pret.id}`, date: pret.date, type: t('purchase_returns.title'), reference: pret.return_number || pret.id.slice(-6), in: Number(pret.total_amount) || 0, out: 0, notes: '' });
+        allTrans.push({ 
+          id: `pret-${pret.id}`, 
+          date: pret.date, 
+          type: t('purchase_returns.title'), 
+          reference: pret.return_number || pret.id.slice(-6), 
+          in: Number(pret.total_amount) || 0, 
+          out: 0, 
+          notes: '' 
+        });
       });
       vouchers.filter(isMatch).forEach((vou: any) => {
-        allTrans.push({ id: `vou-${vou.id}`, date: vou.date, type: t('vouchers.payment'), reference: vou.voucher_number || `${t('vouchers.voucher')}-${vou.id.slice(-6)}`, in: 0, out: Number(vou.amount) || 0, notes: vou.description || '' });
+        allTrans.push({ 
+          id: `vou-${vou.id}`, 
+          date: vou.date, 
+          type: t('vouchers.payment'), 
+          reference: vou.voucher_number || vou.number || `${t('vouchers.voucher')}-${vou.id.slice(-6)}`, 
+          in: 0, 
+          out: Number(vou.amount) || 0, 
+          notes: vou.description || '' 
+        });
       });
       const methodMap = new Map(paymentMethods.map(m => [m.id, m.account_id]));
 
