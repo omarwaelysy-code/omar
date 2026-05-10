@@ -90,12 +90,24 @@ export const CashBalances: React.FC = () => {
         const methodMap = new Map(paymentMethods.map(m => [m.id, m.account_id]));
 
         const calculatedBalances = paymentMethods.map(method => {
-          let opIn = Number(method.opening_balance) > 0 ? Number(method.opening_balance) : 0;
-          let opOut = Number(method.opening_balance) < 0 ? Math.abs(Number(method.opening_balance)) : 0;
+          let opIn = 0;
+          let opOut = 0;
           let movIn = 0;
           let movOut = 0;
 
           const opDate = method.opening_balance_date ? new Date(method.opening_balance_date) : new Date(0);
+          opDate.setHours(0, 0, 0, 0);
+
+          const initialBalance = Number(method.opening_balance || 0);
+          if (initialBalance !== 0) {
+            if (opDate < startDate) {
+              if (initialBalance > 0) opIn += initialBalance;
+              else opOut += Math.abs(initialBalance);
+            } else if (opDate >= startDate && opDate <= endDate) {
+              if (initialBalance > 0) movIn += initialBalance;
+              else movOut += Math.abs(initialBalance);
+            }
+          }
 
           const processTrans = (trans: any[], direction: 'in' | 'out') => {
             trans.forEach(t => {

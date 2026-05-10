@@ -217,11 +217,35 @@ export const CashReport: React.FC = () => {
       });
       const balBefore = before.reduce((sum, t) => sum + (Number(t.in) - Number(t.out)), 0);
 
-      const initialBalance = opBal + balBefore;
+      const startDateObj = startDate ? new Date(startDate) : new Date(0);
+      startDateObj.setHours(0, 0, 0, 0);
+      const endDateObj = endDate ? new Date(endDate) : new Date();
+      endDateObj.setHours(23, 59, 59, 999);
+
+      let initialBalance = balBefore;
+      if (opDateObj < startDateObj) {
+        initialBalance += opBal;
+      }
       setStartBalance(initialBalance);
       
       let currentBal = initialBalance;
-      const finalTrans = filtered.map(t => {
+      
+      // Merge with opening balance if it falls within the period
+      let transactionsToDisplay = [...filtered];
+      if (opBal !== 0 && opDateObj >= startDateObj && opDateObj <= endDateObj) {
+        transactionsToDisplay.push({
+          id: 'opening-balance-movement',
+          date: opDate,
+          type: t('reports.opening_balance'),
+          reference: '-',
+          in: opBal > 0 ? opBal : 0,
+          out: opBal < 0 ? Math.abs(opBal) : 0,
+          notes: ''
+        });
+        transactionsToDisplay.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      }
+
+      const finalTrans = transactionsToDisplay.map(t => {
         currentBal += (Number(t.in) - Number(t.out));
         return { ...t, balance: currentBal };
       });
