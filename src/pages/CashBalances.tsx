@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { PaymentMethod } from '../types';
+import { PaymentMethod, JournalEntry } from '../types';
 import { Calendar, Download, Printer, Wallet, ArrowLeftRight, BarChart3 } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';

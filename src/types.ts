@@ -94,6 +94,7 @@ export interface Customer {
   account_id?: string;
   account_name?: string;
   counter_account_id?: string;
+  company_id: string;
 }
 
 export interface Supplier {
@@ -108,6 +109,7 @@ export interface Supplier {
   account_id?: string;
   account_name?: string;
   counter_account_id?: string;
+  company_id: string;
 }
 
 export interface OperationCategory {
@@ -205,6 +207,7 @@ export interface Product {
   cost_account_id?: string;
   cost_account_name?: string;
   counter_account_id?: string;
+  company_id: string;
 }
 
 export interface Invoice {
@@ -223,7 +226,9 @@ export interface Invoice {
   payment_method_id?: string;
   payment_method_name?: string;
   status: 'paid' | 'unpaid' | 'partial';
+  payment_status?: 'paid' | 'unpaid' | 'partial' | 'partially_paid';
   items?: InvoiceItem[];
+  company_id: string;
 }
 
 export interface PurchaseInvoice {
@@ -239,7 +244,9 @@ export interface PurchaseInvoice {
   payment_type: 'credit' | 'cash';
   payment_method_id?: string;
   payment_method_name?: string;
+  payment_status?: 'paid' | 'unpaid' | 'partial' | 'partially_paid';
   items?: InvoiceItem[];
+  company_id: string;
 }
 
 export interface InvoiceItem {
@@ -265,6 +272,7 @@ export interface ReceiptVoucher {
   payment_method_id?: string;
   payment_method_name?: string;
   account_id?: string;
+  company_id: string;
 }
 
 export interface PaymentVoucher {
@@ -280,6 +288,7 @@ export interface PaymentVoucher {
   payment_method_id: string;
   payment_method_name?: string;
   account_id?: string;
+  company_id: string;
 }
 
 export interface Return {
@@ -294,6 +303,7 @@ export interface Return {
   payment_method_id?: string;
   payment_method_name?: string;
   items?: ReturnItem[];
+  company_id: string;
 }
 
 export interface PurchaseReturn {
@@ -308,6 +318,7 @@ export interface PurchaseReturn {
   payment_method_id?: string;
   payment_method_name?: string;
   items?: ReturnItem[];
+  company_id: string;
 }
 
 export interface ReturnItem {
