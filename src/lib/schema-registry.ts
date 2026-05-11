@@ -62,6 +62,10 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'id', 'company_id', 'supplier_id', 'supplier_name', 'return_number', 'date', 'total_amount', 
     'payment_type', 'payment_method_id', 'payment_method_name', 'description', 'notes', 'created_at'
   ],
+  purchase_return_items: [
+    'id', 'return_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
+    'product_name', 'product_code', 'product_image_url'
+  ],
   receipt_vouchers: [
     'id', 'company_id', 'customer_id', 'customer_name', 'voucher_number', 'date', 'amount', 'description', 
     'payment_method_id', 'payment_method_name', 'account_id', 'created_at'

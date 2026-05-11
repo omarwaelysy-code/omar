@@ -317,6 +317,7 @@ export async function initDatabase() {
         "status" VARCHAR(20) DEFAULT 'draft',
         "payment_type" VARCHAR(20) DEFAULT 'cash',
         "payment_method_id" VARCHAR(36),
+        "description" TEXT,
         "notes" TEXT,
         "created_by" VARCHAR(36),
         "customer_name" VARCHAR(255),
@@ -335,6 +336,7 @@ export async function initDatabase() {
         "total_amount" DECIMAL(18, 4) NOT NULL,
         "payment_type" VARCHAR(20) DEFAULT 'cash',
         "payment_method_id" VARCHAR(36),
+        "description" TEXT,
         "notes" TEXT,
         "customer_name" VARCHAR(255),
         "payment_method_name" VARCHAR(255),
@@ -357,6 +359,7 @@ export async function initDatabase() {
         "status" VARCHAR(20) DEFAULT 'draft',
         "payment_type" VARCHAR(20) DEFAULT 'cash',
         "payment_method_id" VARCHAR(36),
+        "description" TEXT,
         "notes" TEXT,
         "supplier_name" VARCHAR(255),
         "payment_method_name" VARCHAR(255),
@@ -374,6 +377,7 @@ export async function initDatabase() {
         "total_amount" DECIMAL(18, 4) NOT NULL,
         "payment_type" VARCHAR(20) DEFAULT 'cash',
         "payment_method_id" VARCHAR(36),
+        "description" TEXT,
         "notes" TEXT,
         "supplier_name" VARCHAR(255),
         "payment_method_name" VARCHAR(255),
@@ -502,6 +506,23 @@ export async function initDatabase() {
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `, 'purchase_invoice_items table');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "purchase_return_items" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "return_id" VARCHAR(36) REFERENCES "purchase_returns"("id") ON DELETE CASCADE,
+        "product_id" VARCHAR(36),
+        "company_id" VARCHAR(36),
+        "description" TEXT,
+        "quantity" DECIMAL(18, 4) NOT NULL,
+        "unit_price" DECIMAL(18, 4) NOT NULL,
+        "total" DECIMAL(18, 4) NOT NULL,
+        "product_name" VARCHAR(255),
+        "product_code" VARCHAR(100),
+        "product_image_url" TEXT,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'purchase_return_items table');
 
     // Phase 6: System Settings
     await safeQuery(`

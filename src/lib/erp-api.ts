@@ -440,7 +440,7 @@ router.get('/db-health', async (req, res) => {
 
 // Helper for generic list
 const getList = async (table: string, filters: any) => {
-  let sql = `SELECT * FROM ${table}`;
+  let sql = `SELECT * FROM "${table}"`;
   const values: any[] = [];
   const conditions: string[] = [];
   
@@ -455,7 +455,7 @@ const getList = async (table: string, filters: any) => {
       conditions.push(`date <= $${paramIndex++}`);
       values.push(value);
     } else {
-      conditions.push(`${key} = $${paramIndex++}`);
+      conditions.push(`"${key}" = $${paramIndex++}`);
       values.push(value);
     }
   });
@@ -892,7 +892,7 @@ modules.forEach(moduleName => {
     }
 
     if (itemsTable) {
-      const { rows } = await pool.query(`SELECT * FROM ${itemsTable} WHERE ${foreignKey} = $1`, [id]);
+      const { rows } = await pool.query(`SELECT * FROM "${itemsTable}" WHERE "${foreignKey}" = $1`, [id]);
       return rows;
     }
     return [];
@@ -932,7 +932,7 @@ modules.forEach(moduleName => {
           const placeholders = keys.map((_, index) => `$${index + 1}`).join(', ');
           
           const result = await pool.query(
-            `INSERT INTO ${moduleName} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`,
+            `INSERT INTO "${moduleName}" ("${keys.join('", "')}") VALUES (${placeholders}) RETURNING *`,
             values
           );
 
@@ -987,10 +987,10 @@ modules.forEach(moduleName => {
           const hasUpdatedAt = colCheck.rows.length > 0;
 
           const setClause = keys.map((key, index) => {
-            return `${key} = $${index + 1}`;
+            return `"${key}" = $${index + 1}`;
           }).join(', ');
           
-          let query = `UPDATE ${moduleName} SET ${setClause}${hasUpdatedAt ? ', updated_at = CURRENT_TIMESTAMP' : ''} WHERE id = $${keys.length + 1}`;
+          let query = `UPDATE "${moduleName}" SET ${setClause}${hasUpdatedAt ? ', updated_at = CURRENT_TIMESTAMP' : ''} WHERE id = $${keys.length + 1}`;
           let params = [...values, id];
 
           if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies') {
@@ -1042,7 +1042,7 @@ modules.forEach(moduleName => {
           return sendError(res, 400, 'Invalid ID format');
         }
 
-        let query = `DELETE FROM ${moduleName} WHERE id = $1`;
+        let query = `DELETE FROM "${moduleName}" WHERE id = $1`;
         let params = [id];
 
         if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies') {
