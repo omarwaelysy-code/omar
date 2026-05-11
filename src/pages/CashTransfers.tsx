@@ -206,15 +206,23 @@ export const CashTransfers: React.FC = () => {
 
       if (editingTransfer) {
         await dbService.deleteJournalEntryByReference(editingTransfer.id, user.company_id);
+        await TransactionManager.updateWithAccounting(
+          'cash_transfers',
+          editingTransfer.id,
+          data,
+          CashTransferSchema,
+          journalEntryData,
+          JournalEntrySchema
+        );
+      } else {
+        await TransactionManager.saveWithAccounting(
+          'cash_transfers',
+          data,
+          CashTransferSchema,
+          journalEntryData,
+          JournalEntrySchema
+        );
       }
-
-      await TransactionManager.saveWithAccounting(
-        'cash_transfers',
-        data,
-        CashTransferSchema,
-        journalEntryData,
-        JournalEntrySchema
-      );
 
       setIsModalOpen(false);
       setEditingTransfer(null);

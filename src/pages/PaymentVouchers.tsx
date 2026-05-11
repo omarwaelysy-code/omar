@@ -479,15 +479,23 @@ export const PaymentVouchers: React.FC = () => {
 
       if (editingVoucher) {
         await dbService.deleteJournalEntryByReference(editingVoucher.id, user.company_id);
+        await TransactionManager.updateWithAccounting(
+          'payment_vouchers',
+          editingVoucher.id,
+          data,
+          VoucherSchema,
+          journalEntryData,
+          JournalEntrySchema
+        );
+      } else {
+        await TransactionManager.saveWithAccounting(
+          'payment_vouchers',
+          data,
+          VoucherSchema,
+          journalEntryData,
+          JournalEntrySchema
+        );
       }
-
-      await TransactionManager.saveWithAccounting(
-        'payment_vouchers',
-        data,
-        VoucherSchema,
-        journalEntryData,
-        JournalEntrySchema
-      );
 
       showNotification(editingVoucher ? 'تم تعديل سند الصرف بنجاح' : 'تم حفظ سند الصرف بنجاح', 'success');
       setVoucherData({

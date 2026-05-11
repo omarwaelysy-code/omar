@@ -405,15 +405,23 @@ export const Receipts: React.FC = () => {
 
       if (editingReceipt) {
         await dbService.deleteJournalEntryByReference(editingReceipt.id, user.company_id);
+        await TransactionManager.updateWithAccounting(
+          'receipt_vouchers',
+          editingReceipt.id,
+          receiptData,
+          VoucherSchema,
+          journalEntryData,
+          JournalEntrySchema
+        );
+      } else {
+        await TransactionManager.saveWithAccounting(
+          'receipt_vouchers',
+          receiptData,
+          VoucherSchema,
+          journalEntryData,
+          JournalEntrySchema
+        );
       }
-
-      await TransactionManager.saveWithAccounting(
-        'receipt_vouchers',
-        receiptData,
-        VoucherSchema,
-        journalEntryData,
-        JournalEntrySchema
-      );
 
       showNotification(editingReceipt ? 'تم تحديث سند القبض بنجاح' : 'تم إضافة سند القبض بنجاح', 'success');
       closeModal();

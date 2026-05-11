@@ -23,6 +23,8 @@ async function startServer() {
       'ALTER TABLE "returns" ADD COLUMN IF NOT EXISTS "description" TEXT',
       'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "description" TEXT',
       'ALTER TABLE "purchase_returns" ADD COLUMN IF NOT EXISTS "description" TEXT',
+      'ALTER TABLE "journal_entries" ADD COLUMN IF NOT EXISTS "description" TEXT',
+      'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "description" TEXT',
       'ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "required_sub_account" BOOLEAN DEFAULT FALSE'
     ];
     
