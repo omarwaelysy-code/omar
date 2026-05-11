@@ -1186,7 +1186,7 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
     const invPlaceholders = invKeys.map((_, i) => `$${i + 1}`).join(', ');
     
     await client.query(
-      `INSERT INTO invoices (${invKeys.join(', ')}) VALUES (${invPlaceholders})`,
+      `INSERT INTO "invoices" ("${invKeys.join('", "')}") VALUES (${invPlaceholders})`,
       invValues
     );
 
@@ -1202,7 +1202,7 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       
       await client.query(
-        `INSERT INTO invoice_items (${itemKeys.join(', ')}) VALUES (${itemPlaceholders})`,
+        `INSERT INTO "invoice_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
         Object.values(itemData)
       );
     }
@@ -1333,9 +1333,9 @@ router.put('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
     
     const invKeys = Object.keys(invoiceData);
     const invValues = Object.values(invoiceData);
-    const invSetClause = invKeys.map((key, i) => `${key} = $${i + 1}`).join(', ');
+    const invSetClause = invKeys.map((key, i) => `"${key}" = $${i + 1}`).join(', ');
     
-    let query = `UPDATE invoices SET ${invSetClause} WHERE id = $${invKeys.length + 1}`;
+    let query = `UPDATE "invoices" SET ${invSetClause} WHERE id = $${invKeys.length + 1}`;
     let params = [...invValues, invoiceId];
     if (companyId) {
       query += ` AND company_id = $${invKeys.length + 2}`;
@@ -1397,7 +1397,7 @@ router.post('/returns', authenticateToken, async (req: AuthRequest, res) => {
     const rPlaceholders = rKeys.map((_, i) => `$${i + 1}`).join(', ');
     
     await client.query(
-      `INSERT INTO returns (${rKeys.join(', ')}) VALUES (${rPlaceholders})`,
+      `INSERT INTO "returns" ("${rKeys.join('", "')}") VALUES (${rPlaceholders})`,
       Object.values(rData)
     );
 
@@ -1412,7 +1412,7 @@ router.post('/returns', authenticateToken, async (req: AuthRequest, res) => {
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       
       await client.query(
-        `INSERT INTO return_items (${itemKeys.join(', ')}) VALUES (${itemPlaceholders})`,
+        `INSERT INTO "return_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
         Object.values(itemData)
       );
     }
@@ -1441,9 +1441,9 @@ router.put('/returns/:id', authenticateToken, async (req: AuthRequest, res) => {
     
     const rKeys = Object.keys(returnData);
     const rValues = Object.values(returnData);
-    const rSetClause = rKeys.map((key, i) => `${key} = $${i + 1}`).join(', ');
+    const rSetClause = rKeys.map((key, i) => `"${key}" = $${i + 1}`).join(', ');
     
-    let query = `UPDATE returns SET ${rSetClause} WHERE id = $${rKeys.length + 1}`;
+    let query = `UPDATE "returns" SET ${rSetClause} WHERE id = $${rKeys.length + 1}`;
     let params = [...rValues, returnId];
     if (companyId) {
       query += ` AND company_id = $${rKeys.length + 2}`;
@@ -1467,7 +1467,7 @@ router.put('/returns/:id', authenticateToken, async (req: AuthRequest, res) => {
       const itemKeys = Object.keys(finalItemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       await client.query(
-        `INSERT INTO return_items (${itemKeys.join(', ')}) VALUES (${itemPlaceholders})`,
+        `INSERT INTO "return_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
         Object.values(finalItemData)
       );
     }
@@ -1505,7 +1505,7 @@ router.post('/purchase_invoices', authenticateToken, async (req: AuthRequest, re
     const invPlaceholders = invKeys.map((_, i) => `$${i + 1}`).join(', ');
     
     await client.query(
-      `INSERT INTO purchase_invoices (${invKeys.join(', ')}) VALUES (${invPlaceholders})`,
+      `INSERT INTO "purchase_invoices" ("${invKeys.join('", "')}") VALUES (${invPlaceholders})`,
       invValues
     );
 
@@ -1520,7 +1520,7 @@ router.post('/purchase_invoices', authenticateToken, async (req: AuthRequest, re
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       
       await client.query(
-        `INSERT INTO purchase_invoice_items (${itemKeys.join(', ')}) VALUES (${itemPlaceholders})`,
+        `INSERT INTO "purchase_invoice_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
         Object.values(itemData)
       );
     }
@@ -1549,9 +1549,9 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
     
     const invKeys = Object.keys(invoiceData);
     const invValues = Object.values(invoiceData);
-    const invSetClause = invKeys.map((key, i) => `${key} = $${i + 1}`).join(', ');
+    const invSetClause = invKeys.map((key, i) => `"${key}" = $${i + 1}`).join(', ');
     
-    let query = `UPDATE purchase_invoices SET ${invSetClause} WHERE id = $${invKeys.length + 1}`;
+    let query = `UPDATE "purchase_invoices" SET ${invSetClause} WHERE id = $${invKeys.length + 1}`;
     let params = [...invValues, invoiceId];
     if (companyId) {
       query += ` AND company_id = $${invKeys.length + 2}`;
@@ -1575,7 +1575,7 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
       const itemKeys = Object.keys(finalItemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       await client.query(
-        `INSERT INTO purchase_invoice_items (${itemKeys.join(', ')}) VALUES (${itemPlaceholders})`,
+        `INSERT INTO "purchase_invoice_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
         Object.values(finalItemData)
       );
     }
@@ -1612,7 +1612,7 @@ router.post('/purchase_returns', authenticateToken, async (req: AuthRequest, res
     const rPlaceholders = rKeys.map((_, i) => `$${i + 1}`).join(', ');
     
     await client.query(
-      `INSERT INTO purchase_returns (${rKeys.join(', ')}) VALUES (${rPlaceholders})`,
+      `INSERT INTO "purchase_returns" ("${rKeys.join('", "')}") VALUES (${rPlaceholders})`,
       Object.values(rData)
     );
 
@@ -1627,7 +1627,7 @@ router.post('/purchase_returns', authenticateToken, async (req: AuthRequest, res
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       
       await client.query(
-        `INSERT INTO purchase_return_items (${itemKeys.join(', ')}) VALUES (${itemPlaceholders})`,
+        `INSERT INTO "purchase_return_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
         Object.values(itemData)
       );
     }
@@ -1656,9 +1656,9 @@ router.put('/purchase_returns/:id', authenticateToken, async (req: AuthRequest, 
     
     const rKeys = Object.keys(returnData);
     const rValues = Object.values(returnData);
-    const rSetClause = rKeys.map((key, i) => `${key} = $${i + 1}`).join(', ');
+    const rSetClause = rKeys.map((key, i) => `"${key}" = $${i + 1}`).join(', ');
     
-    let query = `UPDATE purchase_returns SET ${rSetClause} WHERE id = $${rKeys.length + 1}`;
+    let query = `UPDATE "purchase_returns" SET ${rSetClause} WHERE id = $${rKeys.length + 1}`;
     let params = [...rValues, returnId];
     if (companyId) {
       query += ` AND company_id = $${rKeys.length + 2}`;
@@ -1682,7 +1682,7 @@ router.put('/purchase_returns/:id', authenticateToken, async (req: AuthRequest, 
       const itemKeys = Object.keys(finalItemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       await client.query(
-        `INSERT INTO purchase_return_items (${itemKeys.join(', ')}) VALUES (${itemPlaceholders})`,
+        `INSERT INTO "purchase_return_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
         Object.values(finalItemData)
       );
     }
@@ -1787,9 +1787,9 @@ router.put('/journal_entries/:id', authenticateToken, async (req: AuthRequest, r
     const entryData = sanitizeData('journal_entries', rawEntryData);
     
     const keys = Object.keys(entryData);
-    const setClause = keys.map((key, i) => `${key} = $${i + 1}`).join(', ');
+    const setClause = keys.map((key, i) => `"${key}" = $${i + 1}`).join(', ');
     
-    let query = `UPDATE journal_entries SET ${setClause} WHERE id = $${keys.length + 1}`;
+    let query = `UPDATE "journal_entries" SET ${setClause} WHERE id = $${keys.length + 1}`;
     let params = [...Object.values(entryData), entryId];
     if (companyId) {
       query += ` AND company_id = $${keys.length + 2}`;
@@ -1838,7 +1838,7 @@ router.post('/auth/update-password', authenticateToken, async (req: AuthRequest,
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hashedPassword, req.user?.id]);
+    await pool.query('UPDATE "users" SET "password_hash" = $1 WHERE id = $2', [hashedPassword, req.user?.id]);
 
     res.json({ message: 'Password updated successfully' });
   } catch (error) {
@@ -1961,7 +1961,7 @@ router.put('/operations/complex/:id', authenticateToken, async (req: AuthRequest
         return `${key} = $${index + 1}`;
       }).join(', ');
       await client.query(
-        `UPDATE operations SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${keys.length + 1} AND company_id = $${keys.length + 2}`,
+        `UPDATE "operations" SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${keys.length + 1} AND company_id = $${keys.length + 2}`,
         [...values, id, companyId]
       );
     }

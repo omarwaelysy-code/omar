@@ -13,7 +13,23 @@ import erpRouter from "./src/lib/erp-api";
 async function startServer() {
   // Initialize PostgreSQL FIRST
   try {
+    const pool = (await import("./src/lib/postgres")).default;
     await initDatabase();
+    
+    // FORCED SCHEMA SYNC for known missing columns that block the user
+    console.log("🛠️ FORCING CRITICAL SCHEMA SYNC...");
+    const syncQueries = [
+      'ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "description" TEXT',
+      'ALTER TABLE "returns" ADD COLUMN IF NOT EXISTS "description" TEXT',
+      'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "description" TEXT',
+      'ALTER TABLE "purchase_returns" ADD COLUMN IF NOT EXISTS "description" TEXT',
+      'ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "required_sub_account" BOOLEAN DEFAULT FALSE'
+    ];
+    
+    for (const q of syncQueries) {
+      await pool.query(q).catch(e => console.warn(`⚠️ Forced sync warning on [${q.substring(0, 30)}...]:`, e.message));
+    }
+
     await runMigrations();
   } catch (err) {
     console.error("❌ CRITICAL: Failed to initialize PostgreSQL database or run migrations. Server will start but may be degraded.");
