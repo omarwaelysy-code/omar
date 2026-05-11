@@ -482,15 +482,23 @@ export const PurchaseReturns: React.FC = () => {
 
       if (editingReturn) {
         await dbService.deleteJournalEntryByReference(editingReturn.id, user.company_id);
+        await TransactionManager.updateWithAccounting(
+          'purchase_returns',
+          editingReturn.id,
+          data,
+          ReturnSchema,
+          journalEntryData,
+          JournalEntrySchema
+        );
+      } else {
+        await TransactionManager.saveWithAccounting(
+          'purchase_returns',
+          data,
+          ReturnSchema,
+          journalEntryData,
+          JournalEntrySchema
+        );
       }
-
-      await TransactionManager.saveWithAccounting(
-        'purchase_returns',
-        data,
-        ReturnSchema,
-        journalEntryData,
-        JournalEntrySchema
-      );
 
       showNotification(editingReturn ? 'تم تحديث مرتجع المشتريات بنجاح' : 'تم حفظ مرتجع المشتريات بنجاح', 'success');
       closeModal();

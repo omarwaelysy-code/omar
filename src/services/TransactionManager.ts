@@ -107,6 +107,44 @@ export class TransactionManager {
       throw error;
     }
   }
+
+  /**
+   * Specialized helper for Accounting Transactions Update (Main Doc Update + Journal Entry Re-creation)
+   */
+  static async updateWithAccounting(
+    mainCollection: string,
+    mainId: string,
+    mainData: any,
+    mainSchema: z.ZodSchema,
+    journalData: any,
+    journalSchema: z.ZodSchema
+  ) {
+    const manager = new TransactionManager();
+    
+    try {
+      // 1. Validate main data
+      mainSchema.parse(mainData);
+
+      // 2. Validate journal data
+      const testJournalWithRef = {
+        ...journalData,
+        reference_id: mainId
+      };
+      journalSchema.parse(testJournalWithRef);
+
+      // 3. Perform main update
+      await dbService.update(mainCollection, mainId, mainData);
+
+      // 4. Perform journal save
+      const journalId = await dbService.add('journal_entries', testJournalWithRef);
+      manager['createdIds'].push({ collection: 'journal_entries', id: journalId });
+
+      return { mainId, journalId };
+    } catch (error) {
+      await manager['rollback']();
+      throw error;
+    }
+  }
 }
 
 export const transactionManager = new TransactionManager();

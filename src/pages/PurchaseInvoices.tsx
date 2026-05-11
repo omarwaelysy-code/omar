@@ -827,15 +827,23 @@ export const PurchaseInvoices: React.FC = () => {
 
       if (editingInvoice) {
         await dbService.deleteJournalEntryByReference(editingInvoice.id, user.company_id);
+        await TransactionManager.updateWithAccounting(
+          'purchase_invoices',
+          editingInvoice.id,
+          data,
+          InvoiceSchema,
+          journalEntryData,
+          JournalEntrySchema
+        );
+      } else {
+        await TransactionManager.saveWithAccounting(
+          'purchase_invoices',
+          data,
+          InvoiceSchema,
+          journalEntryData,
+          JournalEntrySchema
+        );
       }
-
-      await TransactionManager.saveWithAccounting(
-        'purchase_invoices',
-        data,
-        InvoiceSchema,
-        journalEntryData,
-        JournalEntrySchema
-      );
 
       showNotification(editingInvoice ? t('pi.edit_success') : t('pi.add_success'), 'success');
       closeModal();

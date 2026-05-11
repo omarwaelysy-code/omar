@@ -475,8 +475,9 @@ export const Returns: React.FC = () => {
 
       if (editingReturn) {
         await dbService.deleteJournalEntryByReference(editingReturn.id, user.company_id);
-        await TransactionManager.saveWithAccounting(
+        await TransactionManager.updateWithAccounting(
           'returns',
+          editingReturn.id,
           returnData,
           ReturnSchema,
           journalEntryData,

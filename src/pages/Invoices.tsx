@@ -516,15 +516,14 @@ export const Invoices: React.FC = () => {
       if (editingInvoice) {
         // For editing, we still use TransactionManager approach by deleting old journal and adding new one
         await dbService.deleteJournalEntryByReference(editingInvoice.id, user.company_id);
-        const { mainId } = await TransactionManager.saveWithAccounting(
+        await TransactionManager.updateWithAccounting(
           'invoices',
+          editingInvoice.id,
           invoiceData,
           InvoiceSchema,
           journalEntryData,
           JournalEntrySchema
         );
-        // Note: we'd ideally want updateWithId for the main doc if it's an edit, but TransactionManager helper uses add.
-        // Let's refine TransactionManager later. For now, we'll use execute steps for full Control.
       } else {
         await TransactionManager.saveWithAccounting(
           'invoices',
