@@ -13,12 +13,6 @@ import erpRouter from "./src/lib/erp-api";
 async function startServer() {
   // Initialize PostgreSQL FIRST
   try {
-    const pool = (await import("./src/lib/postgres")).default;
-    console.log("🛠️ FORCING REQUIRED COLUMN SYNC...");
-    await pool.query('ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "required_sub_account" BOOLEAN DEFAULT FALSE').catch(e => {
-      console.warn("⚠️ Forced sync warning (non-fatal):", e.message);
-    });
-    
     await initDatabase();
     await runMigrations();
   } catch (err) {

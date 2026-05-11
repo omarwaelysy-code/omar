@@ -979,11 +979,18 @@ modules.forEach(moduleName => {
           const values = Object.values(sanitizedData);
           if (keys.length === 0) return sendError(res, 400, 'No valid fields for update');
 
+          // REAL RUNTIME CHECK: See if updated_at column exists in the database for this table
+          const colCheck = await pool.query(`
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_schema = 'public' AND table_name = $1 AND column_name = 'updated_at'
+          `, [moduleName]);
+          const hasUpdatedAt = colCheck.rows.length > 0;
+
           const setClause = keys.map((key, index) => {
             return `${key} = $${index + 1}`;
           }).join(', ');
           
-          let query = `UPDATE ${moduleName} SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $${keys.length + 1}`;
+          let query = `UPDATE ${moduleName} SET ${setClause}${hasUpdatedAt ? ', updated_at = CURRENT_TIMESTAMP' : ''} WHERE id = $${keys.length + 1}`;
           let params = [...values, id];
 
           if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies') {
