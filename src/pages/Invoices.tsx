@@ -244,7 +244,9 @@ export const Invoices: React.FC = () => {
         account_name: debitAccountName,
         debit: total_amount,
         credit: 0,
-        description: `فاتورة مبيعات رقم ${invoice_number} - ${customer?.name || '...'}`
+        description: `فاتورة مبيعات رقم ${invoice_number} - ${customer?.name || '...'}`,
+        sub_account_id: paymentType === 'cash' ? paymentMethodId : customer?.id,
+        sub_account_type: paymentType === 'cash' ? 'payment_method' : 'customer'
       });
 
       // Debit: Discount Account (if any)
@@ -427,7 +429,9 @@ export const Invoices: React.FC = () => {
         credit: 0,
         description: `فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name}`,
         customer_id: selectedCustomerId,
-        customer_name: customer?.name
+        customer_name: customer?.name,
+        sub_account_id: selectedCustomerId,
+        sub_account_type: 'customer'
       });
 
       if (discount > 0) {
@@ -474,7 +478,9 @@ export const Invoices: React.FC = () => {
           account_name: cashAccountName,
           debit: total_amount,
           credit: 0,
-          description: `تحصيل فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name}`
+          description: `تحصيل فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name}`,
+          sub_account_id: paymentMethodId,
+          sub_account_type: 'payment_method'
         });
         journalItems.push({
           account_id: customerAccountId,
@@ -483,7 +489,9 @@ export const Invoices: React.FC = () => {
           credit: total_amount,
           description: `سداد فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name}`,
           customer_id: selectedCustomerId,
-          customer_name: customer?.name
+          customer_name: customer?.name,
+          sub_account_id: selectedCustomerId,
+          sub_account_type: 'customer'
         });
       }
 

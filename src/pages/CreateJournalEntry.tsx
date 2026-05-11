@@ -13,28 +13,38 @@ export const CreateJournalEntry: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSupplier] = useState<Supplier[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     description: '',
+    reference_number: '',
     items: [
-      { account_id: '', account_name: '', debit: 0, credit: 0, description: '', customer_id: '', supplier_id: '' },
-      { account_id: '', account_name: '', debit: 0, credit: 0, description: '', customer_id: '', supplier_id: '' }
+      { account_id: '', account_name: '', debit: 0, credit: 0, description: '', sub_account_id: '', sub_account_type: undefined },
+      { account_id: '', account_name: '', debit: 0, credit: 0, description: '', sub_account_id: '', sub_account_type: undefined }
     ]
   });
+
+  // Dynamic Sub-account Options
+  const subAccounts = [
+    ...customers.map(c => ({ id: c.id, name: c.name, type: 'customer' as const, label: `عميل: ${c.name}` })),
+    ...suppliers.map(s => ({ id: s.id, name: s.name, type: 'supplier' as const, label: `مورد: ${s.name}` })),
+    ...paymentMethods.map(p => ({ id: p.id, name: p.name, type: 'payment_method' as const, label: `خزينة/بنك: ${p.name}` }))
+  ];
 
   useEffect(() => {
     if (user) {
       const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
       const unsubCustomers = dbService.subscribe<Customer>('customers', user.company_id, setCustomers);
       const unsubSuppliers = dbService.subscribe<Supplier>('suppliers', user.company_id, setSupplier);
+      const unsubPMs = dbService.subscribe<any>('payment_methods', user.company_id, setPaymentMethods);
       setLoading(false);
       return () => {
         unsubAccounts();
         unsubCustomers();
         unsubSuppliers();
+        unsubPMs();
       };
     }
   }, [user]);
@@ -42,8 +52,8 @@ export const CreateJournalEntry: React.FC = () => {
   const addItem = () => {
     setFormData({
       ...formData,
-      items: [...formData.items, { account_id: '', account_name: '', debit: 0, credit: 0, description: '', customer_id: '', supplier_id: '' }]
-    });
+      items: [...formData.items, { account_id: '', account_name: '', debit: 0, credit: 0, description: '', sub_account_id: '', sub_account_type: undefined }]
+    } as any);
   };
 
   const removeItem = (index: number) => {
@@ -64,8 +74,31 @@ export const CreateJournalEntry: React.FC = () => {
       const account = accounts.find(a => a.id === value);
       newItems[index].account_name = account?.name || '';
       // Reset entity selections when account changes
+      newItems[index].sub_account_id = '';
+      newItems[index].sub_account_type = undefined;
       newItems[index].customer_id = '';
       newItems[index].supplier_id = '';
+      
+      console.log(`[ERP] Account Selected: ${account?.name}, Required Sub: ${account?.required_sub_account}`);
+    }
+
+    if (field === 'sub_account_id') {
+       const subAccount = subAccounts.find(s => s.id === value);
+       newItems[index].sub_account_type = subAccount?.type;
+       
+       // Maintain backward compatibility for columns
+       if (subAccount?.type === 'customer') {
+          newItems[index].customer_id = subAccount.id;
+          newItems[index].supplier_id = '';
+       } else if (subAccount?.type === 'supplier') {
+          newItems[index].customer_id = '';
+          newItems[index].supplier_id = subAccount.id;
+       } else {
+          newItems[index].customer_id = '';
+          newItems[index].supplier_id = '';
+       }
+       
+       console.log(`[ERP] Sub-account Selected: ${subAccount?.name}, Type: ${subAccount?.type}`);
     }
 
     setFormData({ ...formData, items: newItems });
@@ -91,37 +124,19 @@ export const CreateJournalEntry: React.FC = () => {
 
     // Validate customer/supplier selection
     for (let i = 0; i < formData.items.length; i++) {
-      const item = formData.items[i];
+      const item = formData.items[i] as any;
       const account = accounts.find(a => a.id === item.account_id);
       if (account) {
-        // Use the new flag or fallback to name check for backward compatibility
-        const needsSubAccount = account.required_sub_account || 
-                                account.name.includes('عملاء') || 
-                                account.name.includes('موردين');
-        
-        if (needsSubAccount) {
-          const isCustomer = account.name.includes('عملاء') || (account.required_sub_account && !account.name.includes('موردين'));
-          const isSupplier = account.name.includes('موردين');
-          
-          if (isCustomer && !item.customer_id) {
-            showNotification(`يرجى اختيار العميل في السطر رقم ${i + 1}`, 'error');
-            return;
-          }
-          if (isSupplier && !item.supplier_id) {
-            showNotification(`يرجى اختيار المورد في السطر رقم ${i + 1}`, 'error');
-            return;
-          }
-          // If it's just marked as required but we don't know if it's customer or supplier,
-          // assume customer for now if neither is selected, or better, show error that sub-account is needed.
-          if (!item.customer_id && !item.supplier_id) {
-            showNotification(`يرجى اختيار الحساب الفرعي (عميل/مورد) في السطر رقم ${i + 1}`, 'error');
-            return;
-          }
+        if (account.required_sub_account && !item.sub_account_id) {
+          showNotification(`يرجى اختيار الحساب الفرعي في السطر رقم ${i + 1}`, 'error');
+          return;
         }
       }
     }
 
     setIsSubmitting(true);
+    console.log('[ERP] Submitting Journal Entry:', JSON.stringify(formData, null, 2));
+    
     try {
       const journalEntry: Omit<JournalEntry, 'id'> = {
         date: formData.date,
@@ -133,7 +148,7 @@ export const CreateJournalEntry: React.FC = () => {
         company_id: user.company_id,
         created_at: new Date().toISOString(),
         created_by: user.id,
-        items: formData.items.map(item => ({
+        items: formData.items.map((item: any) => ({
           account_id: item.account_id,
           account_name: item.account_name,
           debit: Number(item.debit) || 0,
@@ -142,11 +157,15 @@ export const CreateJournalEntry: React.FC = () => {
           customer_id: item.customer_id || undefined,
           customer_name: customers.find(c => c.id === item.customer_id)?.name || undefined,
           supplier_id: item.supplier_id || undefined,
-          supplier_name: suppliers.find(s => s.id === item.supplier_id)?.name || undefined
+          supplier_name: suppliers.find(s => s.id === item.supplier_id)?.name || undefined,
+          sub_account_id: item.sub_account_id || undefined,
+          sub_account_type: item.sub_account_type || undefined
         }))
       };
 
       const id = await dbService.add('journal_entries', journalEntry);
+      console.log('[ERP] Journal Entry Saved Successfully. ID:', id);
+
       await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة قيد يومية', `إضافة قيد يومية يدوي رقم: ${id}`, 'journal_entries', id);
       
       showNotification('تم حفظ قيد اليومية بنجاح', 'success');
@@ -156,10 +175,10 @@ export const CreateJournalEntry: React.FC = () => {
         date: new Date().toISOString().split('T')[0],
         description: '',
         items: [
-          { account_id: '', account_name: '', debit: 0, credit: 0, description: '', customer_id: '', supplier_id: '' },
-          { account_id: '', account_name: '', debit: 0, credit: 0, description: '', customer_id: '', supplier_id: '' }
+          { account_id: '', account_name: '', debit: 0, credit: 0, description: '', sub_account_id: '', sub_account_type: undefined },
+          { account_id: '', account_name: '', debit: 0, credit: 0, description: '', sub_account_id: '', sub_account_type: undefined }
         ]
-      });
+      } as any);
     } catch (error) {
       console.error(error);
       showNotification('حدث خطأ أثناء حفظ القيد', 'error');
@@ -168,19 +187,9 @@ export const CreateJournalEntry: React.FC = () => {
     }
   };
 
-  const isCustomerAccount = (accountId: string) => {
-    const account = accounts.find(a => a.id === accountId);
-    return account?.name.includes('عملاء');
-  };
-
-  const isSupplierAccount = (accountId: string) => {
-    const account = accounts.find(a => a.id === accountId);
-    return account?.name.includes('موردين');
-  };
-
   const needsSubAccount = (accountId: string) => {
     const account = accounts.find(a => a.id === accountId);
-    return account?.required_sub_account || account?.name.includes('عملاء') || account?.name.includes('موردين');
+    return account?.required_sub_account || false;
   };
 
   return (
@@ -246,67 +255,19 @@ export const CreateJournalEntry: React.FC = () => {
                       </select>
                       
                       {needsSubAccount(item.account_id) && (
-                        <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
-                          {isCustomerAccount(item.account_id) ? (
-                            <div className="relative">
-                              <User className="absolute right-3 top-2.5 text-emerald-500" size={16} />
-                              <select
-                                required
-                                className="w-full pr-10 pl-3 py-2 bg-emerald-50 border border-emerald-100 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-bold text-emerald-700"
-                                value={item.customer_id}
-                                onChange={(e) => updateItem(index, 'customer_id', e.target.value)}
-                              >
-                                <option value="">اختر العميل...</option>
-                                {customers.map(c => (
-                                  <option key={c.id} value={c.id}>{c.name}</option>
-                                ))}
-                              </select>
-                            </div>
-                          ) : isSupplierAccount(item.account_id) ? (
-                            <div className="relative">
-                              <Truck className="absolute right-3 top-2.5 text-blue-500" size={16} />
-                              <select
-                                required
-                                className="w-full pr-10 pl-3 py-2 bg-blue-50 border border-blue-100 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-bold text-blue-700"
-                                value={item.supplier_id}
-                                onChange={(e) => updateItem(index, 'supplier_id', e.target.value)}
-                              >
-                                <option value="">اختر المورد...</option>
-                                {suppliers.map(s => (
-                                  <option key={s.id} value={s.id}>{s.name}</option>
-                                ))}
-                              </select>
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-2 gap-2">
-                              <select
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs"
-                                value={item.customer_id}
-                                onChange={(e) => {
-                                  updateItem(index, 'customer_id', e.target.value);
-                                  if (e.target.value) updateItem(index, 'supplier_id', '');
-                                }}
-                              >
-                                <option value="">اختر عميل (اختياري)...</option>
-                                {customers.map(c => (
-                                  <option key={c.id} value={c.id}>{c.name}</option>
-                                ))}
-                              </select>
-                              <select
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs"
-                                value={item.supplier_id}
-                                onChange={(e) => {
-                                  updateItem(index, 'supplier_id', e.target.value);
-                                  if (e.target.value) updateItem(index, 'customer_id', '');
-                                }}
-                              >
-                                <option value="">اختر مورد (اختياري)...</option>
-                                {suppliers.map(s => (
-                                  <option key={s.id} value={s.id}>{s.name}</option>
-                                ))}
-                              </select>
-                            </div>
-                          )}
+                        <div className="relative animate-in slide-in-from-top-2 duration-200">
+                          <User className="absolute right-3 top-2.5 text-emerald-500" size={16} />
+                          <select
+                            required
+                            className="w-full pr-10 pl-3 py-2 bg-emerald-50 border border-emerald-100 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-bold text-emerald-700"
+                            value={item.sub_account_id}
+                            onChange={(e) => updateItem(index, 'sub_account_id', e.target.value)}
+                          >
+                            <option value="">اختر الحساب الفرعي...</option>
+                            {subAccounts.map(sa => (
+                              <option key={sa.id} value={sa.id}>{sa.label}</option>
+                            ))}
+                          </select>
                         </div>
                       )}
                     </td>

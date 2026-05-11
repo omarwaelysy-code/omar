@@ -286,7 +286,9 @@ export const PurchaseInvoices: React.FC = () => {
         account_name: creditAccountName,
         debit: 0,
         credit: total_amount,
-        description: t('pi.invoice_description', { number: invoice_number, supplier: supplier?.name || '...' })
+        description: t('pi.invoice_description', { number: invoice_number, supplier: supplier?.name || '...' }),
+        sub_account_id: invoiceData.payment_type === 'cash' ? invoiceData.payment_method_id : supplier?.id,
+        sub_account_type: invoiceData.payment_type === 'cash' ? 'payment_method' : 'supplier'
       });
 
       // Credit: Discount Account (if any)
@@ -721,7 +723,9 @@ export const PurchaseInvoices: React.FC = () => {
         credit: total_amount,
         description: t('pi.invoice_description', { number: invoice_number, supplier: supplier?.name }),
         supplier_id: invoiceData.supplier_id,
-        supplier_name: supplier?.name
+        supplier_name: supplier?.name,
+        sub_account_id: invoiceData.supplier_id,
+        sub_account_type: 'supplier'
       });
 
       if (invoiceData.discount > 0) {
@@ -786,7 +790,9 @@ export const PurchaseInvoices: React.FC = () => {
           account_name: cashAccountName,
           debit: 0,
           credit: total_amount,
-          description: t('pi.payment_description', { number: invoice_number, supplier: supplier?.name })
+          description: t('pi.payment_description', { number: invoice_number, supplier: supplier?.name }),
+          sub_account_id: invoiceData.payment_method_id,
+          sub_account_type: 'payment_method'
         });
         journalItems.push({
           account_id: supplierAccountId,
@@ -795,7 +801,9 @@ export const PurchaseInvoices: React.FC = () => {
           credit: 0,
           description: t('pi.settlement_description', { number: invoice_number, supplier: supplier?.name }),
           supplier_id: invoiceData.supplier_id,
-          supplier_name: supplier?.name
+          supplier_name: supplier?.name,
+          sub_account_id: invoiceData.supplier_id,
+          sub_account_type: 'supplier'
         });
       }
 

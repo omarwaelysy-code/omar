@@ -164,7 +164,7 @@ export const Accounts: React.FC = () => {
         name: account.name,
         type_id: account.type_id,
         opening_balance: account.opening_balance || 0,
-        required_sub_account: account.required_sub_account || false
+        required_sub_account: Boolean(account.required_sub_account)
       });
     } else {
       setEditingAccount(null);

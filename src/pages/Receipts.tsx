@@ -141,7 +141,9 @@ export const Receipts: React.FC = () => {
         account_name: debitAccountName,
         debit: formData.amount,
         credit: 0,
-        description: `سند قبض رقم ${receipt_number} - ${customer?.name || '...'}`
+        description: `سند قبض رقم ${receipt_number} - ${customer?.name || '...'}`,
+        sub_account_id: paymentMethod?.id,
+        sub_account_type: 'payment_method'
       });
 
       // Credit: Customer
@@ -159,7 +161,9 @@ export const Receipts: React.FC = () => {
         account_name: creditAccountName,
         debit: 0,
         credit: formData.amount,
-        description: `سند قبض رقم ${receipt_number} - ${customer?.name || '...'}`
+        description: `سند قبض رقم ${receipt_number} - ${customer?.name || '...'}`,
+        sub_account_id: customer?.id,
+        sub_account_type: 'customer'
       });
 
       setPreviewJournalEntry({
@@ -361,7 +365,9 @@ export const Receipts: React.FC = () => {
         account_name: debitAccountName,
         debit: formData.amount,
         credit: 0,
-        description: `سند قبض رقم ${voucher_number} - ${formData.description}`
+        description: `سند قبض رقم ${voucher_number} - ${formData.description}`,
+        sub_account_id: paymentMethod?.id,
+        sub_account_type: 'payment_method'
       });
 
       let creditAccountId = customer?.account_id || '';
@@ -379,7 +385,9 @@ export const Receipts: React.FC = () => {
         credit: formData.amount,
         description: `سند قبض رقم ${voucher_number} من العميل: ${customer?.name}`,
         customer_id: formData.customer_id,
-        customer_name: customer?.name
+        customer_name: customer?.name,
+        sub_account_id: formData.customer_id,
+        sub_account_type: 'customer'
       });
 
       const journalEntryData = {

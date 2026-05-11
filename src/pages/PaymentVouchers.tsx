@@ -165,7 +165,9 @@ export const PaymentVouchers: React.FC = () => {
         account_name: debitAccountName,
         debit: voucherData.amount,
         credit: 0,
-        description: `سند صرف رقم ${voucher_number} - ${voucherData.type === 'supplier' ? (supplier?.name || '...') : (category?.name || '...')}`
+        description: `سند صرف رقم ${voucher_number} - ${voucherData.type === 'supplier' ? (supplier?.name || '...') : (category?.name || '...')}`,
+        sub_account_id: voucherData.type === 'supplier' ? supplier?.id : undefined,
+        sub_account_type: voucherData.type === 'supplier' ? 'supplier' : undefined
       });
 
       // Credit: Payment Method (Cash/Bank)
@@ -185,7 +187,9 @@ export const PaymentVouchers: React.FC = () => {
         account_name: creditAccountName,
         debit: 0,
         credit: voucherData.amount,
-        description: `سند صرف رقم ${voucher_number} - ${voucherData.type === 'supplier' ? (supplier?.name || '...') : (category?.name || '...')}`
+        description: `سند صرف رقم ${voucher_number} - ${voucherData.type === 'supplier' ? (supplier?.name || '...') : (category?.name || '...')}`,
+        sub_account_id: paymentMethod?.id,
+        sub_account_type: 'payment_method'
       });
 
       setPreviewJournalEntry({
@@ -435,7 +439,9 @@ export const PaymentVouchers: React.FC = () => {
         credit: 0,
         description: `سند صرف رقم ${voucher_number} - ${voucherData.notes}`,
         supplier_id: voucherData.type === 'supplier' ? voucherData.supplier_id : undefined,
-        supplier_name: voucherData.type === 'supplier' ? supplier?.name : undefined
+        supplier_name: voucherData.type === 'supplier' ? supplier?.name : undefined,
+        sub_account_id: voucherData.type === 'supplier' ? voucherData.supplier_id : undefined,
+        sub_account_type: voucherData.type === 'supplier' ? 'supplier' : undefined
       });
 
       let creditAccountId = paymentMethod?.account_id || '';
@@ -453,7 +459,9 @@ export const PaymentVouchers: React.FC = () => {
         account_name: creditAccountName,
         debit: 0,
         credit: voucherData.amount,
-        description: `سند صرف رقم ${voucher_number} من حساب: ${paymentMethod?.name}`
+        description: `سند صرف رقم ${voucher_number} من حساب: ${paymentMethod?.name}`,
+        sub_account_id: paymentMethod?.id,
+        sub_account_type: 'payment_method'
       });
 
       const journalEntryData = {
