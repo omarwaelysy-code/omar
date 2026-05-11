@@ -999,13 +999,13 @@ export const PurchaseReturns: React.FC = () => {
                 <div className="hidden md:block overflow-x-auto">
                   <table className="w-full text-right border-collapse">
                     <thead>
-                      <tr className="bg-zinc-50/30 border-b border-zinc-100">
-                        <th className="px-6 py-4 text-sm font-bold text-zinc-500 uppercase tracking-tighter w-16 text-center">صورة</th>
-                        <th className="px-6 py-4 text-sm font-bold text-zinc-500 uppercase tracking-tighter">الصنف</th>
-                        <th className="px-6 py-4 text-sm font-bold text-zinc-500 uppercase tracking-tighter w-32">الكمية</th>
-                        <th className="px-6 py-4 text-sm font-bold text-zinc-500 uppercase tracking-tighter w-48">سعر التكلفة</th>
-                        <th className="px-6 py-4 text-sm font-bold text-zinc-500 uppercase tracking-tighter w-48">الإجمالي</th>
-                        <th className="px-6 py-4 text-sm font-bold text-zinc-500 uppercase tracking-tighter w-20"></th>
+                      <tr className="bg-zinc-50/30 border-b border-zinc-100 uppercase tracking-widest text-[10px]">
+                        <th className="px-6 py-4 font-bold text-zinc-500 w-16 text-center">صورة</th>
+                        <th className="px-6 py-4 font-bold text-zinc-500 text-right">الصنف</th>
+                        <th className="px-6 py-4 font-bold text-zinc-500 w-28 text-center">الكمية</th>
+                        <th className="px-6 py-4 font-bold text-zinc-500 w-32 text-center">سعر التكلفة</th>
+                        <th className="px-6 py-4 font-bold text-zinc-500 w-48 text-left">الإجمالي</th>
+                        <th className="px-6 py-4 font-bold text-zinc-500 w-20"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-50">
@@ -1014,25 +1014,25 @@ export const PurchaseReturns: React.FC = () => {
                           <td colSpan={6} className="px-6 py-12 text-center text-zinc-400 italic">لا توجد أصناف مضافة حالياً</td>
                         </tr>
                       ) : items.map((item, index) => (
-                        <tr key={index} className="hover:bg-zinc-50/50 transition-colors">
-                          <td className="px-6 py-4 text-center">
+                        <tr key={index} className="hover:bg-zinc-50/50 transition-colors group">
+                          <td className="px-6 py-5 text-center">
                             {(item as any).product_image_url ? (
                               <img 
                                 src={(item as any).product_image_url} 
                                 alt="Product" 
-                                className="w-10 h-10 object-cover rounded-lg mx-auto border border-zinc-100"
+                                className="w-12 h-12 object-cover rounded-xl mx-auto border border-zinc-100 shadow-sm"
                                 referrerPolicy="no-referrer"
                               />
                             ) : (
-                              <div className="w-10 h-10 bg-zinc-50 rounded-lg flex items-center justify-center mx-auto border border-zinc-100">
-                                <Box size={16} className="text-zinc-300" />
+                              <div className="w-12 h-12 bg-zinc-50 rounded-lg flex items-center justify-center mx-auto border border-zinc-100 shadow-sm">
+                                <Box size={20} className="text-zinc-300" />
                               </div>
                             )}
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-5">
                             <select 
                               required
-                              className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                              className="w-full px-4 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-900"
                               value={item.product_id}
                               onChange={(e) => {
                                 if (e.target.value === 'new_product') {
@@ -1047,28 +1047,28 @@ export const PurchaseReturns: React.FC = () => {
                               <option value="new_product" className="font-bold text-emerald-600">+ إضافة صنف جديد</option>
                             </select>
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-5 text-center">
                             <input 
                               required
                               type="number" 
-                              min="1"
-                              className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-center"
+                              step="any"
+                              className="w-full bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 px-4 py-3 text-sm outline-none text-center font-bold shadow-sm"
                               value={item.quantity}
                               onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
                             />
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-5 text-center">
                             <input 
                               required
                               type="number" 
-                              step="0.01"
-                              className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-center"
+                              step="any"
+                              className="w-full bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 px-4 py-3 text-sm outline-none text-center font-bold shadow-sm"
                               value={item.cost_price}
                               onChange={(e) => updateItem(index, 'cost_price', Number(e.target.value))}
                             />
                           </td>
-                          <td className="px-6 py-4 font-bold text-zinc-900">
-                            {formatNumber(item.quantity * item.cost_price)} ج.م
+                          <td className="px-6 py-5 font-bold text-zinc-900 text-left">
+                            {formatNumber(item.quantity * item.cost_price)}
                           </td>
                           <td className="px-6 py-4">
                             <button 

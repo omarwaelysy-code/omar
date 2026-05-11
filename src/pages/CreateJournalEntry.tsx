@@ -230,12 +230,12 @@ export const CreateJournalEntry: React.FC = () => {
           <div className="overflow-x-auto -mx-8 px-8">
             <table className="w-full border-collapse min-w-[800px]">
               <thead>
-                <tr className="text-right border-b border-zinc-100">
-                  <th className="py-4 px-2 font-black text-zinc-400 text-xs uppercase tracking-wider w-1/4">الحساب</th>
-                  <th className="py-4 px-2 font-black text-zinc-400 text-xs uppercase tracking-wider w-1/6">مدين</th>
-                  <th className="py-4 px-2 font-black text-zinc-400 text-xs uppercase tracking-wider w-1/6">دائن</th>
-                  <th className="py-4 px-2 font-black text-zinc-400 text-xs uppercase tracking-wider">البيان</th>
-                  <th className="py-4 px-2 font-black text-zinc-400 text-xs uppercase tracking-wider w-10"></th>
+                <tr className="text-right border-b border-zinc-100 uppercase tracking-widest text-[10px]">
+                  <th className="py-4 px-2 font-black text-zinc-400 w-1/4">الحساب</th>
+                  <th className="py-4 px-2 font-black text-zinc-400 w-32 text-center">مدين</th>
+                  <th className="py-4 px-2 font-black text-zinc-400 w-32 text-center">دائن</th>
+                  <th className="py-4 px-2 font-black text-zinc-400">البيان</th>
+                  <th className="py-4 px-2 font-black text-zinc-400 w-10"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-50">
@@ -274,8 +274,8 @@ export const CreateJournalEntry: React.FC = () => {
                     <td className="py-4 px-2">
                       <input
                         type="number"
-                        step="0.01"
-                        className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-bold text-emerald-600"
+                        step="any"
+                        className="w-full px-3 py-2.5 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-bold text-emerald-600 text-center shadow-sm"
                         value={item.debit || ''}
                         onChange={(e) => updateItem(index, 'debit', e.target.value)}
                         onFocus={(e) => e.target.select()}
@@ -284,8 +284,8 @@ export const CreateJournalEntry: React.FC = () => {
                     <td className="py-4 px-2">
                       <input
                         type="number"
-                        step="0.01"
-                        className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-bold text-red-600"
+                        step="any"
+                        className="w-full px-3 py-2.5 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-bold text-red-600 text-center shadow-sm"
                         value={item.credit || ''}
                         onChange={(e) => updateItem(index, 'credit', e.target.value)}
                         onFocus={(e) => e.target.select()}
@@ -294,7 +294,7 @@ export const CreateJournalEntry: React.FC = () => {
                     <td className="py-4 px-2">
                       <input
                         type="text"
-                        className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
+                        className="w-full px-3 py-2.5 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm shadow-sm"
                         placeholder="بيان السطر..."
                         value={item.description}
                         onChange={(e) => updateItem(index, 'description', e.target.value)}

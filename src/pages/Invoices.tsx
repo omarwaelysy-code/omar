@@ -1443,12 +1443,12 @@ export const Invoices: React.FC = () => {
                         <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'} text-sm min-w-[400px]`}>
                           <thead className="bg-slate-50 text-slate-500 uppercase text-[9px] font-bold tracking-widest">
                             <tr>
-                              <th className="px-4 py-2 w-12 text-center">{t('products.column_image')}</th>
-                              <th className="px-4 py-2">{t('invoices.column_product')}</th>
-                              <th className="px-4 py-2 w-16 text-center">{t('invoices.column_quantity')}</th>
-                              <th className="px-4 py-2 w-24 text-center">{t('invoices.column_price')}</th>
-                              <th className={`px-4 py-2 w-24 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_total')}</th>
-                              <th className="px-4 py-2 w-8"></th>
+                              <th className="px-4 py-4 w-12 text-center">{t('products.column_image')}</th>
+                              <th className="px-4 py-4">{t('invoices.column_product')}</th>
+                              <th className="px-4 py-4 w-28 text-center">{t('invoices.column_quantity')}</th>
+                              <th className="px-4 py-4 w-32 text-center">{t('invoices.column_price')}</th>
+                              <th className={`px-4 py-4 w-32 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_total')}</th>
+                              <th className="px-4 py-4 w-10"></th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
@@ -1478,18 +1478,20 @@ export const Invoices: React.FC = () => {
                                     {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                                   </select>
                                 </td>
-                                <td className="px-4 py-2">
+                                <td className="px-4 py-3">
                                   <input 
                                     type="number" 
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg focus:ring-1 focus:ring-emerald-500 px-2 py-1 text-sm outline-none text-center font-mono"
+                                    step="any"
+                                    className="w-full bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 px-3 py-2 text-sm outline-none text-center font-bold shadow-sm"
                                     value={isNaN(Number(item.quantity)) ? '' : Number(item.quantity)}
                                     onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
                                   />
                                 </td>
-                                <td className="px-4 py-2">
+                                <td className="px-4 py-3">
                                   <input 
                                     type="number" 
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg focus:ring-1 focus:ring-emerald-500 px-2 py-1 text-sm outline-none text-center font-mono"
+                                    step="any"
+                                    className="w-full bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 px-3 py-2 text-sm outline-none text-center font-bold shadow-sm"
                                     value={isNaN(Number(item.unit_price)) ? '' : Number(item.unit_price)}
                                     onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
                                   />

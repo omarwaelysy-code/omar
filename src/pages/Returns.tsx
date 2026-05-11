@@ -992,12 +992,12 @@ export const Returns: React.FC = () => {
                   <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'} text-sm`}>
                     <thead className="bg-zinc-50 text-zinc-500 uppercase text-[10px] font-bold tracking-wider">
                       <tr>
-                        <th className="px-4 py-3 w-12 text-center">{t('products.column_image')}</th>
-                        <th className="px-4 py-3">{t('returns.column_product')}</th>
-                        <th className="px-4 py-3 w-24">{t('returns.column_quantity')}</th>
-                        <th className="px-4 py-3 w-32">{t('returns.column_price')}</th>
-                        <th className="px-4 py-3 w-32">{t('returns.column_total')}</th>
-                        <th className="px-4 py-3 w-10"></th>
+                        <th className="px-4 py-4 w-12 text-center">{t('products.column_image')}</th>
+                        <th className="px-4 py-4">{t('returns.column_product')}</th>
+                        <th className="px-4 py-4 w-28 text-center">{t('returns.column_quantity')}</th>
+                        <th className="px-4 py-4 w-32 text-center">{t('returns.column_price')}</th>
+                        <th className={`px-4 py-4 w-32 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('returns.column_total')}</th>
+                        <th className="px-4 py-4 w-10"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-50">
@@ -1008,18 +1008,18 @@ export const Returns: React.FC = () => {
                               <img 
                                 src={item.product_image_url} 
                                 alt={item.product_name} 
-                                className="w-8 h-8 object-cover rounded-lg mx-auto border border-zinc-100"
+                                className="w-10 h-10 object-cover rounded-lg mx-auto border border-zinc-100 shadow-sm"
                                 referrerPolicy="no-referrer"
                               />
                             ) : (
-                              <div className="w-8 h-8 bg-zinc-50 rounded-lg flex items-center justify-center mx-auto border border-zinc-100">
-                                <Box size={14} className="text-zinc-300" />
+                              <div className="w-10 h-10 bg-zinc-50 rounded-lg flex items-center justify-center mx-auto border border-zinc-100 shadow-sm">
+                                <Box size={16} className="text-zinc-300" />
                               </div>
                             )}
                           </td>
                           <td className="px-4 py-3">
                             <select 
-                              className="w-full bg-transparent outline-none font-bold text-zinc-900 appearance-none cursor-pointer"
+                              className="w-full bg-transparent outline-none font-bold text-zinc-900 appearance-none cursor-pointer text-sm"
                               value={item.product_id}
                               onChange={(e) => updateItem(index, 'product_id', e.target.value)}
                             >
@@ -1030,8 +1030,8 @@ export const Returns: React.FC = () => {
                           <td className="px-4 py-3">
                             <input 
                               type="number"
-                              min="1"
-                              className="w-full px-2 py-1 bg-zinc-50 border border-zinc-200 rounded-lg text-center"
+                              step="any"
+                              className="w-full bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 px-3 py-2 text-sm outline-none text-center font-bold shadow-sm"
                               value={Number(item.quantity) || 0}
                               onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
                             />
@@ -1039,13 +1039,13 @@ export const Returns: React.FC = () => {
                           <td className="px-4 py-3">
                             <input 
                               type="number"
-                              className="w-full px-2 py-1 bg-zinc-50 border border-zinc-200 rounded-lg text-center"
+                              step="any"
+                              className="w-full bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 px-3 py-2 text-sm outline-none text-center font-bold shadow-sm"
                               value={Number(item.unit_price) || 0}
-                              step="0.01"
                               onChange={(e) => updateItem(index, 'unit_price', Number(e.target.value))}
                             />
                           </td>
-                          <td className="px-4 py-3 font-bold text-zinc-900">{formatNumber(item.total)}</td>
+                          <td className={`px-4 py-3 font-bold text-zinc-900 text-sm ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{formatNumber(item.total)}</td>
                           <td className="px-4 py-3">
                             <button 
                               type="button"

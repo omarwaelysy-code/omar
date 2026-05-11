@@ -1447,12 +1447,12 @@ export const PurchaseInvoices: React.FC = () => {
                           <table className={`w-full ${t('dir') === 'rtl' ? 'text-right' : 'text-left'} border-collapse`}>
                             <thead>
                               <tr className="bg-zinc-50/30 border-b border-zinc-100">
-                                <th className="px-3 py-2 text-xs font-bold text-zinc-500 uppercase tracking-tighter w-12 text-center">{t('common.image')}</th>
-                                <th className="px-3 py-2 text-xs font-bold text-zinc-500 uppercase tracking-tighter">{invoiceData.purchase_type === 'items' ? t('pi.item') : t('pi.expense_item')}</th>
-                                <th className="px-3 py-2 text-xs font-bold text-zinc-500 uppercase tracking-tighter w-24 text-center">{t('pi.quantity')}</th>
-                                <th className="px-3 py-2 text-xs font-bold text-zinc-500 uppercase tracking-tighter w-32 text-center">{t('pi.price')}</th>
-                                <th className="px-3 py-2 text-xs font-bold text-zinc-500 uppercase tracking-tighter w-32 text-center">{t('pi.total')}</th>
-                                <th className="px-3 py-2 text-xs font-bold text-zinc-500 uppercase tracking-tighter w-12"></th>
+                                <th className="px-3 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest w-12 text-center">{t('common.image')}</th>
+                                <th className="px-3 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest leading-none">{invoiceData.purchase_type === 'items' ? t('pi.item') : t('pi.expense_item')}</th>
+                                <th className="px-3 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest w-28 text-center">{t('pi.quantity')}</th>
+                                <th className="px-3 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest w-32 text-center">{t('pi.price')}</th>
+                                <th className="px-3 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest w-32 text-center">{t('pi.total')}</th>
+                                <th className="px-3 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest w-12"></th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-50">
@@ -1462,25 +1462,25 @@ export const PurchaseInvoices: React.FC = () => {
                                 </tr>
                               ) : items.map((item, index) => (
                                 <tr key={index} className="hover:bg-zinc-50/50 transition-colors group">
-                                  <td className="px-3 py-1.5 text-center">
+                                  <td className="px-3 py-3 text-center">
                                     {invoiceData.purchase_type === 'items' && (item as any).product_image_url ? (
                                       <img 
                                         src={(item as any).product_image_url} 
                                         alt="Product" 
-                                        className="w-8 h-8 object-cover rounded-lg mx-auto border border-zinc-100"
+                                        className="w-10 h-10 object-cover rounded-lg mx-auto border border-zinc-100 shadow-sm"
                                         referrerPolicy="no-referrer"
                                       />
                                     ) : (
-                                      <div className="w-8 h-8 bg-zinc-50 rounded-lg flex items-center justify-center mx-auto border border-zinc-100">
-                                        <Box size={14} className="text-zinc-300" />
+                                      <div className="w-10 h-10 bg-zinc-50 rounded-lg flex items-center justify-center mx-auto border border-zinc-100 shadow-sm">
+                                        <Box size={16} className="text-zinc-300" />
                                       </div>
                                     )}
                                   </td>
-                                  <td className="px-3 py-1.5">
+                                  <td className="px-3 py-3">
                                     {invoiceData.purchase_type === 'items' ? (
                                       <select 
                                         required
-                                        className={`w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
+                                        className={`w-full px-4 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-900 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
                                         value={item.product_id || ''}
                                         onChange={(e) => {
                                           if (e.target.value === 'new_product') {
@@ -1497,7 +1497,7 @@ export const PurchaseInvoices: React.FC = () => {
                                     ) : (
                                       <select 
                                         required
-                                        className={`w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
+                                        className={`w-full px-4 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-900 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
                                         value={item.expense_category_id || ''}
                                         onChange={(e) => {
                                           if (e.target.value === 'new_expense_category') {
@@ -1513,28 +1513,27 @@ export const PurchaseInvoices: React.FC = () => {
                                       </select>
                                     )}
                                   </td>
-                                  <td className="px-3 py-1.5">
+                                  <td className="px-3 py-3">
                                     <input 
                                       required
                                       type="number" 
-                                      min="1"
-                                      className="w-full px-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-center text-sm font-mono"
+                                      step="any"
+                                      className="w-full bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 px-3 py-2 text-sm outline-none text-center font-bold shadow-sm"
                                       value={item.quantity}
                                       onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
                                     />
                                   </td>
-                                  <td className="px-3 py-1.5">
+                                  <td className="px-3 py-3">
                                     <input 
                                       required
                                       type="number" 
-                                      min="0"
                                       step="any"
-                                      className="w-full px-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-center text-sm font-mono"
+                                      className="w-full bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 px-3 py-2 text-sm outline-none text-center font-bold shadow-sm"
                                       value={item.cost_price}
                                       onChange={(e) => updateItem(index, 'cost_price', Number(e.target.value))}
                                     />
                                   </td>
-                                  <td className="px-3 py-1.5 font-bold text-zinc-900 text-sm font-mono text-center">
+                                  <td className="px-3 py-3 font-bold text-zinc-900 text-sm text-center">
                                     {formatNumber(item.total || 0)}
                                   </td>
                                   <td className="px-3 py-1.5">
