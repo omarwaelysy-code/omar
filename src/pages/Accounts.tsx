@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Account, AccountType } from '../types';
-import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, BookOpen } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, BookOpen, User } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
@@ -54,7 +54,8 @@ export const Accounts: React.FC = () => {
     code: '',
     name: '',
     type_id: '',
-    opening_balance: 0
+    opening_balance: 0,
+    required_sub_account: false
   });
 
   useEffect(() => {
@@ -80,7 +81,8 @@ export const Accounts: React.FC = () => {
           code: result.code || '',
           name: result.name || '',
           type_id: matchingType?.id || '',
-          opening_balance: 0
+          opening_balance: 0,
+          required_sub_account: result.name?.toLowerCase().includes('عملاء') || result.name?.toLowerCase().includes('موردين') || false
         });
         showNotification(t('common.ai_parse_success'), 'success');
         setAiText('');
@@ -109,7 +111,8 @@ export const Accounts: React.FC = () => {
         const fieldsToTrack = [
           { field: 'code', label: 'الكود' },
           { field: 'name', label: 'الاسم' },
-          { field: 'type_id', label: 'نوع الحساب' }
+          { field: 'type_id', label: 'نوع الحساب' },
+          { field: 'required_sub_account', label: 'يلزم حساب فرعي' }
         ];
         await dbService.updateWithLog(
           'accounts',
@@ -160,7 +163,8 @@ export const Accounts: React.FC = () => {
         code: account.code,
         name: account.name,
         type_id: account.type_id,
-        opening_balance: account.opening_balance || 0
+        opening_balance: account.opening_balance || 0,
+        required_sub_account: account.required_sub_account || false
       });
     } else {
       setEditingAccount(null);
@@ -168,7 +172,8 @@ export const Accounts: React.FC = () => {
         code: '',
         name: '',
         type_id: '',
-        opening_balance: 0
+        opening_balance: 0,
+        required_sub_account: false
       });
     }
     setIsModalOpen(true);
@@ -404,7 +409,28 @@ export const Accounts: React.FC = () => {
                         onChange={(e) => setFormData({...formData, opening_balance: parseFloat(e.target.value) || 0})}
                       />
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-3 font-bold italic px-4 py-2 bg-slate-100 rounded-xl w-fit border border-slate-200">{language === 'ar' ? 'القيمة الموجبة للمدين والسالبة للدائن' : 'Positive for Debit, Negative for Credit'}</p>
+                    <p className="text-[10px] text-slate-400 mt-3 font-bold italic px-4 py-2 bg-slate-100 rounded-xl w-fit border border-slate-200 mb-6">{language === 'ar' ? 'القيمة الموجبة للمدين والسالبة للدائن' : 'Positive for Debit, Negative for Credit'}</p>
+                    
+                    <div className={`p-4 bg-white border border-slate-200 rounded-2xl flex items-center justify-between group-within:border-emerald-500 transition-all ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${formData.required_sub_account ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                           <User size={20} />
+                        </div>
+                        <div>
+                           <p className="font-bold text-slate-900">{language === 'ar' ? 'يلزم حساب فرعي' : 'Required Sub-account'}</p>
+                           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{language === 'ar' ? 'إسأل عن العميل/المورد عند التسجيل' : 'Ask for Customer/Supplier on Entry'}</p>
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          className="sr-only peer" 
+                          checked={formData.required_sub_account}
+                          onChange={(e) => setFormData({...formData, required_sub_account: e.target.checked})}
+                        />
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-500/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] peer-checked:after:left-[auto] peer-checked:after:right-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                      </label>
+                    </div>
                   </div>
                 </div>
 

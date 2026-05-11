@@ -1070,21 +1070,108 @@ modules.forEach(moduleName => {
 });
 
 // --- Invoices with Items (Transaction) ---
+// Helper to ensure default accounts exist for a company
+async function ensureDefaultAccounts(client: any, companyId: string) {
+  console.log(`[ERP] Ensuring default accounts for company: ${companyId}`);
+  
+  // 1. Get or create a basic account type if needed (Assets, Liabilities, etc.)
+  const { rows: accountTypes } = await client.query(
+    'SELECT id, name, classification FROM account_types WHERE company_id = $1',
+    [companyId]
+  );
+  
+  if (accountTypes.length === 0) {
+    console.log('[ERP] No account types found. Creating defaults...');
+    const types = [
+      { id: uuidv4(), name: 'الأصول', code: '1', classification: 'asset', statement_type: 'balance_sheet' },
+      { id: uuidv4(), name: 'الالتزامات', code: '2', classification: 'liability', statement_type: 'balance_sheet' },
+      { id: uuidv4(), name: 'حقوق الملكية', code: '3', classification: 'equity', statement_type: 'balance_sheet' },
+      { id: uuidv4(), name: 'الإيرادات', code: '4', classification: 'revenue', statement_type: 'income_statement' },
+      { id: uuidv4(), name: 'المصروفات', code: '5', classification: 'expense', statement_type: 'income_statement' },
+    ];
+    
+    for (const type of types) {
+      await client.query(
+        'INSERT INTO account_types (id, company_id, name, code, classification, statement_type) VALUES ($1, $2, $3, $4, $5, $6)',
+        [type.id, companyId, type.name, type.code, type.classification, type.statement_type]
+      );
+    }
+  }
+
+  // Reload types
+  const { rows: currentTypes } = await client.query(
+    'SELECT id, name, classification FROM account_types WHERE company_id = $1',
+    [companyId]
+  );
+
+  const getType = (cls: string) => currentTypes.find(t => t.classification === cls)?.id;
+
+  // 2. Define standard accounts
+  const defaultAccounts = [
+    { name: 'الخزينة العامة', code: '1101', classification: 'asset' },
+    { name: 'حساب العملاء', code: '1201', classification: 'asset' },
+    { name: 'المبيعات', code: '4101', classification: 'revenue' },
+    { name: 'الخصم المسموح به', code: '5401', classification: 'expense' },
+  ];
+
+  for (const acc of defaultAccounts) {
+    const { rows: existing } = await client.query(
+      'SELECT id FROM accounts WHERE company_id = $1 AND (name = $2 OR code = $3)',
+      [companyId, acc.name, acc.code]
+    );
+    
+    if (existing.length === 0) {
+      console.log(`[ERP] Creating account: ${acc.name}`);
+      const typeId = getType(acc.classification);
+      if (typeId) {
+        await client.query(
+          'INSERT INTO accounts (id, company_id, name, code, type_id, is_active) VALUES ($1, $2, $3, $4, $5, $6)',
+          [uuidv4(), companyId, acc.name, acc.code, typeId, true]
+        );
+      }
+    }
+  }
+}
+
 router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
   const client = await pool.connect();
   try {
     const companyId = req.user?.company_id;
     if (!companyId) return sendError(res, 401, 'Unauthorized');
 
-    await client.query('BEGIN');
+    console.log(`[ERP] Starting Invoice Creation for company: ${companyId}`);
+    console.log('[ERP] Request Body:', JSON.stringify(req.body, null, 2));
+
     const { items, ...rawInvoiceData } = req.body;
+    
+    // Validate required fields
+    if (!rawInvoiceData.customer_id) return sendError(res, 400, 'customer_id is required');
+    if (!rawInvoiceData.date) return sendError(res, 400, 'date is required');
+    if (rawInvoiceData.total_amount === undefined || rawInvoiceData.total_amount === null) {
+       return sendError(res, 400, 'total_amount is required');
+    }
+
+    await client.query('BEGIN');
+    
+    // Ensure default accounts exist
+    await ensureDefaultAccounts(client, companyId);
+
     const invoiceData = sanitizeData('invoices', rawInvoiceData);
     
     // Ensure company_id
     if (!invoiceData.company_id) invoiceData.company_id = companyId;
     const invoiceId = invoiceData.id || uuidv4();
-    if (!isUUID(invoiceId)) return sendError(res, 400, 'Invalid Invoice ID format');
+    if (!isUUID(invoiceId)) {
+       await client.query('ROLLBACK');
+       return sendError(res, 400, 'Invalid Invoice ID format');
+    }
 
+    // Double check specific fields that might be null from frontend
+    invoiceData.status = invoiceData.status || 'paid';
+    invoiceData.payment_type = invoiceData.payment_type || 'cash';
+    invoiceData.invoice_number = invoiceData.invoice_number || `INV-${Date.now()}`;
+
+    console.log('[ERP] Saving Invoice Header...');
     // Insert Invoice
     const invData = { ...invoiceData, id: invoiceId };
     const invKeys = Object.keys(invData);
@@ -1096,6 +1183,7 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
       invValues
     );
 
+    console.log(`[ERP] Saving ${items?.length || 0} Invoice Items...`);
     // Insert Items
     for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('invoice_items', item);
@@ -1112,7 +1200,92 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
       );
     }
 
+    // --- Generate Journal Entry ---
+    console.log('[ERP] Generating Journal Entry...');
+    
+    // Fetch dependencies
+    const { rows: customers } = await client.query('SELECT * FROM customers WHERE company_id = $1', [companyId]);
+    const { rows: products } = await client.query('SELECT * FROM products WHERE company_id = $1', [companyId]);
+    const { rows: accounts } = await client.query('SELECT * FROM accounts WHERE company_id = $1', [companyId]);
+    const { rows: paymentMethods } = await client.query('SELECT * FROM payment_methods WHERE company_id = $1', [companyId]);
+    
+    const customer = customers.find((c: any) => c.id === invoiceData.customer_id);
+    const totalAmount = parseFloat(invoiceData.total_amount);
+    const subtotal = parseFloat(invoiceData.subtotal || invoiceData.total_amount);
+    const discount = parseFloat(invoiceData.discount_amount || 0);
+
+    const journalItems: any[] = [];
+    
+    // Debit: Customer or Cash
+    let debitAccountId = '';
+    let debitAccountName = '';
+    
+    if (invoiceData.payment_type === 'cash') {
+      const pm = paymentMethods.find((p: any) => p.id === invoiceData.payment_method_id);
+      debitAccountId = pm?.account_id || accounts.find((a: any) => a.name.includes('خزينة') || a.name.includes('نقدية'))?.id;
+      debitAccountName = pm?.account_name || 'حساب النقدية';
+    } else {
+      debitAccountId = customer?.account_id || accounts.find((a: any) => a.name.includes('عملاء'))?.id;
+      debitAccountName = customer?.account_name || 'حساب العملاء';
+    }
+
+    if (debitAccountId) {
+      journalItems.push({
+        account_id: debitAccountId,
+        account_name: debitAccountName,
+        debit: totalAmount,
+        credit: 0,
+        description: `فاتورة مبيعات رقم ${invoiceData.invoice_number}`,
+        customer_id: invoiceData.customer_id
+      });
+    }
+
+    // Discount
+    if (discount > 0) {
+      const discountAcc = accounts.find((a: any) => a.name.includes('خصم مسموح به'));
+      if (discountAcc) {
+        journalItems.push({
+          account_id: discountAcc.id,
+          account_name: discountAcc.name,
+          debit: discount,
+          credit: 0,
+          description: `خصم مسموح به - فاتورة ${invoiceData.invoice_number}`
+        });
+      }
+    }
+
+    // Credit: Revenue
+    const revenueAcc = accounts.find((a: any) => a.name.includes('مبيعات') || a.name.includes('إيراد'));
+    if (revenueAcc) {
+      journalItems.push({
+        account_id: revenueAcc.id,
+        account_name: revenueAcc.name,
+        debit: 0,
+        credit: subtotal,
+        description: `مبيعات - فاتورة ${invoiceData.invoice_number}`
+      });
+    }
+
+    if (journalItems.length > 0) {
+      console.log(`[ERP] Creating Journal Entry with ${journalItems.length} lines`);
+      const journalEntryId = uuidv4();
+      await client.query(
+        `INSERT INTO journal_entries (id, company_id, date, description, reference_id, reference_type, reference_number, total_debit, total_credit, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [journalEntryId, companyId, invoiceData.date, `قيد فاتورة مبيعات رقم: ${invoiceData.invoice_number}`, invoiceId, 'invoice', invoiceData.invoice_number, totalAmount + discount, totalAmount + discount, 'posted']
+      );
+
+      for (const line of journalItems) {
+        await client.query(
+          `INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, company_id, customer_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [uuidv4(), journalEntryId, line.account_id, line.account_name, line.description, line.debit, line.credit, companyId, line.customer_id]
+        );
+      }
+    }
+
     await client.query('COMMIT');
+    console.log(`[ERP] Invoice ${invoiceId} created successfully.`);
 
     // Audit Log
     logAudit({
@@ -1131,9 +1304,10 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
 
     res.status(201).json({ id: invoiceId });
   } catch (error: any) {
-    await client.query('ROLLBACK');
-    console.error('[CRASH PREVENTED] Invoice creation error:', error);
-    sendError(res, 500, 'Failed to create invoice', error.message);
+    if (client) await client.query('ROLLBACK');
+    console.error('[DATABASE] Invoice creation full failure:', error);
+    console.error('[DATABASE] Error Stack:', error.stack);
+    sendError(res, 500, `Failed to create invoice: ${error.message}`, error.detail || error.hint || error.message);
   } finally {
     client.release();
   }
@@ -1528,6 +1702,19 @@ router.post('/journal_entries', authenticateToken, async (req: AuthRequest, res)
     const { items, ...rawEntryData } = req.body;
     const entryData = sanitizeData('journal_entries', rawEntryData);
     if (!entryData.company_id) entryData.company_id = companyId;
+
+    // Check for duplicate reference to avoid conflicts with auto-generated entries
+    if (entryData.reference_id && entryData.reference_type) {
+      const { rows: existing } = await client.query(
+        'SELECT id FROM journal_entries WHERE reference_id = $1 AND reference_type = $2 AND company_id = $3',
+        [entryData.reference_id, entryData.reference_type, companyId]
+      );
+      if (existing.length > 0) {
+        console.log(`[ERP] Journal entry for reference ${entryData.reference_id} already exists. Skipping.`);
+        await client.query('ROLLBACK');
+        return res.status(200).json({ id: existing[0].id, message: 'Already exists' });
+      }
+    }
 
     const entryId = entryData.id || uuidv4();
     if (!isUUID(entryId)) return sendError(res, 400, 'Invalid Entry ID format');

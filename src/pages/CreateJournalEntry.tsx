@@ -94,13 +94,29 @@ export const CreateJournalEntry: React.FC = () => {
       const item = formData.items[i];
       const account = accounts.find(a => a.id === item.account_id);
       if (account) {
-        if (account.name.includes('عملاء') && !item.customer_id) {
-          showNotification(`يرجى اختيار العميل في السطر رقم ${i + 1}`, 'error');
-          return;
-        }
-        if (account.name.includes('موردين') && !item.supplier_id) {
-          showNotification(`يرجى اختيار المورد في السطر رقم ${i + 1}`, 'error');
-          return;
+        // Use the new flag or fallback to name check for backward compatibility
+        const needsSubAccount = account.required_sub_account || 
+                                account.name.includes('عملاء') || 
+                                account.name.includes('موردين');
+        
+        if (needsSubAccount) {
+          const isCustomer = account.name.includes('عملاء') || (account.required_sub_account && !account.name.includes('موردين'));
+          const isSupplier = account.name.includes('موردين');
+          
+          if (isCustomer && !item.customer_id) {
+            showNotification(`يرجى اختيار العميل في السطر رقم ${i + 1}`, 'error');
+            return;
+          }
+          if (isSupplier && !item.supplier_id) {
+            showNotification(`يرجى اختيار المورد في السطر رقم ${i + 1}`, 'error');
+            return;
+          }
+          // If it's just marked as required but we don't know if it's customer or supplier,
+          // assume customer for now if neither is selected, or better, show error that sub-account is needed.
+          if (!item.customer_id && !item.supplier_id) {
+            showNotification(`يرجى اختيار الحساب الفرعي (عميل/مورد) في السطر رقم ${i + 1}`, 'error');
+            return;
+          }
         }
       }
     }
@@ -160,6 +176,11 @@ export const CreateJournalEntry: React.FC = () => {
   const isSupplierAccount = (accountId: string) => {
     const account = accounts.find(a => a.id === accountId);
     return account?.name.includes('موردين');
+  };
+
+  const needsSubAccount = (accountId: string) => {
+    const account = accounts.find(a => a.id === accountId);
+    return account?.required_sub_account || account?.name.includes('عملاء') || account?.name.includes('موردين');
   };
 
   return (
@@ -224,37 +245,68 @@ export const CreateJournalEntry: React.FC = () => {
                         ))}
                       </select>
                       
-                      {isCustomerAccount(item.account_id) && (
-                        <div className="relative animate-in slide-in-from-top-2 duration-200">
-                          <User className="absolute right-3 top-2.5 text-emerald-500" size={16} />
-                          <select
-                            required
-                            className="w-full pr-10 pl-3 py-2 bg-emerald-50 border border-emerald-100 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-bold text-emerald-700"
-                            value={item.customer_id}
-                            onChange={(e) => updateItem(index, 'customer_id', e.target.value)}
-                          >
-                            <option value="">اختر العميل...</option>
-                            {customers.map(c => (
-                              <option key={c.id} value={c.id}>{c.name}</option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-
-                      {isSupplierAccount(item.account_id) && (
-                        <div className="relative animate-in slide-in-from-top-2 duration-200">
-                          <Truck className="absolute right-3 top-2.5 text-blue-500" size={16} />
-                          <select
-                            required
-                            className="w-full pr-10 pl-3 py-2 bg-blue-50 border border-blue-100 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-bold text-blue-700"
-                            value={item.supplier_id}
-                            onChange={(e) => updateItem(index, 'supplier_id', e.target.value)}
-                          >
-                            <option value="">اختر المورد...</option>
-                            {suppliers.map(s => (
-                              <option key={s.id} value={s.id}>{s.name}</option>
-                            ))}
-                          </select>
+                      {needsSubAccount(item.account_id) && (
+                        <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
+                          {isCustomerAccount(item.account_id) ? (
+                            <div className="relative">
+                              <User className="absolute right-3 top-2.5 text-emerald-500" size={16} />
+                              <select
+                                required
+                                className="w-full pr-10 pl-3 py-2 bg-emerald-50 border border-emerald-100 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-bold text-emerald-700"
+                                value={item.customer_id}
+                                onChange={(e) => updateItem(index, 'customer_id', e.target.value)}
+                              >
+                                <option value="">اختر العميل...</option>
+                                {customers.map(c => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ) : isSupplierAccount(item.account_id) ? (
+                            <div className="relative">
+                              <Truck className="absolute right-3 top-2.5 text-blue-500" size={16} />
+                              <select
+                                required
+                                className="w-full pr-10 pl-3 py-2 bg-blue-50 border border-blue-100 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-bold text-blue-700"
+                                value={item.supplier_id}
+                                onChange={(e) => updateItem(index, 'supplier_id', e.target.value)}
+                              >
+                                <option value="">اختر المورد...</option>
+                                {suppliers.map(s => (
+                                  <option key={s.id} value={s.id}>{s.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-2">
+                              <select
+                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs"
+                                value={item.customer_id}
+                                onChange={(e) => {
+                                  updateItem(index, 'customer_id', e.target.value);
+                                  if (e.target.value) updateItem(index, 'supplier_id', '');
+                                }}
+                              >
+                                <option value="">اختر عميل (اختياري)...</option>
+                                {customers.map(c => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                              </select>
+                              <select
+                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs"
+                                value={item.supplier_id}
+                                onChange={(e) => {
+                                  updateItem(index, 'supplier_id', e.target.value);
+                                  if (e.target.value) updateItem(index, 'customer_id', '');
+                                }}
+                              >
+                                <option value="">اختر مورد (اختياري)...</option>
+                                {suppliers.map(s => (
+                                  <option key={s.id} value={s.id}>{s.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
                         </div>
                       )}
                     </td>

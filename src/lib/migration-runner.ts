@@ -69,7 +69,15 @@ export async function runMigrations() {
       { table: 'customers', column: 'created_at', type: 'TIMESTAMP DEFAULT NOW()' },
       { table: 'customers', column: 'updated_at', type: 'TIMESTAMP DEFAULT NOW()' },
       { table: 'products', column: 'created_at', type: 'TIMESTAMP DEFAULT NOW()' },
-      { table: 'products', column: 'updated_at', type: 'TIMESTAMP DEFAULT NOW()' }
+      { table: 'products', column: 'updated_at', type: 'TIMESTAMP DEFAULT NOW()' },
+      { table: 'accounts', column: 'required_sub_account', type: 'BOOLEAN DEFAULT FALSE' },
+      { table: 'journal_entry_lines', column: 'company_id', type: 'VARCHAR(36)' },
+      { table: 'journal_entry_lines', column: 'account_name', type: 'VARCHAR(255)' },
+      { table: 'journal_entry_lines', column: 'customer_id', type: 'VARCHAR(36)' },
+      { table: 'journal_entry_lines', column: 'supplier_id', type: 'VARCHAR(36)' },
+      { table: 'journal_entry_lines', column: 'customer_name', type: 'VARCHAR(255)' },
+      { table: 'journal_entry_lines', column: 'supplier_name', type: 'VARCHAR(255)' },
+      { table: 'journal_entry_lines', column: 'created_at', type: 'TIMESTAMP DEFAULT NOW()' }
     ];
 
     for (const item of columnsToSync) {

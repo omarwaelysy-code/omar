@@ -426,6 +426,7 @@ export interface Account {
   company_id: string;
   opening_balance: number;
   opening_balance_date?: string;
+  required_sub_account?: boolean;
 }
 
 export interface Setting {
