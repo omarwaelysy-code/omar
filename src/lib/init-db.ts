@@ -167,6 +167,7 @@ export async function initDatabase() {
         "code" VARCHAR(20) NOT NULL,
         "name" VARCHAR(200) NOT NULL,
         "opening_balance" DECIMAL(18, 4) DEFAULT 0,
+        "required_sub_account" BOOLEAN DEFAULT FALSE,
         "is_active" BOOLEAN DEFAULT TRUE,
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );

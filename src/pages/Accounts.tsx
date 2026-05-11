@@ -157,15 +157,20 @@ export const Accounts: React.FC = () => {
   };
 
   const openModal = (account?: Account) => {
+    console.log('[ERP] Data from API/List:', account);
     if (account) {
+      const requiredSubAccount = Boolean(account.required_sub_account);
+      console.log('[ERP] required_sub_account value:', requiredSubAccount);
       setEditingAccount(account);
-      setFormData({
+      const newFormData = {
         code: account.code,
         name: account.name,
         type_id: account.type_id,
         opening_balance: account.opening_balance || 0,
-        required_sub_account: Boolean(account.required_sub_account)
-      });
+        required_sub_account: requiredSubAccount
+      };
+      console.log('[ERP] Form State being set:', newFormData);
+      setFormData(newFormData);
     } else {
       setEditingAccount(null);
       setFormData({
@@ -424,9 +429,14 @@ export const Accounts: React.FC = () => {
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input 
                           type="checkbox" 
+                          id="required_sub_account_switch"
                           className="sr-only peer" 
                           checked={formData.required_sub_account}
-                          onChange={(e) => setFormData({...formData, required_sub_account: e.target.checked})}
+                          onChange={(e) => {
+                            const val = e.target.checked;
+                            console.log('[ERP] Switch Change:', val);
+                            setFormData({...formData, required_sub_account: val});
+                          }}
                         />
                         <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-500/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] peer-checked:after:left-[auto] peer-checked:after:right-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
                       </label>
