@@ -388,19 +388,21 @@ export const Invoices: React.FC = () => {
       const customer = customers.find(c => c.id === selectedCustomerId);
       const paymentMethod = paymentMethods.find(pm => pm.id === paymentMethodId);
       
+      const sanitizedItems = validItems.map(i => ({
+        product_id: i.product_id,
+        product_name: i.product_name,
+        quantity: Number(i.quantity) || 0,
+        unit_price: Number(i.unit_price) || 0,
+        total: Number((Number(i.quantity) || 0) * (Number(i.unit_price) || 0)) || 0
+      }));
+
       const invoiceData = { 
         invoice_number: invoiceNumber,
         customer_id: selectedCustomerId, 
         customer_name: customer?.name || '',
         date, 
         description,
-        items: validItems.map(i => ({
-          product_id: i.product_id,
-          product_name: i.product_name,
-          quantity: Number(i.quantity) || 0,
-          unit_price: Number(i.unit_price) || 0,
-          total: (Number(i.quantity) || 0) * (Number(i.unit_price) || 0)
-        })),
+        items: sanitizedItems,
         subtotal,
         discount_amount,
         total_amount,
@@ -446,7 +448,7 @@ export const Invoices: React.FC = () => {
         });
       }
 
-      validItems.forEach(item => {
+      sanitizedItems.forEach(item => {
         const product = products.find(p => p.id === item.product_id);
         let creditAccountId = product?.revenue_account_id || '';
         let creditAccountName = product?.revenue_account_name || '';
@@ -459,7 +461,7 @@ export const Invoices: React.FC = () => {
           account_id: creditAccountId,
           account_name: creditAccountName,
           debit: 0,
-          credit: item.total,
+          credit: Number(item.total) || 0,
           description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoiceNumber}`
         });
       });
@@ -495,8 +497,8 @@ export const Invoices: React.FC = () => {
         });
       }
 
-      const total_debit = journalItems.reduce((sum, item) => sum + item.debit, 0);
-      const total_credit = journalItems.reduce((sum, item) => sum + item.credit, 0);
+      const total_debit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0)) || 0;
+      const total_credit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0)) || 0;
 
       const journalEntryData = {
         date,

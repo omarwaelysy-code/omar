@@ -374,21 +374,23 @@ export const PurchaseReturns: React.FC = () => {
       
       const total_amount = Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.cost_price || 0)), 0)) || 0;
 
+      const sanitizedItems = validItems.map(item => {
+        const product = products.find(p => p.id === item.product_id);
+        return {
+          product_id: item.product_id,
+          product_name: product?.name || '',
+          quantity: Number(item.quantity) || 0,
+          unit_price: Number(item.cost_price) || 0,
+          total: Number(Number(item.quantity || 0) * Number(item.cost_price || 0)) || 0
+        };
+      });
+
       const data = {
         return_number,
         supplier_id: returnData.supplier_id,
         supplier_name: supplier?.name || '',
         date: returnData.date, 
-        items: validItems.map(item => {
-          const product = products.find(p => p.id === item.product_id);
-          return {
-            product_id: item.product_id,
-            product_name: product?.name || '',
-            quantity: Number(item.quantity) || 0,
-            unit_price: Number(item.cost_price) || 0,
-            total: Number(Number(item.quantity || 0) * Number(item.cost_price || 0))
-          };
-        }),
+        items: sanitizedItems,
         total_amount,
         payment_type: returnData.payment_type,
         payment_method_id: returnData.payment_type === 'cash' ? (returnData.payment_method_id || null) : null,
@@ -417,10 +419,10 @@ export const PurchaseReturns: React.FC = () => {
         supplier_name: supplier?.name
       });
 
-      validItems.forEach(item => {
+      sanitizedItems.forEach(item => {
         const product = products.find(p => p.id === item.product_id);
         let creditAccountId = product?.cost_account_id || '';
-        let creditAccountName = product?.cost_account_name || '';
+        let creditAccountName = product?.revenue_account_name || '';
         if (!creditAccountId) {
           const fallback = accounts.find(a => a.name.includes('مشتريات') || a.name.includes('تكلفة'));
           creditAccountId = fallback?.id || 'purchase_account_default';
@@ -430,8 +432,8 @@ export const PurchaseReturns: React.FC = () => {
           account_id: creditAccountId,
           account_name: creditAccountName,
           debit: 0,
-          credit: item.quantity * item.cost_price,
-          description: `مرتجع مشتريات صنف: ${product?.name} - مرتجع ${return_number}`
+          credit: Number(Number(item.quantity || 0) * Number(item.unit_price || 0)) || 0,
+          description: `مرتجع مشتريات صنف: ${item.product_name} - مرتجع ${return_number}`
         });
       });
 
@@ -462,8 +464,8 @@ export const PurchaseReturns: React.FC = () => {
         });
       }
 
-      const total_debit = journalItems.reduce((sum, item) => sum + item.debit, 0);
-      const total_credit = journalItems.reduce((sum, item) => sum + item.credit, 0);
+      const total_debit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0)) || 0;
+      const total_credit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0)) || 0;
 
       const journalEntryData = {
         date: returnData.date,

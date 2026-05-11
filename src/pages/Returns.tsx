@@ -371,18 +371,20 @@ export const Returns: React.FC = () => {
       const return_number = editingReturn ? editingReturn.return_number : `RET-${Date.now().toString().slice(-6)}`;
       const total_amount = Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)), 0)) || 0;
       
+      const sanitizedItems = validItems.map(i => ({
+        product_id: i.product_id,
+        product_name: i.product_name,
+        quantity: Number(i.quantity) || 0,
+        unit_price: Number(i.unit_price) || 0,
+        total: Number((Number(i.quantity) || 0) * (Number(i.unit_price) || 0)) || 0
+      }));
+
       const returnData = { 
         return_number,
         customer_id: selectedCustomerId, 
         customer_name: customer?.name || '',
         date, 
-        items: validItems.map(i => ({
-          product_id: i.product_id,
-          product_name: i.product_name,
-          quantity: Number(i.quantity) || 0,
-          unit_price: Number(i.unit_price) || 0,
-          total: (Number(i.quantity) || 0) * (Number(i.unit_price) || 0)
-        })),
+        items: sanitizedItems,
         total_amount,
         payment_type: paymentType,
         payment_method_id: paymentType === 'cash' ? (paymentMethodId || null) : null,
@@ -412,7 +414,7 @@ export const Returns: React.FC = () => {
         customer_name: customer?.name
       });
 
-      validItems.forEach(item => {
+      sanitizedItems.forEach(item => {
         const product = products.find(p => p.id === item.product_id);
         let debitAccountId = product?.revenue_account_id || '';
         let debitAccountName = product?.revenue_account_name || '';
@@ -424,7 +426,7 @@ export const Returns: React.FC = () => {
         journalItems.push({
           account_id: debitAccountId,
           account_name: debitAccountName,
-          debit: item.total,
+          debit: Number(item.total) || 0,
           credit: 0,
           description: `مرتجع مبيعات صنف: ${item.product_name} - مرتجع ${return_number}`
         });
@@ -455,8 +457,8 @@ export const Returns: React.FC = () => {
         });
       }
 
-      const total_debit = journalItems.reduce((sum, item) => sum + item.debit, 0);
-      const total_credit = journalItems.reduce((sum, item) => sum + item.credit, 0);
+      const total_debit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0)) || 0;
+      const total_credit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0)) || 0;
 
       const journalEntryData = {
         date,

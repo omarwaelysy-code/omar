@@ -681,6 +681,16 @@ export const PurchaseInvoices: React.FC = () => {
       const total_amount = Number(subtotal - discount_amount) || 0;
       const invoice_number = editingInvoice?.invoice_number || invoiceNumber;
 
+      const sanitizedItems = validItems.map(item => ({
+        product_id: item.product_id || '',
+        expense_category_id: item.expense_category_id || '',
+        product_name: item.product_name || '',
+        category_name: item.category_name || '',
+        quantity: Number(item.quantity) || 0,
+        unit_price: Number(item.cost_price) || 0,
+        total: Number((Number(item.quantity) || 0) * (Number(item.cost_price) || 0)) || 0
+      }));
+
       const data = {
         invoice_number,
         supplier_id: invoiceData.supplier_id,
@@ -689,15 +699,7 @@ export const PurchaseInvoices: React.FC = () => {
         subtotal,
         discount_amount,
         total_amount,
-        items: validItems.map(item => ({
-          product_id: item.product_id || '',
-          expense_category_id: item.expense_category_id || '',
-          product_name: item.product_name || '',
-          category_name: item.category_name || '',
-          quantity: Number(item.quantity) || 0,
-          unit_price: Number(item.cost_price) || 0,
-          total: (Number(item.quantity) || 0) * (Number(item.cost_price) || 0)
-        })),
+        items: sanitizedItems,
         payment_type: invoiceData.payment_type,
         payment_method_id: invoiceData.payment_type === 'cash' ? (invoiceData.payment_method_id || null) : null,
         payment_method_name: invoiceData.payment_type === 'cash' ? (paymentMethod?.name || '') : null,
@@ -741,7 +743,7 @@ export const PurchaseInvoices: React.FC = () => {
         });
       }
 
-      validItems.forEach(item => {
+      sanitizedItems.forEach(item => {
         let debitAccountId = '';
         let debitAccountName = '';
 
@@ -767,7 +769,7 @@ export const PurchaseInvoices: React.FC = () => {
         journalItems.push({
           account_id: debitAccountId,
           account_name: debitAccountName,
-          debit: item.total,
+          debit: Number(item.total) || 0,
           credit: 0,
           description: t('pi.purchase_description', { name: item.product_name || item.category_name, number: invoice_number })
         });
@@ -807,8 +809,8 @@ export const PurchaseInvoices: React.FC = () => {
         });
       }
 
-      const total_debit = journalItems.reduce((sum, item) => sum + item.debit, 0);
-      const total_credit = journalItems.reduce((sum, item) => sum + item.credit, 0);
+      const total_debit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0)) || 0;
+      const total_credit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0)) || 0;
 
       const journalEntryData = {
         date: invoiceData.date,
