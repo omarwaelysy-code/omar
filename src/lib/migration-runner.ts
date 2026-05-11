@@ -99,10 +99,15 @@ export async function runMigrations() {
       `, [item.table, item.column]);
 
       if (colRows.length === 0) {
-        console.log(`🚀 Adding missing column: ${item.table}.${item.column}...`);
-        await client.query(`ALTER TABLE ${item.table} ADD COLUMN IF NOT EXISTS ${item.column} ${item.type}`);
-        console.log(`✅ Column ${item.table}.${item.column} added.`);
-        appliedCount++;
+        console.log(`🚀 Adding missing column: "${item.table}"."${item.column}"...`);
+        try {
+          await client.query(`ALTER TABLE "${item.table}" ADD COLUMN IF NOT EXISTS "${item.column}" ${item.type}`);
+          console.log(`✅ Column "${item.table}"."${item.column}" added successfully.`);
+          appliedCount++;
+        } catch (colError: any) {
+          console.error(`❌ Failed to add column "${item.table}"."${item.column}":`, colError.message);
+          // Don't throw here to allow other columns to sync, but we should know it failed
+        }
       }
     }
 

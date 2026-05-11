@@ -159,8 +159,11 @@ export const Accounts: React.FC = () => {
   const openModal = (account?: Account) => {
     console.log('[ERP] Data from API/List:', account);
     if (account) {
-      const requiredSubAccount = Boolean(account.required_sub_account);
-      console.log('[ERP] required_sub_account value:', requiredSubAccount);
+      // Robust boolean conversion for Postgres (handles true, 'true', 1, 't', etc.)
+      const rawVal = (account as any).required_sub_account;
+      const requiredSubAccount = rawVal === true || rawVal === 'true' || rawVal === 1 || rawVal === 't' || rawVal === '1';
+      
+      console.log('[ERP] required_sub_account raw:', rawVal, 'parsed:', requiredSubAccount);
       setEditingAccount(account);
       const newFormData = {
         code: account.code,
