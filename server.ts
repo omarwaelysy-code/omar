@@ -19,12 +19,45 @@ async function startServer() {
     // FORCED SCHEMA SYNC for known missing columns that block the user
     console.log("🛠️ FORCING CRITICAL SCHEMA SYNC...");
     const syncQueries = [
+      // Invoices
       'ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "description" TEXT',
+      'ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "notes" TEXT',
+      
+      // Journal Entries
+      'ALTER TABLE "journal_entries" ADD COLUMN IF NOT EXISTS "description" TEXT',
+      'ALTER TABLE "journal_entries" ADD COLUMN IF NOT EXISTS "reference_id" VARCHAR(36)',
+      'ALTER TABLE "journal_entries" ADD COLUMN IF NOT EXISTS "reference_type" VARCHAR(50)',
+      'ALTER TABLE "journal_entries" ADD COLUMN IF NOT EXISTS "reference_number" VARCHAR(50)',
+      'ALTER TABLE "journal_entries" ADD COLUMN IF NOT EXISTS "total_debit" DECIMAL(18, 4) DEFAULT 0',
+      'ALTER TABLE "journal_entries" ADD COLUMN IF NOT EXISTS "total_credit" DECIMAL(18, 4) DEFAULT 0',
+      'ALTER TABLE "journal_entries" ADD COLUMN IF NOT EXISTS "status" VARCHAR(20) DEFAULT \'posted\'',
+      'ALTER TABLE "journal_entries" ADD COLUMN IF NOT EXISTS "company_id" VARCHAR(36)',
+      
+      // Journal Entry Lines
+      'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "description" TEXT',
+      'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "account_name" VARCHAR(255)',
+      'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "debit" DECIMAL(18, 4) DEFAULT 0',
+      'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "credit" DECIMAL(18, 4) DEFAULT 0',
+      'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "customer_id" VARCHAR(36)',
+      'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "supplier_id" VARCHAR(36)',
+      'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "customer_name" VARCHAR(255)',
+      'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "supplier_name" VARCHAR(255)',
+      'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "sub_account_id" VARCHAR(36)',
+      'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "sub_account_type" VARCHAR(50)',
+      'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "company_id" VARCHAR(36)',
+
+      // Vouchers
+      'ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "description" TEXT',
+      'ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "voucher_number" VARCHAR(50)',
+      'ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "description" TEXT',
+      'ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "voucher_number" VARCHAR(50)',
+      
+      // Returns
       'ALTER TABLE "returns" ADD COLUMN IF NOT EXISTS "description" TEXT',
       'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "description" TEXT',
       'ALTER TABLE "purchase_returns" ADD COLUMN IF NOT EXISTS "description" TEXT',
-      'ALTER TABLE "journal_entries" ADD COLUMN IF NOT EXISTS "description" TEXT',
-      'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "description" TEXT',
+      
+      // Other
       'ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "required_sub_account" BOOLEAN DEFAULT FALSE'
     ];
     
