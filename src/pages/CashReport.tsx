@@ -57,7 +57,24 @@ export const CashReport: React.FC = () => {
 
       journalEntries.forEach(je => {
         je.items?.forEach((item: any) => {
-          if (item.account_id === method.account_id) {
+          let isMatch = false;
+
+          if (item.sub_account_id && item.sub_account_type === 'payment_method') {
+            isMatch = item.sub_account_id === method.id;
+          } else if (je.reference_type === 'opening_balance' && je.reference_id === method.id) {
+            isMatch = item.account_id === method.account_id;
+          } else if (item.account_id === method.account_id && !item.sub_account_id) {
+            // Support for legacy entries before sub_accounts were enforced
+            const sharingMethods = paymentMethods.filter(p => p.account_id === method.account_id);
+            if (sharingMethods.length === 1) {
+              isMatch = true;
+            } else {
+              const matchDesc = (desc: string) => desc && (desc.includes(method.name) || desc.includes(method.code));
+              isMatch = matchDesc(item.description) || matchDesc(je.description);
+            }
+          }
+
+          if (isMatch) {
             allTrans.push({
               id: `${je.id}-${item.account_id}`,
               date: je.date,
