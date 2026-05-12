@@ -51,7 +51,11 @@ export const CashReport: React.FC = () => {
         return;
       }
 
-      const journalEntries = await dbService.list<JournalEntry>('journal_entries', user.company_id);
+      const [journalEntries, invoices, purchaseInvoices] = await Promise.all([
+        dbService.list<JournalEntry>('journal_entries', user.company_id),
+        dbService.list<any>('invoices', user.company_id),
+        dbService.list<any>('purchase_invoices', user.company_id)
+      ]);
 
       const allTrans: CashTransaction[] = [];
 
@@ -59,18 +63,35 @@ export const CashReport: React.FC = () => {
         je.items?.forEach((item: any) => {
           let isMatch = false;
 
+          // 1. Check strict sub_account match
           if (item.sub_account_id && item.sub_account_type === 'payment_method') {
             isMatch = item.sub_account_id === method.id;
-          } else if (je.reference_type === 'opening_balance' && je.reference_id === method.id) {
+          } 
+          // 2. Check Opening Balances explicitly
+          else if (je.reference_type === 'opening_balance' && je.reference_id === method.id) {
             isMatch = item.account_id === method.account_id;
-          } else if (item.account_id === method.account_id && !item.sub_account_id) {
-            // Support for legacy entries before sub_accounts were enforced
-            const sharingMethods = paymentMethods.filter(p => p.account_id === method.account_id);
-            if (sharingMethods.length === 1) {
-              isMatch = true;
+          } 
+          // 3. Look up real reference mapping for missing data (e.g. backend auto-generated JEs)
+          else if (item.account_id === method.account_id && !item.sub_account_id) {
+            if (je.reference_type === 'invoice') {
+              const invoice = invoices.find(i => i.id === je.reference_id);
+              if (invoice && invoice.payment_type === 'cash' && invoice.payment_method_id === method.id) {
+                isMatch = true;
+              }
+            } else if (je.reference_type === 'purchase_invoice') {
+              const pInvoice = purchaseInvoices.find(i => i.id === je.reference_id);
+              if (pInvoice && pInvoice.payment_type === 'cash' && pInvoice.payment_method_id === method.id) {
+                isMatch = true;
+              }
             } else {
-              const matchDesc = (desc: string) => desc && (desc.includes(method.name) || desc.includes(method.code));
-              isMatch = matchDesc(item.description) || matchDesc(je.description);
+              // Support for legacy entries before sub_accounts were enforced
+              const sharingMethods = paymentMethods.filter(p => p.account_id === method.account_id);
+              if (sharingMethods.length === 1) {
+                isMatch = true;
+              } else {
+                const matchDesc = (desc: string) => desc && (desc.includes(method.name) || desc.includes(method.code));
+                isMatch = matchDesc(item.description) || matchDesc(je.description);
+              }
             }
           }
 

@@ -10,7 +10,8 @@ import {
   ArrowDownRight,
   Zap,
   Users as UsersIcon,
-  Calendar
+  Calendar,
+  Wallet
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -157,17 +158,18 @@ export const Dashboard: React.FC = () => {
         dbService.list<SupplierDiscount>('supplier_discounts', user.company_id),
         dbService.list<any>('journal_entries', user.company_id),
         dbService.list<Account>('accounts', user.company_id),
-        dbService.list<AccountType>('account_types', user.company_id)
+        dbService.list<AccountType>('account_types', user.company_id),
+        dbService.list<any>('payment_methods', user.company_id)
       ]);
 
       const [
         invoices, returns, receipts, payments, customers, suppliers,
         purchaseInvoices, purchaseReturns, customerDiscounts, supplierDiscounts,
-        journalEntries, accounts, accountTypes
+        journalEntries, accounts, accountTypes, paymentMethods
       ] = results.map(r => r.status === 'fulfilled' ? r.value : []) as [
         Invoice[], Return[], ReceiptVoucher[], PaymentVoucher[], Customer[], Supplier[],
         PurchaseInvoice[], PurchaseReturn[], CustomerDiscount[], SupplierDiscount[],
-        any[], Account[], AccountType[]
+        any[], Account[], AccountType[], any[]
       ];
 
       const today = new Date().toISOString().split('T')[0];
@@ -193,6 +195,13 @@ export const Dashboard: React.FC = () => {
         })
         .reduce((sum, l) => sum + l.balance, 0);
 
+      const totalCashBalance = balanceSheet.assets
+        .filter(a => {
+          const acc = accounts.find(account => account.id === a.id);
+          return acc?.name.includes('نقدية') || acc?.name.includes('صندوق') || acc?.name.includes('خزينة') || acc?.name.includes('بنك') || paymentMethods.some(p => p.account_id === a.id);
+        })
+        .reduce((sum, a) => sum + a.balance, 0);
+
       const monthKeys = ['months.jan', 'months.feb', 'months.mar', 'months.apr', 'months.may', 'months.jun', 'months.jul', 'months.aug', 'months.sep', 'months.oct', 'months.nov', 'months.dec'];
       const salesByMonth = monthKeys.map((key, index) => {
         const monthInvoices = invoices.filter((inv: Invoice) => (new Date(inv.date).getUTCMonth() === index));
@@ -209,7 +218,7 @@ export const Dashboard: React.FC = () => {
         ...payments.map((p: PaymentVoucher) => ({ id: p.id, type: 'payment' as const, number: p.voucher_number || p.id.slice(-6), customer_name: p.supplier_name || p.description || t('dashboard.unknown_supplier'), date: p.date, total_amount: Number(p.amount) || 0 }))
       ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
 
-      const newStats: DashboardStats = { netProfit, netSales, totalInvoices: invoices.length, totalReceipts, totalExpenses: totalExpensesValue, totalCustomerBalances, totalSupplierBalances, salesByMonth, recentTransactions };
+      const newStats: DashboardStats = { netProfit, netSales, totalInvoices: invoices.length, totalReceipts, totalExpenses: totalExpensesValue, totalCustomerBalances, totalSupplierBalances, totalCashBalance, salesByMonth, recentTransactions };
       setStats(newStats);
       
       const cacheKey = `${user.id}_${companyId}`;
@@ -353,25 +362,48 @@ export const Dashboard: React.FC = () => {
       {/* Major Analytics Bento Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <motion.div 
               whileHover={{ scale: 1.01 }}
-              className="bg-slate-900 p-8 rounded-[2rem] text-white relative overflow-hidden group shadow-xl h-[260px] flex flex-col justify-between"
+              className="bg-brand-primary p-6 rounded-3xl text-white relative overflow-hidden group shadow-lg h-[220px] flex flex-col justify-between"
             >
-              <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 group-hover:scale-[1.7] transition-transform duration-1000 rotate-12">
-                <UsersIcon size={200} />
+              <div className="absolute top-0 right-0 p-8 opacity-5 scale-150 group-hover:scale-[1.7] transition-transform duration-1000 rotate-12">
+                <Wallet size={120} />
               </div>
               <div className="relative z-10">
-                <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center mb-6">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-4">
+                  <Wallet className="text-white" size={20} />
+                </div>
+                <p className="text-white/60 text-[10px] font-bold uppercase tracking-wider mb-2">رصيد النقدية</p>
+                <h3 className="text-2xl md:text-3xl font-bold tracking-tight">
+                  {formatMoney(Math.abs(stats?.totalCashBalance || 0))} 
+                  <span className="text-xs font-medium text-white/50 uppercase ml-1">SAR</span>
+                </h3>
+              </div>
+              <div className="flex items-center gap-2 text-white text-[9px] font-bold uppercase tracking-wider relative z-10 bg-white/10 self-start px-3 py-1.5 rounded-full border border-white/20">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
+                سيولة نقدية
+              </div>
+            </motion.div>
+
+            <motion.div 
+              whileHover={{ scale: 1.01 }}
+              className="bg-slate-900 p-6 rounded-3xl text-white relative overflow-hidden group shadow-xl h-[220px] flex flex-col justify-between"
+            >
+              <div className="absolute top-0 right-0 p-8 opacity-5 scale-150 group-hover:scale-[1.7] transition-transform duration-1000 rotate-12">
+                <UsersIcon size={120} />
+              </div>
+              <div className="relative z-10">
+                <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center mb-4">
                   <TrendingUp className="text-emerald-400" size={20} />
                 </div>
                 <p className="text-white/40 text-[10px] font-bold uppercase tracking-wider mb-2">{t('dashboard.customer_balances')}</p>
-                <h3 className="text-3xl md:text-4xl font-bold tracking-tight">
+                <h3 className="text-2xl md:text-3xl font-bold tracking-tight">
                   {formatMoney(Math.abs(stats?.totalCustomerBalances || 0))} 
-                  <span className="text-xs font-medium text-white/40 uppercase ml-2">SAR</span>
+                  <span className="text-xs font-medium text-white/40 uppercase ml-1">SAR</span>
                 </h3>
               </div>
-              <div className="flex items-center gap-2 text-emerald-400 text-[10px] font-bold uppercase tracking-wider relative z-10 bg-emerald-400/10 self-start px-4 py-1.5 rounded-full border border-emerald-400/20">
+              <div className="flex items-center gap-2 text-emerald-400 text-[9px] font-bold uppercase tracking-wider relative z-10 bg-emerald-400/10 self-start px-3 py-1.5 rounded-full border border-emerald-400/20">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 {t('dashboard.active_receivables')}
               </div>
@@ -379,22 +411,22 @@ export const Dashboard: React.FC = () => {
 
             <motion.div 
               whileHover={{ scale: 1.01 }}
-              className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm relative overflow-hidden group h-[260px] flex flex-col justify-between"
+              className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden group h-[220px] flex flex-col justify-between"
             >
-              <div className="absolute top-0 right-0 p-12 opacity-[0.02] scale-150 group-hover:scale-[1.7] transition-transform duration-1000 -rotate-12">
-                <ReceiptIcon size={200} />
+              <div className="absolute top-0 right-0 p-8 opacity-[0.02] scale-150 group-hover:scale-[1.7] transition-transform duration-1000 -rotate-12">
+                <ReceiptIcon size={120} />
               </div>
               <div className="relative z-10">
-                <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center mb-6 border border-slate-100">
+                <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center mb-4 border border-slate-100">
                   <ReceiptIcon className="text-slate-400" size={20} />
                 </div>
                 <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2">{t('dashboard.supplier_balances')}</p>
-                <h3 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900">
+                <h3 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">
                   {formatMoney(Math.abs(stats?.totalSupplierBalances || 0))} 
-                  <span className="text-xs font-medium text-slate-400 uppercase ml-2">SAR</span>
+                  <span className="text-xs font-medium text-slate-400 uppercase ml-1">SAR</span>
                 </h3>
               </div>
-              <div className="flex items-center gap-2 text-rose-500 text-[10px] font-bold uppercase tracking-wider relative z-10 bg-rose-50 self-start px-4 py-1.5 rounded-full border border-rose-100">
+              <div className="flex items-center gap-2 text-rose-500 text-[9px] font-bold uppercase tracking-wider relative z-10 bg-rose-50 self-start px-3 py-1.5 rounded-full border border-rose-100">
                 <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                 {t('dashboard.outstanding_debts')}
               </div>

@@ -1243,7 +1243,9 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
         debit: totalAmount,
         credit: 0,
         description: `فاتورة مبيعات رقم ${invoiceData.invoice_number}`,
-        customer_id: invoiceData.customer_id
+        customer_id: invoiceData.customer_id,
+        sub_account_id: invoiceData.payment_type === 'cash' ? invoiceData.payment_method_id : invoiceData.customer_id,
+        sub_account_type: invoiceData.payment_type === 'cash' ? 'payment_method' : 'customer'
       });
     }
 
@@ -1256,7 +1258,9 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
           account_name: discountAcc.name,
           debit: discount,
           credit: 0,
-          description: `خصم مسموح به - فاتورة ${invoiceData.invoice_number}`
+          description: `خصم مسموح به - فاتورة ${invoiceData.invoice_number}`,
+          sub_account_id: null,
+          sub_account_type: null
         });
       }
     }
@@ -1269,7 +1273,9 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
         account_name: revenueAcc.name,
         debit: 0,
         credit: subtotal,
-        description: `مبيعات - فاتورة ${invoiceData.invoice_number}`
+        description: `مبيعات - فاتورة ${invoiceData.invoice_number}`,
+        sub_account_id: null,
+        sub_account_type: null
       });
     }
 
@@ -1284,9 +1290,9 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
 
       for (const line of journalItems) {
         await client.query(
-          `INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, company_id, customer_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-          [uuidv4(), journalEntryId, line.account_id, line.account_name, line.description, line.debit, line.credit, companyId, line.customer_id]
+          `INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, company_id, customer_id, sub_account_id, sub_account_type)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+          [uuidv4(), journalEntryId, line.account_id, line.account_name, line.description, line.debit, line.credit, companyId, line.customer_id, line.sub_account_id || null, line.sub_account_type || null]
         );
       }
     }

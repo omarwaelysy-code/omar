@@ -393,6 +393,7 @@ export interface DashboardStats {
   totalExpenses: number;
   totalCustomerBalances: number;
   totalSupplierBalances: number;
+  totalCashBalance: number;
   salesByMonth: { month: string; total: number }[];
   recentTransactions: DashboardTransaction[];
 }
