@@ -735,6 +735,9 @@ export const Customers: React.FC = () => {
                         value={formData.opening_balance}
                         onChange={(e) => setFormData({ ...formData, opening_balance: Number(e.target.value) })}
                       />
+                      <p className="text-[10px] text-slate-400 mt-1 italic px-1">
+                        {language === 'ar' ? 'المبلغ الموجب (+) يعني أن العميل مدين لك، والسالب (-) يعني أنه دائن لك.' : 'Positive (+) means customer owes you, Negative (-) means you owe customer.'}
+                      </p>
                     </div>
                   </div>
 

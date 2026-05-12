@@ -119,7 +119,7 @@ export const CustomerBalances: React.FC = () => {
 
   const formatBalance = (balance: number) => {
     if (balance === 0) return '0';
-    return balance > 0 ? `+${formatNumber(balance)}` : formatNumber(balance);
+    return formatNumber(Math.abs(balance));
   };
 
   const exportReport = async () => {
@@ -197,7 +197,7 @@ export const CustomerBalances: React.FC = () => {
         <div className="bg-zinc-900 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full -mr-16 -mt-16 group-hover:bg-white/10 transition-colors" />
           <p className="text-zinc-400 text-sm font-bold uppercase tracking-widest mb-1">إجمالي المديونيات</p>
-          <h3 className="text-3xl font-bold">{formatNumber(totalOutstanding)} ج.م</h3>
+          <h3 className="text-3xl font-bold">{formatNumber(Math.abs(totalOutstanding))} ج.م</h3>
           <div className="mt-4 flex items-center gap-2 text-emerald-400 text-sm">
             <ArrowUpRight size={16} />
             <span>مستحقات لدى العملاء</span>
@@ -277,12 +277,12 @@ export const CustomerBalances: React.FC = () => {
               <tfoot className="bg-zinc-900 text-white font-bold">
                 <tr>
                   <td colSpan={2} className="px-4 py-4 text-left">الإجمالي:</td>
-                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + (Number(c.openingBalance) || 0), 0))}</td>
-                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + (Number(c.totalInvoices) || 0), 0))}</td>
-                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + (Number(c.totalReturns) || 0), 0))}</td>
-                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + (Number(c.totalDiscounts) || 0), 0))}</td>
-                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + (Number(c.totalReceipts) || 0), 0))}</td>
-                  <td className="px-4 py-4">{formatNumber(filteredCustomers.reduce((sum, c) => sum + (Number(c.manualJournalImpact) || 0), 0))}</td>
+                  <td className="px-4 py-4">{formatNumber(Math.abs(filteredCustomers.reduce((sum, c) => sum + (Number(c.openingBalance) || 0), 0)))}</td>
+                  <td className="px-4 py-4">{formatNumber(Math.abs(filteredCustomers.reduce((sum, c) => sum + (Number(c.totalInvoices) || 0), 0)))}</td>
+                  <td className="px-4 py-4">{formatNumber(Math.abs(filteredCustomers.reduce((sum, c) => sum + (Number(c.totalReturns) || 0), 0)))}</td>
+                  <td className="px-4 py-4">{formatNumber(Math.abs(filteredCustomers.reduce((sum, c) => sum + (Number(c.totalDiscounts) || 0), 0)))}</td>
+                  <td className="px-4 py-4">{formatNumber(Math.abs(filteredCustomers.reduce((sum, c) => sum + (Number(c.totalReceipts) || 0), 0)))}</td>
+                  <td className="px-4 py-4">{formatNumber(Math.abs(filteredCustomers.reduce((sum, c) => sum + (Number(c.manualJournalImpact) || 0), 0)))}</td>
                   <td className="px-4 py-4">{formatBalance(totalOutstanding)} ج.م</td>
                 </tr>
               </tfoot>

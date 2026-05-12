@@ -680,6 +680,9 @@ export const Suppliers: React.FC = () => {
                           value={formData.opening_balance}
                           onChange={(e) => setFormData({ ...formData, opening_balance: Number(e.target.value) })}
                         />
+                        <p className="text-[10px] text-zinc-400 mt-1 italic px-1">
+                          {language === 'ar' ? 'المبلغ الموجب (+) يعني أنك مدين للمورد، والسالب (-) يعني أنك دائن للمورد (رصيد لك).' : 'Positive (+) means you owe supplier, Negative (-) means supplier owes you (credit for you).'}
+                        </p>
                       </div>
                     </div>
                     <div>
