@@ -821,7 +821,7 @@ export const PaymentVouchers: React.FC = () => {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-auto md:max-w-6xl md:rounded-3xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col">
+          <div className="bg-white w-full h-full md:h-[90vh] md:max-h-[850px] md:max-w-4xl md:rounded-3xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col">
             <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <h3 className="text-2xl font-bold text-zinc-900 italic serif">{editingVoucher ? 'تعديل سند صرف' : 'إنشاء سند صرف'}</h3>

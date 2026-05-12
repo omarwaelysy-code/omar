@@ -124,10 +124,10 @@ export const SmartAIInput: React.FC<SmartAIInputProps> = ({ transactionType, onD
   };
 
   return (
-    <div className="bg-emerald-50/50 border border-emerald-100 rounded-3xl p-4 mb-6">
-      <div className="flex items-center gap-2 mb-3 text-emerald-700 font-bold">
-        <Sparkles size={20} className="text-emerald-500" />
-        <span>{t('smart_ai_input.title')}</span>
+    <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-3 mb-4">
+      <div className="flex items-center gap-2 mb-2 text-emerald-700 font-bold">
+        <Sparkles size={16} className="text-emerald-500" />
+        <span className="text-sm">{t('smart_ai_input.title')}</span>
       </div>
 
       <div className="relative group">
@@ -135,7 +135,7 @@ export const SmartAIInput: React.FC<SmartAIInputProps> = ({ transactionType, onD
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder={placeholder || t('smart_ai_input.placeholder')}
-          className="w-full h-32 bg-white border border-emerald-100 rounded-2xl p-4 pr-12 pl-12 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all resize-none text-right"
+          className="w-full h-20 bg-white border border-emerald-100 rounded-xl p-3 pr-10 pl-10 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all resize-none text-right text-sm"
         />
 
         <div className="absolute left-3 top-3 flex flex-col gap-2">

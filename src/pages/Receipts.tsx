@@ -739,7 +739,7 @@ export const Receipts: React.FC = () => {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-auto md:max-w-5xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+          <div className="bg-white w-full h-full md:h-[90vh] md:max-h-[850px] md:max-w-4xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
             <div className="p-6 border-b border-zinc-50 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <h3 className="text-xl font-bold text-zinc-900">{editingReceipt ? 'تعديل سند قبض' : 'إضافة سند قبض'}</h3>

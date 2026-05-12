@@ -610,9 +610,9 @@ export function Operations() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
-              className="bg-zinc-50 rounded-[2.5rem] w-full max-w-3xl overflow-hidden shadow-2xl relative my-8"
+              className="bg-zinc-50 rounded-[2.5rem] w-full max-w-3xl max-h-[90vh] overflow-hidden shadow-2xl relative my-8 flex flex-col"
             >
-              <div className="p-8 bg-white border-b border-zinc-100 flex items-center justify-between">
+              <div className="p-8 bg-white border-b border-zinc-100 flex items-center justify-between shrink-0">
                 <div>
                   <h2 className="text-2xl font-bold text-zinc-900">
                     {editingOperation ? `تعديل العملية: ${formData.operation_number}` : 'تسجيل عملية جديدة'}
@@ -627,7 +627,8 @@ export function Operations() {
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-8 space-y-6 text-right" dir="rtl">
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
+                <form onSubmit={handleSubmit} className="p-8 space-y-6 text-right" dir="rtl">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-bold text-zinc-700 mb-2">الإدارة المختصة</label>
@@ -774,7 +775,8 @@ export function Operations() {
                   </button>
                 </div>
               </form>
-            </motion.div>
+            </div>
+          </motion.div>
           </div>
         )}
       </AnimatePresence>
