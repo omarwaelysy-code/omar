@@ -618,11 +618,11 @@ export const Suppliers: React.FC = () => {
                   <div>
                     <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_name')}</label>
                     <div className="relative">
-                      <User className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
+                      <User className="absolute start-3 top-3 text-zinc-400" size={18} />
                       <input
                         required
                         type="text"
-                        className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
+                        className="w-full ps-10 pe-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       />
@@ -648,10 +648,10 @@ export const Suppliers: React.FC = () => {
                   <div className="space-y-1">
                     <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_email')}</label>
                     <div className="relative">
-                      <Mail className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
+                      <Mail className="absolute start-3 top-3 text-zinc-400" size={18} />
                       <input
                         type="email"
-                        className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
+                        className="w-full ps-10 pe-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-left"
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       />
@@ -660,9 +660,9 @@ export const Suppliers: React.FC = () => {
                   <div className="space-y-1">
                     <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_address')}</label>
                     <div className="relative">
-                      <MapPin className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
+                      <MapPin className="absolute start-3 top-3 text-zinc-400" size={18} />
                       <textarea
-                        className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
+                        className="w-full ps-10 pe-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                         rows={2}
                         value={formData.address}
                         onChange={(e) => setFormData({ ...formData, address: e.target.value })}
@@ -673,10 +673,10 @@ export const Suppliers: React.FC = () => {
                     <div>
                       <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_opening_balance')}</label>
                       <div className="relative">
-                        <Wallet className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
+                        <Wallet className="absolute start-3 top-3 text-zinc-400" size={18} />
                         <input 
                           type="number" 
-                          className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
+                          className="w-full ps-10 pe-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                           value={formData.opening_balance}
                           onChange={(e) => setFormData({ ...formData, opening_balance: Number(e.target.value) })}
                         />
@@ -685,10 +685,10 @@ export const Suppliers: React.FC = () => {
                     <div>
                       <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_balance_date')}</label>
                       <div className="relative">
-                        <Calendar className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
+                        <Calendar className="absolute start-3 top-3 text-zinc-400" size={18} />
                         <input 
                           type="date" 
-                          className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
+                          className="w-full ps-10 pe-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
                           value={formData.opening_balance_date}
                           onChange={(e) => setFormData({ ...formData, opening_balance_date: e.target.value })}
                         />

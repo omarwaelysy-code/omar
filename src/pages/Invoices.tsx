@@ -1025,6 +1025,7 @@ export const Invoices: React.FC = () => {
                   <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_number')}</th>
                   <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_customer')}</th>
                   <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_date')}</th>
+                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>وصف الفاتورة</th>
                   <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.form_payment_type')}</th>
                   <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_amount')}</th>
                   <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
@@ -1038,6 +1039,9 @@ export const Invoices: React.FC = () => {
                     </td>
                     <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{inv.customer_name}</td>
                     <td className={`px-6 py-4 text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(inv.date)}</td>
+                    <td className={`px-6 py-4 text-slate-500 max-w-[200px] truncate ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={inv.description}>
+                      {inv.description || '-'}
+                    </td>
                     <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                       <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                         inv.payment_type === 'cash' 
@@ -1714,11 +1718,11 @@ export const Invoices: React.FC = () => {
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">اسم العميل</label>
                     <div className="relative">
-                      <Search className="absolute left-3 top-3 text-slate-400" size={18} />
+                      <Search className="absolute start-3 top-3 text-slate-400" size={18} />
                       <input
                         required
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className="w-full ps-10 pe-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                         value={customerFormData.name}
                         onChange={(e) => setCustomerFormData({ ...customerFormData, name: e.target.value })}
                       />
@@ -1727,12 +1731,12 @@ export const Invoices: React.FC = () => {
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">رقم الهاتف</label>
                     <div className="relative">
-                      <Phone className="absolute left-3 top-3 text-slate-400" size={18} />
+                      <Phone className="absolute start-3 top-3 text-slate-400" size={18} />
                       <input
                         required
                         type="tel"
                         pattern="[0-9]{11,}"
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-left"
+                        className="w-full ps-10 pe-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-left"
                         value={customerFormData.mobile}
                         onChange={(e) => setCustomerFormData({ ...customerFormData, mobile: e.target.value })}
                       />
@@ -1741,10 +1745,10 @@ export const Invoices: React.FC = () => {
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">البريد الإلكتروني</label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-3 text-slate-400" size={18} />
+                      <Mail className="absolute start-3 top-3 text-slate-400" size={18} />
                       <input
                         type="email"
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-left"
+                        className="w-full ps-10 pe-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-left"
                         value={customerFormData.email}
                         onChange={(e) => setCustomerFormData({ ...customerFormData, email: e.target.value })}
                       />
@@ -1763,10 +1767,10 @@ export const Invoices: React.FC = () => {
                     <div>
                       <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">رصيد أول</label>
                       <div className="relative">
-                        <Wallet className="absolute left-3 top-3 text-slate-400" size={18} />
+                        <Wallet className="absolute start-3 top-3 text-slate-400" size={18} />
                         <input 
                           type="number" 
-                          className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                          className="w-full ps-10 pe-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                           value={customerFormData.opening_balance}
                           onChange={(e) => setCustomerFormData({ ...customerFormData, opening_balance: Number(e.target.value) })}
                         />
@@ -1775,10 +1779,10 @@ export const Invoices: React.FC = () => {
                     <div>
                       <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">تاريخ الرصيد</label>
                       <div className="relative">
-                        <Calendar className="absolute left-3 top-3 text-slate-400" size={18} />
+                        <Calendar className="absolute start-3 top-3 text-slate-400" size={18} />
                         <input 
                           type="date" 
-                          className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
+                          className="w-full ps-10 pe-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
                           value={customerFormData.opening_balance_date}
                           onChange={(e) => setCustomerFormData({ ...customerFormData, opening_balance_date: e.target.value })}
                         />
@@ -1857,11 +1861,11 @@ export const Invoices: React.FC = () => {
                   <div className="space-y-1">
                     <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">كود الصنف</label>
                     <div className="relative">
-                      <Hash className="absolute left-3 top-3 text-slate-400" size={18} />
+                      <Hash className="absolute start-3 top-3 text-slate-400" size={18} />
                       <input
                         required
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
+                        className="w-full ps-10 pe-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
                         value={productFormData.code}
                         onChange={(e) => setProductFormData({ ...productFormData, code: e.target.value })}
                       />
@@ -1870,11 +1874,11 @@ export const Invoices: React.FC = () => {
                   <div className="space-y-1">
                     <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">اسم الصنف</label>
                     <div className="relative">
-                      <Package className="absolute left-3 top-3 text-slate-400" size={18} />
+                      <Package className="absolute start-3 top-3 text-slate-400" size={18} />
                       <input
                         required
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className="w-full ps-10 pe-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                         value={productFormData.name}
                         onChange={(e) => setProductFormData({ ...productFormData, name: e.target.value })}
                       />
@@ -1885,10 +1889,10 @@ export const Invoices: React.FC = () => {
                 <div className="space-y-1">
                   <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">نوع الصنف</label>
                   <div className="relative">
-                    <Layers className="absolute left-3 top-3 text-slate-400" size={18} />
+                    <Layers className="absolute start-3 top-3 text-slate-400" size={18} />
                     <select
                       required
-                      className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
+                      className="w-full ps-10 pe-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
                       value={productFormData.type}
                       onChange={(e) => setProductFormData({ ...productFormData, type: e.target.value as any })}
                     >
@@ -1903,12 +1907,12 @@ export const Invoices: React.FC = () => {
                   <div className="space-y-1">
                     <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">سعر البيع</label>
                     <div className="relative">
-                      <Tag className="absolute left-3 top-3 text-slate-400" size={18} />
+                      <Tag className="absolute start-3 top-3 text-slate-400" size={18} />
                       <input
                         required
                         type="number"
                         step="0.01"
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
+                        className="w-full ps-10 pe-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
                         value={productFormData.sale_price}
                         onChange={(e) => setProductFormData({ ...productFormData, sale_price: Number(e.target.value) })}
                       />
@@ -1917,12 +1921,12 @@ export const Invoices: React.FC = () => {
                   <div className="space-y-1">
                     <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">سعر التكلفة</label>
                     <div className="relative">
-                      <Tag className="absolute left-3 top-3 text-slate-400" size={18} />
+                      <Tag className="absolute start-3 top-3 text-slate-400" size={18} />
                       <input
                         required
                         type="number"
                         step="0.01"
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
+                        className="w-full ps-10 pe-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
                         value={productFormData.cost_price}
                         onChange={(e) => setProductFormData({ ...productFormData, cost_price: Number(e.target.value) })}
                       />
@@ -2082,11 +2086,11 @@ export const Invoices: React.FC = () => {
                   <div className="space-y-1">
                     <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">كود الطريقة</label>
                     <div className="relative">
-                      <Hash className="absolute left-3 top-3 text-slate-400" size={18} />
+                      <Hash className="absolute start-3 top-3 text-slate-400" size={18} />
                       <input
                         required
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
+                        className="w-full ps-10 pe-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
                         value={paymentMethodFormData.code}
                         onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, code: e.target.value })}
                       />
@@ -2095,11 +2099,11 @@ export const Invoices: React.FC = () => {
                   <div className="space-y-1">
                     <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">اسم الطريقة</label>
                     <div className="relative">
-                      <Wallet className="absolute left-3 top-3 text-slate-400" size={18} />
+                      <Wallet className="absolute start-3 top-3 text-slate-400" size={18} />
                       <input
                         required
                         type="text"
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                        className="w-full ps-10 pe-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                         value={paymentMethodFormData.name}
                         onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, name: e.target.value })}
                       />
@@ -2110,9 +2114,9 @@ export const Invoices: React.FC = () => {
                   <div className="space-y-1">
                     <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">النوع</label>
                     <div className="relative">
-                      <Layers className="absolute left-3 top-3 text-slate-400" size={18} />
+                      <Layers className="absolute start-3 top-3 text-slate-400" size={18} />
                       <select
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
+                        className="w-full ps-10 pe-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
                         value={paymentMethodFormData.type}
                         onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, type: e.target.value as any })}
                       >
@@ -2144,10 +2148,10 @@ export const Invoices: React.FC = () => {
                   <div className="space-y-1">
                     <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">الرصيد الافتتاحي</label>
                     <div className="relative">
-                      <Wallet className="absolute left-3 top-3 text-slate-400" size={18} />
+                      <Wallet className="absolute start-3 top-3 text-slate-400" size={18} />
                       <input 
                         type="number" 
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
+                        className="w-full ps-10 pe-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
                         value={paymentMethodFormData.opening_balance}
                         onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, opening_balance: Number(e.target.value) })}
                       />
@@ -2156,10 +2160,10 @@ export const Invoices: React.FC = () => {
                   <div className="space-y-1">
                     <label className="block text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">تاريخ الرصيد</label>
                     <div className="relative">
-                      <Calendar className="absolute left-3 top-3 text-slate-400" size={18} />
+                      <Calendar className="absolute start-3 top-3 text-slate-400" size={18} />
                       <input 
                         type="date" 
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
+                        className="w-full ps-10 pe-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
                         value={paymentMethodFormData.opening_balance_date}
                         onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, opening_balance_date: e.target.value })}
                       />

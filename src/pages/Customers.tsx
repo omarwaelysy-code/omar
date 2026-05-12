@@ -651,12 +651,12 @@ export const Customers: React.FC = () => {
                   <div className="md:col-span-2">
                     <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_name')}</label>
                     <div className="relative group">
-                      <User className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                      <User className="absolute start-4 top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
                       <input
                         required
                         type="text"
                         placeholder="John Doe / شركة السلام"
-                        className="premium-input font-bold"
+                        className="premium-input ps-12 font-bold"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       />
@@ -667,11 +667,11 @@ export const Customers: React.FC = () => {
                     <div>
                       <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_code')}</label>
                       <div className="relative">
-                        <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-300`} size={20} />
+                        <Hash className="absolute start-4 top-3.5 text-slate-300" size={20} />
                         <input
                           disabled
                           type="text"
-                          className="premium-input bg-slate-50 text-slate-400 cursor-not-allowed font-mono font-black"
+                          className="premium-input ps-12 bg-slate-50 text-slate-400 cursor-not-allowed font-mono font-black"
                           value={editingCustomer.code}
                         />
                       </div>
@@ -681,13 +681,13 @@ export const Customers: React.FC = () => {
                   <div>
                     <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_mobile')}</label>
                     <div className="relative group">
-                      <Phone className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                      <Phone className="absolute start-4 top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
                       <input
                         required
                         type="tel"
                         maxLength={11}
                         placeholder="01234567890"
-                        className="premium-input font-bold tracking-widest"
+                        className="premium-input ps-12 font-bold tracking-widest"
                         value={formData.mobile}
                         onChange={(e) => {
                           const value = e.target.value.replace(/\D/g, '');
@@ -700,11 +700,11 @@ export const Customers: React.FC = () => {
                   <div>
                     <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_email')}</label>
                     <div className="relative group">
-                      <Mail className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                      <Mail className="absolute start-4 top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
                       <input
                         type="email"
                         placeholder="customer@example.com"
-                        className="premium-input font-bold"
+                        className="premium-input ps-12 font-bold"
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       />
@@ -714,10 +714,10 @@ export const Customers: React.FC = () => {
                   <div className="md:col-span-2">
                     <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_address')}</label>
                     <div className="relative group">
-                      <MapPin className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                      <MapPin className="absolute start-4 top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
                       <textarea
                         placeholder="العنوان التفصيلي للعميل"
-                        className="premium-input font-bold min-h-[80px]"
+                        className="premium-input ps-12 font-bold min-h-[80px]"
                         rows={2}
                         value={formData.address}
                         onChange={(e) => setFormData({ ...formData, address: e.target.value })}
@@ -728,10 +728,10 @@ export const Customers: React.FC = () => {
                   <div>
                     <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_opening_balance')}</label>
                     <div className="relative group">
-                      <Wallet className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                      <Wallet className="absolute start-4 top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
                       <input 
                         type="number" 
-                        className="premium-input font-black"
+                        className="premium-input ps-12 font-black"
                         value={formData.opening_balance}
                         onChange={(e) => setFormData({ ...formData, opening_balance: Number(e.target.value) })}
                       />
@@ -741,10 +741,10 @@ export const Customers: React.FC = () => {
                   <div>
                     <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_balance_date')}</label>
                     <div className="relative group">
-                      <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                      <Calendar className="absolute start-4 top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
                       <input 
                         type="date" 
-                        className="premium-input font-bold"
+                        className="premium-input ps-12 font-bold"
                         value={formData.opening_balance_date}
                         onChange={(e) => setFormData({ ...formData, opening_balance_date: e.target.value })}
                       />
@@ -754,10 +754,10 @@ export const Customers: React.FC = () => {
                   <div className="md:col-span-2">
                     <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_account')}</label>
                     <div className="relative group">
-                       <Box className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                       <Box className="absolute start-4 top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
                        <select
                         required
-                        className="premium-input font-bold pr-12 appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGZpbGw9Im5vbmUiIHZpZXdCb3g9IjAgMCAyNCAyNCIgc3Ryb2tlPSIjOTRhM2I4IiBzdHJva2Utd2lkdGg9IjIiPjxwYXRoIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZD0iTTE5IDlsLTcgNy03LTciLz48L3N2Zz4=')] bg-[8px_center] bg-[length:16px] bg-no-repeat"
+                        className="premium-input ps-12 font-bold appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGZpbGw9Im5vbmUiIHZpZXdCb3g9IjAgMCAyNCAyNCIgc3Ryb2tlPSIjOTRhM2I4IiBzdHJva2Utd2lkdGg9IjIiPjxwYXRoIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZD0iTTE5IDlsLTcgNy03LTciLz48L3N2Zz4=')] bg-[8px_center] bg-[length:16px] bg-no-repeat"
                         value={formData.account_id}
                         onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
                       >
