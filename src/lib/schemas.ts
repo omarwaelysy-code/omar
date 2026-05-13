@@ -65,8 +65,18 @@ export const InvoiceSchema = BaseSchema.extend({
 });
 
 // Voucher (Receipt/Payment)
+export const VoucherItemSchema = z.object({
+  type: z.enum(['supplier', 'expense', 'account']),
+  entity_id: z.string(),
+  entity_name: z.string().optional(),
+  amount: z.coerce.number().default(0),
+  description: z.string().optional(),
+});
+
 export const VoucherSchema = BaseSchema.extend({
   voucher_number: z.string(),
+  internal_reference: z.string().optional(),
+  manual_reference: z.string().optional(),
   date: z.string(),
   amount: z.coerce.number().default(0),
   notes: z.string().optional(),
@@ -75,6 +85,7 @@ export const VoucherSchema = BaseSchema.extend({
   supplier_id: z.string().nullable().optional(),
   expense_category_id: z.string().nullable().optional(),
   payment_method_id: z.string().nullable().optional(),
+  items: z.array(VoucherItemSchema).optional(),
   type: z.enum(['receipt', 'payment']),
 });
 

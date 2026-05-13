@@ -80,7 +80,10 @@ export const PaymentVouchers: React.FC = () => {
   
   // Voucher State
   const [voucherData, setVoucherData] = useState({
-    type: 'supplier' as 'supplier' | 'expense',
+    internal_reference: '',
+    manual_reference: '',
+    items: [] as any[],
+    type: 'supplier' as 'supplier' | 'expense' | 'multi',
     supplier_id: '',
     expense_category_id: '',
     amount: 0,
@@ -88,6 +91,32 @@ export const PaymentVouchers: React.FC = () => {
     date: new Date().toISOString().slice(0, 10),
     notes: ''
   });
+
+  const generateInternalRef = (allVouchers: any[]) => {
+    const now = new Date();
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const prefix = `GRO-${month}-`;
+    
+    // Find vouchers for this month
+    const thisMonthVouchers = allVouchers.filter(v => v.internal_reference?.startsWith(prefix));
+    
+    let nextNum = 1;
+    if (thisMonthVouchers.length > 0) {
+      const numbers = thisMonthVouchers.map(v => {
+        const parts = v.internal_reference.split('-');
+        return parseInt(parts[2]) || 0;
+      });
+      nextNum = Math.max(...numbers) + 1;
+    }
+    
+    return `${prefix}${nextNum.toString().padStart(4, '0')}`;
+  };
+
+  useEffect(() => {
+    if (!editingVoucher && !voucherData.internal_reference && !loading) {
+      setVoucherData(prev => ({ ...prev, internal_reference: generateInternalRef(vouchers) }));
+    }
+  }, [vouchers, editingVoucher, loading]);
 
   useEffect(() => {
     if (user) {
@@ -138,37 +167,78 @@ export const PaymentVouchers: React.FC = () => {
       // Preview Journal Entry
       const journalItems: JournalEntryItem[] = [];
 
-      // Debit: Supplier or Expense Account
-      let debitAccountId = '';
-      let debitAccountName = '';
+      if (voucherData.type === 'multi') {
+        voucherData.items.forEach(item => {
+          let debitAccountId = '';
+          let debitAccountName = '';
+          let subAccountId = undefined;
+          let subAccountType = undefined;
 
-      if (voucherData.type === 'supplier') {
-        debitAccountId = supplier?.account_id || '';
-        debitAccountName = supplier?.account_name || '';
-        if (!debitAccountId) {
-          const fallbackAccount = accounts.find(a => a.name.includes('موردين'));
-          debitAccountId = fallbackAccount?.id || 'suppliers_account_default';
-          debitAccountName = fallbackAccount?.name || 'حساب الموردين (افتراضي)';
-        }
+          if (item.type === 'supplier') {
+            const supplier = suppliers.find(s => s.id === item.entity_id);
+            debitAccountId = supplier?.account_id || '';
+            debitAccountName = supplier?.account_name || '';
+            subAccountId = supplier?.id;
+            subAccountType = 'supplier';
+          } else if (item.type === 'expense') {
+            const category = categories.find(c => c.id === item.entity_id);
+            debitAccountId = category?.account_id || '';
+            debitAccountName = category?.name || '';
+          } else {
+            const account = accounts.find(a => a.id === item.entity_id);
+            debitAccountId = account?.id || '';
+            debitAccountName = account?.name || '';
+          }
+
+          if (item.amount > 0) {
+            journalItems.push({
+              account_id: debitAccountId || 'debit_account_missing',
+              account_name: debitAccountName || 'حساب مدين مفقود',
+              debit: item.amount,
+              credit: 0,
+              description: item.description || `سند صرف رقم ${voucher_number} - ${voucherData.notes}`,
+              sub_account_id: subAccountId,
+              sub_account_type: subAccountType as 'supplier' | undefined
+            });
+          }
+        });
       } else {
-        debitAccountId = category?.account_id || '';
-        debitAccountName = category?.name || '';
-        if (!debitAccountId) {
-          const fallbackAccount = accounts.find(a => a.name.includes('مصروف'));
-          debitAccountId = fallbackAccount?.id || 'expenses_account_default';
-          debitAccountName = fallbackAccount?.name || 'حساب المصروفات (افتراضي)';
+        // Debit: Supplier or Expense Account
+        let debitAccountId = '';
+        let debitAccountName = '';
+
+        if (voucherData.type === 'supplier') {
+          debitAccountId = supplier?.account_id || '';
+          debitAccountName = supplier?.account_name || '';
+          if (!debitAccountId) {
+            const fallbackAccount = accounts.find(a => a.name.includes('موردين'));
+            debitAccountId = fallbackAccount?.id || 'suppliers_account_default';
+            debitAccountName = fallbackAccount?.name || 'حساب الموردين (افتراضي)';
+          }
+        } else {
+          debitAccountId = category?.account_id || '';
+          debitAccountName = category?.name || '';
+          if (!debitAccountId) {
+            const fallbackAccount = accounts.find(a => a.name.includes('مصروف'));
+            debitAccountId = fallbackAccount?.id || 'expenses_account_default';
+            debitAccountName = fallbackAccount?.name || 'حساب المصروفات (افتراضي)';
+          }
         }
+
+        journalItems.push({
+          account_id: debitAccountId,
+          account_name: debitAccountName,
+          debit: voucherData.amount,
+          credit: 0,
+          description: `سند صرف رقم ${voucher_number} - ${voucherData.type === 'supplier' ? (supplier?.name || '...') : (category?.name || '...')}`,
+          sub_account_id: voucherData.type === 'supplier' ? supplier?.id : undefined,
+          sub_account_type: voucherData.type === 'supplier' ? 'supplier' : undefined
+        });
       }
 
-      journalItems.push({
-        account_id: debitAccountId,
-        account_name: debitAccountName,
-        debit: voucherData.amount,
-        credit: 0,
-        description: `سند صرف رقم ${voucher_number} - ${voucherData.type === 'supplier' ? (supplier?.name || '...') : (category?.name || '...')}`,
-        sub_account_id: voucherData.type === 'supplier' ? supplier?.id : undefined,
-        sub_account_type: voucherData.type === 'supplier' ? 'supplier' : undefined
-      });
+      const totalPreviewAmount = voucherData.type === 'multi' 
+        ? voucherData.items.reduce((sum, item) => sum + item.amount, 0)
+        : voucherData.amount;
 
       // Credit: Payment Method (Cash/Bank)
       let creditAccountId = paymentMethod?.account_id || '';
@@ -186,8 +256,8 @@ export const PaymentVouchers: React.FC = () => {
         account_id: creditAccountId,
         account_name: creditAccountName,
         debit: 0,
-        credit: voucherData.amount,
-        description: `سند صرف رقم ${voucher_number} - ${voucherData.type === 'supplier' ? (supplier?.name || '...') : (category?.name || '...')}`,
+        credit: totalPreviewAmount,
+        description: `سند صرف رقم ${voucher_number} - ${totalPreviewAmount}`,
         sub_account_id: paymentMethod?.id,
         sub_account_type: 'payment_method'
       });
@@ -200,8 +270,8 @@ export const PaymentVouchers: React.FC = () => {
         reference_type: 'payment',
         description: `قيد سند صرف رقم ${voucher_number}`,
         items: journalItems,
-        total_debit: voucherData.amount,
-        total_credit: voucherData.amount,
+        total_debit: totalPreviewAmount,
+        total_credit: totalPreviewAmount,
         company_id: user.company_id,
         created_at: new Date().toISOString(),
         created_by: user.id
@@ -377,88 +447,116 @@ export const PaymentVouchers: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    if (voucherData.amount <= 0) {
+
+    const finalAmount = voucherData.type === 'multi' 
+      ? voucherData.items.reduce((sum, item) => sum + item.amount, 0)
+      : voucherData.amount;
+
+    if (finalAmount <= 0) {
       showNotification('يرجى إدخال مبلغ صحيح', 'error');
       return;
     }
 
     try {
-      const supplier = suppliers.find(s => s.id === voucherData.supplier_id);
-      const category = categories.find(c => c.id === voucherData.expense_category_id);
       const paymentMethod = paymentMethods.find(pm => pm.id === voucherData.payment_method_id);
       
-      const voucher_number = editingVoucher 
+      const voucher_number = voucherData.internal_reference || (editingVoucher 
         ? (editingVoucher.voucher_number || editingVoucher.number) 
-        : `PAY-${Date.now().toString().slice(-6)}`;
+        : `PAY-${Date.now().toString().slice(-6)}`);
 
-      const data = {
+      const data: any = {
         voucher_number,
+        internal_reference: voucherData.internal_reference,
+        manual_reference: voucherData.manual_reference,
         date: voucherData.date,
-        amount: voucherData.amount,
+        amount: finalAmount,
         description: voucherData.notes,
-        supplier_id: voucherData.supplier_id || null,
-        expense_category_id: voucherData.expense_category_id || null,
-        customer_id: null,
-        supplier_name: supplier?.name || '',
-        category_name: category?.name || '',
         payment_method_id: voucherData.payment_method_id,
         payment_method_name: paymentMethod?.name || '',
         account_id: paymentMethod?.account_id || null,
         type: 'payment' as const,
         company_id: user.company_id,
-        created_at: new Date().toISOString(),
-        created_by: user.id
+        created_at: editingVoucher?.created_at || new Date().toISOString(),
+        created_by: editingVoucher?.created_by || user.id,
+        voucher_type: voucherData.type // 'supplier', 'expense', 'multi'
       };
 
       const journalItems: any[] = [];
-      let debitAccountId = '';
-      let debitAccountName = '';
+      
+      if (voucherData.type === 'multi') {
+        data.items = voucherData.items;
+        voucherData.items.forEach(item => {
+          let debitAccountId = '';
+          let debitAccountName = '';
+          let subAccountId = undefined;
+          let subAccountType = undefined;
 
-      if (voucherData.type === 'supplier') {
-        debitAccountId = supplier?.account_id || '';
-        debitAccountName = supplier?.account_name || '';
-        if (!debitAccountId) {
-          const fallback = accounts.find(a => a.name.includes('موردين'));
-          debitAccountId = fallback?.id || 'suppliers_account_default';
-          debitAccountName = fallback?.name || 'حساب الموردين (افتراضي)';
-        }
+          if (item.type === 'supplier') {
+            const supplier = suppliers.find(s => s.id === item.entity_id);
+            debitAccountId = supplier?.account_id || '';
+            debitAccountName = supplier?.account_name || '';
+            subAccountId = supplier?.id;
+            subAccountType = 'supplier';
+          } else if (item.type === 'expense') {
+            const category = categories.find(c => c.id === item.entity_id);
+            debitAccountId = category?.account_id || '';
+            debitAccountName = category?.name || '';
+          } else {
+            const account = accounts.find(a => a.id === item.entity_id);
+            debitAccountId = account?.id || '';
+            debitAccountName = account?.name || '';
+          }
+
+          journalItems.push({
+            account_id: debitAccountId,
+            account_name: debitAccountName,
+            debit: item.amount,
+            credit: 0,
+            description: item.description || `سند صرف رقم ${voucher_number} - ${voucherData.notes}`,
+            sub_account_id: subAccountId,
+            sub_account_type: subAccountType
+          });
+        });
       } else {
-        debitAccountId = category?.account_id || '';
-        debitAccountName = category?.account_name || '';
-        if (!debitAccountId) {
-          const fallback = accounts.find(a => a.name.includes('مصروف'));
-          debitAccountId = fallback?.id || 'expenses_account_default';
-          debitAccountName = fallback?.name || 'حساب المصروفات (افتراضي)';
+        const supplier = suppliers.find(s => s.id === voucherData.supplier_id);
+        const category = categories.find(c => c.id === voucherData.expense_category_id);
+        
+        data.supplier_id = voucherData.supplier_id || null;
+        data.expense_category_id = voucherData.expense_category_id || null;
+        data.supplier_name = supplier?.name || '';
+        data.category_name = category?.name || '';
+
+        let debitAccountId = '';
+        let debitAccountName = '';
+
+        if (voucherData.type === 'supplier') {
+          debitAccountId = supplier?.account_id || '';
+          debitAccountName = supplier?.account_name || '';
+        } else {
+          debitAccountId = category?.account_id || '';
+          debitAccountName = category?.account_name || '';
         }
+
+        journalItems.push({
+          account_id: debitAccountId,
+          account_name: debitAccountName,
+          debit: voucherData.amount,
+          credit: 0,
+          description: `سند صرف رقم ${voucher_number} - ${voucherData.notes}`,
+          sub_account_id: voucherData.type === 'supplier' ? voucherData.supplier_id : undefined,
+          sub_account_type: voucherData.type === 'supplier' ? 'supplier' : undefined
+        });
       }
 
-      journalItems.push({
-        account_id: debitAccountId,
-        account_name: debitAccountName,
-        debit: voucherData.amount,
-        credit: 0,
-        description: `سند صرف رقم ${voucher_number} - ${voucherData.notes}`,
-        supplier_id: voucherData.type === 'supplier' ? voucherData.supplier_id : undefined,
-        supplier_name: voucherData.type === 'supplier' ? supplier?.name : undefined,
-        sub_account_id: voucherData.type === 'supplier' ? voucherData.supplier_id : undefined,
-        sub_account_type: voucherData.type === 'supplier' ? 'supplier' : undefined
-      });
-
+      // Credit: Payment Method
       let creditAccountId = paymentMethod?.account_id || '';
       let creditAccountName = paymentMethod?.account_name || '';
-      if (!creditAccountId) {
-        const fallback = accounts.find(a => 
-          a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق') || a.name.includes('بنك')
-        );
-        creditAccountId = fallback?.id || 'cash_account_default';
-        creditAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
-      }
-
+      
       journalItems.push({
         account_id: creditAccountId,
         account_name: creditAccountName,
         debit: 0,
-        credit: voucherData.amount,
+        credit: finalAmount,
         description: `سند صرف رقم ${voucher_number} من حساب: ${paymentMethod?.name}`,
         sub_account_id: paymentMethod?.id,
         sub_account_type: 'payment_method'
@@ -470,8 +568,8 @@ export const PaymentVouchers: React.FC = () => {
         reference_type: 'payment',
         description: `قيد سند صرف رقم ${voucher_number}`,
         items: journalItems,
-        total_debit: voucherData.amount,
-        total_credit: voucherData.amount,
+        total_debit: finalAmount,
+        total_credit: finalAmount,
         company_id: user.company_id,
         created_at: new Date().toISOString(),
         created_by: user.id
@@ -499,6 +597,9 @@ export const PaymentVouchers: React.FC = () => {
 
       showNotification(editingVoucher ? 'تم تعديل سند الصرف بنجاح' : 'تم حفظ سند الصرف بنجاح', 'success');
       setVoucherData({
+        internal_reference: '',
+        manual_reference: '',
+        items: [],
         type: 'supplier',
         supplier_id: '',
         expense_category_id: '',
@@ -594,7 +695,10 @@ export const PaymentVouchers: React.FC = () => {
 
       setEditingVoucher(fullData);
       setVoucherData({
-        type: fullData.type as 'supplier' | 'expense',
+        internal_reference: fullData.internal_reference || fullData.voucher_number || '',
+        manual_reference: fullData.manual_reference || '',
+        items: fullData.items || [],
+        type: fullData.voucher_type || (fullData.supplier_id ? 'supplier' : 'expense'),
         supplier_id: fullData.supplier_id?.toString() || '',
         expense_category_id: fullData.expense_category_id?.toString() || '',
         amount: fullData.amount,
@@ -681,7 +785,7 @@ export const PaymentVouchers: React.FC = () => {
             <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
               <thead>
                 <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                  <th className="px-6 py-4 font-bold">رقم السند</th>
+                  <th className="px-6 py-4 font-bold">رقم السند / المرجع</th>
                   <th className="px-6 py-4 font-bold">النوع</th>
                   <th className="px-6 py-4 font-bold">المستفيد / الفئة</th>
                   <th className="px-6 py-4 font-bold">التاريخ</th>
@@ -697,17 +801,27 @@ export const PaymentVouchers: React.FC = () => {
                 ) : filteredVouchers.map((voucher) => (
                   <tr key={voucher.id} className="hover:bg-zinc-50/50 transition-colors group">
                     <td className="px-6 py-4">
-                      <span className="font-mono text-xs bg-zinc-100 px-2 py-1 rounded text-zinc-700 font-bold">{voucher.voucher_number}</span>
+                      <div className="flex flex-col gap-1">
+                        <span className="font-mono text-[10px] bg-zinc-100 px-2 py-1 rounded text-zinc-700 font-bold w-fit">{voucher.internal_reference || voucher.voucher_number}</span>
+                        {voucher.manual_reference && (
+                          <span className="text-[10px] text-zinc-400 font-mono italic">M: {voucher.manual_reference}</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
+                        voucher.voucher_type === 'multi' ? 'bg-emerald-50 text-emerald-700' :
                         voucher.type === 'supplier' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'
                       }`}>
-                        {voucher.type === 'supplier' ? 'مورد' : 'مصروف'}
+                        {voucher.voucher_type === 'multi' ? 'متعدد' : voucher.type === 'supplier' ? 'مورد' : 'مصروف'}
                       </span>
                     </td>
                     <td className="px-6 py-4 font-bold text-zinc-900">
-                      {voucher.type === 'supplier' ? voucher.supplier_name : voucher.category_name}
+                      {voucher.voucher_type === 'multi' ? (
+                        <span className="text-zinc-500 italic">متعدد ({voucher.items?.length || 0})</span>
+                      ) : (
+                        voucher.type === 'supplier' ? voucher.supplier_name : voucher.category_name
+                      )}
                     </td>
                     <td className="px-6 py-4 text-zinc-500">{formatDate(voucher.date)}</td>
                     <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(voucher.amount)} {t('common.currency')}</td>
@@ -775,14 +889,28 @@ export const PaymentVouchers: React.FC = () => {
 
                 <div className="flex justify-between items-start">
                   <div className="flex flex-col gap-1">
-                    <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{voucher.voucher_number}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100 italic">
+                        {voucher.internal_reference || voucher.voucher_number}
+                      </span>
+                      {voucher.manual_reference && (
+                        <span className="font-mono text-[9px] text-zinc-400">
+                          {voucher.manual_reference}
+                        </span>
+                      )}
+                    </div>
                     <h4 className="font-bold text-zinc-900 group-hover:text-emerald-700 transition-colors text-xl mt-1 tracking-tight">
-                      {voucher.type === 'supplier' ? voucher.supplier_name : voucher.category_name}
+                      {voucher.voucher_type === 'multi' ? (
+                        <span className="text-zinc-500 italic">متعدد ({voucher.items?.length || 0})</span>
+                      ) : (
+                        voucher.type === 'supplier' ? voucher.supplier_name : voucher.category_name
+                      )}
                     </h4>
                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold w-fit ${
+                      voucher.voucher_type === 'multi' ? 'bg-emerald-100 text-emerald-700' :
                       voucher.type === 'supplier' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
                     }`}>
-                      {voucher.type === 'supplier' ? 'مورد' : 'مصروف'}
+                      {voucher.voucher_type === 'multi' ? 'متعدد' : voucher.type === 'supplier' ? 'مورد' : 'مصروف'}
                     </span>
                   </div>
                 </div>
@@ -838,6 +966,9 @@ export const PaymentVouchers: React.FC = () => {
                 setIsModalOpen(false);
                 setEditingVoucher(null);
                 setVoucherData({
+                  internal_reference: '',
+                  manual_reference: '',
+                  items: [],
                   type: 'supplier',
                   supplier_id: '',
                   expense_category_id: '',
@@ -901,7 +1032,7 @@ export const PaymentVouchers: React.FC = () => {
                   }}
                   transactionType="payment_voucher"
                 />
-                <div className="flex bg-zinc-100 p-1 rounded-2xl">
+              <div className="flex bg-zinc-100 p-1 rounded-2xl">
                 <button
                   type="button"
                   onClick={() => setVoucherData({...voucherData, type: 'supplier', expense_category_id: ''})}
@@ -920,10 +1051,45 @@ export const PaymentVouchers: React.FC = () => {
                 >
                   صرف مصروفات
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setVoucherData({...voucherData, type: 'multi', supplier_id: '', expense_category_id: ''})}
+                  className={`flex-1 py-3 rounded-xl font-bold transition-all ${
+                    voucherData.type === 'multi' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
+                  }`}
+                >
+                  صرف متعدد / حسابات
+                </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {voucherData.type === 'supplier' ? (
+                <div>
+                  <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">مرجع البرنامج (تلقائي)</label>
+                  <div className="relative">
+                    <Hash className="absolute left-3 top-3 text-zinc-400" size={18} />
+                    <input 
+                      type="text" 
+                      readOnly
+                      className="w-full pl-10 pr-4 py-3 bg-zinc-100 border border-zinc-200 rounded-xl outline-none text-zinc-500 font-mono"
+                      value={voucherData.internal_reference}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">مرجع يدوي / آخر</label>
+                  <div className="relative">
+                    <FileText className="absolute left-3 top-3 text-zinc-400" size={18} />
+                    <input 
+                      type="text" 
+                      placeholder="ادخل رقم المرجع اليدوي..."
+                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
+                      value={voucherData.manual_reference}
+                      onChange={(e) => setVoucherData({...voucherData, manual_reference: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                {voucherData.type === 'supplier' && (
                   <div>
                     <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">المورد</label>
                     <div className="relative">
@@ -946,7 +1112,9 @@ export const PaymentVouchers: React.FC = () => {
                       </select>
                     </div>
                   </div>
-                ) : (
+                )} 
+                
+                {voucherData.type === 'expense' && (
                   <div>
                     <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">بند المصروف</label>
                     <div className="relative">
@@ -985,21 +1153,23 @@ export const PaymentVouchers: React.FC = () => {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">المبلغ</label>
-                  <div className="relative">
-                    <Wallet className="absolute left-3 top-3 text-emerald-500" size={18} />
-                    <input 
-                      required
-                      type="number" 
-                      step="0.01"
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all font-bold text-lg"
-                      placeholder="0.00"
-                      value={voucherData.amount || ''}
-                      onChange={(e) => setVoucherData({...voucherData, amount: Number(e.target.value)})}
-                    />
+                {voucherData.type !== 'multi' && (
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">المبلغ الإجمالي</label>
+                    <div className="relative">
+                      <Wallet className="absolute left-3 top-3 text-emerald-500" size={18} />
+                      <input 
+                        required
+                        type="number" 
+                        step="0.01"
+                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all font-bold text-lg"
+                        placeholder="0.00"
+                        value={voucherData.amount || ''}
+                        onChange={(e) => setVoucherData({...voucherData, amount: Number(e.target.value)})}
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">طريقة الصرف (من خزينة/بنك)</label>
@@ -1024,6 +1194,121 @@ export const PaymentVouchers: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {voucherData.type === 'multi' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-zinc-100 pb-2">
+                    <h4 className="font-bold text-zinc-900 italic">بنود السند</h4>
+                    <button 
+                      type="button"
+                      onClick={() => setVoucherData({
+                        ...voucherData,
+                        items: [...voucherData.items, { type: 'supplier', entity_id: '', amount: 0, description: '' }]
+                      })}
+                      className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all font-bold flex items-center gap-1"
+                    >
+                      <Plus size={18} />
+                      إضافة بند
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="text-zinc-500 text-[10px] uppercase font-black tracking-widest text-right">
+                          <th className="px-2 py-2">النوع</th>
+                          <th className="px-2 py-2">المستفيد / الحساب</th>
+                          <th className="px-2 py-2">المبلغ</th>
+                          <th className="px-2 py-2">الوصف</th>
+                          <th className="px-2 py-2 text-left"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-50">
+                        {voucherData.items.map((item, idx) => (
+                          <tr key={idx} className="group">
+                            <td className="px-1 py-2">
+                              <select 
+                                className="w-full px-2 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-xs outline-none"
+                                value={item.type}
+                                onChange={(e) => {
+                                  const newItems = [...voucherData.items];
+                                  newItems[idx].type = e.target.value;
+                                  newItems[idx].entity_id = '';
+                                  setVoucherData({...voucherData, items: newItems});
+                                }}
+                              >
+                                <option value="supplier">مورد</option>
+                                <option value="expense">بند مصروف</option>
+                                <option value="account">حساب عام</option>
+                              </select>
+                            </td>
+                            <td className="px-1 py-2">
+                              <select 
+                                className="w-full px-2 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-xs outline-none"
+                                value={item.entity_id}
+                                onChange={(e) => {
+                                  const newItems = [...voucherData.items];
+                                  newItems[idx].entity_id = e.target.value;
+                                  setVoucherData({...voucherData, items: newItems});
+                                }}
+                              >
+                                <option value="">اختر...</option>
+                                {item.type === 'supplier' && suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                {item.type === 'expense' && categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                {item.type === 'account' && accounts.map(a => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)}
+                              </select>
+                            </td>
+                            <td className="px-1 py-2">
+                              <input 
+                                type="number" 
+                                className="w-full px-2 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-xs outline-none font-bold"
+                                value={item.amount || ''}
+                                onChange={(e) => {
+                                  const newItems = [...voucherData.items];
+                                  newItems[idx].amount = Number(e.target.value);
+                                  setVoucherData({...voucherData, items: newItems});
+                                }}
+                              />
+                            </td>
+                            <td className="px-1 py-2">
+                              <input 
+                                type="text" 
+                                className="w-full px-2 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-xs outline-none"
+                                value={item.description}
+                                onChange={(e) => {
+                                  const newItems = [...voucherData.items];
+                                  newItems[idx].description = e.target.value;
+                                  setVoucherData({...voucherData, items: newItems});
+                                }}
+                              />
+                            </td>
+                            <td className="px-1 py-2 text-left">
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  const newItems = voucherData.items.filter((_, i) => i !== idx);
+                                  setVoucherData({...voucherData, items: newItems});
+                                }}
+                                className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-zinc-50">
+                          <td colSpan={2} className="px-2 py-3 font-bold text-zinc-900 border-t border-zinc-200">الإجمالي:</td>
+                          <td className="px-2 py-3 font-black text-emerald-600 border-t border-zinc-200">
+                            {formatNumber(voucherData.items.reduce((sum, item) => sum + item.amount, 0))}
+                          </td>
+                          <td colSpan={2} className="border-t border-zinc-200"></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">البيان / ملاحظات</label>
@@ -1102,6 +1387,10 @@ export const PaymentVouchers: React.FC = () => {
                     <div className="text-right">
                       <h1 className="text-3xl font-black text-emerald-600 mb-2">سند صرف</h1>
                       <p className="text-zinc-500">التاريخ: {formatDate(viewVoucher.date)}</p>
+                      <p className="text-xs text-zinc-400 mt-1 font-mono">المرجع: {viewVoucher.internal_reference || viewVoucher.voucher_number}</p>
+                      {viewVoucher.manual_reference && (
+                        <p className="text-xs text-zinc-400 font-mono">مرجع يدوي: {viewVoucher.manual_reference}</p>
+                      )}
                     </div>
                     <div className="text-left">
                       <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl">
@@ -1110,22 +1399,63 @@ export const PaymentVouchers: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-8 p-6 bg-zinc-50 rounded-2xl border border-zinc-100">
-                    <div>
-                      <p className="text-xs text-zinc-400 uppercase tracking-wider mb-1">يصرف للسيد / السادة</p>
-                      <p className="text-lg font-bold text-zinc-900">{viewVoucher.supplier_name || viewVoucher.expense_category_name || '---'}</p>
+                  {viewVoucher.voucher_type === 'multi' && viewVoucher.items ? (
+                    <div className="overflow-hidden border border-zinc-100 rounded-2xl">
+                      <table className="w-full text-right">
+                        <thead className="bg-zinc-50 text-xs text-zinc-500 uppercase font-bold">
+                          <tr>
+                            <th className="px-4 py-3">البند / المستفيد</th>
+                            <th className="px-4 py-3">الوصف</th>
+                            <th className="px-4 py-3 text-left">المبلغ</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-100">
+                          {viewVoucher.items.map((item: any, idx: number) => {
+                            let name = '';
+                            if (item.type === 'supplier') name = suppliers.find(s => s.id === item.entity_id)?.name || 'مورد';
+                            else if (item.type === 'expense') name = categories.find(c => c.id === item.entity_id)?.name || 'مصروف';
+                            else name = accounts.find(a => a.id === item.entity_id)?.name || 'حساب';
+
+                            return (
+                              <tr key={idx}>
+                                <td className="px-4 py-3">
+                                  <div className="font-bold text-zinc-900">{name}</div>
+                                  <div className="text-[10px] text-zinc-400 capitalize">{item.type}</div>
+                                </td>
+                                <td className="px-4 py-3 text-zinc-500 text-sm">{item.description}</td>
+                                <td className="px-4 py-3 text-left font-bold text-zinc-900">{formatNumber(item.amount)}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot className="bg-zinc-50/50">
+                          <tr>
+                            <td colSpan={2} className="px-4 py-3 font-bold text-zinc-900 text-left">الإجمالي:</td>
+                            <td className="px-4 py-3 text-left font-black text-emerald-600 text-lg">{formatNumber(viewVoucher.amount)} ج.م</td>
+                          </tr>
+                        </tfoot>
+                      </table>
                     </div>
-                    <div className="text-left">
-                      <p className="text-xs text-zinc-400 uppercase tracking-wider mb-1">المبلغ</p>
-                      <p className="text-2xl font-black text-emerald-600">{formatNumber(viewVoucher.amount)} ج.م</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-8 p-6 bg-zinc-50 rounded-2xl border border-zinc-100">
+                      <div>
+                        <p className="text-xs text-zinc-400 uppercase tracking-wider mb-1">يصرف للسيد / السادة</p>
+                        <p className="text-lg font-bold text-zinc-900">{viewVoucher.supplier_name || viewVoucher.category_name || '---'}</p>
+                      </div>
+                      <div className="text-left">
+                        <p className="text-xs text-zinc-400 uppercase tracking-wider mb-1">المبلغ</p>
+                        <p className="text-2xl font-black text-emerald-600">{formatNumber(viewVoucher.amount)} ج.م</p>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="space-y-4">
-                    <div className="flex justify-between py-3 border-b border-zinc-100">
-                      <span className="text-zinc-500">وذلك عن:</span>
-                      <span className="font-bold text-zinc-900">{viewVoucher.description || '---'}</span>
-                    </div>
+                    {viewVoucher.voucher_type !== 'multi' && (
+                      <div className="flex justify-between py-3 border-b border-zinc-100">
+                        <span className="text-zinc-500">وذلك عن:</span>
+                        <span className="font-bold text-zinc-900">{viewVoucher.description || '---'}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between py-3 border-b border-zinc-100">
                       <span className="text-zinc-500">طريقة الصرف:</span>
                       <span className="font-bold text-zinc-900">{viewVoucher.payment_method_name || '---'}</span>

@@ -275,9 +275,19 @@ export interface ReceiptVoucher {
   company_id: string;
 }
 
+export interface PaymentVoucherItem {
+  type: 'supplier' | 'expense' | 'account';
+  entity_id: string;
+  entity_name?: string;
+  amount: number;
+  description?: string;
+}
+
 export interface PaymentVoucher {
   id: string;
   voucher_number?: string;
+  internal_reference?: string;
+  manual_reference?: string;
   supplier_id?: string;
   supplier_name?: string;
   expense_category_id?: string;
@@ -289,6 +299,7 @@ export interface PaymentVoucher {
   payment_method_name?: string;
   account_id?: string;
   company_id: string;
+  items?: PaymentVoucherItem[];
 }
 
 export interface Return {
