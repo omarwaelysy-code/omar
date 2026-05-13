@@ -87,6 +87,7 @@ export const PaymentVouchers: React.FC = () => {
     type: 'multi' as 'supplier' | 'expense' | 'multi',
     supplier_id: '',
     expense_category_id: '',
+    customer_id: '',
     amount: 0,
     payment_method_id: '',
     date: new Date().toISOString().slice(0, 10),
@@ -622,6 +623,7 @@ export const PaymentVouchers: React.FC = () => {
         type: 'multi',
         supplier_id: '',
         expense_category_id: '',
+        customer_id: '',
         amount: 0,
         payment_method_id: '',
         date: new Date().toISOString().slice(0, 10),
@@ -718,13 +720,15 @@ export const PaymentVouchers: React.FC = () => {
       let items = [];
       if (fullData.items && Array.isArray(fullData.items) && fullData.items.length > 0) {
         items = fullData.items.map((item: any) => ({
-          type: item.type || 'supplier',
+          type: item.type || 'account',
           entity_id: item.entity_id || '',
           amount: item.amount || 0,
           description: item.description || ''
         }));
       } else {
         // Convert old single-type format to multi-item array
+        // IMPORTANT: We prioritize supplier_id and expense_category_id as the "Benefit" side.
+        // We DO NOT use account_id here because in payment_vouchers, account_id is the Cash/Bank side.
         if (fullData.supplier_id && fullData.supplier_id !== '') {
           items.push({ 
             type: 'supplier', 
@@ -739,10 +743,10 @@ export const PaymentVouchers: React.FC = () => {
             amount: fullData.amount || 0, 
             description: fullData.description || '' 
           });
-        } else if (fullData.account_id && fullData.account_id !== '') {
+        } else if (fullData.customer_id && fullData.customer_id !== '') {
           items.push({ 
-            type: 'account', 
-            entity_id: fullData.account_id, 
+            type: 'customer', 
+            entity_id: fullData.customer_id, 
             amount: fullData.amount || 0, 
             description: fullData.description || '' 
           });
@@ -750,12 +754,13 @@ export const PaymentVouchers: React.FC = () => {
       }
 
       setVoucherData({
-        internal_reference: fullData.internal_reference || fullData.voucher_number || fullData.number || '',
+        internal_reference: fullData.internal_reference || fullData.voucher_number || fullData.number || fullData.id || '',
         manual_reference: fullData.manual_reference || '',
         items: items,
         type: 'multi', // Force multi mode for everything going forward
         supplier_id: fullData.supplier_id?.toString() || '',
         expense_category_id: fullData.expense_category_id?.toString() || '',
+        customer_id: fullData.customer_id?.toString() || '',
         amount: fullData.amount || 0,
         payment_method_id: fullData.payment_method_id?.toString() || '',
         date: fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
@@ -1065,6 +1070,7 @@ export const PaymentVouchers: React.FC = () => {
                   type: 'multi',
                   supplier_id: '',
                   expense_category_id: '',
+                  customer_id: '',
                   amount: 0,
                   payment_method_id: '',
                   date: new Date().toISOString().slice(0, 10),
