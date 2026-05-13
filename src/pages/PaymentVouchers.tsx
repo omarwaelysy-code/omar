@@ -728,7 +728,6 @@ export const PaymentVouchers: React.FC = () => {
       } else {
         // Convert old single-type format to multi-item array
         // IMPORTANT: We prioritize supplier_id and expense_category_id as the "Benefit" side.
-        // We DO NOT use account_id here because in payment_vouchers, account_id is the Cash/Bank side.
         if (fullData.supplier_id && fullData.supplier_id !== '') {
           items.push({ 
             type: 'supplier', 
@@ -750,11 +749,18 @@ export const PaymentVouchers: React.FC = () => {
             amount: fullData.amount || 0, 
             description: fullData.description || '' 
           });
+        } else if (fullData.account_id && fullData.account_id !== '') {
+          items.push({ 
+            type: 'account', 
+            entity_id: fullData.account_id, 
+            amount: fullData.amount || 0, 
+            description: fullData.description || '' 
+          });
         }
       }
 
       setVoucherData({
-        internal_reference: fullData.internal_reference || fullData.voucher_number || fullData.number || fullData.id || '',
+        internal_reference: fullData.internal_reference || fullData.voucher_number || fullData.number || '',
         manual_reference: fullData.manual_reference || '',
         items: items,
         type: 'multi', // Force multi mode for everything going forward
