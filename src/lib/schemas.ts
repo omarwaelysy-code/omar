@@ -19,6 +19,8 @@ export const JournalEntryItemSchema = z.object({
   customer_name: z.string().nullable().optional(),
   supplier_id: z.string().nullable().optional(),
   supplier_name: z.string().nullable().optional(),
+  sub_account_id: z.string().nullable().optional(),
+  sub_account_type: z.enum(['customer', 'supplier', 'payment_method', 'other']).nullable().optional(),
 });
 
 // Journal Entry (The Double Entry Core)
@@ -66,7 +68,7 @@ export const InvoiceSchema = BaseSchema.extend({
 
 // Voucher (Receipt/Payment)
 export const VoucherItemSchema = z.object({
-  type: z.enum(['supplier', 'expense', 'account']),
+  type: z.enum(['supplier', 'customer', 'expense', 'account']),
   entity_id: z.string(),
   entity_name: z.string().optional(),
   amount: z.coerce.number().default(0),

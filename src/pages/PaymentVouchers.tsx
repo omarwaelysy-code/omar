@@ -207,7 +207,9 @@ export const PaymentVouchers: React.FC = () => {
               credit: 0,
               description: item.description || `سند صرف رقم ${voucher_number} - ${voucherData.notes}`,
               sub_account_id: subAccountId,
-              sub_account_type: subAccountType as 'supplier' | 'customer' | undefined
+              sub_account_type: subAccountType as 'supplier' | 'customer' | undefined,
+              customer_id: item.type === 'customer' ? item.entity_id : undefined,
+              supplier_id: item.type === 'supplier' ? item.entity_id : undefined,
             });
           }
         });
@@ -529,7 +531,9 @@ export const PaymentVouchers: React.FC = () => {
             credit: 0,
             description: item.description || `سند صرف رقم ${voucher_number} - ${voucherData.notes}`,
             sub_account_id: subAccountId,
-            sub_account_type: subAccountType
+            sub_account_type: subAccountType,
+            customer_id: item.type === 'customer' ? item.entity_id : undefined,
+            supplier_id: item.type === 'supplier' ? item.entity_id : undefined,
           });
         });
       } else {
@@ -1131,14 +1135,14 @@ export const PaymentVouchers: React.FC = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">مرجع البرنامج (تلقائي)</label>
+                  <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">مرجع البرنامج</label>
                   <div className="relative">
                     <Hash className="absolute left-3 top-3 text-zinc-400" size={18} />
                     <input 
                       type="text" 
-                      readOnly
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-100 border border-zinc-200 rounded-xl outline-none text-zinc-500 font-mono"
+                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all font-mono"
                       value={voucherData.internal_reference}
+                      onChange={(e) => setVoucherData({...voucherData, internal_reference: e.target.value})}
                     />
                   </div>
                 </div>
@@ -1456,10 +1460,15 @@ export const PaymentVouchers: React.FC = () => {
                     <div className="text-right">
                       <h1 className="text-3xl font-black text-emerald-600 mb-2">سند صرف</h1>
                       <p className="text-zinc-500">التاريخ: {formatDate(viewVoucher.date)}</p>
-                      <p className="text-xs text-zinc-400 mt-1 font-mono">المرجع: {viewVoucher.internal_reference || viewVoucher.voucher_number}</p>
-                      {viewVoucher.manual_reference && (
-                        <p className="text-xs text-zinc-400 font-mono">مرجع يدوي: {viewVoucher.manual_reference}</p>
-                      )}
+                      <div className="mt-2 space-y-1">
+                        <p className="text-xs text-zinc-400 font-mono">رقم السند: {viewVoucher.voucher_number}</p>
+                        {viewVoucher.internal_reference && viewVoucher.internal_reference !== viewVoucher.voucher_number && (
+                          <p className="text-xs text-zinc-400 font-mono">الرقم المرجعي: {viewVoucher.internal_reference}</p>
+                        )}
+                        {viewVoucher.manual_reference && (
+                          <p className="text-xs text-zinc-400 font-mono">مرجع يدوي: {viewVoucher.manual_reference}</p>
+                        )}
+                      </div>
                     </div>
                     <div className="text-left">
                       <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl">
@@ -1468,7 +1477,7 @@ export const PaymentVouchers: React.FC = () => {
                     </div>
                   </div>
 
-                  {viewVoucher.voucher_type === 'multi' && viewVoucher.items ? (
+                  {(viewVoucher.items && viewVoucher.items.length > 0) ? (
                     <div className="overflow-hidden border border-zinc-100 rounded-2xl">
                       <table className="w-full text-right">
                         <thead className="bg-zinc-50 text-xs text-zinc-500 uppercase font-bold">

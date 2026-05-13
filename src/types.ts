@@ -276,7 +276,7 @@ export interface ReceiptVoucher {
 }
 
 export interface PaymentVoucherItem {
-  type: 'supplier' | 'expense' | 'account';
+  type: 'supplier' | 'customer' | 'expense' | 'account';
   entity_id: string;
   entity_name?: string;
   amount: number;
