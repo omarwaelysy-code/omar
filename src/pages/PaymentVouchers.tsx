@@ -31,6 +31,7 @@ export const PaymentVouchers: React.FC = () => {
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
   const [vouchers, setVouchers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -83,7 +84,7 @@ export const PaymentVouchers: React.FC = () => {
     internal_reference: '',
     manual_reference: '',
     items: [] as any[],
-    type: 'supplier' as 'supplier' | 'expense' | 'multi',
+    type: 'multi' as 'supplier' | 'expense' | 'multi',
     supplier_id: '',
     expense_category_id: '',
     amount: 0,
@@ -125,6 +126,7 @@ export const PaymentVouchers: React.FC = () => {
       const unsubCategories = dbService.subscribe<ExpenseCategory>('expense_categories', user.company_id, setCategories);
       const unsubPM = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setPaymentMethods);
       const unsubAccounts = dbService.subscribe<any>('accounts', user.company_id, setAccounts);
+      const unsubCustomers = dbService.subscribe<any>('customers', user.company_id, setCustomers);
       
       setLoading(false);
       return () => {
@@ -133,6 +135,7 @@ export const PaymentVouchers: React.FC = () => {
         unsubCategories();
         unsubPM();
         unsubAccounts();
+        unsubCustomers();
       };
     }
   }, [user]);
@@ -180,6 +183,12 @@ export const PaymentVouchers: React.FC = () => {
             debitAccountName = supplier?.account_name || '';
             subAccountId = supplier?.id;
             subAccountType = 'supplier';
+          } else if (item.type === 'customer') {
+            const customer = customers.find(c => c.id === item.entity_id);
+            debitAccountId = customer?.account_id || '';
+            debitAccountName = customer?.account_name || '';
+            subAccountId = customer?.id;
+            subAccountType = 'customer';
           } else if (item.type === 'expense') {
             const category = categories.find(c => c.id === item.entity_id);
             debitAccountId = category?.account_id || '';
@@ -198,7 +207,7 @@ export const PaymentVouchers: React.FC = () => {
               credit: 0,
               description: item.description || `سند صرف رقم ${voucher_number} - ${voucherData.notes}`,
               sub_account_id: subAccountId,
-              sub_account_type: subAccountType as 'supplier' | undefined
+              sub_account_type: subAccountType as 'supplier' | 'customer' | undefined
             });
           }
         });
@@ -497,6 +506,12 @@ export const PaymentVouchers: React.FC = () => {
             debitAccountName = supplier?.account_name || '';
             subAccountId = supplier?.id;
             subAccountType = 'supplier';
+          } else if (item.type === 'customer') {
+            const customer = customers.find(c => c.id === item.entity_id);
+            debitAccountId = customer?.account_id || '';
+            debitAccountName = customer?.account_name || '';
+            subAccountId = customer?.id;
+            subAccountType = 'customer';
           } else if (item.type === 'expense') {
             const category = categories.find(c => c.id === item.entity_id);
             debitAccountId = category?.account_id || '';
@@ -600,7 +615,7 @@ export const PaymentVouchers: React.FC = () => {
         internal_reference: '',
         manual_reference: '',
         items: [],
-        type: 'supplier',
+        type: 'multi',
         supplier_id: '',
         expense_category_id: '',
         amount: 0,
@@ -694,11 +709,24 @@ export const PaymentVouchers: React.FC = () => {
       if (!fullData) throw new Error('Payment voucher not found');
 
       setEditingVoucher(fullData);
+      
+      // If it's an old single-type voucher, convert it to multi-type on the fly for editing
+      const items = fullData.items || [];
+      const vType = fullData.voucher_type || (fullData.supplier_id ? 'supplier' : 'expense');
+      
+      if (items.length === 0 && (fullData.supplier_id || fullData.expense_category_id)) {
+        if (fullData.supplier_id) {
+          items.push({ type: 'supplier', entity_id: fullData.supplier_id, amount: fullData.amount, description: fullData.description || '' });
+        } else if (fullData.expense_category_id) {
+          items.push({ type: 'expense', entity_id: fullData.expense_category_id, amount: fullData.amount, description: fullData.description || '' });
+        }
+      }
+
       setVoucherData({
         internal_reference: fullData.internal_reference || fullData.voucher_number || '',
         manual_reference: fullData.manual_reference || '',
-        items: fullData.items || [],
-        type: fullData.voucher_type || (fullData.supplier_id ? 'supplier' : 'expense'),
+        items: items,
+        type: 'multi', // Force multi mode for everything going forward
         supplier_id: fullData.supplier_id?.toString() || '',
         expense_category_id: fullData.expense_category_id?.toString() || '',
         amount: fullData.amount,
@@ -831,8 +859,18 @@ export const PaymentVouchers: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 font-bold text-zinc-900">
-                      {voucher.voucher_type === 'multi' ? (
-                        <span className="text-zinc-500 italic">متعدد ({voucher.items?.length || 0})</span>
+                      {voucher.items && voucher.items.length > 0 ? (
+                        <div className="flex flex-col gap-0.5">
+                          {voucher.items.slice(0, 2).map((item: any, i: number) => {
+                            let name = '...';
+                            if (item.type === 'supplier') name = suppliers.find(s => s.id === item.entity_id)?.name || 'مورد';
+                            else if (item.type === 'customer') name = customers.find(c => c.id === item.entity_id)?.name || 'عميل';
+                            else if (item.type === 'expense') name = categories.find(c => c.id === item.entity_id)?.name || 'مصروف';
+                            else name = accounts.find(a => a.id === item.entity_id)?.name || 'حساب';
+                            return <span key={i} className="text-xs">{name}</span>;
+                          })}
+                          {voucher.items.length > 2 && <span className="text-[10px] text-zinc-400">+{voucher.items.length - 2} آخرين</span>}
+                        </div>
                       ) : (
                         voucher.type === 'supplier' ? voucher.supplier_name : voucher.category_name
                       )}
@@ -915,8 +953,18 @@ export const PaymentVouchers: React.FC = () => {
                       )}
                     </div>
                     <h4 className="font-bold text-zinc-900 group-hover:text-emerald-700 transition-colors text-xl mt-1 tracking-tight">
-                      {voucher.voucher_type === 'multi' ? (
-                        <span className="text-zinc-500 italic">متعدد ({voucher.items?.length || 0})</span>
+                      {voucher.items && voucher.items.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                           {voucher.items.slice(0, 1).map((item: any, i: number) => {
+                            let name = '...';
+                            if (item.type === 'supplier') name = suppliers.find(s => s.id === item.entity_id)?.name || 'مورد';
+                            else if (item.type === 'customer') name = customers.find(c => c.id === item.entity_id)?.name || 'عميل';
+                            else if (item.type === 'expense') name = categories.find(c => c.id === item.entity_id)?.name || 'مصروف';
+                            else name = accounts.find(a => a.id === item.entity_id)?.name || 'حساب';
+                            return <span key={i}>{name}</span>;
+                          })}
+                          {voucher.items.length > 1 && <span className="text-xs text-zinc-400">+{voucher.items.length - 1} آخرين</span>}
+                        </div>
                       ) : (
                         voucher.type === 'supplier' ? voucher.supplier_name : voucher.category_name
                       )}
@@ -987,7 +1035,7 @@ export const PaymentVouchers: React.FC = () => {
                   internal_reference: '',
                   manual_reference: '',
                   items: [],
-                  type: 'supplier',
+                  type: 'multi',
                   supplier_id: '',
                   expense_category_id: '',
                   amount: 0,
@@ -1050,7 +1098,8 @@ export const PaymentVouchers: React.FC = () => {
                   }}
                   transactionType="payment_voucher"
                 />
-              <div className="flex bg-zinc-100 p-1 rounded-2xl">
+              {/* Hide top-level type tabs as requested - switching to multi-mode by default */}
+              <div className="hidden bg-zinc-100 p-1 rounded-2xl">
                 <button
                   type="button"
                   onClick={() => setVoucherData({...voucherData, type: 'supplier', expense_category_id: ''})}
@@ -1255,6 +1304,7 @@ export const PaymentVouchers: React.FC = () => {
                                 }}
                               >
                                 <option value="supplier">مورد</option>
+                                <option value="customer">عميل</option>
                                 <option value="expense">بند مصروف</option>
                                 <option value="account">حساب عام</option>
                               </select>
@@ -1271,6 +1321,7 @@ export const PaymentVouchers: React.FC = () => {
                               >
                                 <option value="">اختر...</option>
                                 {item.type === 'supplier' && suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                {item.type === 'customer' && customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                 {item.type === 'expense' && categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                 {item.type === 'account' && accounts.map(a => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)}
                               </select>
@@ -1431,6 +1482,7 @@ export const PaymentVouchers: React.FC = () => {
                           {viewVoucher.items.map((item: any, idx: number) => {
                             let name = '';
                             if (item.type === 'supplier') name = suppliers.find(s => s.id === item.entity_id)?.name || 'مورد';
+                            else if (item.type === 'customer') name = customers.find(c => c.id === item.entity_id)?.name || 'عميل';
                             else if (item.type === 'expense') name = categories.find(c => c.id === item.entity_id)?.name || 'مصروف';
                             else name = accounts.find(a => a.id === item.entity_id)?.name || 'حساب';
 
