@@ -471,9 +471,9 @@ export const PaymentVouchers: React.FC = () => {
     try {
       const paymentMethod = paymentMethods.find(pm => pm.id === voucherData.payment_method_id);
       
-      const voucher_number = voucherData.internal_reference || (editingVoucher 
+      const voucher_number = editingVoucher 
         ? (editingVoucher.voucher_number || editingVoucher.number) 
-        : `PAY-${Date.now().toString().slice(-6)}`);
+        : (voucherData.internal_reference || `PAY-${Date.now().toString().slice(-6)}`);
 
       const data: any = {
         voucher_number,
@@ -714,29 +714,52 @@ export const PaymentVouchers: React.FC = () => {
 
       setEditingVoucher(fullData);
       
-      // If it's an old single-type voucher, convert it to multi-type on the fly for editing
-      const items = fullData.items || [];
-      const vType = fullData.voucher_type || (fullData.supplier_id ? 'supplier' : 'expense');
-      
-      if (items.length === 0 && (fullData.supplier_id || fullData.expense_category_id)) {
-        if (fullData.supplier_id) {
-          items.push({ type: 'supplier', entity_id: fullData.supplier_id, amount: fullData.amount, description: fullData.description || '' });
-        } else if (fullData.expense_category_id) {
-          items.push({ type: 'expense', entity_id: fullData.expense_category_id, amount: fullData.amount, description: fullData.description || '' });
+      // Ensure we have a clean copy of items or create from old format
+      let items = [];
+      if (fullData.items && Array.isArray(fullData.items) && fullData.items.length > 0) {
+        items = fullData.items.map((item: any) => ({
+          type: item.type || 'supplier',
+          entity_id: item.entity_id || '',
+          amount: item.amount || 0,
+          description: item.description || ''
+        }));
+      } else {
+        // Convert old single-type format to multi-item array
+        if (fullData.supplier_id && fullData.supplier_id !== '') {
+          items.push({ 
+            type: 'supplier', 
+            entity_id: fullData.supplier_id, 
+            amount: fullData.amount || 0, 
+            description: fullData.description || '' 
+          });
+        } else if (fullData.expense_category_id && fullData.expense_category_id !== '') {
+          items.push({ 
+            type: 'expense', 
+            entity_id: fullData.expense_category_id, 
+            amount: fullData.amount || 0, 
+            description: fullData.description || '' 
+          });
+        } else if (fullData.account_id && fullData.account_id !== '') {
+          items.push({ 
+            type: 'account', 
+            entity_id: fullData.account_id, 
+            amount: fullData.amount || 0, 
+            description: fullData.description || '' 
+          });
         }
       }
 
       setVoucherData({
-        internal_reference: fullData.internal_reference || fullData.voucher_number || '',
+        internal_reference: fullData.internal_reference || fullData.voucher_number || fullData.number || '',
         manual_reference: fullData.manual_reference || '',
         items: items,
         type: 'multi', // Force multi mode for everything going forward
         supplier_id: fullData.supplier_id?.toString() || '',
         expense_category_id: fullData.expense_category_id?.toString() || '',
-        amount: fullData.amount,
+        amount: fullData.amount || 0,
         payment_method_id: fullData.payment_method_id?.toString() || '',
         date: fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
-        notes: fullData.description || ''
+        notes: fullData.description || fullData.notes || ''
       });
       setIsModalOpen(true);
       console.log('[EDIT] Form updated with payment voucher:', fullData.id);
@@ -848,7 +871,7 @@ export const PaymentVouchers: React.FC = () => {
                   <tr key={voucher.id} className="hover:bg-zinc-50/50 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1">
-                        <span className="font-mono text-[10px] bg-zinc-100 px-2 py-1 rounded text-zinc-700 font-bold w-fit">{voucher.internal_reference || voucher.voucher_number}</span>
+                        <span className="font-mono text-[10px] bg-zinc-100 px-2 py-1 rounded text-zinc-700 font-bold w-fit">{voucher.internal_reference || voucher.voucher_number || voucher.number}</span>
                         {voucher.manual_reference && (
                           <span className="text-[10px] text-zinc-400 font-mono italic">M: {voucher.manual_reference}</span>
                         )}
@@ -948,7 +971,7 @@ export const PaymentVouchers: React.FC = () => {
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100 italic">
-                        {voucher.internal_reference || voucher.voucher_number}
+                        {voucher.internal_reference || voucher.voucher_number || voucher.number}
                       </span>
                       {voucher.manual_reference && (
                         <span className="font-mono text-[9px] text-zinc-400">
@@ -1461,8 +1484,8 @@ export const PaymentVouchers: React.FC = () => {
                       <h1 className="text-3xl font-black text-emerald-600 mb-2">سند صرف</h1>
                       <p className="text-zinc-500">التاريخ: {formatDate(viewVoucher.date)}</p>
                       <div className="mt-2 space-y-1">
-                        <p className="text-xs text-zinc-400 font-mono">رقم السند: {viewVoucher.voucher_number}</p>
-                        {viewVoucher.internal_reference && viewVoucher.internal_reference !== viewVoucher.voucher_number && (
+                        <p className="text-xs text-zinc-400 font-mono">رقم السند: {viewVoucher.voucher_number || viewVoucher.number}</p>
+                        {viewVoucher.internal_reference && viewVoucher.internal_reference !== (viewVoucher.voucher_number || viewVoucher.number) && (
                           <p className="text-xs text-zinc-400 font-mono">الرقم المرجعي: {viewVoucher.internal_reference}</p>
                         )}
                         {viewVoucher.manual_reference && (
