@@ -203,7 +203,7 @@ export const Customers: React.FC = () => {
                 account_name: selectedAccount?.name || '',
                 debit: isNegative ? 0 : absBalance,
                 credit: isNegative ? absBalance : 0,
-                description: 'رصيد افتتاحي',
+                description: `رصيد افتتاحي: ${formData.name}`,
                 customer_id: id,
                 customer_name: formData.name
               },
@@ -212,7 +212,7 @@ export const Customers: React.FC = () => {
                 account_name: counterAccount?.name || '',
                 debit: isNegative ? absBalance : 0,
                 credit: isNegative ? 0 : absBalance,
-                description: `رصيد افتتاحي للعميل: ${formData.name}`
+                description: `الطرف المقابل للرصيد الافتتاحي: ${formData.name}`
               }
             ],
             total_debit: absBalance,
@@ -628,10 +628,9 @@ export const Customers: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-auto md:max-h-[95vh] md:max-w-6xl md:rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col border border-slate-200">
+          <div className="bg-white w-full h-full md:h-auto md:max-h-[95vh] md:max-w-4xl md:rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col border border-slate-200">
             <div className={`p-6 md:p-8 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white z-10 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">

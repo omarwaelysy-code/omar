@@ -376,7 +376,7 @@ export const Dashboard: React.FC = () => {
                 </div>
                 <p className="text-white/60 text-[10px] font-bold uppercase tracking-wider mb-2">رصيد النقدية</p>
                 <h3 className="text-2xl md:text-3xl font-bold tracking-tight">
-                  {formatMoney(Math.abs(stats?.totalCashBalance || 0))} 
+                  {formatMoney(stats?.totalCashBalance || 0)} 
                   <span className="text-xs font-medium text-white/50 uppercase ml-1">SAR</span>
                 </h3>
               </div>
@@ -399,7 +399,7 @@ export const Dashboard: React.FC = () => {
                 </div>
                 <p className="text-white/40 text-[10px] font-bold uppercase tracking-wider mb-2">{t('dashboard.customer_balances')}</p>
                 <h3 className="text-2xl md:text-3xl font-bold tracking-tight">
-                  {formatMoney(Math.abs(stats?.totalCustomerBalances || 0))} 
+                  {formatMoney(stats?.totalCustomerBalances || 0)} 
                   <span className="text-xs font-medium text-white/40 uppercase ml-1">SAR</span>
                 </h3>
               </div>
@@ -422,7 +422,7 @@ export const Dashboard: React.FC = () => {
                 </div>
                 <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2">{t('dashboard.supplier_balances')}</p>
                 <h3 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">
-                  {formatMoney(Math.abs(stats?.totalSupplierBalances || 0))} 
+                  {formatMoney(stats?.totalSupplierBalances || 0)} 
                   <span className="text-xs font-medium text-slate-400 uppercase ml-1">SAR</span>
                 </h3>
               </div>

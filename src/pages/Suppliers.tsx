@@ -203,7 +203,7 @@ export const Suppliers: React.FC = () => {
                 account_name: selectedAccount?.name || '',
                 debit: isNegative ? absBalance : 0,
                 credit: isNegative ? 0 : absBalance,
-                description: 'رصيد افتتاحي',
+                description: `رصيد افتتاحي: ${formData.name}`,
                 supplier_id: id,
                 supplier_name: formData.name
               },
@@ -212,7 +212,7 @@ export const Suppliers: React.FC = () => {
                 account_name: counterAccount?.name || '',
                 debit: isNegative ? 0 : absBalance,
                 credit: isNegative ? absBalance : 0,
-                description: `رصيد افتتاحي للمورد: ${formData.name}`
+                description: `الطرف المقابل للرصيد الافتتاحي: ${formData.name}`
               }
             ],
             total_debit: absBalance,
@@ -592,7 +592,7 @@ export const Suppliers: React.FC = () => {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-6xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+          <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-4xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
             <div className={`p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
               <h3 className="text-lg md:text-xl font-bold text-zinc-900">{editingSupplier ? t('suppliers.edit') : t('suppliers.add')}</h3>
               <button onClick={closeModal} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-xl transition-all"><X size={24} /></button>

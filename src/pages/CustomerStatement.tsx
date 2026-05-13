@@ -98,7 +98,10 @@ export const CustomerStatement: React.FC = () => {
 
       // Add Balance Forward entry OR Opening Balance from profile if not in entries
       const finalAllEntries = [];
-      const hasOpeningBalanceInEntries = allEntries.some(e => e.type === 'opening_balance' || e.description === 'رصيد افتتاحي');
+      const hasOpeningBalanceInEntries = allEntries.some(e => 
+        e.type === 'opening_balance' || 
+        e.description.includes('رصيد افتتاحي')
+      );
 
       if (startDate) {
         // Always add balance forward (as "carried over" balance)
@@ -107,7 +110,7 @@ export const CustomerStatement: React.FC = () => {
           date: startDate,
           type: 'opening_balance',
           reference: '-',
-          description: 'رصيد منقول',
+          description: language === 'ar' ? 'رصيد منقول' : 'Balance Forward',
           debit: balanceForward > 0 ? balanceForward : 0,
           credit: balanceForward < 0 ? Math.abs(balanceForward) : 0,
           balance: balanceForward
@@ -115,11 +118,11 @@ export const CustomerStatement: React.FC = () => {
       } else if (customerOpBal !== 0 && !hasOpeningBalanceInEntries) {
         // If no start date, only add manual opening balance if it's NOT already in the transaction list
         finalAllEntries.push({
-          id: 'balance-forward',
+          id: 'opening-balance',
           date: allEntries[0]?.date || new Date().toISOString().slice(0, 10),
           type: 'opening_balance',
           reference: '-',
-          description: 'رصيد افتتاحي',
+          description: language === 'ar' ? 'رصيد افتتاحي' : 'Opening Balance',
           debit: customerOpBal > 0 ? customerOpBal : 0,
           credit: customerOpBal < 0 ? Math.abs(customerOpBal) : 0,
           balance: customerOpBal
