@@ -93,14 +93,18 @@ export const SupplierStatement: React.FC = () => {
 
       // Calculate balance forward
       const supplierOpBal = Number(supplier?.opening_balance || 0);
-      const hasOpeningBalanceInItems = allItems.some(item => item.type === 'opening_balance' || item.notes === 'رصيد افتتاحي');
+      const hasOpeningBalanceInItems = allItems.some(item => item.type === 'opening_balance' || item.notes.includes('رصيد افتتاحي'));
       
+      const manualOpBal = hasOpeningBalanceInItems ? 0 : supplierOpBal;
       let balanceBefore = 0;
+      
       if (startDate) {
         const itemsBefore = allItems.filter(item => new Date(item.date) < new Date(startDate));
-        balanceBefore = supplierOpBal + itemsBefore.reduce((sum, item) => sum + (Number(item.credit || 0) - Number(item.debit || 0)), 0);
-      } else if (!hasOpeningBalanceInItems) {
-        balanceBefore = supplierOpBal;
+        balanceBefore = manualOpBal + itemsBefore.reduce((sum, item) => sum + (Number(item.credit || 0) - Number(item.debit || 0)), 0);
+      } else {
+        if (manualOpBal !== 0) {
+          balanceBefore = manualOpBal;
+        }
       }
       
       const initialBalance = balanceBefore;
