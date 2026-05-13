@@ -114,6 +114,13 @@ export const PaymentVouchers: React.FC = () => {
     return `${prefix}${nextNum.toString().padStart(4, '0')}`;
   };
 
+  // Dynamic Sub-account Options
+  const subAccounts = [
+    ...customers.map(c => ({ id: c.id, name: c.name, type: 'customer' as const, label: `عميل: ${c.name}` })),
+    ...suppliers.map(s => ({ id: s.id, name: s.name, type: 'supplier' as const, label: `مورد: ${s.name}` })),
+    ...paymentMethods.map(p => ({ id: p.id, name: p.name, type: 'payment_method' as const, label: `خزينة/بنك: ${p.name}` }))
+  ];
+
   useEffect(() => {
     if (!editingVoucher && !voucherData.internal_reference && !loading) {
       setVoucherData(prev => ({ ...prev, internal_reference: generateInternalRef(vouchers) }));
@@ -523,6 +530,12 @@ export const PaymentVouchers: React.FC = () => {
             const account = accounts.find(a => a.id === item.entity_id);
             debitAccountId = account?.id || '';
             debitAccountName = account?.name || '';
+            
+            if (account?.required_sub_account && item.sub_account_id) {
+              const subAccount = subAccounts.find((sa: any) => sa.id === item.sub_account_id);
+              subAccountId = item.sub_account_id;
+              subAccountType = subAccount?.type;
+            }
           }
 
           journalItems.push({
@@ -719,12 +732,28 @@ export const PaymentVouchers: React.FC = () => {
       // Ensure we have a clean copy of items or create from old format
       let items = [];
       if (fullData.items && Array.isArray(fullData.items) && fullData.items.length > 0) {
-        items = fullData.items.map((item: any) => ({
-          type: item.type || 'account',
-          entity_id: item.entity_id || '',
-          amount: item.amount || 0,
-          description: item.description || ''
-        }));
+        items = fullData.items.map((item: any) => {
+          let type = item.type || item.line_type || 'account';
+          let entity_id = item.entity_id || '';
+          let sub_account_id = item.sub_account_id || '';
+
+          if (!entity_id) {
+             if (item.account_id) {
+               if (item.supplier_id || type === 'supplier') { type = 'supplier'; entity_id = item.supplier_id || item.sub_account_id || item.beneficiary_id; }
+               else if (item.customer_id || type === 'customer') { type = 'customer'; entity_id = item.customer_id || item.sub_account_id || item.beneficiary_id; }
+               else if (item.expense_category_id || type === 'expense') { type = 'expense'; entity_id = item.expense_category_id; }
+               else { type = 'account'; entity_id = item.account_id; sub_account_id = item.sub_account_id || item.beneficiary_id || ''; }
+             }
+          }
+
+          return {
+            type,
+            entity_id: entity_id || item.account_id || '', // Fallback to account_id
+            sub_account_id,
+            amount: item.amount || 0,
+            description: item.description || ''
+          };
+        });
       } else {
         // Convert old single-type format to multi-item array
         // IMPORTANT: We prioritize supplier_id and expense_category_id as the "Benefit" side.
@@ -1355,6 +1384,7 @@ export const PaymentVouchers: React.FC = () => {
                                 onChange={(e) => {
                                   const newItems = [...voucherData.items];
                                   newItems[idx].entity_id = e.target.value;
+                                  newItems[idx].sub_account_id = '';
                                   setVoucherData({...voucherData, items: newItems});
                                 }}
                               >
@@ -1364,6 +1394,23 @@ export const PaymentVouchers: React.FC = () => {
                                 {item.type === 'expense' && categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                 {item.type === 'account' && accounts.map(a => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)}
                               </select>
+                              {item.type === 'account' && accounts.find(a => a.id === item.entity_id)?.required_sub_account && (
+                                <select
+                                  className="w-full px-2 py-2 mt-1 bg-blue-50 border border-blue-200 rounded-lg text-xs outline-none"
+                                  value={item.sub_account_id || ''}
+                                  onChange={(e) => {
+                                    const newItems = [...voucherData.items];
+                                    newItems[idx].sub_account_id = e.target.value;
+                                    setVoucherData({...voucherData, items: newItems});
+                                  }}
+                                  required
+                                >
+                                  <option value="">اختر الحساب الفرعي...</option>
+                                  {subAccounts.map(sa => (
+                                    <option key={sa.id} value={sa.id}>{sa.label}</option>
+                                  ))}
+                                </select>
+                              )}
                             </td>
                             <td className="px-1 py-2">
                               <input 
