@@ -714,11 +714,24 @@ export const PaymentVouchers: React.FC = () => {
     }
   };
 
-  const filteredVouchers = vouchers.filter(v => 
-    v.voucher_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    v.supplier_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    v.category_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const sortedVouchers = [...vouchers].sort((a, b) => {
+    const refA = a.internal_reference || a.voucher_number || '';
+    const refB = b.internal_reference || b.voucher_number || '';
+    return refB.localeCompare(refA);
+  });
+
+  const filteredVouchers = sortedVouchers.filter(v => {
+    const searchLow = searchTerm.toLowerCase();
+    return (
+      (v.voucher_number || '').toLowerCase().includes(searchLow) ||
+      (v.internal_reference || '').toLowerCase().includes(searchLow) ||
+      (v.manual_reference || '').toLowerCase().includes(searchLow) ||
+      (v.description || '').toLowerCase().includes(searchLow) ||
+      (v.notes || '').toLowerCase().includes(searchLow) ||
+      (v.supplier_name || '').toLowerCase().includes(searchLow) ||
+      (v.category_name || '').toLowerCase().includes(searchLow)
+    );
+  });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
@@ -789,6 +802,7 @@ export const PaymentVouchers: React.FC = () => {
                   <th className="px-6 py-4 font-bold">النوع</th>
                   <th className="px-6 py-4 font-bold">المستفيد / الفئة</th>
                   <th className="px-6 py-4 font-bold">التاريخ</th>
+                  <th className="px-6 py-4 font-bold">الوصف</th>
                   <th className="px-6 py-4 font-bold">المبلغ</th>
                   <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>الإجراءات</th>
                 </tr>
@@ -824,6 +838,7 @@ export const PaymentVouchers: React.FC = () => {
                       )}
                     </td>
                     <td className="px-6 py-4 text-zinc-500">{formatDate(voucher.date)}</td>
+                    <td className="px-6 py-4 text-zinc-600 max-w-xs">{voucher.description || '---'}</td>
                     <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(voucher.amount)} {t('common.currency')}</td>
                     <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                       <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity no-pdf`}>
@@ -912,6 +927,9 @@ export const PaymentVouchers: React.FC = () => {
                     }`}>
                       {voucher.voucher_type === 'multi' ? 'متعدد' : voucher.type === 'supplier' ? 'مورد' : 'مصروف'}
                     </span>
+                    {voucher.description && (
+                      <p className="text-[10px] text-zinc-500 mt-2 line-clamp-2">{voucher.description}</p>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-200/50 mt-4">
