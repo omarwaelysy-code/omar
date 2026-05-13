@@ -778,13 +778,17 @@ export const PaymentVouchers: React.FC = () => {
             amount: fullData.amount || 0, 
             description: fullData.description || '' 
           });
-        } else if (fullData.account_id && fullData.account_id !== '') {
-          items.push({ 
-            type: 'account', 
-            entity_id: fullData.account_id, 
-            amount: fullData.amount || 0, 
-            description: fullData.description || '' 
-          });
+        } else if (fullData.account_id && fullData.account_id !== '' && fullData.account_id !== fullData.payment_method_account_id) {
+          // Careful: do not map the payment method's account as the beneficiary
+          const isPaymentMethodAccount = paymentMethods.some(pm => pm.account_id === fullData.account_id);
+          if (!isPaymentMethodAccount || (!fullData.supplier_id && !fullData.expense_category_id && !fullData.customer_id)) {
+            items.push({ 
+              type: 'account', 
+              entity_id: fullData.account_id, 
+              amount: fullData.amount || 0, 
+              description: fullData.description || '' 
+            });
+          }
         }
       }
 

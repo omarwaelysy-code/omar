@@ -49,8 +49,21 @@ async function startServer() {
       // Vouchers
       'ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "description" TEXT',
       'ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "voucher_number" VARCHAR(50)',
+      'ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "items" JSONB',
+      'ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "internal_reference" VARCHAR(50)',
+      'ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "manual_reference" VARCHAR(50)',
+      'ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "voucher_type" VARCHAR(50)',
+      'ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "customer_id" VARCHAR(36)',
+      'ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "customer_name" VARCHAR(255)',
+
       'ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "description" TEXT',
       'ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "voucher_number" VARCHAR(50)',
+      'ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "items" JSONB',
+      'ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "internal_reference" VARCHAR(50)',
+      'ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "manual_reference" VARCHAR(50)',
+      'ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "voucher_type" VARCHAR(50)',
+      'ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "supplier_id" VARCHAR(36)',
+      'ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "supplier_name" VARCHAR(255)',
       
       // Returns
       'ALTER TABLE "returns" ADD COLUMN IF NOT EXISTS "description" TEXT',
