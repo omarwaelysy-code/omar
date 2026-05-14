@@ -219,6 +219,8 @@ export const PaymentVouchers: React.FC = () => {
             const category = categories.find(c => c.id === item.entity_id);
             debitAccountId = category?.account_id || '';
             debitAccountName = category?.name || '';
+            subAccountId = category?.id;
+            subAccountType = 'expense';
           } else {
             const account = accounts.find(a => a.id === item.entity_id);
             debitAccountId = account?.id || '';
@@ -268,8 +270,8 @@ export const PaymentVouchers: React.FC = () => {
           debit: voucherData.amount,
           credit: 0,
           description: `سند صرف رقم ${voucher_number} - ${voucherData.type === 'supplier' ? (supplier?.name || '...') : (category?.name || '...')}`,
-          sub_account_id: voucherData.type === 'supplier' ? supplier?.id : undefined,
-          sub_account_type: voucherData.type === 'supplier' ? 'supplier' : undefined
+          sub_account_id: voucherData.type === 'supplier' ? supplier?.id : (voucherData.type === 'expense' ? category?.id : undefined),
+          sub_account_type: voucherData.type === 'supplier' ? 'supplier' : (voucherData.type === 'expense' ? 'expense' : undefined)
         });
       }
 
@@ -544,6 +546,8 @@ export const PaymentVouchers: React.FC = () => {
             const category = categories.find(c => c.id === item.entity_id);
             debitAccountId = category?.account_id || '';
             debitAccountName = category?.name || '';
+            subAccountId = category?.id;
+            subAccountType = 'expense';
           } else {
             const account = accounts.find(a => a.id === item.entity_id);
             debitAccountId = account?.id || '';
@@ -594,8 +598,8 @@ export const PaymentVouchers: React.FC = () => {
           debit: voucherData.amount,
           credit: 0,
           description: `سند صرف رقم ${voucher_number} - ${voucherData.notes}`,
-          sub_account_id: voucherData.type === 'supplier' ? voucherData.supplier_id : undefined,
-          sub_account_type: voucherData.type === 'supplier' ? 'supplier' : undefined,
+          sub_account_id: voucherData.type === 'supplier' ? voucherData.supplier_id : (voucherData.type === 'expense' ? voucherData.expense_category_id : undefined),
+          sub_account_type: voucherData.type === 'supplier' ? 'supplier' : (voucherData.type === 'expense' ? 'expense' : undefined),
           supplier_id: voucherData.type === 'supplier' ? voucherData.supplier_id : undefined
         });
       }

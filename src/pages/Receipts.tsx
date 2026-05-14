@@ -592,7 +592,7 @@ export const Receipts: React.FC = () => {
           {serverSummary.total_amount !== undefined && (
             <div className="mt-2 flex items-center gap-4 text-sm">
                <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
-                 إجمالي المقبوضات: {formatMoney(serverSummary.total_amount)} ج.م
+                 إجمالي المقبوضات: {formatMoney(serverSummary.total_amount)}
                </span>
             </div>
           )}

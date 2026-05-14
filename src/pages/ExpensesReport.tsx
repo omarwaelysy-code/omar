@@ -29,6 +29,13 @@ export const ExpensesReport: React.FC = () => {
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
 
+      const accountToCategoryCount: Record<string, number> = {};
+      categories.forEach((c: any) => {
+        if (c.account_id) {
+          accountToCategoryCount[c.account_id] = (accountToCategoryCount[c.account_id] || 0) + 1;
+        }
+      });
+
       const data = categories.map((cat: any) => {
         let totalAmount = 0;
         const catAccountId = cat.account_id;
@@ -39,12 +46,19 @@ export const ExpensesReport: React.FC = () => {
           const d = new Date(je.date);
           if (d >= start && d <= end) {
             je.items?.forEach((item: any) => {
-              // Be very specific: match by sub_account_id and ensure both are strings for comparison
+              // DETAILED MATCHING LOGIC:
+              // 1. Specific Match: Sub-account ID matches category ID
               const isSpecificSubMatch = item.sub_account_id && 
                                        String(item.sub_account_id) === String(cat.id) && 
                                        item.sub_account_type === 'expense';
               
-              if (isSpecificSubMatch) {
+              // 2. Unique Account Match: Account matches AND this account is NOT shared between multiple categories
+              // This handles legacy data where sub_account_id wasn't saved, but ONLY if there's no risk of duplication.
+              const isUniqueAccountMatch = !item.sub_account_id && 
+                                          item.account_id === catAccountId && 
+                                          accountToCategoryCount[catAccountId] === 1;
+
+              if (isSpecificSubMatch || isUniqueAccountMatch) {
                 totalAmount += (Number(item.debit) || 0) - (Number(item.credit) || 0);
               }
             });

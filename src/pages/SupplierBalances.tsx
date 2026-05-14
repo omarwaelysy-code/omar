@@ -215,7 +215,7 @@ export const SupplierBalances: React.FC = () => {
         <div className="bg-zinc-900 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full -mr-16 -mt-16 group-hover:bg-white/10 transition-colors" />
           <p className="text-zinc-400 text-sm font-bold uppercase tracking-widest mb-1">إجمالي المديونيات للموردين</p>
-          <h3 className="text-3xl font-bold">{formatNumber(Math.abs(totalOutstanding))} ج.م</h3>
+          <h3 className="text-3xl font-bold">{formatNumber(Math.abs(totalOutstanding))}</h3>
           <div className="mt-4 flex items-center gap-2 text-red-400 text-sm">
             <ArrowDownLeft size={16} />
             <span>مستحقات للموردين علينا</span>
@@ -285,7 +285,7 @@ export const SupplierBalances: React.FC = () => {
                   <td className="px-4 py-4 text-zinc-600 font-medium text-sm">{formatBalance(supplier.manualJournalImpact)}</td>
                   <td className="px-4 py-4">
                     <span className={`font-bold text-sm ${supplier.currentBalance > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {formatBalance(supplier.currentBalance)} ج.م
+                      {formatBalance(supplier.currentBalance)}
                     </span>
                   </td>
                 </tr>
@@ -301,7 +301,7 @@ export const SupplierBalances: React.FC = () => {
                   <td className="px-4 py-4">{formatNumber(Math.abs(filteredSuppliers.reduce((sum, s) => sum + (Number(s.totalDiscounts) || 0), 0)))}</td>
                   <td className="px-4 py-4">{formatNumber(Math.abs(filteredSuppliers.reduce((sum, s) => sum + (Number(s.totalVouchers) || 0), 0)))}</td>
                   <td className="px-4 py-4">{formatNumber(Math.abs(filteredSuppliers.reduce((sum, s) => sum + (Number(s.manualJournalImpact) || 0), 0)))}</td>
-                  <td className="px-4 py-4">{formatBalance(totalOutstanding)} ج.م</td>
+                  <td className="px-4 py-4">{formatBalance(totalOutstanding)}</td>
                 </tr>
               </tfoot>
             )}
@@ -351,7 +351,7 @@ export const SupplierBalances: React.FC = () => {
               <div className="flex items-center justify-between pt-2 border-t border-zinc-100">
                 <span className="text-xs font-bold text-zinc-500 uppercase">الرصيد الحالي</span>
                 <span className={`font-bold ${supplier.currentBalance > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {formatBalance(supplier.currentBalance)} ج.م
+                  {formatBalance(supplier.currentBalance)}
                 </span>
               </div>
             </div>

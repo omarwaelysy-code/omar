@@ -287,7 +287,7 @@ export const Dashboard: React.FC = () => {
               <div className="w-[1px] h-3 bg-slate-200" />
               <div className="flex items-center gap-1">
                 <span className="text-[10px] font-bold text-emerald-600 px-2 py-0.5 bg-emerald-50 rounded-md border border-emerald-100 uppercase tracking-tight">
-                  {currentTime.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { month: 'long', year: 'numeric' })}
+                  {currentTime.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { month: 'long' })}
                 </span>
               </div>
               <div className="w-[1px] h-3 bg-slate-200" />
