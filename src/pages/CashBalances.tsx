@@ -124,7 +124,25 @@ export const CashBalances: React.FC = () => {
                     isMatch = true;
                   } else {
                     const matchDesc = (desc: string) => desc && (desc.includes(method.name) || desc.includes(method.code));
-                    isMatch = matchDesc(item.description) || matchDesc(je.description);
+                    
+                    // Special handling for transfers to avoid double-matching when both names are in description
+                    if (je.reference_type === 'transfer' || je.reference_type === 'cash_transfer' || je.description?.includes('تحويل')) {
+                      // Try to be more specific with item description if available
+                      if (item.description) {
+                        // If it's a debit (incoming), it should only match if it's NOT explicitly from us
+                        // or if it explicitly says it's to us
+                        const isToUs = item.description.includes(`إلى ${method.name}`) || item.description.includes(`وارد ${method.name}`);
+                        const isFromUs = item.description.includes(`من ${method.name}`) || item.description.includes(`صادر ${method.name}`);
+                        
+                        if (item.debit > 0) isMatch = isToUs || (matchDesc(item.description) && !isFromUs);
+                        else if (item.credit > 0) isMatch = isFromUs || (matchDesc(item.description) && !isToUs);
+                        else isMatch = matchDesc(item.description);
+                      } else {
+                        isMatch = matchDesc(je.description);
+                      }
+                    } else {
+                      isMatch = matchDesc(item.description) || matchDesc(je.description);
+                    }
                   }
                 }
               }

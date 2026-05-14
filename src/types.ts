@@ -477,7 +477,7 @@ export interface JournalEntryItem {
   supplier_id?: string;
   supplier_name?: string;
   sub_account_id?: string;
-  sub_account_type?: 'customer' | 'supplier' | 'payment_method' | 'other';
+  sub_account_type?: 'customer' | 'supplier' | 'payment_method' | 'expense' | 'other';
 }
 
 export interface TrialBalanceItem {

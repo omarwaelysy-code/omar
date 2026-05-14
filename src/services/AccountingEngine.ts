@@ -94,7 +94,8 @@ export class AccountingEngine {
           // Apply entity filter if provided
           if (entityIds && entityIds.length > 0) {
             const matchesEntity = entityIds.includes(item.customer_id || '') || 
-                                 entityIds.includes(item.supplier_id || '');
+                                 entityIds.includes(item.supplier_id || '') ||
+                                 entityIds.includes(item.sub_account_id || '');
             if (!matchesEntity) return;
           }
 
@@ -110,7 +111,7 @@ export class AccountingEngine {
               debit: debit,
               credit: credit,
               balance: 0,
-              entity_name: item.customer_name || item.supplier_name
+              entity_name: item.customer_name || item.supplier_name || (item.sub_account_type === 'payment_method' ? 'خزينة/بنك' : '')
             });
           }
         }

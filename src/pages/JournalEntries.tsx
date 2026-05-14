@@ -55,7 +55,9 @@ export const JournalEntries: React.FC = () => {
         _limit: limit,
         _sortBy: sortBy,
         _sortOrder: sortOrder,
-        _search: searchTerm
+        _search: searchTerm,
+        date_from: dateRange.start,
+        date_to: dateRange.end
     }, (result: any) => {
       setEntries(result.data);
       setTotalRecords(result.total);
@@ -69,7 +71,7 @@ export const JournalEntries: React.FC = () => {
       unsubscribeEntries();
       unsubscribeAccounts();
     };
-  }, [user, page, limit, sortBy, sortOrder, searchTerm]);
+  }, [user, page, limit, sortBy, sortOrder, searchTerm, dateRange.start, dateRange.end]);
 
   const filteredEntries = entries.filter(entry => {
     const matchesSearch = 

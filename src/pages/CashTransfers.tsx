@@ -209,14 +209,18 @@ export const CashTransfers: React.FC = () => {
           account_name: toPM.account_name || toPM.name || '',
           debit: formData.amount,
           credit: 0,
-          description: `تحويل من ${fromPM.name} إلى ${toPM.name}${formData.description ? ': ' + formData.description : ''}`
+          description: `تحويل من ${fromPM.name} إلى ${toPM.name}${formData.description ? ': ' + formData.description : ''}`,
+          sub_account_id: toPM.id,
+          sub_account_type: 'payment_method'
         },
         {
           account_id: fromPM.account_id || '',
           account_name: fromPM.account_name || fromPM.name || '',
           debit: 0,
           credit: formData.amount,
-          description: `تحويل من ${fromPM.name} إلى ${toPM.name}${formData.description ? ': ' + formData.description : ''}`
+          description: `تحويل من ${fromPM.name} إلى ${toPM.name}${formData.description ? ': ' + formData.description : ''}`,
+          sub_account_id: fromPM.id,
+          sub_account_type: 'payment_method'
         }
       ];
 

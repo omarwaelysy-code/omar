@@ -19,32 +19,29 @@ export const ExpensesReport: React.FC = () => {
     if (!user) return;
     setLoading(true);
     try {
-      const [vouchers, categories] = await Promise.all([
-        dbService.list<any>('payment_vouchers', user.company_id),
+      const [journalEntries, categories] = await Promise.all([
+        dbService.list<any>('journal_entries', user.company_id),
         dbService.list<any>('expense_categories', user.company_id)
       ]);
 
-      const filteredVouchers = vouchers.filter((v: any) => {
-        if (!v.date) return false;
-        const d = typeof v.date === 'string' ? v.date.slice(0, 10) : new Date(v.date).toISOString().slice(0, 10);
-        return d >= startDate && d <= endDate;
-      });
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
 
       const data = categories.map((cat: any) => {
         let totalAmount = 0;
-        const catId = String(cat.id);
+        const catAccountId = cat.account_id;
         
-        filteredVouchers.forEach((v: any) => {
-          // Check top-level expense category
-          if (v.expense_category_id && String(v.expense_category_id) === catId) {
-            totalAmount += Number(v.amount) || 0;
-          }
-          
-          // Check multi-items
-          if (v.items && Array.isArray(v.items)) {
-            v.items.forEach((item: any) => {
-              if (item.type === 'expense' && String(item.entity_id) === catId) {
-                totalAmount += Number(item.amount) || 0;
+        if (!catAccountId) return { code: cat.code, name: cat.name, totalAmount: 0 };
+
+        journalEntries.forEach((je: any) => {
+          const d = new Date(je.date);
+          if (d >= start && d <= end) {
+            je.items?.forEach((item: any) => {
+              // Match by account_id OR by explicit sub_account_id if present
+              if (item.account_id === catAccountId || (item.sub_account_id === cat.id && item.sub_account_type === 'expense')) {
+                totalAmount += (Number(item.debit) || 0) - (Number(item.credit) || 0);
               }
             });
           }
@@ -53,7 +50,7 @@ export const ExpensesReport: React.FC = () => {
         return {
           code: cat.code,
           name: cat.name,
-          totalAmount
+          totalAmount: totalAmount > 0 ? totalAmount : 0
         };
       }).filter((c: any) => c.totalAmount > 0);
 

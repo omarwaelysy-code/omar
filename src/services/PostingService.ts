@@ -366,14 +366,18 @@ export class PostingService {
           account_name: toPm?.account_name || 'حساب بنك/خزينة (مستلم)',
           debit: amount,
           credit: 0,
-          description: `وارد تحويل من ${fromPm?.name || ''}`
+          description: `وارد تحويل من ${fromPm?.name || ''}`,
+          sub_account_id: toPm?.id,
+          sub_account_type: 'payment_method'
         },
         {
           account_id: fromPm?.account_id || '',
           account_name: fromPm?.account_name || 'حساب بنك/خزينة (محول)',
           debit: 0,
           credit: amount,
-          description: `صادر تحويل إلى ${toPm?.name || ''}`
+          description: `صادر تحويل إلى ${toPm?.name || ''}`,
+          sub_account_id: fromPm?.id,
+          sub_account_type: 'payment_method'
         }
       ],
       total_debit: amount,
