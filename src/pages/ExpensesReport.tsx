@@ -8,7 +8,7 @@ import { formatNumber, formatDate } from '../utils/formatUtils';
 
 export const ExpensesReport: React.FC = () => {
   const { user } = useAuth();
-  const { t, dir } = useLanguage();
+  const { t, dir, language } = useLanguage();
   const reportRef = useRef<HTMLDivElement>(null);
   const [startDate, setStartDate] = useState<string>(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10));
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().slice(0, 10));
@@ -19,9 +19,11 @@ export const ExpensesReport: React.FC = () => {
     if (!user) return;
     setLoading(true);
     try {
-      const [journalEntries, categories] = await Promise.all([
+      const [journalEntries, categories, accounts, accountTypes] = await Promise.all([
         dbService.list<any>('journal_entries', user.company_id),
-        dbService.list<any>('expense_categories', user.company_id)
+        dbService.list<any>('expense_categories', user.company_id),
+        dbService.list<any>('accounts', user.company_id),
+        dbService.list<any>('account_types', user.company_id)
       ]);
 
       const start = new Date(startDate);
@@ -29,52 +31,93 @@ export const ExpensesReport: React.FC = () => {
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
 
-      const accountToCategoryCount: Record<string, number> = {};
-      categories.forEach((c: any) => {
-        if (c.account_id) {
-          accountToCategoryCount[c.account_id] = (accountToCategoryCount[c.account_id] || 0) + 1;
+      // Identify which accounts are "Expense" accounts
+      const expenseTypeIds = accountTypes
+        .filter((t: any) => t.classification === 'expense')
+        .map((t: any) => t.id);
+      
+      const expenseAccountIds = new Set(
+        accounts
+          .filter((a: any) => expenseTypeIds.includes(a.type_id))
+          .map((a: any) => a.id)
+      );
+
+      // Map account IDs to category lists
+      const accountToCategories: Record<string, any[]> = {};
+      categories.forEach((cat: any) => {
+        if (cat.account_id) {
+          if (!accountToCategories[cat.account_id]) accountToCategories[cat.account_id] = [];
+          accountToCategories[cat.account_id].push(cat);
         }
       });
 
-      const data = categories.map((cat: any) => {
-        let totalAmount = 0;
-        const catAccountId = cat.account_id;
-        
-        if (!catAccountId) return { code: cat.code, name: cat.name, totalAmount: 0 };
-
-        journalEntries.forEach((je: any) => {
-          const d = new Date(je.date);
-          if (d >= start && d <= end) {
-            je.items?.forEach((item: any) => {
-              // DETAILED MATCHING LOGIC:
-              // 1. Specific Match: Sub-account ID matches category ID
-              const isSpecificSubMatch = item.sub_account_id && 
-                                       String(item.sub_account_id) === String(cat.id) && 
-                                       item.sub_account_type === 'expense';
-              
-              // 2. Unique Account Match: Account matches AND this account is NOT shared between multiple categories
-              // This handles legacy data where sub_account_id wasn't saved, but ONLY if there's no risk of duplication.
-              const isUniqueAccountMatch = !item.sub_account_id && 
-                                          item.account_id === catAccountId && 
-                                          accountToCategoryCount[catAccountId] === 1;
-
-              if (isSpecificSubMatch || isUniqueAccountMatch) {
-                totalAmount += (Number(item.debit) || 0) - (Number(item.credit) || 0);
-              }
-            });
-          }
-        });
-
-        return {
-          code: cat.code,
-          name: cat.name,
-          totalAmount: totalAmount > 0 ? totalAmount : 0
+      // Initialize results for all categories
+      const categoryResults: Record<string, { code: string; name: string; totalAmount: number }> = {};
+      categories.forEach((cat: any) => {
+        categoryResults[cat.id] = {
+          code: cat.code || '',
+          name: cat.name || '',
+          totalAmount: 0
         };
-      }).filter((c: any) => c.totalAmount > 0);
+      });
+
+      let unclassifiedTotal = 0;
+
+      journalEntries.forEach((je: any) => {
+        const entryDate = new Date(je.date);
+        if (entryDate >= start && entryDate <= end) {
+          je.items?.forEach((item: any) => {
+            const amount = (Number(item.debit) || 0) - (Number(item.credit) || 0);
+            if (amount === 0) return;
+
+            // We only care about debit movements in expense accounts (which represent spending)
+            // Or adjustments. Usually expenses are debits.
+            if (!expenseAccountIds.has(item.account_id)) return;
+
+            let matched = false;
+
+            // 1. Direct sub-account match (Preferred)
+            if (item.sub_account_id && item.sub_account_type === 'expense') {
+              if (categoryResults[item.sub_account_id]) {
+                categoryResults[item.sub_account_id].totalAmount += amount;
+                matched = true;
+              }
+            }
+
+            // 2. Account match (For legacy data)
+            if (!matched && item.account_id) {
+              const linkedCats = accountToCategories[item.account_id] || [];
+              if (linkedCats.length > 0) {
+                // If multiple, we have to pick one for legacy data. 
+                // We pick the first one to avoid losing the amount from the report.
+                categoryResults[linkedCats[0].id].totalAmount += amount;
+                matched = true;
+              }
+            }
+
+            // 3. Fallback for items that are clearly expenses but not linked to any category
+            if (!matched) {
+              unclassifiedTotal += amount;
+            }
+          });
+        }
+      });
+
+      const data = Object.values(categoryResults)
+        .filter((c: any) => c.totalAmount !== 0)
+        .sort((a, b) => b.totalAmount - a.totalAmount);
+
+      if (unclassifiedTotal !== 0) {
+        data.push({
+          code: 'MISC',
+          name: language === 'ar' ? 'مصروفات أخرى غير مصنفة' : 'Other Unclassified Expenses',
+          totalAmount: unclassifiedTotal
+        });
+      }
 
       setExpenseData(data);
     } catch (e) {
-      console.error(e);
+      console.error('Error fetching expense report data:', e);
     } finally {
       setLoading(false);
     }
