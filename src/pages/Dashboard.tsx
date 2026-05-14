@@ -72,8 +72,8 @@ const StatCard = ({ title, value, subtitle, icon: Icon, trend, colorClass }: any
     <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${colorClass} opacity-[0.03] rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500`} />
     
     <div className="flex items-center justify-between mb-4 relative z-10">
-      <div className={`p-3 rounded-xl bg-slate-50 border border-slate-100 group-hover:scale-110 transition-transform`}>
-        <Icon size={24} className={colorClass.split(' ')[0].replace('from-', 'text-')} />
+            <div className={`p-3 rounded-xl bg-slate-50 border border-slate-100 group-hover:scale-110 transition-transform`}>
+        <Icon size={24} className={colorClass && typeof colorClass === 'string' ? colorClass.split(' ')[0].replace('from-', 'text-') : ''} />
       </div>
       {trend && (
         <span className={`text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1 ${trend > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
@@ -172,15 +172,30 @@ export const Dashboard: React.FC = () => {
         any[], Account[], AccountType[], any[]
       ];
 
-      const today = new Date().toISOString().split('T')[0];
-      const incomeStatement = AccountingEngine.calculateIncomeStatement(accounts, accountTypes, journalEntries, '2000-01-01', today);
+      const now = new Date();
+      const statsMonth = now.getUTCMonth();
+      const statsYear = now.getUTCFullYear();
+      const today = now.toISOString().split('T')[0];
+      const startOfMonth = new Date(Date.UTC(statsYear, statsMonth, 1)).toISOString().split('T')[0];
+
+      const incomeStatement = AccountingEngine.calculateIncomeStatement(accounts, accountTypes, journalEntries, startOfMonth, today);
       const balanceSheet = AccountingEngine.calculateBalanceSheet(accounts, accountTypes, journalEntries, today);
 
       const netProfit = incomeStatement.netProfit;
       const netSales = incomeStatement.totalRevenues;
       const totalExpensesValue = incomeStatement.totalExpenses + incomeStatement.totalCosts;
       
-      const totalReceipts = receipts.reduce((sum: number, r: ReceiptVoucher) => sum + r.amount, 0);
+      const monthInvoices = invoices.filter(inv => {
+        const d = new Date(inv.date);
+        return d.getUTCMonth() === statsMonth && d.getUTCFullYear() === statsYear;
+      });
+
+      const monthReceipts = receipts.filter(r => {
+        const d = new Date(r.date);
+        return d.getUTCMonth() === statsMonth && d.getUTCFullYear() === statsYear;
+      });
+
+      const totalReceipts = monthReceipts.reduce((sum: number, r: ReceiptVoucher) => sum + (Number(r.amount) || 0), 0);
       const totalCustomerBalances = balanceSheet.assets
         .filter(a => {
           const acc = accounts.find(account => account.id === a.id);
@@ -218,7 +233,7 @@ export const Dashboard: React.FC = () => {
         ...payments.map((p: PaymentVoucher) => ({ id: p.id, type: 'payment' as const, number: p.voucher_number || p.id.slice(-6), customer_name: p.supplier_name || p.description || t('dashboard.unknown_supplier'), date: p.date, total_amount: Number(p.amount) || 0 }))
       ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
 
-      const newStats: DashboardStats = { netProfit, netSales, totalInvoices: invoices.length, totalReceipts, totalExpenses: totalExpensesValue, totalCustomerBalances, totalSupplierBalances, totalCashBalance, salesByMonth, recentTransactions };
+      const newStats: DashboardStats = { netProfit, netSales, totalInvoices: monthInvoices.length, totalReceipts, totalExpenses: totalExpensesValue, totalCustomerBalances, totalSupplierBalances, totalCashBalance, salesByMonth, recentTransactions };
       setStats(newStats);
       
       const cacheKey = `${user.id}_${companyId}`;
@@ -266,6 +281,12 @@ export const Dashboard: React.FC = () => {
               <p className="text-[10px] font-bold uppercase tracking-wider">
                 {currentTime.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
               </p>
+              <div className="w-[1px] h-3 bg-slate-200" />
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-slate-900 px-2 py-0.5 bg-slate-100 rounded-md">
+                  {currentTime.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { month: 'long' })}
+                </span>
+              </div>
               <div className="w-[1px] h-3 bg-slate-200" />
               <span className="text-slate-900 font-mono text-xs font-bold leading-none">{currentTime.toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}</span>
             </div>
@@ -377,7 +398,6 @@ export const Dashboard: React.FC = () => {
                 <p className="text-white/60 text-[10px] font-bold uppercase tracking-wider mb-2">رصيد النقدية</p>
                 <h3 className="text-2xl md:text-3xl font-bold tracking-tight">
                   {formatMoney(stats?.totalCashBalance || 0)} 
-                  <span className="text-xs font-medium text-white/50 uppercase ml-1">SAR</span>
                 </h3>
               </div>
               <div className="flex items-center gap-2 text-white text-[9px] font-bold uppercase tracking-wider relative z-10 bg-white/10 self-start px-3 py-1.5 rounded-full border border-white/20">
@@ -400,7 +420,6 @@ export const Dashboard: React.FC = () => {
                 <p className="text-white/40 text-[10px] font-bold uppercase tracking-wider mb-2">{t('dashboard.customer_balances')}</p>
                 <h3 className="text-2xl md:text-3xl font-bold tracking-tight">
                   {formatMoney(stats?.totalCustomerBalances || 0)} 
-                  <span className="text-xs font-medium text-white/40 uppercase ml-1">SAR</span>
                 </h3>
               </div>
               <div className="flex items-center gap-2 text-emerald-400 text-[9px] font-bold uppercase tracking-wider relative z-10 bg-emerald-400/10 self-start px-3 py-1.5 rounded-full border border-emerald-400/20">
@@ -423,7 +442,6 @@ export const Dashboard: React.FC = () => {
                 <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2">{t('dashboard.supplier_balances')}</p>
                 <h3 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">
                   {formatMoney(stats?.totalSupplierBalances || 0)} 
-                  <span className="text-xs font-medium text-slate-400 uppercase ml-1">SAR</span>
                 </h3>
               </div>
               <div className="flex items-center gap-2 text-rose-500 text-[9px] font-bold uppercase tracking-wider relative z-10 bg-rose-50 self-start px-3 py-1.5 rounded-full border border-rose-100">
