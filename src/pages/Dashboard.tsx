@@ -198,7 +198,28 @@ export const Dashboard: React.FC = () => {
         return (m - 1) === statsMonth && y === statsYear;
       });
 
-      const totalReceipts = monthReceipts.reduce((sum: number, r: ReceiptVoucher) => sum + (Number(r.amount) || 0), 0);
+      const expenseTypeIds = accountTypes
+        .filter((t: any) => t.classification === 'expense')
+        .map((t: any) => t.id);
+      const expenseAccountIds = new Set(accounts.filter((a: any) => expenseTypeIds.includes(a.type_id)).map((a: any) => a.id));
+
+      const totalReceipts = journalEntries
+        .filter(je => {
+          const d = new Date(je.date);
+          return (d.getUTCMonth() === statsMonth && d.getUTCFullYear() === statsYear && (je.reference?.includes('سند قبض') || je.reference?.includes('Receipt')));
+        })
+        .reduce((sum, je) => {
+          // Total receipts represent debits to cash/bank accounts in receipt journals
+          const receiptDebits = je.items?.filter((item: any) => expenseAccountIds.has(item.account_id) === false && (Number(item.debit) > 0))
+            // We need to identify which items are the "cash" side
+            .filter((item: any) => {
+              const acc = accounts.find(a => a.id === item.account_id);
+              return acc?.name.includes('نقدية') || acc?.name.includes('صندوق') || acc?.name.includes('خزينة') || acc?.name.includes('بنك');
+            })
+            .reduce((s: number, item: any) => s + (Number(item.debit) || 0), 0) || 0;
+          return sum + receiptDebits;
+        }, 0);
+
       const totalCustomerBalances = balanceSheet.assets
         .filter(a => {
           const acc = accounts.find(account => account.id === a.id);
@@ -276,13 +297,15 @@ export const Dashboard: React.FC = () => {
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-3">
             <div className="w-1.5 h-8 bg-brand-primary rounded-full shadow-sm" />
-            <h2 className="text-3xl font-bold tracking-tight text-slate-900">{t('dashboard.title')}</h2>
+            <h2 className="text-3xl font-bold tracking-tight text-slate-900">
+              {t('dashboard.title')} - {currentTime.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { month: 'long', year: 'numeric' })}
+            </h2>
           </div>
           <div className="flex items-center gap-4 mt-2">
             <div className="flex items-center gap-2 text-slate-500 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
               <Calendar size={14} className="text-brand-primary" />
               <p className="text-[10px] font-bold uppercase tracking-wider">
-                {currentTime.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                إحصائيات شهر {currentTime.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { month: 'long' })}
               </p>
               <div className="w-[1px] h-3 bg-slate-200" />
               <div className="flex items-center gap-1">

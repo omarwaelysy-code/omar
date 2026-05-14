@@ -20,7 +20,7 @@ export const JournalEntryItemSchema = z.object({
   supplier_id: z.string().nullable().optional(),
   supplier_name: z.string().nullable().optional(),
   sub_account_id: z.string().nullable().optional(),
-  sub_account_type: z.enum(['customer', 'supplier', 'payment_method', 'other']).nullable().optional(),
+  sub_account_type: z.enum(['customer', 'supplier', 'payment_method', 'expense', 'other']).nullable().optional(),
 });
 
 // Journal Entry (The Double Entry Core)

@@ -480,7 +480,7 @@ export function OperationFields() {
                         value={formData.unit}
                         onChange={e => setFormData({ ...formData, unit: e.target.value })}
                         className="premium-input font-bold"
-                        placeholder="e.g. meter, kg, SAR"
+                        placeholder="e.g. meter, kg"
                       />
                     </div>
                     <div className="space-y-1">

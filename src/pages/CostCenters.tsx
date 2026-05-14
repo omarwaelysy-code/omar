@@ -264,7 +264,7 @@ export function CostCenters() {
                       className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold"
                     >
                       <option value="USD">USD</option>
-                      <option value="SAR">SAR</option>
+                      <option value="">--</option>
                       <option value="EGP">EGP</option>
                       <option value="AED">AED</option>
                     </select>
