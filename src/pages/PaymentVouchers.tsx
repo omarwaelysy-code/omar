@@ -20,7 +20,8 @@ import { ExportButtons } from '../components/ExportButtons';
 import { TransactionManager } from '../services/TransactionManager';
 import { VoucherSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog, Supplier, ExpenseCategory, PaymentMethod, JournalEntry, JournalEntryItem, Account } from '../types';
-import { formatNumber, formatDate } from '../utils/formatUtils';
+import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
+import { PaginationControls } from '../components/PaginationControls';
 import { useViewPreference } from '../hooks/useViewPreference';
 
 export const PaymentVouchers: React.FC = () => {
@@ -39,6 +40,24 @@ export const PaymentVouchers: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [voucherToDelete, setVoucherToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(field);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
+  
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [serverSummary, setServerSummary] = useState<any>({});
+  const [maxSeqGenerated, setMaxSeqGenerated] = useState<number>(0);
+  const [internalRef, setInternalRef] = useState('');
   const [viewVoucher, setViewVoucher] = useState<any | null>(null);
   const voucherRef = React.useRef<HTMLDivElement>(null);
   const tableRef = React.useRef<HTMLDivElement>(null);
@@ -94,24 +113,8 @@ export const PaymentVouchers: React.FC = () => {
     notes: ''
   });
 
-  const generateInternalRef = (allVouchers: any[]) => {
-    const now = new Date();
-    const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    const prefix = `GRO-${month}-`;
-    
-    // Find vouchers for this month
-    const thisMonthVouchers = allVouchers.filter(v => v.internal_reference?.startsWith(prefix));
-    
-    let nextNum = 1;
-    if (thisMonthVouchers.length > 0) {
-      const numbers = thisMonthVouchers.map(v => {
-        const parts = v.internal_reference.split('-');
-        return parseInt(parts[2]) || 0;
-      });
-      nextNum = Math.max(...numbers) + 1;
-    }
-    
-    return `${prefix}${nextNum.toString().padStart(4, '0')}`;
+  const generateInternalRef = async (selectedDate: string) => {
+    return await dbService.getNextSequence('payment_vouchers', selectedDate);
   };
 
   // Dynamic Sub-account Options
@@ -122,14 +125,29 @@ export const PaymentVouchers: React.FC = () => {
   ];
 
   useEffect(() => {
-    if (!editingVoucher && !voucherData.internal_reference && !loading) {
-      setVoucherData(prev => ({ ...prev, internal_reference: generateInternalRef(vouchers) }));
+    if (!editingVoucher && !voucherData.internal_reference && !loading && isModalOpen) {
+      const updateNum = async () => {
+        const num = await generateInternalRef(voucherData.date);
+        setInternalRef(num);
+      };
+      updateNum();
     }
-  }, [vouchers, editingVoucher, loading]);
+  }, [vouchers, editingVoucher, loading, isModalOpen, voucherData.date]);
 
   useEffect(() => {
     if (user) {
-      const unsubVouchers = dbService.subscribe<any>('payment_vouchers', user.company_id, setVouchers);
+      const unsubItems = dbService.subscribePaginated('payment_vouchers', {
+        company_id: user.company_id,
+        _page: page,
+        _limit: limit,
+        _sortBy: sortBy,
+        _sortOrder: sortOrder,
+        _search: searchTerm
+      }, (result: any) => {
+        setVouchers(result.data);
+        setTotalRecords(result.total);
+        setServerSummary(result.summary);
+      });
       const unsubSuppliers = dbService.subscribe<Supplier>('suppliers', user.company_id, setSuppliers);
       const unsubCategories = dbService.subscribe<ExpenseCategory>('expense_categories', user.company_id, setCategories);
       const unsubPM = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setPaymentMethods);
@@ -138,7 +156,7 @@ export const PaymentVouchers: React.FC = () => {
       
       setLoading(false);
       return () => {
-        unsubVouchers();
+        unsubItems();
         unsubSuppliers();
         unsubCategories();
         unsubPM();
@@ -146,7 +164,7 @@ export const PaymentVouchers: React.FC = () => {
         unsubCustomers();
       };
     }
-  }, [user]);
+  }, [user, page, limit, sortBy, sortOrder, searchTerm]);
 
   // Real-time Preview Logic
   useEffect(() => {
@@ -481,7 +499,7 @@ export const PaymentVouchers: React.FC = () => {
       
       const voucher_number = editingVoucher 
         ? (editingVoucher.voucher_number || editingVoucher.number) 
-        : (voucherData.internal_reference || `PAY-${Date.now().toString().slice(-6)}`);
+        : (internalRef || `PAY-${Date.now().toString().slice(-6)}`);
 
       const data: any = {
         voucher_number,
@@ -577,7 +595,8 @@ export const PaymentVouchers: React.FC = () => {
           credit: 0,
           description: `سند صرف رقم ${voucher_number} - ${voucherData.notes}`,
           sub_account_id: voucherData.type === 'supplier' ? voucherData.supplier_id : undefined,
-          sub_account_type: voucherData.type === 'supplier' ? 'supplier' : undefined
+          sub_account_type: voucherData.type === 'supplier' ? 'supplier' : undefined,
+          supplier_id: voucherData.type === 'supplier' ? voucherData.supplier_id : undefined
         });
       }
 
@@ -728,6 +747,7 @@ export const PaymentVouchers: React.FC = () => {
       if (!fullData) throw new Error('Payment voucher not found');
 
       setEditingVoucher(fullData);
+      setInternalRef(fullData.internal_reference || fullData.voucher_number || '');
       
       // Ensure we have a clean copy of items or create from old format
       let items = [];
@@ -838,6 +858,13 @@ export const PaymentVouchers: React.FC = () => {
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('payments.title')}</h2>
           <p className="text-zinc-500">{t('payments.subtitle')}</p>
+          {serverSummary.total_amount !== undefined && (
+            <div className="mt-2 flex items-center gap-4 text-sm">
+               <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
+                 إجمالي المدفوعات: {formatMoney(serverSummary.total_amount)} ج.م
+               </span>
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button 
@@ -897,12 +924,40 @@ export const PaymentVouchers: React.FC = () => {
             <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
               <thead>
                 <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                  <th className="px-6 py-4 font-bold">رقم السند / المرجع</th>
-                  <th className="px-6 py-4 font-bold">النوع</th>
+                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('voucher_number')}>
+                    <div className="flex items-center gap-1">
+                      رقم السند / المرجع
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'voucher_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('voucher_type')}>
+                    <div className="flex items-center gap-1">
+                      النوع
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'voucher_type' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
                   <th className="px-6 py-4 font-bold">المستفيد / الفئة</th>
-                  <th className="px-6 py-4 font-bold">التاريخ</th>
+                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('date')}>
+                    <div className="flex items-center gap-1">
+                      التاريخ
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
                   <th className="px-6 py-4 font-bold">الوصف</th>
-                  <th className="px-6 py-4 font-bold">المبلغ</th>
+                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('amount')}>
+                    <div className="flex items-center gap-1">
+                      المبلغ
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
                   <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>الإجراءات</th>
                 </tr>
               </thead>
@@ -985,6 +1040,7 @@ export const PaymentVouchers: React.FC = () => {
                 ))}
               </tbody>
             </table>
+            <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
           </div>
         ) : (
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1209,8 +1265,14 @@ export const PaymentVouchers: React.FC = () => {
                     <input 
                       type="text" 
                       className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all font-mono"
-                      value={voucherData.internal_reference}
-                      onChange={(e) => setVoucherData({...voucherData, internal_reference: e.target.value})}
+                      value={editingVoucher ? voucherData.internal_reference : (internalRef || voucherData.internal_reference)}
+                      onChange={(e) => {
+                        if (editingVoucher) {
+                          setVoucherData({...voucherData, internal_reference: e.target.value});
+                        } else {
+                          setInternalRef(e.target.value);
+                        }
+                      }}
                     />
                   </div>
                 </div>

@@ -36,7 +36,13 @@ export const SupplierBalances: React.FC = () => {
       const balances = sups.map((supplier: any) => {
         const supInvoices = invoices.filter((i: any) => i.supplier_id === supplier.id);
         const supReturns = returns.filter((r: any) => r.supplier_id === supplier.id);
-        const supVouchers = vouchers.filter((v: any) => v.supplier_id === supplier.id);
+        const supVouchers = vouchers.filter((v: any) => {
+          if (v.supplier_id === supplier.id) return true;
+          if (v.type === 'multi' && v.items && Array.isArray(v.items)) {
+            return v.items.some((item: any) => item.type === 'supplier' && item.entity_id === supplier.id);
+          }
+          return false;
+        });
         const supDiscounts = discounts.filter((d: any) => d.supplier_id === supplier.id);
         
         const openingBalance = supplier.opening_balance || 0;
@@ -66,7 +72,19 @@ export const SupplierBalances: React.FC = () => {
         const totalInvoices = supInvoices.reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
         const totalReturns = supReturns.reduce((sum: number, r: any) => sum + (Number(r.total_amount) || 0), 0);
         const cashInvoicesAmount = supInvoices.filter((i: any) => i.payment_type === 'cash').reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
-        const totalVouchers = supVouchers.reduce((sum: number, v: any) => sum + (Number(v.amount) || 0), 0) + cashInvoicesAmount;
+        
+        const totalVouchers = supVouchers.reduce((sum: number, v: any) => {
+          if (v.type === 'multi' && v.items && Array.isArray(v.items)) {
+             const itemsSum = v.items
+               .filter((item: any) => item.type === 'supplier' && item.entity_id === supplier.id)
+               .reduce((itemSum: number, item: any) => itemSum + (Number(item.amount) || 0), 0);
+             return sum + itemsSum;
+          }
+          if (v.supplier_id === supplier.id) {
+             return sum + (Number(v.amount) || 0);
+          }
+          return sum;
+        }, 0) + cashInvoicesAmount;
         const totalDiscounts = supDiscounts.reduce((sum: number, d: any) => sum + (Number(d.amount) || 0), 0);
         
         return {

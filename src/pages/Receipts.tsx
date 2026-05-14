@@ -21,7 +21,8 @@ import { SmartAIInput } from '../components/SmartAIInput';
 import { TransactionManager } from '../services/TransactionManager';
 import { VoucherSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog, ReceiptVoucher, Customer, PaymentMethod, JournalEntry, JournalEntryItem, Account } from '../types';
-import { formatNumber, formatDate } from '../utils/formatUtils';
+import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
+import { PaginationControls } from '../components/PaginationControls';
 import { useViewPreference } from '../hooks/useViewPreference';
 
 export const Receipts: React.FC = () => {
@@ -34,6 +35,29 @@ export const Receipts: React.FC = () => {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(field);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
+  
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [serverSummary, setServerSummary] = useState<any>({});
+  const [maxSeqGenerated, setMaxSeqGenerated] = useState<number>(0);
+  const [internalRef, setInternalRef] = useState('');
+
+  const generateInternalRef = async (selectedDate: string) => {
+    return await dbService.getNextSequence('receipt_vouchers', selectedDate);
+  };
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingReceipt, setEditingReceipt] = useState<ReceiptVoucher | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -79,20 +103,41 @@ export const Receipts: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      const unsubReceipts = dbService.subscribe<ReceiptVoucher>('receipt_vouchers', user.company_id, setReceipts);
+      const unsubItems = dbService.subscribePaginated('receipt_vouchers', {
+        company_id: user.company_id,
+        _page: page,
+        _limit: limit,
+        _sortBy: sortBy,
+        _sortOrder: sortOrder,
+        _search: searchTerm
+      }, (result: any) => {
+        setReceipts(result.data);
+        setTotalRecords(result.total);
+        setServerSummary(result.summary);
+      });
       const unsubCustomers = dbService.subscribe<Customer>('customers', user.company_id, setCustomers);
       const unsubPM = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setPaymentMethods);
       const unsubAccounts = dbService.subscribe<any>('accounts', user.company_id, setAccounts);
       
       setLoading(false);
       return () => {
-        unsubReceipts();
+        unsubItems();
         unsubCustomers();
         unsubPM();
         unsubAccounts();
       };
     }
-  }, [user]);
+  }, [user, page, limit, sortBy, sortOrder, searchTerm]);
+
+  useEffect(() => {
+    if (!editingReceipt && !internalRef && !loading && isModalOpen) {
+      const updateNum = async () => {
+        const num = await generateInternalRef(formData.date);
+        setInternalRef(num);
+      };
+      updateNum();
+    }
+  }, [editingReceipt, loading, isModalOpen, formData.date]);
 
   // Real-time Preview Logic
   useEffect(() => {
@@ -329,12 +374,12 @@ export const Receipts: React.FC = () => {
     try {
       const customer = customers.find(c => c.id === formData.customer_id);
       const paymentMethod = paymentMethods.find(pm => pm.id === formData.payment_method_id);
-      const voucher_number = editingReceipt 
+      const receipt_number = editingReceipt 
         ? editingReceipt.voucher_number 
-        : `RCPT-${Date.now().toString().slice(-6)}`;
+        : (internalRef || `RCPT-${Date.now().toString().slice(-6)}`);
       
       const receiptData = {
-        voucher_number,
+        voucher_number: receipt_number,
         date: formData.date,
         amount: formData.amount,
         description: formData.description,
@@ -365,7 +410,7 @@ export const Receipts: React.FC = () => {
         account_name: debitAccountName,
         debit: formData.amount,
         credit: 0,
-        description: `سند قبض رقم ${voucher_number} - ${formData.description}`,
+        description: `سند قبض رقم ${receipt_number} - ${formData.description}`,
         sub_account_id: paymentMethod?.id,
         sub_account_type: 'payment_method'
       });
@@ -383,7 +428,7 @@ export const Receipts: React.FC = () => {
         account_name: creditAccountName,
         debit: 0,
         credit: formData.amount,
-        description: `سند قبض رقم ${voucher_number} من العميل: ${customer?.name}`,
+        description: `سند قبض رقم ${receipt_number} من العميل: ${customer?.name}`,
         customer_id: formData.customer_id,
         customer_name: customer?.name,
         sub_account_id: formData.customer_id,
@@ -392,9 +437,9 @@ export const Receipts: React.FC = () => {
 
       const journalEntryData = {
         date: formData.date,
-        reference_number: voucher_number,
+        reference_number: receipt_number,
         reference_type: 'receipt',
-        description: `قيد سند قبض رقم ${voucher_number}`,
+        description: `قيد سند قبض رقم ${receipt_number}`,
         items: journalItems,
         total_debit: formData.amount,
         total_credit: formData.amount,
@@ -469,6 +514,7 @@ export const Receipts: React.FC = () => {
       if (!fullData) throw new Error('Receipt not found');
 
       setEditingReceipt(fullData);
+      setInternalRef(fullData.voucher_number || '');
       setFormData({
         customer_id: fullData.customer_id,
         date: fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
@@ -522,6 +568,7 @@ export const Receipts: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingReceipt(null);
+    setInternalRef('');
     setFormData({ 
       customer_id: '', 
       date: new Date().toISOString().slice(0, 10), 
@@ -542,6 +589,13 @@ export const Receipts: React.FC = () => {
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('receipts.title')}</h2>
           <p className="text-zinc-500">{t('receipts.subtitle')}</p>
+          {serverSummary.total_amount !== undefined && (
+            <div className="mt-2 flex items-center gap-4 text-sm">
+               <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
+                 إجمالي المقبوضات: {formatMoney(serverSummary.total_amount)} ج.م
+               </span>
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button 
@@ -601,11 +655,32 @@ export const Receipts: React.FC = () => {
             <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
               <thead>
                 <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                  <th className="px-6 py-4 font-bold">الرقم</th>
+                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('voucher_number')}>
+                    <div className="flex items-center gap-1">
+                      الرقم
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'voucher_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
                   <th className="px-6 py-4 font-bold">العميل</th>
-                  <th className="px-6 py-4 font-bold">التاريخ</th>
+                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('date')}>
+                    <div className="flex items-center gap-1">
+                      التاريخ
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
                   <th className="px-6 py-4 font-bold">طريقة السداد</th>
-                  <th className="px-6 py-4 font-bold">المبلغ</th>
+                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('amount')}>
+                    <div className="flex items-center gap-1">
+                      المبلغ
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
                   <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>الإجراءات</th>
                 </tr>
               </thead>
@@ -668,6 +743,7 @@ export const Receipts: React.FC = () => {
                 )}
               </tbody>
             </table>
+            <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
           </div>
         ) : (
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -804,8 +880,20 @@ export const Receipts: React.FC = () => {
                   }}
                   transactionType="receipt_voucher"
                 />
-              <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">العميل</label>
+                <div>
+                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">رقم السند</label>
+                  <div className="relative">
+                    <Hash className="absolute left-3 top-3 text-zinc-400" size={18} />
+                    <input 
+                      type="text" 
+                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
+                      value={editingReceipt ? internalRef : (internalRef || `RCPT-${Date.now().toString().slice(-6)}`)}
+                      onChange={(e) => setInternalRef(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">العميل</label>
                 <select 
                   required
                   className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"

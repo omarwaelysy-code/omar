@@ -10,6 +10,7 @@ import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { useNotification } from '../contexts/NotificationContext';
 import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
+import { PaginationControls } from '../components/PaginationControls';
 
 export const JournalEntries: React.FC = () => {
   const { user } = useAuth();
@@ -20,6 +21,23 @@ export const JournalEntries: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(field);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
+  
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [serverSummary, setServerSummary] = useState<any>({});
+  const [maxSeqGenerated, setMaxSeqGenerated] = useState<number>(0);
   const [dateRange, setDateRange] = useState({
     start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
@@ -31,8 +49,17 @@ export const JournalEntries: React.FC = () => {
   useEffect(() => {
     if (!user) return;
 
-    const unsubscribeEntries = dbService.subscribe<JournalEntry>('journal_entries', user.company_id, (data) => {
-      setEntries(data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+    const unsubscribeEntries = dbService.subscribePaginated('journal_entries', {
+        company_id: user.company_id,
+        _page: page,
+        _limit: limit,
+        _sortBy: sortBy,
+        _sortOrder: sortOrder,
+        _search: searchTerm
+    }, (result: any) => {
+      setEntries(result.data);
+      setTotalRecords(result.total);
+      setServerSummary(result.summary);
       setLoading(false);
     });
 
@@ -42,7 +69,7 @@ export const JournalEntries: React.FC = () => {
       unsubscribeEntries();
       unsubscribeAccounts();
     };
-  }, [user]);
+  }, [user, page, limit, sortBy, sortOrder, searchTerm]);
 
   const filteredEntries = entries.filter(entry => {
     const matchesSearch = 
@@ -207,6 +234,13 @@ export const JournalEntries: React.FC = () => {
         <div>
           <h2 className="text-2xl font-black text-zinc-900">{t('journal.title')}</h2>
           <p className="text-zinc-500 font-medium mt-1">{t('journal.subtitle')}</p>
+          {serverSummary.total_debit !== undefined && (
+            <div className="mt-2 flex items-center gap-4 text-sm">
+               <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
+                 إجمالي الحركات: {formatMoney(serverSummary.total_debit)} ج.م
+               </span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button 
@@ -266,11 +300,39 @@ export const JournalEntries: React.FC = () => {
           <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'} border-collapse`}>
             <thead>
               <tr className="bg-zinc-50 border-b border-zinc-200">
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_date')}</th>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('date')}>
+                  <div className="flex items-center gap-1">
+                    {t('journal.column_date')}
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
                 <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_description')}</th>
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_reference')}</th>
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center">{t('journal.column_debit')}</th>
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center">{t('journal.column_credit')}</th>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('reference_number')}>
+                  <div className="flex items-center gap-1">
+                    {t('journal.column_reference')}
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'reference_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('total_debit')}>
+                  <div className="flex items-center gap-1 justify-center">
+                    {t('journal.column_debit')}
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'total_debit' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('total_credit')}>
+                  <div className="flex items-center gap-1 justify-center">
+                    {t('journal.column_credit')}
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'total_credit' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
                 <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center">{t('common.actions')}</th>
               </tr>
             </thead>
@@ -314,18 +376,23 @@ export const JournalEntries: React.FC = () => {
                 </tr>
               )}
             </tbody>
-            {filteredEntries.length > 0 && (
+            {entries.length > 0 && (
               <tfoot className="bg-zinc-900 text-white font-black">
                 <tr>
                   <td colSpan={3} className="px-6 py-4 text-center border-l border-zinc-700">{t('journal.total')}</td>
-                  <td className="px-6 py-4 text-center border-l border-zinc-700">{formatMoney(filteredEntries.reduce((sum, e) => sum + (Number(e.total_debit) || 0), 0))}</td>
-                  <td className="px-6 py-4 text-center border-l border-zinc-700">{formatMoney(filteredEntries.reduce((sum, e) => sum + (Number(e.total_credit) || 0), 0))}</td>
+                  <td className="px-6 py-4 text-center border-l border-zinc-700">
+                    {serverSummary.total_debit ? formatMoney(serverSummary.total_debit) : '0.00'}
+                  </td>
+                  <td className="px-6 py-4 text-center border-l border-zinc-700">
+                    {serverSummary.total_credit ? formatMoney(serverSummary.total_credit) : '0.00'}
+                  </td>
                   <td className="px-6 py-4"></td>
                 </tr>
               </tfoot>
             )}
           </table>
         </div>
+        <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
       </div>
 
       {/* Entry Details Modal */}

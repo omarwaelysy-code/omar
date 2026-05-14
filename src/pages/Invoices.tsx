@@ -21,6 +21,7 @@ import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import DocumentChatter from '../components/DocumentChatter';
 import { ExportButtons } from '../components/ExportButtons';
+import { PaginationControls } from '../components/PaginationControls';
 import { usePermissions } from '../hooks/usePermissions';
 import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
 
@@ -39,6 +40,22 @@ export const Invoices: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(field);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
+  
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [serverSummary, setServerSummary] = useState<any>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -105,7 +122,18 @@ export const Invoices: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      const unsubInvoices = dbService.subscribe<Invoice>('invoices', user.company_id, setInvoices);
+      const unsubInvoices = dbService.subscribePaginated<Invoice>('invoices', {
+        company_id: user.company_id,
+        _page: page,
+        _limit: limit,
+        _sortBy: sortBy,
+        _sortOrder: sortOrder,
+        _search: searchTerm
+      }, (result) => {
+        setInvoices(result.data);
+        setTotalRecords(result.total);
+        setServerSummary(result.summary);
+      });
       const unsubCustomers = dbService.subscribe<Customer>('customers', user.company_id, setCustomers);
       const unsubProducts = dbService.subscribe<Product>('products', user.company_id, setProducts);
       const unsubPM = dbService.subscribe<any>('payment_methods', user.company_id, setPaymentMethods);
@@ -130,26 +158,11 @@ export const Invoices: React.FC = () => {
         unsubAccounts();
       };
     }
-  }, [user]);
+  }, [user, page, limit, sortBy, sortOrder, searchTerm]);
 
-  const generateInvoiceNumber = (dateStr: string) => {
-    const month = dateStr.split('-')[1];
-    const monthInvoices = invoices.filter(inv => inv.date.startsWith(dateStr.slice(0, 7)));
-    
-    // Find the highest sequence number for this month
-    let maxSeq = 0;
-    monthInvoices.forEach(inv => {
-      const parts = inv.invoice_number.split('-');
-      if (parts.length === 3 && parts[1] === month) {
-        const seq = parseInt(parts[2]);
-        if (!isNaN(seq) && seq > maxSeq) {
-          maxSeq = seq;
-        }
-      }
-    });
-    
-    const nextNumber = maxSeq + 1;
-    return `INV-${month}-${nextNumber.toString().padStart(5, '0')}`;
+  const generateInvoiceNumber = async (dateStr: string) => {
+    const next = await dbService.getNextSequence('invoices', dateStr);
+    return next;
   };
 
   const handlePrint = () => {
@@ -176,7 +189,11 @@ export const Invoices: React.FC = () => {
 
     // Update invoice number if date changes and we are creating a new invoice
     if (!editingInvoice) {
-      setInvoiceNumber(generateInvoiceNumber(date));
+      const updateNum = async () => {
+        const num = await generateInvoiceNumber(date);
+        setInvoiceNumber(num);
+      };
+      updateNum();
     }
   }, [date, invoices, isModalOpen, editingInvoice, user]);
 
@@ -857,12 +874,13 @@ export const Invoices: React.FC = () => {
     }
   };
 
-  const openModal = () => {
+  const openModal = async () => {
     setEditingInvoice(null);
     setSelectedCustomerId('');
     const newDate = new Date().toISOString().slice(0, 10);
     setDate(newDate);
-    setInvoiceNumber(generateInvoiceNumber(newDate));
+    const num = await generateInvoiceNumber(newDate);
+    setInvoiceNumber(num);
     setItems([]);
     setDescription('');
     setPaymentType('credit');
@@ -961,6 +979,13 @@ export const Invoices: React.FC = () => {
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-slate-900 italic serif">{t('invoices.title')}</h2>
           <p className="text-slate-500">{t('invoices.subtitle')}</p>
+          {(serverSummary.total_amount !== undefined) && (
+            <div className="mt-2 flex items-center gap-4 text-sm">
+              <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">إجمالي الفواتير: {formatMoney(serverSummary.total_amount)} {t('invoices.currency')}</span>
+              <span className="bg-red-50 text-red-700 px-3 py-1 rounded-full border border-red-100 font-bold">إجمالي الخصومات: {formatMoney(serverSummary.total_discount || 0)} {t('invoices.currency')}</span>
+              <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100 font-bold">الصافي: {formatMoney((serverSummary.total_amount || 0) - (serverSummary.total_discount || 0))} {t('invoices.currency')}</span>
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button 
@@ -1022,12 +1047,47 @@ export const Invoices: React.FC = () => {
             <table className="w-full">
               <thead>
                 <tr className="bg-slate-50/50 text-slate-500 text-[10px] uppercase tracking-widest font-bold">
-                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_number')}</th>
-                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_customer')}</th>
-                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_date')}</th>
+                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group`} onClick={() => handleSort('invoice_number')}>
+                    <div className="flex items-center gap-1">
+                      {t('invoices.column_number')}
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'invoice_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
+                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group`} onClick={() => handleSort('customer_name')}>
+                    <div className="flex items-center gap-1">
+                      {t('invoices.column_customer')}
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'customer_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
+                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group`} onClick={() => handleSort('date')}>
+                    <div className="flex items-center gap-1">
+                      {t('invoices.column_date')}
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
                   <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>وصف الفاتورة</th>
-                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.form_payment_type')}</th>
-                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('invoices.column_amount')}</th>
+                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group`} onClick={() => handleSort('payment_type')}>
+                    <div className="flex items-center gap-1">
+                      {t('invoices.form_payment_type')}
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'payment_type' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
+                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group`} onClick={() => handleSort('total_amount')}>
+                    <div className="flex items-center gap-1">
+                      {t('invoices.column_amount')}
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'total_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
                   <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
                 </tr>
               </thead>
@@ -1228,6 +1288,14 @@ export const Invoices: React.FC = () => {
             </div>
           ))}
         </div>
+
+        <PaginationControls 
+          page={page} 
+          limit={limit} 
+          total={totalRecords} 
+          onPageChange={setPage} 
+          onLimitChange={setLimit} 
+        />
       </div>
 
       {/* Create Modal */}

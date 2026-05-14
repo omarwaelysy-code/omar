@@ -753,6 +753,54 @@ function sanitizeData(table: string, data: any) {
   return sanitized;
 }
 
+router.get('/utils/next-sequence/:moduleName', authenticateToken, async (req: any, res) => {
+  try {
+    const { moduleName } = req.params;
+    const dateStr = req.query.date as string || new Date().toISOString().slice(0, 10);
+    const companyId = req.user?.company_id;
+    
+    if (!companyId) return res.status(401).json({ error: 'Unauthorized' });
+
+    let numField = 'invoice_number';
+    let prefix = 'INV';
+    
+    switch (moduleName) {
+      case 'invoices': numField = 'invoice_number'; prefix = 'INV'; break;
+      case 'purchase_invoices': numField = 'invoice_number'; prefix = 'PINV'; break;
+      case 'returns': numField = 'return_number'; prefix = 'RET'; break;
+      case 'purchase_returns': numField = 'return_number'; prefix = 'PRET'; break;
+      case 'payment_vouchers': numField = 'voucher_number'; prefix = 'PV'; break;
+      case 'receipt_vouchers': numField = 'voucher_number'; prefix = 'RV'; break;
+      case 'journal_entries': numField = 'entry_number'; prefix = 'JE'; break;
+    }
+
+    const monthPrefix = dateStr.slice(0, 7);
+    const sql = `SELECT ${numField} FROM "${moduleName}" WHERE company_id = $1 AND date::text LIKE $2 ORDER BY id DESC LIMIT 500`;
+    const rows = await pool.query(sql, [companyId, `${monthPrefix}%`]);
+    
+    let maxSeq = 0;
+    const monthStr = monthPrefix.split('-')[1];
+    rows.rows.forEach((row: any) => {
+      const val = row[numField] || '';
+      const parts = val.split('-');
+      if (parts.length === 3 && parts[1] === monthStr) {
+        const seq = parseInt(parts[2]);
+        if (!isNaN(seq) && seq > maxSeq) {
+          maxSeq = seq;
+        }
+      }
+    });
+
+    const nextSeq = String(maxSeq + 1).padStart(4, '0');
+    const nextNumber = `${prefix}-${monthStr}-${nextSeq}`;
+    
+    res.json({ nextNumber });
+  } catch (error: any) {
+    console.error(`Error generating sequence:`, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 modules.forEach(moduleName => {
   const hyphenName = moduleName.replace(/_/g, '-');
   const routeNames = [moduleName];
@@ -820,6 +868,95 @@ modules.forEach(moduleName => {
         const queryFilters = { ...req.query } as any;
         if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && !queryFilters.company_id && req.user?.company_id) {
           queryFilters.company_id = req.user.company_id;
+        }
+
+        const isPaginated = queryFilters._page && queryFilters._limit;
+        
+        if (isPaginated) {
+          const limit = parseInt(queryFilters._limit, 10) || 50;
+          const page = parseInt(queryFilters._page, 10) || 1;
+          const offset = (page - 1) * limit;
+          const sortBy = queryFilters._sortBy || 'date';
+          const sortOrder = queryFilters._sortOrder || 'DESC';
+          const search = queryFilters._search || '';
+          
+          let sql = `SELECT * FROM "${moduleName}"`;
+          const values: any[] = [];
+          const conditions: string[] = [];
+          let paramIndex = 1;
+
+          Object.keys(queryFilters).forEach((key) => {
+            if (['company_id', 'date_from', 'date_to'].includes(key) || (!key.startsWith('_') && key !== 'company_id')) {
+              const value = queryFilters[key];
+              if (key === 'date_from') {
+                conditions.push(`date >= $${paramIndex++}`);
+                values.push(value);
+              } else if (key === 'date_to') {
+                conditions.push(`date <= $${paramIndex++}`);
+                values.push(value);
+              } else if (!key.startsWith('_')) {
+                conditions.push(`"${key}" = $${paramIndex++}`);
+                values.push(value);
+              }
+            }
+          });
+
+          if (search) {
+             const searchCols = EXPECTED_SCHEMA[moduleName] || [];
+             const textCols = searchCols.filter(c => ['description', 'notes', 'reference_number', 'invoice_number', 'voucher_number', 'customer_name', 'supplier_name', 'account_name', 'code', 'name'].includes(c));
+             if (textCols.length > 0) {
+               const searchConditions = textCols.map(c => `"${c}"::text ILIKE $${paramIndex}`).join(' OR ');
+               conditions.push(`(${searchConditions})`);
+               values.push(`%${search}%`);
+               paramIndex++;
+             }
+          }
+
+          if (conditions.length > 0) {
+            sql += ` WHERE ${conditions.join(' AND ')}`;
+          }
+
+          const countSql = `SELECT count(*) as total FROM (${sql}) t`;
+          const countRes = await pool.query(countSql, values);
+          const total = parseInt(countRes.rows[0].total);
+
+          let summary = {};
+          if (moduleName === 'invoices' || moduleName === 'purchase_invoices') {
+             const sumRes = await pool.query(`SELECT sum(total_amount) as sum1, sum(discount) as sum2 FROM (${sql}) t`, values);
+             summary = { total_amount: Number(sumRes.rows[0].sum1 || 0), total_discount: Number(sumRes.rows[0].sum2 || 0) };
+          } else if (moduleName === 'returns' || moduleName === 'purchase_returns') {
+             const sumRes = await pool.query(`SELECT sum(total_amount) as sum1 FROM (${sql}) t`, values);
+             summary = { total_amount: Number(sumRes.rows[0].sum1 || 0) };
+          } else if (moduleName === 'receipt_vouchers' || moduleName === 'payment_vouchers' || moduleName === 'customer_discounts' || moduleName === 'supplier_discounts') {
+             const sumRes = await pool.query(`SELECT sum(amount) as sum1 FROM (${sql}) t`, values);
+             summary = { total_amount: Number(sumRes.rows[0].sum1 || 0) };
+          } else if (moduleName === 'journal_entries') {
+             const sumRes = await pool.query(`SELECT sum(total_debit) as sum1, sum(total_credit) as sum2 FROM (${sql}) t`, values);
+             summary = { total_debit: Number(sumRes.rows[0].sum1 || 0), total_credit: Number(sumRes.rows[0].sum2 || 0) };
+          }
+
+          let finalSort = `"${sortBy}" ${sortOrder.toUpperCase()}`;
+          if (sortBy === 'date' || sortBy === 'operation_date') finalSort += `, id DESC`;
+          
+          sql += ` ORDER BY ${finalSort} LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
+          values.push(limit, offset);
+
+          const paginatedRes = await pool.query(sql, values);
+          rows = paginatedRes.rows;
+
+          if (transactionalModules.includes(moduleName)) {
+            for (let row of rows) {
+              row.items = await fetchItems(moduleName, row.id);
+            }
+          }
+          
+          return res.json({
+            data: rows.map((row: any) => parseRow(moduleName, row)),
+            total,
+            summary,
+            page,
+            limit
+          });
         }
 
         rows = await getList(moduleName, queryFilters);

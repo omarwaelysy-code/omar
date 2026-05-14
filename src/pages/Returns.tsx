@@ -12,10 +12,11 @@ import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
-import { formatNumber, formatDate } from '../utils/formatUtils';
+import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { ExportButtons } from '../components/ExportButtons';
 import { ActivityLog } from '../types';
+import { PaginationControls } from '../components/PaginationControls';
 
 export const Returns: React.FC = () => {
   const { user } = useAuth();
@@ -28,6 +29,23 @@ export const Returns: React.FC = () => {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(field);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
+  
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [serverSummary, setServerSummary] = useState<any>({});
+  const [maxSeqGenerated, setMaxSeqGenerated] = useState<number>(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewReturn, setViewReturn] = useState<Return | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -43,6 +61,11 @@ export const Returns: React.FC = () => {
   const [previewActivityLog, setPreviewActivityLog] = useState<Partial<ActivityLog> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [editingReturn, setEditingReturn] = useState<Return | null>(null);
+  const [returnNumber, setReturnNumber] = useState('');
+
+  const generateReturnNumber = async (selectedDate: string) => {
+    return await dbService.getNextSequence('returns', selectedDate);
+  };
 
   const [customerFormData, setCustomerFormData] = useState({
     name: '',
@@ -75,7 +98,18 @@ export const Returns: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      const unsubReturns = dbService.subscribe<Return>('returns', user.company_id, setReturns);
+      const unsubItems = dbService.subscribePaginated('returns', {
+        company_id: user.company_id,
+        _page: page,
+        _limit: limit,
+        _sortBy: sortBy,
+        _sortOrder: sortOrder,
+        _search: searchTerm
+      }, (result: any) => {
+        setReturns(result.data);
+        setTotalRecords(result.total);
+        setServerSummary(result.summary);
+      });
       const unsubCustomers = dbService.subscribe<Customer>('customers', user.company_id, setCustomers);
       const unsubProducts = dbService.subscribe<Product>('products', user.company_id, setProducts);
       const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
@@ -83,14 +117,14 @@ export const Returns: React.FC = () => {
       
       setLoading(false);
       return () => {
-        unsubReturns();
+        unsubItems();
         unsubCustomers();
         unsubProducts();
         unsubAccounts();
         unsubPaymentMethods();
       };
     }
-  }, [user]);
+  }, [user, page, limit, sortBy, sortOrder, searchTerm]);
 
   // Real-time Preview Logic
   useEffect(() => {
@@ -98,6 +132,14 @@ export const Returns: React.FC = () => {
       setPreviewJournalEntry(null);
       setPreviewActivityLog(null);
       return;
+    }
+
+    if (!editingReturn && isModalOpen) {
+      const updateNum = async () => {
+        const num = await generateReturnNumber(date);
+        setReturnNumber(num);
+      };
+      updateNum();
     }
 
     const generatePreview = () => {
@@ -368,7 +410,7 @@ export const Returns: React.FC = () => {
     try {
       const customer = customers.find(c => c.id === selectedCustomerId);
       const paymentMethod = paymentMethods.find(m => m.id === paymentMethodId);
-      const return_number = editingReturn ? editingReturn.return_number : `RET-${Date.now().toString().slice(-6)}`;
+      const return_number = editingReturn ? editingReturn.return_number : returnNumber;
       const total_amount = Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)), 0)) || 0;
       
       const sanitizedItems = validItems.map(i => ({
@@ -547,6 +589,7 @@ export const Returns: React.FC = () => {
         setPaymentType(fullData.payment_type);
         setPaymentMethodId(fullData.payment_method_id || '');
         setItems(fullData.items || []);
+        setReturnNumber(fullData.return_number);
         console.log('[EDIT] Form updated with sales return:', fullData.id);
       } catch (error: any) {
         console.error('[EDIT] Error loading return:', error);
@@ -555,11 +598,14 @@ export const Returns: React.FC = () => {
       }
     } else {
       setEditingReturn(null);
+      const newDate = new Date().toISOString().slice(0, 10);
       setSelectedCustomerId('');
-      setDate(new Date().toISOString().slice(0, 10));
+      setDate(newDate);
       setPaymentType('credit');
       setPaymentMethodId('');
       setItems([{ product_id: '', product_name: '', quantity: 1, unit_price: 0, total: 0 }]);
+      const num = await generateReturnNumber(newDate);
+      setReturnNumber(num);
     }
     setIsModalOpen(true);
   };
@@ -642,6 +688,13 @@ export const Returns: React.FC = () => {
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('returns.title')}</h2>
           <p className="text-zinc-500">{t('returns.subtitle')}</p>
+          {serverSummary.total_amount !== undefined && (
+            <div className={`mt-2 flex items-center gap-4 text-sm ${dir === 'rtl' ? 'flex-row-reverse' : ''}`}>
+               <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
+                 {t('returns.summary_total')}: {formatMoney(serverSummary.total_amount)} {t('returns.currency')}
+               </span>
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button 
@@ -684,11 +737,46 @@ export const Returns: React.FC = () => {
           <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
             <thead>
               <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                <th className="px-6 py-4 font-bold">{t('returns.column_number')}</th>
-                <th className="px-6 py-4 font-bold">{t('returns.column_customer')}</th>
-                <th className="px-6 py-4 font-bold">{t('returns.column_date')}</th>
-                <th className="px-6 py-4 font-bold">{t('returns.column_type')}</th>
-                <th className="px-6 py-4 font-bold">{t('returns.column_total')}</th>
+                <th className={`px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('return_number')}>
+                  <div className="flex items-center gap-1">
+                    {t('returns.column_number')}
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'return_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
+                <th className={`px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('customer_name')}>
+                  <div className="flex items-center gap-1">
+                    {t('returns.column_customer')}
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'customer_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
+                <th className={`px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('date')}>
+                  <div className="flex items-center gap-1">
+                    {t('returns.column_date')}
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
+                <th className={`px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('payment_type')}>
+                  <div className="flex items-center gap-1">
+                    {t('returns.column_type')}
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'payment_type' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
+                <th className={`px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('total_amount')}>
+                  <div className="flex items-center gap-1">
+                    {t('returns.column_total')}
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'total_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
                 <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.actions')}</th>
               </tr>
             </thead>
@@ -750,6 +838,7 @@ export const Returns: React.FC = () => {
               )}
             </tbody>
           </table>
+          <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
         </div>
 
         {/* Mobile List View */}

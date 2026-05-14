@@ -73,6 +73,66 @@ export const dbService = {
     return apiRequest<T[]>(`/${collectionName}${queryString ? '?' + queryString : ''}`);
   },
 
+  async listPaginated<T>(collectionName: string, options?: string | { company_id?: string; [key: string]: any }): Promise<{ data: T[], total: number, summary: any, page: number, limit: number }> {
+    const params = new URLSearchParams();
+    if (options) {
+      if (typeof options === 'string') {
+        params.append('company_id', options);
+      } else {
+        Object.entries(options).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            params.append(key, value.toString());
+          }
+        });
+      }
+    }
+    const queryString = params.toString();
+    return apiRequest<{ data: T[], total: number, summary: any, page: number, limit: number }>(`/${collectionName}${queryString ? '?' + queryString : ''}`);
+  },
+
+  async getNextSequence(collectionName: string, dateStr: string): Promise<string> {
+    const res = await apiRequest<{nextNumber: string}>(`/utils/next-sequence/${collectionName}?date=${dateStr}`);
+    return res.nextNumber;
+  },
+
+  subscribePaginated<T>(
+    collectionName: string, 
+    options: string | { company_id: string; [key: string]: any }, 
+    callback: (result: { data: T[], total: number, summary: any, page: number, limit: number }) => void, 
+    onError?: (error: Error) => void
+  ) {
+    let lastData = '';
+    const fetchData = async () => {
+      try {
+        const result = await dbService.listPaginated<T>(collectionName, options);
+        // Only stringify the data part to avoid missing updates if only summary changes? No, stringify whole result
+        const dataString = JSON.stringify(result);
+        if (dataString !== lastData) {
+          lastData = dataString;
+          callback(result);
+        }
+      } catch (err: any) {
+        console.error('Polling error:', err);
+        if (onError) onError(err);
+      }
+    };
+
+    fetchData(); // Initial fetch
+    const interval = setInterval(fetchData, 2000); // Poll every 2 seconds
+    
+    const handleRefresh = (e: any) => {
+      if (e.detail?.collection === collectionName) {
+        fetchData();
+      }
+    };
+    window.addEventListener('db-refresh', handleRefresh as EventListener);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('db-refresh', handleRefresh as EventListener);
+    };
+  },
+
   subscribe<T>(collectionName: string, options: string | { company_id: string; [key: string]: any }, callback: (data: T[]) => void, onError?: (error: Error) => void) {
     let lastData = '';
     const fetchData = async () => {

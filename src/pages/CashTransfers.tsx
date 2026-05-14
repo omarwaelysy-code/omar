@@ -18,8 +18,9 @@ import { InlineActivityLog } from '../components/InlineActivityLog';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
-import { formatNumber, formatDate } from '../utils/formatUtils';
+import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { ExportButtons } from '../components/ExportButtons';
+import { PaginationControls } from '../components/PaginationControls';
 
 export const CashTransfers: React.FC = () => {
   const { user } = useAuth();
@@ -34,6 +35,22 @@ export const CashTransfers: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [transferToDelete, setTransferToDelete] = useState<string | null>(null);
   const [viewTransfer, setViewTransfer] = useState<CashTransfer | null>(null);
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(field);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
+  
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [serverSummary, setServerSummary] = useState<any>({});
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [showSidePanel, setShowSidePanel] = useState(false);
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
@@ -65,18 +82,29 @@ export const CashTransfers: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      const unsubTransfers = dbService.subscribe<CashTransfer>('cash_transfers', user.company_id, setTransfers);
+      const unsubTransfers = dbService.subscribePaginated('cash_transfers', {
+          company_id: user.company_id,
+          _page: page,
+          _limit: limit,
+          _sortBy: sortBy,
+          _sortOrder: sortOrder,
+          _search: searchTerm
+      }, (result: any) => {
+        setTransfers(result.data);
+        setTotalRecords(result.total);
+        setServerSummary(result.summary);
+        setLoading(false);
+      });
       const unsubPM = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setPaymentMethods);
       const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
       
-      setLoading(false);
       return () => {
         unsubTransfers();
         unsubPM();
         unsubAccounts();
       };
     }
-  }, [user]);
+  }, [user, page, limit, sortBy, sortOrder, searchTerm]);
 
   // Real-time Preview Logic
   useEffect(() => {
@@ -375,6 +403,13 @@ export const CashTransfers: React.FC = () => {
           <div>
             <h2 className="text-2xl font-black text-zinc-900 tracking-tight">التحويل بين الخزائن</h2>
             <p className="text-zinc-500 font-medium">إدارة عمليات تحويل النقدية بين الخزائن والحسابات البنكية</p>
+            {serverSummary.total_amount !== undefined && (
+              <div className="mt-2 flex items-center gap-4 text-sm">
+                <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
+                  إجمالي المحول: {formatMoney(serverSummary.total_amount)} ج.م
+                </span>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -420,10 +455,38 @@ export const CashTransfers: React.FC = () => {
           <table className="w-full text-right border-collapse">
             <thead>
               <tr className="bg-zinc-50/50">
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100">التاريخ</th>
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100">من خزينة</th>
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100">إلى خزينة</th>
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100">المبلغ</th>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('date')}>
+                  <div className="flex items-center gap-1">
+                    التاريخ
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('from_payment_method_name')}>
+                  <div className="flex items-center gap-1">
+                    من خزينة
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'from_payment_method_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('to_payment_method_name')}>
+                  <div className="flex items-center gap-1">
+                    إلى خزينة
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'to_payment_method_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('amount')}>
+                  <div className="flex items-center gap-1">
+                    المبلغ
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
                 <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100">الوصف</th>
                 <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100">الإجراءات</th>
               </tr>
@@ -498,6 +561,7 @@ export const CashTransfers: React.FC = () => {
             </tbody>
           </table>
         </div>
+        <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
       </div>
 
       {/* Add/Edit Transfer Modal */}

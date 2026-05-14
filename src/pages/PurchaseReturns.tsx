@@ -15,7 +15,8 @@ import { ExportButtons } from '../components/ExportButtons';
 import { TransactionManager } from '../services/TransactionManager';
 import { ReturnSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog } from '../types';
-import { formatNumber, formatDate } from '../utils/formatUtils';
+import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
+import { PaginationControls } from '../components/PaginationControls';
 
 export const PurchaseReturns: React.FC = () => {
   const { user } = useAuth();
@@ -35,6 +36,28 @@ export const PurchaseReturns: React.FC = () => {
   const returnRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(field);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
+  
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [serverSummary, setServerSummary] = useState<any>({});
+  const [maxSeqGenerated, setMaxSeqGenerated] = useState<number>(0);
+  const [returnNumber, setReturnNumber] = useState('');
+
+  const generateReturnNumber = async (selectedDate: string) => {
+    return await dbService.getNextSequence('purchase_returns', selectedDate);
+  };
   
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -86,7 +109,18 @@ export const PurchaseReturns: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      const unsubPR = dbService.subscribe<any>('purchase_returns', user.company_id, setPurchaseReturns);
+      const unsubPR = dbService.subscribePaginated('purchase_returns', {
+        company_id: user.company_id,
+        _page: page,
+        _limit: limit,
+        _sortBy: sortBy,
+        _sortOrder: sortOrder,
+        _search: searchTerm
+      }, (result: any) => {
+        setPurchaseReturns(result.data);
+        setTotalRecords(result.total);
+        setServerSummary(result.summary);
+      });
       const unsubSuppliers = dbService.subscribe<Supplier>('suppliers', user.company_id, setSuppliers);
       const unsubProducts = dbService.subscribe<Product>('products', user.company_id, setProducts);
       const unsubPM = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setPaymentMethods);
@@ -101,7 +135,7 @@ export const PurchaseReturns: React.FC = () => {
         unsubAccounts();
       };
     }
-  }, [user]);
+  }, [user, page, limit, sortBy, sortOrder, searchTerm]);
 
   // Real-time Preview Logic
   useEffect(() => {
@@ -109,6 +143,14 @@ export const PurchaseReturns: React.FC = () => {
       setPreviewJournalEntry(null);
       setPreviewActivityLog(null);
       return;
+    }
+
+    if (!editingReturn && isModalOpen) {
+      const updateNum = async () => {
+        const num = await generateReturnNumber(returnData.date);
+        setReturnNumber(num);
+      };
+      updateNum();
     }
 
     const generatePreview = () => {
@@ -370,7 +412,7 @@ export const PurchaseReturns: React.FC = () => {
     try {
       const supplier = suppliers.find(s => s.id === returnData.supplier_id);
       const paymentMethod = paymentMethods.find(pm => pm.id === returnData.payment_method_id);
-      const return_number = editingReturn ? editingReturn.return_number : `PRET-${Date.now().toString().slice(-6)}`;
+      const return_number = editingReturn ? editingReturn.return_number : returnNumber;
       
       const total_amount = Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.cost_price || 0)), 0)) || 0;
 
@@ -534,15 +576,18 @@ export const PurchaseReturns: React.FC = () => {
     }
   };
 
-  const openModal = () => {
+  const openModal = async () => {
+    const newDate = new Date().toISOString().slice(0, 10);
     setReturnData({
       supplier_id: '',
-      date: new Date().toISOString().slice(0, 10),
+      date: newDate,
       payment_type: 'credit',
       payment_method_id: '',
       notes: ''
     });
     setItems([{ product_id: '', quantity: 1, cost_price: 0 }]);
+    const num = await generateReturnNumber(newDate);
+    setReturnNumber(num);
     setIsModalOpen(true);
   };
 
@@ -559,6 +604,7 @@ export const PurchaseReturns: React.FC = () => {
       if (!fullData) throw new Error('Return details not found');
 
       setEditingReturn(fullData);
+      setReturnNumber(fullData.return_number);
       setReturnData({
         supplier_id: fullData.supplier_id,
         date: fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
@@ -657,6 +703,13 @@ export const PurchaseReturns: React.FC = () => {
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">مرتجع المشتريات</h2>
           <p className="text-zinc-500">إدارة الأصناف المرتجعة للموردين.</p>
+          {serverSummary.total_amount !== undefined && (
+            <div className="mt-2 flex items-center gap-4 text-sm">
+               <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
+                 إجمالي المرتجعات: {formatMoney(serverSummary.total_amount)} ج.م
+               </span>
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button 
@@ -699,11 +752,46 @@ export const PurchaseReturns: React.FC = () => {
           <table className="w-full text-right">
             <thead>
               <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                <th className="px-6 py-4 font-bold">رقم المرتجع</th>
-                <th className="px-6 py-4 font-bold">المورد</th>
-                <th className="px-6 py-4 font-bold">التاريخ</th>
-                <th className="px-6 py-4 font-bold">النوع</th>
-                <th className="px-6 py-4 font-bold">المبلغ</th>
+                <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('return_number')}>
+                  <div className="flex items-center gap-1">
+                    رقم المرتجع
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'return_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
+                <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('supplier_name')}>
+                  <div className="flex items-center gap-1">
+                    المورد
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'supplier_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
+                <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('date')}>
+                  <div className="flex items-center gap-1">
+                    التاريخ
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
+                <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('payment_type')}>
+                  <div className="flex items-center gap-1">
+                    النوع
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'payment_type' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
+                <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('total_amount')}>
+                  <div className="flex items-center gap-1">
+                    المبلغ
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'total_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
                 <th className="px-6 py-4 font-bold text-left">الإجراءات</th>
               </tr>
             </thead>
@@ -768,6 +856,7 @@ export const PurchaseReturns: React.FC = () => {
               ))}
             </tbody>
           </table>
+          <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
         </div>
 
         {/* Mobile Card View */}

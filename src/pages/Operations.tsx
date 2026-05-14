@@ -11,6 +11,8 @@ import QRCode from 'react-qr-code';
 import Barcode from 'react-barcode';
 
 import { Operation, OperationField, OperationCategory, Customer, Department, CostCenter } from '../types';
+import { PaginationControls } from '../components/PaginationControls';
+import { formatMoney } from '../utils/formatUtils';
 
 export function Operations() {
   const { t, dir } = useLanguage();
@@ -21,6 +23,15 @@ export function Operations() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(21);
+  const [sortBy, setSortBy] = useState('operation_date');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [serverSummary, setServerSummary] = useState<any>({});
+  const [searchTerm, setSearchTerm] = useState('');
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [dynamicFields, setDynamicFields] = useState<OperationField[]>([]);
@@ -39,7 +50,7 @@ export function Operations() {
 
   useEffect(() => {
     fetchInitialData();
-  }, []);
+  }, [user, page, limit, sortBy, sortOrder, searchTerm]);
 
   useEffect(() => {
     if (selectedCategory) {
@@ -50,16 +61,21 @@ export function Operations() {
   }, [selectedCategory]);
 
   const fetchInitialData = async () => {
+    if (!user) return;
     try {
-      const companyId = user?.company_id || '';
-      const [ops, cats, custs, depts, ccs] = await Promise.all([
-        dbService.list<Operation>('operations', companyId),
+      const companyId = user.company_id || '';
+      
+      const [cats, custs, depts, ccs, opsResult] = await Promise.all([
         dbService.list<OperationCategory>('operation_categories', companyId),
         dbService.list<Customer>('customers', companyId),
         dbService.list<Department>('departments', companyId),
-        dbService.list<CostCenter>('cost_centers', companyId)
+        dbService.list<CostCenter>('cost_centers', companyId),
+        apiRequest<any>(`/operations?company_id=${companyId}&_page=${page}&_limit=${limit}&_sortBy=${sortBy}&_sortOrder=${sortOrder}&_search=${searchTerm}`)
       ]);
-      setOperations(ops);
+      
+      setOperations(opsResult.data);
+      setTotalRecords(opsResult.total);
+      setServerSummary(opsResult.summary || {});
       setCategories(cats);
       setCustomers(custs);
       setDepartments(depts);
@@ -499,6 +515,26 @@ export function Operations() {
         <div>
           <h1 className="text-2xl font-bold text-zinc-900">نظام العمليات المرن</h1>
           <p className="text-zinc-500">إدارة المشروعات والعمليات التشغيلية (Construction / Services / Trade)</p>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+             <div className="relative">
+                <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                <input 
+                  type="text"
+                  placeholder="بحث في العمليات..."
+                  className="pr-10 pl-4 py-2 bg-white border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none w-64"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+             </div>
+             <div className="flex bg-white border border-zinc-200 rounded-xl p-1">
+                <button onClick={() => { setSortBy('operation_date'); setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC'); }} className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${sortBy === 'operation_date' ? 'bg-emerald-50 text-emerald-700' : 'text-zinc-500'}`}>
+                  التاريخ {sortBy === 'operation_date' && (sortOrder === 'ASC' ? '↑' : '↓')}
+                </button>
+                <button onClick={() => { setSortBy('customer_name'); setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC'); }} className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${sortBy === 'customer_name' ? 'bg-emerald-50 text-emerald-700' : 'text-zinc-500'}`}>
+                  العميل {sortBy === 'customer_name' && (sortOrder === 'ASC' ? '↑' : '↓')}
+                </button>
+             </div>
+          </div>
         </div>
         <button
           onClick={() => {
@@ -601,6 +637,16 @@ export function Operations() {
           ))}
         </div>
       )}
+
+      <div className="mt-8 flex justify-center">
+        <PaginationControls 
+          page={page} 
+          limit={limit} 
+          total={totalRecords} 
+          onPageChange={setPage} 
+          onLimitChange={setLimit} 
+        />
+      </div>
 
       {/* Modal */}
       <AnimatePresence>

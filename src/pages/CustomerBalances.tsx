@@ -36,7 +36,13 @@ export const CustomerBalances: React.FC = () => {
       const balances = custs.map((customer: any) => {
         const custInvoices = invoices.filter((i: any) => i.customer_id === customer.id);
         const custReturns = returns.filter((r: any) => r.customer_id === customer.id);
-        const custReceipts = receipts.filter((r: any) => r.customer_id === customer.id);
+        const custReceipts = receipts.filter((r: any) => {
+          if (r.customer_id === customer.id) return true;
+          if (r.type === 'multi' && r.items && Array.isArray(r.items)) {
+            return r.items.some((item: any) => item.type === 'customer' && item.entity_id === customer.id);
+          }
+          return false;
+        });
         const custDiscounts = discounts.filter((d: any) => d.customer_id === customer.id);
         
         const openingBalance = customer.opening_balance || 0;
@@ -66,7 +72,19 @@ export const CustomerBalances: React.FC = () => {
         const totalInvoices = custInvoices.reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
         const totalReturns = custReturns.reduce((sum: number, r: any) => sum + (Number(r.total_amount) || 0), 0);
         const cashInvoicesAmount = custInvoices.filter((i: any) => i.payment_type === 'cash').reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
-        const totalReceipts = custReceipts.reduce((sum: number, r: any) => sum + (Number(r.amount) || 0), 0) + cashInvoicesAmount;
+        
+        const totalReceipts = custReceipts.reduce((sum: number, r: any) => {
+          if (r.type === 'multi' && r.items && Array.isArray(r.items)) {
+             const itemsSum = r.items
+               .filter((item: any) => item.type === 'customer' && item.entity_id === customer.id)
+               .reduce((itemSum: number, item: any) => itemSum + (Number(item.amount) || 0), 0);
+             return sum + itemsSum;
+          }
+          if (r.customer_id === customer.id) {
+             return sum + (Number(r.amount) || 0);
+          }
+          return sum;
+        }, 0) + cashInvoicesAmount;
         const totalDiscounts = custDiscounts.reduce((sum: number, d: any) => sum + (Number(d.amount) || 0), 0);
         
         return {

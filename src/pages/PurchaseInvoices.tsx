@@ -24,8 +24,9 @@ import { TransactionManager } from '../services/TransactionManager';
 import { InvoiceSchema, JournalEntrySchema } from '../lib/schemas';
 import { ExportButtons } from '../components/ExportButtons';
 import { ActivityLog } from '../types';
-import { formatNumber, formatDate } from '../utils/formatUtils';
+import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { useViewPreference } from '../hooks/useViewPreference';
+import { PaginationControls } from '../components/PaginationControls';
 
 export const PurchaseInvoices: React.FC = () => {
   const { user } = useAuth();
@@ -44,6 +45,23 @@ export const PurchaseInvoices: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(field);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
+  
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [serverSummary, setServerSummary] = useState<any>({});
+  const [maxSeqGenerated, setMaxSeqGenerated] = useState<number>(0);
   const [viewInvoice, setViewInvoice] = useState<any | null>(null);
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -125,7 +143,18 @@ export const PurchaseInvoices: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      const unsubPI = dbService.subscribe<any>('purchase_invoices', user.company_id, setPurchaseInvoices);
+      const unsubPI = dbService.subscribePaginated('purchase_invoices', {
+        company_id: user.company_id,
+        _page: page,
+        _limit: limit,
+        _sortBy: sortBy,
+        _sortOrder: sortOrder,
+        _search: searchTerm
+      }, (result: any) => {
+        setPurchaseInvoices(result.data);
+        setTotalRecords(result.total);
+        setServerSummary(result.summary);
+      });
       const unsubSuppliers = dbService.subscribe<Supplier>('suppliers', user.company_id, setSuppliers);
       const unsubProducts = dbService.subscribe<Product>('products', user.company_id, setProducts);
       const unsubPM = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setPaymentMethods);
@@ -152,30 +181,10 @@ export const PurchaseInvoices: React.FC = () => {
         unsubAccounts();
       };
     }
-  }, [user]);
+  }, [user, page, limit, sortBy, sortOrder, searchTerm]);
 
-  const generateInvoiceNumber = (selectedDate: string) => {
-    const dateObj = new Date(selectedDate);
-    const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
-    
-    const monthInvoices = purchaseInvoices.filter(inv => {
-      const invDate = new Date(inv.date);
-      return (invDate.getMonth() + 1).toString().padStart(2, '0') === month;
-    });
-
-    let maxSeq = 0;
-    monthInvoices.forEach(inv => {
-      const parts = inv.invoice_number.split('-');
-      if (parts.length === 3 && parts[1] === month) {
-        const seq = parseInt(parts[2]);
-        if (!isNaN(seq) && seq > maxSeq) {
-          maxSeq = seq;
-        }
-      }
-    });
-    
-    const nextNumber = maxSeq + 1;
-    return `PUR-${month}-${nextNumber.toString().padStart(5, '0')}`;
+  const generateInvoiceNumber = async (selectedDate: string) => {
+    return await dbService.getNextSequence('purchase_invoices', selectedDate);
   };
 
   // Real-time Preview Logic
@@ -187,8 +196,12 @@ export const PurchaseInvoices: React.FC = () => {
     }
 
     // Update invoice number if date changes and we are creating a new invoice
-    if (!editingInvoice) {
-      setInvoiceNumber(generateInvoiceNumber(invoiceData.date));
+    if (!editingInvoice && isModalOpen) {
+      const updateNum = async () => {
+        const num = await generateInvoiceNumber(invoiceData.date);
+        setInvoiceNumber(num);
+      };
+      updateNum();
     }
   }, [invoiceData.date, purchaseInvoices, isModalOpen, editingInvoice, user]);
 
@@ -919,9 +932,10 @@ export const PurchaseInvoices: React.FC = () => {
       }
     } else {
       setEditingInvoice(null);
+      const newDate = new Date().toISOString().slice(0, 10);
       setInvoiceData({
         supplier_id: '',
-        date: new Date().toISOString().slice(0, 10),
+        date: newDate,
         payment_type: 'cash',
         payment_method_id: '',
         notes: '',
@@ -929,7 +943,8 @@ export const PurchaseInvoices: React.FC = () => {
         purchase_type: 'items'
       });
       setItems([]);
-      setInvoiceNumber(generateInvoiceNumber(new Date().toISOString().slice(0, 10)));
+      const num = await generateInvoiceNumber(newDate);
+      setInvoiceNumber(num);
     }
     setIsModalOpen(true);
   };
@@ -997,6 +1012,23 @@ export const PurchaseInvoices: React.FC = () => {
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('pi.title')}</h2>
           <p className="text-zinc-500">{t('pi.subtitle')}</p>
+          {(serverSummary.total_amount !== undefined) && (
+            <div className={`mt-2 flex items-center gap-4 text-sm ${t('dir') === 'rtl' ? 'flex-row-reverse' : ''}`}>
+              <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
+                {t('pi.total_amount')}: {formatMoney(serverSummary.total_amount)} {t('common.currency')}
+              </span>
+              {serverSummary.total_discount !== undefined && (
+                <span className="bg-rose-50 text-rose-700 px-3 py-1 rounded-full border border-rose-100 font-bold">
+                   إجمالي الخصومات: {formatMoney(serverSummary.total_discount)} {t('common.currency')}
+                </span>
+              )}
+              {serverSummary.total_discount !== undefined && (
+                <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100 font-bold">
+                   الصافي: {formatMoney(serverSummary.total_amount - serverSummary.total_discount)} {t('common.currency')}
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button 
@@ -1052,14 +1084,43 @@ export const PurchaseInvoices: React.FC = () => {
         </div>
 
         {view === 'table' ? (
-          <div ref={tableRef} id="purchase-invoices-list-table" className="overflow-x-auto hidden md:block">
+          <>
+            <div ref={tableRef} id="purchase-invoices-list-table" className="overflow-x-auto hidden md:block">
             <table className={`w-full ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
               <thead>
                 <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                  <th className="px-6 py-4 font-bold">{t('pi.invoice_number')}</th>
-                  <th className="px-6 py-4 font-bold">{t('pi.supplier')}</th>
-                  <th className="px-6 py-4 font-bold">{t('common.date')}</th>
-                  <th className="px-6 py-4 font-bold">{t('pi.total_amount')}</th>
+                  <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('invoice_number')}>
+                    <div className="flex items-center gap-1">
+                      {t('pi.invoice_number')}
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'invoice_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
+                  <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('supplier_name')}>
+                    <div className="flex items-center gap-1">
+                      {t('pi.supplier')}
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'supplier_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
+                  <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('date')}>
+                    <div className="flex items-center gap-1">
+                      {t('common.date')}
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
+                  <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('total_amount')}>
+                    <div className="flex items-center gap-1">
+                      {t('pi.total_amount')}
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'total_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
                   <th className={`px-6 py-4 font-bold ${t('dir') === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.actions')}</th>
                 </tr>
               </thead>
@@ -1113,6 +1174,8 @@ export const PurchaseInvoices: React.FC = () => {
               </tbody>
             </table>
           </div>
+            <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
+          </>
         ) : (
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredInvoices.map((inv) => (

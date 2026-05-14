@@ -11,7 +11,8 @@ import { SmartAIInput } from '../components/SmartAIInput';
 import { TransactionManager } from '../services/TransactionManager';
 import { DiscountSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog } from '../types';
-import { formatNumber, formatDate } from '../utils/formatUtils';
+import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
+import { PaginationControls } from '../components/PaginationControls';
 
 export const CustomerDiscounts: React.FC = () => {
   const { user } = useAuth();
@@ -32,6 +33,28 @@ export const CustomerDiscounts: React.FC = () => {
   const [previewActivityLog, setPreviewActivityLog] = useState<Partial<ActivityLog> | null>(null);
   const [discountToDelete, setDiscountToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [serverSummary, setServerSummary] = useState<any>({});
+  const [discountNumber, setDiscountNumber] = useState('');
+
+  const generateDiscountNumber = async (selectedDate: string) => {
+    return await dbService.getNextSequence('customer_discounts', selectedDate);
+  };
+
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(field);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
   
   const [newCustomer, setNewCustomer] = useState({ 
     name: '', 
@@ -55,7 +78,18 @@ export const CustomerDiscounts: React.FC = () => {
     if (user) {
       const unsubCustomers = dbService.subscribe<Customer>('customers', user.company_id, setCustomers);
       const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
-      const unsubDiscounts = dbService.subscribe<any>('customer_discounts', user.company_id, setDiscounts);
+      const unsubDiscounts = dbService.subscribePaginated('customer_discounts', {
+        company_id: user.company_id,
+        _page: page,
+        _limit: limit,
+        _sortBy: sortBy,
+        _sortOrder: sortOrder,
+        _search: searchTerm
+      }, (result: any) => {
+        setDiscounts(result.data);
+        setTotalRecords(result.total);
+        setServerSummary(result.summary);
+      });
       
       const fetchSettings = async () => {
         const docs = await dbService.getDocsByFilter<any>('settings', user.company_id, [
@@ -75,7 +109,7 @@ export const CustomerDiscounts: React.FC = () => {
         unsubDiscounts();
       };
     }
-  }, [user]);
+  }, [user, page, limit, sortBy, sortOrder, searchTerm]);
 
   // Real-time Preview Logic
   useEffect(() => {
@@ -83,6 +117,14 @@ export const CustomerDiscounts: React.FC = () => {
       setPreviewJournalEntry(null);
       setPreviewActivityLog(null);
       return;
+    }
+
+    if (isModalOpen) {
+      const updateNum = async () => {
+        const num = await generateDiscountNumber(discountData.date);
+        setDiscountNumber(num);
+      };
+      updateNum();
     }
 
     const generatePreview = () => {
@@ -199,7 +241,7 @@ export const CustomerDiscounts: React.FC = () => {
 
     try {
       const customer = customers.find(c => c.id === discountData.customer_id);
-      const number = `CDISC-${Date.now().toString().slice(-6)}`;
+      const number = discountNumber;
       
       const data = {
         customer_id: discountData.customer_id,
@@ -319,6 +361,13 @@ export const CustomerDiscounts: React.FC = () => {
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">خصم العملاء</h2>
           <p className="text-zinc-500">إدارة الخصومات الممنوحة للعملاء.</p>
+          {serverSummary.total_amount !== undefined && (
+            <div className="mt-2 flex items-center gap-4 text-sm">
+               <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
+                 إجمالي الخصومات: {formatMoney(serverSummary.total_amount)} ج.م
+               </span>
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           <button 
@@ -356,9 +405,30 @@ export const CustomerDiscounts: React.FC = () => {
           <table className="w-full text-right">
             <thead>
               <tr className="bg-[rgba(244,244,245,0.5)] text-zinc-500 text-xs uppercase tracking-wider">
-                <th className="px-6 py-4 font-bold">العميل</th>
-                <th className="px-6 py-4 font-bold">التاريخ</th>
-                <th className="px-6 py-4 font-bold">المبلغ</th>
+                <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('customer_name')}>
+                  <div className="flex items-center gap-1">
+                    العميل
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'customer_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
+                <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('date')}>
+                  <div className="flex items-center gap-1">
+                    التاريخ
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
+                <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('amount')}>
+                  <div className="flex items-center gap-1">
+                    المبلغ
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
                 <th className="px-6 py-4 font-bold">ملاحظات</th>
                 <th className="px-6 py-4 font-bold text-left">الإجراءات</th>
               </tr>
@@ -398,6 +468,7 @@ export const CustomerDiscounts: React.FC = () => {
               ))}
             </tbody>
           </table>
+          <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
         </div>
 
         {/* Mobile Card View */}
