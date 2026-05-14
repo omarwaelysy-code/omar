@@ -20,20 +20,35 @@ export const ExpensesReport: React.FC = () => {
     setLoading(true);
     try {
       const [vouchers, categories] = await Promise.all([
-        dbService.getDocsByFilter<any>('payment_vouchers', user.company_id, [
-          { field: 'type', operator: '==', value: 'expense' }
-        ]),
+        dbService.list<any>('payment_vouchers', user.company_id),
         dbService.list<any>('expense_categories', user.company_id)
       ]);
 
       const filteredVouchers = vouchers.filter((v: any) => {
-        const d = v.date;
+        if (!v.date) return false;
+        const d = typeof v.date === 'string' ? v.date.slice(0, 10) : new Date(v.date).toISOString().slice(0, 10);
         return d >= startDate && d <= endDate;
       });
 
       const data = categories.map((cat: any) => {
-        const catVouchers = filteredVouchers.filter((v: any) => v.expense_category_id === cat.id);
-        const totalAmount = catVouchers.reduce((sum: number, v: any) => sum + v.amount, 0);
+        let totalAmount = 0;
+        const catId = String(cat.id);
+        
+        filteredVouchers.forEach((v: any) => {
+          // Check top-level expense category
+          if (v.expense_category_id && String(v.expense_category_id) === catId) {
+            totalAmount += Number(v.amount) || 0;
+          }
+          
+          // Check multi-items
+          if (v.items && Array.isArray(v.items)) {
+            v.items.forEach((item: any) => {
+              if (item.type === 'expense' && String(item.entity_id) === catId) {
+                totalAmount += Number(item.amount) || 0;
+              }
+            });
+          }
+        });
 
         return {
           code: cat.code,
