@@ -173,10 +173,11 @@ export const Dashboard: React.FC = () => {
       ];
 
       const now = new Date();
-      const statsMonth = now.getUTCMonth();
-      const statsYear = now.getUTCFullYear();
+      const statsMonth = now.getMonth();
+      const statsYear = now.getFullYear();
+      
+      const startOfMonth = `${statsYear}-${String(statsMonth + 1).padStart(2, '0')}-01`;
       const today = now.toISOString().split('T')[0];
-      const startOfMonth = new Date(Date.UTC(statsYear, statsMonth, 1)).toISOString().split('T')[0];
 
       const incomeStatement = AccountingEngine.calculateIncomeStatement(accounts, accountTypes, journalEntries, startOfMonth, today);
       const balanceSheet = AccountingEngine.calculateBalanceSheet(accounts, accountTypes, journalEntries, today);
@@ -186,13 +187,15 @@ export const Dashboard: React.FC = () => {
       const totalExpensesValue = incomeStatement.totalExpenses + incomeStatement.totalCosts;
       
       const monthInvoices = invoices.filter(inv => {
-        const d = new Date(inv.date);
-        return d.getUTCMonth() === statsMonth && d.getUTCFullYear() === statsYear;
+        if (!inv.date) return false;
+        const [y, m] = inv.date.split('-').map(Number);
+        return (m - 1) === statsMonth && y === statsYear;
       });
 
       const monthReceipts = receipts.filter(r => {
-        const d = new Date(r.date);
-        return d.getUTCMonth() === statsMonth && d.getUTCFullYear() === statsYear;
+        if (!r.date) return false;
+        const [y, m] = r.date.split('-').map(Number);
+        return (m - 1) === statsMonth && y === statsYear;
       });
 
       const totalReceipts = monthReceipts.reduce((sum: number, r: ReceiptVoucher) => sum + (Number(r.amount) || 0), 0);
@@ -283,8 +286,8 @@ export const Dashboard: React.FC = () => {
               </p>
               <div className="w-[1px] h-3 bg-slate-200" />
               <div className="flex items-center gap-1">
-                <span className="text-[10px] font-bold text-slate-900 px-2 py-0.5 bg-slate-100 rounded-md">
-                  {currentTime.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { month: 'long' })}
+                <span className="text-[10px] font-bold text-emerald-600 px-2 py-0.5 bg-emerald-50 rounded-md border border-emerald-100 uppercase tracking-tight">
+                  {currentTime.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { month: 'long', year: 'numeric' })}
                 </span>
               </div>
               <div className="w-[1px] h-3 bg-slate-200" />

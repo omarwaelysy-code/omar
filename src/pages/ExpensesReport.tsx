@@ -39,8 +39,12 @@ export const ExpensesReport: React.FC = () => {
           const d = new Date(je.date);
           if (d >= start && d <= end) {
             je.items?.forEach((item: any) => {
-              // Match by account_id OR by explicit sub_account_id if present
-              if (item.account_id === catAccountId || (item.sub_account_id === cat.id && item.sub_account_type === 'expense')) {
+              // Priority 1: Match by sub_account_id if present
+              // Priority 2: Match by account_id only if no sub_account is specified
+              const isSubMatch = item.sub_account_id === cat.id && item.sub_account_type === 'expense';
+              const isPrimaryMatch = !item.sub_account_id && item.account_id === catAccountId;
+
+              if (isSubMatch || isPrimaryMatch) {
                 totalAmount += (Number(item.debit) || 0) - (Number(item.credit) || 0);
               }
             });

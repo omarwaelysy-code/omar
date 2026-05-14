@@ -178,17 +178,18 @@ export class AccountingEngine {
     const expenses = isAccounts.filter(a => a.typeInfo?.classification === 'expense');
 
     // Sign handling: Revenue is normally Credit, Cost/Expense normally Debit
-    const totalRevenues = revenues.reduce((sum, a) => sum + (Number(a.closing.credit) - Number(a.closing.debit)), 0);
-    const totalCosts = costs.reduce((sum, a) => sum + (Number(a.closing.debit) - Number(a.closing.credit)), 0);
-    const totalExpenses = expenses.reduce((sum, a) => sum + (Number(a.closing.debit) - Number(a.closing.credit)), 0);
+    // For Income Statement we use MOVEMENTS in the period
+    const totalRevenues = revenues.reduce((sum, a) => sum + (Number(a.movement.credit) - Number(a.movement.debit)), 0);
+    const totalCosts = costs.reduce((sum, a) => sum + (Number(a.movement.debit) - Number(a.movement.credit)), 0);
+    const totalExpenses = expenses.reduce((sum, a) => sum + (Number(a.movement.debit) - Number(a.movement.credit)), 0);
 
     const grossProfit = totalRevenues - totalCosts;
     const netProfit = grossProfit - totalExpenses;
 
     return {
-      revenues: revenues.map(r => ({ id: r.id, name: r.name, balance: r.closing.credit - r.closing.debit })),
-      costs: costs.map(c => ({ id: c.id, name: c.name, balance: c.closing.debit - c.closing.credit })),
-      expenses: expenses.map(e => ({ id: e.id, name: e.name, balance: e.closing.debit - e.closing.credit })),
+      revenues: revenues.map(r => ({ id: r.id, name: r.name, balance: r.movement.credit - r.movement.debit })),
+      costs: costs.map(c => ({ id: c.id, name: c.name, balance: c.movement.debit - c.movement.credit })),
+      expenses: expenses.map(e => ({ id: e.id, name: e.name, balance: e.movement.debit - e.movement.credit })),
       totalRevenues,
       totalCosts,
       grossProfit,
