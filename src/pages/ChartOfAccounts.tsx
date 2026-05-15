@@ -68,6 +68,39 @@ export const ChartOfAccounts: React.FC = () => {
     { id: 'expense', label: 'المصروفات', statement: 'income_statement' },
   ];
 
+  const renderAccountTree = (parentId: string | null, typeId: string, level: number) => {
+    const levelAccounts = accounts.filter(a => {
+      // If we're looking for root accounts, they either have no parent_id or parent_id is empty/invalid
+      if (parentId === null) {
+        return a.type_id === typeId && (!a.parent_id || a.parent_id === "");
+      }
+      return a.type_id === typeId && a.parent_id === parentId;
+    });
+
+    return levelAccounts.map(account => {
+      const hasChildren = accounts.some(a => a.parent_id === account.id);
+      return (
+        <TreeItem 
+          key={account.id} 
+          label={`${account.code} - ${account.name}`} 
+          icon={hasChildren ? Folder : FileText} 
+          level={level}
+        >
+          {hasChildren && renderAccountTree(account.id, typeId, level + 1)}
+        </TreeItem>
+      );
+    });
+  };
+
+  const filterTypesByCls = (clsId: string) => {
+    return types.filter(t => {
+      if (clsId === 'liability_equity') {
+        return ['liability', 'equity', 'liability_equity'].includes(t.classification);
+      }
+      return t.classification === clsId;
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -96,11 +129,9 @@ export const ChartOfAccounts: React.FC = () => {
           <div className="space-y-2">
             {classifications.filter(c => c.statement === 'balance_sheet').map(cls => (
               <TreeItem key={cls.id} label={cls.label} icon={Folder} level={0} isOpenDefault={true}>
-                {types.filter(t => t.classification === cls.id).map(type => (
+                {filterTypesByCls(cls.id).map(type => (
                   <TreeItem key={type.id} label={`${type.code} - ${type.name}`} icon={Folder} level={1}>
-                    {accounts.filter(a => a.type_id === type.id).map(account => (
-                      <TreeItem key={account.id} label={`${account.code} - ${account.name}`} icon={FileText} level={2} />
-                    ))}
+                    {renderAccountTree(null, type.id, 2)}
                   </TreeItem>
                 ))}
               </TreeItem>
@@ -120,11 +151,9 @@ export const ChartOfAccounts: React.FC = () => {
           <div className="space-y-2">
             {classifications.filter(c => c.statement === 'income_statement').map(cls => (
               <TreeItem key={cls.id} label={cls.label} icon={Folder} level={0} isOpenDefault={true}>
-                {types.filter(t => t.classification === cls.id).map(type => (
+                {filterTypesByCls(cls.id).map(type => (
                   <TreeItem key={type.id} label={`${type.code} - ${type.name}`} icon={Folder} level={1}>
-                    {accounts.filter(a => a.type_id === type.id).map(account => (
-                      <TreeItem key={account.id} label={`${account.code} - ${account.name}`} icon={FileText} level={2} />
-                    ))}
+                    {renderAccountTree(null, type.id, 2)}
                   </TreeItem>
                 ))}
               </TreeItem>

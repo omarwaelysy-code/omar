@@ -55,7 +55,8 @@ export const Accounts: React.FC = () => {
     name: '',
     type_id: '',
     opening_balance: 0,
-    required_sub_account: false
+    required_sub_account: false,
+    parent_id: ''
   });
 
   useEffect(() => {
@@ -82,7 +83,8 @@ export const Accounts: React.FC = () => {
           name: result.name || '',
           type_id: matchingType?.id || '',
           opening_balance: 0,
-          required_sub_account: result.name?.toLowerCase().includes('عملاء') || result.name?.toLowerCase().includes('موردين') || false
+          required_sub_account: result.name?.toLowerCase().includes('عملاء') || result.name?.toLowerCase().includes('موردين') || false,
+          parent_id: ''
         });
         showNotification(t('common.ai_parse_success'), 'success');
         setAiText('');
@@ -170,7 +172,8 @@ export const Accounts: React.FC = () => {
         name: account.name,
         type_id: account.type_id,
         opening_balance: account.opening_balance || 0,
-        required_sub_account: requiredSubAccount
+        required_sub_account: requiredSubAccount,
+        parent_id: account.parent_id || ''
       };
       console.log('[ERP] Form State being set:', newFormData);
       setFormData(newFormData);
@@ -181,7 +184,8 @@ export const Accounts: React.FC = () => {
         name: '',
         type_id: '',
         opening_balance: 0,
-        required_sub_account: false
+        required_sub_account: false,
+        parent_id: ''
       });
     }
     setIsModalOpen(true);
@@ -393,12 +397,31 @@ export const Accounts: React.FC = () => {
                         required
                         className="premium-input font-bold pr-12 appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGZpbGw9Im5vbmUiIHZpZXdCb3g9IjAgMCAyNCAyNCIgc3Ryb2tlPSIjOTRhM2I4IiBzdHJva2Utd2lkdGg9IjIiPjxwYXRoIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZD0iTTE5IDlsLTcgNy03LTciLz48L3N2Zz4=')] bg-[8px_center] bg-[length:16px] bg-no-repeat"
                         value={formData.type_id}
-                        onChange={(e) => setFormData({...formData, type_id: e.target.value})}
+                        onChange={(e) => setFormData({...formData, type_id: e.target.value, parent_id: ''})}
                       >
                         <option value="">{language === 'ar' ? 'اختر النوع...' : 'Select type...'}</option>
                         {types.map(t => (
                           <option key={t.id} value={t.id}>{t.name}</option>
                         ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الحساب الرئيسي' : 'Parent Account'}</label>
+                    <div className="relative group">
+                       <BookOpen className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                       <select 
+                        className="premium-input font-bold pr-12 appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGZpbGw9Im5vbmUiIHZpZXdCb3g9IjAgMCAyNCAyNCIgc3Ryb2tlPSIjOTRhM2I4IiBzdHJva2Utd2lkdGg9IjIiPjxwYXRoIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZD0iTTE5IDlsLTcgNy03LTciLz48L3N2Zz4=')] bg-[8px_center] bg-[length:16px] bg-no-repeat"
+                        value={formData.parent_id}
+                        onChange={(e) => setFormData({...formData, parent_id: e.target.value})}
+                      >
+                        <option value="">{language === 'ar' ? 'حساب رئيسي (مستوى أول)' : 'Main Account (Level 1)'}</option>
+                        {accounts
+                          .filter(a => a.type_id === formData.type_id && a.id !== editingAccount?.id)
+                          .map(a => (
+                            <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                          ))}
                       </select>
                     </div>
                   </div>

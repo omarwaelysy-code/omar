@@ -435,6 +435,7 @@ export interface Account {
   name: string;
   type_id: string;
   type_name?: string;
+  parent_id?: string | null;
   company_id: string;
   opening_balance: number;
   opening_balance_date?: string;
