@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
-import { Invoice, Customer, Product, InvoiceItem, Account, JournalEntry, JournalEntryItem, ActivityLog } from '../types';
+import { Invoice, Customer, Product, InvoiceItem, Account, JournalEntry, JournalEntryItem, ActivityLog, Company } from '../types';
 import { 
   Search, Plus, Trash2, X, Eye, Download, Sparkles, Mic, 
   Image as ImageIcon, FileText, Pencil, History, Printer, 
   ChevronLeft, ChevronRight, Maximize2, Minimize2, Hash, 
   Wallet, Calendar, Package, Tag, Layers, Box, Paperclip, 
-  Phone, Mail, Lock, LayoutGrid, List 
+  Phone, Mail, Lock, LayoutGrid, List, Building2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Barcode from 'react-barcode';
@@ -29,6 +29,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { transactionManager, TransactionManager } from '../services/TransactionManager';
 import { InvoiceSchema, JournalEntrySchema } from '../lib/schemas';
 import { useViewPreference } from '../hooks/useViewPreference';
+import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
 
 export const Invoices: React.FC = () => {
   const { t, dir, language } = useLanguage();
@@ -118,6 +119,7 @@ export const Invoices: React.FC = () => {
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [settings, setSettings] = useState<any>(null);
+  const [companyData, setCompanyData] = useState<Company | null>(null);
   const [view, setView] = useViewPreference('invoices', 'table');
 
   useEffect(() => {
@@ -148,7 +150,19 @@ export const Invoices: React.FC = () => {
         }
       };
 
+      const loadCompanyData = async () => {
+        try {
+          const company = await dbService.get<Company>('companies', user.company_id);
+          if (company) {
+            setCompanyData(company);
+          }
+        } catch (error) {
+          console.error('Failed to load company data:', error);
+        }
+      };
+
       fetchSettings();
+      loadCompanyData();
       setLoading(false);
       return () => {
         unsubInvoices();
@@ -1386,102 +1400,117 @@ export const Invoices: React.FC = () => {
                   />
 
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-                      <div>
-                        <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">{t('invoices.column_number')}</label>
-                        <input
-                          required
-                          type="text"
-                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base font-mono"
-                          value={invoiceNumber}
-                          onChange={(e) => setInvoiceNumber(e.target.value)}
-                        />
+                    {/* Basic Info Section */}
+                    <section className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
+                      <div className="flex items-center gap-2 mb-2 text-emerald-600">
+                        <FileText className="w-5 h-5" />
+                        <h2 className="font-semibold">المعلومات الأساسية</h2>
                       </div>
-                      <div>
-                        <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">{t('invoices.form_customer')}</label>
-                        <select 
-                          required
-                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base"
-                          value={selectedCustomerId}
-                          onChange={(e) => {
-                            if (e.target.value === 'new_customer') {
-                              setIsCustomerModalOpen(true);
-                            } else {
-                              setSelectedCustomerId(e.target.value);
-                            }
-                          }}
-                        >
-                          <option value="">{t('common.select_customer')}</option>
-                          {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                          <option value="new_customer" className="font-bold text-emerald-600">+ {t('customers.add')}</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">{t('invoices.form_date')}</label>
-                        <input
-                          required
-                          type="date"
-                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base"
-                          value={date}
-                          onChange={(e) => setDate(e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">وصف الفاتورة</label>
-                      <textarea
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base min-h-[100px]"
-                        placeholder="أدخل وصفاً للفاتورة (اختياري)..."
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                      <div>
-                        <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">{t('invoices.form_payment_type')}</label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button 
-                            type="button"
-                            onClick={() => setPaymentType('cash')}
-                            className={`py-3 rounded-xl font-bold transition-all ${paymentType === 'cash' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'}`}
-                          >
-                            {t('invoices.payment_cash')}
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={() => setPaymentType('credit')}
-                            className={`py-3 rounded-xl font-bold transition-all ${paymentType === 'credit' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'}`}
-                          >
-                            {t('invoices.payment_credit')}
-                          </button>
-                        </div>
-                      </div>
-
-                      {paymentType === 'cash' && (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
                         <div>
-                          <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">{t('invoices.form_payment_method')}</label>
+                          <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">{t('invoices.column_number')}</label>
+                          <input
+                            required
+                            type="text"
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base font-mono font-bold"
+                            value={invoiceNumber}
+                            onChange={(e) => setInvoiceNumber(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">{t('invoices.form_customer')}</label>
                           <select 
                             required
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base"
-                            value={paymentMethodId}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base font-bold"
+                            value={selectedCustomerId}
                             onChange={(e) => {
-                              if (e.target.value === 'new_payment_method') {
-                                setIsPaymentMethodModalOpen(true);
+                              if (e.target.value === 'new_customer') {
+                                setIsCustomerModalOpen(true);
                               } else {
-                                setPaymentMethodId(e.target.value);
+                                setSelectedCustomerId(e.target.value);
                               }
                             }}
                           >
-                            <option value="">{t('common.select_method')}</option>
-                            {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
-                            <option value="new_payment_method" className="font-bold text-emerald-600">+ {t('payment_methods.add')}</option>
+                            <option value="">{t('common.select_customer')}</option>
+                            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            <option value="new_customer" className="font-bold text-emerald-600">+ {t('customers.add')}</option>
                           </select>
                         </div>
-                      )}
-                    </div>
+                        <div>
+                          <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">{t('invoices.form_date')}</label>
+                          <input
+                            required
+                            type="date"
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base font-bold"
+                            value={date}
+                            onChange={(e) => setDate(e.target.value)}
+                          />
+                        </div>
+                      </div>
 
+                      <div>
+                        <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">وصف الفاتورة</label>
+                        <textarea
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base min-h-[100px] font-medium"
+                          placeholder="أدخل وصفاً للفاتورة (اختياري)..."
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                        />
+                      </div>
+                    </section>
+
+                    {/* Payment Info Section */}
+                    <section className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm">
+                      <div className="flex items-center gap-2 mb-6 text-emerald-600">
+                        <Wallet className="w-5 h-5" />
+                        <h2 className="font-semibold">إعدادات الدفع</h2>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                        <div>
+                          <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">{t('invoices.form_payment_type')}</label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button 
+                              type="button"
+                              onClick={() => setPaymentType('cash')}
+                              className={`py-3 rounded-xl font-bold transition-all ${paymentType === 'cash' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'}`}
+                            >
+                              {t('invoices.payment_cash')}
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => setPaymentType('credit')}
+                              className={`py-3 rounded-xl font-bold transition-all ${paymentType === 'credit' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'}`}
+                            >
+                              {t('invoices.payment_credit')}
+                            </button>
+                          </div>
+                        </div>
+
+                        {paymentType === 'cash' && (
+                          <div>
+                            <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">{t('invoices.form_payment_method')}</label>
+                            <select 
+                              required
+                              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base font-bold"
+                              value={paymentMethodId}
+                              onChange={(e) => {
+                                if (e.target.value === 'new_payment_method') {
+                                  setIsPaymentMethodModalOpen(true);
+                                } else {
+                                  setPaymentMethodId(e.target.value);
+                                }
+                              }}
+                            >
+                              <option value="">{t('common.select_method')}</option>
+                              {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
+                              <option value="new_payment_method" className="font-bold text-emerald-600">+ {t('payment_methods.add')}</option>
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                    </section>
+
+                    {/* Items Section */}
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <h4 className="font-bold text-slate-900 text-lg">{t('invoices.form_items')}</h4>
@@ -1651,12 +1680,11 @@ export const Invoices: React.FC = () => {
             
             <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full">
               <div ref={invoiceRef} id="invoice-capture-area" className="flex-1 p-6 md:p-8 space-y-8 bg-white overflow-y-auto" style={{ color: '#18181b' }}>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="text-2xl md:text-3xl font-bold text-[#18181b] italic serif">{t('invoices.invoice')}</h3>
-                    <p className="text-[#71717a] font-mono text-sm md:text-base">{viewInvoice.invoice_number}</p>
-                  </div>
-                </div>
+                <CompanyInvoiceHeader 
+                  company={companyData} 
+                  documentNumber={viewInvoice.invoice_number}
+                  documentDate={formatDate(viewInvoice.date)}
+                />
 
                 <div className="grid grid-cols-2 gap-8">
                   <div>
@@ -1664,8 +1692,6 @@ export const Invoices: React.FC = () => {
                     <p className="text-xl font-bold text-[#18181b]">{viewInvoice.customer_name}</p>
                   </div>
                   <div className={dir === 'rtl' ? 'text-left' : 'text-right'}>
-                    <p className="text-xs font-bold text-[#a1a1aa] uppercase tracking-widest mb-1">{t('invoices.column_date')}</p>
-                    <p className="text-lg font-medium text-[#18181b]">{formatDate(viewInvoice.date)}</p>
                     <span className={`inline-block mt-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                       viewInvoice.payment_type === 'cash' 
                         ? 'bg-emerald-100 text-emerald-700' 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Supplier, Product, PaymentMethod, ExpenseCategory, Account, JournalEntry, JournalEntryItem } from '../types';
+import { Company, Supplier, Product, PaymentMethod, ExpenseCategory, Account, JournalEntry, JournalEntryItem } from '../types';
 import { 
   Search, Plus, Trash2, X, ShoppingCart, User, CreditCard, 
   Calendar, Hash, Package, Save, FileText, Pencil, Download, 
@@ -19,6 +19,7 @@ import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
+import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
 import DocumentChatter from '../components/DocumentChatter';
 import { TransactionManager } from '../services/TransactionManager';
 import { InvoiceSchema, JournalEntrySchema } from '../lib/schemas';
@@ -37,6 +38,7 @@ export const PurchaseInvoices: React.FC = () => {
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [companyData, setCompanyData] = useState<Company | null>(null);
   const [settings, setSettings] = useState<any>(null);
   const [purchaseInvoices, setPurchaseInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -171,6 +173,19 @@ export const PurchaseInvoices: React.FC = () => {
       };
 
       fetchSettings();
+      
+      const fetchCompany = async () => {
+        try {
+          const company = await dbService.get<Company>('companies', user.company_id);
+          if (company) {
+            setCompanyData(company);
+          }
+        } catch (error) {
+          console.error('Failed to load company data:', error);
+        }
+      };
+      
+      fetchCompany();
       setLoading(false);
       return () => {
         unsubPI();
@@ -1368,9 +1383,13 @@ export const PurchaseInvoices: React.FC = () => {
                 <div className="flex-1">
                   <SmartAIInput transactionType="purchase_invoice" onDataExtracted={applyAiData} />
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Form Content */}
-                    <div className="space-y-6">
-                      <div className="flex justify-center gap-4 mb-6">
+                    {/* Invoice Type Section */}
+                    <section className="bg-white p-4 md:p-6 rounded-xl border border-zinc-200 shadow-sm">
+                      <div className="flex items-center gap-2 mb-6 text-zinc-900">
+                        <Layers size={20} className="text-emerald-500" />
+                        <h2 className="font-bold">نوع العملية</h2>
+                      </div>
+                      <div className="flex justify-center gap-4">
                         <button 
                           type="button"
                           onClick={() => {
@@ -1394,15 +1413,22 @@ export const PurchaseInvoices: React.FC = () => {
                           {t('pi.purchase_expenses')}
                         </button>
                       </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    </section>
+                    
+                    {/* Basic Info Section */}
+                    <section className="bg-white p-4 md:p-6 rounded-xl border border-zinc-200 shadow-sm space-y-6">
+                      <div className="flex items-center gap-2 mb-2 text-zinc-900">
+                        <User size={20} className="text-emerald-500" />
+                        <h2 className="font-bold">المعلومات الأساسية</h2>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">{t('pi.supplier')}</label>
                           <div className="relative">
                             <User className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                             <select 
                               required
-                              className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none`}
+                              className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none font-bold`}
                               value={invoiceData.supplier_id}
                               onChange={(e) => {
                                 if (e.target.value === 'new_supplier') {
@@ -1426,13 +1452,33 @@ export const PurchaseInvoices: React.FC = () => {
                             <input 
                               required
                               type="date" 
-                              className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
+                              className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold`}
                               value={invoiceData.date}
                               onChange={(e) => setInvoiceData({...invoiceData, date: e.target.value})}
                             />
                           </div>
                         </div>
+                      </div>
 
+                      <div>
+                        <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">{t('common.notes')}</label>
+                        <textarea 
+                          rows={2}
+                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none font-medium text-sm"
+                          placeholder={t('pi.notes_placeholder')}
+                          value={invoiceData.notes}
+                          onChange={(e) => setInvoiceData({...invoiceData, notes: e.target.value})}
+                        />
+                      </div>
+                    </section>
+
+                    {/* Payment Info Section */}
+                    <section className="bg-white p-4 md:p-6 rounded-xl border border-zinc-200 shadow-sm space-y-6">
+                      <div className="flex items-center gap-2 mb-2 text-zinc-900">
+                        <Wallet size={20} className="text-emerald-500" />
+                        <h2 className="font-bold">إعدادات الدفع</h2>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">{t('pi.payment_type')}</label>
                           <div className="grid grid-cols-2 gap-2">
@@ -1460,7 +1506,7 @@ export const PurchaseInvoices: React.FC = () => {
                               <CreditCard className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                               <select 
                                 required
-                                className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none`}
+                                className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none font-bold`}
                                 value={invoiceData.payment_method_id}
                                 onChange={(e) => {
                                   if (e.target.value === 'new_payment_method') {
@@ -1478,19 +1524,9 @@ export const PurchaseInvoices: React.FC = () => {
                           </div>
                         )}
                       </div>
+                    </section>
 
-                      <div>
-                        <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">{t('common.notes')}</label>
-                        <textarea 
-                          rows={2}
-                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none"
-                          placeholder={t('pi.notes_placeholder')}
-                          value={invoiceData.notes}
-                          onChange={(e) => setInvoiceData({...invoiceData, notes: e.target.value})}
-                        />
-                      </div>
-
-                      <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
+                    <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
                         <div className="p-6 border-b border-zinc-50 flex items-center justify-between bg-zinc-50/50">
                           <div className="flex items-center gap-4">
                             <h3 className="text-xl font-bold text-zinc-900 flex items-center gap-2">
@@ -1650,9 +1686,8 @@ export const PurchaseInvoices: React.FC = () => {
                           </table>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="flex justify-end pt-6 border-t border-zinc-100">
+                      <div className="flex justify-end pt-6 border-t border-zinc-100">
                       <button 
                         type="submit"
                         className="flex items-center gap-3 px-12 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-500/20 active:scale-95"
@@ -1693,12 +1728,12 @@ export const PurchaseInvoices: React.FC = () => {
               />
 
               <div ref={invoiceRef} id="purchase-invoice-capture-area" className={`flex-1 p-6 md:p-8 space-y-8 bg-white overflow-y-auto ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`} style={{ color: '#18181b' }}>
-                <div className={`flex justify-between items-start ${t('dir') === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                  <div>
-                    <h3 className="text-2xl md:text-3xl font-bold text-[#18181b] italic serif">{t('pi.title')}</h3>
-                    <p className="text-[#71717a] font-mono text-sm md:text-base">{viewInvoice.invoice_number}</p>
-                  </div>
-                </div>
+                <CompanyInvoiceHeader 
+                  company={companyData} 
+                  documentNumber={viewInvoice.invoice_number}
+                  documentDate={viewInvoice.date}
+                  title={t('pi.title')}
+                />
 
                 <div className="grid grid-cols-2 gap-8">
                   <div>
