@@ -19,10 +19,11 @@ import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { ExportButtons } from '../components/ExportButtons';
 import { TransactionManager } from '../services/TransactionManager';
 import { VoucherSchema, JournalEntrySchema } from '../lib/schemas';
-import { ActivityLog, Supplier, ExpenseCategory, PaymentMethod, JournalEntry, JournalEntryItem, Account } from '../types';
+import { ActivityLog, Supplier, ExpenseCategory, PaymentMethod, JournalEntry, JournalEntryItem, Account, Company } from '../types';
 import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { PaginationControls } from '../components/PaginationControls';
 import { useViewPreference } from '../hooks/useViewPreference';
+import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
 
 export const PaymentVouchers: React.FC = () => {
   const { user } = useAuth();
@@ -70,6 +71,7 @@ export const PaymentVouchers: React.FC = () => {
   const [previewJournalEntry, setPreviewJournalEntry] = useState<JournalEntry | null>(null);
   const [previewActivityLog, setPreviewActivityLog] = useState<Partial<ActivityLog> | null>(null);
   const [view, setView] = useViewPreference('payment_vouchers', 'table');
+  const [companyData, setCompanyData] = useState<Company | null>(null);
 
   const [supplierFormData, setSupplierFormData] = useState({
     name: '',
@@ -154,6 +156,16 @@ export const PaymentVouchers: React.FC = () => {
       const unsubAccounts = dbService.subscribe<any>('accounts', user.company_id, setAccounts);
       const unsubCustomers = dbService.subscribe<any>('customers', user.company_id, setCustomers);
       
+      const fetchCompany = async () => {
+        try {
+          const company = await dbService.get<Company>('companies', user.company_id);
+          if (company) setCompanyData(company);
+        } catch (error) {
+          console.error('Failed to load company data:', error);
+        }
+      };
+      
+      fetchCompany();
       setLoading(false);
       return () => {
         unsubItems();
@@ -1607,27 +1619,14 @@ export const PaymentVouchers: React.FC = () => {
               />
 
               <div className="flex-1 overflow-y-auto p-8" ref={voucherRef}>
+                <CompanyInvoiceHeader 
+                  company={companyData} 
+                  documentNumber={viewVoucher.voucher_number || viewVoucher.number}
+                  documentDate={formatDate(viewVoucher.date)}
+                  title="سند صرف"
+                />
+                
                 <div className="space-y-8">
-                  <div className="flex justify-between items-start">
-                    <div className="text-right">
-                      <h1 className="text-3xl font-black text-emerald-600 mb-2">سند صرف</h1>
-                      <p className="text-zinc-500">التاريخ: {formatDate(viewVoucher.date)}</p>
-                      <div className="mt-2 space-y-1">
-                        <p className="text-xs text-zinc-400 font-mono">رقم السند: {viewVoucher.voucher_number || viewVoucher.number}</p>
-                        {viewVoucher.internal_reference && viewVoucher.internal_reference !== (viewVoucher.voucher_number || viewVoucher.number) && (
-                          <p className="text-xs text-zinc-400 font-mono">الرقم المرجعي: {viewVoucher.internal_reference}</p>
-                        )}
-                        {viewVoucher.manual_reference && (
-                          <p className="text-xs text-zinc-400 font-mono">مرجع يدوي: {viewVoucher.manual_reference}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-left">
-                      <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl">
-                        LOGO
-                      </div>
-                    </div>
-                  </div>
 
                   {(viewVoucher.items && viewVoucher.items.length > 0) ? (
                     <div className="overflow-hidden border border-zinc-100 rounded-2xl">

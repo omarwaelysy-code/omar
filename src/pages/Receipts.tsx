@@ -20,10 +20,11 @@ import { ExportButtons } from '../components/ExportButtons';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { TransactionManager } from '../services/TransactionManager';
 import { VoucherSchema, JournalEntrySchema } from '../lib/schemas';
-import { ActivityLog, ReceiptVoucher, Customer, PaymentMethod, JournalEntry, JournalEntryItem, Account } from '../types';
+import { ActivityLog, ReceiptVoucher, Customer, PaymentMethod, JournalEntry, JournalEntryItem, Account, Company } from '../types';
 import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { PaginationControls } from '../components/PaginationControls';
 import { useViewPreference } from '../hooks/useViewPreference';
+import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
 
 export const Receipts: React.FC = () => {
   const { user } = useAuth();
@@ -69,6 +70,7 @@ export const Receipts: React.FC = () => {
   const [previewJournalEntry, setPreviewJournalEntry] = useState<JournalEntry | null>(null);
   const [previewActivityLog, setPreviewActivityLog] = useState<Partial<ActivityLog> | null>(null);
   const [view, setView] = useViewPreference('receipts', 'table');
+  const [companyData, setCompanyData] = useState<Company | null>(null);
   const receiptRef = React.useRef<HTMLDivElement>(null);
   const tableRef = React.useRef<HTMLDivElement>(null);
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
@@ -119,6 +121,16 @@ export const Receipts: React.FC = () => {
       const unsubPM = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setPaymentMethods);
       const unsubAccounts = dbService.subscribe<any>('accounts', user.company_id, setAccounts);
       
+      const fetchCompany = async () => {
+        try {
+          const company = await dbService.get<Company>('companies', user.company_id);
+          if (company) setCompanyData(company);
+        } catch (error) {
+          console.error('Failed to load company data:', error);
+        }
+      };
+      
+      fetchCompany();
       setLoading(false);
       return () => {
         unsubItems();
@@ -1022,19 +1034,14 @@ export const Receipts: React.FC = () => {
               />
 
               <div className="flex-1 overflow-y-auto p-8" ref={receiptRef} id="receipt-capture-area">
+                <CompanyInvoiceHeader 
+                  company={companyData} 
+                  documentNumber={viewReceipt.voucher_number || viewReceipt.id}
+                  documentDate={formatDate(viewReceipt.date)}
+                  title="سند قبض"
+                />
+                
                 <div className="space-y-8">
-                  <div className="flex justify-between items-start">
-                    <div className="text-right">
-                      <h1 className="text-3xl font-black text-emerald-600 mb-2">سند قبض</h1>
-                      <p className="text-zinc-500">التاريخ: {formatDate(viewReceipt.date)}</p>
-                    </div>
-                    <div className="text-left">
-                      <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl">
-                        LOGO
-                      </div>
-                    </div>
-                  </div>
-
                   <div className="grid grid-cols-2 gap-8 p-6 bg-zinc-50 rounded-2xl border border-zinc-100">
                     <div>
                       <p className="text-xs text-zinc-400 uppercase tracking-wider mb-1">وصلنا من السيد / السادة</p>

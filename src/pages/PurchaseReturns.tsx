@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Supplier, Product, PaymentMethod, JournalEntry, JournalEntryItem, Account } from '../types';
+import { Supplier, Product, PaymentMethod, JournalEntry, JournalEntryItem, Account, Company } from '../types';
 import { Search, Plus, Trash2, X, RotateCcw, User, CreditCard, Calendar, Hash, Package, Save, Eye, Download, History, Printer, Edit, Phone, Mail, MapPin, Wallet, Box } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartAIInput } from '../components/SmartAIInput';
@@ -17,6 +17,7 @@ import { ReturnSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog } from '../types';
 import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { PaginationControls } from '../components/PaginationControls';
+import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
 
 export const PurchaseReturns: React.FC = () => {
   const { user } = useAuth();
@@ -54,6 +55,17 @@ export const PurchaseReturns: React.FC = () => {
   const [serverSummary, setServerSummary] = useState<any>({});
   const [maxSeqGenerated, setMaxSeqGenerated] = useState<number>(0);
   const [returnNumber, setReturnNumber] = useState('');
+  const [company, setCompany] = useState<Company | null>(null);
+
+  useEffect(() => {
+    const fetchCompany = async () => {
+      if (user?.company_id) {
+        const companyData = await dbService.get<Company>('companies', user.company_id);
+        setCompany(companyData);
+      }
+    };
+    fetchCompany();
+  }, [user?.company_id]);
 
   const generateReturnNumber = async (selectedDate: string) => {
     return await dbService.getNextSequence('purchase_returns', selectedDate);
@@ -1319,6 +1331,13 @@ export const PurchaseReturns: React.FC = () => {
               />
 
               <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8">
+                <CompanyInvoiceHeader 
+                  company={company} 
+                  documentNumber={viewReturn.return_number}
+                  documentDate={formatDate(viewReturn.date)}
+                  title="مرتجع مشتريات"
+                />
+
                 <div className="grid grid-cols-2 gap-8">
                   <div>
                     <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1" style={{ color: '#71717a' }}>المورد</p>
@@ -1377,10 +1396,10 @@ export const PurchaseReturns: React.FC = () => {
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="bg-zinc-50/50" style={{ backgroundColor: '#fafafa' }}>
-                      <tr>
-                        <td colSpan={window.innerWidth < 768 ? 2 : 3} className="px-6 py-4 font-bold text-zinc-500" style={{ color: '#71717a' }}>الإجمالي الكلي</td>
-                        <td className="px-6 py-4 font-black text-red-600 text-lg" style={{ color: '#dc2626' }}>{formatNumber(viewReturn.total_amount)} ج.م</td>
+                    <tfoot className="bg-slate-50/50 font-bold border-t border-slate-100">
+                      <tr className="bg-slate-900 text-white font-bold">
+                        <td colSpan={4} className="px-6 py-5 text-right font-black text-lg uppercase tracking-tight">الإجمالي الكلي</td>
+                        <td className="px-6 py-5 text-2xl font-black text-rose-400">{formatNumber(viewReturn.total_amount)} ج.م</td>
                       </tr>
                     </tfoot>
                   </table>

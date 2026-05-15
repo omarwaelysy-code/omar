@@ -1686,19 +1686,25 @@ export const Invoices: React.FC = () => {
                   documentDate={formatDate(viewInvoice.date)}
                 />
 
-                <div className="grid grid-cols-2 gap-8">
-                  <div>
-                    <p className="text-xs font-bold text-[#a1a1aa] uppercase tracking-widest mb-1">{t('invoices.invoice_to')}</p>
-                    <p className="text-xl font-bold text-[#18181b]">{viewInvoice.customer_name}</p>
+                <div className="grid grid-cols-2 gap-8 py-2">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('invoices.invoice_to')}</p>
+                    <p className="text-2xl font-black text-slate-900 tracking-tight">{viewInvoice.customer_name}</p>
+                    {viewInvoice.customer_id && (
+                      <p className="text-xs text-slate-500 font-medium">كود العميل: {viewInvoice.customer_id.slice(-6).toUpperCase()}</p>
+                    )}
                   </div>
-                  <div className={dir === 'rtl' ? 'text-left' : 'text-right'}>
-                    <span className={`inline-block mt-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                      viewInvoice.payment_type === 'cash' 
-                        ? 'bg-emerald-100 text-emerald-700' 
-                        : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      {viewInvoice.payment_type === 'cash' ? 'طريقة الدفع: نقدي' : 'طريقة الدفع: آجل'}
-                    </span>
+                  <div className={`flex flex-col ${dir === 'rtl' ? 'items-start' : 'items-end'} justify-center gap-2`}>
+                    <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border
+                      ${viewInvoice.payment_type === 'cash' 
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                        : 'bg-amber-50 text-amber-700 border-amber-100'
+                      }`}>
+                      {viewInvoice.payment_type === 'cash' ? 'سداد نقدي' : 'سداد آجل'}
+                    </div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      حالة الدفع
+                    </div>
                   </div>
                 </div>
 
@@ -1744,20 +1750,20 @@ export const Invoices: React.FC = () => {
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="bg-[#fafafa] font-bold text-sm">
+                    <tfoot className="bg-slate-50/50 font-bold border-t border-slate-100">
                       <tr>
-                        <td colSpan={3} className={`px-4 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-[#71717a]`}>{t('invoices.summary_subtotal')}:</td>
-                        <td className="px-4 py-2 text-[#18181b]">{formatMoney(viewInvoice.subtotal)} {t('invoices.currency')}</td>
+                        <td colSpan={4} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-slate-400 font-bold text-[10px] uppercase tracking-wider`}>{t('invoices.summary_subtotal')}</td>
+                        <td className="px-6 py-3 text-slate-900 text-base">{formatMoney(viewInvoice.subtotal)} {t('invoices.currency')}</td>
                       </tr>
                       {Number(viewInvoice.discount_amount || viewInvoice.discount) > 0 && (
                         <tr>
-                          <td colSpan={3} className={`px-4 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-[#71717a]`}>{t('invoices.summary_discount')}:</td>
-                          <td className="px-4 py-2 text-red-600">-{formatMoney(viewInvoice.discount_amount || viewInvoice.discount)} {t('invoices.currency')}</td>
+                          <td colSpan={4} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-red-400 font-bold text-[10px] uppercase tracking-wider`}>{t('invoices.summary_discount')}</td>
+                          <td className="px-6 py-3 text-red-600 text-base">-{formatMoney(viewInvoice.discount_amount || viewInvoice.discount)} {t('invoices.currency')}</td>
                         </tr>
                       )}
-                      <tr className="text-lg bg-[#f4f4f5]">
-                        <td colSpan={3} className={`px-4 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-[#18181b]`}>{t('invoices.summary_total')}:</td>
-                        <td className="px-4 py-3 text-[#18181b]">{formatMoney(viewInvoice.total_amount)} {t('invoices.currency')}</td>
+                      <tr className="bg-slate-900 text-white">
+                        <td colSpan={4} className={`px-6 py-5 ${dir === 'rtl' ? 'text-left' : 'text-right'} font-black text-lg uppercase tracking-tight`}>{t('invoices.summary_total')}</td>
+                        <td className="px-6 py-5 text-2xl font-black text-brand-primary">{formatMoney(viewInvoice.total_amount)} {t('invoices.currency')}</td>
                       </tr>
                     </tfoot>
                   </table>

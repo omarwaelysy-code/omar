@@ -1781,20 +1781,20 @@ export const PurchaseInvoices: React.FC = () => {
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="bg-[#fafafa] font-bold">
+                    <tfoot className="bg-slate-50/50 font-bold border-t border-slate-100">
                       <tr>
-                        <td colSpan={3} className={`px-4 py-2 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} text-[#71717a]`}>{t('pi.subtotal')}:</td>
-                        <td className="px-4 py-2 text-[#18181b]">{formatNumber(viewInvoice.subtotal || viewInvoice.total_amount || 0)} {t('common.currency')}</td>
+                        <td colSpan={4} className={`px-6 py-3 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} text-slate-400 font-bold text-[10px] uppercase tracking-wider`}>{t('pi.subtotal')}</td>
+                        <td className="px-6 py-3 text-slate-900 text-base">{formatNumber(viewInvoice.subtotal || viewInvoice.total_amount || 0)} {t('common.currency')}</td>
                       </tr>
                       {viewInvoice.discount > 0 && (
                         <tr>
-                          <td colSpan={3} className={`px-4 py-2 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} text-[#71717a]`}>{t('pi.discount')}:</td>
-                          <td className="px-4 py-2 text-red-600">-{formatNumber(viewInvoice.discount)} {t('common.currency')}</td>
+                          <td colSpan={4} className={`px-6 py-3 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} text-red-400 font-bold text-[10px] uppercase tracking-wider`}>{t('pi.discount')}</td>
+                          <td className="px-6 py-3 text-red-600 text-base">-{formatNumber(viewInvoice.discount)} {t('common.currency')}</td>
                         </tr>
                       )}
-                      <tr>
-                        <td colSpan={3} className={`px-4 py-6 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} text-[#71717a]`}>{t('pi.grand_total')}:</td>
-                        <td className="px-4 py-6 text-3xl text-[#f97316]">{formatNumber(viewInvoice.total_amount)} {t('common.currency')}</td>
+                      <tr className="bg-slate-900 text-white">
+                        <td colSpan={4} className={`px-6 py-5 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} font-black text-lg uppercase tracking-tight`}>{t('pi.grand_total')}</td>
+                        <td className="px-6 py-5 text-2xl font-black text-emerald-400">{formatNumber(viewInvoice.total_amount)} {t('common.currency')}</td>
                       </tr>
                     </tfoot>
                   </table>

@@ -21,10 +21,10 @@ export const CompanyInvoiceHeader: React.FC<CompanyInvoiceHeaderProps> = ({
   if (!company) return null;
 
   return (
-    <div className={`flex flex-col md:flex-row items-start justify-between gap-6 mb-8 p-6 bg-slate-50/50 rounded-3xl border border-slate-100 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-      <div className="flex flex-col md:flex-row items-center md:items-start gap-4 flex-1">
+    <div className={`flex flex-col md:flex-row items-start justify-between gap-6 mb-10 pb-8 border-b-2 border-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+      <div className="flex flex-col md:flex-row items-center md:items-start gap-6 flex-1">
         {company.logo_url ? (
-          <div className="w-24 h-24 rounded-2xl bg-white border border-slate-200 overflow-hidden shadow-sm flex items-center justify-center p-2">
+          <div className="w-28 h-28 rounded-2xl bg-white border-2 border-slate-100 overflow-hidden shadow-sm flex items-center justify-center p-3">
             <img 
               src={company.logo_url} 
               alt={company.name} 
@@ -33,45 +33,59 @@ export const CompanyInvoiceHeader: React.FC<CompanyInvoiceHeaderProps> = ({
             />
           </div>
         ) : (
-          <div className="w-24 h-24 rounded-2xl bg-white border border-slate-200 flex items-center justify-center shadow-sm">
-            <Building2 className="w-10 h-10 text-slate-300" />
+          <div className="w-28 h-28 rounded-2xl bg-slate-50 border-2 border-slate-100 flex items-center justify-center shadow-sm">
+            <Building2 className="w-12 h-12 text-slate-300" />
           </div>
         )}
         
-        <div className="space-y-1">
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">{company.name}</h1>
-          <div className="flex flex-wrap gap-4 text-sm font-medium text-slate-500">
+        <div className="space-y-2 mt-1">
+          <h1 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">{company.name}</h1>
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm font-bold text-slate-500">
             {company.commercial_register && (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <Hash size={14} className="text-slate-400" />
-                <span>{t('company_settings.commercial_register')}:</span>
-                <span className="text-slate-900 font-bold">{company.commercial_register}</span>
+                <span className="text-slate-400 uppercase tracking-widest text-[10px]">{t('company_settings.commercial_register')}:</span>
+                <span className="text-slate-900 font-mono">{company.commercial_register}</span>
               </div>
             )}
             {company.tax_number && (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <FileText size={14} className="text-slate-400" />
-                <span>{t('company_settings.tax_number')}:</span>
-                <span className="text-slate-900 font-bold">{company.tax_number}</span>
+                <span className="text-slate-400 uppercase tracking-widest text-[10px]">{t('company_settings.tax_number')}:</span>
+                <span className="text-slate-900 font-mono">{company.tax_number}</span>
               </div>
             )}
           </div>
           {company.address && (
-            <div className="flex items-center gap-1.5 text-sm font-medium text-slate-500 pt-1">
-              <MapPin size={14} className="text-slate-400" />
-              <span className="italic">{company.address}</span>
+            <div className="flex items-start gap-2 text-sm font-medium text-slate-600 max-w-md">
+              <MapPin size={16} className="text-slate-400 shrink-0 mt-0.5" />
+              <span>{company.address}</span>
             </div>
+          )}
+          {company.phone && (
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                <Globe size={14} className="text-slate-400" />
+                <span>{company.phone}</span>
+              </div>
           )}
         </div>
       </div>
 
-      <div className="flex flex-col items-center md:items-end gap-2 shrink-0 self-stretch md:self-start">
-        <div className="px-6 py-4 bg-white border border-slate-200 rounded-2xl shadow-sm text-center min-w-[160px]">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{title || t('invoices.invoice')}</p>
-            <p className="text-indigo-600 font-black text-xl font-mono mb-1">{documentNumber || '---'}</p>
-            {documentDate && (
-              <p className="text-xs font-bold text-slate-500 font-mono border-t border-slate-50 pt-1 mt-1">{documentDate}</p>
-            )}
+      <div className="flex flex-col items-center md:items-end gap-3 shrink-0 self-stretch md:self-start">
+        <div className="text-center md:text-right space-y-1">
+            <h2 className="text-4xl font-black text-slate-900 tracking-tighter uppercase mb-2">{title || t('invoices.invoice')}</h2>
+            <div className="flex flex-col items-center md:items-end">
+                <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('invoices.column_number')}:</span>
+                    <span className="text-emerald-600 font-black text-xl font-mono">{documentNumber || '---'}</span>
+                </div>
+                {documentDate && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('invoices.column_date')}:</span>
+                    <span className="text-slate-600 font-bold text-sm font-mono">{documentDate}</span>
+                  </div>
+                )}
+            </div>
         </div>
       </div>
     </div>

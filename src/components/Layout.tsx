@@ -40,13 +40,15 @@ import {
   Bell,
   Languages,
   Sun,
-  Moon
+  Moon,
+  Search
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { notificationService } from '../services/notificationService';
 import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
+import { Company } from '../types';
 
 import { Logo } from './Logo';
 
@@ -67,6 +69,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isCompanyMenuOpen, setIsCompanyMenuOpen] = React.useState(false);
   const [expandedMenus, setExpandedMenus] = React.useState<string[]>(['transactions']);
+  const [company, setCompany] = useState<Company | null>(null);
   
   // Change Password Modal State
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
@@ -80,6 +83,21 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
     if (user?.must_change_password) {
       setShowChangePasswordModal(true);
     }
+    
+    const loadCompany = async () => {
+      if (user?.company_id) {
+        try {
+          const compData = await dbService.get<Company>('companies', user.company_id);
+          if (compData) {
+            setCompany(compData);
+          }
+        } catch (error) {
+          console.error('Failed to load company data for layout:', error);
+        }
+      }
+    };
+    
+    loadCompany();
   }, [user]);
 
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -384,8 +402,22 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
       {/* Desktop Top Navigation */}
       <header className="hidden md:flex sticky top-0 z-30 bg-white border-b border-slate-200 h-16 items-center px-8 shadow-sm">
-        <div className={`flex items-center gap-4 ${dir === 'rtl' ? 'ml-10' : 'mr-10'}`}>
-          <Logo variant="full" className="h-8" />
+        <div className={`flex items-center gap-4 ${dir === 'rtl' ? 'ml-6' : 'mr-6'}`}>
+          {company?.logo_url ? (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 p-1 flex items-center justify-center">
+                <img 
+                  src={company.logo_url} 
+                  alt={company.name} 
+                  className="max-w-full max-h-full object-contain"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <span className="font-black text-slate-900 tracking-tight text-lg truncate max-w-[200px]">{company.name}</span>
+            </div>
+          ) : (
+            <Logo variant="full" className="h-8" />
+          )}
         </div>
 
         <nav className="flex items-center gap-1 flex-1">
@@ -584,16 +616,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             </button>
           </div>
           
-          <div className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5 custom-scrollbar overflow-x-hidden">
+          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1 custom-scrollbar overflow-x-hidden bg-slate-50/30">
             {openTabs.map((tab) => (
               <div 
                 key={tab.id}
                 className={`
-                  group relative flex items-center gap-2 px-3 py-2 rounded-lg transition-all cursor-pointer
+                  group relative flex items-center gap-2 px-3 py-2.5 rounded-xl transition-all cursor-pointer border
                   ${activeTabId === tab.id 
-                    ? 'bg-slate-100 text-slate-900 shadow-sm' 
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}
-                  ${isSidebarCollapsed ? 'justify-center' : ''}
+                    ? 'bg-white text-emerald-600 shadow-sm border-emerald-100 ring-4 ring-emerald-500/5' 
+                    : 'text-slate-500 hover:bg-white hover:text-slate-700 border-transparent hover:border-slate-100 hover:shadow-sm'}
+                  ${isSidebarCollapsed ? 'justify-center mx-1' : 'mx-1'}
                 `}
                 onClick={() => setActiveTab(tab.id)}
                 title={isSidebarCollapsed ? tab.label : ''}
@@ -601,7 +633,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 {!isSidebarCollapsed ? (
                   <>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold truncate">{tab.label}</p>
+                      <p className={`text-sm font-bold truncate ${activeTabId === tab.id ? 'text-emerald-700' : 'text-slate-600 group-hover:text-slate-900'}`}>{tab.label}</p>
                     </div>
                     
                     {tab.id !== 'dashboard' && (
@@ -611,25 +643,22 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                           closeTab(tab.id);
                         }}
                         className={`
-                          p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-all opacity-0 group-hover:opacity-100
-                          ${activeTabId === tab.id ? 'opacity-50' : ''}
+                          p-1 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100
+                          ${activeTabId === tab.id ? 'opacity-40 hover:opacity-100' : ''}
                         `}
                       >
-                        <X size={12} />
+                        <X size={14} />
                       </button>
                     )}
                   </>
                 ) : (
-                  <div className={`w-8 h-8 rounded-lg ${activeTabId === tab.id ? 'bg-slate-200' : 'bg-slate-100'} flex items-center justify-center font-bold text-xs text-slate-600`}>
+                  <div className={`w-9 h-9 rounded-xl ${activeTabId === tab.id ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20' : 'bg-white border border-slate-200 text-slate-400 group-hover:border-slate-300'} flex items-center justify-center font-black text-xs transition-all`}>
                     {tab.label[0]}
                   </div>
                 )}
                 
                 {activeTabId === tab.id && !isSidebarCollapsed && (
-                  <motion.div 
-                    layoutId="active-tab-indicator"
-                    className={`absolute ${dir === 'rtl' ? 'right-0' : 'left-0'} top-2 bottom-2 w-1 bg-brand-primary rounded-full`}
-                  />
+                  <div className={`absolute ${dir === 'rtl' ? '-right-1' : '-left-1'} top-3 bottom-3 w-1 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]`} />
                 )}
               </div>
             ))}
@@ -651,7 +680,21 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           {/* Mobile Header */}
           <header className="md:hidden sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200 p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Logo variant="full" className="h-8" />
+              {company?.logo_url ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 p-1 flex items-center justify-center">
+                    <img 
+                      src={company.logo_url} 
+                      alt={company.name} 
+                      className="max-w-full max-h-full object-contain"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                  <span className="font-bold text-slate-900 truncate max-w-[120px]">{company.name}</span>
+                </div>
+              ) : (
+                <Logo variant="full" className="h-8" />
+              )}
             </div>
             <div className="flex items-center gap-2">
               <button 

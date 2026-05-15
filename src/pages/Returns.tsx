@@ -15,8 +15,9 @@ import { PageActivityLog } from '../components/PageActivityLog';
 import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { ExportButtons } from '../components/ExportButtons';
-import { ActivityLog } from '../types';
+import { ActivityLog, Company } from '../types';
 import { PaginationControls } from '../components/PaginationControls';
+import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
 
 export const Returns: React.FC = () => {
   const { user } = useAuth();
@@ -62,6 +63,17 @@ export const Returns: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [editingReturn, setEditingReturn] = useState<Return | null>(null);
   const [returnNumber, setReturnNumber] = useState('');
+  const [company, setCompany] = useState<Company | null>(null);
+
+  useEffect(() => {
+    const fetchCompany = async () => {
+      if (user?.company_id) {
+        const companyData = await dbService.get<Company>('companies', user.company_id);
+        setCompany(companyData);
+      }
+    };
+    fetchCompany();
+  }, [user?.company_id]);
 
   const generateReturnNumber = async (selectedDate: string) => {
     return await dbService.getNextSequence('returns', selectedDate);
@@ -1201,34 +1213,19 @@ export const Returns: React.FC = () => {
             </div>
             <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full">
               <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="text-2xl md:text-3xl font-bold text-zinc-900" style={{ color: '#18181b' }}>{t('returns.title')}</h3>
-                    <p className="text-zinc-500 font-mono text-sm md:text-base" style={{ color: '#71717a' }}>{viewReturn.return_number}</p>
-                  </div>
-                  <button onClick={() => setViewReturn(null)} className="hidden md:block text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-full transition-all">
-                    <X size={24} />
-                  </button>
-                </div>
-                <div className={`flex ${dir === 'rtl' ? 'justify-end' : 'justify-start'} gap-2`}>
-                  <button 
-                    onClick={() => {
-                      setActivityLogDocumentId(viewReturn.id);
-                      setIsActivityLogOpen(true);
-                    }}
-                    className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all"
-                    title={t('common.activity_log')}
-                  >
-                    <History size={20} />
-                  </button>
-                </div>
+                <CompanyInvoiceHeader 
+                  company={company} 
+                  documentNumber={viewReturn.return_number}
+                  documentDate={formatDate(viewReturn.date)}
+                />
+
                 <div className="grid grid-cols-2 gap-8">
                   <div>
                     <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1" style={{ color: '#71717a' }}>{t('returns.column_customer')}</p>
                     <p className="text-lg font-bold text-zinc-900" style={{ color: '#18181b' }}>{viewReturn.customer_name}</p>
                   </div>
                   <div className={dir === 'rtl' ? 'text-left' : 'text-right'}>
-                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1" style={{ color: '#71717a' }}>{t('returns.column_date')}</p>
+                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1" style={{ color: '#71717a' }}>تاريخ المرتجع</p>
                     <p className="text-lg font-bold text-zinc-900" style={{ color: '#18181b' }}>{formatDate(viewReturn.date)}</p>
                   </div>
                 </div>
@@ -1280,10 +1277,10 @@ export const Returns: React.FC = () => {
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="bg-zinc-50/50" style={{ backgroundColor: '#fafafa' }}>
-                      <tr>
-                        <td colSpan={3} className="px-6 py-4 font-bold text-zinc-500" style={{ color: '#71717a' }}>{t('returns.summary_total')}</td>
-                        <td className="px-6 py-4 font-black text-orange-600 text-lg" style={{ color: '#ea580c' }}>{formatNumber(viewReturn.total_amount)} {t('returns.currency')}</td>
+                    <tfoot className="bg-slate-50/50 font-bold border-t border-slate-100">
+                      <tr className="bg-slate-900 text-white font-bold">
+                        <td colSpan={4} className={`px-6 py-5 ${dir === 'rtl' ? 'text-left' : 'text-right'} font-black text-lg uppercase tracking-tight`}>{t('returns.summary_total')}</td>
+                        <td className="px-6 py-5 text-2xl font-black text-orange-400">{formatNumber(viewReturn.total_amount)} {t('returns.currency')}</td>
                       </tr>
                     </tfoot>
                   </table>
