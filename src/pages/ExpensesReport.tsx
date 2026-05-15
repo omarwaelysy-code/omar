@@ -32,9 +32,9 @@ export const ExpensesReport: React.FC = () => {
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
 
-      // Identify expense account types
+      // 1. Identify which account types classify as "Expenses"
       const expenseTypeIds = accountTypes
-        .filter((t: any) => t.classification === 'expense' || (t.name && (t.name.includes('مصروف') || t.name.includes('Expense'))))
+        .filter((t: any) => t.classification === 'expense' || t.name === 'Expenses' || t.name === 'مصاريف')
         .map((t: any) => t.id);
       
       const expenseAccountIds = new Set(
@@ -43,10 +43,10 @@ export const ExpensesReport: React.FC = () => {
           .map((a: any) => a.id)
       );
 
-      // Initialize results
-      const categoryResults: Record<string, { code: string; name: string; total: number; count: number }> = {};
+      // 2. Initialize a map for categories
+      const categoryMap: Record<string, { code: string; name: string; total: number; count: number }> = {};
       categories.forEach((cat: any) => {
-        categoryResults[cat.id] = {
+        categoryMap[cat.id] = {
           code: cat.code || '',
           name: cat.name || '',
           total: 0,
@@ -54,66 +54,71 @@ export const ExpensesReport: React.FC = () => {
         };
       });
 
-      let unclassifiedTotal = 0;
-      let unclassifiedCount = 0;
+      // 3. Keep track of unclassified expenses
+      let miscTotal = 0;
+      let miscCount = 0;
 
+      // 4. Process all journal entries
       journalEntries.forEach((je: any) => {
-        const d = new Date(je.date);
-        if (d >= start && d <= end) {
+        const jeDate = new Date(je.date);
+        if (jeDate >= start && jeDate <= end) {
           je.items?.forEach((item: any) => {
-            const amount = (Number(item.debit) || 0) - (Number(item.credit) || 0);
-            if (amount === 0) return;
+            // Net of debit - credit is the expense amount (usually expenses are debits)
+            const amt = (Number(item.debit) || 0) - (Number(item.credit) || 0);
+            if (amt === 0) return;
 
-            // Only track movements in expense accounts
+            // Only proceed if the account is an expense account
             if (!expenseAccountIds.has(item.account_id)) return;
 
-            let matched = false;
+            let classified = false;
 
-            // 1. Explicit sub_account matching
+            // A. Check if the item explicitly specifies a category (sub-account)
             if (item.sub_account_type === 'expense' && item.sub_account_id) {
-              if (categoryResults[item.sub_account_id]) {
-                categoryResults[item.sub_account_id].total += amount;
-                categoryResults[item.sub_account_id].count++;
-                matched = true;
+              if (categoryMap[item.sub_account_id]) {
+                categoryMap[item.sub_account_id].total += amt;
+                categoryMap[item.sub_account_id].count++;
+                classified = true;
               }
             }
 
-            // 2. Fallback: Check if the category itself is linked to this account
-            if (!matched) {
-              const cat = categories.find((c: any) => c.account_id === item.account_id);
-              if (cat) {
-                categoryResults[cat.id].total += amount;
-                categoryResults[cat.id].count++;
-                matched = true;
+            // B. Fallback: If not explicitly linked, check if this category is the default for this account
+            if (!classified) {
+              const defaultCat = categories.find((c: any) => c.account_id === item.account_id);
+              if (defaultCat) {
+                categoryMap[defaultCat.id].total += amt;
+                categoryMap[defaultCat.id].count++;
+                classified = true;
               }
             }
 
-            if (!matched) {
-              unclassifiedTotal += amount;
-              unclassifiedCount++;
+            // C. Final fallback to "Unclassified"
+            if (!classified) {
+              miscTotal += amt;
+              miscCount++;
             }
           });
         }
       });
 
-      const finalData = Object.keys(categoryResults)
-        .map(id => ({ id, ...categoryResults[id] }))
-        .filter(c => c.total !== 0)
+      // 5. Convert map to sorted array
+      const reportRows = Object.keys(categoryMap)
+        .map(id => ({ id, ...categoryMap[id] }))
+        .filter(r => r.total !== 0)
         .sort((a, b) => b.total - a.total);
 
-      if (unclassifiedTotal !== 0) {
-        finalData.push({
-          id: 'unclassified',
+      if (miscTotal !== 0) {
+        reportRows.push({
+          id: 'misc',
           code: 'MISC',
-          name: language === 'ar' ? 'مصروفات أخرى غير مصنفة' : 'Other Unclassified Expenses',
-          total: unclassifiedTotal,
-          count: unclassifiedCount
+          name: language === 'ar' ? 'مصروفات متنوعة' : 'Miscellaneous Expenses',
+          total: miscTotal,
+          count: miscCount
         });
       }
 
-      setExpenseData(finalData);
+      setExpenseData(reportRows);
     } catch (e) {
-      console.error('Error fetching expenses:', e);
+      console.error('Failed to generate expenses report:', e);
     } finally {
       setLoading(false);
     }
