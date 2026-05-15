@@ -7,7 +7,8 @@ import {
   Image as ImageIcon, FileText, Pencil, History, Printer, 
   ChevronLeft, ChevronRight, Maximize2, Minimize2, Hash, 
   Wallet, Calendar, Package, Tag, Layers, Box, Paperclip, 
-  Phone, Mail, Lock, LayoutGrid, List, Building2
+  Phone, Mail, Lock, LayoutGrid, List, Building2, ChevronDown, 
+  CreditCard, RotateCcw, Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Barcode from 'react-barcode';
@@ -1399,265 +1400,334 @@ export const Invoices: React.FC = () => {
                     transactionType="sales_invoice"
                   />
 
-                  <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Basic Info Section */}
-                    <section className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
-                      <div className="flex items-center gap-2 mb-2 text-emerald-600">
+                  <form onSubmit={handleSubmit} className="space-y-8">
+                    {/* Card 1: المعلومات الأساسية */}
+                    <section className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-6">
+                      <div className="flex items-center gap-2 mb-6 text-indigo-600">
                         <FileText className="w-5 h-5" />
-                        <h2 className="font-semibold">المعلومات الأساسية</h2>
+                        <h2 className="font-semibold text-zinc-900">{t('invoices.basic_info')}</h2>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
-                          <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">{t('invoices.column_number')}</label>
-                          <input
-                            required
-                            type="text"
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base font-mono font-bold"
-                            value={invoiceNumber}
-                            onChange={(e) => setInvoiceNumber(e.target.value)}
-                          />
+                          <label className="block text-sm font-medium text-zinc-700 mb-2">{t('invoices.column_number')}</label>
+                          <div className="relative">
+                            <Hash className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 w-4 h-4 text-zinc-400`} />
+                            <input
+                              required
+                              type="text"
+                              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800`}
+                              value={invoiceNumber}
+                              onChange={(e) => setInvoiceNumber(e.target.value)}
+                            />
+                          </div>
                         </div>
                         <div>
-                          <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">{t('invoices.form_customer')}</label>
-                          <select 
-                            required
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base font-bold"
-                            value={selectedCustomerId}
-                            onChange={(e) => {
-                              if (e.target.value === 'new_customer') {
-                                setIsCustomerModalOpen(true);
-                              } else {
-                                setSelectedCustomerId(e.target.value);
-                              }
-                            }}
-                          >
-                            <option value="">{t('common.select_customer')}</option>
-                            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                            <option value="new_customer" className="font-bold text-emerald-600">+ {t('customers.add')}</option>
-                          </select>
+                          <label className="block text-sm font-medium text-zinc-700 mb-2">{t('invoices.form_customer')}</label>
+                          <div className="relative group">
+                            <Building2 className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 w-4 h-4 text-zinc-400`} />
+                            <select 
+                              required
+                              className={`w-full ${dir === 'rtl' ? 'pr-10' : 'pl-10'} py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer`}
+                              value={selectedCustomerId}
+                              onChange={(e) => {
+                                if (e.target.value === 'new_customer') {
+                                  setIsCustomerModalOpen(true);
+                                } else {
+                                  setSelectedCustomerId(e.target.value);
+                                }
+                              }}
+                            >
+                              <option value="">{t('common.select_customer')}</option>
+                              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                              <option value="new_customer" className="font-bold text-indigo-600 italic">+ {t('customers.add')}</option>
+                            </select>
+                            <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                          </div>
                         </div>
                         <div>
-                          <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">{t('invoices.form_date')}</label>
-                          <input
-                            required
-                            type="date"
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base font-bold"
-                            value={date}
-                            onChange={(e) => setDate(e.target.value)}
-                          />
+                          <label className="block text-sm font-medium text-zinc-700 mb-2">{t('invoices.column_date')}</label>
+                          <div className="relative">
+                            <Calendar className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 w-4 h-4 text-zinc-400`} />
+                            <input
+                              required
+                              type="date"
+                              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800`}
+                              value={date}
+                              onChange={(e) => setDate(e.target.value)}
+                            />
+                          </div>
                         </div>
                       </div>
 
                       <div>
-                        <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">وصف الفاتورة</label>
+                        <label className="block text-sm font-medium text-zinc-700 mb-2">{language === 'ar' ? 'موضوع الفاتورة' : 'Invoice Subject'}</label>
                         <textarea
-                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base min-h-[100px] font-medium"
-                          placeholder="أدخل وصفاً للفاتورة (اختياري)..."
+                          className="w-full px-4 py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800 min-h-[80px] resize-none"
+                          placeholder={language === 'ar' ? 'أدخل وصفاً عاماً يظهر في أعلى الفاتورة...' : 'Enter a general description...'}
                           value={description}
                           onChange={(e) => setDescription(e.target.value)}
                         />
                       </div>
                     </section>
 
-                    {/* Payment Info Section */}
-                    <section className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm">
-                      <div className="flex items-center gap-2 mb-6 text-emerald-600">
+                    {/* Card 2: إعدادات الدفع */}
+                    <section className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-6">
+                      <div className="flex items-center gap-2 mb-6 text-indigo-600">
                         <Wallet className="w-5 h-5" />
-                        <h2 className="font-semibold">إعدادات الدفع</h2>
+                        <h2 className="font-semibold text-zinc-900">{t('invoices.payment_settings')}</h2>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                        <div>
-                          <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">{t('invoices.form_payment_type')}</label>
-                          <div className="grid grid-cols-2 gap-2">
-                            <button 
-                              type="button"
-                              onClick={() => setPaymentType('cash')}
-                              className={`py-3 rounded-xl font-bold transition-all ${paymentType === 'cash' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'}`}
-                            >
-                              {t('invoices.payment_cash')}
-                            </button>
-                            <button 
-                              type="button"
-                              onClick={() => setPaymentType('credit')}
-                              className={`py-3 rounded-xl font-bold transition-all ${paymentType === 'credit' ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'}`}
-                            >
-                              {t('invoices.payment_credit')}
-                            </button>
-                          </div>
-                        </div>
 
-                        {paymentType === 'cash' && (
-                          <div>
-                            <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1 uppercase tracking-tighter">{t('invoices.form_payment_method')}</label>
-                            <select 
-                              required
-                              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-base font-bold"
-                              value={paymentMethodId}
-                              onChange={(e) => {
-                                if (e.target.value === 'new_payment_method') {
-                                  setIsPaymentMethodModalOpen(true);
-                                } else {
-                                  setPaymentMethodId(e.target.value);
-                                }
-                              }}
-                            >
-                              <option value="">{t('common.select_method')}</option>
-                              {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
-                              <option value="new_payment_method" className="font-bold text-emerald-600">+ {t('payment_methods.add')}</option>
-                            </select>
-                          </div>
-                        )}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6">
+                        <button 
+                          type="button"
+                          onClick={() => setPaymentType('cash')}
+                          className={`flex-1 py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-3 border ${paymentType === 'cash' ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg scale-[1.02]' : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'}`}
+                        >
+                          <Wallet size={18} />
+                          {t('invoices.payment_cash')}
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setPaymentType('credit')}
+                          className={`flex-1 py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-3 border ${paymentType === 'credit' ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg scale-[1.02]' : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'}`}
+                        >
+                          <CreditCard size={18} />
+                          {t('invoices.payment_credit')}
+                        </button>
                       </div>
+
+                      {paymentType === 'cash' && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 pt-6 border-t border-zinc-100">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                              <label className="block text-sm font-medium text-zinc-700 mb-2">{t('invoices.form_payment_method')}</label>
+                              <div className="relative group">
+                                <CreditCard className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 w-4 h-4 text-zinc-400 Transition-colors`} />
+                                <select 
+                                  required
+                                  className={`w-full ${dir === 'rtl' ? 'pr-10' : 'pl-10'} py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer`}
+                                  value={paymentMethodId}
+                                  onChange={(e) => {
+                                    if (e.target.value === 'new_payment_method') {
+                                      setIsPaymentMethodModalOpen(true);
+                                    } else {
+                                      setPaymentMethodId(e.target.value);
+                                    }
+                                  }}
+                                >
+                                  <option value="">{t('common.select_method')}</option>
+                                  {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
+                                  <option value="new_payment_method" className="font-bold text-indigo-600 italic">+ {t('payment_methods.add')}</option>
+                                </select>
+                                <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
                     </section>
 
-                    {/* Items Section */}
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-bold text-slate-900 text-lg">{t('invoices.form_items')}</h4>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={addEmptyRow}
-                            className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-sm font-bold hover:bg-emerald-100 transition-colors flex items-center gap-2"
-                          >
-                            <Plus size={16} />
-                            {t('invoices.add_item')}
-                          </button>
-                          <select 
-                            className="px-4 py-2 bg-slate-100 rounded-xl text-sm font-bold text-slate-600 outline-none border border-slate-200"
-                            onChange={(e) => {
-                              if (e.target.value === 'new_product') {
-                                setIsProductModalOpen(true);
-                              } else if (e.target.value) {
-                                addItem(e.target.value);
-                              }
-                              e.target.value = "";
-                            }}
-                          >
-                            <option value="">+ {t('common.select_product')}</option>
-                            {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.sale_price} {t('invoices.currency')})</option>)}
-                            <option value="new_product" className="font-bold text-emerald-600">+ {t('products.add')}</option>
-                          </select>
+                    {/* Card 3: الأصناف */}
+                    <section className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-6">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
+                        <div className="flex items-center gap-2 text-indigo-600">
+                          <Package className="w-5 h-5" />
+                          <h2 className="font-semibold text-zinc-900">{t('invoices.form_items')}</h2>
                         </div>
+
+                        <div className="flex gap-2 bg-zinc-50 p-1 rounded-lg border border-zinc-200">
+                          <button 
+                            type="button"
+                            onClick={() => {
+                                setInvoiceType('items');
+                                setItems([]);
+                            }}
+                            className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${invoiceType === 'items' ? 'bg-white text-indigo-600 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
+                          >
+                            مبيعات سلع
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                                setInvoiceType('services');
+                                setItems([]);
+                            }}
+                            className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${invoiceType === 'services' ? 'bg-white text-indigo-600 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
+                          >
+                            مبيعات خدمات
+                          </button>
+                        </div>
+
+                        <button 
+                          type="button"
+                          onClick={addItem}
+                          className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-sm text-sm"
+                        >
+                          <Plus size={18} />
+                          {t('invoices.form_add_item')}
+                        </button>
                       </div>
 
-                      <div className="border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto">
-                        <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'} text-sm min-w-[400px]`}>
-                          <thead className="bg-slate-50 text-slate-500 uppercase text-[9px] font-bold tracking-widest">
-                            <tr>
-                              <th className="px-4 py-4 w-12 text-center">{t('products.column_image')}</th>
-                              <th className="px-4 py-4">{t('invoices.column_product')}</th>
-                              <th className="px-4 py-4 w-28 text-center">{t('invoices.column_quantity')}</th>
-                              <th className="px-4 py-4 w-32 text-center">{t('invoices.column_price')}</th>
-                              <th className={`px-4 py-4 w-32 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_total')}</th>
-                              <th className="px-4 py-4 w-10"></th>
+                      <div className="overflow-x-auto rounded-xl border border-zinc-200 overflow-hidden">
+                        <table className="w-full text-sm text-right border-collapse">
+                          <thead>
+                            <tr className="bg-zinc-50 border-b border-zinc-200">
+                              <th className="px-6 py-4 font-bold text-zinc-700">{t('invoices.item_name')}</th>
+                              <th className="px-6 py-4 font-bold text-zinc-700 w-32">{t('invoices.item_quantity')}</th>
+                              <th className="px-6 py-4 font-bold text-zinc-700 w-40">{t('invoices.item_price')}</th>
+                              <th className="px-6 py-4 font-bold text-zinc-700 w-40">{t('invoices.item_total')}</th>
+                              <th className="px-6 py-4 w-20"></th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-100">
+                          <tbody className="divide-y divide-slate-100 bg-white/40">
                             {items.map((item, index) => (
-                              <tr key={index} className="hover:bg-slate-50/50 transition-colors group">
-                                <td className="px-4 py-2 text-center">
+                              <tr key={index} className="hover:bg-white transition-colors group">
+                                <td className="px-6 py-4 text-center">
                                   {item.product_image_url ? (
                                     <img 
                                       src={item.product_image_url} 
                                       alt={item.product_name} 
-                                      className="w-10 h-10 object-cover rounded-lg mx-auto border border-slate-100"
+                                      className="w-14 h-14 object-cover rounded-xl mx-auto shadow-sm border-2 border-slate-100"
                                       referrerPolicy="no-referrer"
                                     />
                                   ) : (
-                                    <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center mx-auto border border-slate-100">
-                                      <Box size={16} className="text-slate-300" />
+                                    <div className="w-14 h-14 bg-slate-50 rounded-xl flex items-center justify-center mx-auto border-2 border-slate-100 text-slate-200 shadow-sm">
+                                      <ImageIcon size={20} />
                                     </div>
                                   )}
                                 </td>
-                                <td className="px-4 py-2">
-                                  <select 
-                                    className="w-full bg-transparent outline-none font-bold text-slate-900 appearance-none cursor-pointer text-sm"
-                                    value={item.product_id}
-                                    onChange={(e) => updateItem(index, 'product_id', e.target.value)}
-                                  >
-                                    <option value="">{t('common.select_product')}</option>
-                                    {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                  </select>
+                                <td className="px-6 py-4">
+                                  <div className="relative group/select">
+                                    <select 
+                                      className={`w-full bg-slate-50/50 border border-transparent hover:border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 rounded-2xl px-5 py-3 outline-none font-bold text-slate-900 transition-all cursor-pointer appearance-none shadow-sm hover:shadow-md`}
+                                      value={item.product_id}
+                                      onChange={(e) => updateItem(index, 'product_id', e.target.value)}
+                                    >
+                                      <option value="">{t('common.select_product')}</option>
+                                      {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                    </select>
+                                    <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-4 w-4 h-4 text-slate-300 pointer-events-none group-hover/select:text-slate-400 transition-colors`} />
+                                  </div>
                                 </td>
-                                <td className="px-4 py-3">
+                                <td className="px-6 py-4">
                                   <input 
                                     type="number" 
                                     step="any"
-                                    className="w-full bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 px-3 py-2 text-sm outline-none text-center font-bold shadow-sm"
+                                    className="w-full bg-white border-2 border-slate-100 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 px-4 py-3 text-base outline-none text-center font-black text-slate-900 shadow-sm transition-all"
                                     value={isNaN(Number(item.quantity)) ? '' : Number(item.quantity)}
                                     onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
                                   />
                                 </td>
-                                <td className="px-4 py-3">
+                                <td className="px-6 py-4">
                                   <input 
                                     type="number" 
                                     step="any"
-                                    className="w-full bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 px-3 py-2 text-sm outline-none text-center font-bold shadow-sm"
+                                    className="w-full bg-white border-2 border-slate-100 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 px-4 py-3 text-base outline-none text-center font-black text-slate-900 shadow-sm transition-all"
                                     value={isNaN(Number(item.unit_price)) ? '' : Number(item.unit_price)}
                                     onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
                                   />
                                 </td>
-                                <td className="px-4 py-2 text-left font-mono font-bold text-slate-900 text-sm">
+                                <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'} font-black text-indigo-700 text-xl tracking-tighter`}>
                                   {formatMoney(item.total)}
                                 </td>
-                                <td className="px-4 py-2 text-center">
+                                <td className="px-6 py-4 text-center">
                                   <button 
+                                    type="button"
                                     onClick={() => removeItem(index)}
-                                    className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                    className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100 border border-transparent hover:border-red-100"
                                   >
-                                    <Trash2 size={14} />
+                                    <Trash2 size={20} />
                                   </button>
                                 </td>
                               </tr>
                             ))}
                             {items.length === 0 && (
                               <tr>
-                                <td colSpan={6} className="px-4 py-8 text-center text-slate-400 italic">لا توجد أصناف مضافة بعد.</td>
+                                <td colSpan={6} className="px-6 py-24 text-center">
+                                  <div className="flex flex-col items-center gap-4">
+                                    <div className="w-20 h-20 rounded-full bg-slate-50 flex items-center justify-center text-slate-200">
+                                      <Package size={40} />
+                                    </div>
+                                    <div>
+                                      <p className="text-slate-900 font-black text-lg">لم يتم إضافة أي أصناف</p>
+                                      <p className="text-slate-400 font-bold mt-1">ابدأ بإضافة أول صنف للفاتورة عبر الضغط على الزر أعلاه</p>
+                                    </div>
+                                  </div>
+                                </td>
                               </tr>
                             )}
                           </tbody>
-                        <tfoot className="bg-slate-50/50 font-bold border-t border-slate-200">
-                          <tr>
-                            <td colSpan={4} className={`px-4 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-slate-500`}>{t('invoices.summary_subtotal')}:</td>
-                            <td className="px-4 py-3 text-base text-slate-900 font-mono">{formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}</td>
-                            <td></td>
-                          </tr>
-                          <tr>
-                            <td colSpan={4} className={`px-4 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-slate-500 flex items-center justify-end gap-2`}>
-                              <span>{t('invoices.summary_discount')}:</span>
+                        </table>
+                      </div>
+                    </section>
+
+                    {/* Totals & Notes Section */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      <section className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-6">
+                        <div className="flex items-center gap-2 mb-4 text-indigo-600">
+                          <Layers className="w-5 h-5" />
+                          <h2 className="font-semibold text-zinc-900">ملخص الفاتورة</h2>
+                        </div>
+
+                        <div className="bg-zinc-50 rounded-lg p-6 border border-zinc-100 space-y-4">
+                          <div className="flex justify-between items-center text-zinc-600">
+                            <span className="font-medium text-sm">{t('invoices.summary_subtotal')}</span>
+                            <span className="font-bold text-lg">
+                              {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-rose-600">
+                            <div className="flex items-center gap-4">
+                              <span className="font-medium text-sm">{t('invoices.summary_discount')}</span>
                               <input 
                                 type="number" 
-                                className="w-24 bg-white border border-slate-200 rounded-lg px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
+                                className="w-24 bg-white border border-zinc-200 rounded-lg px-2 py-1 text-center font-bold text-rose-600 focus:ring-2 focus:ring-rose-500 outline-none"
                                 value={Number(discount)}
                                 onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
                               />
-                            </td>
-                            <td className="px-4 py-3 text-base text-red-600 font-mono">-{formatMoney(discount)}</td>
-                            <td></td>
-                          </tr>
-                          <tr className="bg-emerald-50">
-                            <td colSpan={4} className={`px-4 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-emerald-900`}>{t('invoices.summary_total')}:</td>
-                            <td className="px-4 py-3 text-xl text-emerald-600 font-mono font-black">{formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) - (Number(discount) || 0))} {t('invoices.currency')}</td>
-                            <td></td>
-                          </tr>
-                        </tfoot>
-                        </table>
-                      </div>
+                            </div>
+                            <span className="font-bold text-lg">-{formatMoney(discount)}</span>
+                          </div>
+                          <div className="pt-4 border-t border-zinc-200 flex justify-between items-center text-indigo-600">
+                            <span className="font-black text-lg">{t('invoices.summary_total')}</span>
+                            <span className="font-black text-2xl tracking-tighter">
+                              {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) - discount)} {t('invoices.currency')}
+                            </span>
+                          </div>
+                        </div>
+                      </section>
+
+                      {/* Notes Card */}
+                      <section className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-6">
+                        <div className="flex items-center gap-2 mb-4 text-indigo-600">
+                          <Tag className="w-5 h-5" />
+                          <h2 className="font-semibold text-zinc-900">{language === 'ar' ? 'الملاحظات' : 'Notes'}</h2>
+                        </div>
+                        <textarea 
+                          className="w-full min-h-[150px] bg-zinc-50 border border-zinc-200 rounded-lg p-4 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-zinc-700 font-bold"
+                          placeholder={language === 'ar' ? 'أدخل أي ملاحظات إضافية هنا...' : 'Enter any additional notes...'}
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                        />
+                      </section>
                     </div>
 
-                    <div className="pt-6 flex gap-4 sticky bottom-0 bg-white pb-4 md:pb-0">
+                    {/* Actions */}
+                    <div className="pt-8 flex gap-4 sticky bottom-0 bg-white/95 backdrop-blur-sm pb-4 border-t border-zinc-100 z-40">
                       <button 
                         type="button"
                         onClick={closeModal}
-                        className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all border border-slate-200"
+                        className="flex-1 py-3 bg-zinc-100 text-zinc-600 rounded-lg font-bold hover:bg-zinc-200 transition-all border border-zinc-200 active:scale-95 flex items-center justify-center gap-2"
                       >
+                        <RotateCcw size={18} />
                         {t('common.cancel')}
                       </button>
                       <button 
                         type="submit"
-                        className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+                        className="flex-[2] py-3 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
                       >
+                        <Save size={18} />
                         {editingInvoice ? t('common.save') : t('common.save')}
                       </button>
                     </div>

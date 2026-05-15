@@ -8,7 +8,7 @@ import {
   Calendar, Hash, Package, Save, FileText, Pencil, Download, 
   Eye, History, Printer, ArrowRight, ArrowLeft, Minimize2, 
   Maximize2, Phone, Mail, MapPin, Wallet, Layers, Paperclip, 
-  Tag, Box, LayoutGrid, List
+  Tag, Box, LayoutGrid, List, Receipt, ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartAIInput } from '../components/SmartAIInput';
@@ -1383,22 +1383,23 @@ export const PurchaseInvoices: React.FC = () => {
                 <div className="flex-1">
                   <SmartAIInput transactionType="purchase_invoice" onDataExtracted={applyAiData} />
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Invoice Type Section */}
-                    <section className="bg-white p-4 md:p-6 rounded-xl border border-zinc-200 shadow-sm">
-                      <div className="flex items-center gap-2 mb-6 text-zinc-900">
-                        <Layers size={20} className="text-emerald-500" />
-                        <h2 className="font-bold">نوع العملية</h2>
+                    {/* Card 1: معلومات النوع والمورد */}
+                    <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
+                      <div className="flex items-center gap-2 mb-4 text-emerald-600">
+                        <FileText className="w-5 h-5" />
+                        <h2 className="font-semibold text-lg">المعلومات الأساسية</h2>
                       </div>
-                      <div className="flex justify-center gap-4">
+                      
+                      <div className="grid grid-cols-2 gap-4 pb-6">
                         <button 
                           type="button"
                           onClick={() => {
                             setInvoiceData({...invoiceData, purchase_type: 'items'});
                             setItems([]);
                           }}
-                          className={`flex-1 py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 ${invoiceData.purchase_type === 'items' ? 'bg-zinc-900 text-white shadow-xl scale-105' : 'bg-zinc-50 text-zinc-500 border border-zinc-200 hover:bg-zinc-100'}`}
+                          className={`flex-1 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 border ${invoiceData.purchase_type === 'items' ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg scale-105 z-10' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}`}
                         >
-                          <Package size={20} />
+                          <Package size={18} />
                           {t('pi.purchase_items')}
                         </button>
                         <button 
@@ -1407,28 +1408,21 @@ export const PurchaseInvoices: React.FC = () => {
                             setInvoiceData({...invoiceData, purchase_type: 'expenses'});
                             setItems([]);
                           }}
-                          className={`flex-1 py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 ${invoiceData.purchase_type === 'expenses' ? 'bg-zinc-900 text-white shadow-xl scale-105' : 'bg-zinc-50 text-zinc-500 border border-zinc-200 hover:bg-zinc-100'}`}
+                          className={`flex-1 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 border ${invoiceData.purchase_type === 'expenses' ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg scale-105 z-10' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}`}
                         >
-                          <FileText size={20} />
+                          <Receipt size={18} />
                           {t('pi.purchase_expenses')}
                         </button>
                       </div>
-                    </section>
-                    
-                    {/* Basic Info Section */}
-                    <section className="bg-white p-4 md:p-6 rounded-xl border border-zinc-200 shadow-sm space-y-6">
-                      <div className="flex items-center gap-2 mb-2 text-zinc-900">
-                        <User size={20} className="text-emerald-500" />
-                        <h2 className="font-bold">المعلومات الأساسية</h2>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
                         <div>
-                          <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">{t('pi.supplier')}</label>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">{t('pi.supplier')}</label>
                           <div className="relative">
-                            <User className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
+                            <User className="absolute start-3 top-2.5 text-slate-400" size={16} />
                             <select 
                               required
-                              className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none font-bold`}
+                              className="w-full ps-10 pe-10 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-800 appearance-none"
                               value={invoiceData.supplier_id}
                               onChange={(e) => {
                                 if (e.target.value === 'new_supplier') {
@@ -1442,17 +1436,18 @@ export const PurchaseInvoices: React.FC = () => {
                               {suppliers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
                               <option value="new_supplier" className="font-bold text-emerald-600">+ {t('suppliers.add_new')}</option>
                             </select>
+                            <ChevronDown className="absolute end-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
                           </div>
                         </div>
 
                         <div>
-                          <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">{t('common.date')}</label>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">{t('common.date')}</label>
                           <div className="relative">
-                            <Calendar className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
+                            <Calendar className="absolute start-3 top-2.5 text-slate-400" size={16} />
                             <input 
                               required
                               type="date" 
-                              className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold`}
+                              className="w-full ps-10 pe-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-800"
                               value={invoiceData.date}
                               onChange={(e) => setInvoiceData({...invoiceData, date: e.target.value})}
                             />
@@ -1461,10 +1456,10 @@ export const PurchaseInvoices: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">{t('common.notes')}</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">{t('common.notes')}</label>
                         <textarea 
                           rows={2}
-                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none font-medium text-sm"
+                          className="w-full px-4 py-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all resize-none font-medium text-sm text-slate-600"
                           placeholder={t('pi.notes_placeholder')}
                           value={invoiceData.notes}
                           onChange={(e) => setInvoiceData({...invoiceData, notes: e.target.value})}
@@ -1472,41 +1467,43 @@ export const PurchaseInvoices: React.FC = () => {
                       </div>
                     </section>
 
-                    {/* Payment Info Section */}
-                    <section className="bg-white p-4 md:p-6 rounded-xl border border-zinc-200 shadow-sm space-y-6">
-                      <div className="flex items-center gap-2 mb-2 text-zinc-900">
-                        <Wallet size={20} className="text-emerald-500" />
-                        <h2 className="font-bold">إعدادات الدفع</h2>
+                    {/* Card 2: إعدادات الدفع */}
+                    <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
+                      <div className="flex items-center gap-2 mb-4 text-emerald-600">
+                        <Wallet className="w-5 h-5" />
+                        <h2 className="font-semibold text-lg">إعدادات الدفع</h2>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                          <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">{t('pi.payment_type')}</label>
-                          <div className="grid grid-cols-2 gap-2">
+                          <label className="block text-sm font-medium text-slate-700 mb-3">{t('pi.payment_type')}</label>
+                          <div className="grid grid-cols-2 gap-3">
                             <button 
                               type="button"
                               onClick={() => setInvoiceData({...invoiceData, payment_type: 'cash'})}
-                              className={`py-3 rounded-xl font-bold transition-all ${invoiceData.payment_type === 'cash' ? 'bg-zinc-900 text-white shadow-lg' : 'bg-zinc-50 text-zinc-500 border border-zinc-200 hover:bg-zinc-100'}`}
+                              className={`py-2.5 rounded-lg font-bold transition-all border flex items-center justify-center gap-2 ${invoiceData.payment_type === 'cash' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
                             >
+                              <Wallet size={16} />
                               {t('pi.cash')}
                             </button>
                             <button 
                               type="button"
                               onClick={() => setInvoiceData({...invoiceData, payment_type: 'credit'})}
-                              className={`py-3 rounded-xl font-bold transition-all ${invoiceData.payment_type === 'credit' ? 'bg-zinc-900 text-white shadow-lg' : 'bg-zinc-50 text-zinc-500 border border-zinc-200 hover:bg-zinc-100'}`}
+                              className={`py-2.5 rounded-lg font-bold transition-all border flex items-center justify-center gap-2 ${invoiceData.payment_type === 'credit' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
                             >
+                              <Layers size={16} />
                               {t('pi.credit')}
                             </button>
                           </div>
                         </div>
 
                         {invoiceData.payment_type === 'cash' && (
-                          <div>
-                            <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">{t('pi.payment_method')}</label>
+                          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">{t('pi.payment_method')}</label>
                             <div className="relative">
-                              <CreditCard className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
+                              <CreditCard className="absolute start-3 top-2.5 text-slate-400" size={16} />
                               <select 
                                 required
-                                className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none font-bold`}
+                                className="w-full ps-10 pe-10 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-800 appearance-none"
                                 value={invoiceData.payment_method_id}
                                 onChange={(e) => {
                                   if (e.target.value === 'new_payment_method') {
@@ -1520,23 +1517,25 @@ export const PurchaseInvoices: React.FC = () => {
                                 {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
                                 <option value="new_payment_method" className="font-bold text-emerald-600">+ {t('payment_methods.add_new')}</option>
                               </select>
+                              <ChevronDown className="absolute end-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
                             </div>
-                          </div>
+                          </motion.div>
                         )}
                       </div>
                     </section>
-
-                    <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
-                        <div className="p-6 border-b border-zinc-50 flex items-center justify-between bg-zinc-50/50">
-                          <div className="flex items-center gap-4">
-                            <h3 className="text-xl font-bold text-zinc-900 flex items-center gap-2">
-                              {invoiceData.purchase_type === 'items' ? <Package size={24} className="text-emerald-500" /> : <FileText size={24} className="text-emerald-500" />}
+                    
+                    {/* Card 3: الأصناف */}
+                    <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
+                        <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-100">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                              {invoiceData.purchase_type === 'items' ? <Package size={24} className="text-emerald-600" /> : <Receipt size={24} className="text-emerald-600" />}
                               {invoiceData.purchase_type === 'items' ? t('pi.invoice_items') : t('pi.expense_items')}
                             </h3>
                             <button 
                               type="button"
                               onClick={() => setShowSidePanel(!showSidePanel)}
-                              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${showSidePanel ? 'bg-orange-50 text-orange-600 border border-orange-100' : 'bg-zinc-100 text-zinc-600 border border-zinc-200 hover:bg-zinc-200'}`}
+                              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${showSidePanel ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}`}
                             >
                               <History size={14} />
                               {t('pi.toggle_side_panel')}
@@ -1545,89 +1544,92 @@ export const PurchaseInvoices: React.FC = () => {
                           <button 
                             type="button"
                             onClick={addItem}
-                            className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition-all active:scale-95"
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-md shadow-emerald-500/10"
                           >
                             <Plus size={18} />
-                            {t('common.add')} {invoiceData.purchase_type === 'items' ? t('pi.item') : t('pi.expense_item')}
+                            {t('common.add')}
                           </button>
                         </div>
 
-                        <div className="overflow-x-auto">
-                          <table className={`w-full ${t('dir') === 'rtl' ? 'text-right' : 'text-left'} border-collapse`}>
+                        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                          <table className={`w-full ${t('dir') === 'rtl' ? 'text-right' : 'text-left'} border-collapse text-sm`}>
                             <thead>
-                              <tr className="bg-zinc-50/30 border-b border-zinc-100">
-                                <th className="px-3 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest w-12 text-center">{t('common.image')}</th>
-                                <th className="px-3 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest leading-none">{invoiceData.purchase_type === 'items' ? t('pi.item') : t('pi.expense_item')}</th>
-                                <th className="px-3 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest w-28 text-center">{t('pi.quantity')}</th>
-                                <th className="px-3 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest w-32 text-center">{t('pi.price')}</th>
-                                <th className="px-3 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest w-32 text-center">{t('pi.total')}</th>
-                                <th className="px-3 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest w-12"></th>
+                              <tr className="bg-slate-50 border-b border-slate-200">
+                                <th className="px-3 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest w-16 text-center">{t('common.image')}</th>
+                                <th className="px-3 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">{invoiceData.purchase_type === 'items' ? t('pi.item') : t('pi.expense_item')}</th>
+                                <th className="px-3 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest w-24 text-center">{t('pi.quantity')}</th>
+                                <th className="px-3 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest w-32 text-center">{t('pi.price')}</th>
+                                <th className={`px-3 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest w-32 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'}`}>{t('pi.total')}</th>
+                                <th className="px-3 py-4 w-12"></th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-zinc-50">
+                            <tbody className="divide-y divide-slate-100 italic">
                               {items.length === 0 ? (
                                 <tr>
-                                  <td colSpan={6} className="px-6 py-12 text-center text-zinc-400 italic">{t('pi.no_items_added')}</td>
+                                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400 italic font-medium">{t('pi.no_items_added')}</td>
                                 </tr>
                               ) : items.map((item, index) => (
-                                <tr key={index} className="hover:bg-zinc-50/50 transition-colors group">
+                                <tr key={index} className="hover:bg-slate-50/50 transition-colors group">
                                   <td className="px-3 py-3 text-center">
                                     {invoiceData.purchase_type === 'items' && (item as any).product_image_url ? (
                                       <img 
                                         src={(item as any).product_image_url} 
                                         alt="Product" 
-                                        className="w-10 h-10 object-cover rounded-lg mx-auto border border-zinc-100 shadow-sm"
+                                        className="w-10 h-10 object-cover rounded-lg mx-auto border border-slate-200 shadow-sm"
                                         referrerPolicy="no-referrer"
                                       />
                                     ) : (
-                                      <div className="w-10 h-10 bg-zinc-50 rounded-lg flex items-center justify-center mx-auto border border-zinc-100 shadow-sm">
-                                        <Box size={16} className="text-zinc-300" />
+                                      <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center mx-auto border border-slate-200">
+                                        <Box size={16} className="text-slate-300" />
                                       </div>
                                     )}
                                   </td>
                                   <td className="px-3 py-3">
-                                    {invoiceData.purchase_type === 'items' ? (
-                                      <select 
-                                        required
-                                        className={`w-full px-4 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-900 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
-                                        value={item.product_id || ''}
-                                        onChange={(e) => {
-                                          if (e.target.value === 'new_product') {
-                                            setIsProductModalOpen(true);
-                                          } else {
-                                            updateItem(index, 'product_id', e.target.value);
-                                          }
-                                        }}
-                                      >
-                                        <option value="">{t('pi.select_item')}</option>
-                                        {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}
-                                        <option value="new_product" className="font-bold text-emerald-600">+ {t('products.add_new')}</option>
-                                      </select>
-                                    ) : (
-                                      <select 
-                                        required
-                                        className={`w-full px-4 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-900 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
-                                        value={item.expense_category_id || ''}
-                                        onChange={(e) => {
-                                          if (e.target.value === 'new_expense_category') {
-                                            setIsExpenseCategoryModalOpen(true);
-                                          } else {
-                                            updateItem(index, 'expense_category_id', e.target.value);
-                                          }
-                                        }}
-                                      >
-                                        <option value="">{t('pi.select_expense_item')}</option>
-                                        {categories.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
-                                        <option value="new_expense_category" className="font-bold text-emerald-600">+ {t('expense_categories.add_new')}</option>
-                                      </select>
-                                    )}
+                                    <div className="relative">
+                                      {invoiceData.purchase_type === 'items' ? (
+                                        <select 
+                                          required
+                                          className={`w-full ps-3 pe-8 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-800 appearance-none text-xs ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
+                                          value={item.product_id || ''}
+                                          onChange={(e) => {
+                                            if (e.target.value === 'new_product') {
+                                              setIsProductModalOpen(true);
+                                            } else {
+                                              updateItem(index, 'product_id', e.target.value);
+                                            }
+                                          }}
+                                        >
+                                          <option value="">{t('pi.select_item')}</option>
+                                          {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}
+                                          <option value="new_product" className="font-bold text-emerald-600">+ {t('products.add_new')}</option>
+                                        </select>
+                                      ) : (
+                                        <select 
+                                          required
+                                          className={`w-full ps-3 pe-8 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-800 appearance-none text-xs ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
+                                          value={item.expense_category_id || ''}
+                                          onChange={(e) => {
+                                            if (e.target.value === 'new_expense_category') {
+                                              setIsExpenseCategoryModalOpen(true);
+                                            } else {
+                                              updateItem(index, 'expense_category_id', e.target.value);
+                                            }
+                                          }}
+                                        >
+                                          <option value="">{t('pi.select_expense_item')}</option>
+                                          {categories.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
+                                          <option value="new_expense_category" className="font-bold text-emerald-600">+ {t('expense_categories.add_new')}</option>
+                                        </select>
+                                      )}
+                                      <ChevronDown className="absolute end-2 top-2.5 w-3 h-3 text-slate-400 pointer-events-none" />
+                                    </div>
                                   </td>
                                   <td className="px-3 py-3">
                                     <input 
                                       required
                                       type="number" 
                                       step="any"
-                                      className="w-full bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 px-3 py-2 text-sm outline-none text-center font-bold shadow-sm"
+                                      className="w-full bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 px-3 py-2 text-xs outline-none text-center font-bold text-slate-800 transition-all border-dashed"
                                       value={item.quantity}
                                       onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
                                     />
@@ -1637,73 +1639,77 @@ export const PurchaseInvoices: React.FC = () => {
                                       required
                                       type="number" 
                                       step="any"
-                                      className="w-full bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 px-3 py-2 text-sm outline-none text-center font-bold shadow-sm"
+                                      className="w-full bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 px-3 py-2 text-xs outline-none text-center font-bold text-slate-800 transition-all border-dashed"
                                       value={item.cost_price}
                                       onChange={(e) => updateItem(index, 'cost_price', Number(e.target.value))}
                                     />
                                   </td>
-                                  <td className="px-3 py-3 font-bold text-zinc-900 text-sm text-center">
+                                  <td className={`px-3 py-3 font-bold text-slate-900 text-xs ${t('dir') === 'rtl' ? 'text-left' : 'text-right'}`}>
                                     {formatNumber(item.total || 0)}
                                   </td>
-                                  <td className="px-3 py-1.5">
+                                  <td className="px-3 py-3 text-center">
                                     <button 
                                       type="button"
                                       onClick={() => removeItem(index)}
-                                      className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                      className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                                     >
-                                      <Trash2 size={16} />
+                                      <Trash2 size={14} />
                                     </button>
                                   </td>
                                 </tr>
                               ))}
                             </tbody>
-                            <tfoot>
-                              <tr className="bg-zinc-50/50 font-bold border-t border-zinc-100">
-                                <td colSpan={3} className={`px-3 py-2 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} text-zinc-500`}>{t('pi.subtotal')}:</td>
-                                <td className="px-3 py-2 text-base text-zinc-900 font-mono text-center">{formatNumber(calculateSubtotal())}</td>
-                                <td></td>
-                              </tr>
-                              <tr className="bg-zinc-50/50 font-bold">
-                                <td colSpan={3} className={`px-3 py-2 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} text-zinc-500 flex items-center justify-end gap-2`}>
-                                  <span>{t('pi.discount')}:</span>
-                                  <input 
-                                    type="number" 
-                                    className="w-24 bg-white border border-zinc-200 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-orange-500 font-mono"
-                                    value={invoiceData.discount}
-                                    onChange={(e) => setInvoiceData({ ...invoiceData, discount: parseFloat(e.target.value) || 0 })}
-                                  />
-                                </td>
-                                <td className="px-3 py-2 text-base text-red-600 font-mono text-center">-{formatNumber(invoiceData.discount)}</td>
-                                <td></td>
-                              </tr>
-                              <tr className="bg-zinc-900 text-white">
-                                <td colSpan={3} className={`px-6 py-4 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} font-bold text-lg`}>{t('pi.grand_total')}:</td>
-                                <td colSpan={2} className="px-6 py-4 font-bold text-2xl text-emerald-400">
-                                  {formatNumber(calculateTotal())} {t('common.currency')}
-                                </td>
-                              </tr>
-                            </tfoot>
                           </table>
                         </div>
-                      </div>
 
-                      <div className="flex justify-end pt-6 border-t border-zinc-100">
+                        {/* Totals Section within Card 3 */}
+                        <div className="mt-6 pt-6 border-t border-slate-100 space-y-3">
+                          <div className={`flex justify-between items-center py-2 italic font-bold text-slate-600`}>
+                            <span>{t('pi.subtotal')}:</span>
+                            <span className="text-slate-900">{formatNumber(calculateSubtotal())} {t('common.currency')}</span>
+                          </div>
+                          <div className={`flex justify-between items-center py-2 italic font-bold text-slate-600`}>
+                            <div className="flex items-center gap-2">
+                              <span>{t('pi.discount')}:</span>
+                              <input 
+                                type="number" 
+                                className="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-emerald-500 font-bold"
+                                value={invoiceData.discount}
+                                onChange={(e) => setInvoiceData({ ...invoiceData, discount: parseFloat(e.target.value) || 0 })}
+                              />
+                            </div>
+                            <span className="text-rose-500">-{formatNumber(invoiceData.discount)} {t('common.currency')}</span>
+                          </div>
+                          <div className="flex justify-between items-center py-4 px-6 bg-slate-900 text-white rounded-2xl italic shadow-lg">
+                            <span className="font-bold text-lg">{t('pi.grand_total')}</span>
+                            <div className="text-right">
+                              <span className="font-black text-2xl text-emerald-400">
+                                {formatNumber(calculateTotal())} {t('common.currency')}
+                              </span>
+                              <p className="text-[9px] uppercase tracking-widest text-slate-400 mt-1 font-black">صافي المستحق للمورد</p>
+                            </div>
+                          </div>
+                        </div>
+                    </section>
+
+                    <div className="pt-6 flex gap-4 sticky bottom-0 bg-white/80 backdrop-blur-md pb-4 md:pb-0 z-20 border-t border-slate-100">
+                      <button 
+                        type="button"
+                        onClick={closeModal}
+                        className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all border border-slate-200 active:scale-95"
+                      >
+                        {t('common.cancel')}
+                      </button>
                       <button 
                         type="submit"
-                        className="flex items-center gap-3 px-12 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-500/20 active:scale-95"
+                        className="flex-[2] py-3 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-3"
                       >
-                        <Save size={24} />
+                        <Save className="w-5 h-5" />
                         {editingInvoice ? t('pi.edit_invoice') : t('pi.add_invoice')}
                       </button>
                     </div>
                   </form>
                 </div>
-
-                {editingInvoice && (
-                  <div className="hidden lg:block">
-                    <DocumentChatter documentId={editingInvoice.id} collectionName="purchase_invoices" />
-                  </div>
-                )}
               </div>
             </div>
           </div>

@@ -5,7 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { TransactionManager } from '../services/TransactionManager';
 import { ReturnSchema, JournalEntrySchema } from '../lib/schemas';
 import { Return, Customer, Product, ReturnItem, JournalEntry, JournalEntryItem, Account, PaymentMethod } from '../types';
-import { Search, Plus, Trash2, X, Eye, Download, FileText, RotateCcw, History, Printer, Phone, Mail, MapPin, Wallet, Calendar, Box, CreditCard } from 'lucide-react';
+import { Search, Plus, Trash2, X, Eye, Download, FileText, RotateCcw, History, Printer, Phone, Mail, MapPin, Wallet, Calendar, Box, CreditCard, User, ChevronDown, Layers, Save, Package } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
@@ -964,238 +964,281 @@ export const Returns: React.FC = () => {
                 )}
               </AnimatePresence>
 
-              <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 pb-32 md:pb-6">
+              <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32 md:pb-8">
                 <SmartAIInput transactionType="return" onDataExtracted={applyAiData} />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('returns.form_customer')}</label>
-                    <select 
-                      required
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
-                      value={selectedCustomerId}
-                      onChange={(e) => {
-                        if (e.target.value === 'new_customer') {
-                          setIsCustomerModalOpen(true);
-                        } else {
-                          setSelectedCustomerId(e.target.value);
-                        }
-                      }}
-                    >
-                      <option value="">{t('common.select_customer')}</option>
-                      {customers.map(c => (
-                        <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
-                      ))}
-                      <option value="new_customer" className="font-bold text-emerald-600">+ {t('customers.add')}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('returns.form_date')}</label>
-                    <input 
-                      required
-                      type="date"
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('returns.form_payment_type')}</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setPaymentType('credit')}
-                        className={`flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${paymentType === 'credit' ? 'bg-orange-600 text-white shadow-lg shadow-orange-200' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
-                      >
-                        <CreditCard size={18} />
-                        {t('returns.payment_credit')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPaymentType('cash')}
-                        className={`flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${paymentType === 'cash' ? 'bg-orange-600 text-white shadow-lg shadow-orange-200' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
-                      >
-                        <Wallet size={18} />
-                        {t('returns.payment_cash')}
-                      </button>
-                    </div>
-                  </div>
-                  {paymentType === 'cash' && (
-                    <div className="animate-in slide-in-from-top-2 duration-200">
-                      <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('returns.form_payment_method')}</label>
-                      <select 
-                        required
-                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
-                        value={paymentMethodId}
-                        onChange={(e) => setPaymentMethodId(e.target.value)}
-                      >
-                        <option value="">{t('common.select_method')}</option>
-                        {paymentMethods.map(m => (
-                          <option key={m.id} value={m.id}>{m.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-
-                <div className="bg-orange-50 rounded-2xl p-6 border border-orange-100 flex flex-col justify-center items-center text-center">
-                  <span className="text-orange-600 text-sm font-bold uppercase tracking-widest mb-1">{t('returns.summary_total')}</span>
-                  <span className="text-4xl font-black text-orange-700">
-                    {formatNumber(items.reduce((sum, item) => sum + (item.total || 0), 0))} <span className="text-lg">{t('returns.currency')}</span>
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <h4 className="font-bold text-zinc-900 flex items-center gap-2">
-                      <FileText size={18} className="text-orange-500" />
-                      {t('returns.form_items')}
-                    </h4>
-                    <button 
-                      type="button"
-                      onClick={() => setShowSidePanel(!showSidePanel)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${showSidePanel ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-zinc-100 text-zinc-600 border border-zinc-200 hover:bg-zinc-200'}`}
-                    >
-                      <History size={14} />
-                      {showSidePanel ? t('common.hide_side_panel') : t('common.journal_entry')}
-                    </button>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={addEmptyRow}
-                      className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-sm font-bold hover:bg-emerald-100 transition-colors flex items-center gap-2"
-                    >
-                      <Plus size={16} />
-                      {t('returns.add_item')}
-                    </button>
-                    <select 
-                      className="px-4 py-2 bg-white border border-zinc-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500 outline-none"
-                      onChange={(e) => {
-                        if (e.target.value === 'new_product') {
-                          setIsProductModalOpen(true);
-                          e.target.value = "";
-                        } else if (e.target.value !== "") {
-                          addItem(e.target.value);
-                          e.target.value = "";
-                        }
-                      }}
-                    >
-                      <option value="">{t('common.select_product')}</option>
-                      {products.map(p => (
-                        <option key={p.id} value={p.id}>{p.name} ({p.sale_price} {t('returns.currency')})</option>
-                      ))}
-                      <option value="new_product" className="font-bold text-emerald-600">+ {t('products.add')}</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="border border-zinc-100 rounded-2xl overflow-hidden">
-                  <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'} text-sm`}>
-                    <thead className="bg-zinc-50 text-zinc-500 uppercase text-[10px] font-bold tracking-wider">
-                      <tr>
-                        <th className="px-4 py-4 w-12 text-center">{t('products.column_image')}</th>
-                        <th className="px-4 py-4">{t('returns.column_product')}</th>
-                        <th className="px-4 py-4 w-28 text-center">{t('returns.column_quantity')}</th>
-                        <th className="px-4 py-4 w-32 text-center">{t('returns.column_price')}</th>
-                        <th className={`px-4 py-4 w-32 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('returns.column_total')}</th>
-                        <th className="px-4 py-4 w-10"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-50">
-                      {items.map((item, index) => (
-                        <tr key={index}>
-                          <td className="px-4 py-3 text-center">
-                            {item.product_image_url ? (
-                              <img 
-                                src={item.product_image_url} 
-                                alt={item.product_name} 
-                                className="w-10 h-10 object-cover rounded-lg mx-auto border border-zinc-100 shadow-sm"
-                                referrerPolicy="no-referrer"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 bg-zinc-50 rounded-lg flex items-center justify-center mx-auto border border-zinc-100 shadow-sm">
-                                <Box size={16} className="text-zinc-300" />
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
+                
+                <div className="flex flex-col lg:flex-row gap-6">
+                  <div className="flex-1 space-y-6">
+                    {/* Card 1: Basic Info */}
+                    <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
+                      <div className="flex items-center gap-2 mb-4 text-emerald-600">
+                        <FileText className="w-5 h-5" />
+                        <h2 className="font-semibold text-lg">{t('returns.basic_info')}</h2>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">{t('returns.form_customer')}</label>
+                          <div className="relative">
+                            <User className="absolute start-3 top-2.5 text-slate-400" size={16} />
                             <select 
-                              className="w-full bg-transparent outline-none font-bold text-zinc-900 appearance-none cursor-pointer text-sm"
-                              value={item.product_id}
-                              onChange={(e) => updateItem(index, 'product_id', e.target.value)}
+                              required
+                              className="w-full ps-10 pe-10 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-800 appearance-none text-sm"
+                              value={selectedCustomerId}
+                              onChange={(e) => {
+                                if (e.target.value === 'new_customer') {
+                                  setIsCustomerModalOpen(true);
+                                } else {
+                                  setSelectedCustomerId(e.target.value);
+                                }
+                              }}
+                            >
+                              <option value="">{t('common.select_customer')}</option>
+                              {customers.map(c => (
+                                <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+                              ))}
+                              <option value="new_customer" className="font-bold text-emerald-600">+ {t('customers.add')}</option>
+                            </select>
+                            <ChevronDown className="absolute end-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">{t('returns.form_date')}</label>
+                          <div className="relative">
+                            <Calendar className="absolute start-3 top-2.5 text-slate-400" size={16} />
+                            <input 
+                              required
+                              type="date"
+                              className="w-full ps-10 pe-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-800 text-sm"
+                              value={date}
+                              onChange={(e) => setDate(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+
+                    {/* Card 2: Payment settings */}
+                    <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
+                      <div className="flex items-center gap-2 mb-4 text-emerald-600">
+                        <Wallet className="w-5 h-5" />
+                        <h2 className="font-semibold text-lg">{t('returns.payment_settings')}</h2>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-3">{t('returns.form_payment_type')}</label>
+                          <div className="grid grid-cols-2 gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setPaymentType('cash')}
+                              className={`py-2 rounded-lg font-bold transition-all border flex items-center justify-center gap-2 text-sm ${paymentType === 'cash' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
+                            >
+                              <Wallet size={16} />
+                              {t('returns.payment_cash')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPaymentType('credit')}
+                              className={`py-2 rounded-lg font-bold transition-all border flex items-center justify-center gap-2 text-sm ${paymentType === 'credit' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
+                            >
+                              <Layers size={16} />
+                              {t('returns.payment_credit')}
+                            </button>
+                          </div>
+                        </div>
+
+                        {paymentType === 'cash' && (
+                          <div className="animate-in slide-in-from-top-2 duration-200">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">{t('returns.form_payment_method')}</label>
+                            <div className="relative">
+                              <CreditCard className="absolute start-3 top-2.5 text-slate-400" size={16} />
+                              <select 
+                                required
+                                className="w-full ps-10 pe-10 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-800 appearance-none text-sm"
+                                value={paymentMethodId}
+                                onChange={(e) => setPaymentMethodId(e.target.value)}
+                              >
+                                <option value="">{t('common.select_method')}</option>
+                                {paymentMethods.map(m => (
+                                  <option key={m.id} value={m.id}>{m.name}</option>
+                                ))}
+                              </select>
+                              <ChevronDown className="absolute end-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </section>
+
+                    {/* Card 3: Items */}
+                    <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
+                      <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <Package className="w-5 h-5 text-emerald-600" />
+                          <h2 className="font-semibold text-lg">{t('returns.form_items')}</h2>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={addEmptyRow}
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-all border border-emerald-100"
+                          >
+                            <Plus size={14} />
+                            {t('returns.add_empty')}
+                          </button>
+                          <div className="relative">
+                            <select 
+                              className="ps-3 pe-8 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none font-bold text-slate-800 appearance-none h-full"
+                              onChange={(e) => {
+                                if (e.target.value === 'new_product') {
+                                  setIsProductModalOpen(true);
+                                  e.target.value = "";
+                                } else if (e.target.value !== "") {
+                                  addItem(e.target.value);
+                                  e.target.value = "";
+                                }
+                              }}
                             >
                               <option value="">{t('common.select_product')}</option>
-                              {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                              {products.map(p => (
+                                <option key={p.id} value={p.id}>{p.name} ({p.sale_price} {t('returns.currency')})</option>
+                              ))}
+                              <option value="new_product" className="font-bold text-emerald-600">+ {t('products.add')}</option>
                             </select>
-                          </td>
-                          <td className="px-4 py-3">
-                            <input 
-                              type="number"
-                              step="any"
-                              className="w-full bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 px-3 py-2 text-sm outline-none text-center font-bold shadow-sm"
-                              value={Number(item.quantity) || 0}
-                              onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
-                            />
-                          </td>
-                          <td className="px-4 py-3">
-                            <input 
-                              type="number"
-                              step="any"
-                              className="w-full bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 px-3 py-2 text-sm outline-none text-center font-bold shadow-sm"
-                              value={Number(item.unit_price) || 0}
-                              onChange={(e) => updateItem(index, 'unit_price', Number(e.target.value))}
-                            />
-                          </td>
-                          <td className={`px-4 py-3 font-bold text-zinc-900 text-sm ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{formatNumber(item.total)}</td>
-                          <td className="px-4 py-3">
-                            <button 
-                              type="button"
-                              onClick={() => removeItem(index)}
-                              className="text-zinc-300 hover:text-red-500 transition-colors"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                      {items.length === 0 && (
-                        <tr>
-                          <td colSpan={6} className="px-4 py-8 text-center text-zinc-400 italic">{t('common.no_data')}</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                            <ChevronDown className="absolute end-2 top-2.5 w-3 h-3 text-slate-400 pointer-events-none" />
+                          </div>
+                        </div>
+                      </div>
 
-              <div className="pt-4 flex gap-3">
-                <button 
-                  type="submit"
-                  disabled={items.length === 0 || selectedCustomerId === '' || isSaving}
-                  className="flex-1 py-4 bg-orange-500 text-white rounded-2xl font-bold hover:bg-orange-600 transition-all shadow-lg shadow-orange-500/20 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
-                >
-                  {isSaving ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      {t('common.saving')}
-                    </>
-                  ) : (
-                    t('common.save')
-                  )}
-                </button>
-                <button 
-                  type="button"
-                  onClick={closeModal}
-                  disabled={isSaving}
-                  className="px-8 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all disabled:opacity-50"
-                >
-                  {t('common.cancel')}
-                </button>
-              </div>
-            </form>
+                      <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                        <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'} text-sm`}>
+                          <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200">
+                            <tr>
+                              <th className="px-4 py-4 w-12 text-center">{t('products.column_image')}</th>
+                              <th className="px-4 py-4">{t('returns.column_product')}</th>
+                              <th className="px-4 py-4 w-28 text-center">{t('returns.column_quantity')}</th>
+                              <th className="px-4 py-4 w-32 text-center">{t('returns.column_price')}</th>
+                              <th className={`px-4 py-4 w-32 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('returns.column_total')}</th>
+                              <th className="px-4 py-4 w-10"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {items.map((item, index) => (
+                              <tr key={index} className="hover:bg-slate-50/50 transition-colors group italic">
+                                <td className="px-4 py-3 text-center">
+                                  {item.product_image_url ? (
+                                    <img 
+                                      src={item.product_image_url} 
+                                      alt={item.product_name} 
+                                      className="w-10 h-10 object-cover rounded-lg mx-auto border border-slate-200 shadow-sm"
+                                      referrerPolicy="no-referrer"
+                                    />
+                                  ) : (
+                                    <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center mx-auto border border-slate-200">
+                                      <Box size={16} className="text-slate-300" />
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="relative">
+                                    <select 
+                                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none font-bold text-slate-800 appearance-none text-xs focus:ring-2 focus:ring-emerald-500/20"
+                                      value={item.product_id}
+                                      onChange={(e) => updateItem(index, 'product_id', e.target.value)}
+                                    >
+                                      <option value="">{t('common.select_product')}</option>
+                                      {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                    </select>
+                                    <ChevronDown className="absolute end-2 top-2.5 w-3 h-3 text-slate-400 pointer-events-none" />
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <input 
+                                    type="number"
+                                    step="any"
+                                    className="w-full bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 px-3 py-2 text-xs outline-none text-center font-bold text-slate-800 transition-all border-dashed"
+                                    value={Number(item.quantity) || 0}
+                                    onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
+                                  />
+                                </td>
+                                <td className="px-4 py-3">
+                                  <input 
+                                    type="number"
+                                    step="any"
+                                    className="w-full bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 px-3 py-2 text-xs outline-none text-center font-bold text-slate-800 transition-all border-dashed"
+                                    value={Number(item.unit_price) || 0}
+                                    onChange={(e) => updateItem(index, 'unit_price', Number(e.target.value))}
+                                  />
+                                </td>
+                                <td className={`px-4 py-3 font-bold text-slate-900 text-xs ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                                  {formatNumber(item.total || 0)}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <button 
+                                    type="button"
+                                    onClick={() => removeItem(index)}
+                                    className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                            {items.length === 0 && (
+                              <tr>
+                                <td colSpan={6} className="px-4 py-12 text-center text-slate-400 italic font-medium">{t('common.no_data')}</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Summary Section within Items Card */}
+                      <div className="mt-6 pt-6 border-t border-slate-100">
+                        <div className="flex justify-between items-center py-4 px-6 bg-slate-100 text-slate-900 rounded-2xl italic border border-slate-200">
+                          <span className="font-bold text-lg">{t('returns.summary_total')}</span>
+                          <div className="text-right">
+                            <span className="font-black text-2xl text-emerald-600">
+                              {formatNumber(items.reduce((sum, item) => sum + (item.total || 0), 0))} {t('returns.currency')}
+                            </span>
+                            <p className="text-[9px] uppercase tracking-widest text-slate-400 mt-1 font-black">إجمالي قيمة المرتجعات</p>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+                  </div>
+                </div>
+
+                <div className="pt-6 flex gap-4 sticky bottom-0 bg-white/80 backdrop-blur-md pb-4 md:pb-0 z-20 border-t border-slate-100">
+                  <button 
+                    type="button"
+                    onClick={closeModal}
+                    disabled={isSaving}
+                    className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all border border-slate-200 active:scale-95"
+                  >
+                    {t('common.cancel')}
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={items.length === 0 || selectedCustomerId === '' || isSaving}
+                    className="flex-[2] py-3 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-3"
+                  >
+                    {isSaving ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        {t('common.saving')}
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-5 h-5" />
+                        {editingReturn ? t('returns.edit') : t('returns.add')}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+
           </div>
         </div>
       </div>
