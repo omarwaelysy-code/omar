@@ -257,6 +257,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       label: t('nav.admin'),
       icon: Settings,
       subItems: [
+        { id: 'company_settings', label: t('nav.company_settings'), icon: Building2 },
         { id: 'users', label: t('nav.users'), icon: UsersIcon },
         { id: 'integrity_dashboard', label: t('nav.integrity_check') || 'Integrity Check', icon: ShieldCheck },
         { id: 'backup_restore', label: t('nav.backup_restore'), icon: Database },

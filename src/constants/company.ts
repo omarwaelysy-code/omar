@@ -1,0 +1,32 @@
+export const COUNTRIES = [
+  { code: 'EG', name: 'Egypt', nameAr: 'مصر' },
+  { code: 'SA', name: 'Saudi Arabia', nameAr: 'السعودية' },
+  { code: 'AE', name: 'United Arab Emirates', nameAr: 'الإمارات' },
+  { code: 'KW', name: 'Kuwait', nameAr: 'الكويت' },
+  { code: 'QA', name: 'Qatar', nameAr: 'قطر' },
+  { code: 'OM', name: 'Oman', nameAr: 'عمان' },
+  { code: 'BH', name: 'Bahrain', nameAr: 'البحرين' },
+  { code: 'JO', name: 'Jordan', nameAr: 'الأردن' },
+  { code: 'LB', name: 'Lebanon', nameAr: 'لبنان' },
+  { code: 'IQ', name: 'Iraq', nameAr: 'العراق' },
+  { code: 'MA', name: 'Morocco', nameAr: 'المغرب' },
+  { code: 'DZ', name: 'Algeria', nameAr: 'الجزائر' },
+  { code: 'TN', name: 'Tunisia', nameAr: 'تونس' },
+  { code: 'LY', name: 'Libya', nameAr: 'ليبيا' },
+  { code: 'SD', name: 'Sudan', nameAr: 'السودان' },
+  { code: 'SY', name: 'Syria', nameAr: 'سوريا' },
+  { code: 'YE', name: 'Yemen', nameAr: 'اليمن' },
+  { code: 'PS', name: 'Palestine', nameAr: 'فلسطين' },
+];
+
+export const CURRENCIES = [
+  { code: 'EGP', symbol: 'ج.م', name: 'Egyptian Pound', nameAr: 'جنيه مصري' },
+  { code: 'SAR', symbol: 'ر.س', name: 'Saudi Riyal', nameAr: 'ريال سعودي' },
+  { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham', nameAr: 'درهم إماراتي' },
+  { code: 'KWD', symbol: 'د.ك', name: 'Kuwaiti Dinar', nameAr: 'دينار كويتي' },
+  { code: 'QAR', symbol: 'ر.ق', name: 'Qatari Riyal', nameAr: 'ريال قطري' },
+  { code: 'OMR', symbol: 'ر.ع.', name: 'Omani Rial', nameAr: 'ريال عماني' },
+  { code: 'BHD', symbol: 'د.ب', name: 'Bahraini Dinar', nameAr: 'دينار بحريني' },
+  { code: 'USD', symbol: '$', name: 'US Dollar', nameAr: 'دولار أمريكي' },
+  { code: 'EUR', symbol: '€', name: 'Euro', nameAr: 'يورو' },
+];

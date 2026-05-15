@@ -8,7 +8,8 @@ export interface TableSchema {
 export const EXPECTED_SCHEMA: TableSchema = {
   companies: [
     'id', 'name', 'code', 'tax_number', 'commercial_register', 'address', 'phone', 'email',
-    'logo_url', 'website', 'subscription_status', 'subscription_plan', 'subscription_start',
+    'logo_url', 'website', 'country', 'currency', 'fiscal_year_end',
+    'subscription_status', 'subscription_plan', 'subscription_start',
     'subscription_end', 'subscription_expiry', 'subscription_days', 'users_limit', 
     'transactions_limit', 'company_status', 'features', 'settings', 'created_at', 'updated_at'
   ],

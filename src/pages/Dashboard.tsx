@@ -207,7 +207,7 @@ export const Dashboard: React.FC = () => {
         .reduce((sum, r: any) => {
           // If header amount exists, use it. Otherwise sum items (for multi-receipt)
           if (r.amount && Number(r.amount) > 0) return sum + Number(r.amount);
-          if (r.type === 'multi' && r.items && Array.isArray(r.items)) {
+          if (r.voucher_type === 'multi' && r.items && Array.isArray(r.items)) {
             return sum + r.items.reduce((s: number, item: any) => s + (Number(item.amount) || 0), 0);
           }
           return sum;

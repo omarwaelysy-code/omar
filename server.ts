@@ -71,7 +71,13 @@ async function startServer() {
       'ALTER TABLE "purchase_returns" ADD COLUMN IF NOT EXISTS "description" TEXT',
       
       // Other
-      'ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "required_sub_account" BOOLEAN DEFAULT FALSE'
+      'ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "required_sub_account" BOOLEAN DEFAULT FALSE',
+      
+      // Companies
+      'ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "logo_url" TEXT',
+      'ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "country" VARCHAR(100)',
+      'ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "currency" VARCHAR(50)',
+      'ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "fiscal_year_end" DATE'
     ];
     
     for (const q of syncQueries) {
