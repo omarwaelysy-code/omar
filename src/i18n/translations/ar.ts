@@ -661,6 +661,15 @@ export const ar = {
   'reports.sales_by_customer': 'تقرير المبيعات - حسب العملاء',
   'reports.sales_by_product': 'تقرير المبيعات - حسب الأصناف',
   'reports.sales_by_transactions': 'تقرير المبيعات - حسب الحركات التفصيلية',
+  'reference_types.opening_balance': 'رصيد أول',
+  'reference_types.receipt': 'سند قبض',
+  'reference_types.payment': 'سند صرف',
+  'reference_types.transfer': 'تحويل بين الخزائن',
+  'reference_types.invoice': 'فاتورة نقدي',
+  'reference_types.purchase_invoice': 'سند صرف (شراء)',
+  'reference_types.sales_return': 'مرتجع نقدي',
+  'reference_types.purchase_return': 'مرتجع مشتريات نقدي',
+  'reference_types.manual': 'قيد يدوي',
 
   // Months
   'months.jan': 'يناير',

@@ -661,6 +661,15 @@ export const en = {
   'reports.sales_by_customer': 'Sales Report - By Customers',
   'reports.sales_by_product': 'Sales Report - By Products',
   'reports.sales_by_transactions': 'Sales Report - By Detailed Transactions',
+  'reference_types.opening_balance': 'Opening Balance',
+  'reference_types.receipt': 'Receipt Voucher',
+  'reference_types.payment': 'Payment Voucher',
+  'reference_types.transfer': 'Cash Transfer',
+  'reference_types.invoice': 'Cash Invoice',
+  'reference_types.purchase_invoice': 'Purchase Payment',
+  'reference_types.sales_return': 'Cash Return',
+  'reference_types.purchase_return': 'Purchase Return',
+  'reference_types.manual': 'Manual Entry',
 
   // Months
   'months.jan': 'Jan',

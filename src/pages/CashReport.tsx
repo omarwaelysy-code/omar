@@ -95,17 +95,25 @@ export const CashReport: React.FC = () => {
             }
           }
 
-          if (isMatch) {
-            allTrans.push({
-              id: `${je.id}-${item.account_id}`,
-              date: je.date,
-              type: je.reference_type === 'manual' ? t('journal.manual') : (t(`reference_types.${je.reference_type}`) || je.reference_type),
-              reference: je.reference_number || je.id.slice(-6),
-              in: Number(item.debit) || 0,
-              out: Number(item.credit) || 0,
-              notes: item.description || je.description || ''
-            });
-          }
+              if (isMatch) {
+                const transType = je.reference_type === 'manual' 
+                  ? t('journal.manual') 
+                  : (t(`reference_types.${je.reference_type}`) || je.reference_type);
+                
+                const transNotes = je.reference_type === 'opening_balance'
+                  ? t('reference_types.opening_balance')
+                  : (item.description || je.description || '');
+
+                allTrans.push({
+                  id: `${je.id}-${item.account_id}`,
+                  date: je.date,
+                  type: transType,
+                  reference: je.reference_number || je.id.slice(-6),
+                  in: Number(item.debit) || 0,
+                  out: Number(item.credit) || 0,
+                  notes: transNotes
+                });
+              }
         });
       });
 
@@ -271,7 +279,7 @@ export const CashReport: React.FC = () => {
                     {/* Opening Balance Row */}
                     <tr className="border-b border-zinc-50 bg-zinc-50/30">
                       <td className="px-4 py-3 text-sm font-mono">{startDate || (paymentMethods.find(m => m.id === selectedMethodId)?.opening_balance_date) || '-'}</td>
-                      <td className="px-4 py-3 text-sm"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600">{t('reports.balance')}</span></td>
+                      <td className="px-4 py-3 text-sm"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600">{t('reports.brought_forward')}</span></td>
                       <td className="px-4 py-3 text-sm font-mono">-</td>
                       <td className="px-4 py-3 text-sm">{t('reports.brought_forward')}</td>
                       <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance > 0 ? formatMoney(startBalance) : '-'}</td>
