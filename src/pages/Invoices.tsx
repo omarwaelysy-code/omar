@@ -122,6 +122,7 @@ export const Invoices: React.FC = () => {
   const [settings, setSettings] = useState<any>(null);
   const [companyData, setCompanyData] = useState<Company | null>(null);
   const [view, setView] = useViewPreference('invoices', 'table');
+  const [invoiceType, setInvoiceType] = useState<'items' | 'services'>('items');
 
   useEffect(() => {
     if (user) {
@@ -1540,8 +1541,8 @@ export const Invoices: React.FC = () => {
                           <button 
                             type="button"
                             onClick={() => {
-                                setInvoiceType('items');
-                                setItems([]);
+                              setInvoiceType('items');
+                              setItems([]);
                             }}
                             className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${invoiceType === 'items' ? 'bg-white text-indigo-600 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
                           >
@@ -1550,8 +1551,8 @@ export const Invoices: React.FC = () => {
                           <button 
                             type="button"
                             onClick={() => {
-                                setInvoiceType('services');
-                                setItems([]);
+                              setInvoiceType('services');
+                              setItems([]);
                             }}
                             className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${invoiceType === 'services' ? 'bg-white text-indigo-600 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
                           >
@@ -1561,7 +1562,7 @@ export const Invoices: React.FC = () => {
 
                         <button 
                           type="button"
-                          onClick={addItem}
+                          onClick={() => addEmptyRow()}
                           className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-sm text-sm"
                         >
                           <Plus size={18} />
@@ -1580,80 +1581,66 @@ export const Invoices: React.FC = () => {
                               <th className="px-6 py-4 w-20"></th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-100 bg-white/40">
+                          <tbody className="divide-y divide-zinc-100">
                             {items.map((item, index) => (
-                              <tr key={index} className="hover:bg-white transition-colors group">
-                                <td className="px-6 py-4 text-center">
-                                  {item.product_image_url ? (
-                                    <img 
-                                      src={item.product_image_url} 
-                                      alt={item.product_name} 
-                                      className="w-14 h-14 object-cover rounded-xl mx-auto shadow-sm border-2 border-slate-100"
-                                      referrerPolicy="no-referrer"
-                                    />
-                                  ) : (
-                                    <div className="w-14 h-14 bg-slate-50 rounded-xl flex items-center justify-center mx-auto border-2 border-slate-100 text-slate-200 shadow-sm">
-                                      <ImageIcon size={20} />
-                                    </div>
-                                  )}
-                                </td>
+                              <tr key={index} className="group hover:bg-zinc-50 transition-colors">
                                 <td className="px-6 py-4">
-                                  <div className="relative group/select">
-                                    <select 
-                                      className={`w-full bg-slate-50/50 border border-transparent hover:border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 rounded-2xl px-5 py-3 outline-none font-bold text-slate-900 transition-all cursor-pointer appearance-none shadow-sm hover:shadow-md`}
-                                      value={item.product_id}
-                                      onChange={(e) => updateItem(index, 'product_id', e.target.value)}
-                                    >
-                                      <option value="">{t('common.select_product')}</option>
-                                      {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                    </select>
-                                    <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-4 w-4 h-4 text-slate-300 pointer-events-none group-hover/select:text-slate-400 transition-colors`} />
-                                  </div>
+                                  {invoiceType === 'items' ? (
+                                    <div className="relative">
+                                      <select 
+                                        className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2 outline-none font-bold text-zinc-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none transition-all"
+                                        value={item.product_id}
+                                        onChange={(e) => updateItem(index, 'product_id', e.target.value)}
+                                      >
+                                        <option value="">{t('common.select_product')}</option>
+                                        {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                      </select>
+                                      <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                                    </div>
+                                  ) : (
+                                    <input 
+                                      type="text" 
+                                      className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2 outline-none font-bold text-zinc-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-bold"
+                                      placeholder="وصف الخدمة..."
+                                      value={item.product_name || ''}
+                                      onChange={(e) => updateItem(index, 'product_name', e.target.value)}
+                                    />
+                                  )}
                                 </td>
                                 <td className="px-6 py-4">
                                   <input 
                                     type="number" 
-                                    step="any"
-                                    className="w-full bg-white border-2 border-slate-100 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 px-4 py-3 text-base outline-none text-center font-black text-slate-900 shadow-sm transition-all"
-                                    value={isNaN(Number(item.quantity)) ? '' : Number(item.quantity)}
+                                    className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2 text-center font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-bold"
+                                    value={item.quantity}
                                     onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
                                   />
                                 </td>
                                 <td className="px-6 py-4">
                                   <input 
                                     type="number" 
-                                    step="any"
-                                    className="w-full bg-white border-2 border-slate-100 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 px-4 py-3 text-base outline-none text-center font-black text-slate-900 shadow-sm transition-all"
-                                    value={isNaN(Number(item.unit_price)) ? '' : Number(item.unit_price)}
+                                    className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2 text-center font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-bold"
+                                    value={item.unit_price}
                                     onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
                                   />
                                 </td>
-                                <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'} font-black text-indigo-700 text-xl tracking-tighter`}>
+                                <td className="px-6 py-4 text-left font-black text-indigo-600 text-lg">
                                   {formatMoney(item.total)}
                                 </td>
                                 <td className="px-6 py-4 text-center">
                                   <button 
                                     type="button"
                                     onClick={() => removeItem(index)}
-                                    className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100 border border-transparent hover:border-red-100"
+                                    className="p-2 text-zinc-300 hover:text-rose-500 transition-colors"
                                   >
-                                    <Trash2 size={20} />
+                                    <Trash2 size={18} />
                                   </button>
                                 </td>
                               </tr>
                             ))}
                             {items.length === 0 && (
                               <tr>
-                                <td colSpan={6} className="px-6 py-24 text-center">
-                                  <div className="flex flex-col items-center gap-4">
-                                    <div className="w-20 h-20 rounded-full bg-slate-50 flex items-center justify-center text-slate-200">
-                                      <Package size={40} />
-                                    </div>
-                                    <div>
-                                      <p className="text-slate-900 font-black text-lg">لم يتم إضافة أي أصناف</p>
-                                      <p className="text-slate-400 font-bold mt-1">ابدأ بإضافة أول صنف للفاتورة عبر الضغط على الزر أعلاه</p>
-                                    </div>
-                                  </div>
+                                <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 italic">
+                                  {t('common.no_items')}
                                 </td>
                               </tr>
                             )}
