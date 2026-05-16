@@ -143,6 +143,7 @@ export function CompanySettings() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [originalSettings, setOriginalSettings] = useState<any>({});
   const [data, setData] = useState<CompanyData>({
     id: '',
     name: '',
@@ -185,6 +186,7 @@ export function CompanySettings() {
           }
         }
 
+          setOriginalSettings(company.settings || {});
           setData({
             id: company.id,
             name: company.name || '',
@@ -230,8 +232,18 @@ export function CompanySettings() {
         address: data.address,
         currency: data.currency,
         fiscal_year_end: fiscalYearEnd,
-        'settings.enable_multi_currency': data.enable_multi_currency
+        settings: {
+          ...originalSettings,
+          enable_multi_currency: data.enable_multi_currency
+        }
       });
+      
+      // Update local original settings to reflect the save
+      setOriginalSettings({
+        ...originalSettings,
+        enable_multi_currency: data.enable_multi_currency
+      });
+      
       toast.success(t('company_settings.save_success'));
     } catch (error) {
       console.error('Failed to save company settings:', error);
