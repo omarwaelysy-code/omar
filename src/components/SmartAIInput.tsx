@@ -124,27 +124,21 @@ export const SmartAIInput: React.FC<SmartAIInputProps> = ({ transactionType, onD
   };
 
   return (
-    <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-3 mb-4">
-      <div className="flex items-center gap-2 mb-2 text-emerald-700 font-bold">
-        <Sparkles size={16} className="text-emerald-500" />
-        <span className="text-sm">{t('smart_ai_input.title')}</span>
+    <div className="bg-emerald-50/20 border border-emerald-100 rounded-[2.5rem] p-6 mb-8 relative">
+      <div className="flex items-center justify-end gap-2 mb-4 text-emerald-600 font-black">
+        <span className="text-sm tracking-tight">الإنشاء الذكي بالذكاء الاصطناعي</span>
+        <Sparkles size={18} className="text-emerald-500" />
       </div>
 
-      <div className="relative group">
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder={placeholder || t('smart_ai_input.placeholder')}
-          className="w-full h-20 bg-white border border-emerald-100 rounded-xl p-3 pr-10 pl-10 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all resize-none text-right text-sm"
-        />
-
-        <div className="absolute left-3 top-3 flex flex-col gap-2">
+      <div className="relative bg-white rounded-3xl border border-emerald-100 shadow-sm overflow-hidden min-h-[160px] flex group focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all">
+        {/* Side Actions Bar */}
+        <div className="w-16 border-r border-emerald-50 flex flex-col items-center py-4 gap-4 bg-zinc-50/50">
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="p-2 bg-white border border-emerald-100 text-emerald-600 rounded-xl hover:bg-emerald-50 transition-all shadow-sm"
+            className="p-2.5 text-emerald-600 hover:bg-white rounded-2xl transition-all hover:shadow-sm group/btn"
             title={t('smart_ai_input.attachment_image')}
           >
-            <ImageIcon size={20} />
+            <ImageIcon size={22} className="group-hover/btn:scale-110 transition-transform" />
           </button>
           <input
             type="file"
@@ -156,18 +150,18 @@ export const SmartAIInput: React.FC<SmartAIInputProps> = ({ transactionType, onD
 
           <button
             onClick={isRecording ? stopRecording : startRecording}
-            className={`p-2 ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-white border border-emerald-100 text-emerald-600 hover:bg-emerald-50'} rounded-xl transition-all shadow-sm`}
+            className={`p-2.5 ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'text-emerald-600 hover:bg-white'} rounded-2xl transition-all hover:shadow-sm group/btn`}
             title={isRecording ? t('smart_ai_input.stop_record') : t('smart_ai_input.voice_record')}
           >
-            <Mic size={20} />
+            <Mic size={22} className="group-hover/btn:scale-110 transition-transform" />
           </button>
 
           <button
             onClick={() => docInputRef.current?.click()}
-            className="p-2 bg-white border border-emerald-100 text-emerald-600 rounded-xl hover:bg-emerald-50 transition-all shadow-sm"
+            className="p-2.5 text-emerald-600 hover:bg-white rounded-2xl transition-all hover:shadow-sm group/btn"
             title={t('smart_ai_input.attachment_doc')}
           >
-            <FileText size={20} />
+            <FileText size={22} className="group-hover/btn:scale-110 transition-transform" />
           </button>
           <input
             type="file"
@@ -178,56 +172,65 @@ export const SmartAIInput: React.FC<SmartAIInputProps> = ({ transactionType, onD
           />
         </div>
 
-        <div className="absolute right-3 bottom-3">
-          <button
-            onClick={handleAnalyze}
-            disabled={isProcessing || (!text.trim() && !attachedImage && !attachedDoc)}
-            className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all flex items-center gap-2 disabled:opacity-50 shadow-lg shadow-emerald-600/20"
-          >
-            {isProcessing ? (
-              <Loader2 size={18} className="animate-spin" />
-            ) : (
-              <Sparkles size={18} />
-            )}
-            {t('smart_ai_input.analyze')}
-          </button>
+        {/* Input Area */}
+        <div className="flex-1 flex flex-col">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={placeholder || t('smart_ai_input.placeholder')}
+            className="w-full flex-1 p-5 outline-none resize-none text-right text-base font-bold text-zinc-800 placeholder:text-zinc-300 bg-transparent leading-relaxed"
+          />
+          
+          <div className="p-4 flex justify-start items-center gap-4">
+            <button
+              onClick={handleAnalyze}
+              disabled={isProcessing || (!text.trim() && !attachedImage && !attachedDoc)}
+              className="px-8 py-3 bg-emerald-500 text-white rounded-2xl font-black hover:bg-emerald-600 transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-lg shadow-emerald-500/20 active:scale-95 min-w-[140px]"
+            >
+              {isProcessing ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Sparkles size={20} />
+              )}
+              <span className="text-sm">تحليل النص</span>
+            </button>
+
+            <AnimatePresence>
+              {(attachedImage || attachedDoc) && (
+                <motion.div
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  className="flex gap-2"
+                >
+                  {attachedImage && (
+                    <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-emerald-200 group/img">
+                      <img src={attachedImage} alt="Attached" className="w-full h-full object-cover" />
+                      <button
+                        onClick={() => setAttachedImage(null)}
+                        className="absolute inset-0 bg-black/40 flex items-center justify-center text-white opacity-0 group-hover/img:opacity-100 transition-opacity"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+                  {attachedDoc && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-700 text-[10px] font-black">
+                      <Paperclip size={12} />
+                      <button
+                        onClick={() => setAttachedDoc(null)}
+                        className="text-red-500 hover:scale-110 transition-transform"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
-
-      <AnimatePresence>
-        {(attachedImage || attachedDoc) && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="mt-3 flex flex-wrap gap-2"
-          >
-            {attachedImage && (
-              <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-emerald-200 group">
-                <img src={attachedImage} alt="Attached" className="w-full h-full object-cover" />
-                <button
-                  onClick={() => setAttachedImage(null)}
-                  className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            )}
-            {attachedDoc && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-white border border-emerald-100 rounded-xl text-emerald-700 text-xs font-medium">
-                <Paperclip size={14} />
-                <span>{t('smart_ai_input.attached_doc')}</span>
-                <button
-                  onClick={() => setAttachedDoc(null)}
-                  className="text-red-500 hover:text-red-700"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

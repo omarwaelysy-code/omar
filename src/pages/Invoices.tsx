@@ -1317,10 +1317,37 @@ export const Invoices: React.FC = () => {
       {/* Create Modal */}
       {isModalOpen && (
         <div className={`fixed inset-0 z-[60] flex items-center justify-center ${isFullScreen ? 'p-0' : 'md:p-4'} bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200`}>
-          <div className={`bg-white w-full h-full ${isFullScreen ? 'md:h-full md:max-w-none md:rounded-none' : 'md:h-auto md:max-w-6xl md:rounded-3xl'} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col ${isFullScreen ? 'md:max-h-none' : 'md:max-h-[90vh] border border-slate-200'}`}>
-            <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+          <div className={`bg-white w-full h-full ${isFullScreen ? 'md:h-full md:max-w-none md:rounded-none' : 'md:h-auto md:max-w-6xl md:rounded-3xl'} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col ${isFullScreen ? 'md:max-h-none' : 'md:max-h-[90vh] border border-slate-200'} relative`}>
+            {/* Modal Header */}
+            <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-[70]">
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={closeModal} 
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
+                >
+                  <X size={24} />
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setIsFullScreen(!isFullScreen)}
+                  className="hidden md:flex p-2 hover:bg-slate-100 rounded-xl transition-all text-slate-600"
+                >
+                  {isFullScreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+                </button>
+              </div>
+
+              <div className="flex-1 flex justify-center">
+                <button 
+                  type="button"
+                  onClick={() => setShowSidePanel(!showSidePanel)}
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold transition-all border shadow-sm ${showSidePanel ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
+                >
+                  <History size={18} />
+                  قيد اليومية \ سجل التعديلات
+                </button>
+              </div>
+
               <div className="flex items-center gap-4">
-                <h3 className="text-lg md:text-xl font-bold text-slate-900">{editingInvoice ? 'تعديل الفاتورة' : 'إنشاء فاتورة جديدة'}</h3>
                 {editingInvoice && (
                   <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
                     <button 
@@ -1343,23 +1370,8 @@ export const Invoices: React.FC = () => {
                     </button>
                   </div>
                 )}
-                <button 
-                  type="button"
-                  onClick={() => setIsFullScreen(!isFullScreen)}
-                  className="hidden md:flex p-2 hover:bg-slate-100 rounded-xl transition-all text-slate-600"
-                >
-                  {isFullScreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => setShowSidePanel(!showSidePanel)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${showSidePanel ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'}`}
-                >
-                  <History size={14} />
-                  قيد اليومية \ سجل التعديلات
-                </button>
+                <h3 className="text-xl md:text-2xl font-black text-slate-900">{editingInvoice ? 'تعديل الفاتورة' : 'إنشاء فاتورة جديدة'}</h3>
               </div>
-              <button onClick={closeModal} className="p-2 text-slate-400 hover:text-slate-600"><X size={24} /></button>
             </div>
             
             <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full relative">
@@ -1401,35 +1413,35 @@ export const Invoices: React.FC = () => {
                     transactionType="sales_invoice"
                   />
 
-                  <form onSubmit={handleSubmit} className="space-y-8">
+                  <form id="invoice-form" onSubmit={handleSubmit} className="space-y-8">
                     {/* Card 1: المعلومات الأساسية */}
-                    <section className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-6">
-                      <div className="flex items-center gap-2 mb-6 text-indigo-600">
-                        <FileText className="w-5 h-5" />
-                        <h2 className="font-semibold text-zinc-900">{t('invoices.basic_info')}</h2>
+                    <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
+                      <div className="absolute top-4 right-4 flex items-center gap-2 text-indigo-600 bg-indigo-50/50 px-3 py-1 rounded-full border border-indigo-100">
+                        <FileText className="w-4 h-4" />
+                        <span className="text-xs font-bold">invoices.basic_info</span>
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                          <label className="block text-sm font-medium text-zinc-700 mb-2">{t('invoices.column_number')}</label>
+                        <div className="order-3 md:order-1">
+                          <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('invoices.column_date')}</label>
                           <div className="relative">
-                            <Hash className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 w-4 h-4 text-zinc-400`} />
                             <input
                               required
-                              type="text"
-                              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800`}
-                              value={invoiceNumber}
-                              onChange={(e) => setInvoiceNumber(e.target.value)}
+                              type="date"
+                              className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800 text-sm`}
+                              value={date}
+                              onChange={(e) => setDate(e.target.value)}
                             />
+                            <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           </div>
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-zinc-700 mb-2">{t('invoices.form_customer')}</label>
+
+                        <div className="order-2 md:order-2">
+                          <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('invoices.form_customer')} {selectedCustomerId ? `(ID: ${selectedCustomerId.slice(-4)})` : ''}</label>
                           <div className="relative group">
-                            <Building2 className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 w-4 h-4 text-zinc-400`} />
                             <select 
                               required
-                              className={`w-full ${dir === 'rtl' ? 'pr-10' : 'pl-10'} py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer`}
+                              className={`w-full ${dir === 'rtl' ? 'pr-12' : 'pl-12'} py-3 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm`}
                               value={selectedCustomerId}
                               onChange={(e) => {
                                 if (e.target.value === 'new_customer') {
@@ -1443,28 +1455,30 @@ export const Invoices: React.FC = () => {
                               {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                               <option value="new_customer" className="font-bold text-indigo-600 italic">+ {t('customers.add')}</option>
                             </select>
-                            <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                            <Building2 className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                            <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           </div>
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-zinc-700 mb-2">{t('invoices.column_date')}</label>
+
+                        <div className="order-1 md:order-3">
+                          <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('invoices.column_number')}</label>
                           <div className="relative">
-                            <Calendar className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 w-4 h-4 text-zinc-400`} />
                             <input
                               required
-                              type="date"
-                              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800`}
-                              value={date}
-                              onChange={(e) => setDate(e.target.value)}
+                              type="text"
+                              className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800 text-sm`}
+                              value={invoiceNumber}
+                              onChange={(e) => setInvoiceNumber(e.target.value)}
                             />
+                            <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           </div>
                         </div>
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-zinc-700 mb-2">{language === 'ar' ? 'موضوع الفاتورة' : 'Invoice Subject'}</label>
+                      <div className="pt-4 border-t border-zinc-100">
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'موضوع الفاتورة' : 'Invoice Subject'}</label>
                         <textarea
-                          className="w-full px-4 py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800 min-h-[80px] resize-none"
+                          className="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800 min-h-[100px] resize-none text-sm placeholder:text-zinc-300"
                           placeholder={language === 'ar' ? 'أدخل وصفاً عاماً يظهر في أعلى الفاتورة...' : 'Enter a general description...'}
                           value={description}
                           onChange={(e) => setDescription(e.target.value)}
@@ -1473,10 +1487,10 @@ export const Invoices: React.FC = () => {
                     </section>
 
                     {/* Card 2: إعدادات الدفع */}
-                    <section className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-6">
-                      <div className="flex items-center gap-2 mb-6 text-indigo-600">
-                        <Wallet className="w-5 h-5" />
-                        <h2 className="font-semibold text-zinc-900">{t('invoices.payment_settings')}</h2>
+                    <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
+                      <div className="absolute top-4 right-4 flex items-center gap-2 text-indigo-600 bg-indigo-50/50 px-3 py-1 rounded-full border border-indigo-100">
+                        <Wallet className="w-4 h-4" />
+                        <span className="text-xs font-bold">invoices.payment_settings</span>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6">
@@ -1721,6 +1735,27 @@ export const Invoices: React.FC = () => {
                   </form>
                 </div>
               </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 md:p-6 border-t border-slate-100 bg-white/80 backdrop-blur-md sticky bottom-0 z-[70] flex items-center justify-between gap-4">
+              <button 
+                type="button"
+                onClick={closeModal}
+                className="flex-1 max-w-[200px] py-4 rounded-2xl bg-zinc-100 text-zinc-600 font-black hover:bg-zinc-200 transition-all flex items-center justify-center gap-3 active:scale-95"
+              >
+                <RotateCcw size={20} />
+                إلغاء
+              </button>
+              <button 
+                type="submit"
+                form="invoice-form"
+                onClick={handleSubmit}
+                className="flex-1 py-4 rounded-2xl bg-indigo-600 text-white font-black hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 shadow-xl shadow-indigo-600/20 active:scale-95"
+              >
+                <Save size={20} />
+                حفظ
+              </button>
             </div>
           </div>
         </div>
