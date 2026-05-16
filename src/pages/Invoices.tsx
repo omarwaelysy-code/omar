@@ -991,350 +991,344 @@ export const Invoices: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 italic serif">{t('invoices.title')}</h2>
-          <p className="text-slate-500">{t('invoices.subtitle')}</p>
-          {(serverSummary.total_amount !== undefined) && (
-            <div className="mt-2 flex items-center gap-4 text-sm">
-              <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">إجمالي الفواتير: {formatMoney(serverSummary.total_amount)} {t('invoices.currency')}</span>
-              <span className="bg-red-50 text-red-700 px-3 py-1 rounded-full border border-red-100 font-bold">إجمالي الخصومات: {formatMoney(serverSummary.total_discount || 0)} {t('invoices.currency')}</span>
-              <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100 font-bold">الصافي: {formatMoney((serverSummary.total_amount || 0) - (serverSummary.total_discount || 0))} {t('invoices.currency')}</span>
+      {!isModalOpen ? (
+        <>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-3xl font-bold tracking-tight text-slate-900 italic serif">{t('invoices.title')}</h2>
+              <p className="text-slate-500">{t('invoices.subtitle')}</p>
+              {(serverSummary.total_amount !== undefined) && (
+                <div className="mt-2 flex items-center gap-4 text-sm">
+                  <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">إجمالي الفواتير: {formatMoney(serverSummary.total_amount)} {t('invoices.currency')}</span>
+                  <span className="bg-red-50 text-red-700 px-3 py-1 rounded-full border border-red-100 font-bold">إجمالي الخصومات: {formatMoney(serverSummary.total_discount || 0)} {t('invoices.currency')}</span>
+                  <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100 font-bold">الصافي: {formatMoney((serverSummary.total_amount || 0) - (serverSummary.total_discount || 0))} {t('invoices.currency')}</span>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button 
-            onClick={() => setIsActivityLogOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
-            title={t('common.activity_log')}
-          >
-            <History size={20} />
-            <span className="hidden md:inline">{t('common.activity_log')}</span>
-          </button>
-          <ExportButtons 
-            onExportExcel={handleExportExcel} 
-            onExportPDF={handleExportPDF} 
-          />
-          {canCreate && (
-            <button 
-              onClick={openModal}
-              className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
-            >
-              <Plus size={20} />
-              {t('invoices.add_invoice')}
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center gap-4">
-          <div className="relative flex-1">
-            <Search className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 text-slate-400`} size={18} />
-            <input
-              type="text"
-              placeholder={t('invoices.search_placeholder')}
-              className={`w-full ${dir === 'rtl' ? 'pl-10 pr-4' : 'pr-10 pl-4'} py-2 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all`}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <button 
+                onClick={() => setIsActivityLogOpen(true)}
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+                title={t('common.activity_log')}
+              >
+                <History size={20} />
+                <span className="hidden md:inline">{t('common.activity_log')}</span>
+              </button>
+              <ExportButtons 
+                onExportExcel={handleExportExcel} 
+                onExportPDF={handleExportPDF} 
+              />
+              {canCreate && (
+                <button 
+                  onClick={openModal}
+                  className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
+                >
+                  <Plus size={20} />
+                  {t('invoices.add_invoice')}
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex bg-slate-100 p-1 rounded-xl">
-            <button
-              onClick={() => setView('table')}
-              className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
-            >
-              <List size={18} />
-            </button>
-            <button
-              onClick={() => setView('card')}
-              className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
-            >
-              <LayoutGrid size={18} />
-            </button>
-          </div>
-        </div>
 
-        {view === 'table' ? (
-          <div ref={tableRef} id="invoices-list-table" className="overflow-x-auto hidden md:block">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-slate-50/50 text-slate-500 text-[10px] uppercase tracking-widest font-bold">
-                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group`} onClick={() => handleSort('invoice_number')}>
-                    <div className="flex items-center gap-1">
-                      {t('invoices.column_number')}
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        {sortBy === 'invoice_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                      </span>
-                    </div>
-                  </th>
-                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group`} onClick={() => handleSort('customer_name')}>
-                    <div className="flex items-center gap-1">
-                      {t('invoices.column_customer')}
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        {sortBy === 'customer_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                      </span>
-                    </div>
-                  </th>
-                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group`} onClick={() => handleSort('date')}>
-                    <div className="flex items-center gap-1">
-                      {t('invoices.column_date')}
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                      </span>
-                    </div>
-                  </th>
-                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>وصف الفاتورة</th>
-                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group`} onClick={() => handleSort('payment_type')}>
-                    <div className="flex items-center gap-1">
-                      {t('invoices.form_payment_type')}
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        {sortBy === 'payment_type' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                      </span>
-                    </div>
-                  </th>
-                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group`} onClick={() => handleSort('total_amount')}>
-                    <div className="flex items-center gap-1">
-                      {t('invoices.column_amount')}
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        {sortBy === 'total_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                      </span>
-                    </div>
-                  </th>
-                  <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center gap-4">
+              <div className="relative flex-1">
+                <Search className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 text-slate-400`} size={18} />
+                <input
+                  type="text"
+                  placeholder={t('invoices.search_placeholder')}
+                  className={`w-full ${dir === 'rtl' ? 'pl-10 pr-4' : 'pr-10 pl-4'} py-2 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all`}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <div className="flex bg-slate-100 p-1 rounded-xl">
+                <button
+                  onClick={() => setView('table')}
+                  className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
+                >
+                  <List size={18} />
+                </button>
+                <button
+                  onClick={() => setView('card')}
+                  className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
+                >
+                  <LayoutGrid size={18} />
+                </button>
+              </div>
+            </div>
+
+            {view === 'table' ? (
+              <div ref={tableRef} id="invoices-list-table" className="overflow-x-auto hidden md:block">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-slate-50/50 text-slate-500 text-[10px] uppercase tracking-widest font-bold">
+                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group`} onClick={() => handleSort('invoice_number')}>
+                        <div className="flex items-center gap-1">
+                          {t('invoices.column_number')}
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            {sortBy === 'invoice_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group`} onClick={() => handleSort('customer_name')}>
+                        <div className="flex items-center gap-1">
+                          {t('invoices.column_customer')}
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            {sortBy === 'customer_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group`} onClick={() => handleSort('date')}>
+                        <div className="flex items-center gap-1">
+                          {t('invoices.column_date')}
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>وصف الفاتورة</th>
+                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group`} onClick={() => handleSort('payment_type')}>
+                        <div className="flex items-center gap-1">
+                          {t('invoices.form_payment_type')}
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            {sortBy === 'payment_type' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group`} onClick={() => handleSort('total_amount')}>
+                        <div className="flex items-center gap-1">
+                          {t('invoices.column_amount')}
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            {sortBy === 'total_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredInvoices.map((inv) => (
+                      <tr key={inv.id} className="hover:bg-slate-50/50 transition-colors group">
+                        <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                          <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100">{inv.invoice_number}</span>
+                        </td>
+                        <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{inv.customer_name}</td>
+                        <td className={`px-6 py-4 text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(inv.date)}</td>
+                        <td className={`px-6 py-4 text-slate-500 max-w-[200px] truncate ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={inv.description}>
+                          {inv.description || '-'}
+                        </td>
+                        <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            inv.payment_type === 'cash' 
+                              ? 'bg-emerald-100 text-emerald-700' 
+                              : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            {inv.payment_type === 'cash' ? 'نقدي' : 'آجل'}
+                          </span>
+                        </td>
+                        <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatMoney(inv.total_amount)} {t('invoices.currency')}</td>
+                        <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                          <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                            <button 
+                              onClick={() => {
+                                setActivityLogDocumentId(inv.id);
+                                setIsActivityLogOpen(true);
+                              }}
+                              className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
+                              title={t('common.activity_log')}
+                            >
+                              <History size={18} />
+                            </button>
+                            <button 
+                              onClick={() => handleViewInvoice(inv)}
+                              className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
+                              title={t('common.view')}
+                            >
+                              <Eye size={18} />
+                            </button>
+                            {canEdit && (
+                              <button 
+                                onClick={() => openEditModal(inv)}
+                                className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
+                                title={t('common.edit')}
+                              >
+                                <Pencil size={18} />
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button 
+                                onClick={() => handleDelete(inv.id)}
+                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
+                                title={t('common.delete')}
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredInvoices.length === 0 && !loading && (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-12 text-center text-slate-500 italic font-medium">{t('common.no_data')}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredInvoices.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                      <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100">{inv.invoice_number}</span>
-                    </td>
-                    <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{inv.customer_name}</td>
-                    <td className={`px-6 py-4 text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(inv.date)}</td>
-                    <td className={`px-6 py-4 text-slate-500 max-w-[200px] truncate ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={inv.description}>
-                      {inv.description || '-'}
-                    </td>
-                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                        inv.payment_type === 'cash' 
-                          ? 'bg-emerald-100 text-emerald-700' 
-                          : 'bg-amber-100 text-amber-700'
-                      }`}>
-                        {inv.payment_type === 'cash' ? 'نقدي' : 'آجل'}
-                      </span>
-                    </td>
-                    <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatMoney(inv.total_amount)} {t('invoices.currency')}</td>
-                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                      <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                  <div key={inv.id} className="p-6 bg-slate-50/50 rounded-3xl border border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden">
+                    <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => handleViewInvoice(inv)}
+                        className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
+                      >
+                        <Eye size={16} />
+                      </button>
+                      {canEdit && (
+                        <button 
+                          onClick={() => openEditModal(inv)}
+                          className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button 
+                          onClick={() => handleDelete(inv.id)}
+                          className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex justify-between items-start">
+                      <div className="flex flex-col gap-1">
+                        <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
+                        <h4 className="font-bold text-slate-900 group-hover:text-emerald-700 transition-colors text-xl mt-1 tracking-tight">{inv.customer_name}</h4>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200/50 mt-4">
+                      <div className="space-y-1">
+                        <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">التاريخ</p>
+                        <p className="text-slate-900 font-bold text-sm tracking-tight">{formatDate(inv.date)}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">الحالة</p>
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider ${
+                          inv.payment_type === 'cash' 
+                            ? 'bg-emerald-100 text-emerald-700' 
+                            : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {inv.payment_type === 'cash' ? 'نقدي' : 'آجل'}
+                        </span>
+                      </div>
+                      <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-slate-200/50 flex justify-between items-end">
+                        <div>
+                          <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">إجمالي المبلغ</p>
+                          <p className="font-black text-2xl tracking-tighter text-emerald-600">
+                            {formatMoney(inv.total_amount)} <span className="text-sm font-bold">{t('invoices.currency')}</span>
+                          </p>
+                        </div>
                         <button 
                           onClick={() => {
                             setActivityLogDocumentId(inv.id);
                             setIsActivityLogOpen(true);
                           }}
-                          className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
+                          className="p-2 text-slate-400 hover:text-emerald-500 bg-white border border-slate-100 rounded-xl transition-all"
                           title={t('common.activity_log')}
                         >
-                          <History size={18} />
+                          <History size={16} />
                         </button>
-                        <button 
-                          onClick={() => handleViewInvoice(inv)}
-                          className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
-                          title={t('common.view')}
-                        >
-                          <Eye size={18} />
-                        </button>
-                        {canEdit && (
-                          <button 
-                            onClick={() => openEditModal(inv)}
-                            className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
-                            title={t('common.edit')}
-                          >
-                            <Pencil size={18} />
-                          </button>
-                        )}
-                        {canDelete && (
-                          <button 
-                            onClick={() => handleDelete(inv.id)}
-                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
-                            title={t('common.delete')}
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        )}
                       </div>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 ))}
                 {filteredInvoices.length === 0 && !loading && (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500 italic font-medium">{t('common.no_data')}</td>
-                  </tr>
+                  <div className="col-span-full p-12 text-center text-slate-500 font-bold italic">{t('common.no_data')}</div>
                 )}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredInvoices.map((inv) => (
-              <div key={inv.id} className="p-6 bg-slate-50/50 rounded-3xl border border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden">
-                <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button 
-                    onClick={() => handleViewInvoice(inv)}
-                    className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
-                  >
-                    <Eye size={16} />
-                  </button>
-                  {canEdit && (
-                    <button 
-                      onClick={() => openEditModal(inv)}
-                      className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
-                    >
-                      <Pencil size={16} />
-                    </button>
-                  )}
-                  {canDelete && (
-                    <button 
-                      onClick={() => handleDelete(inv.id)}
-                      className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex justify-between items-start">
-                  <div className="flex flex-col gap-1">
-                    <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
-                    <h4 className="font-bold text-slate-900 group-hover:text-emerald-700 transition-colors text-xl mt-1 tracking-tight">{inv.customer_name}</h4>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200/50 mt-4">
-                  <div className="space-y-1">
-                    <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">التاريخ</p>
-                    <p className="text-slate-900 font-bold text-sm tracking-tight">{formatDate(inv.date)}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">الحالة</p>
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider ${
-                      inv.payment_type === 'cash' 
-                        ? 'bg-emerald-100 text-emerald-700' 
-                        : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      {inv.payment_type === 'cash' ? 'نقدي' : 'آجل'}
-                    </span>
-                  </div>
-                  <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-slate-200/50 flex justify-between items-end">
-                    <div>
-                      <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">إجمالي المبلغ</p>
-                      <p className="font-black text-2xl tracking-tighter text-emerald-600">
-                        {formatMoney(inv.total_amount)} <span className="text-sm font-bold">{t('invoices.currency')}</span>
-                      </p>
-                    </div>
-                    <button 
-                      onClick={() => {
-                        setActivityLogDocumentId(inv.id);
-                        setIsActivityLogOpen(true);
-                      }}
-                      className="p-2 text-slate-400 hover:text-emerald-500 bg-white border border-slate-100 rounded-xl transition-all"
-                      title={t('common.activity_log')}
-                    >
-                      <History size={16} />
-                    </button>
-                  </div>
-                </div>
               </div>
-            ))}
-            {filteredInvoices.length === 0 && !loading && (
-              <div className="col-span-full p-12 text-center text-slate-500 font-bold italic">{t('common.no_data')}</div>
             )}
-          </div>
-        )}
 
-        {/* Mobile List View */}
-        <div className="md:hidden divide-y divide-slate-100">
-          {filteredInvoices.map((inv) => (
-            <div key={inv.id} className="p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider ${
-                      inv.payment_type === 'cash' 
-                        ? 'bg-emerald-100 text-emerald-700' 
-                        : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      {inv.payment_type === 'cash' ? 'نقدي' : 'آجل'}
-                    </span>
+            {/* Mobile List View */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {filteredInvoices.map((inv) => (
+                <div key={inv.id} className="p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[10px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider ${
+                          inv.payment_type === 'cash' 
+                            ? 'bg-emerald-100 text-emerald-700' 
+                            : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {inv.payment_type === 'cash' ? 'نقدي' : 'آجل'}
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-slate-900 text-lg">{inv.customer_name}</h4>
+                    </div>
+                    <div className={`${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                      <p className="font-bold text-emerald-600 text-lg">{formatMoney(inv.total_amount)} {t('invoices.currency')}</p>
+                      <span className="text-xs text-slate-400">{formatDate(inv.date)}</span>
+                    </div>
                   </div>
-                  <h4 className="font-bold text-slate-900 text-lg">{inv.customer_name}</h4>
+                  <div className="flex items-center gap-2 pt-2">
+                    <button 
+                      onClick={() => handleViewInvoice(inv)}
+                      className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-600 rounded-2xl text-sm font-bold border border-slate-100 active:scale-95 transition-transform"
+                    >
+                      <Eye size={18} /> عرض
+                    </button>
+                    {canEdit && (
+                      <button 
+                        onClick={() => openEditModal(inv)}
+                        className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-50 text-blue-600 rounded-2xl text-sm font-bold border border-blue-100 active:scale-95 transition-transform"
+                      >
+                        <Pencil size={18} /> تعديل
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button 
+                        onClick={() => handleDelete(inv.id)}
+                        className="p-3 bg-red-50 text-red-600 rounded-2xl border border-red-100 active:scale-95 transition-transform"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className={`${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                  <p className="font-bold text-emerald-600 text-lg">{formatMoney(inv.total_amount)} {t('invoices.currency')}</p>
-                  <span className="text-xs text-slate-400">{formatDate(inv.date)}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 pt-2">
-                <button 
-                  onClick={() => handleViewInvoice(inv)}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-600 rounded-2xl text-sm font-bold border border-slate-100 active:scale-95 transition-transform"
-                >
-                  <Eye size={18} /> عرض
-                </button>
-                {canEdit && (
-                  <button 
-                    onClick={() => openEditModal(inv)}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-50 text-blue-600 rounded-2xl text-sm font-bold border border-blue-100 active:scale-95 transition-transform"
-                  >
-                    <Pencil size={18} /> تعديل
-                  </button>
-                )}
-                {canDelete && (
-                  <button 
-                    onClick={() => handleDelete(inv.id)}
-                    className="p-3 bg-red-50 text-red-600 rounded-2xl border border-red-100 active:scale-95 transition-transform"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                )}
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        <PaginationControls 
-          page={page} 
-          limit={limit} 
-          total={totalRecords} 
-          onPageChange={setPage} 
-          onLimitChange={setLimit} 
-        />
-      </div>
-
-      {/* Create Modal */}
-      {isModalOpen && (
-        <div className={`fixed inset-0 z-[60] flex items-center justify-center ${isFullScreen ? 'p-0' : 'md:p-4'} bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200`}>
-          <div className={`bg-white w-full h-full ${isFullScreen ? 'md:h-full md:max-w-none md:rounded-none' : 'md:h-auto md:max-w-6xl md:rounded-3xl'} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col ${isFullScreen ? 'md:max-h-none' : 'md:max-h-[90vh] border border-slate-200'} relative`}>
-            {/* Modal Header */}
-            <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70]">
-              <div className="flex items-center gap-3">
-                <button 
-                  onClick={closeModal} 
-                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
-                >
-                  <X size={24} />
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => setIsFullScreen(!isFullScreen)}
-                  className="hidden md:flex p-2 hover:bg-slate-100 rounded-xl transition-all text-slate-600"
-                >
-                  {isFullScreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
-                </button>
-              </div>
+            <PaginationControls 
+              page={page} 
+              limit={limit} 
+              total={totalRecords} 
+              onPageChange={setPage} 
+              onLimitChange={setLimit} 
+            />
+          </div>
+        </>
+      ) : (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
+          {/* Form Header */}
+          <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70]">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={closeModal} 
+                className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all font-black text-sm"
+              >
+                <ChevronRight size={20} />
+                <span>العودة للقائمة</span>
+              </button>
+            </div>
 
               <div className="flex-1 flex justify-center">
                 <button 
@@ -1720,7 +1714,7 @@ export const Invoices: React.FC = () => {
               </div>
             </div>
 
-            {/* Modal Footer */}
+            {/* Form Footer */}
             <div className="p-4 md:p-6 border-t border-slate-100 bg-white/80 backdrop-blur-md sticky bottom-0 z-[70] flex items-center justify-between gap-4">
               <button 
                 type="button"
@@ -1741,7 +1735,6 @@ export const Invoices: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
       )}
 
       {/* View Modal */}
