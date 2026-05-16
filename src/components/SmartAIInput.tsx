@@ -125,12 +125,12 @@ export const SmartAIInput: React.FC<SmartAIInputProps> = ({ transactionType, onD
 
   return (
     <div className="bg-emerald-50/20 border border-emerald-100 rounded-[2.5rem] p-6 mb-8 relative">
-      <div className="flex items-center justify-end gap-2 mb-4 text-emerald-600 font-black">
-        <span className="text-sm tracking-tight">الإنشاء الذكي بالذكاء الاصطناعي</span>
-        <Sparkles size={18} className="text-emerald-500" />
+      <div className="flex items-center justify-start flex-row-reverse gap-3 mb-6 text-emerald-600 font-black">
+        <Sparkles size={22} className="text-emerald-500 animate-pulse" />
+        <span className="text-lg tracking-tight">الإنشاء الذكي بالذكاء الاصطناعي</span>
       </div>
 
-      <div className="relative bg-white rounded-3xl border border-emerald-100 shadow-sm overflow-hidden min-h-[160px] flex group focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all">
+      <div className="relative bg-white rounded-3xl border border-emerald-100 shadow-sm overflow-hidden min-h-[160px] flex group focus-within:ring-4 focus-within:ring-emerald-500/10 transition-all">
         {/* Side Actions Bar */}
         <div className="w-16 border-r border-emerald-50 flex flex-col items-center py-4 gap-4 bg-zinc-50/50">
           <button

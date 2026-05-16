@@ -1319,7 +1319,7 @@ export const Invoices: React.FC = () => {
         <div className={`fixed inset-0 z-[60] flex items-center justify-center ${isFullScreen ? 'p-0' : 'md:p-4'} bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200`}>
           <div className={`bg-white w-full h-full ${isFullScreen ? 'md:h-full md:max-w-none md:rounded-none' : 'md:h-auto md:max-w-6xl md:rounded-3xl'} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col ${isFullScreen ? 'md:max-h-none' : 'md:max-h-[90vh] border border-slate-200'} relative`}>
             {/* Modal Header */}
-            <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-[70]">
+            <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70]">
               <div className="flex items-center gap-3">
                 <button 
                   onClick={closeModal} 
@@ -1340,20 +1340,20 @@ export const Invoices: React.FC = () => {
                 <button 
                   type="button"
                   onClick={() => setShowSidePanel(!showSidePanel)}
-                  className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold transition-all border shadow-sm ${showSidePanel ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
+                  className={`flex items-center gap-3 px-6 py-2.5 rounded-2xl text-sm font-black transition-all border shadow-sm ${showSidePanel ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-zinc-50'}`}
                 >
                   <History size={18} />
-                  قيد اليومية \ سجل التعديلات
+                  <span>قيد اليومية \ سجل التعديلات</span>
                 </button>
               </div>
 
               <div className="flex items-center gap-4">
                 {editingInvoice && (
-                  <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
+                  <div className="hidden lg:flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl">
                     <button 
                       type="button"
                       onClick={handlePrevInvoice}
-                      className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-lg transition-all text-slate-600 disabled:opacity-30 text-xs font-bold"
+                      className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-slate-600 disabled:opacity-30 text-xs font-black"
                       disabled={invoices.findIndex(inv => inv.id === editingInvoice.id) === 0}
                     >
                       <ChevronRight size={16} />
@@ -1362,7 +1362,7 @@ export const Invoices: React.FC = () => {
                     <button 
                       type="button"
                       onClick={handleNextInvoice}
-                      className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-lg transition-all text-slate-600 disabled:opacity-30 text-xs font-bold"
+                      className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-slate-600 disabled:opacity-30 text-xs font-black"
                       disabled={invoices.findIndex(inv => inv.id === editingInvoice.id) === invoices.length - 1}
                     >
                       التالي
@@ -1370,7 +1370,7 @@ export const Invoices: React.FC = () => {
                     </button>
                   </div>
                 )}
-                <h3 className="text-xl md:text-2xl font-black text-slate-900">{editingInvoice ? 'تعديل الفاتورة' : 'إنشاء فاتورة جديدة'}</h3>
+                <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">{editingInvoice ? 'تعديل الفاتورة' : 'إنشاء فاتورة جديدة'}</h3>
               </div>
             </div>
             
@@ -1714,24 +1714,7 @@ export const Invoices: React.FC = () => {
                       </section>
                     </div>
 
-                    {/* Actions */}
-                    <div className="pt-8 flex gap-4 sticky bottom-0 bg-white/95 backdrop-blur-sm pb-4 border-t border-zinc-100 z-40">
-                      <button 
-                        type="button"
-                        onClick={closeModal}
-                        className="flex-1 py-3 bg-zinc-100 text-zinc-600 rounded-lg font-bold hover:bg-zinc-200 transition-all border border-zinc-200 active:scale-95 flex items-center justify-center gap-2"
-                      >
-                        <RotateCcw size={18} />
-                        {t('common.cancel')}
-                      </button>
-                      <button 
-                        type="submit"
-                        className="flex-[2] py-3 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
-                      >
-                        <Save size={18} />
-                        {editingInvoice ? t('common.save') : t('common.save')}
-                      </button>
-                    </div>
+                    {/* Actions removed from bottom of scrollable area as they are in the fixed footer */}
                   </form>
                 </div>
               </div>
