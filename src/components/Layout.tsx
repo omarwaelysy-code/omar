@@ -41,7 +41,8 @@ import {
   Languages,
   Sun,
   Moon,
-  Search
+  Search,
+  Coins
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
@@ -280,6 +281,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         { id: 'integrity_dashboard', label: t('nav.integrity_check') || 'Integrity Check', icon: ShieldCheck },
         { id: 'backup_restore', label: t('nav.backup_restore'), icon: Database },
         { id: 'activity_log', label: t('nav.activity_log'), icon: History },
+        ...(company?.settings?.enable_multi_currency ? [{ id: 'currencies', label: t('nav.currencies'), icon: Coins }] : [])
       ]
     }
   ];

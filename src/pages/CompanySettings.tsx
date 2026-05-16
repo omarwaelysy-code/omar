@@ -32,6 +32,7 @@ interface CompanyData {
   currency: string;
   fiscal_year_day: number;
   fiscal_year_month: number;
+  enable_multi_currency: boolean;
 }
 
 // Searchable Select Component
@@ -152,7 +153,8 @@ export function CompanySettings() {
     address: '',
     currency: 'EGP',
     fiscal_year_day: 31,
-    fiscal_year_month: 12
+    fiscal_year_month: 12,
+    enable_multi_currency: false
   });
 
   useEffect(() => {
@@ -183,18 +185,19 @@ export function CompanySettings() {
           }
         }
 
-        setData({
-          id: company.id,
-          name: company.name || '',
-          logo_url: company.logo_url || '',
-          commercial_register: company.commercial_register || '',
-          tax_number: company.tax_number || '',
-          country: company.country || '',
-          address: company.address || '',
-          currency: company.currency || 'EGP',
-          fiscal_year_day: fday,
-          fiscal_year_month: fmonth
-        });
+          setData({
+            id: company.id,
+            name: company.name || '',
+            logo_url: company.logo_url || '',
+            commercial_register: company.commercial_register || '',
+            tax_number: company.tax_number || '',
+            country: company.country || '',
+            address: company.address || '',
+            currency: company.currency || 'EGP',
+            fiscal_year_day: fday,
+            fiscal_year_month: fmonth,
+            enable_multi_currency: company.settings?.enable_multi_currency || false
+          });
       }
     } catch (error) {
       console.error('Failed to load company data:', error);
@@ -226,7 +229,8 @@ export function CompanySettings() {
         country: data.country,
         address: data.address,
         currency: data.currency,
-        fiscal_year_end: fiscalYearEnd
+        fiscal_year_end: fiscalYearEnd,
+        'settings.enable_multi_currency': data.enable_multi_currency
       });
       toast.success(t('company_settings.save_success'));
     } catch (error) {
@@ -471,6 +475,28 @@ export function CompanySettings() {
                     ? '* سيتم تعيين السنة المالية لتنتهي في هذا التاريخ من كل عام.' 
                     : '* Fiscal year will be set to end on this date every year.'}
               </p>
+            </div>
+
+            {/* Enable Multi-Currency Toggle */}
+            <div className="md:col-span-2 pt-4 border-t border-zinc-50">
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <div 
+                  className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${data.enable_multi_currency ? 'bg-indigo-600' : 'bg-zinc-200'}`}
+                  onClick={() => setData({ ...data, enable_multi_currency: !data.enable_multi_currency })}
+                >
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${dir === 'rtl' ? (data.enable_multi_currency ? '-translate-x-7' : '-translate-x-1') : (data.enable_multi_currency ? 'translate-x-7' : 'translate-x-1')}`} />
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-bold text-zinc-800 text-sm">
+                    {language === 'ar' ? 'تفعيل العملات المتعددة' : 'Enable Multi-Currency'}
+                  </span>
+                  <span className="text-xs text-zinc-400">
+                    {language === 'ar' 
+                      ? 'عند التفعيل، ستتمكن من إدارة عملات متعددة وأسعار الصرف.' 
+                      : 'When enabled, you will be able to manage multiple currencies and exchange rates.'}
+                  </span>
+                </div>
+              </label>
             </div>
           </div>
         </section>

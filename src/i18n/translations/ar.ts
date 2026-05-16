@@ -48,6 +48,7 @@ export const ar = {
   'nav.system_settings': 'إعدادات النظام',
   'nav.integrity_check': 'تحقق من سلامة البيانات',
   'nav.audit_logs': 'سجلات الرقابة',
+  'nav.currencies': 'إدارة العملات',
 
   // Common
   'common.logout': 'تسجيل الخروج',
@@ -923,6 +924,23 @@ export const ar = {
   'company_settings.currency': 'العملة',
   'company_settings.fiscal_year_end': 'تاريخ انتهاء السنة المالية',
   'company_settings.save_success': 'تم حفظ بيانات الشركة بنجاح',
+
+  'currencies.title': 'إدارة العملات والعملات المتعددة',
+  'currencies.subtitle': 'إدارة العملات المتاحة وأسعار الصرف للفواتير والقيود.',
+  'currencies.add': 'إضافة عملة جديدة',
+  'currencies.edit': 'تعديل عملة',
+  'currencies.code': 'كود العملة (ISO)',
+  'currencies.name_ar': 'الاسم بالعربية',
+  'currencies.name_en': 'الاسم بالإنجليزية',
+  'currencies.symbol': 'الرمز',
+  'currencies.is_active': 'نشط',
+  'currencies.exchange_rates': 'سجل أسعار الصرف',
+  'currencies.add_rate': 'إضافة سعر صرف يدوي',
+  'currencies.rate': 'سعر الصرف',
+  'currencies.rate_date': 'تاريخ السعر',
+  'currencies.base_currency_hint': 'العملة الأساسية للنظام هي {currency}',
+  'currencies.log_add': 'إضافة عملة',
+  'currencies.log_add_rate': 'إضافة سعر صرف',
 
   'delete_confirmation.title': 'تأكيد الحذف',
   'delete_confirmation.message': 'هل أنت متأكد من رغبتك في حذف هذه الفاتورة؟ لا يمكن التراجع عن هذا الإجراء.',

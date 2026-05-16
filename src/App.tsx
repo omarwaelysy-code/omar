@@ -27,6 +27,7 @@ import { CashReport } from './pages/CashReport';
 import { CashBalances } from './pages/CashBalances';
 import { ActivityLogPage } from './pages/ActivityLog';
 import { CompanySettings } from './pages/CompanySettings';
+import Currencies from './pages/Currencies';
 import { AccountTypes } from './pages/AccountTypes';
 import { Accounts } from './pages/Accounts';
 import { ChartOfAccounts } from './pages/ChartOfAccounts';
@@ -189,6 +190,7 @@ export default function App() {
       case 'integrity_dashboard': return <IntegrityDashboard />;
       case 'activity_log': return <ActivityLogPage />;
       case 'company_settings': return <CompanySettings />;
+      case 'currencies': return <Currencies />;
       case 'operation_categories': return <OperationCategories />;
       case 'operation_fields': return <OperationFields />;
       case 'operations': return <Operations />;

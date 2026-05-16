@@ -48,6 +48,7 @@ export const en = {
   'nav.system_settings': 'System Settings',
   'nav.integrity_check': 'System Integrity',
   'nav.audit_logs': 'Audit Logs',
+  'nav.currencies': 'Currency Management',
 
   // Common
   'common.logout': 'Logout',
@@ -923,6 +924,23 @@ export const en = {
   'company_settings.currency': 'Currency',
   'company_settings.fiscal_year_end': 'Fiscal Year End',
   'company_settings.save_success': 'Company settings saved successfully',
+
+  'currencies.title': 'Currency Management',
+  'currencies.subtitle': 'Manage available currencies and exchange rates for invoices and entries.',
+  'currencies.add': 'Add New Currency',
+  'currencies.edit': 'Edit Currency',
+  'currencies.code': 'Currency Code (ISO)',
+  'currencies.name_ar': 'Name (Arabic)',
+  'currencies.name_en': 'Name (English)',
+  'currencies.symbol': 'Symbol',
+  'currencies.is_active': 'Active',
+  'currencies.exchange_rates': 'Exchange Rate History',
+  'currencies.add_rate': 'Add Manual Exchange Rate',
+  'currencies.rate': 'Exchange Rate',
+  'currencies.rate_date': 'Rate Date',
+  'currencies.base_currency_hint': 'System base currency is {currency}',
+  'currencies.log_add': 'Add Currency',
+  'currencies.log_add_rate': 'Add Exchange Rate',
 
   'delete_confirmation.title': 'Confirm Delete',
   'delete_confirmation.message': 'Are you sure you want to delete this invoice? This action cannot be undone.',

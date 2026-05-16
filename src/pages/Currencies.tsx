@@ -1,0 +1,458 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Plus, 
+  Coins, 
+  History, 
+  ToggleLeft, 
+  ToggleRight, 
+  Calendar,
+  AlertCircle,
+  TrendingUp,
+  Save,
+  X,
+  PlusCircle
+} from 'lucide-react';
+import { dbService } from '../services/dbService';
+import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
+import { Currency, ExchangeRate, Company } from '../types';
+import { toast } from 'react-hot-toast';
+import { format } from 'date-fns';
+
+export default function Currencies() {
+  const { language, t, dir } = useLanguage();
+  const { user } = useAuth();
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [exchangeRates, setExchangeRates] = useState<Record<string, ExchangeRate[]>>({});
+  const [loading, setLoading] = useState(true);
+  const [company, setCompany] = useState<Company | null>(null);
+  
+  // Modals
+  const [isAddCurrencyOpen, setIsAddCurrencyOpen] = useState(false);
+  const [isAddRateOpen, setIsAddRateOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
+
+  // Forms
+  const [newCurrency, setNewCurrency] = useState({
+    code: '',
+    name_ar: '',
+    name_en: '',
+    symbol: '',
+    is_active: true
+  });
+
+  const [newRate, setNewRate] = useState({
+    exchange_rate: '',
+    rate_date: format(new Date(), 'yyyy-MM-dd'),
+    notes: ''
+  });
+
+  useEffect(() => {
+    loadData();
+  }, [user]);
+
+  const loadData = async () => {
+    if (!user?.company_id) return;
+    setLoading(true);
+    try {
+      const [currData, compData] = await Promise.all([
+        dbService.list<Currency>('currencies', [
+          { field: 'company_id', operator: '==', value: user.company_id }
+        ]),
+        dbService.get<Company>('companies', user.company_id)
+      ]);
+      
+      setCurrencies(currData);
+      setCompany(compData);
+      
+      // Load latest rates for each currency
+      const ratesMap: Record<string, ExchangeRate[]> = {};
+      for (const curr of currData) {
+        const rates = await dbService.list<ExchangeRate>('exchange_rates', [
+          { field: 'currency_id', operator: '==', value: curr.id },
+          { field: 'company_id', operator: '==', value: user.company_id }
+        ]);
+        ratesMap[curr.id] = rates.sort((a, b) => new Date(b.rate_date).getTime() - new Date(a.rate_date).getTime());
+      }
+      setExchangeRates(ratesMap);
+    } catch (error) {
+      console.error('Failed to load currencies:', error);
+      toast.error(t('common.error'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddCurrency = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.company_id) return;
+
+    try {
+      const currencyData: Omit<Currency, 'id'> = {
+        ...newCurrency,
+        company_id: user.company_id,
+        created_at: new Date().toISOString(),
+        is_active: true
+      };
+
+      const id = await dbService.add('currencies', currencyData);
+      setCurrencies([...currencies, { id, ...currencyData }]);
+      setIsAddCurrencyOpen(false);
+      setNewCurrency({
+        code: '',
+        name_ar: '',
+        name_en: '',
+        symbol: '',
+        is_active: true
+      });
+      toast.success(t('common.save_success'));
+    } catch (error) {
+      console.error('Failed to add currency:', error);
+      toast.error(t('common.error'));
+    }
+  };
+
+  const toggleCurrencyStatus = async (currency: Currency) => {
+    try {
+      await dbService.update('currencies', currency.id, {
+        is_active: !currency.is_active
+      });
+      setCurrencies(currencies.map(c => 
+        c.id === currency.id ? { ...c, is_active: !c.is_active } : c
+      ));
+      toast.success(t('common.update_success'));
+    } catch (error) {
+      console.error('Failed to toggle currency status:', error);
+      toast.error(t('common.error'));
+    }
+  };
+
+  const handleAddRate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.company_id || !selectedCurrency) return;
+
+    try {
+      const rateData: Omit<ExchangeRate, 'id'> = {
+        currency_id: selectedCurrency.id,
+        exchange_rate: Number(newRate.exchange_rate),
+        rate_date: newRate.rate_date,
+        notes: newRate.notes,
+        created_by: user.id || '',
+        created_at: new Date().toISOString(),
+        company_id: user.company_id
+      };
+
+      const id = await dbService.add('exchange_rates', rateData);
+      const updatedRates = [
+        { id, ...rateData },
+        ...(exchangeRates[selectedCurrency.id] || [])
+      ].sort((a, b) => new Date(b.rate_date).getTime() - new Date(a.rate_date).getTime());
+
+      setExchangeRates({
+        ...exchangeRates,
+        [selectedCurrency.id]: updatedRates
+      });
+      
+      setIsAddRateOpen(false);
+      setNewRate({
+        exchange_rate: '',
+        rate_date: format(new Date(), 'yyyy-MM-dd'),
+        notes: ''
+      });
+      toast.success(t('common.save_success'));
+    } catch (error) {
+      console.error('Failed to add exchange rate:', error);
+      toast.error(t('common.error'));
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-900 flex items-center gap-2">
+            <Coins className="w-8 h-8 text-indigo-600" />
+            {t('currencies.title')}
+          </h1>
+          <p className="text-zinc-500 text-sm mt-1">
+            {t('currencies.subtitle')}
+          </p>
+        </div>
+        <button
+          onClick={() => setIsAddCurrencyOpen(true)}
+          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors w-full md:w-auto justify-center"
+        >
+          <Plus className="w-5 h-5" />
+          {t('currencies.add')}
+        </button>
+      </div>
+
+      <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl flex items-start gap-4">
+        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+        <div>
+          <h3 className="font-bold text-amber-900 text-sm">
+            {t('currencies.base_currency_hint', { currency: company?.settings?.currency || 'EGP' })}
+          </h3>
+          <p className="text-xs text-amber-700 mt-1">
+            {language === 'ar' 
+              ? 'تستخدم العملة الأساسية في جميع التقارير والقيود المحاسبية. يتم إدخال العملات الأخرى مع تحديد سعر صرفها بالمقارنة مع العملة الأساسية.' 
+              : 'Base currency is used in all reports and accounting entries. Other currencies are defined by their exchange rate relative to the base currency.'}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {currencies.map(curr => {
+          const latestRate = exchangeRates[curr.id]?.[0];
+          return (
+            <div key={curr.id} className="bg-white border border-zinc-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center">
+                    <span className="text-indigo-600 font-bold text-lg">{curr.symbol}</span>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-zinc-900">{language === 'ar' ? curr.name_ar : curr.name_en}</h3>
+                    <p className="text-xs text-zinc-400 font-mono">{curr.code}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => toggleCurrencyStatus(curr)}
+                  className={`p-1.5 rounded-lg transition-colors ${curr.is_active ? 'text-green-600 hover:bg-green-50' : 'text-zinc-400 hover:bg-zinc-50'}`}
+                >
+                  {curr.is_active ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="bg-zinc-50 rounded-xl p-4 flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-zinc-400 uppercase font-bold">{t('currencies.rate')}</span>
+                    <span className="text-lg font-bold text-zinc-800">
+                      {latestRate ? latestRate.exchange_rate.toLocaleString() : '---'}
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[10px] text-zinc-400 font-bold uppercase">{t('currencies.rate_date')}</span>
+                    <span className="text-xs text-zinc-600">
+                      {latestRate ? format(new Date(latestRate.rate_date), 'dd/MM/yyyy') : '---'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setSelectedCurrency(curr);
+                      setIsAddRateOpen(true);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-black transition-colors"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    {t('currencies.add_rate')}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedCurrency(curr);
+                      setIsHistoryOpen(true);
+                    }}
+                    className="w-12 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-xl hover:bg-zinc-200 transition-colors"
+                  >
+                    <History className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Add Currency Modal */}
+      {isAddCurrencyOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-zinc-900">{t('currencies.add')}</h2>
+              <button onClick={() => setIsAddCurrencyOpen(false)} className="text-zinc-400 hover:text-zinc-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <form onSubmit={handleAddCurrency} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{t('currencies.code')}</label>
+                  <input
+                    required
+                    type="text"
+                    placeholder="USD, EUR, SAR..."
+                    className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                    value={newCurrency.code}
+                    onChange={e => setNewCurrency({ ...newCurrency, code: e.target.value.toUpperCase() })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{t('currencies.name_ar')}</label>
+                  <input
+                    required
+                    type="text"
+                    className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                    value={newCurrency.name_ar}
+                    onChange={e => setNewCurrency({ ...newCurrency, name_ar: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{t('currencies.name_en')}</label>
+                  <input
+                    required
+                    type="text"
+                    className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                    value={newCurrency.name_en}
+                    onChange={e => setNewCurrency({ ...newCurrency, name_en: e.target.value })}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{t('currencies.symbol')}</label>
+                  <input
+                    required
+                    type="text"
+                    placeholder="$, €, ر.س..."
+                    className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                    value={newCurrency.symbol}
+                    onChange={e => setNewCurrency({ ...newCurrency, symbol: e.target.value })}
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 mt-6"
+              >
+                <Save className="w-5 h-5" />
+                {t('common.save')}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Rate Modal */}
+      {isAddRateOpen && selectedCurrency && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-indigo-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-zinc-900">{t('currencies.add_rate')}</h2>
+                  <p className="text-xs text-zinc-400">{language === 'ar' ? selectedCurrency.name_ar : selectedCurrency.name_en}</p>
+                </div>
+              </div>
+              <button onClick={() => setIsAddRateOpen(false)} className="text-zinc-400 hover:text-zinc-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <form onSubmit={handleAddRate} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{t('currencies.rate')}</label>
+                <input
+                  required
+                  type="number"
+                  step="0.000001"
+                  className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                  value={newRate.exchange_rate}
+                  onChange={e => setNewRate({ ...newRate, exchange_rate: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{t('currencies.rate_date')}</label>
+                <div className="relative">
+                  <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
+                  <input
+                    required
+                    type="date"
+                    className="w-full bg-zinc-50 border border-zinc-100 rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                    value={newRate.rate_date}
+                    onChange={e => setNewRate({ ...newRate, rate_date: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{t('common.notes')}</label>
+                <textarea
+                  rows={3}
+                  className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                  value={newRate.notes}
+                  onChange={e => setNewRate({ ...newRate, notes: e.target.value })}
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 mt-6"
+              >
+                <Save className="w-5 h-5" />
+                {t('common.save')}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {isHistoryOpen && selectedCurrency && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[80vh] flex flex-col">
+            <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center">
+                  <History className="w-6 h-6 text-indigo-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-zinc-900">{t('currencies.exchange_rates')}</h2>
+                  <p className="text-xs text-zinc-400">{language === 'ar' ? selectedCurrency.name_ar : selectedCurrency.name_en}</p>
+                </div>
+              </div>
+              <button onClick={() => setIsHistoryOpen(false)} className="text-zinc-400 hover:text-zinc-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="border-b border-zinc-100 bg-zinc-50 px-6 py-3 grid grid-cols-4 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+              <div className="col-span-1">{t('currencies.rate')}</div>
+              <div className="col-span-1">{t('currencies.rate_date')}</div>
+              <div className="col-span-2">{t('common.notes')}</div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-0">
+              {(exchangeRates[selectedCurrency.id] || []).length > 0 ? (
+                (exchangeRates[selectedCurrency.id] || []).map((rate, idx) => (
+                  <div 
+                    key={rate.id} 
+                    className={`px-6 py-4 grid grid-cols-4 items-center text-sm border-b border-zinc-100 last:border-0 hover:bg-zinc-50 transition-colors ${idx === 0 ? 'bg-indigo-50/30' : ''}`}
+                  >
+                    <div className="col-span-1 font-bold text-zinc-800">{rate.exchange_rate.toLocaleString()}</div>
+                    <div className="col-span-1 text-zinc-500 font-mono text-xs">{format(new Date(rate.rate_date), 'dd/MM/yyyy')}</div>
+                    <div className="col-span-2 text-zinc-400 text-xs italic">{rate.notes || '---'}</div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-12 text-center text-zinc-400 italic">
+                  {t('common.no_data')}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

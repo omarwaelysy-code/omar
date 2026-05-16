@@ -79,7 +79,30 @@ export interface Company {
     timezone: string;
     language: 'ar' | 'en';
     fiscal_year_start: string;
+    enable_multi_currency?: boolean;
   };
+}
+
+export interface Currency {
+  id: string;
+  code: string;
+  name_ar: string;
+  name_en: string;
+  symbol: string;
+  is_active: boolean;
+  company_id: string;
+  created_at: string;
+}
+
+export interface ExchangeRate {
+  id: string;
+  currency_id: string;
+  exchange_rate: number;
+  rate_date: string;
+  notes?: string;
+  created_by: string;
+  created_at: string;
+  company_id: string;
 }
 
 export interface Customer {
