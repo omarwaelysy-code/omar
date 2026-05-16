@@ -168,9 +168,19 @@ export function CompanySettings() {
       if (company) {
         let fday = 31, fmonth = 12;
         if (company.fiscal_year_end) {
-          const d = new Date(company.fiscal_year_end);
-          fday = d.getDate();
-          fmonth = d.getMonth() + 1;
+          // Standard date string format is YYYY-MM-DD
+          const parts = company.fiscal_year_end.split('-');
+          if (parts.length === 3) {
+            fday = parseInt(parts[2]);
+            fmonth = parseInt(parts[1]);
+          } else {
+            // Fallback for native Date objects or other formats
+            const d = new Date(company.fiscal_year_end);
+            if (!isNaN(d.getTime())) {
+              fday = d.getDate();
+              fmonth = d.getMonth() + 1;
+            }
+          }
         }
 
         setData({
@@ -202,8 +212,11 @@ export function CompanySettings() {
       setSaving(true);
       
       // Construct a valid ISO date for the current year to store in DB
+      // We manually construct the string to avoid timezone shifts from Date.toISOString()
       const currentYear = new Date().getFullYear();
-      const fiscalDate = new Date(currentYear, data.fiscal_year_month - 1, data.fiscal_year_day);
+      const monthStr = String(data.fiscal_year_month).padStart(2, '0');
+      const dayStr = String(data.fiscal_year_day).padStart(2, '0');
+      const fiscalYearEnd = `${currentYear}-${monthStr}-${dayStr}`;
       
       await dbService.update('companies', user.company_id, {
         name: data.name,
@@ -213,7 +226,7 @@ export function CompanySettings() {
         country: data.country,
         address: data.address,
         currency: data.currency,
-        fiscal_year_end: fiscalDate.toISOString().split('T')[0]
+        fiscal_year_end: fiscalYearEnd
       });
       toast.success(t('company_settings.save_success'));
     } catch (error) {
