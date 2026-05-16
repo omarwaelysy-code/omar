@@ -309,6 +309,11 @@ export interface Return {
   customer_name?: string;
   date: string;
   description?: string;
+  notes?: string;
+  discount?: number;
+  tax?: number;
+  shipping?: number;
+  subtotal?: number;
   total_amount: number;
   payment_type: 'credit' | 'cash';
   payment_method_id?: string;
@@ -324,6 +329,11 @@ export interface PurchaseReturn {
   supplier_name?: string;
   date: string;
   description?: string;
+  notes?: string;
+  discount?: number;
+  tax?: number;
+  shipping?: number;
+  subtotal?: number;
   total_amount: number;
   payment_type: 'credit' | 'cash';
   payment_method_id?: string;
@@ -341,6 +351,7 @@ export interface ReturnItem {
   product_image_url?: string;
   quantity: number;
   unit_price: number;
+  price?: number; // Keep price for backward compatibility if needed
   total: number;
 }
 

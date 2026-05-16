@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Customer, Account, JournalEntry, JournalEntryItem } from '../types';
-import { Search, Plus, Trash2, X, Tag, User, Calendar, Save, Wallet, CreditCard, History, BookOpen, Phone, Mail, MapPin } from 'lucide-react';
+import { Search, Plus, Trash2, X, Tag, User, Calendar, Save, Wallet, CreditCard, History, BookOpen, Phone, Mail, MapPin, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
@@ -17,6 +18,7 @@ import { PaginationControls } from '../components/PaginationControls';
 export const CustomerDiscounts: React.FC = () => {
   const { user } = useAuth();
   const { showNotification } = useNotification();
+  const { dir } = useLanguage();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -41,9 +43,52 @@ export const CustomerDiscounts: React.FC = () => {
   const [totalRecords, setTotalRecords] = useState(0);
   const [serverSummary, setServerSummary] = useState<any>({});
   const [discountNumber, setDiscountNumber] = useState('');
+  const [editingDiscount, setEditingDiscount] = useState<any | null>(null);
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   const generateDiscountNumber = async (selectedDate: string) => {
     return await dbService.getNextSequence('customer_discounts', selectedDate);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingDiscount(null);
+    setDiscountData({
+      customer_id: '',
+      amount: 0,
+      date: new Date().toISOString().slice(0, 10),
+      account_id: settings?.customer_discount_account_id || '',
+      notes: ''
+    });
+  };
+
+  const openEditModal = (discount: any) => {
+    setEditingDiscount(discount);
+    setDiscountData({
+      customer_id: discount.customer_id,
+      amount: discount.amount,
+      date: discount.date.slice(0, 10),
+      account_id: discount.account_id || '',
+      notes: discount.notes || ''
+    });
+    setDiscountNumber(discount.number || '');
+    setIsModalOpen(true);
+  };
+
+  const handlePrevDiscount = () => {
+    if (!editingDiscount) return;
+    const currentIndex = discounts.findIndex(d => d.id === editingDiscount.id);
+    if (currentIndex > 0) {
+      openEditModal(discounts[currentIndex - 1]);
+    }
+  };
+
+  const handleNextDiscount = () => {
+    if (!editingDiscount) return;
+    const currentIndex = discounts.findIndex(d => d.id === editingDiscount.id);
+    if (currentIndex < discounts.length - 1) {
+      openEditModal(discounts[currentIndex + 1]);
+    }
   };
 
   const handleSort = (field: string) => {
@@ -241,7 +286,7 @@ export const CustomerDiscounts: React.FC = () => {
 
     try {
       const customer = customers.find(c => c.id === discountData.customer_id);
-      const number = discountNumber;
+      const number = editingDiscount ? editingDiscount.number : discountNumber;
       
       const data = {
         customer_id: discountData.customer_id,
@@ -253,9 +298,14 @@ export const CustomerDiscounts: React.FC = () => {
         number,
         type: 'customer',
         company_id: user.company_id,
-        created_at: new Date().toISOString(),
-        created_by: user.id
+        updated_at: new Date().toISOString(),
+        updated_by: user.id
       };
+
+      if (!editingDiscount) {
+        (data as any).created_at = new Date().toISOString();
+        (data as any).created_by = user.id;
+      }
 
       const journalItems: any[] = [];
       const discountAccount = accounts.find(a => a.id === discountData.account_id) || 
@@ -302,26 +352,29 @@ export const CustomerDiscounts: React.FC = () => {
         created_by: user.id
       };
 
-      await TransactionManager.saveWithAccounting(
-        'customer_discounts',
-        data,
-        DiscountSchema,
-        journalEntryData,
-        JournalEntrySchema
-      );
+      if (editingDiscount) {
+        await TransactionManager.updateWithAccounting(
+          'customer_discounts',
+          editingDiscount.id,
+          data,
+          DiscountSchema,
+          journalEntryData,
+          JournalEntrySchema
+        );
+        showNotification('تم تحديث الخصم بنجاح', 'success');
+      } else {
+        await TransactionManager.saveWithAccounting(
+          'customer_discounts',
+          data,
+          DiscountSchema,
+          journalEntryData,
+          JournalEntrySchema
+        );
+        showNotification('تم إضافة الخصم بنجاح', 'success');
+      }
 
-      showNotification('تم إضافة الخصم بنجاح', 'success');
-      setDiscountData({
-        customer_id: '',
-        amount: 0,
-        date: new Date().toISOString().slice(0, 10),
-        account_id: settings?.customer_discount_account_id || '',
-        notes: ''
-      });
-      setIsModalOpen(false);
-
-      dbService.logActivity(user.id, user.username, user.company_id, 'إضافة خصم عميل', `إضافة خصم للعميل: ${customer?.name} بمبلغ: ${discountData.amount}`, 'customer_discounts');
-
+      closeModal();
+      dbService.logActivity(user.id, user.username, user.company_id, editingDiscount ? 'تعديل خصم عميل' : 'إضافة خصم عميل', `${editingDiscount ? 'تعديل' : 'إضافة'} خصم للعميل: ${customer?.name} بمبلغ: ${discountData.amount}`, 'customer_discounts');
     } catch (e: any) {
       console.error('Save failed:', e);
       showNotification(e.message || 'حدث خطأ أثناء حفظ البيانات', 'error');
@@ -331,6 +384,19 @@ export const CustomerDiscounts: React.FC = () => {
   const handleDelete = (id: string) => {
     setDiscountToDelete(id);
     setIsDeleteModalOpen(true);
+  };
+
+  const openAddModal = () => {
+    setEditingDiscount(null);
+    setDiscountData({
+      customer_id: '',
+      amount: 0,
+      date: new Date().toISOString().slice(0, 10),
+      account_id: settings?.customer_discount_account_id || '',
+      notes: ''
+    });
+    generateDiscountNumber(new Date().toISOString().slice(0, 10)).then(setDiscountNumber);
+    setIsModalOpen(true);
   };
 
   const confirmDelete = async () => {
@@ -447,6 +513,13 @@ export const CustomerDiscounts: React.FC = () => {
                   <td className="px-6 py-4 text-left">
                     <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
+                        onClick={() => openEditModal(discount)}
+                        className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                        title="تعديل"
+                      >
+                        <Tag size={18} />
+                      </button>
+                      <button 
                         onClick={() => {
                           setActivityLogDocumentId(discount.id);
                           setIsActivityLogOpen(true);
@@ -489,6 +562,13 @@ export const CustomerDiscounts: React.FC = () => {
                   <div className="font-bold text-emerald-600 text-lg">{formatNumber(discount.amount)} ج.م</div>
                   <div className="flex items-center justify-end gap-2 mt-2">
                     <button 
+                      onClick={() => openEditModal(discount)}
+                      className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                      title="تعديل"
+                    >
+                      <Tag size={18} />
+                    </button>
+                    <button 
                       onClick={() => {
                         setActivityLogDocumentId(discount.id);
                         setIsActivityLogOpen(true);
@@ -500,185 +580,250 @@ export const CustomerDiscounts: React.FC = () => {
                     </button>
                     <button 
                       onClick={() => handleDelete(discount.id)}
-                      className="p-2 text-red-500 bg-red-50 rounded-xl transition-all inline-flex items-center justify-center"
+                      className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                      title="حذف"
                     >
                       <Trash2 size={18} />
                     </button>
                   </div>
                 </div>
               </div>
-              {discount.notes && (
-                <div className="bg-zinc-50 p-3 rounded-xl text-zinc-600 text-sm italic">
-                  {discount.notes}
-                </div>
-              )}
             </div>
           ))}
         </div>
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-[rgba(24,24,27,0.6)] backdrop-blur-sm z-50 flex items-center justify-center p-0 md:p-4 overflow-y-auto">
-          <div className="bg-white rounded-none md:rounded-3xl w-full max-w-5xl min-h-screen md:min-h-0 shadow-2xl animate-in zoom-in-95 duration-200 my-auto flex flex-col">
-            <div className="p-6 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white z-10">
-              <div className="flex items-center gap-4">
-                <h3 className="text-2xl font-bold text-zinc-900 italic serif">إضافة خصم لعميل</h3>
-                <button 
-                  type="button"
-                  onClick={() => setShowSidePanel(!showSidePanel)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${showSidePanel ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-zinc-100 text-zinc-600 border border-zinc-200 hover:bg-zinc-200'}`}
-                >
-                  <History size={14} />
-                  {showSidePanel ? 'إخفاء القيد والسجل' : 'قيد اليومية'}
-                </button>
-              </div>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-zinc-100 rounded-xl transition-all">
-                <X size={24} />
+        <div className={`fixed inset-0 bg-zinc-100 dark:bg-zinc-900 z-[100] flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300 ${isFullScreen ? 'm-0 rounded-none' : 'md:m-4 md:rounded-[2.5rem] shadow-2xl border border-white/20'}`}>
+          {/* Header Block */}
+          <div className="p-4 md:p-6 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[90]">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={closeModal}
+                className="p-3 hover:bg-zinc-100 rounded-2xl transition-all text-zinc-400 hover:text-zinc-900 group"
+              >
+                <div className="flex items-center gap-2">
+                   <RotateCcw className={`w-5 h-5 transition-transform group-hover:-rotate-45`} />
+                  <span className="text-sm font-bold">عودة</span>
+                </div>
+              </button>
+              <div className="w-px h-6 bg-zinc-200 mx-2" />
+              <button
+                type="button"
+                onClick={() => setShowSidePanel(!showSidePanel)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                  showSidePanel 
+                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-sm' 
+                    : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200 border-transparent'
+                } border`}
+              >
+                <History size={18} />
+                <span>قيد اليومية \\ سجل التعديلات</span>
               </button>
             </div>
-            
-            <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full relative">
-              {/* Side Panel for Activity Log and Journal Entry */}
-              <AnimatePresence>
-                {showSidePanel && (
-                  <motion.div 
-                    initial={{ x: '-100%' }}
-                    animate={{ x: 0 }}
-                    exit={{ x: '-100%' }}
-                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    className="absolute inset-y-0 left-0 z-50 w-full lg:w-80 shadow-2xl lg:shadow-none lg:relative lg:inset-auto"
+
+            <div className="flex items-center gap-4">
+              {editingDiscount && (
+                <div className="hidden lg:flex items-center gap-2 bg-zinc-100 p-1.5 rounded-2xl">
+                  <button 
+                    type="button"
+                    onClick={handlePrevDiscount}
+                    className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
+                    disabled={filteredDiscounts.findIndex(d => d.id === editingDiscount.id) === 0}
                   >
-                    <div className="h-full bg-white border-r border-zinc-100 flex flex-col">
-                      <div className="p-4 border-b border-zinc-100 flex items-center justify-between lg:hidden">
-                        <h3 className="font-bold text-zinc-900">سجل النشاط والقيد</h3>
-                        <button onClick={() => setShowSidePanel(false)} className="p-2 text-zinc-400 hover:text-zinc-600">
-                          <X size={20} />
-                        </button>
+                    <ChevronRight size={16} />
+                    السابق
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={handleNextDiscount}
+                    className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
+                    disabled={filteredDiscounts.findIndex(d => d.id === editingDiscount.id) === filteredDiscounts.length - 1}
+                  >
+                    التالي
+                    <ChevronLeft size={16} />
+                  </button>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsFullScreen(!isFullScreen)}
+                className="p-2 text-zinc-400 hover:bg-zinc-100 rounded-xl transition-all hidden md:block"
+                title={isFullScreen ? 'تصغير' : 'تكبير'}
+              >
+                {isFullScreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+              </button>
+              <h3 className="text-xl md:text-2xl font-black text-zinc-900 tracking-tight">
+                {editingDiscount ? 'تعديل خصم عميل' : 'إضافة خصم لعميل'}
+              </h3>
+            </div>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full relative">
+            {/* Side Panel for Activity Log and Journal Entry */}
+            <AnimatePresence>
+              {showSidePanel && (
+                <motion.div 
+                  initial={{ x: '100%' }}
+                  animate={{ x: 0 }}
+                  exit={{ x: '100%' }}
+                  transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                  className="absolute inset-y-0 right-0 z-[80] w-full lg:w-96 shadow-2xl lg:shadow-none lg:relative lg:inset-auto"
+                >
+                  <div className="h-full bg-white border-l border-zinc-100 flex flex-col">
+                    <div className="p-4 border-b border-zinc-100 flex items-center justify-between lg:hidden">
+                      <h3 className="font-bold text-zinc-900">سجل النشاط والقيد</h3>
+                      <button onClick={() => setShowSidePanel(false)} className="p-2 text-zinc-400 hover:text-zinc-600">
+                        <X size={20} />
+                      </button>
+                    </div>
+                    <div className="flex-1 overflow-hidden">
+                      <TransactionSidePanel 
+                        documentId={editingDiscount?.id || ''}
+                        category="customer_discounts" 
+                        previewJournalEntry={previewJournalEntry}
+                        previewActivityLog={previewActivityLog}
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32 md:pb-8">
+              <SmartAIInput 
+                onDataExtracted={(data) => {
+                  if (data.customerName) {
+                    const customer = customers.find(c => c.name.includes(data.customerName!) || data.customerName!.includes(c.name));
+                    if (customer) {
+                      setDiscountData(prev => ({ ...prev, customer_id: customer.id }));
+                    }
+                  }
+                  if (data.amount) setDiscountData(prev => ({ ...prev, amount: data.amount! }));
+                  if (data.date) setDiscountData(prev => ({ ...prev, date: data.date! }));
+                  if (data.description || data.notes) setDiscountData(prev => ({ ...prev, notes: data.description || data.notes || '' }));
+                }}
+                transactionType="discount"
+              />
+              
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-3 space-y-6">
+                  {/* Card: Basic Info */}
+                  <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                      <Tag className="w-4 h-4" />
+                      <span className="text-xs font-bold">بيانات الخصم</span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase">العميل</label>
+                        <div className="relative group">
+                          <User className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <select 
+                            required
+                            className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
+                            value={discountData.customer_id}
+                            onChange={(e) => {
+                              if (e.target.value === 'new') {
+                                setIsCustomerModalOpen(true);
+                              } else {
+                                setDiscountData({...discountData, customer_id: e.target.value});
+                              }
+                            }}
+                          >
+                            <option value="">اختر العميل...</option>
+                            {customers.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
+                            <option value="new" className="font-bold text-emerald-600">+ إضافة عميل جديد...</option>
+                          </select>
+                          <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                        </div>
                       </div>
-                      <div className="flex-1 overflow-hidden">
-                        <TransactionSidePanel 
-                          category="customer_discounts" 
-                          previewJournalEntry={previewJournalEntry}
-                          previewActivityLog={previewActivityLog}
-                        />
+
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">تاريخ الخصم</label>
+                        <div className="relative group">
+                          <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <input 
+                            required
+                            type="date" 
+                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                            value={discountData.date}
+                            onChange={(e) => setDiscountData({...discountData, date: e.target.value})}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase">قيمة الخصم</label>
+                        <div className="relative group">
+                          <Wallet className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <input 
+                            required
+                            type="number" 
+                            step="0.01"
+                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                            placeholder="0.00"
+                            value={discountData.amount || ''}
+                            onChange={(e) => setDiscountData({...discountData, amount: Number(e.target.value)})}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">الحساب المالي (الخصم)</label>
+                        <div className="relative group">
+                          <BookOpen className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <select 
+                            required
+                            className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
+                            value={discountData.account_id}
+                            onChange={(e) => setDiscountData({...discountData, account_id: e.target.value})}
+                          >
+                            <option value="">اختر الحساب...</option>
+                            {accounts.map(a => <option key={a.id} value={a.id}>{a.name} ({a.code})</option>)}
+                          </select>
+                          <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                        </div>
                       </div>
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
 
-              <form onSubmit={handleSubmit} className="flex-1 p-6 md:p-8 space-y-6 pb-24 md:pb-8 overflow-y-auto">
-                <SmartAIInput 
-                  onDataExtracted={(data) => {
-                    if (data.customerName) {
-                      const customer = customers.find(c => c.name.includes(data.customerName!) || data.customerName!.includes(c.name));
-                      if (customer) {
-                        setDiscountData(prev => ({ ...prev, customer_id: customer.id }));
-                      }
-                    }
-                    if (data.amount) setDiscountData(prev => ({ ...prev, amount: data.amount! }));
-                    if (data.date) setDiscountData(prev => ({ ...prev, date: data.date! }));
-                    if (data.description || data.notes) setDiscountData(prev => ({ ...prev, notes: data.description || data.notes || '' }));
-                  }}
-                  transactionType="discount"
-                />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">العميل</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-3 text-zinc-400" size={18} />
-                    <select 
-                      required
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
-                      value={discountData.customer_id}
-                      onChange={(e) => {
-                        if (e.target.value === 'new') {
-                          setIsCustomerModalOpen(true);
-                        } else {
-                          setDiscountData({...discountData, customer_id: e.target.value});
-                        }
-                      }}
-                    >
-                      <option value="">اختر العميل...</option>
-                      {customers.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
-                      <option value="new" className="font-bold text-emerald-600">+ إضافة عميل جديد...</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">التاريخ</label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-3 text-zinc-400" size={18} />
-                    <input 
-                      required
-                      type="date" 
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                      value={discountData.date}
-                      onChange={(e) => setDiscountData({...discountData, date: e.target.value})}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">قيمة الخصم</label>
-                  <div className="relative">
-                    <Wallet className="absolute left-3 top-3 text-zinc-400" size={18} />
-                    <input 
-                      required
-                      type="number" 
-                      step="0.01"
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                      placeholder="0.00"
-                      value={discountData.amount || ''}
-                      onChange={(e) => setDiscountData({...discountData, amount: Number(e.target.value)})}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">الحساب المالي (الخصم)</label>
-                  <div className="relative">
-                    <BookOpen className="absolute left-3 top-3 text-zinc-400" size={18} />
-                    <select 
-                      required
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
-                      value={discountData.account_id}
-                      onChange={(e) => setDiscountData({...discountData, account_id: e.target.value})}
-                    >
-                      <option value="">اختر الحساب...</option>
-                      {accounts.map(a => <option key={a.id} value={a.id}>{a.name} ({a.code})</option>)}
-                    </select>
-                  </div>
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">ملاحظات</label>
+                      <textarea 
+                        rows={3}
+                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-3xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none font-bold text-sm text-zinc-800"
+                        placeholder="سبب الخصم أو أي ملاحظات إضافية..."
+                        value={discountData.notes}
+                        onChange={(e) => setDiscountData({...discountData, notes: e.target.value})}
+                      />
+                    </div>
+                  </section>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">ملاحظات</label>
-                <textarea 
-                  rows={3}
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none"
-                  placeholder="سبب الخصم أو أي ملاحظات إضافية..."
-                  value={discountData.notes}
-                  onChange={(e) => setDiscountData({...discountData, notes: e.target.value})}
-                />
-              </div>
-
-              <div className="flex justify-end pt-6 border-t border-zinc-100">
+              {/* Action Footer */}
+              <div className="flex gap-4 p-6 bg-zinc-50 border-t border-zinc-100 sticky bottom-0 z-[60] mt-auto">
+                <button 
+                  type="button"
+                  onClick={closeModal}
+                  className="flex-1 py-4 bg-white text-zinc-600 rounded-2xl font-bold border border-zinc-200 hover:bg-zinc-100 transition-all active:scale-95 shadow-sm"
+                >
+                  إلغاء
+                </button>
                 <button 
                   type="submit"
-                  className="flex items-center gap-3 px-12 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-xl shadow-[rgba(16,185,129,0.2)] active:scale-95"
+                  disabled={discountData.amount <= 0 || !discountData.customer_id}
+                  className="flex-[2] py-4 bg-emerald-500 text-white rounded-2xl font-black uppercase tracking-wider hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-3"
                 >
-                  <Save size={24} />
-                  حفظ الخصم
+                  <Save className="w-6 h-6" />
+                  {editingDiscount ? 'حفظ التعديلات' : 'حفظ الخصم'}
                 </button>
               </div>
             </form>
           </div>
         </div>
-      </div>
-    )}
-
+      )}
       {/* Add Customer Modal */}
       {isCustomerModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">

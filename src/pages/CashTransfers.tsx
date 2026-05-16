@@ -7,7 +7,8 @@ import { CashTransfer, PaymentMethod, JournalEntry, JournalEntryItem, Account, A
 import { 
   Search, Plus, Trash2, X, ArrowLeftRight, Pencil, 
   Download, Eye, FileText, History, Printer, 
-  Wallet, Calendar, Hash, Layers, Save
+  Wallet, Calendar, Hash, Layers, Save,
+  Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, User, ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
@@ -56,6 +57,52 @@ export const CashTransfers: React.FC = () => {
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
   const [previewJournalEntry, setPreviewJournalEntry] = useState<JournalEntry | null>(null);
   const [previewActivityLog, setPreviewActivityLog] = useState<Partial<ActivityLog> | null>(null);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const dir = 'rtl';
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingTransfer(null);
+    setFormData({
+      date: new Date().toISOString().slice(0, 10),
+      amount: 0,
+      from_payment_method_id: '',
+      to_payment_method_id: '',
+      description: ''
+    });
+  };
+
+  const handlePrevTransfer = () => {
+    if (!editingTransfer) return;
+    const currentIndex = transfers.findIndex(t => t.id === editingTransfer.id);
+    if (currentIndex > 0) {
+      const prev = transfers[currentIndex - 1];
+      setEditingTransfer(prev);
+      setFormData({
+        date: prev.date ? prev.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        amount: prev.amount,
+        from_payment_method_id: prev.from_payment_method_id,
+        to_payment_method_id: prev.to_payment_method_id,
+        description: prev.description
+      });
+    }
+  };
+
+  const handleNextTransfer = () => {
+    if (!editingTransfer) return;
+    const currentIndex = transfers.findIndex(t => t.id === editingTransfer.id);
+    if (currentIndex < transfers.length - 1) {
+      const next = transfers[currentIndex + 1];
+      setEditingTransfer(next);
+      setFormData({
+        date: next.date ? next.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        amount: next.amount,
+        from_payment_method_id: next.from_payment_method_id,
+        to_payment_method_id: next.to_payment_method_id,
+        description: next.description
+      });
+    }
+  };
   const transferRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
@@ -571,27 +618,104 @@ export const CashTransfers: React.FC = () => {
       {/* Add/Edit Transfer Modal */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-6xl md:rounded-3xl shadow-2xl overflow-hidden flex flex-col"
-            >
-              <div className="p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white">
-                    <ArrowLeftRight size={20} />
+          <div className={`fixed inset-0 bg-zinc-100 dark:bg-zinc-900 z-[100] flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300 ${isFullScreen ? 'm-0 rounded-none' : 'md:m-4 md:rounded-[2.5rem] shadow-2xl border border-white/20'}`}>
+            {/* Header Block */}
+            <div className="p-4 md:p-6 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[90]">
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={closeModal}
+                  className="p-3 hover:bg-zinc-100 rounded-2xl transition-all text-zinc-400 hover:text-zinc-900 group"
+                >
+                  <div className="flex items-center gap-2">
+                     <RotateCcw className={`w-5 h-5 transition-transform group-hover:-rotate-45`} />
+                    <span className="text-sm font-bold">عودة</span>
                   </div>
-                  <h3 className="text-xl font-bold text-zinc-900">
-                    {editingTransfer ? 'تعديل عملية تحويل' : 'عملية تحويل نقدية جديدة'}
-                  </h3>
-                </div>
-                <button onClick={() => setIsModalOpen(false)} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-xl transition-all"><X size={24} /></button>
+                </button>
+                <div className="w-px h-6 bg-zinc-200 mx-2" />
+                <button
+                  type="button"
+                  onClick={() => setShowSidePanel(!showSidePanel)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                    showSidePanel 
+                      ? 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-sm' 
+                      : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200 border-transparent'
+                  } border`}
+                >
+                  <History size={18} />
+                  <span>قيد اليومية \\ سجل التعديلات</span>
+                </button>
               </div>
 
-              <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-                <form onSubmit={handleSubmit} className="p-8 space-y-6 flex-1 overflow-y-auto">
+              <div className="flex items-center gap-4">
+                {editingTransfer && (
+                  <div className="hidden lg:flex items-center gap-2 bg-zinc-100 p-1.5 rounded-2xl">
+                    <button 
+                      type="button"
+                      onClick={handlePrevTransfer}
+                      className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
+                      disabled={transfers.findIndex(t => t.id === editingTransfer.id) === 0}
+                    >
+                      <ChevronRight size={16} />
+                      السابق
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={handleNextTransfer}
+                      className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
+                      disabled={transfers.findIndex(t => t.id === editingTransfer.id) === transfers.length - 1}
+                    >
+                      التالي
+                      <ChevronLeft size={16} />
+                    </button>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsFullScreen(!isFullScreen)}
+                  className="p-2 text-zinc-400 hover:bg-zinc-100 rounded-xl transition-all hidden md:block"
+                  title={isFullScreen ? 'تصغير' : 'تكبير'}
+                >
+                  {isFullScreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+                </button>
+                <h3 className="text-xl md:text-2xl font-black text-zinc-900 tracking-tight flex items-center gap-2">
+                  {editingTransfer ? 'تعديل عملية تحويل' : 'عملية تحويل نقدية جديدة'}
+                </h3>
+              </div>
+            </div>
+
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+              {/* Side Panel for Activity Log and Journal Entry */}
+              <AnimatePresence>
+                {showSidePanel && (
+                  <motion.div 
+                    initial={{ x: '100%' }}
+                    animate={{ x: 0 }}
+                    exit={{ x: '100%' }}
+                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                    className="absolute inset-y-0 right-0 z-[80] w-full lg:w-[28rem] shadow-2xl lg:shadow-none lg:relative lg:inset-auto"
+                  >
+                    <div className="h-full bg-white border-l border-zinc-100 flex flex-col">
+                      <div className="p-4 border-b border-zinc-100 flex items-center justify-between lg:hidden">
+                        <h3 className="font-bold text-zinc-900 italic">سجل النشاط والقيد</h3>
+                        <button onClick={() => setShowSidePanel(false)} className="p-2 text-zinc-400 hover:text-zinc-600">
+                          <X size={20} />
+                        </button>
+                      </div>
+                      <div className="flex-1 overflow-hidden">
+                        <TransactionSidePanel 
+                          documentId={editingTransfer?.id} 
+                          category="cash_transfers"
+                          previewJournalEntry={previewJournalEntry}
+                          previewActivityLog={previewActivityLog}
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col">
+                <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl mx-auto w-full pb-32 md:pb-8">
                   <SmartAIInput 
                     onDataExtracted={(data) => {
                       if (data.amount) setFormData(prev => ({ ...prev, amount: data.amount! }));
@@ -608,142 +732,150 @@ export const CashTransfers: React.FC = () => {
                     }}
                     transactionType="cash_transfer"
                   />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="block text-sm font-bold text-zinc-700 uppercase tracking-tighter">التاريخ</label>
-                      <div className="relative">
-                        <Calendar className="absolute left-3 top-3 text-zinc-400" size={18} />
-                        <input 
-                          required
-                          type="date" 
-                          className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
-                          value={formData.date}
-                          onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                        />
+                  
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Basic Details Card */}
+                    <section className="bg-white p-6 md:p-8 rounded-[2rem] border border-zinc-100 shadow-sm space-y-6 relative pt-12 overflow-hidden">
+                      <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                        <Calendar className="w-4 h-4" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">التفاصيل الأساسية</span>
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="block text-sm font-bold text-zinc-700 uppercase tracking-tighter">المبلغ</label>
-                      <div className="relative">
-                        <Hash className="absolute left-3 top-3 text-zinc-400" size={18} />
-                        <input 
-                          required
-                          type="number" 
-                          step="0.01"
-                          min="0.01"
-                          className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-black text-emerald-600"
-                          value={formData.amount}
-                          onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
-                        />
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2">تاريخ التحويل</label>
+                          <div className="relative group">
+                            <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none group-focus-within:text-emerald-500 transition-colors`} />
+                            <input 
+                              required
+                              type="date" 
+                              className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white focus:border-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                              value={formData.date}
+                              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2">المبلغ</label>
+                          <div className="relative group">
+                            <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none group-focus-within:text-emerald-500 transition-colors`} />
+                            <input 
+                              required
+                              type="number" 
+                              step="0.01"
+                              min="0.01"
+                              placeholder="0.00"
+                              className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white focus:border-emerald-500 outline-none transition-all font-black text-emerald-600 text-lg`}
+                              value={formData.amount || ''}
+                              onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
+                            />
+                          </div>
+                        </div>
                       </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2">ملاحظات / وصف</label>
+                        <div className="relative group">
+                          <FileText className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none group-focus-within:text-emerald-500 transition-colors`} />
+                          <textarea 
+                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white focus:border-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm min-h-[100px] resize-none`}
+                            rows={3}
+                            placeholder="وصف إضافي لعملية التحويل..."
+                            value={formData.description}
+                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    </section>
+
+                    {/* Treasury Selection Card */}
+                    <div className="space-y-6">
+                      <section className="bg-white p-6 md:p-8 rounded-[2rem] border border-zinc-100 shadow-sm space-y-6 relative pt-12 overflow-hidden">
+                        <div className="absolute top-4 right-4 flex items-center gap-2 text-red-600 bg-red-50 px-3 py-1 rounded-full border border-red-100">
+                          <Wallet className="w-4 h-4" />
+                          <span className="text-[10px] font-black uppercase tracking-widest">من خزينة (المصدر)</span>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2 italic font-serif tracking-widest uppercase mb-1">اختر المصدر</label>
+                            <button 
+                              type="button"
+                              onClick={() => setIsPaymentMethodModalOpen(true)}
+                              className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg transition-colors"
+                            >
+                              <Plus size={14} />
+                              إضافة خزينة
+                            </button>
+                          </div>
+                          <div className="relative group">
+                            <Wallet className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none group-focus-within:text-red-500 transition-colors`} />
+                            <select
+                              required
+                              className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-red-500/20 focus:bg-white focus:border-red-500 outline-none transition-all appearance-none font-bold text-zinc-800`}
+                              value={formData.from_payment_method_id}
+                              onChange={(e) => setFormData({ ...formData, from_payment_method_id: e.target.value })}
+                            >
+                              <option value="">اختر الخزينة المصدر...</option>
+                              {paymentMethods.map(pm => (
+                                <option key={pm.id} value={pm.id}>{pm.name}</option>
+                              ))}
+                            </select>
+                            <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 transition-transform group-focus-within:rotate-180`} />
+                          </div>
+                        </div>
+                      </section>
+
+                      <section className="bg-white p-6 md:p-8 rounded-[2rem] border border-zinc-100 shadow-sm space-y-6 relative pt-12 overflow-hidden">
+                        <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                          <Wallet className="w-4 h-4" />
+                          <span className="text-[10px] font-black uppercase tracking-widest tracking-widest uppercase mb-1">إلى خزينة (الوجهة)</span>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2 italic font-serif tracking-widest uppercase mb-1 px-2 italic font-serif tracking-widest uppercase mb-1 tracking-widest uppercase mb-1 px-2 italic font-serif tracking-widest uppercase mb-1">اختر الوجهة</label>
+                          <div className="relative group text-emerald-600">
+                            <Wallet className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none group-focus-within:text-emerald-500 transition-colors`} />
+                            <select
+                              required
+                              className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white focus:border-emerald-500 outline-none transition-all appearance-none font-bold text-zinc-800`}
+                              value={formData.to_payment_method_id}
+                              onChange={(e) => setFormData({ ...formData, to_payment_method_id: e.target.value })}
+                            >
+                              <option value="">اختر الخزينة الوجهة...</option>
+                              {paymentMethods.map(pm => (
+                                <option key={pm.id} value={pm.id}>{pm.name}</option>
+                              ))}
+                            </select>
+                            <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 transition-transform group-focus-within:rotate-180 text-emerald-600`} />
+                          </div>
+                        </div>
+                      </section>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className="block text-sm font-bold text-zinc-700 uppercase tracking-tighter">من خزينة (المصدر)</label>
-                        <button 
-                          type="button"
-                          onClick={() => setIsPaymentMethodModalOpen(true)}
-                          className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
-                        >
-                          <Plus size={12} />
-                          إضافة خزينة
-                        </button>
-                      </div>
-                      <div className="relative">
-                        <Wallet className="absolute left-3 top-3 text-zinc-400" size={18} />
-                        <select
-                          required
-                          className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none font-bold"
-                          value={formData.from_payment_method_id}
-                          onChange={(e) => setFormData({ ...formData, from_payment_method_id: e.target.value })}
-                        >
-                          <option value="">اختر الخزينة المصدر...</option>
-                          {paymentMethods.map(pm => (
-                            <option key={pm.id} value={pm.id}>{pm.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className="block text-sm font-bold text-zinc-700 uppercase tracking-tighter">إلى خزينة (الوجهة)</label>
-                        <button 
-                          type="button"
-                          onClick={() => setIsPaymentMethodModalOpen(true)}
-                          className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
-                        >
-                          <Plus size={12} />
-                          إضافة خزينة
-                        </button>
-                      </div>
-                      <div className="relative">
-                        <Wallet className="absolute left-3 top-3 text-zinc-400" size={18} />
-                        <select
-                          required
-                          className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none font-bold"
-                          value={formData.to_payment_method_id}
-                          onChange={(e) => setFormData({ ...formData, to_payment_method_id: e.target.value })}
-                        >
-                          <option value="">اختر الخزينة الوجهة...</option>
-                          {paymentMethods.map(pm => (
-                            <option key={pm.id} value={pm.id}>{pm.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="block text-sm font-bold text-zinc-700 uppercase tracking-tighter">الوصف</label>
-                    <div className="relative">
-                      <FileText className="absolute left-3 top-3 text-zinc-400" size={18} />
-                      <textarea 
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
-                        rows={3}
-                        value={formData.description}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  {previewJournalEntry && (
-                    <JournalEntryPreview 
-                      title="معاينة قيد التحويل"
-                      items={previewJournalEntry.items}
-                    />
-                  )}
-
-                  <div className="pt-4 flex gap-3">
-                    <button 
-                      type="submit"
-                      className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-2"
-                    >
-                      <Save size={20} />
-                      <span>{editingTransfer ? 'تحديث التحويل' : 'حفظ التحويل'}</span>
-                    </button>
+                  {/* Action Footer */}
+                  <div className="flex gap-4 p-6 bg-transparent border-t border-zinc-100 sticky bottom-4 z-[90] mt-auto max-w-4xl mx-auto w-full">
                     <button 
                       type="button"
-                      onClick={() => setIsModalOpen(false)}
-                      className="px-8 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all active:scale-95"
+                      onClick={closeModal}
+                      className="flex-1 py-4 bg-white text-zinc-600 rounded-[1.5rem] font-bold border border-zinc-200 hover:bg-zinc-100 transition-all active:scale-95 shadow-lg shadow-black/5"
                     >
-                      إلغاء
+                      إلغاء التعديل
+                    </button>
+                    <button 
+                      type="submit"
+                      disabled={formData.amount <= 0 || !formData.from_payment_method_id || !formData.to_payment_method_id}
+                      className="flex-[2] py-4 bg-emerald-500 text-white rounded-[1.5rem] font-black uppercase tracking-wider hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-500/30 active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 disabled:grayscale"
+                    >
+                      <Save className="w-6 h-6 animate-pulse" />
+                      <span>{editingTransfer ? 'حفظ التعديلات' : 'إبرام التحويل'}</span>
                     </button>
                   </div>
                 </form>
-
-                <div className="hidden md:block w-80 border-r border-zinc-100 bg-zinc-50/30 overflow-hidden">
-                  <TransactionSidePanel 
-                    documentId={editingTransfer?.id} 
-                    category="cash_transfers"
-                    previewJournalEntry={previewJournalEntry}
-                    previewActivityLog={previewActivityLog}
-                  />
-                </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
       </AnimatePresence>

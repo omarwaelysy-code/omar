@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Supplier, Product, PaymentMethod, JournalEntry, JournalEntryItem, Account, Company } from '../types';
-import { Search, Plus, Trash2, X, RotateCcw, User, CreditCard, Calendar, Hash, Package, Save, Eye, Download, History, Printer, Edit, Phone, Mail, MapPin, Wallet, Box } from 'lucide-react';
+import { Search, Plus, Trash2, X, RotateCcw, User, CreditCard, Calendar, Hash, Package, Save, Eye, Download, History, Printer, Edit, Phone, Mail, MapPin, Wallet, Box, Maximize2, Minimize2, ChevronRight, ChevronLeft, FileText, Layers, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
@@ -21,7 +21,7 @@ import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
 
 export const PurchaseReturns: React.FC = () => {
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -56,6 +56,7 @@ export const PurchaseReturns: React.FC = () => {
   const [maxSeqGenerated, setMaxSeqGenerated] = useState<number>(0);
   const [returnNumber, setReturnNumber] = useState('');
   const [company, setCompany] = useState<Company | null>(null);
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   useEffect(() => {
     const fetchCompany = async () => {
@@ -69,6 +70,37 @@ export const PurchaseReturns: React.FC = () => {
 
   const generateReturnNumber = async (selectedDate: string) => {
     return await dbService.getNextSequence('purchase_returns', selectedDate);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingReturn(null);
+    setReturnData({
+      supplier_id: '',
+      date: new Date().toISOString().slice(0, 10),
+      payment_type: 'credit',
+      payment_method_id: '',
+      notes: ''
+    });
+    setItems([{ product_id: '', quantity: 1, cost_price: 0 }]);
+  };
+
+  const handlePrevReturn = () => {
+    if (!editingReturn) return;
+    const currentIndex = purchaseReturns.findIndex(r => r.id === editingReturn.id);
+    if (currentIndex > 0) {
+      const prev = purchaseReturns[currentIndex - 1];
+      handleEdit(prev);
+    }
+  };
+
+  const handleNextReturn = () => {
+    if (!editingReturn) return;
+    const currentIndex = purchaseReturns.findIndex(r => r.id === editingReturn.id);
+    if (currentIndex < purchaseReturns.length - 1) {
+      const next = purchaseReturns[currentIndex + 1];
+      handleEdit(next);
+    }
   };
   
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
@@ -600,11 +632,8 @@ export const PurchaseReturns: React.FC = () => {
     setItems([{ product_id: '', quantity: 1, cost_price: 0 }]);
     const num = await generateReturnNumber(newDate);
     setReturnNumber(num);
+    setEditingReturn(null);
     setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
   };
 
   const handleEdit = async (ret: any) => {
@@ -627,7 +656,7 @@ export const PurchaseReturns: React.FC = () => {
       setItems((fullData.items || []).map((item: any) => ({
         product_id: item.product_id,
         quantity: item.quantity,
-        cost_price: item.price
+        cost_price: item.unit_price || item.price || 0
       })));
       setIsModalOpen(true);
       console.log('[EDIT] Form updated with purchase return:', fullData.id);
@@ -940,367 +969,392 @@ export const PurchaseReturns: React.FC = () => {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center md:p-4 overflow-y-auto">
-          <div className="bg-white md:rounded-3xl w-full max-w-6xl shadow-2xl animate-in zoom-in-95 duration-200 min-h-screen md:min-h-0 md:my-auto">
-            <div className="p-6 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white z-10">
-              <div className="flex items-center gap-4">
-                <h3 className="text-2xl font-bold text-zinc-900 italic serif">إنشاء مرتجع مشتريات</h3>
-                <button 
-                  type="button"
-                  onClick={() => setShowSidePanel(!showSidePanel)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${showSidePanel ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-zinc-100 text-zinc-600 border border-zinc-200 hover:bg-zinc-200'}`}
-                >
-                  <History size={14} />
-                  {showSidePanel ? 'إخفاء القيد والسجل' : 'قيد اليومية'}
-                </button>
-              </div>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-zinc-100 rounded-xl transition-all">
-                <X size={24} />
+        <div className={`fixed inset-0 bg-zinc-100 dark:bg-zinc-900 z-[100] flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300 ${isFullScreen ? 'm-0 rounded-none' : 'md:m-4 md:rounded-[2.5rem] shadow-2xl border border-white/20'}`}>
+          {/* Header Block */}
+          <div className="p-4 md:p-6 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[90]">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={closeModal}
+                className="p-3 hover:bg-zinc-100 rounded-2xl transition-all text-zinc-400 hover:text-zinc-900 group"
+              >
+                <div className="flex items-center gap-2">
+                  <RotateCcw className={`w-5 h-5 transition-transform group-hover:-rotate-45`} />
+                  <span className="text-sm font-bold">{t('common.back')}</span>
+                </div>
+              </button>
+              <div className="w-px h-6 bg-zinc-200 mx-2" />
+              <button
+                type="button"
+                onClick={() => setShowSidePanel(!showSidePanel)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                  showSidePanel 
+                    ? 'bg-orange-50 text-orange-600 border-orange-100 shadow-sm' 
+                    : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200 border-transparent'
+                } border`}
+              >
+                <History size={18} />
+                <span>{language === 'ar' ? 'قيد اليومية \\ سجل التعديلات' : 'Journal Entry / Activity Log'}</span>
               </button>
             </div>
-            
-            <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full relative">
-              {/* Side Panel for Activity Log and Journal Entry */}
-              <AnimatePresence>
-                {showSidePanel && (
-                  <motion.div 
-                    initial={{ x: '-100%' }}
-                    animate={{ x: 0 }}
-                    exit={{ x: '-100%' }}
-                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    className="absolute inset-y-0 left-0 z-50 w-full lg:w-80 shadow-2xl lg:shadow-none lg:relative lg:inset-auto"
+
+            <div className="flex items-center gap-4">
+              {editingReturn && (
+                <div className="hidden lg:flex items-center gap-2 bg-zinc-100 p-1.5 rounded-2xl">
+                  <button 
+                    type="button"
+                    onClick={handlePrevReturn}
+                    className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
+                    disabled={purchaseReturns.findIndex(r => r.id === editingReturn.id) === 0}
                   >
-                    <div className="h-full bg-white border-r border-zinc-100 flex flex-col">
-                      <div className="p-4 border-b border-zinc-100 flex items-center justify-between lg:hidden">
-                        <h3 className="font-bold text-zinc-900">سجل النشاط والقيد</h3>
-                        <button onClick={() => setShowSidePanel(false)} className="p-2 text-zinc-400 hover:text-zinc-600">
-                          <X size={20} />
-                        </button>
-                      </div>
-                      <div className="flex-1 overflow-hidden">
-                        <TransactionSidePanel 
-                          category="purchase_returns" 
-                          previewJournalEntry={previewJournalEntry}
-                          previewActivityLog={previewActivityLog}
-                        />
-                      </div>
+                    {dir === 'rtl' ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                    {language === 'ar' ? 'السابق' : 'Prev'}
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={handleNextReturn}
+                    className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
+                    disabled={purchaseReturns.findIndex(r => r.id === editingReturn.id) === purchaseReturns.length - 1}
+                  >
+                    {language === 'ar' ? 'التالي' : 'Next'}
+                    {dir === 'rtl' ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+                  </button>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsFullScreen(!isFullScreen)}
+                className="p-2 text-zinc-400 hover:bg-zinc-100 rounded-xl transition-all hidden md:block"
+                title={isFullScreen ? t('common.minimize') : t('common.maximize')}
+              >
+                {isFullScreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+              </button>
+              <h3 className="text-xl md:text-2xl font-black text-zinc-900 tracking-tight">
+                {editingReturn ? 'تعديل مرتجع مشتريات' : 'إضافة مرتجع مشتريات'}
+              </h3>
+            </div>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full relative">
+            {/* Side Panel for Activity Log and Journal Entry */}
+            <AnimatePresence>
+              {showSidePanel && (
+                <motion.div 
+                  initial={{ x: '-100%' }}
+                  animate={{ x: 0 }}
+                  exit={{ x: '-100%' }}
+                  transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                  className="absolute inset-y-0 left-0 z-[80] w-full lg:w-96 shadow-2xl lg:shadow-none lg:relative lg:inset-auto"
+                >
+                  <div className="h-full bg-white border-r border-zinc-100 flex flex-col">
+                    <div className="p-4 border-b border-zinc-100 flex items-center justify-between lg:hidden">
+                      <h3 className="font-bold text-zinc-900">{t('common.activity_log')}</h3>
+                      <button onClick={() => setShowSidePanel(false)} className="p-2 text-zinc-400 hover:text-zinc-600">
+                        <X size={20} />
+                      </button>
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <form onSubmit={handleSubmit} className="flex-1 p-4 md:p-8 space-y-6 overflow-y-auto">
-                <SmartAIInput transactionType="purchase_return" onDataExtracted={applyAiData} />
-                <div className="bg-white p-4 md:p-8 rounded-3xl border border-zinc-100 shadow-sm space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">المورد</label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-3 text-zinc-400" size={18} />
-                      <select 
-                        required
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
-                        value={returnData.supplier_id}
-                        onChange={(e) => {
-                          if (e.target.value === 'new') {
-                            setIsSupplierModalOpen(true);
-                          } else {
-                            setReturnData({...returnData, supplier_id: e.target.value});
-                          }
-                        }}
-                      >
-                        <option value="">اختر المورد...</option>
-                        {suppliers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
-                        <option value="new" className="font-bold text-emerald-600">+ إضافة مورد جديد...</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">التاريخ</label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-3 text-zinc-400" size={18} />
-                      <input 
-                        required
-                        type="date" 
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                        value={returnData.date}
-                        onChange={(e) => setReturnData({...returnData, date: e.target.value})}
+                    <div className="flex-1 overflow-hidden">
+                      <TransactionSidePanel 
+                        documentId={editingReturn?.id || ''}
+                        category="purchase_returns" 
+                        previewJournalEntry={previewJournalEntry}
+                        previewActivityLog={previewActivityLog}
                       />
                     </div>
                   </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-                  <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">نوع المرتجع</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setReturnData({ ...returnData, payment_type: 'credit' })}
-                        className={`flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${returnData.payment_type === 'credit' ? 'bg-orange-600 text-white shadow-lg shadow-orange-200' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
-                      >
-                        <CreditCard size={18} />
-                        آجل
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setReturnData({ ...returnData, payment_type: 'cash' })}
-                        className={`flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${returnData.payment_type === 'cash' ? 'bg-orange-600 text-white shadow-lg shadow-orange-200' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
-                      >
-                        <Wallet size={18} />
-                        نقدي
-                      </button>
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32 md:pb-8">
+              <SmartAIInput transactionType="purchase_return" onDataExtracted={applyAiData} />
+              
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-3 space-y-6">
+                  {/* Card 1: Basic Info */}
+                  <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-100">
+                      <FileText className="w-4 h-4" />
+                      <span className="text-xs font-bold">البيانات الأساسية</span>
                     </div>
-                  </div>
-
-                  {returnData.payment_type === 'cash' && (
-                    <div className="animate-in slide-in-from-top-2 duration-200">
-                      <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">طريقة استرداد المبلغ (إلى خزينة/بنك)</label>
-                      <div className="relative">
-                        <Wallet className="absolute left-3 top-3 text-zinc-400" size={18} />
-                        <select 
-                          required
-                          className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
-                          value={returnData.payment_method_id}
-                          onChange={(e) => {
-                            if (e.target.value === 'new') {
-                              setIsPaymentMethodModalOpen(true);
-                            } else {
-                              setReturnData({...returnData, payment_method_id: e.target.value});
-                            }
-                          }}
-                        >
-                          <option value="">اختر الطريقة...</option>
-                          {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
-                          <option value="new" className="font-bold text-emerald-600">+ إضافة طريقة دفع...</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">ملاحظات</label>
-                  <textarea 
-                    rows={2}
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none"
-                    placeholder="سبب الارتجاع أو أي ملاحظات..."
-                    value={returnData.notes}
-                    onChange={(e) => setReturnData({...returnData, notes: e.target.value})}
-                  />
-                </div>
-              </div>
-
-              <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
-                <div className="p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between bg-zinc-50/50">
-                  <h3 className="text-xl font-bold text-zinc-900 flex items-center gap-2">
-                    <RotateCcw size={24} className="text-red-500" />
-                    الأصناف المرتجعة
-                  </h3>
-                  <button 
-                    type="button"
-                    onClick={addItem}
-                    className="flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-xl font-bold hover:bg-zinc-800 transition-all active:scale-95"
-                  >
-                    <Plus size={18} />
-                    إضافة صنف
-                  </button>
-                </div>
-
-                {/* Desktop Table for Items */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full text-right border-collapse">
-                    <thead>
-                      <tr className="bg-zinc-50/30 border-b border-zinc-100 uppercase tracking-widest text-[10px]">
-                        <th className="px-6 py-4 font-bold text-zinc-500 w-16 text-center">صورة</th>
-                        <th className="px-6 py-4 font-bold text-zinc-500 text-right">الصنف</th>
-                        <th className="px-6 py-4 font-bold text-zinc-500 w-28 text-center">الكمية</th>
-                        <th className="px-6 py-4 font-bold text-zinc-500 w-32 text-center">سعر التكلفة</th>
-                        <th className="px-6 py-4 font-bold text-zinc-500 w-48 text-left">الإجمالي</th>
-                        <th className="px-6 py-4 font-bold text-zinc-500 w-20"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-50">
-                      {items.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="px-6 py-12 text-center text-zinc-400 italic">لا توجد أصناف مضافة حالياً</td>
-                        </tr>
-                      ) : items.map((item, index) => (
-                        <tr key={index} className="hover:bg-zinc-50/50 transition-colors group">
-                          <td className="px-6 py-5 text-center">
-                            {(item as any).product_image_url ? (
-                              <img 
-                                src={(item as any).product_image_url} 
-                                alt="Product" 
-                                className="w-12 h-12 object-cover rounded-xl mx-auto border border-zinc-100 shadow-sm"
-                                referrerPolicy="no-referrer"
-                              />
-                            ) : (
-                              <div className="w-12 h-12 bg-zinc-50 rounded-lg flex items-center justify-center mx-auto border border-zinc-100 shadow-sm">
-                                <Box size={20} className="text-zinc-300" />
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-6 py-5">
-                            <select 
-                              required
-                              className="w-full px-4 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-900"
-                              value={item.product_id}
-                              onChange={(e) => {
-                                if (e.target.value === 'new_product') {
-                                  setIsProductModalOpen(true);
-                                } else {
-                                  updateItem(index, 'product_id', e.target.value);
-                                }
-                              }}
-                            >
-                              <option value="">اختر الصنف...</option>
-                              {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}
-                              <option value="new_product" className="font-bold text-emerald-600">+ إضافة صنف جديد</option>
-                            </select>
-                          </td>
-                          <td className="px-6 py-5 text-center">
-                            <input 
-                              required
-                              type="number" 
-                              step="any"
-                              className="w-full bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 px-4 py-3 text-sm outline-none text-center font-bold shadow-sm"
-                              value={item.quantity}
-                              onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
-                            />
-                          </td>
-                          <td className="px-6 py-5 text-center">
-                            <input 
-                              required
-                              type="number" 
-                              step="any"
-                              className="w-full bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 px-4 py-3 text-sm outline-none text-center font-bold shadow-sm"
-                              value={item.cost_price}
-                              onChange={(e) => updateItem(index, 'cost_price', Number(e.target.value))}
-                            />
-                          </td>
-                          <td className="px-6 py-5 font-bold text-zinc-900 text-left">
-                            {formatNumber(item.quantity * item.cost_price)}
-                          </td>
-                          <td className="px-6 py-4">
-                            <button 
-                              type="button"
-                              onClick={() => removeItem(index)}
-                              className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Mobile View for Items */}
-                <div className="md:hidden divide-y divide-zinc-100">
-                  {items.length === 0 ? (
-                    <div className="px-6 py-12 text-center text-zinc-400 italic">لا توجد أصناف مضافة حالياً</div>
-                  ) : items.map((item, index) => (
-                    <div key={index} className="p-4 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {(item as any).product_image_url ? (
-                            <img 
-                              src={(item as any).product_image_url} 
-                              alt="Product" 
-                              className="w-12 h-12 object-cover rounded-xl border border-zinc-100"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 bg-zinc-50 rounded-xl flex items-center justify-center border border-zinc-100">
-                              <Box size={20} className="text-zinc-300" />
-                            </div>
-                          )}
-                          <span className="font-bold text-zinc-900">صنف #{index + 1}</span>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">رقم المرتجع</label>
+                        <div className="relative">
+                          <RotateCcw className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <input 
+                            readOnly
+                            type="text"
+                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl font-bold text-zinc-800 text-sm outline-none`}
+                            value={returnNumber}
+                          />
                         </div>
-                        <button 
-                          type="button"
-                          onClick={() => removeItem(index)}
-                          className="p-2 text-red-500 bg-red-50 rounded-lg"
-                        >
-                          <Trash2 size={16} />
-                        </button>
                       </div>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">الصنف</label>
+
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">المورد</label>
+                        <div className="relative group">
+                          <User className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <select 
                             required
-                            className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                            value={item.product_id}
+                            className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-rose-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
+                            value={returnData.supplier_id}
                             onChange={(e) => {
-                              if (e.target.value === 'new_product') {
-                                setIsProductModalOpen(true);
+                              if (e.target.value === 'new') {
+                                setIsSupplierModalOpen(true);
                               } else {
-                                updateItem(index, 'product_id', e.target.value);
+                                setReturnData({...returnData, supplier_id: e.target.value});
                               }
                             }}
                           >
-                            <option value="">اختر الصنف...</option>
-                            {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}
-                            <option value="new_product" className="font-bold text-emerald-600">+ إضافة صنف جديد</option>
+                            <option value="">اختر المورد...</option>
+                            {suppliers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
+                            <option value="new" className="font-bold text-emerald-600">+ إضافة مورد جديد...</option>
                           </select>
+                          <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">الكمية</label>
-                            <input 
-                              required
-                              type="number" 
-                              min="1"
-                              className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                              value={item.quantity}
-                              onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">سعر التكلفة</label>
-                            <input 
-                              required
-                              type="number" 
-                              step="0.01"
-                              className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                              value={item.cost_price}
-                              onChange={(e) => updateItem(index, 'cost_price', Number(e.target.value))}
-                            />
-                          </div>
-                        </div>
-                        <div className="flex justify-between items-center bg-zinc-50 p-3 rounded-xl">
-                          <span className="text-sm text-zinc-500">الإجمالي:</span>
-                          <span className="font-bold text-zinc-900">{formatNumber(item.quantity * item.cost_price)} ج.م</span>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">تاريخ المرتجع</label>
+                        <div className="relative">
+                          <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <input 
+                            required
+                            type="date"
+                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-rose-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                            value={returnData.date}
+                            onChange={(e) => setReturnData({...returnData, date: e.target.value})}
+                          />
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </section>
 
-                <div className="bg-red-500 text-white p-6 flex flex-col md:flex-row items-center justify-between gap-4">
-                  <span className="font-bold text-lg">إجمالي المرتجع:</span>
-                  <span className="font-bold text-3xl">
-                    {formatNumber(calculateTotal())} ج.م
-                  </span>
+                  {/* Card 2: Payment settings */}
+                  <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-100">
+                      <Wallet className="w-4 h-4" />
+                      <span className="text-xs font-bold">إعدادات الدفع</span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">نوع المرتجع</label>
+                        <div className="grid grid-cols-2 gap-3 p-1 bg-zinc-100 rounded-2xl">
+                          <button
+                            type="button"
+                            onClick={() => setReturnData({ ...returnData, payment_type: 'cash' })}
+                            className={`py-2 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm ${returnData.payment_type === 'cash' ? 'bg-white text-rose-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+                          >
+                            <Wallet size={16} />
+                            نقدي
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setReturnData({ ...returnData, payment_type: 'credit' })}
+                            className={`py-2 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm ${returnData.payment_type === 'credit' ? 'bg-white text-rose-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+                          >
+                            <Layers size={16} />
+                            آجل
+                          </button>
+                        </div>
+                      </div>
+
+                      {returnData.payment_type === 'cash' && (
+                        <div className="animate-in slide-in-from-top-2 duration-200">
+                          <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">طريقة استرداد المبلغ</label>
+                          <div className="relative group">
+                            <CreditCard className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                            <select 
+                              required
+                              className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-rose-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
+                              value={returnData.payment_method_id}
+                              onChange={(e) => {
+                                if (e.target.value === 'new') {
+                                  setIsPaymentMethodModalOpen(true);
+                                } else {
+                                  setReturnData({...returnData, payment_method_id: e.target.value});
+                                }
+                              }}
+                            >
+                              <option value="">اختر الطريقة...</option>
+                              {paymentMethods.map(m => (
+                                <option key={m.id} value={m.id}>{m.name}</option>
+                              ))}
+                              <option value="new" className="font-bold text-emerald-600">+ إضافة طريقة دفع...</option>
+                            </select>
+                            <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">ملاحظات</label>
+                      <textarea 
+                        rows={2}
+                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-rose-500 outline-none transition-all resize-none text-sm font-bold text-zinc-800"
+                        placeholder="سبب الارتجاع أو أي ملاحظات..."
+                        value={returnData.notes}
+                        onChange={(e) => setReturnData({...returnData, notes: e.target.value})}
+                      />
+                    </div>
+                  </section>
+
+                  {/* Card 3: Items */}
+                  <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-100">
+                      <Package className="w-4 h-4" />
+                      <span className="text-xs font-bold">الأصناف المرتجعة</span>
+                    </div>
+
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsProductModalOpen(true);
+                          }}
+                          className="px-4 py-2 bg-rose-50 text-rose-600 rounded-xl text-xs font-bold border border-rose-100 hover:bg-rose-100 transition-all"
+                        >
+                          + إضافة صنف جديد
+                        </button>
+                        <button
+                          type="button"
+                          onClick={addItem}
+                          className="px-4 py-2 bg-zinc-100 text-zinc-600 rounded-xl text-xs font-bold hover:bg-zinc-200 transition-all"
+                        >
+                          <Plus size={14} className="inline-block me-1" />
+                          إضافة صف جديد
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
+                      <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'} text-sm`}>
+                        <thead className="bg-zinc-50 text-zinc-400 uppercase text-[10px] font-black tracking-widest border-b border-zinc-100">
+                          <tr>
+                            <th className="px-6 py-4 w-12 text-center">صورة</th>
+                            <th className="px-6 py-4">الصنف</th>
+                            <th className="px-6 py-4 w-28 text-center">الكمية</th>
+                            <th className="px-6 py-4 w-32 text-center">سعر التكلفة</th>
+                            <th className={`px-6 py-4 w-32 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>الإجمالي</th>
+                            <th className="px-6 py-4 w-10"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-50">
+                          {items.map((item, index) => (
+                            <tr key={index} className="hover:bg-zinc-50/50 transition-colors group">
+                              <td className="px-6 py-3 text-center">
+                                {(item as any).product_image_url ? (
+                                  <img 
+                                    src={(item as any).product_image_url} 
+                                    alt="Product" 
+                                    className="w-10 h-10 object-cover rounded-xl mx-auto border border-zinc-100 shadow-sm"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 bg-zinc-50 rounded-xl flex items-center justify-center mx-auto border border-zinc-100">
+                                    <Box size={16} className="text-zinc-300" />
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-6 py-3">
+                                <div className="relative">
+                                  <select 
+                                    className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2.5 outline-none font-bold text-zinc-800 appearance-none text-xs focus:ring-2 focus:ring-rose-500 transition-all"
+                                    value={item.product_id}
+                                    onChange={(e) => {
+                                      if (e.target.value === 'new_product') {
+                                        setIsProductModalOpen(true);
+                                      } else {
+                                        updateItem(index, 'product_id', e.target.value);
+                                      }
+                                    }}
+                                  >
+                                    <option value="">اختر الصنف...</option>
+                                    {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}
+                                    <option value="new_product" className="font-bold text-emerald-600">+ إضافة صنف جديد</option>
+                                  </select>
+                                  <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                                </div>
+                              </td>
+                              <td className="px-6 py-3">
+                                <input 
+                                  type="number"
+                                  step="any"
+                                  className="w-full bg-zinc-50 border border-transparent focus:bg-white focus:ring-2 focus:ring-rose-500 rounded-xl px-4 py-2.5 text-xs outline-none text-center font-bold text-zinc-800 transition-all"
+                                  value={item.quantity}
+                                  onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
+                                />
+                              </td>
+                              <td className="px-6 py-3">
+                                <input 
+                                  type="number"
+                                  step="any"
+                                  className="w-full bg-zinc-50 border border-transparent focus:bg-white focus:ring-2 focus:ring-rose-500 rounded-xl px-4 py-2.5 text-xs outline-none text-center font-bold text-zinc-800 transition-all"
+                                  value={item.cost_price}
+                                  onChange={(e) => updateItem(index, 'cost_price', Number(e.target.value))}
+                                />
+                              </td>
+                              <td className={`px-6 py-3 font-bold text-zinc-900 text-sm ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                                {formatNumber(item.quantity * item.cost_price)}
+                              </td>
+                              <td className="px-6 py-3 text-center">
+                                <button 
+                                  type="button"
+                                  onClick={() => removeItem(index)}
+                                  className="p-2 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Summary Section */}
+                    <div className="mt-8 flex justify-end">
+                      <div className="bg-zinc-900 text-white rounded-3xl p-8 min-w-[300px] space-y-4 shadow-xl">
+                        <div className="flex justify-between items-center text-zinc-400 text-xs font-bold uppercase tracking-widest">
+                          <span>إجمالي المرتجع</span>
+                        </div>
+                        <div className="flex justify-between items-baseline gap-4">
+                          <span className="text-4xl font-black tracking-tighter text-rose-400">
+                            {formatNumber(calculateTotal())}
+                          </span>
+                          <span className="font-bold text-zinc-400">ج.م</span>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
                 </div>
               </div>
 
-              <div className="flex justify-end pt-6 border-t border-zinc-100 sticky bottom-0 bg-white p-4 md:p-0">
+              {/* Action Footer */}
+              <div className="flex gap-4 p-6 bg-zinc-50 border-t border-zinc-100 sticky bottom-0 z-[60] mt-auto">
+                <button 
+                  type="button"
+                  onClick={closeModal}
+                  className="flex-1 py-4 bg-white text-zinc-600 rounded-2xl font-bold border border-zinc-200 hover:bg-zinc-100 transition-all active:scale-95 shadow-sm"
+                >
+                  {t('common.cancel')}
+                </button>
                 <button 
                   type="submit"
-                  className="w-full md:w-auto flex items-center justify-center gap-3 px-12 py-4 bg-red-500 text-white rounded-2xl font-bold hover:bg-red-600 transition-all shadow-xl shadow-red-500/20 active:scale-95"
+                  disabled={items.length === 0 || returnData.supplier_id === ''}
+                  className="flex-[2] py-4 bg-rose-600 text-white rounded-2xl font-black uppercase tracking-wider hover:bg-rose-700 transition-all shadow-lg shadow-rose-500/20 active:scale-95 flex items-center justify-center gap-3"
                 >
-                  <Save size={24} />
-                  حفظ مرتجع المشتريات
+                  <Save className="w-6 h-6" />
+                  {editingReturn ? 'حفظ التعديلات' : 'حفظ المرتجع'}
                 </button>
               </div>
             </form>
           </div>
         </div>
-      </div>
-    )}
+      )}
       {/* View Return Modal */}
       {viewReturn && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">

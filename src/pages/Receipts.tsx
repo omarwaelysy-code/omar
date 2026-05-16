@@ -6,7 +6,7 @@ import {
   Search, Plus, Trash2, X, Receipt as ReceiptIcon, Pencil, 
   CreditCard, Download, Eye, FileText, History, Printer, 
   Phone, Mail, MapPin, Wallet, Calendar, Hash, Layers, 
-  LayoutGrid, List 
+  LayoutGrid, List, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, User, ChevronDown, Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
@@ -54,6 +54,7 @@ export const Receipts: React.FC = () => {
   const [serverSummary, setServerSummary] = useState<any>({});
   const [maxSeqGenerated, setMaxSeqGenerated] = useState<number>(0);
   const [internalRef, setInternalRef] = useState('');
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   const generateInternalRef = async (selectedDate: string) => {
     return await dbService.getNextSequence('receipt_vouchers', selectedDate);
@@ -590,6 +591,22 @@ export const Receipts: React.FC = () => {
     });
   };
 
+  const handlePrevReceipt = () => {
+    if (!editingReceipt) return;
+    const currentIndex = receipts.findIndex(r => r.id === editingReceipt.id);
+    if (currentIndex > 0) {
+      openEditModal(receipts[currentIndex - 1]);
+    }
+  };
+
+  const handleNextReceipt = () => {
+    if (!editingReceipt) return;
+    const currentIndex = receipts.findIndex(r => r.id === editingReceipt.id);
+    if (currentIndex < receipts.length - 1) {
+      openEditModal(receipts[currentIndex + 1]);
+    }
+  };
+
   const filteredReceipts = receipts.filter(r => 
     r.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     r.description.toLowerCase().includes(searchTerm.toLowerCase())
@@ -826,167 +843,269 @@ export const Receipts: React.FC = () => {
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-[90vh] md:max-h-[850px] md:max-w-4xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
-            <div className="p-6 border-b border-zinc-50 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <h3 className="text-xl font-bold text-zinc-900">{editingReceipt ? 'تعديل سند قبض' : 'إضافة سند قبض'}</h3>
-                <button 
-                  type="button"
-                  onClick={() => setShowSidePanel(!showSidePanel)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${showSidePanel ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-zinc-100 text-zinc-600 border border-zinc-200 hover:bg-zinc-200'}`}
-                >
-                  <History size={14} />
-                  {showSidePanel ? 'إخفاء القيد والسجل' : 'قيد اليومية'}
-                </button>
-              </div>
-              <button onClick={closeModal} className="text-zinc-400 hover:text-zinc-600 p-2"><X size={24} /></button>
+        <div className={`fixed inset-0 bg-zinc-100 dark:bg-zinc-900 z-[100] flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300 ${isFullScreen ? 'm-0 rounded-none' : 'md:m-4 md:rounded-[2.5rem] shadow-2xl border border-white/20'}`}>
+          {/* Header Block */}
+          <div className="p-4 md:p-6 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[90]">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={closeModal}
+                className="p-3 hover:bg-zinc-100 rounded-2xl transition-all text-zinc-400 hover:text-zinc-900 group"
+              >
+                <div className="flex items-center gap-2">
+                  <RotateCcw className={`w-5 h-5 transition-transform group-hover:-rotate-45`} />
+                  <span className="text-sm font-bold">{t('common.back')}</span>
+                </div>
+              </button>
+              <div className="w-px h-6 bg-zinc-200 mx-2" />
+              <button
+                type="button"
+                onClick={() => setShowSidePanel(!showSidePanel)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                  showSidePanel 
+                    ? 'bg-orange-50 text-orange-600 border-orange-100 shadow-sm' 
+                    : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200 border-transparent'
+                } border`}
+              >
+                <History size={18} />
+                <span>{language === 'ar' ? 'قيد اليومية \\ سجل التعديلات' : 'Journal Entry / Activity Log'}</span>
+              </button>
             </div>
-            <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full relative">
-              {/* Side Panel for Activity Log and Journal Entry */}
-              <AnimatePresence>
-                {showSidePanel && (
-                  <motion.div 
-                    initial={{ x: '100%' }}
-                    animate={{ x: 0 }}
-                    exit={{ x: '100%' }}
-                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    className="absolute inset-y-0 right-0 z-50 w-full lg:w-80 shadow-2xl lg:shadow-none lg:relative lg:inset-auto"
+
+            <div className="flex items-center gap-4">
+              {editingReceipt && (
+                <div className="hidden lg:flex items-center gap-2 bg-zinc-100 p-1.5 rounded-2xl">
+                  <button 
+                    type="button"
+                    onClick={handlePrevReceipt}
+                    className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
+                    disabled={receipts.findIndex(r => r.id === editingReceipt.id) === 0}
                   >
-                    <div className="h-full bg-white border-l border-zinc-100 flex flex-col">
-                      <div className="p-4 border-b border-zinc-100 flex items-center justify-between lg:hidden">
-                        <h3 className="font-bold text-zinc-900">سجل النشاط والقيد</h3>
-                        <button onClick={() => setShowSidePanel(false)} className="p-2 text-zinc-400 hover:text-zinc-600">
-                          <X size={20} />
-                        </button>
+                    {dir === 'rtl' ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                    {language === 'ar' ? 'السابق' : 'Prev'}
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={handleNextReceipt}
+                    className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
+                    disabled={receipts.findIndex(r => r.id === editingReceipt.id) === receipts.length - 1}
+                  >
+                    {language === 'ar' ? 'التالي' : 'Next'}
+                    {dir === 'rtl' ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+                  </button>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsFullScreen(!isFullScreen)}
+                className="p-2 text-zinc-400 hover:bg-zinc-100 rounded-xl transition-all hidden md:block"
+                title={isFullScreen ? t('common.minimize') : t('common.maximize')}
+              >
+                {isFullScreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+              </button>
+              <h3 className="text-xl md:text-2xl font-black text-zinc-900 tracking-tight">
+                {editingReceipt ? 'تعديل سند قبض' : 'إضافة سند قبض'}
+              </h3>
+            </div>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full relative">
+            {/* Side Panel for Activity Log and Journal Entry */}
+            <AnimatePresence>
+              {showSidePanel && (
+                <motion.div 
+                  initial={{ x: '-100%' }}
+                  animate={{ x: 0 }}
+                  exit={{ x: '-100%' }}
+                  transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                  className="absolute inset-y-0 left-0 z-[80] w-full lg:w-96 shadow-2xl lg:shadow-none lg:relative lg:inset-auto"
+                >
+                  <div className="h-full bg-white border-r border-zinc-100 flex flex-col">
+                    <div className="p-4 border-b border-zinc-100 flex items-center justify-between lg:hidden">
+                      <h3 className="font-bold text-zinc-900">{t('common.activity_log')}</h3>
+                      <button onClick={() => setShowSidePanel(false)} className="p-2 text-zinc-400 hover:text-zinc-600">
+                        <X size={20} />
+                      </button>
+                    </div>
+                    <div className="flex-1 overflow-hidden">
+                      <TransactionSidePanel 
+                        documentId={editingReceipt?.id || ''}
+                        category="receipt_vouchers" 
+                        previewJournalEntry={previewJournalEntry}
+                        previewActivityLog={previewActivityLog}
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32 md:pb-8">
+              <SmartAIInput 
+                onDataExtracted={(data) => {
+                  if (data.customerName) {
+                    const customer = customers.find(c => c.name.includes(data.customerName!) || data.customerName!.includes(c.name));
+                    if (customer) {
+                      setFormData(prev => ({ ...prev, customer_id: customer.id }));
+                    }
+                  }
+                  if (data.amount) setFormData(prev => ({ ...prev, amount: data.amount! }));
+                  if (data.date) setFormData(prev => ({ ...prev, date: data.date! }));
+                  if (data.description) setFormData(prev => ({ ...prev, description: data.description! }));
+                  if (data.paymentMethod) {
+                    const pm = paymentMethods.find(p => p.name.includes(data.paymentMethod!) || data.paymentMethod!.includes(p.name));
+                    if (pm) setFormData(prev => ({ ...prev, payment_method_id: pm.id }));
+                  }
+                }}
+                transactionType="receipt_voucher"
+              />
+              
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-3 space-y-6">
+                  {/* Card 1: Basic Info */}
+                  <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                      <FileText className="w-4 h-4" />
+                      <span className="text-xs font-bold">البيانات الأساسية</span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">رقم السند</label>
+                        <div className="relative">
+                          <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <input 
+                            type="text" 
+                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl font-bold text-zinc-800 text-sm outline-none font-mono focus:ring-2 focus:ring-emerald-500 transition-all`}
+                            value={editingReceipt ? internalRef : (internalRef || `RCPT-${Date.now().toString().slice(-6)}`)}
+                            onChange={(e) => setInternalRef(e.target.value)}
+                          />
+                        </div>
                       </div>
-                      <div className="flex-1 overflow-hidden">
-                        <TransactionSidePanel 
-                          documentId={editingReceipt?.id || ''} 
-                          category="receipt_vouchers" 
-                          previewJournalEntry={previewJournalEntry}
-                          previewActivityLog={previewActivityLog}
-                        />
+
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">العميل</label>
+                        <div className="relative group">
+                          <User className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <select 
+                            required
+                            className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
+                            value={formData.customer_id}
+                            onChange={(e) => {
+                              if (e.target.value === 'new_customer') {
+                                setIsCustomerModalOpen(true);
+                              } else {
+                                setFormData({ ...formData, customer_id: e.target.value });
+                              }
+                            }}
+                          >
+                            <option value="">اختر العميل...</option>
+                            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            <option value="new_customer" className="font-bold text-emerald-600">+ إضافة عميل جديد...</option>
+                          </select>
+                          <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">تاريخ السند</label>
+                        <div className="relative">
+                          <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <input 
+                            required
+                            type="date"
+                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                            value={formData.date}
+                            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                  </section>
 
-              <form onSubmit={handleSubmit} className="flex-1 p-6 space-y-4 overflow-y-auto">
-                <SmartAIInput 
-                  onDataExtracted={(data) => {
-                    if (data.customerName) {
-                      const customer = customers.find(c => c.name.includes(data.customerName!) || data.customerName!.includes(c.name));
-                      if (customer) {
-                        setFormData(prev => ({ ...prev, customer_id: customer.id }));
-                      }
-                    }
-                    if (data.amount) setFormData(prev => ({ ...prev, amount: data.amount! }));
-                    if (data.date) setFormData(prev => ({ ...prev, date: data.date! }));
-                    if (data.description) setFormData(prev => ({ ...prev, description: data.description! }));
-                    if (data.paymentMethod) {
-                      const pm = paymentMethods.find(p => p.name.includes(data.paymentMethod!) || data.paymentMethod!.includes(p.name));
-                      if (pm) setFormData(prev => ({ ...prev, payment_method_id: pm.id }));
-                    }
-                  }}
-                  transactionType="receipt_voucher"
-                />
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">رقم السند</label>
-                  <div className="relative">
-                    <Hash className="absolute left-3 top-3 text-zinc-400" size={18} />
-                    <input 
-                      type="text" 
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
-                      value={editingReceipt ? internalRef : (internalRef || `RCPT-${Date.now().toString().slice(-6)}`)}
-                      onChange={(e) => setInternalRef(e.target.value)}
-                    />
-                  </div>
+                  {/* Card 2: Payment details */}
+                  <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                      <Wallet className="w-4 h-4" />
+                      <span className="text-xs font-bold">تفاصيل القبض</span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">طريقة القبض</label>
+                        <div className="relative group">
+                          <CreditCard className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <select 
+                            required
+                            className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
+                            value={formData.payment_method_id}
+                            onChange={(e) => {
+                              if (e.target.value === 'new_payment_method') {
+                                setIsPaymentMethodModalOpen(true);
+                              } else {
+                                setFormData({ ...formData, payment_method_id: e.target.value });
+                              }
+                            }}
+                          >
+                            <option value="">اختر طريقة السداد...</option>
+                            {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
+                            <option value="new_payment_method" className="font-bold text-emerald-600">+ إضافة طريقة دفع جديدة...</option>
+                          </select>
+                          <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">المبلغ</label>
+                        <div className="relative">
+                          <span className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 font-bold text-zinc-400 text-sm`}>ج.م</span>
+                          <input 
+                            required
+                            type="number"
+                            step="0.01"
+                            className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-black text-2xl text-emerald-600 tracking-tighter`}
+                            value={isNaN(formData.amount) ? '' : formData.amount}
+                            onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">الوصف / ملاحظات</label>
+                      <textarea 
+                        rows={3}
+                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none text-sm font-bold text-zinc-800"
+                        placeholder="اكتب تفاصيل القبض هنا..."
+                        value={formData.description}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      />
+                    </div>
+                  </section>
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">العميل</label>
-                <select 
-                  required
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                  value={formData.customer_id}
-                  onChange={(e) => {
-                    if (e.target.value === 'new_customer') {
-                      setIsCustomerModalOpen(true);
-                    } else {
-                      setFormData({ ...formData, customer_id: e.target.value });
-                    }
-                  }}
+              </div>
+
+              {/* Action Footer */}
+              <div className="flex gap-4 p-6 bg-zinc-50 border-t border-zinc-100 sticky bottom-0 z-[60] mt-auto">
+                <button 
+                  type="button"
+                  onClick={closeModal}
+                  className="flex-1 py-4 bg-white text-zinc-600 rounded-2xl font-bold border border-zinc-200 hover:bg-zinc-100 transition-all active:scale-95 shadow-sm"
                 >
-                  <option value="">اختر العميل</option>
-                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  <option value="new_customer" className="font-bold text-emerald-600">+ إضافة عميل جديد</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">طريقة السداد</label>
-                <select 
-                  required
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                  value={formData.payment_method_id}
-                  onChange={(e) => {
-                    if (e.target.value === 'new_payment_method') {
-                      setIsPaymentMethodModalOpen(true);
-                    } else {
-                      setFormData({ ...formData, payment_method_id: e.target.value });
-                    }
-                  }}
-                >
-                  <option value="">اختر طريقة السداد</option>
-                  {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
-                  <option value="new_payment_method" className="font-bold text-emerald-600">+ إضافة طريقة دفع جديدة</option>
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">التاريخ</label>
-                  <input
-                    required
-                    type="date"
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                    value={formData.date}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">المبلغ</label>
-                  <input
-                    required
-                    type="number"
-                    step="0.01"
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                    value={isNaN(formData.amount) ? '' : formData.amount}
-                    onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) })}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">الوصف</label>
-                <textarea
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                  rows={3}
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                />
-              </div>
-              <div className="pt-4">
+                  {t('common.cancel')}
+                </button>
                 <button 
                   type="submit"
-                  className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
+                  disabled={formData.amount <= 0 || !formData.customer_id}
+                  className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-3"
                 >
-                  {editingReceipt ? 'تحديث السند' : 'حفظ السند'}
+                  <Save className="w-6 h-6" />
+                  {editingReceipt ? 'حفظ التعديلات' : 'حفظ السند'}
                 </button>
               </div>
             </form>
           </div>
         </div>
-      </div>
-    )}
+      )}
 
       {/* View Modal */}
       {viewReceipt && (

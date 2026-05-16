@@ -5,7 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { 
   Search, Plus, Trash2, X, Wallet, User, CreditCard, Calendar, 
   Hash, FileText, Save, Pencil, Eye, Download, History, Printer, 
-  Phone, Mail, MapPin, Layers, LayoutGrid, List 
+  Phone, Mail, MapPin, Layers, LayoutGrid, List, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
@@ -59,6 +59,7 @@ export const PaymentVouchers: React.FC = () => {
   const [serverSummary, setServerSummary] = useState<any>({});
   const [maxSeqGenerated, setMaxSeqGenerated] = useState<number>(0);
   const [internalRef, setInternalRef] = useState('');
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const [viewVoucher, setViewVoucher] = useState<any | null>(null);
   const voucherRef = React.useRef<HTMLDivElement>(null);
   const tableRef = React.useRef<HTMLDivElement>(null);
@@ -731,6 +732,22 @@ export const PaymentVouchers: React.FC = () => {
     }
   };
 
+  const exportToPDF = async (voucher: any) => {
+    const element = document.getElementById('payment-voucher-capture-area');
+    if (!element) return;
+    try {
+      await exportToPDFUtil(element, {
+        filename: `${voucher.internal_reference || voucher.voucher_number}.pdf`,
+        margin: 10,
+        orientation: 'portrait',
+        reportTitle: `سند صرف رقم: ${voucher.internal_reference || voucher.voucher_number}`
+      });
+    } catch (e) {
+      console.error('PDF Export Error:', e);
+      showNotification('حدث خطأ أثناء تصدير PDF', 'error');
+    }
+  };
+
   const handleViewVoucher = async (id: string) => {
     try {
       const data = await dbService.get<any>('payment_vouchers', id);
@@ -740,17 +757,38 @@ export const PaymentVouchers: React.FC = () => {
     }
   };
 
-  const exportToPDF = async (voucher: any) => {
-    if (!voucherRef.current) return;
-    try {
-      await exportToPDFUtil(voucherRef.current, {
-        filename: `Voucher-${voucher.id}.pdf`,
-        margin: 10,
-        orientation: 'portrait'
-      });
-    } catch (e) {
-      console.error(e);
-      showNotification('حدث خطأ أثناء تصدير PDF', 'error');
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingVoucher(null);
+    setInternalRef('');
+    setVoucherData({
+      internal_reference: '',
+      manual_reference: '',
+      items: [],
+      type: 'multi',
+      supplier_id: '',
+      expense_category_id: '',
+      customer_id: '',
+      amount: 0,
+      payment_method_id: '',
+      date: new Date().toISOString().slice(0, 10),
+      notes: ''
+    });
+  };
+
+  const handlePrevVoucher = () => {
+    if (!editingVoucher) return;
+    const currentIndex = vouchers.findIndex(v => v.id === editingVoucher.id);
+    if (currentIndex > 0) {
+      openEditModal(vouchers[currentIndex - 1]);
+    }
+  };
+
+  const handleNextVoucher = () => {
+    if (!editingVoucher) return;
+    const currentIndex = vouchers.findIndex(v => v.id === editingVoucher.id);
+    if (currentIndex < vouchers.length - 1) {
+      openEditModal(vouchers[currentIndex + 1]);
     }
   };
 
@@ -1157,422 +1195,391 @@ export const PaymentVouchers: React.FC = () => {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-[90vh] md:max-h-[850px] md:max-w-4xl md:rounded-3xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col">
-            <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <h3 className="text-2xl font-bold text-zinc-900 italic serif">{editingVoucher ? 'تعديل سند صرف' : 'إنشاء سند صرف'}</h3>
-                <button 
-                  type="button"
-                  onClick={() => setShowSidePanel(!showSidePanel)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${showSidePanel ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-zinc-100 text-zinc-600 border border-zinc-200 hover:bg-zinc-200'}`}
-                >
-                  <History size={14} />
-                  {showSidePanel ? 'إخفاء القيد والسجل' : 'قيد اليومية'}
-                </button>
-              </div>
-              <button onClick={() => {
-                setIsModalOpen(false);
-                setEditingVoucher(null);
-                setVoucherData({
-                  internal_reference: '',
-                  manual_reference: '',
-                  items: [],
-                  type: 'multi',
-                  supplier_id: '',
-                  expense_category_id: '',
-                  customer_id: '',
-                  amount: 0,
-                  payment_method_id: '',
-                  date: new Date().toISOString().slice(0, 10),
-                  notes: ''
-                });
-              }} className="p-2 hover:bg-zinc-100 rounded-xl transition-all">
-                <X size={24} />
+        <div className={`fixed inset-0 bg-zinc-100 dark:bg-zinc-900 z-[100] flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300 ${isFullScreen ? 'm-0 rounded-none' : 'md:m-4 md:rounded-[2.5rem] shadow-2xl border border-white/20'}`}>
+          {/* Header Block */}
+          <div className="p-4 md:p-6 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[90]">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={closeModal}
+                className="p-3 hover:bg-zinc-100 rounded-2xl transition-all text-zinc-400 hover:text-zinc-900 group"
+              >
+                <div className="flex items-center gap-2">
+                  <RotateCcw className={`w-5 h-5 transition-transform group-hover:-rotate-45`} />
+                  <span className="text-sm font-bold">{t('common.back')}</span>
+                </div>
+              </button>
+              <div className="w-px h-6 bg-zinc-200 mx-2" />
+              <button
+                type="button"
+                onClick={() => setShowSidePanel(!showSidePanel)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                  showSidePanel 
+                    ? 'bg-orange-50 text-orange-600 border-orange-100 shadow-sm' 
+                    : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200 border-transparent'
+                } border`}
+              >
+                <History size={18} />
+                <span>{language === 'ar' ? 'قيد اليومية \\ سجل التعديلات' : 'Journal Entry / Activity Log'}</span>
               </button>
             </div>
-            
-            <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full relative">
-              {/* Side Panel for Activity Log and Journal Entry */}
-              <AnimatePresence>
-                {showSidePanel && (
-                  <motion.div 
-                    initial={{ x: '100%' }}
-                    animate={{ x: 0 }}
-                    exit={{ x: '100%' }}
-                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    className="absolute inset-y-0 right-0 z-50 w-full lg:w-80 shadow-2xl lg:shadow-none lg:relative lg:inset-auto"
+
+            <div className="flex items-center gap-4">
+              {editingVoucher && (
+                <div className="hidden lg:flex items-center gap-2 bg-zinc-100 p-1.5 rounded-2xl">
+                  <button 
+                    type="button"
+                    onClick={handlePrevVoucher}
+                    className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
+                    disabled={vouchers.findIndex(v => v.id === editingVoucher.id) === 0}
                   >
-                    <div className="h-full bg-white border-l border-zinc-100 flex flex-col">
-                      <div className="p-4 border-b border-zinc-100 flex items-center justify-between lg:hidden">
-                        <h3 className="font-bold text-zinc-900">سجل النشاط والقيد</h3>
-                        <button onClick={() => setShowSidePanel(false)} className="p-2 text-zinc-400 hover:text-zinc-600">
-                          <X size={20} />
-                        </button>
-                      </div>
-                      <div className="flex-1 overflow-hidden">
-                        <TransactionSidePanel 
-                          documentId={editingVoucher?.id || ''} 
-                          category="payment_vouchers" 
-                          previewJournalEntry={previewJournalEntry}
-                          previewActivityLog={previewActivityLog}
-                        />
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <form onSubmit={handleSubmit} className="flex-1 p-6 md:p-8 space-y-6 overflow-y-auto">
-                <SmartAIInput 
-                  onDataExtracted={(data) => {
-                    if (data.supplierName) {
-                      const supplier = suppliers.find(s => s.name.includes(data.supplierName!) || data.supplierName!.includes(s.name));
-                      if (supplier) {
-                        setVoucherData(prev => ({ ...prev, supplier_id: supplier.id, type: 'supplier' }));
-                      }
-                    }
-                    if (data.amount) setVoucherData(prev => ({ ...prev, amount: data.amount! }));
-                    if (data.date) setVoucherData(prev => ({ ...prev, date: data.date! }));
-                    if (data.description || data.notes) setVoucherData(prev => ({ ...prev, notes: data.description || data.notes || '' }));
-                    if (data.paymentMethod) {
-                      const pm = paymentMethods.find(p => p.name.includes(data.paymentMethod!) || data.paymentMethod!.includes(p.name));
-                      if (pm) setVoucherData(prev => ({ ...prev, payment_method_id: pm.id }));
-                    }
-                  }}
-                  transactionType="payment_voucher"
-                />
-              {/* Hide top-level type tabs as requested - switching to multi-mode by default */}
-              <div className="hidden bg-zinc-100 p-1 rounded-2xl">
-                <button
-                  type="button"
-                  onClick={() => setVoucherData({...voucherData, type: 'supplier', expense_category_id: ''})}
-                  className={`flex-1 py-3 rounded-xl font-bold transition-all ${
-                    voucherData.type === 'supplier' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
-                  }`}
-                >
-                  صرف لمورد
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setVoucherData({...voucherData, type: 'expense', supplier_id: ''})}
-                  className={`flex-1 py-3 rounded-xl font-bold transition-all ${
-                    voucherData.type === 'expense' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
-                  }`}
-                >
-                  صرف مصروفات
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setVoucherData({...voucherData, type: 'multi', supplier_id: '', expense_category_id: ''})}
-                  className={`flex-1 py-3 rounded-xl font-bold transition-all ${
-                    voucherData.type === 'multi' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
-                  }`}
-                >
-                  صرف متعدد / حسابات
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">مرجع البرنامج</label>
-                  <div className="relative">
-                    <Hash className="absolute left-3 top-3 text-zinc-400" size={18} />
-                    <input 
-                      type="text" 
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all font-mono"
-                      value={editingVoucher ? voucherData.internal_reference : (internalRef || voucherData.internal_reference)}
-                      onChange={(e) => {
-                        if (editingVoucher) {
-                          setVoucherData({...voucherData, internal_reference: e.target.value});
-                        } else {
-                          setInternalRef(e.target.value);
-                        }
-                      }}
-                    />
-                  </div>
+                    {dir === 'rtl' ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                    {language === 'ar' ? 'السابق' : 'Prev'}
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={handleNextVoucher}
+                    className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
+                    disabled={vouchers.findIndex(v => v.id === editingVoucher.id) === vouchers.length - 1}
+                  >
+                    {language === 'ar' ? 'التالي' : 'Next'}
+                    {dir === 'rtl' ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">مرجع يدوي / آخر</label>
-                  <div className="relative">
-                    <FileText className="absolute left-3 top-3 text-zinc-400" size={18} />
-                    <input 
-                      type="text" 
-                      placeholder="ادخل رقم المرجع اليدوي..."
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
-                      value={voucherData.manual_reference}
-                      onChange={(e) => setVoucherData({...voucherData, manual_reference: e.target.value})}
-                    />
-                  </div>
-                </div>
-
-                {voucherData.type === 'supplier' && (
-                  <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">المورد</label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-3 text-zinc-400" size={18} />
-                      <select 
-                        required
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all appearance-none"
-                        value={voucherData.supplier_id}
-                        onChange={(e) => {
-                          if (e.target.value === 'new_supplier') {
-                            setIsSupplierModalOpen(true);
-                          } else {
-                            setVoucherData({...voucherData, supplier_id: e.target.value});
-                          }
-                        }}
-                      >
-                        <option value="">اختر المورد...</option>
-                        {suppliers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
-                        <option value="new_supplier" className="font-bold text-emerald-600">+ إضافة مورد جديد</option>
-                      </select>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsFullScreen(!isFullScreen)}
+                className="p-2 text-zinc-400 hover:bg-zinc-100 rounded-xl transition-all hidden md:block"
+                title={isFullScreen ? t('common.minimize') : t('common.maximize')}
+              >
+                {isFullScreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+              </button>
+              <h3 className="text-xl md:text-2xl font-black text-zinc-900 tracking-tight">
+                {editingVoucher ? 'تعديل سند صرف' : 'إضافة سند صرف'}
+              </h3>
+            </div>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full relative">
+            {/* Side Panel for Activity Log and Journal Entry */}
+            <AnimatePresence>
+              {showSidePanel && (
+                <motion.div 
+                  initial={{ x: '-100%' }}
+                  animate={{ x: 0 }}
+                  exit={{ x: '-100%' }}
+                  transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                  className="absolute inset-y-0 left-0 z-[80] w-full lg:w-96 shadow-2xl lg:shadow-none lg:relative lg:inset-auto"
+                >
+                  <div className="h-full bg-white border-r border-zinc-100 flex flex-col">
+                    <div className="p-4 border-b border-zinc-100 flex items-center justify-between lg:hidden">
+                      <h3 className="font-bold text-zinc-900">{t('common.activity_log')}</h3>
+                      <button onClick={() => setShowSidePanel(false)} className="p-2 text-zinc-400 hover:text-zinc-600">
+                        <X size={20} />
+                      </button>
                     </div>
-                  </div>
-                )} 
-                
-                {voucherData.type === 'expense' && (
-                  <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">بند المصروف</label>
-                    <div className="relative">
-                      <FileText className="absolute left-3 top-3 text-zinc-400" size={18} />
-                      <select 
-                        required
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all appearance-none"
-                        value={voucherData.expense_category_id}
-                        onChange={(e) => {
-                          if (e.target.value === 'new_category') {
-                            setIsCategoryModalOpen(true);
-                          } else {
-                            setVoucherData({...voucherData, expense_category_id: e.target.value});
-                          }
-                        }}
-                      >
-                        <option value="">اختر البند...</option>
-                        {categories.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
-                        <option value="new_category" className="font-bold text-emerald-600">+ إضافة بند مصروف جديد</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">التاريخ</label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-3 text-zinc-400" size={18} />
-                    <input 
-                      required
-                      type="date" 
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
-                      value={voucherData.date}
-                      onChange={(e) => setVoucherData({...voucherData, date: e.target.value})}
-                    />
-                  </div>
-                </div>
-
-                {voucherData.type !== 'multi' && (
-                  <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">المبلغ الإجمالي</label>
-                    <div className="relative">
-                      <Wallet className="absolute left-3 top-3 text-emerald-500" size={18} />
-                      <input 
-                        required
-                        type="number" 
-                        step="0.01"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all font-bold text-lg"
-                        placeholder="0.00"
-                        value={voucherData.amount || ''}
-                        onChange={(e) => setVoucherData({...voucherData, amount: Number(e.target.value)})}
+                    <div className="flex-1 overflow-hidden">
+                      <TransactionSidePanel 
+                        documentId={editingVoucher?.id || ''}
+                        category="payment_vouchers" 
+                        previewJournalEntry={previewJournalEntry}
+                        previewActivityLog={previewActivityLog}
                       />
                     </div>
                   </div>
-                )}
-
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">طريقة الصرف (من خزينة/بنك)</label>
-                  <div className="relative">
-                    <CreditCard className="absolute left-3 top-3 text-zinc-400" size={18} />
-                    <select 
-                      required
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all appearance-none"
-                      value={voucherData.payment_method_id}
-                      onChange={(e) => {
-                        if (e.target.value === 'new_payment_method') {
-                          setIsPaymentMethodModalOpen(true);
-                        } else {
-                          setVoucherData({...voucherData, payment_method_id: e.target.value});
-                        }
-                      }}
-                    >
-                      <option value="">اختر الطريقة...</option>
-                      {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
-                      <option value="new_payment_method" className="font-bold text-emerald-600">+ إضافة طريقة دفع جديدة</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {voucherData.type === 'multi' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between border-b border-zinc-100 pb-2">
-                    <h4 className="font-bold text-zinc-900 italic">بنود السند</h4>
-                    <button 
-                      type="button"
-                      onClick={() => setVoucherData({
-                        ...voucherData,
-                        items: [...voucherData.items, { type: 'supplier', entity_id: '', amount: 0, description: '' }]
-                      })}
-                      className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all font-bold flex items-center gap-1"
-                    >
-                      <Plus size={18} />
-                      إضافة بند
-                    </button>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="text-zinc-500 text-[10px] uppercase font-black tracking-widest text-right">
-                          <th className="px-2 py-2">النوع</th>
-                          <th className="px-2 py-2">المستفيد / الحساب</th>
-                          <th className="px-2 py-2">المبلغ</th>
-                          <th className="px-2 py-2">الوصف</th>
-                          <th className="px-2 py-2 text-left"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-50">
-                        {voucherData.items.map((item, idx) => (
-                          <tr key={idx} className="group">
-                            <td className="px-1 py-2">
-                              <select 
-                                className="w-full px-2 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-xs outline-none"
-                                value={item.type}
-                                onChange={(e) => {
-                                  const newItems = [...voucherData.items];
-                                  newItems[idx].type = e.target.value;
-                                  newItems[idx].entity_id = '';
-                                  setVoucherData({...voucherData, items: newItems});
-                                }}
-                              >
-                                <option value="supplier">مورد</option>
-                                <option value="customer">عميل</option>
-                                <option value="expense">بند مصروف</option>
-                                <option value="account">حساب عام</option>
-                              </select>
-                            </td>
-                            <td className="px-1 py-2">
-                              <select 
-                                className="w-full px-2 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-xs outline-none"
-                                value={item.entity_id}
-                                onChange={(e) => {
-                                  const newItems = [...voucherData.items];
-                                  newItems[idx].entity_id = e.target.value;
-                                  newItems[idx].sub_account_id = '';
-                                  setVoucherData({...voucherData, items: newItems});
-                                }}
-                              >
-                                <option value="">اختر...</option>
-                                {item.type === 'supplier' && suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                {item.type === 'customer' && customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                {item.type === 'expense' && categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                {item.type === 'account' && accounts.map(a => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)}
-                              </select>
-                              {item.type === 'account' && accounts.find(a => a.id === item.entity_id)?.required_sub_account && (
-                                <select
-                                  className="w-full px-2 py-2 mt-1 bg-blue-50 border border-blue-200 rounded-lg text-xs outline-none"
-                                  value={item.sub_account_id || ''}
-                                  onChange={(e) => {
-                                    const newItems = [...voucherData.items];
-                                    newItems[idx].sub_account_id = e.target.value;
-                                    setVoucherData({...voucherData, items: newItems});
-                                  }}
-                                  required
-                                >
-                                  <option value="">اختر الحساب الفرعي...</option>
-                                  {subAccounts.map(sa => (
-                                    <option key={sa.id} value={sa.id}>{sa.label}</option>
-                                  ))}
-                                </select>
-                              )}
-                            </td>
-                            <td className="px-1 py-2">
-                              <input 
-                                type="number" 
-                                className="w-full px-2 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-xs outline-none font-bold"
-                                value={item.amount || ''}
-                                onChange={(e) => {
-                                  const newItems = [...voucherData.items];
-                                  newItems[idx].amount = Number(e.target.value);
-                                  setVoucherData({...voucherData, items: newItems});
-                                }}
-                              />
-                            </td>
-                            <td className="px-1 py-2">
-                              <input 
-                                type="text" 
-                                className="w-full px-2 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-xs outline-none"
-                                value={item.description}
-                                onChange={(e) => {
-                                  const newItems = [...voucherData.items];
-                                  newItems[idx].description = e.target.value;
-                                  setVoucherData({...voucherData, items: newItems});
-                                }}
-                              />
-                            </td>
-                            <td className="px-1 py-2 text-left">
-                              <button 
-                                type="button"
-                                onClick={() => {
-                                  const newItems = voucherData.items.filter((_, i) => i !== idx);
-                                  setVoucherData({...voucherData, items: newItems});
-                                }}
-                                className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="bg-zinc-50">
-                          <td colSpan={2} className="px-2 py-3 font-bold text-zinc-900 border-t border-zinc-200">الإجمالي:</td>
-                          <td className="px-2 py-3 font-black text-emerald-600 border-t border-zinc-200">
-                            {formatNumber(voucherData.items.reduce((sum, item) => sum + item.amount, 0))}
-                          </td>
-                          <td colSpan={2} className="border-t border-zinc-200"></td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </div>
+                </motion.div>
               )}
+            </AnimatePresence>
 
-              <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-2 uppercase tracking-tighter">البيان / ملاحظات</label>
-                <textarea 
-                  rows={3}
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all resize-none"
-                  placeholder="اكتب تفاصيل الصرف هنا..."
-                  value={voucherData.notes}
-                  onChange={(e) => setVoucherData({...voucherData, notes: e.target.value})}
-                />
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32 md:pb-8">
+              <SmartAIInput 
+                onDataExtracted={(data) => {
+                  if (data.supplierName) {
+                    const supplier = suppliers.find(s => s.name.includes(data.supplierName!) || data.supplierName!.includes(s.name));
+                    if (supplier) {
+                      setVoucherData(prev => ({ ...prev, supplier_id: supplier.id, type: 'supplier' }));
+                    }
+                  }
+                  if (data.amount) setVoucherData(prev => ({ ...prev, amount: data.amount! }));
+                  if (data.date) setVoucherData(prev => ({ ...prev, date: data.date! }));
+                  if (data.description || data.notes) setVoucherData(prev => ({ ...prev, notes: data.description || data.notes || '' }));
+                  if (data.paymentMethod) {
+                    const pm = paymentMethods.find(p => p.name.includes(data.paymentMethod!) || data.paymentMethod!.includes(p.name));
+                    if (pm) setVoucherData(prev => ({ ...prev, payment_method_id: pm.id }));
+                  }
+                }}
+                transactionType="payment_voucher"
+              />
+              
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-3 space-y-6">
+                  {/* Card 1: Basic Info */}
+                  <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-orange-600 bg-orange-50 px-3 py-1 rounded-full border border-orange-100">
+                      <FileText className="w-4 h-4" />
+                      <span className="text-xs font-bold">البيانات الأساسية</span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">مرجع البرنامج</label>
+                        <div className="relative">
+                          <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <input 
+                            type="text" 
+                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl font-bold text-zinc-800 text-sm outline-none font-mono focus:ring-2 focus:ring-orange-500 transition-all`}
+                            value={editingVoucher ? voucherData.internal_reference : (internalRef || voucherData.internal_reference)}
+                            onChange={(e) => {
+                              if (editingVoucher) {
+                                setVoucherData({...voucherData, internal_reference: e.target.value});
+                              } else {
+                                setInternalRef(e.target.value);
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercaseTracking tracking-tighter uppercase mb-2 px-2 uppercase">مرجع يدوي / آخر</label>
+                        <div className="relative group">
+                          <FileText className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <input 
+                            type="text" 
+                            placeholder="ادخل رقم المرجع اليدوي..."
+                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                            value={voucherData.manual_reference}
+                            onChange={(e) => setVoucherData({...voucherData, manual_reference: e.target.value})}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">تاريخ السند</label>
+                        <div className="relative">
+                          <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <input 
+                            required
+                            type="date"
+                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                            value={voucherData.date}
+                            onChange={(e) => setVoucherData({...voucherData, date: e.target.value})}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase">طريقة الصرف (من خزينة/بنك)</label>
+                      <div className="relative group">
+                        <CreditCard className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                        <select 
+                          required
+                          className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
+                          value={voucherData.payment_method_id}
+                          onChange={(e) => {
+                            if (e.target.value === 'new_payment_method') {
+                              setIsPaymentMethodModalOpen(true);
+                            } else {
+                              setVoucherData({...voucherData, payment_method_id: e.target.value});
+                            }
+                          }}
+                        >
+                          <option value="">اختر الطريقة...</option>
+                          {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
+                          <option value="new_payment_method" className="font-bold text-orange-600">+ إضافة طريقة دفع جديدة...</option>
+                        </select>
+                        <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Card 2: Beneficiaries & Amounts */}
+                  <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-orange-600 bg-orange-50 px-3 py-1 rounded-full border border-orange-100">
+                      <Layers className="w-4 h-4" />
+                      <span className="text-xs font-bold">بنود الصرف</span>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-zinc-100 pb-2">
+                        <h4 className="font-bold text-zinc-900 italic tracking-tight uppercase text-sm">تفاصيل البنود</h4>
+                        <button 
+                          type="button"
+                          onClick={() => setVoucherData({
+                            ...voucherData,
+                            items: [...voucherData.items, { type: 'supplier', entity_id: '', amount: 0, description: '' }]
+                          })}
+                          className="flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-600 rounded-xl text-xs font-black border border-orange-100 hover:bg-orange-100 transition-all shadow-sm"
+                        >
+                          <Plus size={16} />
+                          <span>إضافة بند صرف جديد</span>
+                        </button>
+                      </div>
+                      
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className={`text-zinc-500 text-[10px] uppercase font-black tracking-widest ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              <th className="px-2 py-3 w-32 tracking-tighter">النوع</th>
+                              <th className="px-2 py-3 tracking-tighter">المستفيد / الحساب</th>
+                              <th className="px-2 py-3 w-32 tracking-tighter uppercase tracking-widest">المبلغ</th>
+                              <th className="px-2 py-3 tracking-tighter uppercase tracking-widest">الوصف</th>
+                              <th className="px-2 py-3 w-10"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-50">
+                            {voucherData.items.map((item, idx) => (
+                              <tr key={idx} className="group hover:bg-zinc-50 transition-colors">
+                                <td className="px-1 py-1 relative">
+                                  <select 
+                                    className="w-full px-2 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] font-bold outline-none appearance-none"
+                                    value={item.type}
+                                    onChange={(e) => {
+                                      const newItems = [...voucherData.items];
+                                      newItems[idx].type = e.target.value;
+                                      newItems[idx].entity_id = '';
+                                      setVoucherData({...voucherData, items: newItems});
+                                    }}
+                                  >
+                                    <option value="supplier">مورد</option>
+                                    <option value="customer">عميل</option>
+                                    <option value="expense">بند مصروف</option>
+                                    <option value="account">حساب عام</option>
+                                  </select>
+                                  <ChevronDown size={12} className="absolute right-3 top-4 text-zinc-400 pointer-events-none" />
+                                </td>
+                                <td className="px-1 py-1 relative">
+                                  <select 
+                                    className="w-full px-2 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] font-black outline-none appearance-none"
+                                    value={item.entity_id}
+                                    onChange={(e) => {
+                                      const newItems = [...voucherData.items];
+                                      newItems[idx].entity_id = e.target.value;
+                                      newItems[idx].sub_account_id = '';
+                                      setVoucherData({...voucherData, items: newItems});
+                                    }}
+                                  >
+                                    <option value="">اختر...</option>
+                                    {item.type === 'supplier' && suppliers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
+                                    {item.type === 'customer' && customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    {item.type === 'expense' && categories.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
+                                    {item.type === 'account' && accounts.map(a => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)}
+                                  </select>
+                                  <ChevronDown size={12} className="absolute right-4 top-4 text-zinc-400 pointer-events-none" />
+                                  {item.type === 'account' && accounts.find(a => a.id === item.entity_id)?.required_sub_account && (
+                                    <select
+                                      className="w-full px-2 py-2 mt-1 bg-orange-50 border border-orange-200 rounded-xl text-[10px] font-bold outline-none"
+                                      value={item.sub_account_id || ''}
+                                      onChange={(e) => {
+                                        const newItems = [...voucherData.items];
+                                        newItems[idx].sub_account_id = e.target.value;
+                                        setVoucherData({...voucherData, items: newItems});
+                                      }}
+                                      required
+                                    >
+                                      <option value="">اختر الحساب الفرعي...</option>
+                                      {subAccounts.map(sa => (
+                                        <option key={sa.id} value={sa.id}>{sa.label}</option>
+                                      ))}
+                                    </select>
+                                  )}
+                                </td>
+                                <td className="px-1 py-1">
+                                  <input 
+                                    type="number" 
+                                    className="w-full px-2 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-black text-orange-600 outline-none text-center"
+                                    placeholder="0"
+                                    value={item.amount || ''}
+                                    onChange={(e) => {
+                                      const newItems = [...voucherData.items];
+                                      newItems[idx].amount = Number(e.target.value);
+                                      setVoucherData({...voucherData, items: newItems});
+                                    }}
+                                  />
+                                </td>
+                                <td className="px-1 py-1">
+                                  <input 
+                                    type="text" 
+                                    placeholder="بيان تفصيلي..."
+                                    className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] font-bold outline-none"
+                                    value={item.description}
+                                    onChange={(e) => {
+                                      const newItems = [...voucherData.items];
+                                      newItems[idx].description = e.target.value;
+                                      setVoucherData({...voucherData, items: newItems});
+                                    }}
+                                  />
+                                </td>
+                                <td className="px-1 py-1 text-center">
+                                  <button 
+                                    type="button"
+                                    onClick={() => {
+                                      const newItems = voucherData.items.filter((_, i) => i !== idx);
+                                      setVoucherData({...voucherData, items: newItems});
+                                    }}
+                                    className="p-2 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                            {voucherData.items.length === 0 && (
+                              <tr>
+                                <td colSpan={5} className="py-12 text-center text-zinc-400 italic text-sm">لم يتم إضافة أي بنود صرف بعد</td>
+                              </tr>
+                            )}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-zinc-50/50">
+                              <td colSpan={2} className="px-4 py-4 font-black text-zinc-900 border-t border-zinc-100 text-sm italic tracking-tighter uppercase underline decoration-orange-300 decoration-2 underline-offset-4 tracking-tight">إجمالي المبلغ المنصرف:</td>
+                              <td className="px-2 py-4 font-black text-2xl text-orange-600 border-t border-zinc-100 text-center tracking-tighter">
+                                {formatNumber(voucherData.items.reduce((sum, item) => sum + item.amount, 0))}
+                              </td>
+                              <td colSpan={2} className="border-t border-zinc-100"></td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase">البيان العام / ملاحظات إضافية</label>
+                      <textarea 
+                        rows={3}
+                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-3xl focus:ring-2 focus:ring-orange-500 outline-none transition-all resize-none font-bold text-sm text-zinc-800"
+                        placeholder="اكتب ملاحظات السند هنا..."
+                        value={voucherData.notes}
+                        onChange={(e) => setVoucherData({...voucherData, notes: e.target.value})}
+                      />
+                    </div>
+                  </section>
+                </div>
               </div>
 
-              <div className="flex justify-end pt-6 border-t border-zinc-100">
+              {/* Action Footer */}
+              <div className="flex gap-4 p-6 bg-zinc-50 border-t border-zinc-100 sticky bottom-0 z-[60] mt-auto">
+                <button 
+                  type="button"
+                  onClick={closeModal}
+                  className="flex-1 py-4 bg-white text-zinc-600 rounded-2xl font-bold border border-zinc-200 hover:bg-zinc-100 transition-all active:scale-95 shadow-sm"
+                >
+                  {t('common.cancel')}
+                </button>
                 <button 
                   type="submit"
-                  className="flex items-center gap-3 px-12 py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-900/20 active:scale-95"
+                  disabled={voucherData.items.reduce((sum, item) => sum + item.amount, 0) <= 0 || !voucherData.payment_method_id}
+                  className="flex-[2] py-4 bg-orange-600 text-white rounded-2xl font-black uppercase tracking-wider hover:bg-orange-700 transition-all shadow-lg shadow-orange-500/20 active:scale-95 flex items-center justify-center gap-3"
                 >
-                  <Save size={24} />
-                  {editingVoucher ? 'تحديث سند الصرف' : 'حفظ سند الصرف'}
+                  <Save className="w-6 h-6" />
+                  {editingVoucher ? 'حفظ التعديلات' : 'حفظ السند'}
                 </button>
               </div>
             </form>
           </div>
         </div>
-      </div>
-    )}
-
+      )}
       {/* View Modal */}
       {viewVoucher && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">

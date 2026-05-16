@@ -5,7 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { TransactionManager } from '../services/TransactionManager';
 import { ReturnSchema, JournalEntrySchema } from '../lib/schemas';
 import { Return, Customer, Product, ReturnItem, JournalEntry, JournalEntryItem, Account, PaymentMethod } from '../types';
-import { Search, Plus, Trash2, X, Eye, Download, FileText, RotateCcw, History, Printer, Phone, Mail, MapPin, Wallet, Calendar, Box, CreditCard, User, ChevronDown, Layers, Save, Package } from 'lucide-react';
+import { Search, Plus, Trash2, X, Eye, Download, FileText, RotateCcw, History, Printer, Phone, Mail, MapPin, Wallet, Calendar, Box, CreditCard, User, ChevronDown, Layers, Save, Package, ChevronRight, ChevronLeft, Maximize2, Minimize2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
@@ -64,6 +64,7 @@ export const Returns: React.FC = () => {
   const [editingReturn, setEditingReturn] = useState<Return | null>(null);
   const [returnNumber, setReturnNumber] = useState('');
   const [company, setCompany] = useState<Company | null>(null);
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   useEffect(() => {
     const fetchCompany = async () => {
@@ -77,6 +78,32 @@ export const Returns: React.FC = () => {
 
   const generateReturnNumber = async (selectedDate: string) => {
     return await dbService.getNextSequence('returns', selectedDate);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingReturn(null);
+    setSelectedCustomerId('');
+    setDate(new Date().toISOString().slice(0, 10));
+    setPaymentType('credit');
+    setPaymentMethodId('');
+    setItems([{ product_id: '', product_name: '', quantity: 1, unit_price: 0, total: 0 }]);
+  };
+
+  const handlePrevReturn = () => {
+    if (!editingReturn) return;
+    const currentIndex = returns.findIndex(r => r.id === editingReturn.id);
+    if (currentIndex > 0) {
+      openModal(returns[currentIndex - 1]);
+    }
+  };
+
+  const handleNextReturn = () => {
+    if (!editingReturn) return;
+    const currentIndex = returns.findIndex(r => r.id === editingReturn.id);
+    if (currentIndex < returns.length - 1) {
+      openModal(returns[currentIndex + 1]);
+    }
   };
 
   const [customerFormData, setCustomerFormData] = useState({
@@ -620,11 +647,7 @@ export const Returns: React.FC = () => {
       setReturnNumber(num);
     }
     setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setEditingReturn(null);
+    setIsFullScreen(false);
   };
 
   const handleViewReturn = (ret: Return) => {
@@ -681,7 +704,7 @@ export const Returns: React.FC = () => {
           product_id: product?.id || '',
           product_name: product?.name || item.productName,
           quantity: item.quantity || 1,
-          price: item.price || product?.sale_price || 0,
+          unit_price: item.price || product?.sale_price || 0,
           total: (item.quantity || 1) * (item.price || product?.sale_price || 0)
         };
       });
@@ -696,7 +719,9 @@ export const Returns: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {!isModalOpen ? (
+        <>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('returns.title')}</h2>
           <p className="text-zinc-500">{t('returns.subtitle')}</p>
@@ -904,345 +929,375 @@ export const Returns: React.FC = () => {
             <div className="p-8 text-center text-zinc-500 italic">{t('common.no_data')}</div>
           )}
         </div>
-      </div>
-
-      {/* Create Return Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-auto md:max-w-6xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 md:max-h-[90vh] flex flex-col">
-            <div className="p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between bg-zinc-50/50 sticky top-0 z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 md:w-10 md:h-10 bg-orange-500 rounded-xl flex items-center justify-center text-white">
-                  <RotateCcw size={20} className="md:w-6 md:h-6" />
-                </div>
-                <div>
-                  <h3 className="text-lg md:text-xl font-bold text-zinc-900">{editingReturn ? t('returns.edit') : t('returns.add')}</h3>
-                  <p className="text-[10px] md:text-xs text-zinc-500 hidden md:block">{t('returns.form_subtitle')}</p>
-                </div>
-                <button 
-                  type="button"
-                  onClick={() => setShowSidePanel(!showSidePanel)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${showSidePanel ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-zinc-100 text-zinc-600 border border-zinc-200 hover:bg-zinc-200'}`}
-                >
-                  <History size={14} />
-                  {showSidePanel ? t('common.hide_side_panel') : t('common.journal_entry')}
-                </button>
-              </div>
-              <button onClick={closeModal} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-full transition-all">
-                <X size={24} />
+          </div>
+        </>
+      ) : (
+        <div className={`bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col ${isFullScreen ? 'fixed inset-0 z-[100] rounded-none' : 'min-h-[80vh] relative'}`}>
+          {/* Form Header */}
+          <div className="p-4 md:p-6 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70]">
+            <div className="flex items-center gap-3">
+              <button 
+                type="button"
+                onClick={closeModal} 
+                className={`flex items-center gap-2 px-4 py-2 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all font-black text-sm ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}
+              >
+                {dir === 'rtl' ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+                <span>{language === 'ar' ? 'العودة للقائمة' : 'Back to List'}</span>
               </button>
             </div>
-            
-            <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full relative">
-              {/* Side Panel for Activity Log and Journal Entry */}
-              <AnimatePresence>
-                {showSidePanel && (
-                  <motion.div 
-                    initial={{ x: '-100%' }}
-                    animate={{ x: 0 }}
-                    exit={{ x: '-100%' }}
-                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    className="absolute inset-y-0 left-0 z-50 w-full lg:w-80 shadow-2xl lg:shadow-none lg:relative lg:inset-auto"
-                  >
-                    <div className="h-full bg-white border-r border-zinc-100 flex flex-col">
-                      <div className="p-4 border-b border-zinc-100 flex items-center justify-between lg:hidden">
-                        <h3 className="font-bold text-zinc-900">{t('common.activity_log')}</h3>
-                        <button onClick={() => setShowSidePanel(false)} className="p-2 text-zinc-400 hover:text-zinc-600">
-                          <X size={20} />
-                        </button>
-                      </div>
-                      <div className="flex-1 overflow-hidden">
-                        <TransactionSidePanel 
-                          documentId={''}
-                          category="returns" 
-                          previewJournalEntry={previewJournalEntry}
-                          previewActivityLog={previewActivityLog}
-                        />
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
 
-              <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32 md:pb-8">
-                <SmartAIInput transactionType="return" onDataExtracted={applyAiData} />
-                
-                <div className="flex flex-col lg:flex-row gap-6">
-                  <div className="flex-1 space-y-6">
-                    {/* Card 1: Basic Info */}
-                    <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
-                      <div className="flex items-center gap-2 mb-4 text-emerald-600">
-                        <FileText className="w-5 h-5" />
-                        <h2 className="font-semibold text-lg">{t('returns.basic_info')}</h2>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-2">{t('returns.form_customer')}</label>
-                          <div className="relative">
-                            <User className="absolute start-3 top-2.5 text-slate-400" size={16} />
-                            <select 
-                              required
-                              className="w-full ps-10 pe-10 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-800 appearance-none text-sm"
-                              value={selectedCustomerId}
-                              onChange={(e) => {
-                                if (e.target.value === 'new_customer') {
-                                  setIsCustomerModalOpen(true);
-                                } else {
-                                  setSelectedCustomerId(e.target.value);
-                                }
-                              }}
-                            >
-                              <option value="">{t('common.select_customer')}</option>
-                              {customers.map(c => (
-                                <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
-                              ))}
-                              <option value="new_customer" className="font-bold text-emerald-600">+ {t('customers.add')}</option>
-                            </select>
-                            <ChevronDown className="absolute end-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-2">{t('returns.form_date')}</label>
-                          <div className="relative">
-                            <Calendar className="absolute start-3 top-2.5 text-slate-400" size={16} />
-                            <input 
-                              required
-                              type="date"
-                              className="w-full ps-10 pe-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-800 text-sm"
-                              value={date}
-                              onChange={(e) => setDate(e.target.value)}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </section>
+            <div className="flex-1 flex justify-center">
+              <button 
+                type="button"
+                onClick={() => setShowSidePanel(!showSidePanel)}
+                className={`flex items-center gap-3 px-6 py-2.5 rounded-2xl text-sm font-black transition-all border shadow-sm ${showSidePanel ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'}`}
+              >
+                <History size={18} />
+                <span>{language === 'ar' ? 'قيد اليومية \\ سجل التعديلات' : 'Journal Entry / Activity Log'}</span>
+              </button>
+            </div>
 
-                    {/* Card 2: Payment settings */}
-                    <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
-                      <div className="flex items-center gap-2 mb-4 text-emerald-600">
-                        <Wallet className="w-5 h-5" />
-                        <h2 className="font-semibold text-lg">{t('returns.payment_settings')}</h2>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-3">{t('returns.form_payment_type')}</label>
-                          <div className="grid grid-cols-2 gap-3">
-                            <button
-                              type="button"
-                              onClick={() => setPaymentType('cash')}
-                              className={`py-2 rounded-lg font-bold transition-all border flex items-center justify-center gap-2 text-sm ${paymentType === 'cash' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
-                            >
-                              <Wallet size={16} />
-                              {t('returns.payment_cash')}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setPaymentType('credit')}
-                              className={`py-2 rounded-lg font-bold transition-all border flex items-center justify-center gap-2 text-sm ${paymentType === 'credit' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
-                            >
-                              <Layers size={16} />
-                              {t('returns.payment_credit')}
-                            </button>
-                          </div>
-                        </div>
-
-                        {paymentType === 'cash' && (
-                          <div className="animate-in slide-in-from-top-2 duration-200">
-                            <label className="block text-sm font-medium text-slate-700 mb-2">{t('returns.form_payment_method')}</label>
-                            <div className="relative">
-                              <CreditCard className="absolute start-3 top-2.5 text-slate-400" size={16} />
-                              <select 
-                                required
-                                className="w-full ps-10 pe-10 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-800 appearance-none text-sm"
-                                value={paymentMethodId}
-                                onChange={(e) => setPaymentMethodId(e.target.value)}
-                              >
-                                <option value="">{t('common.select_method')}</option>
-                                {paymentMethods.map(m => (
-                                  <option key={m.id} value={m.id}>{m.name}</option>
-                                ))}
-                              </select>
-                              <ChevronDown className="absolute end-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </section>
-
-                    {/* Card 3: Items */}
-                    <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
-                      <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-100">
-                        <div className="flex items-center gap-2">
-                          <Package className="w-5 h-5 text-emerald-600" />
-                          <h2 className="font-semibold text-lg">{t('returns.form_items')}</h2>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={addEmptyRow}
-                            className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-all border border-emerald-100"
-                          >
-                            <Plus size={14} />
-                            {t('returns.add_empty')}
-                          </button>
-                          <div className="relative">
-                            <select 
-                              className="ps-3 pe-8 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none font-bold text-slate-800 appearance-none h-full"
-                              onChange={(e) => {
-                                if (e.target.value === 'new_product') {
-                                  setIsProductModalOpen(true);
-                                  e.target.value = "";
-                                } else if (e.target.value !== "") {
-                                  addItem(e.target.value);
-                                  e.target.value = "";
-                                }
-                              }}
-                            >
-                              <option value="">{t('common.select_product')}</option>
-                              {products.map(p => (
-                                <option key={p.id} value={p.id}>{p.name} ({p.sale_price} {t('returns.currency')})</option>
-                              ))}
-                              <option value="new_product" className="font-bold text-emerald-600">+ {t('products.add')}</option>
-                            </select>
-                            <ChevronDown className="absolute end-2 top-2.5 w-3 h-3 text-slate-400 pointer-events-none" />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                        <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'} text-sm`}>
-                          <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200">
-                            <tr>
-                              <th className="px-4 py-4 w-12 text-center">{t('products.column_image')}</th>
-                              <th className="px-4 py-4">{t('returns.column_product')}</th>
-                              <th className="px-4 py-4 w-28 text-center">{t('returns.column_quantity')}</th>
-                              <th className="px-4 py-4 w-32 text-center">{t('returns.column_price')}</th>
-                              <th className={`px-4 py-4 w-32 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('returns.column_total')}</th>
-                              <th className="px-4 py-4 w-10"></th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {items.map((item, index) => (
-                              <tr key={index} className="hover:bg-slate-50/50 transition-colors group italic">
-                                <td className="px-4 py-3 text-center">
-                                  {item.product_image_url ? (
-                                    <img 
-                                      src={item.product_image_url} 
-                                      alt={item.product_name} 
-                                      className="w-10 h-10 object-cover rounded-lg mx-auto border border-slate-200 shadow-sm"
-                                      referrerPolicy="no-referrer"
-                                    />
-                                  ) : (
-                                    <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center mx-auto border border-slate-200">
-                                      <Box size={16} className="text-slate-300" />
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="px-4 py-3">
-                                  <div className="relative">
-                                    <select 
-                                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none font-bold text-slate-800 appearance-none text-xs focus:ring-2 focus:ring-emerald-500/20"
-                                      value={item.product_id}
-                                      onChange={(e) => updateItem(index, 'product_id', e.target.value)}
-                                    >
-                                      <option value="">{t('common.select_product')}</option>
-                                      {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                    </select>
-                                    <ChevronDown className="absolute end-2 top-2.5 w-3 h-3 text-slate-400 pointer-events-none" />
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <input 
-                                    type="number"
-                                    step="any"
-                                    className="w-full bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 px-3 py-2 text-xs outline-none text-center font-bold text-slate-800 transition-all border-dashed"
-                                    value={Number(item.quantity) || 0}
-                                    onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
-                                  />
-                                </td>
-                                <td className="px-4 py-3">
-                                  <input 
-                                    type="number"
-                                    step="any"
-                                    className="w-full bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 px-3 py-2 text-xs outline-none text-center font-bold text-slate-800 transition-all border-dashed"
-                                    value={Number(item.unit_price) || 0}
-                                    onChange={(e) => updateItem(index, 'unit_price', Number(e.target.value))}
-                                  />
-                                </td>
-                                <td className={`px-4 py-3 font-bold text-slate-900 text-xs ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                                  {formatNumber(item.total || 0)}
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                  <button 
-                                    type="button"
-                                    onClick={() => removeItem(index)}
-                                    className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                            {items.length === 0 && (
-                              <tr>
-                                <td colSpan={6} className="px-4 py-12 text-center text-slate-400 italic font-medium">{t('common.no_data')}</td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* Summary Section within Items Card */}
-                      <div className="mt-6 pt-6 border-t border-slate-100">
-                        <div className="flex justify-between items-center py-4 px-6 bg-slate-100 text-slate-900 rounded-2xl italic border border-slate-200">
-                          <span className="font-bold text-lg">{t('returns.summary_total')}</span>
-                          <div className="text-right">
-                            <span className="font-black text-2xl text-emerald-600">
-                              {formatNumber(items.reduce((sum, item) => sum + (item.total || 0), 0))} {t('returns.currency')}
-                            </span>
-                            <p className="text-[9px] uppercase tracking-widest text-slate-400 mt-1 font-black">إجمالي قيمة المرتجعات</p>
-                          </div>
-                        </div>
-                      </div>
-                    </section>
-                  </div>
-                </div>
-
-                <div className="pt-6 flex gap-4 sticky bottom-0 bg-white/80 backdrop-blur-md pb-4 md:pb-0 z-20 border-t border-slate-100">
+            <div className="flex items-center gap-4">
+              {editingReturn && (
+                <div className="hidden lg:flex items-center gap-2 bg-zinc-100 p-1.5 rounded-2xl">
                   <button 
                     type="button"
-                    onClick={closeModal}
-                    disabled={isSaving}
-                    className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all border border-slate-200 active:scale-95"
+                    onClick={handlePrevReturn}
+                    className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
+                    disabled={returns.findIndex(r => r.id === editingReturn.id) === 0}
                   >
-                    {t('common.cancel')}
+                    {dir === 'rtl' ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                    {language === 'ar' ? 'السابق' : 'Prev'}
                   </button>
                   <button 
-                    type="submit"
-                    disabled={items.length === 0 || selectedCustomerId === '' || isSaving}
-                    className="flex-[2] py-3 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-3"
+                    type="button"
+                    onClick={handleNextReturn}
+                    className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
+                    disabled={returns.findIndex(r => r.id === editingReturn.id) === returns.length - 1}
                   >
-                    {isSaving ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        {t('common.saving')}
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-5 h-5" />
-                        {editingReturn ? t('returns.edit') : t('returns.add')}
-                      </>
-                    )}
+                    {language === 'ar' ? 'التالي' : 'Next'}
+                    {dir === 'rtl' ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
                   </button>
                 </div>
-              </form>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsFullScreen(!isFullScreen)}
+                className="p-2 text-zinc-400 hover:bg-zinc-100 rounded-xl transition-all hidden md:block"
+                title={isFullScreen ? t('common.minimize') : t('common.maximize')}
+              >
+                {isFullScreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+              </button>
+              <h3 className="text-xl md:text-2xl font-black text-zinc-900 tracking-tight">
+                {editingReturn ? t('returns.edit') : t('returns.add')}
+              </h3>
+            </div>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full relative">
+            {/* Side Panel for Activity Log and Journal Entry */}
+            <AnimatePresence>
+              {showSidePanel && (
+                <motion.div 
+                  initial={{ x: '-100%' }}
+                  animate={{ x: 0 }}
+                  exit={{ x: '-100%' }}
+                  transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                  className="absolute inset-y-0 left-0 z-[80] w-full lg:w-96 shadow-2xl lg:shadow-none lg:relative lg:inset-auto"
+                >
+                  <div className="h-full bg-white border-r border-zinc-100 flex flex-col">
+                    <div className="p-4 border-b border-zinc-100 flex items-center justify-between lg:hidden">
+                      <h3 className="font-bold text-zinc-900">{t('common.activity_log')}</h3>
+                      <button onClick={() => setShowSidePanel(false)} className="p-2 text-zinc-400 hover:text-zinc-600">
+                        <X size={20} />
+                      </button>
+                    </div>
+                    <div className="flex-1 overflow-hidden">
+                      <TransactionSidePanel 
+                        documentId={editingReturn?.id || ''}
+                        category="returns" 
+                        previewJournalEntry={previewJournalEntry}
+                        previewActivityLog={previewActivityLog}
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32 md:pb-8">
+              <SmartAIInput transactionType="return" onDataExtracted={applyAiData} />
+              
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-3 space-y-6">
+                  {/* Card 1: Basic Info */}
+                  <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-orange-600 bg-orange-50 px-3 py-1 rounded-full border border-orange-100">
+                      <FileText className="w-4 h-4" />
+                      <span className="text-xs font-bold">{t('returns.basic_info')}</span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('returns.column_number')}</label>
+                        <div className="relative">
+                          <RotateCcw className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <input 
+                            readOnly
+                            type="text"
+                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl font-bold text-zinc-800 text-sm outline-none`}
+                            value={returnNumber}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('returns.form_customer')}</label>
+                        <div className="relative group">
+                          <User className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <select 
+                            required
+                            className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
+                            value={selectedCustomerId}
+                            onChange={(e) => {
+                              if (e.target.value === 'new_customer') {
+                                setIsCustomerModalOpen(true);
+                              } else {
+                                setSelectedCustomerId(e.target.value);
+                              }
+                            }}
+                          >
+                            <option value="">{t('common.select_customer')}</option>
+                            {customers.map(c => (
+                              <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+                            ))}
+                            <option value="new_customer" className="font-bold text-orange-600">+ {t('customers.add')}</option>
+                          </select>
+                          <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('returns.form_date')}</label>
+                        <div className="relative">
+                          <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <input 
+                            required
+                            type="date"
+                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                            value={date}
+                            onChange={(e) => setDate(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Card 2: Payment settings */}
+                  <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-orange-600 bg-orange-50 px-3 py-1 rounded-full border border-orange-100">
+                      <Wallet className="w-4 h-4" />
+                      <span className="text-xs font-bold">{t('returns.payment_settings')}</span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('returns.form_payment_type')}</label>
+                        <div className="grid grid-cols-2 gap-3 p-1 bg-zinc-100 rounded-2xl">
+                          <button
+                            type="button"
+                            onClick={() => setPaymentType('cash')}
+                            className={`py-2 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm ${paymentType === 'cash' ? 'bg-white text-orange-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+                          >
+                            <Wallet size={16} />
+                            {t('returns.payment_cash')}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPaymentType('credit')}
+                            className={`py-2 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm ${paymentType === 'credit' ? 'bg-white text-orange-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+                          >
+                            <Layers size={16} />
+                            {t('returns.payment_credit')}
+                          </button>
+                        </div>
+                      </div>
+
+                      {paymentType === 'cash' && (
+                        <div className="animate-in slide-in-from-top-2 duration-200">
+                          <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('returns.form_payment_method')}</label>
+                          <div className="relative group">
+                            <CreditCard className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                            <select 
+                              required
+                              className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
+                              value={paymentMethodId}
+                              onChange={(e) => setPaymentMethodId(e.target.value)}
+                            >
+                              <option value="">{t('common.select_method')}</option>
+                              {paymentMethods.map(m => (
+                                <option key={m.id} value={m.id}>{m.name}</option>
+                              ))}
+                            </select>
+                            <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+
+                  {/* Card 3: Items */}
+                  <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-orange-600 bg-orange-50 px-3 py-1 rounded-full border border-orange-100">
+                      <Package className="w-4 h-4" />
+                      <span className="text-xs font-bold">{t('returns.form_items')}</span>
+                    </div>
+
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsProductModalOpen(true);
+                          }}
+                          className="px-4 py-2 bg-orange-50 text-orange-600 rounded-xl text-xs font-bold border border-orange-100 hover:bg-orange-100 transition-all"
+                        >
+                          + {t('products.add')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={addEmptyRow}
+                          className="px-4 py-2 bg-zinc-100 text-zinc-600 rounded-xl text-xs font-bold hover:bg-zinc-200 transition-all"
+                        >
+                          <Plus size={14} className="inline-block me-1" />
+                          {t('returns.add_empty')}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
+                      <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'} text-sm`}>
+                        <thead className="bg-zinc-50 text-zinc-400 uppercase text-[10px] font-black tracking-widest border-b border-zinc-100">
+                          <tr>
+                            <th className="px-6 py-4 w-12 text-center">{t('products.column_image')}</th>
+                            <th className="px-6 py-4">{t('returns.column_product')}</th>
+                            <th className="px-6 py-4 w-28 text-center">{t('returns.column_quantity')}</th>
+                            <th className="px-6 py-4 w-32 text-center">{t('returns.column_price')}</th>
+                            <th className={`px-6 py-4 w-32 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('returns.column_total')}</th>
+                            <th className="px-6 py-4 w-10"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-50">
+                          {items.map((item, index) => (
+                            <tr key={index} className="hover:bg-zinc-50/50 transition-colors group">
+                              <td className="px-6 py-3 text-center">
+                                {item.product_image_url ? (
+                                  <img 
+                                    src={item.product_image_url} 
+                                    alt={item.product_name} 
+                                    className="w-10 h-10 object-cover rounded-xl mx-auto border border-zinc-100 shadow-sm"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 bg-zinc-50 rounded-xl flex items-center justify-center mx-auto border border-zinc-100">
+                                    <Box size={16} className="text-zinc-300" />
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-6 py-3">
+                                <div className="relative">
+                                  <select 
+                                    className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2.5 outline-none font-bold text-zinc-800 appearance-none text-xs focus:ring-2 focus:ring-orange-500 transition-all"
+                                    value={item.product_id}
+                                    onChange={(e) => updateItem(index, 'product_id', e.target.value)}
+                                  >
+                                    <option value="">{t('common.select_product')}</option>
+                                    {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                  </select>
+                                  <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                                </div>
+                              </td>
+                              <td className="px-6 py-3">
+                                <input 
+                                  type="number"
+                                  step="any"
+                                  className="w-full bg-zinc-50 border border-transparent focus:bg-white focus:ring-2 focus:ring-orange-500 rounded-xl px-4 py-2.5 text-xs outline-none text-center font-bold text-zinc-800 transition-all"
+                                  value={Number(item.quantity) || 0}
+                                  onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
+                                />
+                              </td>
+                              <td className="px-6 py-3">
+                                <input 
+                                  type="number"
+                                  step="any"
+                                  className="w-full bg-zinc-50 border border-transparent focus:bg-white focus:ring-2 focus:ring-orange-500 rounded-xl px-4 py-2.5 text-xs outline-none text-center font-bold text-zinc-800 transition-all"
+                                  value={Number(item.unit_price) || 0}
+                                  onChange={(e) => updateItem(index, 'unit_price', Number(e.target.value))}
+                                />
+                              </td>
+                              <td className={`px-6 py-3 font-bold text-zinc-900 text-sm ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                                {formatNumber(item.total || 0)}
+                              </td>
+                              <td className="px-6 py-3 text-center">
+                                <button 
+                                  type="button"
+                                  onClick={() => removeItem(index)}
+                                  className="p-2 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Summary Section */}
+                    <div className="mt-8 flex justify-end">
+                      <div className="bg-zinc-900 text-white rounded-3xl p-8 min-w-[300px] space-y-4 shadow-xl">
+                        <div className="flex justify-between items-center text-zinc-400 text-xs font-bold uppercase tracking-widest">
+                          <span>{t('returns.summary_total')}</span>
+                        </div>
+                        <div className="flex justify-between items-baseline gap-4">
+                          <span className="text-4xl font-black tracking-tighter text-orange-400">
+                            {formatNumber(items.reduce((sum, item) => sum + (item.total || 0), 0))}
+                          </span>
+                          <span className="font-bold text-zinc-400">{t('returns.currency')}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </div>
+
+              {/* Action Footer */}
+              <div className="flex gap-4 p-6 bg-zinc-50 border-t border-zinc-100 sticky bottom-0 z-[60] mt-auto">
+                <button 
+                  type="button"
+                  onClick={closeModal}
+                  disabled={isSaving}
+                  className="flex-1 py-4 bg-white text-zinc-600 rounded-2xl font-bold border border-zinc-200 hover:bg-zinc-100 transition-all active:scale-95 shadow-sm"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button 
+                  type="submit"
+                  disabled={items.length === 0 || selectedCustomerId === '' || isSaving}
+                  className="flex-[2] py-4 bg-orange-600 text-white rounded-2xl font-black uppercase tracking-wider hover:bg-orange-700 transition-all shadow-lg shadow-orange-500/20 active:scale-95 flex items-center justify-center gap-3"
+                >
+                  {isSaving ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Save className="w-6 h-6" />
+                  )}
+                  {editingReturn ? t('returns.edit') : t('returns.add')}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-      </div>
-    )}
+      )}
 
       {/* View Return Modal */}
       {viewReturn && (
