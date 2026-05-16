@@ -171,7 +171,16 @@ export class AccountingEngine {
       return { ...a, typeInfo: type };
     });
 
-    const isAccounts = mappedAccounts.filter(a => a.typeInfo?.statement_type === 'income_statement');
+    const isIncomeStatementType = (type: AccountType | undefined) => {
+      if (!type) return false;
+      // Primary check: classification
+      if (['revenue', 'cost', 'expense'].includes(type.classification)) return true;
+      if (['asset', 'liability', 'equity', 'liability_equity'].includes(type.classification)) return false;
+      // Secondary check: statement_type
+      return type.statement_type === 'income_statement';
+    };
+
+    const isAccounts = mappedAccounts.filter(a => isIncomeStatementType(a.typeInfo));
     
     const revenues = isAccounts.filter(a => a.typeInfo?.classification === 'revenue');
     const costs = isAccounts.filter(a => a.typeInfo?.classification === 'cost');
@@ -218,7 +227,16 @@ export class AccountingEngine {
       return { ...a, typeInfo: type };
     });
 
-    const bsAccounts = mappedAccounts.filter(a => a.typeInfo?.statement_type === 'balance_sheet');
+    const isBalanceSheetType = (type: AccountType | undefined) => {
+      if (!type) return false;
+      // Primary check: classification
+      if (['asset', 'liability', 'equity', 'liability_equity'].includes(type.classification)) return true;
+      if (['revenue', 'cost', 'expense'].includes(type.classification)) return false;
+      // Secondary check: statement_type
+      return type.statement_type === 'balance_sheet';
+    };
+
+    const bsAccounts = mappedAccounts.filter(a => isBalanceSheetType(a.typeInfo));
     
     // Calculate Net Profit for the entire period up to targetDate (Cumulative)
     const incomeStatement = this.calculateIncomeStatement(accounts, accountTypes, entries, startDate, endDate);

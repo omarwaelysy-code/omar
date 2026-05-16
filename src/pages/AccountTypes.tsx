@@ -227,6 +227,8 @@ export const AccountTypes: React.FC = () => {
                   </span>
                   <span className="inline-block text-[10px] font-bold text-zinc-600 bg-zinc-100 px-2 py-0.5 rounded-md uppercase tracking-wider">
                     {type.classification === 'asset' ? 'أصل' : 
+                     type.classification === 'liability' ? 'التزام' :
+                     type.classification === 'equity' ? 'حقوق ملكية' :
                      type.classification === 'liability_equity' ? 'التزام/حقوق ملكية' :
                      type.classification === 'revenue' ? 'إيراد' :
                      type.classification === 'cost' ? 'تكلفة' : 'مصروف'}

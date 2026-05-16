@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Account, AccountType } from '../types';
 import { dbService } from '../services/dbService';
-import { ChevronDown, ChevronRight, BookOpen, PieChart, Folder, FileText, BarChart3 } from 'lucide-react';
+import { ChevronDown, ChevronRight, BookOpen, PieChart, Folder, FileText, BarChart3, AlertTriangle } from 'lucide-react';
 
 interface TreeItemProps {
   label: string;
@@ -66,15 +66,17 @@ export const ChartOfAccounts: React.FC = () => {
     { id: 'revenue', label: 'الإيرادات', statement: 'income_statement' },
     { id: 'cost', label: 'التكاليف', statement: 'income_statement' },
     { id: 'expense', label: 'المصروفات', statement: 'income_statement' },
+    { id: 'other', label: 'أخرى / غير مصنف', statement: 'other' },
   ];
 
-  const renderAccountTree = (parentId: string | null, typeId: string, level: number) => {
+  const renderAccountTree = (parentId: string | null, typeId: string | null, level: number) => {
     const levelAccounts = accounts.filter(a => {
       // If we're looking for root accounts, they either have no parent_id or parent_id is empty/invalid
       if (parentId === null) {
-        return a.type_id === typeId && (!a.parent_id || a.parent_id === "");
+        const isRoot = !a.parent_id || a.parent_id === "" || !accounts.some(potentialParent => potentialParent.id === a.parent_id);
+        return a.type_id === typeId && isRoot;
       }
-      return a.type_id === typeId && a.parent_id === parentId;
+      return a.parent_id === parentId;
     });
 
     return levelAccounts.map(account => {
@@ -82,7 +84,7 @@ export const ChartOfAccounts: React.FC = () => {
       return (
         <TreeItem 
           key={account.id} 
-          label={`${account.code} - ${account.name}`} 
+          label={`${account.code} - ${account.name} (رصيد: ${account.opening_balance || 0})`} 
           icon={hasChildren ? Folder : FileText} 
           level={level}
         >
@@ -93,12 +95,39 @@ export const ChartOfAccounts: React.FC = () => {
   };
 
   const filterTypesByCls = (clsId: string) => {
+    if (clsId === 'other') {
+      const knownClassifications = ['asset', 'liability', 'equity', 'liability_equity', 'revenue', 'cost', 'expense'];
+      return types.filter(t => !t.classification || !knownClassifications.includes(t.classification));
+    }
     return types.filter(t => {
       if (clsId === 'liability_equity') {
         return ['liability', 'equity', 'liability_equity'].includes(t.classification);
       }
       return t.classification === clsId;
     });
+  };
+
+  const renderOrphanedAccounts = () => {
+    // Accounts with missing or invalid type
+    const orphaned = accounts.filter(a => {
+      const typeExists = types.some(t => t.id === a.type_id);
+      return !a.type_id || !typeExists;
+    });
+
+    if (orphaned.length === 0) return null;
+
+    return (
+      <TreeItem label="حسابات بدون تصنيف" icon={AlertTriangle} level={0}>
+        {orphaned.map(a => (
+          <TreeItem 
+            key={a.id} 
+            label={`${a.code} - ${a.name}`} 
+            icon={FileText} 
+            level={1}
+          />
+        ))}
+      </TreeItem>
+    );
   };
 
   if (loading) {
@@ -136,6 +165,7 @@ export const ChartOfAccounts: React.FC = () => {
                 ))}
               </TreeItem>
             ))}
+            {renderOrphanedAccounts()}
           </div>
         </div>
 
@@ -149,7 +179,7 @@ export const ChartOfAccounts: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            {classifications.filter(c => c.statement === 'income_statement').map(cls => (
+            {classifications.filter(c => c.statement === 'income_statement' || c.statement === 'other').map(cls => (
               <TreeItem key={cls.id} label={cls.label} icon={Folder} level={0} isOpenDefault={true}>
                 {filterTypesByCls(cls.id).map(type => (
                   <TreeItem key={type.id} label={`${type.code} - ${type.name}`} icon={Folder} level={1}>
