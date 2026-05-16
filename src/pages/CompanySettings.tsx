@@ -479,12 +479,18 @@ export function CompanySettings() {
 
             {/* Enable Multi-Currency Toggle */}
             <div className="md:col-span-2 pt-4 border-t border-zinc-50">
-              <label className="flex items-center gap-3 cursor-pointer group">
+              <div 
+                className="flex items-center gap-3 cursor-pointer group select-none"
+                onClick={() => setData(prev => ({ ...prev, enable_multi_currency: !prev.enable_multi_currency }))}
+              >
                 <div 
                   className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${data.enable_multi_currency ? 'bg-indigo-600' : 'bg-zinc-200'}`}
-                  onClick={() => setData({ ...data, enable_multi_currency: !data.enable_multi_currency })}
                 >
-                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${dir === 'rtl' ? (data.enable_multi_currency ? '-translate-x-7' : '-translate-x-1') : (data.enable_multi_currency ? 'translate-x-7' : 'translate-x-1')}`} />
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-200 ${
+                    dir === 'rtl'
+                      ? (data.enable_multi_currency ? 'right-7' : 'right-1')
+                      : (data.enable_multi_currency ? 'left-7' : 'left-1')
+                  }`} />
                 </div>
                 <div className="flex flex-col">
                   <span className="font-bold text-zinc-800 text-sm">
@@ -496,7 +502,7 @@ export function CompanySettings() {
                       : 'When enabled, you will be able to manage multiple currencies and exchange rates.'}
                   </span>
                 </div>
-              </label>
+              </div>
             </div>
           </div>
         </section>
