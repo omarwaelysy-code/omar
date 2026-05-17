@@ -145,6 +145,7 @@ export default function App() {
       if (id === 'super_admin_dashboard') return <SuperAdminDashboard />;
       if (id === 'companies') return <SuperAdminDashboard initialTab="companies" />;
       if (id === 'system_check') return <SuperAdminDashboard initialTab="system" />;
+      if (id === 'currencies') return <Currencies />;
       // Only show Super Admin dashboard for 'dashboard' if no specific company is selected or explicitly requested
       if (id === 'dashboard' && (!user?.company_id || user.company_id === 'system')) return <SuperAdminDashboard />;
     }
