@@ -131,6 +131,13 @@ export default function Currencies() {
     e.preventDefault();
     if (!user?.company_id) return;
 
+    // Check for duplicates
+    const isDuplicate = currencies.some(c => c.code.toLowerCase() === newCurrency.code.toLowerCase());
+    if (isDuplicate) {
+      toast.error(language === 'ar' ? 'هذه العملة مضافة بالفعل' : 'This currency is already added');
+      return;
+    }
+
     try {
       const currencyData: Omit<Currency, 'id'> = {
         ...newCurrency,
@@ -536,24 +543,37 @@ export default function Currencies() {
                     <div className="sticky top-0 bg-zinc-50 px-4 py-2 text-[10px] font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-100">
                       {language === 'ar' ? 'عملات شائعة' : 'Popular Currencies'}
                     </div>
-                    {WORLD_CURRENCIES.slice(0, 5).map(curr => (
-                      <button
-                        key={curr.code}
-                        type="button"
-                        onClick={() => selectWorldCurrency(curr)}
-                        className="w-full px-4 py-3 hover:bg-indigo-50/50 text-right flex items-center justify-between group transition-colors border-b border-zinc-50 last:border-0"
-                        style={{ direction: dir }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl drop-shadow-sm">{curr.flag}</span>
-                          <div className="text-right">
-                            <p className="text-sm font-bold text-zinc-800">{language === 'ar' ? curr.name_ar : curr.name_en}</p>
-                            <p className="text-[10px] text-zinc-400 font-mono tracking-tighter">{curr.code} • {curr.symbol}</p>
+                    {WORLD_CURRENCIES.slice(0, 5).map(curr => {
+                      const isAdded = currencies.some(c => c.code.toLowerCase() === curr.code.toLowerCase());
+                      return (
+                        <button
+                          key={curr.code}
+                          type="button"
+                          onClick={() => !isAdded && selectWorldCurrency(curr)}
+                          disabled={isAdded}
+                          className={`w-full px-4 py-3 text-right flex items-center justify-between group transition-colors border-b border-zinc-50 last:border-0 ${
+                            isAdded ? 'opacity-50 cursor-not-allowed bg-zinc-50/50' : 'hover:bg-indigo-50/50'
+                          }`}
+                          style={{ direction: dir }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl drop-shadow-sm">{curr.flag}</span>
+                            <div className="text-right">
+                              <p className="text-sm font-bold text-zinc-800">{language === 'ar' ? curr.name_ar : curr.name_en}</p>
+                              <p className="text-[10px] text-zinc-400 font-mono tracking-tighter">
+                                {curr.code} • {curr.symbol}
+                                {isAdded && (
+                                  <span className="mx-1 text-indigo-600 font-bold bg-indigo-50 px-1 rounded">
+                                    {language === 'ar' ? 'مضافة مسبقاً' : 'Added'}
+                                  </span>
+                                )}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                        <PlusCircle className="w-5 h-5 text-zinc-200 group-hover:text-indigo-600 transition-colors" />
-                      </button>
-                    ))}
+                          {!isAdded && <PlusCircle className="w-5 h-5 text-zinc-200 group-hover:text-indigo-600 transition-colors" />}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -563,24 +583,37 @@ export default function Currencies() {
                       {language === 'ar' ? 'نتائج البحث' : 'Search Results'}
                     </div>
                     {filteredWorldCurrencies.length > 0 ? (
-                      filteredWorldCurrencies.map(curr => (
-                        <button
-                          key={curr.code}
-                          type="button"
-                          onClick={() => selectWorldCurrency(curr)}
-                          className="w-full px-4 py-3 hover:bg-indigo-50/50 text-right flex items-center justify-between group transition-colors border-b border-zinc-50 last:border-0"
-                          style={{ direction: dir }}
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="text-2xl drop-shadow-sm">{curr.flag}</span>
-                            <div className="text-right">
-                              <p className="text-sm font-bold text-zinc-800">{language === 'ar' ? curr.name_ar : curr.name_en}</p>
-                              <p className="text-[10px] text-zinc-400 font-mono tracking-tighter">{curr.code} • {curr.symbol}</p>
+                      filteredWorldCurrencies.map(curr => {
+                        const isAdded = currencies.some(c => c.code.toLowerCase() === curr.code.toLowerCase());
+                        return (
+                          <button
+                            key={curr.code}
+                            type="button"
+                            onClick={() => !isAdded && selectWorldCurrency(curr)}
+                            disabled={isAdded}
+                            className={`w-full px-4 py-3 text-right flex items-center justify-between group transition-colors border-b border-zinc-50 last:border-0 ${
+                              isAdded ? 'opacity-50 cursor-not-allowed bg-zinc-50/50' : 'hover:bg-indigo-50/50'
+                            }`}
+                            style={{ direction: dir }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className="text-2xl drop-shadow-sm">{curr.flag}</span>
+                              <div className="text-right">
+                                <p className="text-sm font-bold text-zinc-800">{language === 'ar' ? curr.name_ar : curr.name_en}</p>
+                                <p className="text-[10px] text-zinc-400 font-mono tracking-tighter">
+                                  {curr.code} • {curr.symbol}
+                                  {isAdded && (
+                                    <span className="mx-1 text-indigo-600 font-bold bg-indigo-50 px-1 rounded">
+                                      {language === 'ar' ? 'مضافة مسبقاً' : 'Added'}
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                          <PlusCircle className="w-5 h-5 text-zinc-200 group-hover:text-indigo-600 transition-colors" />
-                        </button>
-                      ))
+                            {!isAdded && <PlusCircle className="w-5 h-5 text-zinc-200 group-hover:text-indigo-600 transition-colors" />}
+                          </button>
+                        );
+                      })
                     ) : (
                       <div className="p-8 text-center text-zinc-400 bg-white">
                         <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-20" />
