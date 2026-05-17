@@ -37,6 +37,8 @@ export default function Currencies() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [mainSearchQuery, setMainSearchQuery] = useState('');
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   // Search in selection
   const [searchQuery, setSearchQuery] = useState('');
@@ -88,13 +90,17 @@ export default function Currencies() {
       setCurrencies(currData);
       setCompany(compData);
       
+      // Initially, we only need the latest rate for each currency for the main view
       const ratesMap: Record<string, ExchangeRate[]> = {};
       for (const curr of currData) {
-        const rates = await dbService.list<ExchangeRate>('exchange_rates', [
-          { field: 'currency_id', operator: '==', value: curr.id },
-          { field: 'company_id', operator: '==', value: user.company_id }
-        ]);
-        ratesMap[curr.id] = rates.sort((a, b) => new Date(b.rate_date).getTime() - new Date(a.rate_date).getTime());
+        const latestRate = await dbService.list<ExchangeRate>('exchange_rates', {
+          currency_id: curr.id,
+          company_id: user.company_id,
+          _limit: 1,
+          _sort: 'rate_date',
+          _order: 'desc'
+        });
+        ratesMap[curr.id] = latestRate;
       }
       setExchangeRates(ratesMap);
     } catch (error) {
@@ -102,6 +108,24 @@ export default function Currencies() {
       toast.error(t('common.error'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadHistory = async (currencyId: string) => {
+    if (!user?.company_id) return;
+    setLoadingHistory(true);
+    try {
+      const rates = await dbService.list<ExchangeRate>('exchange_rates', [
+        { field: 'currency_id', operator: '==', value: currencyId },
+        { field: 'company_id', operator: '==', value: user.company_id }
+      ]);
+      const sorted = rates.sort((a, b) => new Date(b.rate_date).getTime() - new Date(a.rate_date).getTime());
+      setExchangeRates(prev => ({ ...prev, [currencyId]: sorted }));
+    } catch (error) {
+      console.error('Failed to load rate history:', error);
+      toast.error(t('common.error'));
+    } finally {
+      setLoadingHistory(false);
     }
   };
 
@@ -223,6 +247,20 @@ export default function Currencies() {
     setSearchQuery('');
   };
 
+  const filteredCurrencies = currencies.filter(curr => {
+    const query = mainSearchQuery.toLowerCase();
+    const latestRate = exchangeRates[curr.id]?.[0];
+    const rateValue = latestRate?.exchange_rate.toString() || '';
+    
+    return (
+      curr.code.toLowerCase().includes(query) ||
+      curr.name_ar.toLowerCase().includes(query) ||
+      curr.name_en.toLowerCase().includes(query) ||
+      curr.symbol.toLowerCase().includes(query) ||
+      rateValue.includes(query)
+    );
+  });
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -243,8 +281,20 @@ export default function Currencies() {
             {t('currencies.subtitle')}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex bg-zinc-100 p-1 rounded-lg mr-2">
+        <div className="flex flex-col md:flex-row items-center gap-3">
+          {/* Main Search Bar */}
+          <div className="relative w-full md:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+            <input
+              type="text"
+              placeholder={language === 'ar' ? 'بحث في العملات والقيمة...' : 'Search currencies and value...'}
+              className="w-full bg-white border border-zinc-200 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+              value={mainSearchQuery}
+              onChange={e => setMainSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <div className="flex bg-zinc-100 p-1 rounded-lg">
             <button
               onClick={() => setViewMode('grid')}
               className={`p-1.5 rounded-md transition-all ${
@@ -270,7 +320,7 @@ export default function Currencies() {
           </div>
           <button
             onClick={() => setIsAddCurrencyOpen(true)}
-            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors w-full md:w-auto justify-center"
+            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors w-full md:w-auto justify-center whitespace-nowrap"
           >
             <Plus className="w-5 h-5" />
             {t('currencies.add')}
@@ -294,7 +344,7 @@ export default function Currencies() {
 
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {currencies.map(curr => {
+          {filteredCurrencies.map(curr => {
             const latestRate = exchangeRates[curr.id]?.[0];
             return (
               <div key={curr.id} className="bg-white border border-zinc-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
@@ -325,7 +375,7 @@ export default function Currencies() {
                     <div className="flex flex-col">
                       <span className="text-[10px] text-zinc-400 uppercase font-bold">{t('currencies.rate')}</span>
                       <span className="text-lg font-bold text-zinc-800">
-                        {latestRate ? latestRate.exchange_rate.toLocaleString() : '---'}
+                        {latestRate ? latestRate.exchange_rate.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '---'}
                       </span>
                     </div>
                     <div className="flex flex-col items-end">
@@ -351,6 +401,7 @@ export default function Currencies() {
                       onClick={() => {
                         setSelectedCurrency(curr);
                         setIsHistoryOpen(true);
+                        loadHistory(curr.id);
                       }}
                       className="w-12 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-xl hover:bg-zinc-200 transition-colors"
                     >
@@ -361,6 +412,12 @@ export default function Currencies() {
               </div>
             );
           })}
+          {filteredCurrencies.length === 0 && (
+            <div className="col-span-full py-12 text-center text-zinc-400 bg-zinc-50 rounded-2xl border-2 border-dashed border-zinc-200">
+              <Search className="w-12 h-12 mx-auto mb-4 opacity-10" />
+              <p>{t('common.no_results')}</p>
+            </div>
+          )}
         </div>
       ) : (
         <div className="bg-white border border-zinc-100 rounded-2xl overflow-hidden shadow-sm">
@@ -377,7 +434,7 @@ export default function Currencies() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
-                {currencies.map(curr => {
+                {filteredCurrencies.map(curr => {
                   const latestRate = exchangeRates[curr.id]?.[0];
                   return (
                     <tr key={curr.id} className="hover:bg-zinc-50/50 transition-colors">
@@ -392,7 +449,7 @@ export default function Currencies() {
                       <td className="px-6 py-4 text-center">
                         {latestRate ? (
                           <div className="flex flex-col">
-                            <span className="font-bold text-zinc-800">{latestRate.exchange_rate.toLocaleString()}</span>
+                            <span className="font-bold text-zinc-800">{latestRate.exchange_rate.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                             <span className="text-[10px] text-zinc-400 font-mono italic">{format(new Date(latestRate.rate_date), 'dd/MM/yyyy')}</span>
                           </div>
                         ) : (
@@ -427,6 +484,7 @@ export default function Currencies() {
                             onClick={() => {
                               setSelectedCurrency(curr);
                               setIsHistoryOpen(true);
+                              loadHistory(curr.id);
                             }}
                             className="p-2 text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
                             title={t('currencies.history')}
@@ -438,6 +496,13 @@ export default function Currencies() {
                     </tr>
                   );
                 })}
+                {filteredCurrencies.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-zinc-400 italic">
+                      {t('common.no_results')}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -719,7 +784,14 @@ export default function Currencies() {
             </div>
             
             <div className="flex-1 overflow-y-auto p-0">
-              {(() => {
+              {loadingHistory ? (
+                <div className="flex flex-col items-center justify-center p-12 space-y-4">
+                  <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest animate-pulse">
+                    {language === 'ar' ? 'جاري تحميل السجل...' : 'Loading history...'}
+                  </p>
+                </div>
+              ) : (() => {
                 let filteredRates = (exchangeRates[selectedCurrency.id] || []);
                 if (historySearchQuery) {
                   const query = historySearchQuery.toLowerCase();
