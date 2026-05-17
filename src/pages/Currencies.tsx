@@ -696,9 +696,10 @@ export default function Currencies() {
                   <div>
                     <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{t('currencies.name_ar')}</label>
                     <input
+                      readOnly
                       required
                       type="text"
-                      className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                      className="w-full bg-zinc-100 border border-zinc-200 rounded-xl px-4 py-3 focus:outline-none opacity-70 cursor-not-allowed"
                       value={newCurrency.name_ar}
                       onChange={e => setNewCurrency({ ...newCurrency, name_ar: e.target.value })}
                     />
@@ -706,9 +707,10 @@ export default function Currencies() {
                   <div>
                     <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{t('currencies.name_en')}</label>
                     <input
+                      readOnly
                       required
                       type="text"
-                      className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                      className="w-full bg-zinc-100 border border-zinc-200 rounded-xl px-4 py-3 focus:outline-none opacity-70 cursor-not-allowed"
                       value={newCurrency.name_en}
                       onChange={e => setNewCurrency({ ...newCurrency, name_en: e.target.value })}
                     />
@@ -716,9 +718,10 @@ export default function Currencies() {
                   <div className="col-span-2">
                     <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{t('currencies.symbol')}</label>
                     <input
+                      readOnly
                       required
                       type="text"
-                      className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                      className="w-full bg-zinc-100 border border-zinc-200 rounded-xl px-4 py-3 focus:outline-none opacity-70 cursor-not-allowed font-mono"
                       value={newCurrency.symbol}
                       onChange={e => setNewCurrency({ ...newCurrency, symbol: e.target.value })}
                     />
