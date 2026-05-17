@@ -309,7 +309,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       
       return canView ? item : null;
     }).filter(Boolean) as typeof navItems;
-  }, [user, isSuperAdmin, isCompanyAdmin, hasPermission]);
+  }, [user, isSuperAdmin, isCompanyAdmin, hasPermission, company]);
 
   // Update nav item click to use openTab
   const handleNavClick = (id: string, label: string, path?: string) => {
