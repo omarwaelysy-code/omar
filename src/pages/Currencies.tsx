@@ -41,6 +41,11 @@ export default function Currencies() {
   // Search in selection
   const [searchQuery, setSearchQuery] = useState('');
   
+  // History Filters
+  const [historySearchQuery, setHistorySearchQuery] = useState('');
+  const [historyDateFrom, setHistoryDateFrom] = useState('');
+  const [historyDateTo, setHistoryDateTo] = useState('');
+  
   // Forms
   const [newCurrency, setNewCurrency] = useState({
     code: '',
@@ -663,34 +668,91 @@ export default function Currencies() {
                   <p className="text-xs text-zinc-400">{language === 'ar' ? selectedCurrency.name_ar : selectedCurrency.name_en}</p>
                 </div>
               </div>
-              <button onClick={() => setIsHistoryOpen(false)} className="text-zinc-400 hover:text-zinc-600">
+              <button onClick={() => {
+                setIsHistoryOpen(false);
+                setHistorySearchQuery('');
+                setHistoryDateFrom('');
+                setHistoryDateTo('');
+              }} className="text-zinc-400 hover:text-zinc-600">
                 <X className="w-6 h-6" />
               </button>
             </div>
+
+            {/* History Filters */}
+            <div className="p-4 bg-zinc-50 border-b border-zinc-100 grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                <input
+                  type="text"
+                  placeholder={language === 'ar' ? 'بحث في القيمة أو الملاحظات...' : 'Search rate or notes...'}
+                  className="w-full bg-white border border-zinc-200 rounded-lg pl-10 pr-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                  value={historySearchQuery}
+                  onChange={e => setHistorySearchQuery(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-zinc-400 shrink-0" />
+                <input
+                  type="date"
+                  className="flex-1 bg-white border border-zinc-200 rounded-lg px-3 py-2 text-xs focus:outline-none"
+                  value={historyDateFrom}
+                  onChange={e => setHistoryDateFrom(e.target.value)}
+                  title={language === 'ar' ? 'من تاريخ' : 'From date'}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-zinc-400 shrink-0" />
+                <input
+                  type="date"
+                  className="flex-1 bg-white border border-zinc-200 rounded-lg px-3 py-2 text-xs focus:outline-none"
+                  value={historyDateTo}
+                  onChange={e => setHistoryDateTo(e.target.value)}
+                  title={language === 'ar' ? 'إلى تاريخ' : 'To date'}
+                />
+              </div>
+            </div>
             
-            <div className="border-b border-zinc-100 bg-zinc-50 px-6 py-3 grid grid-cols-4 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+            <div className="border-b border-zinc-100 bg-zinc-50/50 px-6 py-3 grid grid-cols-4 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
               <div className="col-span-1">{t('currencies.rate')}</div>
               <div className="col-span-1">{t('currencies.rate_date')}</div>
               <div className="col-span-2">{t('common.notes')}</div>
             </div>
             
             <div className="flex-1 overflow-y-auto p-0">
-              {(exchangeRates[selectedCurrency.id] || []).length > 0 ? (
-                (exchangeRates[selectedCurrency.id] || []).map((rate, idx) => (
-                  <div 
-                    key={rate.id} 
-                    className={`px-6 py-4 grid grid-cols-4 items-center text-sm border-b border-zinc-100 last:border-0 hover:bg-zinc-50 transition-colors ${idx === 0 ? 'bg-indigo-50/30' : ''}`}
-                  >
-                    <div className="col-span-1 font-bold text-zinc-800">{rate.exchange_rate.toLocaleString()}</div>
-                    <div className="col-span-1 text-zinc-500 font-mono text-xs">{format(new Date(rate.rate_date), 'dd/MM/yyyy')}</div>
-                    <div className="col-span-2 text-zinc-400 text-xs italic">{rate.notes || '---'}</div>
+              {(() => {
+                let filteredRates = (exchangeRates[selectedCurrency.id] || []);
+                if (historySearchQuery) {
+                  const query = historySearchQuery.toLowerCase();
+                  filteredRates = filteredRates.filter(r => 
+                    r.exchange_rate.toString().includes(query) || 
+                    (r.notes || '').toLowerCase().includes(query)
+                  );
+                }
+                if (historyDateFrom) {
+                  filteredRates = filteredRates.filter(r => r.rate_date >= historyDateFrom);
+                }
+                if (historyDateTo) {
+                  filteredRates = filteredRates.filter(r => r.rate_date <= historyDateTo);
+                }
+
+                if (filteredRates.length > 0) {
+                  return filteredRates.map((rate, idx) => (
+                    <div 
+                      key={rate.id} 
+                      className={`px-6 py-4 grid grid-cols-4 items-center text-sm border-b border-zinc-100 last:border-0 hover:bg-zinc-50 transition-colors ${idx === 0 && !historySearchQuery && !historyDateFrom && !historyDateTo ? 'bg-indigo-50/30' : ''}`}
+                    >
+                      <div className="col-span-1 font-bold text-zinc-800">{rate.exchange_rate.toLocaleString()}</div>
+                      <div className="col-span-1 text-zinc-500 font-mono text-xs">{format(new Date(rate.rate_date), 'dd/MM/yyyy')}</div>
+                      <div className="col-span-2 text-zinc-400 text-xs italic">{rate.notes || '---'}</div>
+                    </div>
+                  ));
+                }
+                return (
+                  <div className="p-12 text-center text-zinc-400 italic">
+                    {t('common.no_data')}
                   </div>
-                ))
-              ) : (
-                <div className="p-12 text-center text-zinc-400 italic">
-                  {t('common.no_data')}
-                </div>
-              )}
+                );
+              })()}
             </div>
           </div>
         </div>
