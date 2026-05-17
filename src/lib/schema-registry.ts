@@ -137,7 +137,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'id', 'company_id', 'user_id', 'username', 'user_email', 'action', 'module', 'details', 'entity_type', 'entity_id', 'ip_address', 'metadata', 'created_at'
   ],
   currencies: [
-    'id', 'company_id', 'code', 'name_ar', 'name_en', 'symbol', 'is_active', 'created_at'
+    'id', 'company_id', 'code', 'name_ar', 'name_en', 'symbol', 'flag', 'is_active', 'created_at'
   ],
   exchange_rates: [
     'id', 'company_id', 'currency_id', 'exchange_rate', 'rate_date', 'notes', 'created_by', 'created_at'

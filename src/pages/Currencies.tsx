@@ -81,9 +81,7 @@ export default function Currencies() {
     if (!user?.company_id) return;
     try {
       const [currData, compData] = await Promise.all([
-        dbService.list<Currency>('currencies', [
-          { field: 'company_id', operator: '==', value: user.company_id }
-        ]),
+        dbService.list<Currency>('currencies', user.company_id),
         dbService.get<Company>('companies', user.company_id)
       ]);
       
@@ -115,10 +113,10 @@ export default function Currencies() {
     if (!user?.company_id) return;
     setLoadingHistory(true);
     try {
-      const rates = await dbService.list<ExchangeRate>('exchange_rates', [
-        { field: 'currency_id', operator: '==', value: currencyId },
-        { field: 'company_id', operator: '==', value: user.company_id }
-      ]);
+      const rates = await dbService.list<ExchangeRate>('exchange_rates', {
+        currency_id: currencyId,
+        company_id: user.company_id
+      });
       const sorted = rates.sort((a, b) => new Date(b.rate_date).getTime() - new Date(a.rate_date).getTime());
       setExchangeRates(prev => ({ ...prev, [currencyId]: sorted }));
     } catch (error) {
@@ -532,6 +530,32 @@ export default function Currencies() {
                     onChange={e => setSearchQuery(e.target.value)}
                   />
                 </div>
+
+                {!searchQuery && (
+                  <div className="bg-white border border-zinc-100 rounded-xl max-h-60 overflow-y-auto shadow-sm">
+                    <div className="sticky top-0 bg-zinc-50 px-4 py-2 text-[10px] font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-100">
+                      {language === 'ar' ? 'عملات شائعة' : 'Popular Currencies'}
+                    </div>
+                    {WORLD_CURRENCIES.slice(0, 5).map(curr => (
+                      <button
+                        key={curr.code}
+                        type="button"
+                        onClick={() => selectWorldCurrency(curr)}
+                        className="w-full px-4 py-3 hover:bg-indigo-50/50 text-right flex items-center justify-between group transition-colors border-b border-zinc-50 last:border-0"
+                        style={{ direction: dir }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl drop-shadow-sm">{curr.flag}</span>
+                          <div className="text-right">
+                            <p className="text-sm font-bold text-zinc-800">{language === 'ar' ? curr.name_ar : curr.name_en}</p>
+                            <p className="text-[10px] text-zinc-400 font-mono tracking-tighter">{curr.code} • {curr.symbol}</p>
+                          </div>
+                        </div>
+                        <PlusCircle className="w-5 h-5 text-zinc-200 group-hover:text-indigo-600 transition-colors" />
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {searchQuery && (
                   <div className="bg-white border border-indigo-100 rounded-xl max-h-60 overflow-y-auto shadow-lg z-20 relative">

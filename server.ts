@@ -77,7 +77,10 @@ async function startServer() {
       'ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "logo_url" TEXT',
       'ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "country" VARCHAR(100)',
       'ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "currency" VARCHAR(50)',
-      'ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "fiscal_year_end" DATE'
+      'ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "fiscal_year_end" DATE',
+      
+      // Currencies
+      'ALTER TABLE "currencies" ADD COLUMN IF NOT EXISTS "flag" VARCHAR(20)'
     ];
     
     for (const q of syncQueries) {

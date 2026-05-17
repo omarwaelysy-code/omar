@@ -56,7 +56,10 @@ export const dbService = {
     return apiRequest<T[]>(`/${collectionName}`);
   },
 
-  async list<T>(collectionName: string, options?: string | { company_id?: string; [key: string]: any }): Promise<T[]> {
+  async list<T>(collectionName: string, options?: string | any[] | { company_id?: string; [key: string]: any }): Promise<T[]> {
+    if (Array.isArray(options)) {
+      return dbService.query<T>(collectionName, options as any);
+    }
     const params = new URLSearchParams();
     if (options) {
       if (typeof options === 'string') {
@@ -73,11 +76,15 @@ export const dbService = {
     return apiRequest<T[]>(`/${collectionName}${queryString ? '?' + queryString : ''}`);
   },
 
-  async listPaginated<T>(collectionName: string, options?: string | { company_id?: string; [key: string]: any }): Promise<{ data: T[], total: number, summary: any, page: number, limit: number }> {
+  async listPaginated<T>(collectionName: string, options?: string | any[] | { company_id?: string; [key: string]: any }): Promise<{ data: T[], total: number, summary: any, page: number, limit: number }> {
     const params = new URLSearchParams();
     if (options) {
       if (typeof options === 'string') {
         params.append('company_id', options);
+      } else if (Array.isArray(options)) {
+        options.forEach(c => {
+          params.append(c.field, c.value);
+        });
       } else {
         Object.entries(options).forEach(([key, value]) => {
           if (value !== undefined && value !== null) {
