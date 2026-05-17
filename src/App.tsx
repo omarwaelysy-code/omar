@@ -65,7 +65,7 @@ import { AnimatePresence } from 'framer-motion';
 
 export default function App() {
   const { t, dir } = useLanguage();
-  const { isAuthenticated, loading: authLoading, isSuperAdmin } = useAuth();
+  const { isAuthenticated, loading: authLoading, isSuperAdmin, user } = useAuth();
   const { currentPage, setCurrentPage, openTabs, activeTabId } = useNavigation();
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(true);
@@ -140,13 +140,13 @@ export default function App() {
 
   function getPageComponent(id: string) {
     // Role-based access control for pages
-    // Super Admin should NEVER see regular tenant pages
+    // Super Admin specific pages
     if (isSuperAdmin) {
-      if (id === 'dashboard' || id === 'super_admin_dashboard') return <SuperAdminDashboard />;
+      if (id === 'super_admin_dashboard') return <SuperAdminDashboard />;
       if (id === 'companies') return <SuperAdminDashboard initialTab="companies" />;
-      if (id === 'users') return <SuperAdminDashboard initialTab="users" />;
       if (id === 'system_check') return <SuperAdminDashboard initialTab="system" />;
-      if (id === 'activity_log' || id === 'audit_logs') return <SuperAdminDashboard initialTab="audit" />;
+      // Only show Super Admin dashboard for 'dashboard' if no specific company is selected or explicitly requested
+      if (id === 'dashboard' && (!user?.company_id || user.company_id === 'system')) return <SuperAdminDashboard />;
     }
 
     switch (id) {

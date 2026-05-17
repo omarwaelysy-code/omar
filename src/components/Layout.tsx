@@ -246,6 +246,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         subItems: [
           { id: 'account_types', label: t('nav.account_types'), icon: PieChart },
           { id: 'accounts', label: t('nav.accounts'), icon: BookOpen },
+          ...(company?.settings?.enable_multi_currency || isSuperAdmin ? [{ id: 'currencies', label: t('nav.currencies'), icon: Coins }] : []),
           { id: 'chart_of_accounts', label: t('nav.chart_of_accounts'), icon: PieChart },
           { id: 'create_journal_entry', label: t('nav.create_journal_entry'), icon: Plus },
           { id: 'journal_entries', label: t('nav.journal_entries'), icon: FileText },
@@ -280,7 +281,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'integrity_dashboard', label: t('nav.integrity_check') || 'Integrity Check', icon: ShieldCheck },
           { id: 'backup_restore', label: t('nav.backup_restore'), icon: Database },
           { id: 'activity_log', label: t('nav.activity_log'), icon: History },
-          ...(company?.settings?.enable_multi_currency === true || (company?.settings as any)?.enable_multi_currency === 'true' ? [{ id: 'currencies', label: t('nav.currencies'), icon: Coins }] : [])
+          ...(company?.settings?.enable_multi_currency || (company?.settings as any)?.enable_multi_currency === 'true' || isSuperAdmin ? [{ id: 'currencies', label: t('nav.currencies'), icon: Coins }] : [])
         ]
       }
     ];
@@ -289,6 +290,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       { id: 'dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
       { id: 'companies', label: t('nav.companies'), icon: Building2 },
       { id: 'users', label: t('nav.users'), icon: UsersIcon },
+      { id: 'currencies', label: t('nav.currencies'), icon: Coins },
       { id: 'system_check', label: 'System Integrity', icon: ShieldCheck },
       { id: 'activity_log', label: 'Audit Logs', icon: History },
     ];
