@@ -92,8 +92,7 @@ export default function Currencies() {
       const currencyData: Omit<Currency, 'id'> = {
         ...newCurrency,
         company_id: user.company_id,
-        created_at: new Date().toISOString(),
-        is_active: true
+        created_at: new Date().toISOString()
       };
 
       const id = await dbService.add('currencies', currencyData);
@@ -329,6 +328,23 @@ export default function Currencies() {
                     value={newCurrency.symbol}
                     onChange={e => setNewCurrency({ ...newCurrency, symbol: e.target.value })}
                   />
+                </div>
+                
+                <div className="col-span-2 pt-2">
+                  <button 
+                    type="button"
+                    onClick={() => setNewCurrency(prev => ({ ...prev, is_active: !prev.is_active }))}
+                    className="flex items-center gap-3 cursor-pointer select-none"
+                  >
+                    <div className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${newCurrency.is_active ? 'bg-green-600' : 'bg-zinc-200'}`}>
+                      <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all duration-200 ${
+                        dir === 'rtl' 
+                          ? (newCurrency.is_active ? 'right-5.5' : 'right-0.5')
+                          : (newCurrency.is_active ? 'left-5.5' : 'left-0.5')
+                      }`} />
+                    </div>
+                    <span className="text-sm font-bold text-zinc-700">{t('common.status')} ({newCurrency.is_active ? t('common.active') : t('common.inactive')})</span>
+                  </button>
                 </div>
               </div>
               <button

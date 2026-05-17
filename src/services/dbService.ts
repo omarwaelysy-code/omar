@@ -301,5 +301,36 @@ export const dbService = {
       { field: 'reference_id', operator: '==', value: referenceId }
     ]);
     return entries.length > 0 ? entries[0] : null;
+  },
+
+  listen<T>(collectionName: string, id: string, callback: (data: T | null) => void) {
+    let lastData = '';
+    const fetchData = async () => {
+      try {
+        const data = await dbService.get<T>(collectionName, id);
+        const dataString = JSON.stringify(data);
+        if (dataString !== lastData) {
+          lastData = dataString;
+          callback(data);
+        }
+      } catch (err) {
+        console.error('Listen polling error:', err);
+      }
+    };
+
+    fetchData();
+    const interval = setInterval(fetchData, 2000);
+    
+    const handleRefresh = (e: any) => {
+      if (e.detail?.collection === collectionName) {
+        fetchData();
+      }
+    };
+    window.addEventListener('db-refresh', handleRefresh as EventListener);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('db-refresh', handleRefresh as EventListener);
+    };
   }
 };

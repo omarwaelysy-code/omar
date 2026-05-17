@@ -252,6 +252,10 @@ export interface Invoice {
   payment_status?: 'paid' | 'unpaid' | 'partial' | 'partially_paid';
   items?: InvoiceItem[];
   company_id: string;
+  currency_id?: string;
+  currency_code?: string;
+  exchange_rate?: number;
+  total_base_amount?: number;
 }
 
 export interface PurchaseInvoice {
@@ -270,6 +274,10 @@ export interface PurchaseInvoice {
   payment_status?: 'paid' | 'unpaid' | 'partial' | 'partially_paid';
   items?: InvoiceItem[];
   company_id: string;
+  currency_id?: string;
+  currency_code?: string;
+  exchange_rate?: number;
+  total_base_amount?: number;
 }
 
 export interface InvoiceItem {

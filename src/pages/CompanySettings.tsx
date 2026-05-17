@@ -180,8 +180,8 @@ export function CompanySettings() {
             // Fallback for native Date objects or other formats
             const d = new Date(company.fiscal_year_end);
             if (!isNaN(d.getTime())) {
-              fday = d.getDate();
-              fmonth = d.getMonth() + 1;
+              fday = d.getUTCDate();
+              fmonth = d.getUTCMonth() + 1;
             }
           }
         }
@@ -195,7 +195,7 @@ export function CompanySettings() {
             tax_number: company.tax_number || '',
             country: company.country || '',
             address: company.address || '',
-            currency: company.currency || 'EGP',
+            currency: company.settings?.currency || company.currency || 'EGP',
             fiscal_year_day: fday,
             fiscal_year_month: fmonth,
             enable_multi_currency: company.settings?.enable_multi_currency || false
@@ -230,10 +230,10 @@ export function CompanySettings() {
         tax_number: data.tax_number,
         country: data.country,
         address: data.address,
-        currency: data.currency,
         fiscal_year_end: fiscalYearEnd,
         settings: {
           ...originalSettings,
+          currency: data.currency,
           enable_multi_currency: data.enable_multi_currency
         }
       });
@@ -241,6 +241,7 @@ export function CompanySettings() {
       // Update local original settings to reflect the save
       setOriginalSettings({
         ...originalSettings,
+        currency: data.currency,
         enable_multi_currency: data.enable_multi_currency
       });
       

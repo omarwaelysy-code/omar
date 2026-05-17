@@ -85,21 +85,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       setShowChangePasswordModal(true);
     }
     
-    const loadCompany = async () => {
-      if (user?.company_id) {
-        try {
-          const compData = await dbService.get<Company>('companies', user.company_id);
-          if (compData) {
-            setCompany(compData);
-          }
-        } catch (error) {
-          console.error('Failed to load company data for layout:', error);
-        }
+    if (!user?.company_id) return;
+
+    // Use onSnapshot for real-time company updates
+    const unsubscribe = dbService.listen<Company>('companies', user.company_id, (compData) => {
+      if (compData) {
+        setCompany(compData);
       }
-    };
+    });
     
-    loadCompany();
-  }, [user]);
+    return () => unsubscribe();
+  }, [user?.company_id]);
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();

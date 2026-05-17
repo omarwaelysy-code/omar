@@ -28,10 +28,11 @@ import { ActivityLog } from '../types';
 import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { PaginationControls } from '../components/PaginationControls';
+// Currency import removed for now from view cleanup
 
 export const PurchaseInvoices: React.FC = () => {
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -47,6 +48,18 @@ export const PurchaseInvoices: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [isExpenseCategoryModalOpen, setIsExpenseCategoryModalOpen] = useState(false);
+  const [isPaymentMethodModalOpen, setIsPaymentMethodModalOpen] = useState(false);
+  const [showSidePanel, setShowSidePanel] = useState(false);
+  const [previewJournalEntry, setPreviewJournalEntry] = useState<any | null>(null);
+  const [previewActivityLog, setPreviewActivityLog] = useState<any | null>(null);
+  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
+  const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
+  const [view, setView] = useViewPreference('purchase_invoices', 'table');
   const handleSort = (field: string) => {
     if (sortBy === field) {
       setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
@@ -65,18 +78,6 @@ export const PurchaseInvoices: React.FC = () => {
   const [serverSummary, setServerSummary] = useState<any>({});
   const [maxSeqGenerated, setMaxSeqGenerated] = useState<number>(0);
   const [viewInvoice, setViewInvoice] = useState<any | null>(null);
-  const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
-  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
-  const [isExpenseCategoryModalOpen, setIsExpenseCategoryModalOpen] = useState(false);
-  const [isPaymentMethodModalOpen, setIsPaymentMethodModalOpen] = useState(false);
-  const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
-  const [showSidePanel, setShowSidePanel] = useState(false);
-  const [isFullScreen, setIsFullScreen] = useState(false);
-  const [invoiceNumber, setInvoiceNumber] = useState('');
-  const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
-  const [previewJournalEntry, setPreviewJournalEntry] = useState<JournalEntry | null>(null);
-  const [previewActivityLog, setPreviewActivityLog] = useState<Partial<ActivityLog> | null>(null);
-  const [view, setView] = useViewPreference('purchase_invoices', 'table');
 
   const [supplierFormData, setSupplierFormData] = useState({
     name: '',
@@ -224,6 +225,7 @@ export const PurchaseInvoices: React.FC = () => {
     const generatePreview = () => {
       const subtotal = (items || []).reduce((sum, item) => sum + item.total, 0);
       const total_amount = subtotal - invoiceData.discount;
+      
       if (subtotal <= 0) {
         setPreviewJournalEntry(null);
         setPreviewActivityLog(null);
@@ -743,7 +745,7 @@ export const PurchaseInvoices: React.FC = () => {
       if (!supplierAccountId) {
         const fallback = accounts.find(a => a.name.includes('موردين') || a.name.toLowerCase().includes('supplier'));
         supplierAccountId = fallback?.id || 'suppliers_account_default';
-        supplierAccountName = fallback?.name || t('pi.suppliers_account_default');
+        supplierAccountName = fallback?.name || t('pi.supplier_account_default');
       }
 
       journalItems.push({
@@ -1151,7 +1153,9 @@ export const PurchaseInvoices: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 font-bold text-zinc-900">{inv.supplier_name}</td>
                     <td className="px-6 py-4 text-zinc-500">{formatDate(inv.date)}</td>
-                    <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(inv.total_amount)} {t('common.currency')}</td>
+                    <td className="px-6 py-4 font-bold text-zinc-900">
+                      {formatNumber(inv.total_amount)} {t('common.currency')}
+                    </td>
                     <td className={`px-6 py-4 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'}`}>
                       <div className={`flex items-center ${t('dir') === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
                         <button 
@@ -1264,7 +1268,9 @@ export const PurchaseInvoices: React.FC = () => {
                   <h4 className="font-bold text-zinc-900 text-lg">{inv.supplier_name}</h4>
                 </div>
                 <div className={t('dir') === 'rtl' ? 'text-left' : 'text-right'}>
-                  <p className="font-bold text-emerald-600 text-lg">{formatNumber(inv.total_amount)} {t('common.currency')}</p>
+                  <p className="font-bold text-emerald-600 text-lg">
+                    {formatNumber(inv.total_amount)} {t('common.currency')}
+                  </p>
                   <span className="text-xs text-zinc-400">{formatDate(inv.date)}</span>
                 </div>
               </div>
@@ -1454,6 +1460,8 @@ export const PurchaseInvoices: React.FC = () => {
                           </div>
                         </div>
                       </div>
+
+                      {/* Currency - REMOVED */}
 
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">{t('common.notes')}</label>
@@ -1666,7 +1674,9 @@ export const PurchaseInvoices: React.FC = () => {
                         <div className="mt-6 pt-6 border-t border-slate-100 space-y-3">
                           <div className={`flex justify-between items-center py-2 italic font-bold text-slate-600`}>
                             <span>{t('pi.subtotal')}:</span>
-                            <span className="text-slate-900">{formatNumber(calculateSubtotal())} {t('common.currency')}</span>
+                            <span className="text-slate-900">
+                              {formatNumber(calculateSubtotal())} {companyData?.settings?.currency || ''}
+                            </span>
                           </div>
                           <div className={`flex justify-between items-center py-2 italic font-bold text-slate-600`}>
                             <div className="flex items-center gap-2">
@@ -1678,15 +1688,18 @@ export const PurchaseInvoices: React.FC = () => {
                                 onChange={(e) => setInvoiceData({ ...invoiceData, discount: parseFloat(e.target.value) || 0 })}
                               />
                             </div>
-                            <span className="text-rose-500">-{formatNumber(invoiceData.discount)} {t('common.currency')}</span>
+                            <span className="text-rose-500">
+                              -{formatNumber(invoiceData.discount)} {companyData?.settings?.currency || ''}
+                            </span>
                           </div>
-                          <div className="flex justify-between items-center py-4 px-6 bg-slate-900 text-white rounded-2xl italic shadow-lg">
-                            <span className="font-bold text-lg">{t('pi.grand_total')}</span>
-                            <div className="text-right">
-                              <span className="font-black text-2xl text-emerald-400">
-                                {formatNumber(calculateTotal())} {t('common.currency')}
-                              </span>
-                              <p className="text-[9px] uppercase tracking-widest text-slate-400 mt-1 font-black">صافي المستحق للمورد</p>
+                          <div className="flex flex-col gap-2 p-6 bg-slate-900 text-white rounded-2xl italic shadow-lg">
+                            <div className="flex justify-between items-center">
+                              <span className="font-bold text-lg">{t('pi.grand_total')}</span>
+                              <div className="text-right">
+                                <span className="font-black text-2xl text-emerald-400">
+                                  {formatNumber(calculateTotal())} {companyData?.settings?.currency || ''}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1782,25 +1795,25 @@ export const PurchaseInvoices: React.FC = () => {
                           </td>
                           <td className="px-4 py-3 font-medium text-[#18181b]">{item.product_name || item.category_name}</td>
                           <td className="px-4 py-3 text-[#71717a]">{item.quantity}</td>
-                          <td className="px-4 py-3 text-[#71717a]">{formatNumber(item.price || item.cost_price || 0)} {t('common.currency')}</td>
-                          <td className="px-4 py-3 font-bold text-[#18181b]">{formatNumber(item.total)} {t('common.currency')}</td>
+                          <td className="px-4 py-3 text-[#71717a]">{formatNumber(item.price || item.cost_price || 0)} {companyData?.settings?.currency || ''}</td>
+                          <td className="px-4 py-3 font-bold text-[#18181b]">{formatNumber(item.total)} {companyData?.settings?.currency || ''}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot className="bg-slate-50/50 font-bold border-t border-slate-100">
                       <tr>
                         <td colSpan={4} className={`px-6 py-3 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} text-slate-400 font-bold text-[10px] uppercase tracking-wider`}>{t('pi.subtotal')}</td>
-                        <td className="px-6 py-3 text-slate-900 text-base">{formatNumber(viewInvoice.subtotal || viewInvoice.total_amount || 0)} {t('common.currency')}</td>
+                        <td className="px-6 py-3 text-slate-900 text-base">{formatNumber(viewInvoice.subtotal || viewInvoice.total_amount || 0)} {companyData?.settings?.currency || ''}</td>
                       </tr>
                       {viewInvoice.discount > 0 && (
                         <tr>
                           <td colSpan={4} className={`px-6 py-3 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} text-red-400 font-bold text-[10px] uppercase tracking-wider`}>{t('pi.discount')}</td>
-                          <td className="px-6 py-3 text-red-600 text-base">-{formatNumber(viewInvoice.discount)} {t('common.currency')}</td>
+                          <td className="px-6 py-3 text-red-600 text-base">-{formatNumber(viewInvoice.discount)} {companyData?.settings?.currency || ''}</td>
                         </tr>
                       )}
                       <tr className="bg-slate-900 text-white">
                         <td colSpan={4} className={`px-6 py-5 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} font-black text-lg uppercase tracking-tight`}>{t('pi.grand_total')}</td>
-                        <td className="px-6 py-5 text-2xl font-black text-emerald-400">{formatNumber(viewInvoice.total_amount)} {t('common.currency')}</td>
+                        <td className="px-6 py-5 text-2xl font-black text-emerald-400">{formatNumber(viewInvoice.total_amount)} {companyData?.settings?.currency || ''}</td>
                       </tr>
                     </tfoot>
                   </table>

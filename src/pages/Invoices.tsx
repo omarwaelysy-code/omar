@@ -494,7 +494,7 @@ export const Invoices: React.FC = () => {
           account_id: creditAccountId,
           account_name: creditAccountName,
           debit: 0,
-          credit: Number(item.total) || 0,
+          credit: item.total,
           description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoiceNumber}`
         });
       });
@@ -530,8 +530,8 @@ export const Invoices: React.FC = () => {
         });
       }
 
-      const total_debit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0)) || 0;
-      const total_credit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0)) || 0;
+      const total_debit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0).toFixed(2)) || 0;
+      const total_credit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0).toFixed(2)) || 0;
 
       const journalEntryData = {
         date,
@@ -1129,7 +1129,9 @@ export const Invoices: React.FC = () => {
                             {inv.payment_type === 'cash' ? 'نقدي' : 'آجل'}
                           </span>
                         </td>
-                        <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatMoney(inv.total_amount)} {t('invoices.currency')}</td>
+                        <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                          {formatMoney(inv.total_amount)} {t('invoices.currency')}
+                        </td>
                         <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                           <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
                             <button 
@@ -1274,10 +1276,10 @@ export const Invoices: React.FC = () => {
                       </div>
                       <h4 className="font-bold text-slate-900 text-lg">{inv.customer_name}</h4>
                     </div>
-                    <div className={`${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                      <p className="font-bold text-emerald-600 text-lg">{formatMoney(inv.total_amount)} {t('invoices.currency')}</p>
-                      <span className="text-xs text-slate-400">{formatDate(inv.date)}</span>
-                    </div>
+                      <div className={`${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                        <p className="font-bold text-emerald-600 text-lg">{formatMoney(inv.total_amount)} {t('invoices.currency')}</p>
+                        <span className="text-xs text-slate-400">{formatDate(inv.date)}</span>
+                      </div>
                   </div>
                   <div className="flex items-center gap-2 pt-2">
                     <button 
@@ -1535,6 +1537,8 @@ export const Invoices: React.FC = () => {
                           </div>
                         </motion.div>
                       )}
+
+                      {/* Currency Selection - REMOVED */}
                     </section>
 
                     {/* Card 3: الأصناف */}
@@ -1684,11 +1688,13 @@ export const Invoices: React.FC = () => {
                             </div>
                             <span className="font-bold text-lg">-{formatMoney(discount)}</span>
                           </div>
-                          <div className="pt-4 border-t border-zinc-200 flex justify-between items-center text-indigo-600">
+                          <div className="flex justify-between items-center text-indigo-600">
                             <span className="font-black text-lg">{t('invoices.summary_total')}</span>
-                            <span className="font-black text-2xl tracking-tighter">
-                              {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) - discount)} {t('invoices.currency')}
-                            </span>
+                            <div className="flex flex-col items-end">
+                              <span className="font-black text-2xl tracking-tighter text-left">
+                                {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) - discount)} {companyData?.settings?.currency || ''}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </section>
