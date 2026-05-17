@@ -192,106 +192,107 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
     );
   };
 
-  const navItems = [
-    ...(isSuperAdmin ? [{ id: 'super_admin_dashboard', label: t('nav.super_admin_dashboard'), icon: Shield, path: '/super-admin@m@r2020' }] : []),
-    { id: 'dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
-    { 
-      id: 'master_data', 
-      label: t('nav.master_data'), 
-      icon: Database,
-      subItems: [
-        { id: 'customers', label: t('nav.customers'), icon: UsersIcon },
-        { id: 'suppliers', label: t('nav.suppliers'), icon: Truck },
-        { id: 'products', label: t('nav.products'), icon: Package },
-        { id: 'expenses', label: t('nav.expenses'), icon: Wallet },
-        { id: 'payment_methods', label: t('nav.payment_methods'), icon: CreditCard },
-        { id: 'discount_settings', label: t('nav.discount_settings'), icon: Settings },
-      ]
-    },
-    { 
-      id: 'transactions', 
-      label: t('nav.transactions'), 
-      icon: ArrowLeftRight,
-      subItems: [
-        { id: 'invoices', label: t('nav.invoices'), icon: ArrowUpFromLine },
-        { id: 'returns', label: t('nav.returns'), icon: RotateCcw },
-        { id: 'purchase_invoices', label: t('nav.purchase_invoices'), icon: ArrowDownToLine },
-        { id: 'purchase_returns', label: t('nav.purchase_returns'), icon: RotateCcw },
-        { id: 'customer_discounts', label: t('nav.customer_discounts'), icon: Tags },
-        { id: 'supplier_discounts', label: t('nav.supplier_discounts'), icon: Tags },
-        { id: 'receipts', label: t('nav.receipts'), icon: Receipt },
-        { id: 'payment_vouchers', label: t('nav.payment_vouchers'), icon: CreditCard },
-        { id: 'cash_transfers', label: t('nav.cash_transfers'), icon: ArrowLeftRight },
-      ]
-    },
-    {
-      id: 'flexible_operations',
-      label: 'نظام العمليات',
-      icon: Layers,
-      subItems: [
-        { id: 'operations', label: 'العمليات', icon: List },
-        { id: 'departments', label: 'الإدارات والهيكل', icon: Building2 },
-        { id: 'cost_centers', label: 'مراكز التكلفة', icon: PieChart },
-        { id: 'operation_categories', label: 'تصنيفات العمليات', icon: Folder },
-        { id: 'operation_fields', label: 'حقول البيانات', icon: Settings },
-      ]
-    },
-    { 
-      id: 'general_ledger', 
-      label: t('nav.general_ledger'), 
-      icon: BookOpen,
-      subItems: [
-        { id: 'account_types', label: t('nav.account_types'), icon: PieChart },
-        { id: 'accounts', label: t('nav.accounts'), icon: BookOpen },
-        { id: 'chart_of_accounts', label: t('nav.chart_of_accounts'), icon: PieChart },
-        { id: 'create_journal_entry', label: t('nav.create_journal_entry'), icon: Plus },
-        { id: 'journal_entries', label: t('nav.journal_entries'), icon: FileText },
-        { id: 'general_ledger_report', label: t('nav.general_ledger_report'), icon: BookOpen },
-        { id: 'trial_balance', label: t('nav.trial_balance'), icon: BarChart3 },
-        { id: 'income_statement', label: t('nav.income_statement'), icon: BarChart3 },
-        { id: 'balance_sheet', label: t('nav.balance_sheet'), icon: Shield },
-      ]
-    },
-    {
-      id: 'reports',
-      label: t('nav.reports'),
-      icon: BarChart3,
-      subItems: [
-        { id: 'customer_statement', label: t('nav.customer_statement'), icon: FileText },
-        { id: 'supplier_statement', label: t('nav.supplier_statement'), icon: FileText },
-        { id: 'customer_balances', label: t('nav.customer_balances'), icon: BarChart3 },
-        { id: 'supplier_balances', label: t('nav.supplier_balances'), icon: BarChart3 },
-        { id: 'sales_report', label: t('nav.sales_report'), icon: BarChart3 },
-        { id: 'expenses_report', label: t('nav.expenses_report'), icon: BarChart3 },
-        { id: 'cash_report', label: t('nav.cash_report'), icon: BarChart3 },
-        { id: 'cash_balances', label: t('nav.cash_balances'), icon: BarChart3 },
-      ]
-    },
-    {
-      id: 'admin',
-      label: t('nav.admin'),
-      icon: Settings,
-      subItems: [
-        { id: 'company_settings', label: t('nav.company_settings'), icon: Building2 },
-        { id: 'users', label: t('nav.users'), icon: UsersIcon },
-        { id: 'integrity_dashboard', label: t('nav.integrity_check') || 'Integrity Check', icon: ShieldCheck },
-        { id: 'backup_restore', label: t('nav.backup_restore'), icon: Database },
-        { id: 'activity_log', label: t('nav.activity_log'), icon: History },
-        ...(company?.settings?.enable_multi_currency ? [{ id: 'currencies', label: t('nav.currencies'), icon: Coins }] : [])
-      ]
-    }
-  ];
-
-  const superAdminNavItems = [
-    { id: 'dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
-    { id: 'companies', label: t('nav.companies'), icon: Building2 },
-    { id: 'users', label: t('nav.users'), icon: UsersIcon },
-    { id: 'system_check', label: 'System Integrity', icon: ShieldCheck },
-    { id: 'activity_log', label: 'Audit Logs', icon: History },
-  ];
-  
   const filteredNavItems = React.useMemo(() => {
     if (!user) return [];
+
+    const navItems = [
+      ...(isSuperAdmin ? [{ id: 'super_admin_dashboard', label: t('nav.super_admin_dashboard'), icon: Shield, path: '/super-admin@m@r2020' }] : []),
+      { id: 'dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
+      { 
+        id: 'master_data', 
+        label: t('nav.master_data'), 
+        icon: Database,
+        subItems: [
+          { id: 'customers', label: t('nav.customers'), icon: UsersIcon },
+          { id: 'suppliers', label: t('nav.suppliers'), icon: Truck },
+          { id: 'products', label: t('nav.products'), icon: Package },
+          { id: 'expenses', label: t('nav.expenses'), icon: Wallet },
+          { id: 'payment_methods', label: t('nav.payment_methods'), icon: CreditCard },
+          { id: 'discount_settings', label: t('nav.discount_settings'), icon: Settings },
+        ]
+      },
+      { 
+        id: 'transactions', 
+        label: t('nav.transactions'), 
+        icon: ArrowLeftRight,
+        subItems: [
+          { id: 'invoices', label: t('nav.invoices'), icon: ArrowUpFromLine },
+          { id: 'returns', label: t('nav.returns'), icon: RotateCcw },
+          { id: 'purchase_invoices', label: t('nav.purchase_invoices'), icon: ArrowDownToLine },
+          { id: 'purchase_returns', label: t('nav.purchase_returns'), icon: RotateCcw },
+          { id: 'customer_discounts', label: t('nav.customer_discounts'), icon: Tags },
+          { id: 'supplier_discounts', label: t('nav.supplier_discounts'), icon: Tags },
+          { id: 'receipts', label: t('nav.receipts'), icon: Receipt },
+          { id: 'payment_vouchers', label: t('nav.payment_vouchers'), icon: CreditCard },
+          { id: 'cash_transfers', label: t('nav.cash_transfers'), icon: ArrowLeftRight },
+        ]
+      },
+      {
+        id: 'flexible_operations',
+        label: 'نظام العمليات',
+        icon: Layers,
+        subItems: [
+          { id: 'operations', label: 'العمليات', icon: List },
+          { id: 'departments', label: 'الإدارات والهيكل', icon: Building2 },
+          { id: 'cost_centers', label: 'مراكز التكلفة', icon: PieChart },
+          { id: 'operation_categories', label: 'تصنيفات العمليات', icon: Folder },
+          { id: 'operation_fields', label: 'حقول البيانات', icon: Settings },
+        ]
+      },
+      { 
+        id: 'general_ledger', 
+        label: t('nav.general_ledger'), 
+        icon: BookOpen,
+        subItems: [
+          { id: 'account_types', label: t('nav.account_types'), icon: PieChart },
+          { id: 'accounts', label: t('nav.accounts'), icon: BookOpen },
+          { id: 'chart_of_accounts', label: t('nav.chart_of_accounts'), icon: PieChart },
+          { id: 'create_journal_entry', label: t('nav.create_journal_entry'), icon: Plus },
+          { id: 'journal_entries', label: t('nav.journal_entries'), icon: FileText },
+          { id: 'general_ledger_report', label: t('nav.general_ledger_report'), icon: BookOpen },
+          { id: 'trial_balance', label: t('nav.trial_balance'), icon: BarChart3 },
+          { id: 'income_statement', label: t('nav.income_statement'), icon: BarChart3 },
+          { id: 'balance_sheet', label: t('nav.balance_sheet'), icon: Shield },
+        ]
+      },
+      {
+        id: 'reports',
+        label: t('nav.reports'),
+        icon: BarChart3,
+        subItems: [
+          { id: 'customer_statement', label: t('nav.customer_statement'), icon: FileText },
+          { id: 'supplier_statement', label: t('nav.supplier_statement'), icon: FileText },
+          { id: 'customer_balances', label: t('nav.customer_balances'), icon: BarChart3 },
+          { id: 'supplier_balances', label: t('nav.supplier_balances'), icon: BarChart3 },
+          { id: 'sales_report', label: t('nav.sales_report'), icon: BarChart3 },
+          { id: 'expenses_report', label: t('nav.expenses_report'), icon: BarChart3 },
+          { id: 'cash_report', label: t('nav.cash_report'), icon: BarChart3 },
+          { id: 'cash_balances', label: t('nav.cash_balances'), icon: BarChart3 },
+        ]
+      },
+      {
+        id: 'admin',
+        label: t('nav.admin'),
+        icon: Settings,
+        subItems: [
+          { id: 'company_settings', label: t('nav.company_settings'), icon: Building2 },
+          { id: 'users', label: t('nav.users'), icon: UsersIcon },
+          { id: 'integrity_dashboard', label: t('nav.integrity_check') || 'Integrity Check', icon: ShieldCheck },
+          { id: 'backup_restore', label: t('nav.backup_restore'), icon: Database },
+          { id: 'activity_log', label: t('nav.activity_log'), icon: History },
+          ...(company?.settings?.enable_multi_currency === true || (company?.settings as any)?.enable_multi_currency === 'true' ? [{ id: 'currencies', label: t('nav.currencies'), icon: Coins }] : [])
+        ]
+      }
+    ];
+
+    const superAdminNavItems = [
+      { id: 'dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
+      { id: 'companies', label: t('nav.companies'), icon: Building2 },
+      { id: 'users', label: t('nav.users'), icon: UsersIcon },
+      { id: 'system_check', label: 'System Integrity', icon: ShieldCheck },
+      { id: 'activity_log', label: 'Audit Logs', icon: History },
+    ];
+
     if (isSuperAdmin) return superAdminNavItems;
     if (isCompanyAdmin) return navItems;
 
@@ -309,7 +310,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       
       return canView ? item : null;
     }).filter(Boolean) as typeof navItems;
-  }, [user, isSuperAdmin, isCompanyAdmin, hasPermission, company]);
+  }, [user, isSuperAdmin, isCompanyAdmin, hasPermission, company, t]);
+
 
   // Update nav item click to use openTab
   const handleNavClick = (id: string, label: string, path?: string) => {

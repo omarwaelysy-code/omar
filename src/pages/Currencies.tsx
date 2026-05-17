@@ -50,11 +50,19 @@ export default function Currencies() {
 
   useEffect(() => {
     loadData();
+
+    // Real-time synchronization
+    const handleRefresh = (e: any) => {
+      if (e.detail?.collection === 'currencies' || e.detail?.collection === 'exchange_rates' || e.detail?.collection === 'companies') {
+        loadData();
+      }
+    };
+    window.addEventListener('db-refresh', handleRefresh as EventListener);
+    return () => window.removeEventListener('db-refresh', handleRefresh as EventListener);
   }, [user]);
 
   const loadData = async () => {
     if (!user?.company_id) return;
-    setLoading(true);
     try {
       const [currData, compData] = await Promise.all([
         dbService.list<Currency>('currencies', [
@@ -66,7 +74,6 @@ export default function Currencies() {
       setCurrencies(currData);
       setCompany(compData);
       
-      // Load latest rates for each currency
       const ratesMap: Record<string, ExchangeRate[]> = {};
       for (const curr of currData) {
         const rates = await dbService.list<ExchangeRate>('exchange_rates', [
@@ -77,7 +84,7 @@ export default function Currencies() {
       }
       setExchangeRates(ratesMap);
     } catch (error) {
-      console.error('Failed to load currencies:', error);
+      console.error('Failed to load currency data:', error);
       toast.error(t('common.error'));
     } finally {
       setLoading(false);
@@ -96,7 +103,12 @@ export default function Currencies() {
       };
 
       const id = await dbService.add('currencies', currencyData);
-      setCurrencies([...currencies, { id, ...currencyData }]);
+      
+      // Update local state for instant feedback
+      const addedCurrency = { id, ...currencyData };
+      setCurrencies(prev => [...prev, addedCurrency]);
+      setExchangeRates(prev => ({ ...prev, [id]: [] }));
+      
       setIsAddCurrencyOpen(false);
       setNewCurrency({
         code: '',
@@ -106,6 +118,10 @@ export default function Currencies() {
         is_active: true
       });
       toast.success(t('common.save_success'));
+      
+      // Automatically show rate addition for the new currency
+      setSelectedCurrency(addedCurrency);
+      setIsHistoryOpen(true);
     } catch (error) {
       console.error('Failed to add currency:', error);
       toast.error(t('common.error'));
@@ -143,14 +159,18 @@ export default function Currencies() {
       };
 
       const id = await dbService.add('exchange_rates', rateData);
-      const updatedRates = [
-        { id, ...rateData },
-        ...(exchangeRates[selectedCurrency.id] || [])
-      ].sort((a, b) => new Date(b.rate_date).getTime() - new Date(a.rate_date).getTime());
-
-      setExchangeRates({
-        ...exchangeRates,
-        [selectedCurrency.id]: updatedRates
+      
+      // Update local state for immediate feedback
+      const newRateRecord = { id, ...rateData };
+      setExchangeRates(prev => {
+        const currentCurrencyRates = prev[selectedCurrency.id] || [];
+        const updated = [newRateRecord, ...currentCurrencyRates].sort((a, b) => 
+          new Date(b.rate_date).getTime() - new Date(a.rate_date).getTime()
+        );
+        return {
+          ...prev,
+          [selectedCurrency.id]: updated
+        };
       });
       
       setIsAddRateOpen(false);
