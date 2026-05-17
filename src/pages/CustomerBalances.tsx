@@ -38,7 +38,7 @@ export const CustomerBalances: React.FC = () => {
         const custReturns = returns.filter((r: any) => r.customer_id === customer.id);
         const custReceipts = receipts.filter((r: any) => {
           if (r.customer_id === customer.id) return true;
-          if (r.type === 'multi' && r.items && Array.isArray(r.items)) {
+          if ((r.voucher_type === 'multi' || r.type === 'multi') && r.items && Array.isArray(r.items)) {
             return r.items.some((item: any) => item.type === 'customer' && item.entity_id === customer.id);
           }
           return false;
@@ -50,7 +50,7 @@ export const CustomerBalances: React.FC = () => {
         let journalCredit = 0;
         let manualJournalDebit = 0;
         let manualJournalCredit = 0;
-        let currentBalance = 0;
+        let currentBalance = openingBalance;
 
         journalEntries.forEach((je: any) => {
           je.items?.forEach((item: any) => {
@@ -74,7 +74,7 @@ export const CustomerBalances: React.FC = () => {
         const cashInvoicesAmount = custInvoices.filter((i: any) => i.payment_type === 'cash').reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
         
         const totalReceipts = custReceipts.reduce((sum: number, r: any) => {
-          if (r.type === 'multi' && r.items && Array.isArray(r.items)) {
+          if ((r.voucher_type === 'multi' || r.type === 'multi') && r.items && Array.isArray(r.items)) {
              const itemsSum = r.items
                .filter((item: any) => item.type === 'customer' && item.entity_id === customer.id)
                .reduce((itemSum: number, item: any) => itemSum + (Number(item.amount) || 0), 0);

@@ -38,7 +38,7 @@ export const SupplierBalances: React.FC = () => {
         const supReturns = returns.filter((r: any) => r.supplier_id === supplier.id);
         const supVouchers = vouchers.filter((v: any) => {
           if (v.supplier_id === supplier.id) return true;
-          if (v.type === 'multi' && v.items && Array.isArray(v.items)) {
+          if ((v.voucher_type === 'multi' || v.type === 'multi') && v.items && Array.isArray(v.items)) {
             return v.items.some((item: any) => item.type === 'supplier' && item.entity_id === supplier.id);
           }
           return false;
@@ -50,7 +50,7 @@ export const SupplierBalances: React.FC = () => {
         let journalCredit = 0;
         let manualJournalDebit = 0;
         let manualJournalCredit = 0;
-        let currentBalance = 0;
+        let currentBalance = openingBalance;
 
         journalEntries.forEach((je: any) => {
           je.items?.forEach((item: any) => {
@@ -74,7 +74,7 @@ export const SupplierBalances: React.FC = () => {
         const cashInvoicesAmount = supInvoices.filter((i: any) => i.payment_type === 'cash').reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
         
         const totalVouchers = supVouchers.reduce((sum: number, v: any) => {
-          if (v.type === 'multi' && v.items && Array.isArray(v.items)) {
+          if ((v.voucher_type === 'multi' || v.type === 'multi') && v.items && Array.isArray(v.items)) {
              const itemsSum = v.items
                .filter((item: any) => item.type === 'supplier' && item.entity_id === supplier.id)
                .reduce((itemSum: number, item: any) => itemSum + (Number(item.amount) || 0), 0);
