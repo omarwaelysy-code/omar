@@ -89,6 +89,7 @@ export interface Currency {
   name_ar: string;
   name_en: string;
   symbol: string;
+  flag?: string;
   is_active: boolean;
   company_id: string;
   created_at: string;

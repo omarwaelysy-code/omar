@@ -10,7 +10,8 @@ import {
   TrendingUp,
   Save,
   X,
-  PlusCircle
+  PlusCircle,
+  Search
 } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,6 +19,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { Currency, ExchangeRate, Company } from '../types';
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
+import { WORLD_CURRENCIES, WorldCurrency } from '../constants/worldCurrencies';
 
 export default function Currencies() {
   const { language, t, dir } = useLanguage();
@@ -33,13 +35,17 @@ export default function Currencies() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
 
+  // Search in selection
+  const [searchQuery, setSearchQuery] = useState('');
+  
   // Forms
   const [newCurrency, setNewCurrency] = useState({
     code: '',
     name_ar: '',
     name_en: '',
     symbol: '',
-    is_active: true
+    is_active: true,
+    flag: ''
   });
 
   const [newRate, setNewRate] = useState({
@@ -115,8 +121,10 @@ export default function Currencies() {
         name_ar: '',
         name_en: '',
         symbol: '',
-        is_active: true
+        is_active: true,
+        flag: ''
       });
+      setSearchQuery('');
       toast.success(t('common.save_success'));
       
       // Automatically show rate addition for the new currency
@@ -186,6 +194,27 @@ export default function Currencies() {
     }
   };
 
+  const filteredWorldCurrencies = WORLD_CURRENCIES.filter(curr => {
+    const query = searchQuery.toLowerCase();
+    return (
+      curr.code.toLowerCase().includes(query) ||
+      curr.name_ar.toLowerCase().includes(query) ||
+      curr.name_en.toLowerCase().includes(query)
+    );
+  });
+
+  const selectWorldCurrency = (curr: WorldCurrency) => {
+    setNewCurrency({
+      ...newCurrency,
+      code: curr.code,
+      name_ar: curr.name_ar,
+      name_en: curr.name_en,
+      symbol: curr.symbol,
+      flag: curr.flag
+    });
+    setSearchQuery('');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -236,11 +265,15 @@ export default function Currencies() {
             <div key={curr.id} className="bg-white border border-zinc-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center">
-                    <span className="text-indigo-600 font-bold text-lg">{curr.symbol}</span>
+                  <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center relative overflow-hidden">
+                    <span className="text-2xl absolute -top-1 -right-1 opacity-20 select-none">{curr.flag}</span>
+                    <span className="text-indigo-600 font-bold text-lg z-10">{curr.symbol}</span>
                   </div>
                   <div>
-                    <h3 className="font-bold text-zinc-900">{language === 'ar' ? curr.name_ar : curr.name_en}</h3>
+                    <h3 className="font-bold text-zinc-900 flex items-center gap-2">
+                      <span>{curr.flag}</span>
+                      {language === 'ar' ? curr.name_ar : curr.name_en}
+                    </h3>
                     <p className="text-xs text-zinc-400 font-mono">{curr.code}</p>
                   </div>
                 </div>
@@ -305,76 +338,138 @@ export default function Currencies() {
                 <X className="w-6 h-6" />
               </button>
             </div>
-            <form onSubmit={handleAddCurrency} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{t('currencies.code')}</label>
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* Currency Search/Selection */}
+              <div className="space-y-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                   <input
-                    required
                     type="text"
-                    placeholder="USD, EUR, SAR..."
-                    className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
-                    value={newCurrency.code}
-                    onChange={e => setNewCurrency({ ...newCurrency, code: e.target.value.toUpperCase() })}
+                    placeholder={language === 'ar' ? 'ابحث عن عملة عالمية...' : 'Search global currencies...'}
+                    className="w-full bg-zinc-50 border border-zinc-100 rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{t('currencies.name_ar')}</label>
-                  <input
-                    required
-                    type="text"
-                    className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
-                    value={newCurrency.name_ar}
-                    onChange={e => setNewCurrency({ ...newCurrency, name_ar: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{t('currencies.name_en')}</label>
-                  <input
-                    required
-                    type="text"
-                    className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
-                    value={newCurrency.name_en}
-                    onChange={e => setNewCurrency({ ...newCurrency, name_en: e.target.value })}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{t('currencies.symbol')}</label>
-                  <input
-                    required
-                    type="text"
-                    placeholder="$, €, ر.س..."
-                    className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
-                    value={newCurrency.symbol}
-                    onChange={e => setNewCurrency({ ...newCurrency, symbol: e.target.value })}
-                  />
-                </div>
-                
-                <div className="col-span-2 pt-2">
-                  <button 
-                    type="button"
-                    onClick={() => setNewCurrency(prev => ({ ...prev, is_active: !prev.is_active }))}
-                    className="flex items-center gap-3 cursor-pointer select-none"
-                  >
-                    <div className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${newCurrency.is_active ? 'bg-green-600' : 'bg-zinc-200'}`}>
-                      <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all duration-200 ${
-                        dir === 'rtl' 
-                          ? (newCurrency.is_active ? 'right-5.5' : 'right-0.5')
-                          : (newCurrency.is_active ? 'left-5.5' : 'left-0.5')
-                      }`} />
+
+                {searchQuery && (
+                  <div className="bg-white border border-indigo-100 rounded-xl max-h-60 overflow-y-auto shadow-lg z-20 relative">
+                    <div className="sticky top-0 bg-indigo-50 px-4 py-2 text-[10px] font-bold text-indigo-400 uppercase tracking-widest border-b border-indigo-100">
+                      {language === 'ar' ? 'نتائج البحث' : 'Search Results'}
                     </div>
-                    <span className="text-sm font-bold text-zinc-700">{t('common.status')} ({newCurrency.is_active ? t('common.active') : t('common.inactive')})</span>
-                  </button>
-                </div>
+                    {filteredWorldCurrencies.length > 0 ? (
+                      filteredWorldCurrencies.map(curr => (
+                        <button
+                          key={curr.code}
+                          type="button"
+                          onClick={() => selectWorldCurrency(curr)}
+                          className="w-full px-4 py-3 hover:bg-indigo-50/50 text-right flex items-center justify-between group transition-colors border-b border-zinc-50 last:border-0"
+                          style={{ direction: dir }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl drop-shadow-sm">{curr.flag}</span>
+                            <div className="text-right">
+                              <p className="text-sm font-bold text-zinc-800">{language === 'ar' ? curr.name_ar : curr.name_en}</p>
+                              <p className="text-[10px] text-zinc-400 font-mono tracking-tighter">{curr.code} • {curr.symbol}</p>
+                            </div>
+                          </div>
+                          <PlusCircle className="w-5 h-5 text-zinc-200 group-hover:text-indigo-600 transition-colors" />
+                        </button>
+                      ))
+                    ) : (
+                      <div className="p-8 text-center text-zinc-400 bg-white">
+                        <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                        <p className="text-xs uppercase font-bold tracking-widest">{t('common.no_results')}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <button
-                type="submit"
-                className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 mt-6"
-              >
-                <Save className="w-5 h-5" />
-                {t('common.save')}
-              </button>
-            </form>
+
+              <form onSubmit={handleAddCurrency} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{t('currencies.code')}</label>
+                    <div className="relative">
+                      <input
+                        readOnly
+                        disabled
+                        type="text"
+                        placeholder="اختر من القائمة أعلاه"
+                        className="w-full bg-zinc-100 border border-zinc-200 rounded-xl px-4 py-3 focus:outline-none opacity-70 cursor-not-allowed font-mono"
+                        value={newCurrency.code}
+                      />
+                      {newCurrency.flag && (
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl">{newCurrency.flag}</span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-zinc-400 mt-1">
+                      {language === 'ar' ? '* كود العملة دولي ولا يمكن تعديله برمجياً لضمان سلامة العمليات.' : '* Currency code is international and locked for data integrity.'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{t('currencies.name_ar')}</label>
+                    <input
+                      required
+                      type="text"
+                      className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                      value={newCurrency.name_ar}
+                      onChange={e => setNewCurrency({ ...newCurrency, name_ar: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{t('currencies.name_en')}</label>
+                    <input
+                      required
+                      type="text"
+                      className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                      value={newCurrency.name_en}
+                      onChange={e => setNewCurrency({ ...newCurrency, name_en: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{t('currencies.symbol')}</label>
+                    <input
+                      required
+                      type="text"
+                      className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                      value={newCurrency.symbol}
+                      onChange={e => setNewCurrency({ ...newCurrency, symbol: e.target.value })}
+                    />
+                  </div>
+                  
+                  <div className="col-span-2 pt-2">
+                    <button 
+                      type="button"
+                      onClick={() => setNewCurrency(prev => ({ ...prev, is_active: !prev.is_active }))}
+                      className="flex items-center gap-3 cursor-pointer select-none"
+                    >
+                      <div className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${newCurrency.is_active ? 'bg-green-600' : 'bg-zinc-200'}`}>
+                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all duration-200 ${
+                          dir === 'rtl' 
+                            ? (newCurrency.is_active ? 'right-5.5' : 'right-0.5')
+                            : (newCurrency.is_active ? 'left-5.5' : 'left-0.5')
+                        }`} />
+                      </div>
+                      <span className="text-sm font-bold text-zinc-700">{t('common.status')} ({newCurrency.is_active ? t('common.active') : t('common.inactive')})</span>
+                    </button>
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  disabled={!newCurrency.code}
+                  className={`w-full font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 mt-6 ${
+                    !newCurrency.code 
+                      ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed' 
+                      : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  }`}
+                >
+                  <Save className="w-5 h-5" />
+                  {t('common.save')}
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}
