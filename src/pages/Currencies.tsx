@@ -576,14 +576,17 @@ export default function Currencies() {
                     </div>
                     {WORLD_CURRENCIES.slice(0, 5).map(curr => {
                       const isAdded = currencies.some(c => c.code.toLowerCase() === curr.code.toLowerCase());
+                      const isBase = company?.settings?.currency?.toLowerCase() === curr.code.toLowerCase();
+                      const isDisabled = isAdded || isBase;
+                      
                       return (
                         <button
                           key={curr.code}
                           type="button"
-                          onClick={() => !isAdded && selectWorldCurrency(curr)}
-                          disabled={isAdded}
+                          onClick={() => !isDisabled && selectWorldCurrency(curr)}
+                          disabled={isDisabled}
                           className={`w-full px-4 py-3 text-right flex items-center justify-between group transition-colors border-b border-zinc-50 last:border-0 ${
-                            isAdded ? 'opacity-50 cursor-not-allowed bg-zinc-50/50' : 'hover:bg-indigo-50/50'
+                            isDisabled ? 'opacity-50 cursor-not-allowed bg-zinc-50/50' : 'hover:bg-indigo-50/50'
                           }`}
                           style={{ direction: dir }}
                         >
@@ -593,7 +596,12 @@ export default function Currencies() {
                               <p className="text-sm font-bold text-zinc-800">{language === 'ar' ? curr.name_ar : curr.name_en}</p>
                               <p className="text-[10px] text-zinc-400 font-mono tracking-tighter">
                                 {curr.code} • {curr.symbol}
-                                {isAdded && (
+                                {isBase && (
+                                  <span className="mx-1 text-amber-600 font-bold bg-amber-50 px-1 rounded">
+                                    {language === 'ar' ? 'العملة الأساسية' : 'Base Currency'}
+                                  </span>
+                                )}
+                                {isAdded && !isBase && (
                                   <span className="mx-1 text-indigo-600 font-bold bg-indigo-50 px-1 rounded">
                                     {language === 'ar' ? 'مضافة مسبقاً' : 'Added'}
                                   </span>
@@ -601,7 +609,7 @@ export default function Currencies() {
                               </p>
                             </div>
                           </div>
-                          {!isAdded && <PlusCircle className="w-5 h-5 text-zinc-200 group-hover:text-indigo-600 transition-colors" />}
+                          {!isDisabled && <PlusCircle className="w-5 h-5 text-zinc-200 group-hover:text-indigo-600 transition-colors" />}
                         </button>
                       );
                     })}
@@ -616,14 +624,17 @@ export default function Currencies() {
                     {filteredWorldCurrencies.length > 0 ? (
                       filteredWorldCurrencies.map(curr => {
                         const isAdded = currencies.some(c => c.code.toLowerCase() === curr.code.toLowerCase());
+                        const isBase = company?.settings?.currency?.toLowerCase() === curr.code.toLowerCase();
+                        const isDisabled = isAdded || isBase;
+
                         return (
                           <button
                             key={curr.code}
                             type="button"
-                            onClick={() => !isAdded && selectWorldCurrency(curr)}
-                            disabled={isAdded}
+                            onClick={() => !isDisabled && selectWorldCurrency(curr)}
+                            disabled={isDisabled}
                             className={`w-full px-4 py-3 text-right flex items-center justify-between group transition-colors border-b border-zinc-50 last:border-0 ${
-                              isAdded ? 'opacity-50 cursor-not-allowed bg-zinc-50/50' : 'hover:bg-indigo-50/50'
+                              isDisabled ? 'opacity-50 cursor-not-allowed bg-zinc-50/50' : 'hover:bg-indigo-50/50'
                             }`}
                             style={{ direction: dir }}
                           >
@@ -633,7 +644,12 @@ export default function Currencies() {
                                 <p className="text-sm font-bold text-zinc-800">{language === 'ar' ? curr.name_ar : curr.name_en}</p>
                                 <p className="text-[10px] text-zinc-400 font-mono tracking-tighter">
                                   {curr.code} • {curr.symbol}
-                                  {isAdded && (
+                                  {isBase && (
+                                    <span className="mx-1 text-amber-600 font-bold bg-amber-50 px-1 rounded">
+                                      {language === 'ar' ? 'العملة الأساسية' : 'Base Currency'}
+                                    </span>
+                                  )}
+                                  {isAdded && !isBase && (
                                     <span className="mx-1 text-indigo-600 font-bold bg-indigo-50 px-1 rounded">
                                       {language === 'ar' ? 'مضافة مسبقاً' : 'Added'}
                                     </span>
@@ -641,7 +657,7 @@ export default function Currencies() {
                                 </p>
                               </div>
                             </div>
-                            {!isAdded && <PlusCircle className="w-5 h-5 text-zinc-200 group-hover:text-indigo-600 transition-colors" />}
+                            {!isDisabled && <PlusCircle className="w-5 h-5 text-zinc-200 group-hover:text-indigo-600 transition-colors" />}
                           </button>
                         );
                       })
