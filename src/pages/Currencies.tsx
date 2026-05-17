@@ -13,7 +13,8 @@ import {
   LayoutGrid,
   List,
   PlusCircle,
-  Search
+  Search,
+  Trash2
 } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { useAuth } from '../contexts/AuthContext';
@@ -169,6 +170,18 @@ export default function Currencies() {
       setIsHistoryOpen(true);
     } catch (error) {
       console.error('Failed to add currency:', error);
+      toast.error(t('common.error'));
+    }
+  };
+
+  const handleDeleteCurrency = async (id: string) => {
+    if (!window.confirm(language === 'ar' ? 'هل أنت متأكد من حذف هذه العملة؟' : 'Are you sure you want to delete this currency?')) return;
+    try {
+      await dbService.delete('currencies', id);
+      setCurrencies(prev => prev.filter(c => c.id !== id));
+      toast.success(t('common.delete_success'));
+    } catch (error) {
+      console.error('Failed to delete currency:', error);
       toast.error(t('common.error'));
     }
   };
@@ -412,6 +425,15 @@ export default function Currencies() {
                     >
                       <History className="w-5 h-5" />
                     </button>
+                    {(!latestRate || exchangeRates[curr.id]?.length === 0) && (
+                      <button
+                        onClick={() => handleDeleteCurrency(curr.id)}
+                        className="w-12 flex items-center justify-center bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors"
+                        title={language === 'ar' ? 'حذف' : 'Delete'}
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -496,6 +518,15 @@ export default function Currencies() {
                           >
                             <History className="w-5 h-5" />
                           </button>
+                          {(!latestRate || exchangeRates[curr.id]?.length === 0) && (
+                            <button
+                              onClick={() => handleDeleteCurrency(curr.id)}
+                              className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                              title={language === 'ar' ? 'حذف' : 'Delete'}
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
