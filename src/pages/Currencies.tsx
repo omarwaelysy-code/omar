@@ -10,6 +10,8 @@ import {
   TrendingUp,
   Save,
   X,
+  LayoutGrid,
+  List,
   PlusCircle,
   Search
 } from 'lucide-react';
@@ -34,6 +36,7 @@ export default function Currencies() {
   const [isAddRateOpen, setIsAddRateOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   // Search in selection
   const [searchQuery, setSearchQuery] = useState('');
@@ -235,13 +238,39 @@ export default function Currencies() {
             {t('currencies.subtitle')}
           </p>
         </div>
-        <button
-          onClick={() => setIsAddCurrencyOpen(true)}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors w-full md:w-auto justify-center"
-        >
-          <Plus className="w-5 h-5" />
-          {t('currencies.add')}
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex bg-zinc-100 p-1 rounded-lg mr-2">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-1.5 rounded-md transition-all ${
+                viewMode === 'grid' 
+                  ? 'bg-white text-indigo-600 shadow-sm' 
+                  : 'text-zinc-400 hover:text-zinc-600'
+              }`}
+              title={language === 'ar' ? 'عرض شبكي' : 'Grid View'}
+            >
+              <LayoutGrid className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-1.5 rounded-md transition-all ${
+                viewMode === 'list' 
+                  ? 'bg-white text-indigo-600 shadow-sm' 
+                  : 'text-zinc-400 hover:text-zinc-600'
+              }`}
+              title={language === 'ar' ? 'عرض قائمة' : 'List View'}
+            >
+              <List className="w-5 h-5" />
+            </button>
+          </div>
+          <button
+            onClick={() => setIsAddCurrencyOpen(true)}
+            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors w-full md:w-auto justify-center"
+          >
+            <Plus className="w-5 h-5" />
+            {t('currencies.add')}
+          </button>
+        </div>
       </div>
 
       <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl flex items-start gap-4">
@@ -258,75 +287,157 @@ export default function Currencies() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {currencies.map(curr => {
-          const latestRate = exchangeRates[curr.id]?.[0];
-          return (
-            <div key={curr.id} className="bg-white border border-zinc-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center relative overflow-hidden">
-                    <span className="text-2xl absolute -top-1 -right-1 opacity-20 select-none">{curr.flag}</span>
-                    <span className="text-indigo-600 font-bold text-lg z-10">{curr.symbol}</span>
+      {viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {currencies.map(curr => {
+            const latestRate = exchangeRates[curr.id]?.[0];
+            return (
+              <div key={curr.id} className="bg-white border border-zinc-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center relative overflow-hidden">
+                      <span className="text-2xl absolute -top-1 -right-1 opacity-20 select-none">{curr.flag}</span>
+                      <span className="text-indigo-600 font-bold text-lg z-10">{curr.symbol}</span>
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-zinc-900 flex items-center gap-2">
+                        <span>{curr.flag}</span>
+                        {language === 'ar' ? curr.name_ar : curr.name_en}
+                      </h3>
+                      <p className="text-xs text-zinc-400 font-mono">{curr.code}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-zinc-900 flex items-center gap-2">
-                      <span>{curr.flag}</span>
-                      {language === 'ar' ? curr.name_ar : curr.name_en}
-                    </h3>
-                    <p className="text-xs text-zinc-400 font-mono">{curr.code}</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => toggleCurrencyStatus(curr)}
-                  className={`p-1.5 rounded-lg transition-colors ${curr.is_active ? 'text-green-600 hover:bg-green-50' : 'text-zinc-400 hover:bg-zinc-50'}`}
-                >
-                  {curr.is_active ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div className="bg-zinc-50 rounded-xl p-4 flex items-center justify-between">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] text-zinc-400 uppercase font-bold">{t('currencies.rate')}</span>
-                    <span className="text-lg font-bold text-zinc-800">
-                      {latestRate ? latestRate.exchange_rate.toLocaleString() : '---'}
-                    </span>
-                  </div>
-                  <div className="flex flex-col items-end">
-                    <span className="text-[10px] text-zinc-400 font-bold uppercase">{t('currencies.rate_date')}</span>
-                    <span className="text-xs text-zinc-600">
-                      {latestRate ? format(new Date(latestRate.rate_date), 'dd/MM/yyyy') : '---'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      setSelectedCurrency(curr);
-                      setIsAddRateOpen(true);
-                    }}
-                    className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-black transition-colors"
+                  <button 
+                    onClick={() => toggleCurrencyStatus(curr)}
+                    className={`p-1.5 rounded-lg transition-colors ${curr.is_active ? 'text-green-600 hover:bg-green-50' : 'text-zinc-400 hover:bg-zinc-50'}`}
                   >
-                    <PlusCircle className="w-4 h-4" />
-                    {t('currencies.add_rate')}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedCurrency(curr);
-                      setIsHistoryOpen(true);
-                    }}
-                    className="w-12 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-xl hover:bg-zinc-200 transition-colors"
-                  >
-                    <History className="w-5 h-5" />
+                    {curr.is_active ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
                   </button>
                 </div>
+
+                <div className="space-y-4">
+                  <div className="bg-zinc-50 rounded-xl p-4 flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-zinc-400 uppercase font-bold">{t('currencies.rate')}</span>
+                      <span className="text-lg font-bold text-zinc-800">
+                        {latestRate ? latestRate.exchange_rate.toLocaleString() : '---'}
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] text-zinc-400 font-bold uppercase">{t('currencies.rate_date')}</span>
+                      <span className="text-xs text-zinc-600">
+                        {latestRate ? format(new Date(latestRate.rate_date), 'dd/MM/yyyy') : '---'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setSelectedCurrency(curr);
+                        setIsAddRateOpen(true);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-black transition-colors"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      {t('currencies.add_rate')}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedCurrency(curr);
+                        setIsHistoryOpen(true);
+                      }}
+                      className="w-12 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-xl hover:bg-zinc-200 transition-colors"
+                    >
+                      <History className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="bg-white border border-zinc-100 rounded-2xl overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-zinc-50 border-b border-zinc-100">
+                  <th className={`px-6 py-4 font-bold text-zinc-500 uppercase tracking-wider ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'العملة' : 'Currency'}</th>
+                  <th className="px-6 py-4 text-center font-bold text-zinc-500 uppercase tracking-wider">{t('currencies.code')}</th>
+                  <th className="px-6 py-4 text-center font-bold text-zinc-500 uppercase tracking-wider">{t('currencies.symbol')}</th>
+                  <th className="px-6 py-4 text-center font-bold text-zinc-500 uppercase tracking-wider">{t('currencies.rate')}</th>
+                  <th className="px-6 py-4 text-center font-bold text-zinc-500 uppercase tracking-wider">{t('common.status')}</th>
+                  <th className="px-6 py-4 text-center font-bold text-zinc-500 uppercase tracking-wider">{t('common.actions')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {currencies.map(curr => {
+                  const latestRate = exchangeRates[curr.id]?.[0];
+                  return (
+                    <tr key={curr.id} className="hover:bg-zinc-50/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xl drop-shadow-sm">{curr.flag}</span>
+                          <span className="font-bold text-zinc-900">{language === 'ar' ? curr.name_ar : curr.name_en}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center font-mono text-zinc-500 uppercase">{curr.code}</td>
+                      <td className="px-6 py-4 text-center font-bold text-indigo-600">{curr.symbol}</td>
+                      <td className="px-6 py-4 text-center">
+                        {latestRate ? (
+                          <div className="flex flex-col">
+                            <span className="font-bold text-zinc-800">{latestRate.exchange_rate.toLocaleString()}</span>
+                            <span className="text-[10px] text-zinc-400 font-mono italic">{format(new Date(latestRate.rate_date), 'dd/MM/yyyy')}</span>
+                          </div>
+                        ) : (
+                          <span className="text-zinc-300">---</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <button 
+                          onClick={() => toggleCurrencyStatus(curr)}
+                          className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all ${
+                            curr.is_active 
+                              ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                              : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'
+                          }`}
+                        >
+                          {curr.is_active ? t('common.active') : t('common.inactive')}
+                        </button>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-center gap-3">
+                          <button
+                            onClick={() => {
+                              setSelectedCurrency(curr);
+                              setIsAddRateOpen(true);
+                            }}
+                            className="p-2 text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                            title={t('currencies.add_rate')}
+                          >
+                            <PlusCircle className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedCurrency(curr);
+                              setIsHistoryOpen(true);
+                            }}
+                            className="p-2 text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                            title={t('currencies.history')}
+                          >
+                            <History className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Add Currency Modal */}
       {isAddCurrencyOpen && (
