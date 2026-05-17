@@ -293,7 +293,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       { id: 'activity_log', label: 'Audit Logs', icon: History },
     ];
 
-    if (isSuperAdmin) return superAdminNavItems;
+    if (isSuperAdmin) {
+      // For Super Admin, we merge both menus to give them full control
+      const superAdminSpecificItems = superAdminNavItems.filter(s => !navItems.some(n => n.id === s.id));
+      return [...superAdminSpecificItems, ...navItems];
+    }
     if (isCompanyAdmin) return navItems;
 
     return navItems.map(item => {

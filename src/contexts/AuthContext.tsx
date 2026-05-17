@@ -100,7 +100,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser({ 
             ...activeMembership, 
             role: 'super_admin',
-            company_id: 'system',
             must_change_password: activeMembership.must_change_password || false
           });
         } else {

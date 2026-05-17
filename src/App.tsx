@@ -147,8 +147,6 @@ export default function App() {
       if (id === 'users') return <SuperAdminDashboard initialTab="users" />;
       if (id === 'system_check') return <SuperAdminDashboard initialTab="system" />;
       if (id === 'activity_log' || id === 'audit_logs') return <SuperAdminDashboard initialTab="audit" />;
-      
-      return <SuperAdminDashboard />;
     }
 
     switch (id) {
