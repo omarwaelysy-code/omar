@@ -119,7 +119,9 @@ const TABLES_TO_BACKUP = [
   'cash_transfers',
   'journal_entries',
   'journal_entry_lines',
-  'activity_logs'
+  'activity_logs',
+  'currencies',
+  'exchange_rates'
 ];
 
 // --- System Diagnostics ---
@@ -600,7 +602,8 @@ const modules = [
   'returns', 'return_items', 'purchase_invoices', 'purchase_returns', 
   'customer_discounts', 'supplier_discounts', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers',
   'system_config', 'audit_logs', 'operation_categories', 'operations', 'operation_fields',
-  'departments', 'cost_centers', 'operation_field_values', 'field_operation_categories'
+  'departments', 'cost_centers', 'operation_field_values', 'field_operation_categories',
+  'currencies', 'exchange_rates'
 ];
 
 // --- Flexible Operations Logic ---

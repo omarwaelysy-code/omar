@@ -190,6 +190,32 @@ export async function initDatabase() {
       );
     `, 'activity_logs table');
 
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "currencies" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id"),
+        "code" VARCHAR(10) NOT NULL,
+        "name_ar" VARCHAR(100) NOT NULL,
+        "name_en" VARCHAR(100) NOT NULL,
+        "symbol" VARCHAR(10),
+        "is_active" BOOLEAN DEFAULT TRUE,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'currencies table');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "exchange_rates" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id"),
+        "currency_id" VARCHAR(36) REFERENCES "currencies"("id") ON DELETE CASCADE,
+        "exchange_rate" DECIMAL(18, 6) NOT NULL,
+        "rate_date" DATE NOT NULL,
+        "notes" TEXT,
+        "created_by" VARCHAR(36),
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'exchange_rates table');
+
     // Phase 3: Masters
     await safeQuery(`
       CREATE TABLE IF NOT EXISTS "expense_categories" (
