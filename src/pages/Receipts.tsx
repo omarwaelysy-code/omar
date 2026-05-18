@@ -423,7 +423,7 @@ export const Receipts: React.FC = () => {
         account_name: debitAccountName,
         debit: formData.amount,
         credit: 0,
-        description: `سند قبض رقم ${receipt_number} - ${formData.description}`,
+        description: `سند قبض رقم ${receipt_number}${formData.description ? ` - ${formData.description}` : ''}`,
         sub_account_id: paymentMethod?.id,
         sub_account_type: 'payment_method'
       });
@@ -441,7 +441,7 @@ export const Receipts: React.FC = () => {
         account_name: creditAccountName,
         debit: 0,
         credit: formData.amount,
-        description: `سند قبض رقم ${receipt_number} من العميل: ${customer?.name}`,
+        description: `سند قبض رقم ${receipt_number}${formData.description ? ` - ${formData.description}` : ''} من العميل: ${customer?.name}`,
         customer_id: formData.customer_id,
         customer_name: customer?.name,
         sub_account_id: formData.customer_id,

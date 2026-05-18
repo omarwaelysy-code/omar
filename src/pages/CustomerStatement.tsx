@@ -52,6 +52,22 @@ export const CustomerStatement: React.FC = () => {
         dbService.list<any>('journal_entries', user.company_id)
       ]);
 
+      // Create maps for efficient lookups
+      const invoicesMap = invoices.reduce((acc, inv) => {
+        acc[inv.invoice_number] = inv;
+        return acc;
+      }, {} as Record<string, Invoice>);
+
+      const receiptsMap = receipts.reduce((acc, r) => {
+        if (r.voucher_number) acc[r.voucher_number] = r;
+        return acc;
+      }, {} as Record<string, ReceiptVoucher>);
+
+      const returnsMap = returns.reduce((acc, ret) => {
+        acc[ret.return_number] = ret;
+        return acc;
+      }, {} as Record<string, Return>);
+
       let allEntries: any[] = [];
 
       // Add all journal entries related to this customer's account
@@ -60,12 +76,32 @@ export const CustomerStatement: React.FC = () => {
           // Only count lines that have the customer_id AND match the customer's ledger account
           // This prevents double entries if customer_id was accidentally set on both sides of a transaction
           if (item.customer_id === selectedCustomerId && item.account_id === customer?.account_id) {
+            let description = item.description || je.description || 'قيد مالي';
+
+            // Enrich description from source document if available
+            if (je.reference_type === 'invoice' && je.reference_number) {
+              const inv = invoicesMap[je.reference_number];
+              if (inv && inv.description) {
+                description += ` - ${inv.description}`;
+              }
+            } else if ((je.reference_type === 'receipt' || je.reference_type === 'receipt_voucher') && je.reference_number) {
+              const rect = receiptsMap[je.reference_number];
+              if (rect && rect.description) {
+                description += ` - ${rect.description}`;
+              }
+            } else if (je.reference_type === 'return' && je.reference_number) {
+              const ret = returnsMap[je.reference_number];
+              if (ret && (ret.description || ret.notes)) {
+                description += ` - ${ret.description || ret.notes}`;
+              }
+            }
+
             allEntries.push({
               id: `je-${je.id}-${Math.random()}`,
               date: je.date,
               type: je.reference_type || 'journal',
               reference: je.reference_number || '-',
-              description: item.description || je.description || 'قيد مالي',
+              description: description,
               debit: item.debit || 0,
               credit: item.credit || 0,
               balance: 0

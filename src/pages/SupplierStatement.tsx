@@ -54,6 +54,23 @@ export const SupplierStatement: React.FC = () => {
         dbService.list<any>('journal_entries', user.company_id)
       ]);
 
+      // Create maps for efficient lookups
+      const invoicesMap = invoices.reduce((acc, inv) => {
+        acc[inv.invoice_number] = inv;
+        return acc;
+      }, {} as Record<string, PurchaseInvoice>);
+
+      const vouchersMap = vouchers.reduce((acc, v) => {
+        const ref = v.voucher_number || v.manual_reference || v.internal_reference;
+        if (ref) acc[ref] = v;
+        return acc;
+      }, {} as Record<string, PaymentVoucher>);
+
+      const returnsMap = returns.reduce((acc, ret) => {
+        acc[ret.return_number] = ret;
+        return acc;
+      }, {} as Record<string, PurchaseReturn>);
+
       const allItems: StatementItem[] = [];
 
       // Add all journal entries related to this supplier's account
@@ -62,6 +79,26 @@ export const SupplierStatement: React.FC = () => {
           // Only count lines that have the supplier_id AND match the supplier's ledger account
           // This prevents double entries if supplier_id was accidentally set on both sides of a transaction
           if (item.supplier_id === selectedSupplierId && item.account_id === supplier?.account_id) {
+            let notes = item.description || je.description || 'قيد مالي';
+
+            // Enrich notes from source document if available
+            if (je.reference_type === 'purchase_invoice' && je.reference_number) {
+              const inv = invoicesMap[je.reference_number];
+              if (inv && inv.description) {
+                notes += ` - ${inv.description}`;
+              }
+            } else if (je.reference_type === 'payment_voucher' && je.reference_number) {
+              const voucher = vouchersMap[je.reference_number];
+              if (voucher && voucher.description) {
+                notes += ` - ${voucher.description}`;
+              }
+            } else if (je.reference_type === 'purchase_return' && je.reference_number) {
+              const ret = returnsMap[je.reference_number];
+              if (ret && (ret.description || ret.notes)) {
+                notes += ` - ${ret.description || ret.notes}`;
+              }
+            }
+
             allItems.push({
               id: `je-${je.id}-${Math.random()}`,
               date: je.date,
@@ -69,7 +106,7 @@ export const SupplierStatement: React.FC = () => {
               reference: je.reference_number || '-',
               debit: item.debit || 0,
               credit: item.credit || 0,
-              notes: item.description || je.description || 'قيد مالي'
+              notes: notes
             });
           }
         });

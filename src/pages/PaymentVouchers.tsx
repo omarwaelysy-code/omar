@@ -578,7 +578,7 @@ export const PaymentVouchers: React.FC = () => {
             account_name: debitAccountName,
             debit: item.amount,
             credit: 0,
-            description: item.description || `سند صرف رقم ${voucher_number} - ${voucherData.notes}`,
+            description: (item.description || `سند صرف رقم ${voucher_number}`) + (voucherData.notes ? ` - ${voucherData.notes}` : ''),
             sub_account_id: subAccountId,
             sub_account_type: subAccountType,
             customer_id: item.type === 'customer' ? item.entity_id : undefined,
@@ -610,7 +610,7 @@ export const PaymentVouchers: React.FC = () => {
           account_name: debitAccountName,
           debit: voucherData.amount,
           credit: 0,
-          description: `سند صرف رقم ${voucher_number} - ${voucherData.notes}`,
+          description: `سند صرف رقم ${voucher_number} - ${voucherData.type === 'supplier' ? (supplier?.name || '') : (category?.name || '')}` + (voucherData.notes ? ` - ${voucherData.notes}` : ''),
           sub_account_id: voucherData.type === 'supplier' ? voucherData.supplier_id : (voucherData.type === 'expense' ? voucherData.expense_category_id : undefined),
           sub_account_type: voucherData.type === 'supplier' ? 'supplier' : (voucherData.type === 'expense' ? 'expense' : undefined),
           supplier_id: voucherData.type === 'supplier' ? voucherData.supplier_id : undefined
@@ -626,7 +626,7 @@ export const PaymentVouchers: React.FC = () => {
         account_name: creditAccountName,
         debit: 0,
         credit: finalAmount,
-        description: `سند صرف رقم ${voucher_number} من حساب: ${paymentMethod?.name}`,
+        description: `سند صرف رقم ${voucher_number} من حساب: ${paymentMethod?.name}` + (voucherData.notes ? ` - ${voucherData.notes}` : ''),
         sub_account_id: paymentMethod?.id,
         sub_account_type: 'payment_method'
       });

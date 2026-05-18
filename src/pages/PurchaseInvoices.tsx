@@ -753,7 +753,7 @@ export const PurchaseInvoices: React.FC = () => {
         account_name: supplierAccountName,
         debit: 0,
         credit: total_amount,
-        description: t('pi.invoice_description', { number: invoice_number, supplier: supplier?.name }),
+        description: t('pi.invoice_description', { number: invoice_number, supplier: supplier?.name }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : ''),
         supplier_id: invoiceData.supplier_id,
         supplier_name: supplier?.name,
         sub_account_id: invoiceData.supplier_id,
@@ -769,7 +769,7 @@ export const PurchaseInvoices: React.FC = () => {
           account_name: discountAccount?.name || t('pi.discount_account_default'),
           debit: 0,
           credit: invoiceData.discount,
-          description: t('pi.discount_description', { number: invoice_number })
+          description: t('pi.discount_description', { number: invoice_number }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : '')
         });
       }
 
@@ -801,7 +801,7 @@ export const PurchaseInvoices: React.FC = () => {
           account_name: debitAccountName,
           debit: Number(item.total) || 0,
           credit: 0,
-          description: t('pi.purchase_description', { name: item.product_name || item.category_name, number: invoice_number })
+          description: t('pi.purchase_description', { name: item.product_name || item.category_name, number: invoice_number }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : '')
         });
       });
 
@@ -822,7 +822,7 @@ export const PurchaseInvoices: React.FC = () => {
           account_name: cashAccountName,
           debit: 0,
           credit: total_amount,
-          description: t('pi.payment_description', { number: invoice_number, supplier: supplier?.name }),
+          description: t('pi.payment_description', { number: invoice_number, supplier: supplier?.name }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : ''),
           sub_account_id: invoiceData.payment_method_id,
           sub_account_type: 'payment_method'
         });
@@ -831,7 +831,7 @@ export const PurchaseInvoices: React.FC = () => {
           account_name: supplierAccountName,
           debit: total_amount,
           credit: 0,
-          description: t('pi.settlement_description', { number: invoice_number, supplier: supplier?.name }),
+          description: t('pi.settlement_description', { number: invoice_number, supplier: supplier?.name }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : ''),
           supplier_id: invoiceData.supplier_id,
           supplier_name: supplier?.name,
           sub_account_id: invoiceData.supplier_id,

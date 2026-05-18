@@ -462,7 +462,7 @@ export const Invoices: React.FC = () => {
         account_name: customerAccountName,
         debit: total_amount,
         credit: 0,
-        description: `فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name}`,
+        description: `فاتورة مبيعات رقم ${invoiceNumber}${description ? ` - ${description}` : ''} - ${customer?.name}`,
         customer_id: selectedCustomerId,
         customer_name: customer?.name,
         sub_account_id: selectedCustomerId,
@@ -471,13 +471,13 @@ export const Invoices: React.FC = () => {
 
       if (discount > 0) {
         const discountAccount = accounts.find(a => a.id === settings?.customer_discount_account_id) || 
-                                accounts.find(a => a.name.includes('خصم مسموح به') || a.name.includes('خصم مبيعات'));
+                                 accounts.find(a => a.name.includes('خصم مسموح به') || a.name.includes('خصم مبيعات'));
         journalItems.push({
           account_id: discountAccount?.id || 'sales_discount_default',
           account_name: discountAccount?.name || 'حساب الخصم المسموح به (افتراضي)',
           debit: discount,
           credit: 0,
-          description: `خصم مسموح به - فاتورة رقم ${invoiceNumber}`
+          description: `خصم مسموح به - فاتورة رقم ${invoiceNumber}${description ? ` - ${description}` : ''}`
         });
       }
 
@@ -495,7 +495,7 @@ export const Invoices: React.FC = () => {
           account_name: creditAccountName,
           debit: 0,
           credit: item.total,
-          description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoiceNumber}`
+          description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoiceNumber}${description ? ` - ${description}` : ''}`
         });
       });
 
