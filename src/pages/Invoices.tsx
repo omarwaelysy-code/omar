@@ -347,7 +347,9 @@ export const Invoices: React.FC = () => {
       product_image_url: product.image_url,
       quantity: 1,
       unit_price: product.sale_price,
-      total: product.sale_price
+      total: product.sale_price,
+      barcode: product.barcode || '',
+      image_url: product.image_url || ''
     }]);
   };
 
@@ -357,7 +359,9 @@ export const Invoices: React.FC = () => {
       product_name: '',
       quantity: 1,
       unit_price: 0,
-      total: 0
+      total: 0,
+      barcode: '',
+      image_url: ''
     }]);
   };
 
@@ -426,7 +430,9 @@ export const Invoices: React.FC = () => {
         product_name: i.product_name,
         quantity: Number(i.quantity) || 0,
         unit_price: Number(i.unit_price) || 0,
-        total: Number((Number(i.quantity) || 0) * (Number(i.unit_price) || 0)) || 0
+        total: Number((Number(i.quantity) || 0) * (Number(i.unit_price) || 0)) || 0,
+        barcode: i.barcode || '',
+        image_url: i.image_url || ''
       }));
 
       const invoiceData = { 
@@ -1587,6 +1593,8 @@ export const Invoices: React.FC = () => {
                           <thead>
                             <tr className="bg-zinc-50 border-b border-zinc-200">
                               <th className="px-6 py-4 font-bold text-zinc-700">{t('invoices.item_name')}</th>
+                              <th className="px-6 py-4 font-bold text-zinc-700 w-24">صورة</th>
+                              <th className="px-6 py-4 font-bold text-zinc-700 w-32">باركود</th>
                               <th className="px-6 py-4 font-bold text-zinc-700 w-32">{t('invoices.item_quantity')}</th>
                               <th className="px-6 py-4 font-bold text-zinc-700 w-40">{t('invoices.item_price')}</th>
                               <th className="px-6 py-4 font-bold text-zinc-700 w-40">{t('invoices.item_total')}</th>
@@ -1620,6 +1628,47 @@ export const Invoices: React.FC = () => {
                                   )}
                                 </td>
                                 <td className="px-6 py-4">
+                                  <div className="flex flex-col items-center gap-1">
+                                    {item.image_url ? (
+                                      <div className="relative group w-10 h-10">
+                                        <img src={item.image_url} alt="" className="w-full h-full object-cover rounded shadow-sm" referrerPolicy="no-referrer" />
+                                        <button 
+                                          onClick={() => updateItem(index, 'image_url', '')}
+                                          className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                          <X size={8} />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <label className="cursor-pointer p-2 bg-zinc-50 border border-zinc-200 border-dashed rounded-lg hover:bg-zinc-100 transition-colors">
+                                        <ImageIcon size={16} className="text-zinc-400" />
+                                        <input 
+                                          type="file" 
+                                          className="hidden" 
+                                          accept="image/*" 
+                                          onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                              const reader = new FileReader();
+                                              reader.onloadend = () => updateItem(index, 'image_url', reader.result as string);
+                                              reader.readAsDataURL(file);
+                                            }
+                                          }} 
+                                        />
+                                      </label>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <input 
+                                    type="text" 
+                                    placeholder="الباركود..."
+                                    className="w-full bg-white border border-zinc-200 rounded-lg px-2 py-1 text-center font-bold text-xs text-zinc-800 outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                                    value={item.barcode || ''}
+                                    onChange={(e) => updateItem(index, 'barcode', e.target.value)}
+                                  />
+                                </td>
+                                <td className="px-6 py-4">
                                   <input 
                                     type="number" 
                                     className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2 text-center font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-bold"
@@ -1651,7 +1700,7 @@ export const Invoices: React.FC = () => {
                             ))}
                             {items.length === 0 && (
                               <tr>
-                                <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 italic">
+                                <td colSpan={8} className="px-6 py-12 text-center text-zinc-400 italic">
                                   {t('common.no_items')}
                                 </td>
                               </tr>
@@ -1795,6 +1844,7 @@ export const Invoices: React.FC = () => {
                       <tr>
                         <th className="px-4 py-3 w-16 text-center">{t('products.column_image')}</th>
                         <th className="px-4 py-3">{t('invoices.column_product')}</th>
+                        <th className="px-4 py-3 text-center">باركود</th>
                         <th className="px-4 py-3 w-24">{t('invoices.column_quantity')}</th>
                         <th className="px-4 py-3 w-32">{t('invoices.column_price')}</th>
                         <th className="px-4 py-3 w-32">{t('invoices.column_total')}</th>
@@ -1804,9 +1854,9 @@ export const Invoices: React.FC = () => {
                       {viewInvoice.items?.map((item, index) => (
                         <tr key={index}>
                           <td className="px-4 py-3 text-center">
-                            {item.product_image_url ? (
+                            {(item.image_url || item.product_image_url) ? (
                               <img 
-                                src={item.product_image_url} 
+                                src={item.image_url || item.product_image_url} 
                                 alt={item.product_name} 
                                 className="w-10 h-10 object-cover rounded-lg mx-auto border border-[#f4f4f5]"
                                 referrerPolicy="no-referrer"
@@ -1818,6 +1868,20 @@ export const Invoices: React.FC = () => {
                             )}
                           </td>
                           <td className="px-4 py-3 font-medium text-[#18181b]">{item.product_name}</td>
+                          <td className="px-4 py-3 text-center min-w-[100px]">
+                            {item.barcode && (
+                              <div className="flex flex-col items-center">
+                                <Barcode 
+                                  value={item.barcode} 
+                                  width={0.8} 
+                                  height={20} 
+                                  fontSize={8}
+                                  background="transparent"
+                                />
+                                <span className="text-[8px] mt-1 text-slate-400 font-mono">{item.barcode}</span>
+                              </div>
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-[#71717a]">{item.quantity}</td>
                           <td className="px-4 py-3 text-[#71717a]">{formatMoney(item.unit_price)} {t('invoices.currency')}</td>
                           <td className="px-4 py-3 font-bold text-[#18181b]">{formatMoney(item.total)} {t('invoices.currency')}</td>
@@ -1826,17 +1890,17 @@ export const Invoices: React.FC = () => {
                     </tbody>
                     <tfoot className="bg-slate-50/50 font-bold border-t border-slate-100">
                       <tr>
-                        <td colSpan={4} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-slate-400 font-bold text-[10px] uppercase tracking-wider`}>{t('invoices.summary_subtotal')}</td>
+                        <td colSpan={5} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-slate-400 font-bold text-[10px] uppercase tracking-wider`}>{t('invoices.summary_subtotal')}</td>
                         <td className="px-6 py-3 text-slate-900 text-base">{formatMoney(viewInvoice.subtotal)} {t('invoices.currency')}</td>
                       </tr>
                       {Number(viewInvoice.discount_amount || viewInvoice.discount) > 0 && (
                         <tr>
-                          <td colSpan={4} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-red-400 font-bold text-[10px] uppercase tracking-wider`}>{t('invoices.summary_discount')}</td>
+                          <td colSpan={5} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-red-400 font-bold text-[10px] uppercase tracking-wider`}>{t('invoices.summary_discount')}</td>
                           <td className="px-6 py-3 text-red-600 text-base">-{formatMoney(viewInvoice.discount_amount || viewInvoice.discount)} {t('invoices.currency')}</td>
                         </tr>
                       )}
                       <tr className="bg-slate-900 text-white">
-                        <td colSpan={4} className={`px-6 py-5 ${dir === 'rtl' ? 'text-left' : 'text-right'} font-black text-lg uppercase tracking-tight`}>{t('invoices.summary_total')}</td>
+                        <td colSpan={5} className={`px-6 py-5 ${dir === 'rtl' ? 'text-left' : 'text-right'} font-black text-lg uppercase tracking-tight`}>{t('invoices.summary_total')}</td>
                         <td className="px-6 py-5 text-2xl font-black text-brand-primary">{formatMoney(viewInvoice.total_amount)} {t('invoices.currency')}</td>
                       </tr>
                     </tfoot>

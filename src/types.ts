@@ -291,6 +291,8 @@ export interface InvoiceItem {
   quantity: number;
   unit_price: number;
   total: number;
+  barcode?: string;
+  image_url?: string;
 }
 
 export interface ReceiptVoucher {
