@@ -50,7 +50,6 @@ export const CustomerBalances: React.FC = () => {
         let journalCredit = 0;
         let manualJournalDebit = 0;
         let manualJournalCredit = 0;
-        let currentBalance = openingBalance;
 
         journalEntries.forEach((je: any) => {
           je.items?.forEach((item: any) => {
@@ -59,7 +58,6 @@ export const CustomerBalances: React.FC = () => {
               const credit = item.credit || 0;
               journalDebit += debit;
               journalCredit += credit;
-              currentBalance += debit - credit;
               
               if (je.reference_type === 'manual' || je.reference_type === 'journal') {
                 manualJournalDebit += debit;
@@ -86,6 +84,8 @@ export const CustomerBalances: React.FC = () => {
           return sum;
         }, 0) + cashInvoicesAmount;
         const totalDiscounts = custDiscounts.reduce((sum: number, d: any) => sum + (Number(d.amount) || 0), 0);
+
+        const currentBalance = openingBalance + totalInvoices - totalReturns - totalReceipts - totalDiscounts + (manualJournalDebit - manualJournalCredit);
         
         return {
           ...customer,
