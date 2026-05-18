@@ -40,7 +40,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   invoice_items: [
     'id', 'invoice_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
-    'product_name', 'product_code', 'product_image_url'
+    'product_name', 'product_code', 'product_image_url', 'image_url', 'barcode'
   ],
   returns: [
     'id', 'company_id', 'customer_id', 'customer_name', 'return_number', 'date', 'total_amount', 

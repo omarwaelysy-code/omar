@@ -381,11 +381,15 @@ export const Invoices: React.FC = () => {
           item.product_image_url = product.image_url;
           item.unit_price = product.sale_price;
           item.total = (item.quantity || 0) * (item.unit_price || 0);
+          item.barcode = product.barcode || '';
+          item.image_url = product.image_url || '';
         } else {
           item.product_name = '';
           item.product_image_url = '';
           item.unit_price = 0;
           item.total = 0;
+          item.barcode = '';
+          item.image_url = '';
         }
       }
       
@@ -1660,13 +1664,26 @@ export const Invoices: React.FC = () => {
                                   </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                  <input 
-                                    type="text" 
-                                    placeholder="الباركود..."
-                                    className="w-full bg-white border border-zinc-200 rounded-lg px-2 py-1 text-center font-bold text-xs text-zinc-800 outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                                    value={item.barcode || ''}
-                                    onChange={(e) => updateItem(index, 'barcode', e.target.value)}
-                                  />
+                                  <div className="flex flex-col items-center gap-1">
+                                    <input 
+                                      type="text" 
+                                      placeholder="الباركود..."
+                                      className="w-full bg-white border border-zinc-200 rounded-lg px-2 py-1 text-center font-bold text-xs text-zinc-800 outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-mono"
+                                      value={item.barcode || ''}
+                                      onChange={(e) => updateItem(index, 'barcode', e.target.value)}
+                                    />
+                                    {item.barcode && (
+                                      <div className="mt-1 bg-white p-1 rounded border border-zinc-100 shadow-sm">
+                                        <Barcode 
+                                          value={item.barcode} 
+                                          width={0.6} 
+                                          height={15} 
+                                          fontSize={6}
+                                          margin={0}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="px-6 py-4">
                                   <input 
@@ -1868,17 +1885,19 @@ export const Invoices: React.FC = () => {
                             )}
                           </td>
                           <td className="px-4 py-3 font-medium text-[#18181b]">{item.product_name}</td>
-                          <td className="px-4 py-3 text-center min-w-[100px]">
+                          <td className="px-4 py-3 text-center min-w-[120px]">
                             {item.barcode && (
-                              <div className="flex flex-col items-center">
+                              <div className="flex flex-col items-center justify-center p-1 bg-white rounded-lg border border-slate-100">
                                 <Barcode 
                                   value={item.barcode} 
-                                  width={0.8} 
-                                  height={20} 
+                                  width={1} 
+                                  height={25} 
                                   fontSize={8}
-                                  background="transparent"
+                                  background="white"
+                                  lineColor="#000000"
+                                  margin={2}
                                 />
-                                <span className="text-[8px] mt-1 text-slate-400 font-mono">{item.barcode}</span>
+                                <span className="text-[8px] mt-0.5 text-slate-500 font-mono font-bold tracking-tighter">{item.barcode}</span>
                               </div>
                             )}
                           </td>

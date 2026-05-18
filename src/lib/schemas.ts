@@ -45,6 +45,8 @@ export const InvoiceItemSchema = z.object({
   quantity: z.coerce.number().default(0),
   unit_price: z.coerce.number().default(0),
   total: z.coerce.number().default(0),
+  barcode: z.string().optional().nullable(),
+  image_url: z.string().optional().nullable(),
 });
 
 export const InvoiceSchema = BaseSchema.extend({
