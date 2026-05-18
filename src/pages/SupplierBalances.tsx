@@ -38,14 +38,15 @@ export const SupplierBalances: React.FC = () => {
         const supReturns = returns.filter((r: any) => r.supplier_id === supplier.id);
         const supVouchers = vouchers.filter((v: any) => {
           if (v.supplier_id === supplier.id) return true;
-          if ((v.voucher_type === 'multi' || v.type === 'multi') && v.items && Array.isArray(v.items)) {
+          const isMulti = v.voucher_type === 'multi' || v.type === 'multi';
+          if (isMulti && v.items && Array.isArray(v.items)) {
             return v.items.some((item: any) => item.type === 'supplier' && item.entity_id === supplier.id);
           }
           return false;
         });
         const supDiscounts = discounts.filter((d: any) => d.supplier_id === supplier.id);
         
-        const openingBalance = supplier.opening_balance || 0;
+        const openingBalance = Number(supplier.opening_balance) || 0;
         let journalDebit = 0;
         let journalCredit = 0;
         let manualJournalDebit = 0;
@@ -54,12 +55,17 @@ export const SupplierBalances: React.FC = () => {
         journalEntries.forEach((je: any) => {
           je.items?.forEach((item: any) => {
             if (item.supplier_id === supplier.id) {
-              const debit = item.debit || 0;
-              const credit = item.credit || 0;
+              const debit = Number(item.debit) || 0;
+              const credit = Number(item.credit) || 0;
               journalDebit += debit;
               journalCredit += credit;
               
-              if (je.reference_type === 'manual' || je.reference_type === 'journal') {
+              // Only include as "manual impact" if it's not from a standard document we're already counting
+              if (je.reference_type === 'manual' || je.reference_type === 'journal' || 
+                  (je.reference_type !== 'invoice' && je.reference_type !== 'purchase_invoice' && 
+                   je.reference_type !== 'return' && je.reference_type !== 'purchase_return' && 
+                   je.reference_type !== 'payment' && je.reference_type !== 'supplier_discount' && 
+                   je.reference_type !== 'opening_balance')) {
                 manualJournalDebit += debit;
                 manualJournalCredit += credit;
               }
@@ -69,10 +75,12 @@ export const SupplierBalances: React.FC = () => {
 
         const totalInvoices = supInvoices.reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
         const totalReturns = supReturns.reduce((sum: number, r: any) => sum + (Number(r.total_amount) || 0), 0);
-        const cashInvoicesAmount = supInvoices.filter((i: any) => i.payment_type === 'cash').reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
+        const cashInvoicesAmount = supInvoices.filter((i: any) => i.payment_type === 'cash')
+          .reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
         
         const totalVouchers = supVouchers.reduce((sum: number, v: any) => {
-          if ((v.voucher_type === 'multi' || v.type === 'multi') && v.items && Array.isArray(v.items)) {
+          const isMulti = v.voucher_type === 'multi' || v.type === 'multi';
+          if (isMulti && v.items && Array.isArray(v.items)) {
              const itemsSum = v.items
                .filter((item: any) => item.type === 'supplier' && item.entity_id === supplier.id)
                .reduce((itemSum: number, item: any) => itemSum + (Number(item.amount) || 0), 0);
@@ -83,9 +91,11 @@ export const SupplierBalances: React.FC = () => {
           }
           return sum;
         }, 0) + cashInvoicesAmount;
+
         const totalDiscounts = supDiscounts.reduce((sum: number, d: any) => sum + (Number(d.amount) || 0), 0);
 
-        const currentBalance = openingBalance + totalInvoices - totalReturns - totalVouchers - totalDiscounts + (manualJournalCredit - manualJournalDebit);
+        // Precise calculation formula for supplier: Credit (+) is debt, Debit (-) is payment
+        const currentBalance = (openingBalance + totalInvoices) - totalReturns - totalVouchers - totalDiscounts + (manualJournalCredit - manualJournalDebit);
         
         return {
           ...supplier,
@@ -137,7 +147,8 @@ export const SupplierBalances: React.FC = () => {
 
   const formatBalance = (balance: number) => {
     if (balance === 0) return '0';
-    return formatNumber(Math.abs(balance));
+    const num = formatNumber(Math.abs(balance));
+    return balance < 0 ? `(${num})` : num;
   };
 
   const exportReport = async () => {

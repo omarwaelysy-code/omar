@@ -81,18 +81,27 @@ export const CustomerStatement: React.FC = () => {
             // Enrich description from source document if available
             if (je.reference_type === 'invoice' && je.reference_number) {
               const inv = invoicesMap[je.reference_number];
-              if (inv && inv.description) {
-                description += ` - ${inv.description}`;
+              if (inv) {
+                const parts = [];
+                if (inv.description) parts.push(inv.description);
+                if (inv.notes) parts.push(inv.notes);
+                if (parts.length > 0) description += ` - ${parts.join(' | ')}`;
               }
             } else if ((je.reference_type === 'receipt' || je.reference_type === 'receipt_voucher') && je.reference_number) {
               const rect = receiptsMap[je.reference_number];
-              if (rect && rect.description) {
-                description += ` - ${rect.description}`;
+              if (rect) {
+                const parts = [];
+                if (rect.description) parts.push(rect.description);
+                if (rect.notes) parts.push(rect.notes);
+                if (parts.length > 0) description += ` - ${parts.join(' | ')}`;
               }
             } else if (je.reference_type === 'return' && je.reference_number) {
               const ret = returnsMap[je.reference_number];
-              if (ret && (ret.description || ret.notes)) {
-                description += ` - ${ret.description || ret.notes}`;
+              if (ret) {
+                const parts = [];
+                if (ret.description) parts.push(ret.description);
+                if (ret.notes) parts.push(ret.notes);
+                if (parts.length > 0) description += ` - ${parts.join(' | ')}`;
               }
             }
 

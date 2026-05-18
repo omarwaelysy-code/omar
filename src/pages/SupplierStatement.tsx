@@ -84,18 +84,27 @@ export const SupplierStatement: React.FC = () => {
             // Enrich notes from source document if available
             if (je.reference_type === 'purchase_invoice' && je.reference_number) {
               const inv = invoicesMap[je.reference_number];
-              if (inv && inv.description) {
-                notes += ` - ${inv.description}`;
+              if (inv) {
+                const parts = [];
+                if (inv.description) parts.push(inv.description);
+                if (inv.notes) parts.push(inv.notes);
+                if (parts.length > 0) notes += ` - ${parts.join(' | ')}`;
               }
             } else if (je.reference_type === 'payment_voucher' && je.reference_number) {
               const voucher = vouchersMap[je.reference_number];
-              if (voucher && voucher.description) {
-                notes += ` - ${voucher.description}`;
+              if (voucher) {
+                const parts = [];
+                if (voucher.description) parts.push(voucher.description);
+                if (voucher.notes) parts.push(voucher.notes);
+                if (parts.length > 0) notes += ` - ${parts.join(' | ')}`;
               }
             } else if (je.reference_type === 'purchase_return' && je.reference_number) {
               const ret = returnsMap[je.reference_number];
-              if (ret && (ret.description || ret.notes)) {
-                notes += ` - ${ret.description || ret.notes}`;
+              if (ret) {
+                const parts = [];
+                if (ret.description) parts.push(ret.description);
+                if (ret.notes) parts.push(ret.notes);
+                if (parts.length > 0) notes += ` - ${parts.join(' | ')}`;
               }
             }
 

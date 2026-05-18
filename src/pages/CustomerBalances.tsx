@@ -38,14 +38,15 @@ export const CustomerBalances: React.FC = () => {
         const custReturns = returns.filter((r: any) => r.customer_id === customer.id);
         const custReceipts = receipts.filter((r: any) => {
           if (r.customer_id === customer.id) return true;
-          if ((r.voucher_type === 'multi' || r.type === 'multi') && r.items && Array.isArray(r.items)) {
+          const isMulti = r.voucher_type === 'multi' || r.type === 'multi';
+          if (isMulti && r.items && Array.isArray(r.items)) {
             return r.items.some((item: any) => item.type === 'customer' && item.entity_id === customer.id);
           }
           return false;
         });
         const custDiscounts = discounts.filter((d: any) => d.customer_id === customer.id);
         
-        const openingBalance = customer.opening_balance || 0;
+        const openingBalance = Number(customer.opening_balance) || 0;
         let journalDebit = 0;
         let journalCredit = 0;
         let manualJournalDebit = 0;
@@ -54,12 +55,16 @@ export const CustomerBalances: React.FC = () => {
         journalEntries.forEach((je: any) => {
           je.items?.forEach((item: any) => {
             if (item.customer_id === customer.id) {
-              const debit = item.debit || 0;
-              const credit = item.credit || 0;
+              const debit = Number(item.debit) || 0;
+              const credit = Number(item.credit) || 0;
               journalDebit += debit;
               journalCredit += credit;
               
-              if (je.reference_type === 'manual' || je.reference_type === 'journal') {
+              // Only include as "manual impact" if it's not from a standard document we're already counting
+              if (je.reference_type === 'manual' || je.reference_type === 'journal' || 
+                  (je.reference_type !== 'invoice' && je.reference_type !== 'return' && 
+                   je.reference_type !== 'receipt' && je.reference_type !== 'customer_discount' && 
+                   je.reference_type !== 'opening_balance')) {
                 manualJournalDebit += debit;
                 manualJournalCredit += credit;
               }
@@ -69,10 +74,12 @@ export const CustomerBalances: React.FC = () => {
 
         const totalInvoices = custInvoices.reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
         const totalReturns = custReturns.reduce((sum: number, r: any) => sum + (Number(r.total_amount) || 0), 0);
-        const cashInvoicesAmount = custInvoices.filter((i: any) => i.payment_type === 'cash').reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
+        const cashInvoicesAmount = custInvoices.filter((i: any) => i.payment_type === 'cash')
+          .reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
         
         const totalReceipts = custReceipts.reduce((sum: number, r: any) => {
-          if ((r.voucher_type === 'multi' || r.type === 'multi') && r.items && Array.isArray(r.items)) {
+          const isMulti = r.voucher_type === 'multi' || r.type === 'multi';
+          if (isMulti && r.items && Array.isArray(r.items)) {
              const itemsSum = r.items
                .filter((item: any) => item.type === 'customer' && item.entity_id === customer.id)
                .reduce((itemSum: number, item: any) => itemSum + (Number(item.amount) || 0), 0);
@@ -83,9 +90,11 @@ export const CustomerBalances: React.FC = () => {
           }
           return sum;
         }, 0) + cashInvoicesAmount;
+
         const totalDiscounts = custDiscounts.reduce((sum: number, d: any) => sum + (Number(d.amount) || 0), 0);
 
-        const currentBalance = openingBalance + totalInvoices - totalReturns - totalReceipts - totalDiscounts + (manualJournalDebit - manualJournalCredit);
+        // Precise calculation formula
+        const currentBalance = (openingBalance + totalInvoices) - totalReturns - totalReceipts - totalDiscounts + (manualJournalDebit - manualJournalCredit);
         
         return {
           ...customer,
@@ -137,7 +146,8 @@ export const CustomerBalances: React.FC = () => {
 
   const formatBalance = (balance: number) => {
     if (balance === 0) return '0';
-    return formatNumber(Math.abs(balance));
+    const num = formatNumber(Math.abs(balance));
+    return balance < 0 ? `(${num})` : num;
   };
 
   const exportReport = async () => {
