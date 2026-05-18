@@ -24,6 +24,8 @@ async function startServer() {
       'ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "notes" TEXT',
       'ALTER TABLE "invoice_items" ADD COLUMN IF NOT EXISTS "barcode" VARCHAR(255)',
       'ALTER TABLE "invoice_items" ADD COLUMN IF NOT EXISTS "image_url" TEXT',
+      'ALTER TABLE "invoice_items" ADD COLUMN IF NOT EXISTS "product_code" VARCHAR(100)',
+      'ALTER TABLE "invoice_items" ADD COLUMN IF NOT EXISTS "product_image_url" TEXT',
       
       // Journal Entries
       'ALTER TABLE "journal_entries" ADD COLUMN IF NOT EXISTS "description" TEXT',

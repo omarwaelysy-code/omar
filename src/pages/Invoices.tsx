@@ -182,7 +182,43 @@ export const Invoices: React.FC = () => {
   };
 
   const handlePrint = () => {
+    // Add print-specific styles dynamically to ensure only the invoice content is printed
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @media print {
+        body * {
+          visibility: hidden !important;
+        }
+        #invoice-capture-area, #invoice-capture-area * {
+          visibility: visible !important;
+        }
+        #invoice-capture-area {
+          position: absolute !important;
+          left: 0 !important;
+          top: 0 !important;
+          width: 100% !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          box-shadow: none !important;
+          border: none !important;
+        }
+        .no-print {
+          display: none !important;
+        }
+        /* Ensure images and barcodes are rendered */
+        img {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        svg {
+          max-width: 100% !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
     window.print();
+    // Remove the style after printing (optional but cleaner)
+    setTimeout(() => document.head.removeChild(style), 1000);
   };
 
   const handleExportInvoicePDF = (invoice: Invoice) => {
@@ -432,6 +468,8 @@ export const Invoices: React.FC = () => {
       const sanitizedItems = validItems.map(i => ({
         product_id: i.product_id,
         product_name: i.product_name,
+        product_code: i.product_code || '',
+        product_image_url: i.product_image_url || i.image_url || '',
         quantity: Number(i.quantity) || 0,
         unit_price: Number(i.unit_price) || 0,
         total: Number((Number(i.quantity) || 0) * (Number(i.unit_price) || 0)) || 0,
