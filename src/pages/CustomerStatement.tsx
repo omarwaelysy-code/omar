@@ -84,7 +84,6 @@ export const CustomerStatement: React.FC = () => {
               if (inv) {
                 const parts = [];
                 if (inv.description) parts.push(inv.description);
-                if (inv.notes) parts.push(inv.notes);
                 if (parts.length > 0) description += ` - ${parts.join(' | ')}`;
               }
             } else if ((je.reference_type === 'receipt' || je.reference_type === 'receipt_voucher') && je.reference_number) {
@@ -92,7 +91,6 @@ export const CustomerStatement: React.FC = () => {
               if (rect) {
                 const parts = [];
                 if (rect.description) parts.push(rect.description);
-                if (rect.notes) parts.push(rect.notes);
                 if (parts.length > 0) description += ` - ${parts.join(' | ')}`;
               }
             } else if (je.reference_type === 'return' && je.reference_number) {

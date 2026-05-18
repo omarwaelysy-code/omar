@@ -54,18 +54,23 @@ export const SupplierBalances: React.FC = () => {
 
         journalEntries.forEach((je: any) => {
           je.items?.forEach((item: any) => {
-            if (item.supplier_id === supplier.id) {
+            if (item.supplier_id === supplier.id && item.account_id === supplier.account_id) {
               const debit = Number(item.debit) || 0;
               const credit = Number(item.credit) || 0;
               journalDebit += debit;
               journalCredit += credit;
               
               // Only include as "manual impact" if it's not from a standard document we're already counting
+              // Expanded exclusion list to cover potential legacy or variations in naming
+              const standardTypes = [
+                'purchase_invoice', 'purchase_return', 
+                'payment', 'payment_voucher', 
+                'supplier_discount', 'opening_balance',
+                'invoice', 'return' // added for broad safety
+              ];
+              
               if (je.reference_type === 'manual' || je.reference_type === 'journal' || 
-                  (je.reference_type !== 'invoice' && je.reference_type !== 'purchase_invoice' && 
-                   je.reference_type !== 'return' && je.reference_type !== 'purchase_return' && 
-                   je.reference_type !== 'payment' && je.reference_type !== 'supplier_discount' && 
-                   je.reference_type !== 'opening_balance')) {
+                  !standardTypes.includes(je.reference_type)) {
                 manualJournalDebit += debit;
                 manualJournalCredit += credit;
               }
@@ -312,7 +317,7 @@ export const SupplierBalances: React.FC = () => {
                   <td className="px-4 py-4">{formatNumber(Math.abs(filteredSuppliers.reduce((sum, s) => sum + (Number(s.totalDiscounts) || 0), 0)))}</td>
                   <td className="px-4 py-4">{formatNumber(Math.abs(filteredSuppliers.reduce((sum, s) => sum + (Number(s.totalVouchers) || 0), 0)))}</td>
                   <td className="px-4 py-4">{formatNumber(Math.abs(filteredSuppliers.reduce((sum, s) => sum + (Number(s.manualJournalImpact) || 0), 0)))}</td>
-                  <td className="px-4 py-4">{formatBalance(totalOutstanding)}</td>
+                  <td className="px-4 py-4 text-white">{formatBalance(totalOutstanding)}</td>
                 </tr>
               </tfoot>
             )}

@@ -54,17 +54,24 @@ export const CustomerBalances: React.FC = () => {
 
         journalEntries.forEach((je: any) => {
           je.items?.forEach((item: any) => {
-            if (item.customer_id === customer.id) {
+            if (item.customer_id === customer.id && item.account_id === customer.account_id) {
               const debit = Number(item.debit) || 0;
               const credit = Number(item.credit) || 0;
               journalDebit += debit;
               journalCredit += credit;
               
               // Only include as "manual impact" if it's not from a standard document we're already counting
+              // Expanded exclusion list to cover potential legacy or variations in naming
+              const standardTypes = [
+                'invoice', 'sales_invoice', 'cash_invoice', 
+                'return', 'sales_return', 
+                'receipt', 'receipt_voucher', 
+                'customer_discount', 'discount',
+                'opening_balance'
+              ];
+              
               if (je.reference_type === 'manual' || je.reference_type === 'journal' || 
-                  (je.reference_type !== 'invoice' && je.reference_type !== 'return' && 
-                   je.reference_type !== 'receipt' && je.reference_type !== 'customer_discount' && 
-                   je.reference_type !== 'opening_balance')) {
+                  !standardTypes.includes(je.reference_type)) {
                 manualJournalDebit += debit;
                 manualJournalCredit += credit;
               }
@@ -311,7 +318,7 @@ export const CustomerBalances: React.FC = () => {
                   <td className="px-4 py-4">{formatNumber(Math.abs(filteredCustomers.reduce((sum, c) => sum + (Number(c.totalDiscounts) || 0), 0)))}</td>
                   <td className="px-4 py-4">{formatNumber(Math.abs(filteredCustomers.reduce((sum, c) => sum + (Number(c.totalReceipts) || 0), 0)))}</td>
                   <td className="px-4 py-4">{formatNumber(Math.abs(filteredCustomers.reduce((sum, c) => sum + (Number(c.manualJournalImpact) || 0), 0)))}</td>
-                  <td className="px-4 py-3 font-bold text-zinc-900">{formatBalance(totalOutstanding)}</td>
+                  <td className="px-4 py-3 font-bold text-white">{formatBalance(totalOutstanding)}</td>
                 </tr>
               </tfoot>
             )}

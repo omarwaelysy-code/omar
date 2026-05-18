@@ -87,7 +87,6 @@ export const SupplierStatement: React.FC = () => {
               if (inv) {
                 const parts = [];
                 if (inv.description) parts.push(inv.description);
-                if (inv.notes) parts.push(inv.notes);
                 if (parts.length > 0) notes += ` - ${parts.join(' | ')}`;
               }
             } else if (je.reference_type === 'payment_voucher' && je.reference_number) {
@@ -95,7 +94,6 @@ export const SupplierStatement: React.FC = () => {
               if (voucher) {
                 const parts = [];
                 if (voucher.description) parts.push(voucher.description);
-                if (voucher.notes) parts.push(voucher.notes);
                 if (parts.length > 0) notes += ` - ${parts.join(' | ')}`;
               }
             } else if (je.reference_type === 'purchase_return' && je.reference_number) {
