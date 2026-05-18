@@ -89,7 +89,7 @@ export const Invoices: React.FC = () => {
   const [productFormData, setProductFormData] = useState({
     code: '',
     name: '',
-    type: 'product' as 'service' | 'product' | 'commodity',
+    type: 'finished_good' as 'service' | 'finished_good' | 'raw_material' | 'commodity',
     sale_price: 0,
     cost_price: 0,
     description: '',
@@ -180,6 +180,41 @@ export const Invoices: React.FC = () => {
     const next = await dbService.getNextSequence('invoices', dateStr);
     return next;
   };
+
+  useEffect(() => {
+    if (isProductModalOpen) {
+      const prefixMap: Record<string, string> = {
+        'service': 'SRV',
+        'finished_good': 'FG',
+        'raw_material': 'RM',
+        'commodity': 'CMD'
+      };
+      
+      const prefix = prefixMap[productFormData.type] || 'PRD';
+      
+      const typeProducts = products.filter(p => p.type === productFormData.type);
+      
+      let maxNum = 0;
+      typeProducts.forEach(p => {
+        const parts = p.code?.split('-');
+        if (parts && parts.length > 1) {
+          const num = parseInt(parts[1]);
+          if (!isNaN(num) && num > maxNum) maxNum = num;
+        } else if (p.code?.startsWith(prefix)) {
+          const numStr = p.code.substring(prefix.length);
+          const num = parseInt(numStr);
+          if (!isNaN(num) && num > maxNum) maxNum = num;
+        }
+      });
+      
+      const nextNum = (maxNum + 1).toString().padStart(4, '0');
+      const newCode = `${prefix}-${nextNum}`;
+      
+      if (productFormData.code !== newCode) {
+        setProductFormData(prev => ({ ...prev, code: newCode }));
+      }
+    }
+  }, [productFormData.type, isProductModalOpen, products]);
 
   const handlePrint = () => {
     // Add print-specific styles dynamically to ensure only the invoice content is printed
@@ -763,7 +798,7 @@ export const Invoices: React.FC = () => {
       setProductFormData({
         code: '',
         name: '',
-        type: 'product',
+        type: 'finished_good' as any,
         sale_price: 0,
         cost_price: 0,
         description: '',
@@ -2159,8 +2194,9 @@ export const Invoices: React.FC = () => {
                       <Hash className="absolute start-3 top-3 text-slate-400" size={18} />
                       <input
                         required
+                        readOnly
                         type="text"
-                        className="w-full ps-10 pe-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono"
+                        className="w-full ps-10 pe-4 py-3 bg-slate-100 border border-slate-200 rounded-xl focus:ring-0 outline-none transition-all font-mono opacity-70 cursor-not-allowed"
                         value={productFormData.code}
                         onChange={(e) => setProductFormData({ ...productFormData, code: e.target.value })}
                       />
@@ -2191,9 +2227,10 @@ export const Invoices: React.FC = () => {
                       value={productFormData.type}
                       onChange={(e) => setProductFormData({ ...productFormData, type: e.target.value as any })}
                     >
-                      <option value="product">منتج</option>
-                      <option value="service">خدمة</option>
-                      <option value="commodity">سلعة</option>
+                      <option value="finished_good">{t('products.type_finished_good')}</option>
+                      <option value="service">{t('products.type_service')}</option>
+                      <option value="raw_material">{t('products.type_raw_material')}</option>
+                      <option value="commodity">{t('products.type_commodity')}</option>
                     </select>
                   </div>
                 </div>

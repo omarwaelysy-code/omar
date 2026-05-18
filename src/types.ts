@@ -214,7 +214,7 @@ export interface Product {
   id: string;
   code: string;
   name: string;
-  type: 'service' | 'product' | 'commodity';
+  type: 'service' | 'finished_good' | 'raw_material' | 'commodity';
   sale_price: number;
   cost_price: number;
   description?: string;

@@ -34,6 +34,7 @@ export const Products: React.FC = () => {
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
   const tableRef = useRef<HTMLTableElement>(null);
   const [view, setView] = useViewPreference('products', 'table');
+  const [isAutoCode, setIsAutoCode] = useState(true);
 
   const handleExportExcel = () => {
     const headers = {
@@ -59,7 +60,7 @@ export const Products: React.FC = () => {
   const [formData, setFormData] = useState({ 
     code: '', 
     name: '', 
-    type: 'product' as 'service' | 'product' | 'commodity',
+    type: 'finished_good' as 'service' | 'finished_good' | 'raw_material' | 'commodity',
     category: '',
     unit: 'قطعة',
     sale_price: 0, 
@@ -160,6 +161,47 @@ export const Products: React.FC = () => {
       };
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!editingProduct && formData.type && isModalOpen && isAutoCode) {
+      const prefixMap: Record<string, string> = {
+        'service': 'SRV',
+        'finished_good': 'FG',
+        'raw_material': 'RM',
+        'commodity': 'CMD'
+      };
+      
+      const prefix = prefixMap[formData.type] || 'PRD';
+      
+      // Filter products of this type to find the next sequential number
+      const typeProducts = products.filter(p => p.type === formData.type);
+      
+      let maxNum = 0;
+      typeProducts.forEach(p => {
+        const parts = p.code?.split('-');
+        if (parts && parts.length > 1) {
+          const num = parseInt(parts[1]);
+          if (!isNaN(num) && num > maxNum) {
+            maxNum = num;
+          }
+        } else if (p.code?.startsWith(prefix)) {
+          // Alternative check for codes like "FG0001"
+          const numStr = p.code.substring(prefix.length);
+          const num = parseInt(numStr);
+          if (!isNaN(num) && num > maxNum) {
+            maxNum = num;
+          }
+        }
+      });
+      
+      const nextNum = (maxNum + 1).toString().padStart(4, '0');
+      const newCode = `${prefix}-${nextNum}`;
+      
+      if (formData.code !== newCode) {
+        setFormData(prev => ({ ...prev, code: newCode }));
+      }
+    }
+  }, [formData.type, editingProduct, isModalOpen, products, isAutoCode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -319,10 +361,11 @@ export const Products: React.FC = () => {
         if (!fullData) throw new Error('Product not found');
 
         setEditingProduct(fullData);
+        setIsAutoCode(false);
         setFormData({ 
           code: fullData.code, 
           name: fullData.name, 
-          type: fullData.type || 'product',
+          type: (fullData.type as any) === 'product' ? 'finished_good' : fullData.type,
           category: fullData.category || '',
           unit: fullData.unit || 'قطعة',
           sale_price: fullData.sale_price, 
@@ -345,10 +388,11 @@ export const Products: React.FC = () => {
       }
     } else {
       setEditingProduct(null);
+      setIsAutoCode(true);
       setFormData({ 
         code: '', 
         name: '', 
-        type: 'product',
+        type: 'finished_good',
         category: '',
         unit: 'قطعة',
         sale_price: 0, 
@@ -492,7 +536,11 @@ export const Products: React.FC = () => {
                     </td>
                     <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                       <span className="text-xs font-bold text-zinc-500 bg-zinc-100 px-2 py-1 rounded-lg">
-                        {product.type === 'service' ? t('products.type_service') : product.type === 'commodity' ? t('products.type_commodity') : t('products.type_product')}
+                        {product.type === 'service' ? t('products.type_service') : 
+                         product.type === 'finished_good' ? t('products.type_finished_good') :
+                         product.type === 'raw_material' ? t('products.type_raw_material') :
+                         product.type === 'commodity' ? t('products.type_commodity') : 
+                         (product.type as any) === 'product' ? t('products.type_finished_good') : t('products.type_finished_good')}
                       </span>
                     </td>
                     <td className={`px-6 py-4 font-bold text-emerald-600 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatNumber(Number(product.sale_price) || 0)} {t('invoices.currency')}</td>
@@ -581,7 +629,11 @@ export const Products: React.FC = () => {
                     <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-zinc-500 border border-zinc-100 font-bold mb-1 inline-block">{product.code}</span>
                     <h4 className="font-bold text-zinc-900 group-hover:text-emerald-700 transition-colors truncate">{product.name}</h4>
                     <span className="text-[10px] font-bold text-zinc-400 bg-zinc-200/50 px-2 py-0.5 rounded-full uppercase">
-                      {product.type === 'service' ? t('products.type_service') : product.type === 'commodity' ? t('products.type_commodity') : t('products.type_product')}
+                      {product.type === 'service' ? t('products.type_service') : 
+                       product.type === 'finished_good' ? t('products.type_finished_good') :
+                       product.type === 'raw_material' ? t('products.type_raw_material') :
+                       product.type === 'commodity' ? t('products.type_commodity') : 
+                       (product.type as any) === 'product' ? t('products.type_finished_good') : t('products.type_finished_good')}
                     </span>
                   </div>
                 </div>
@@ -706,8 +758,9 @@ export const Products: React.FC = () => {
                     <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_code')}</label>
                     <input
                       required
+                      readOnly
                       type="text"
-                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
+                      className={`w-full px-4 py-3 bg-zinc-100 border border-zinc-200 rounded-xl focus:ring-0 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'} opacity-70 cursor-not-allowed`}
                       value={formData.code}
                       onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                     />
@@ -731,8 +784,9 @@ export const Products: React.FC = () => {
                     value={formData.type}
                     onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
                   >
-                    <option value="product">{t('products.type_product')}</option>
+                    <option value="finished_good">{t('products.type_finished_good')}</option>
                     <option value="service">{t('products.type_service')}</option>
+                    <option value="raw_material">{t('products.type_raw_material')}</option>
                     <option value="commodity">{t('products.type_commodity')}</option>
                   </select>
                 </div>

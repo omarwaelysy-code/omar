@@ -93,7 +93,7 @@ export const PurchaseInvoices: React.FC = () => {
   const [productFormData, setProductFormData] = useState({
     code: '',
     name: '',
-    type: 'product' as 'service' | 'product' | 'commodity',
+    type: 'finished_good' as 'service' | 'finished_good' | 'raw_material' | 'commodity',
     sale_price: 0,
     cost_price: 0,
     description: '',
@@ -198,6 +198,41 @@ export const PurchaseInvoices: React.FC = () => {
       };
     }
   }, [user, page, limit, sortBy, sortOrder, searchTerm]);
+
+  useEffect(() => {
+    if (isProductModalOpen) {
+      const prefixMap: Record<string, string> = {
+        'service': 'SRV',
+        'finished_good': 'FG',
+        'raw_material': 'RM',
+        'commodity': 'CMD'
+      };
+      
+      const prefix = prefixMap[productFormData.type] || 'PRD';
+      
+      const typeProducts = products.filter(p => p.type === productFormData.type);
+      
+      let maxNum = 0;
+      typeProducts.forEach(p => {
+        const parts = p.code?.split('-');
+        if (parts && parts.length > 1) {
+          const num = parseInt(parts[1]);
+          if (!isNaN(num) && num > maxNum) maxNum = num;
+        } else if (p.code?.startsWith(prefix)) {
+          const numStr = p.code.substring(prefix.length);
+          const num = parseInt(numStr);
+          if (!isNaN(num) && num > maxNum) maxNum = num;
+        }
+      });
+      
+      const nextNum = (maxNum + 1).toString().padStart(4, '0');
+      const newCode = `${prefix}-${nextNum}`;
+      
+      if (productFormData.code !== newCode) {
+        setProductFormData(prev => ({ ...prev, code: newCode }));
+      }
+    }
+  }, [productFormData.type, isProductModalOpen, products]);
 
   const generateInvoiceNumber = async (selectedDate: string) => {
     return await dbService.getNextSequence('purchase_invoices', selectedDate);
@@ -532,7 +567,7 @@ export const PurchaseInvoices: React.FC = () => {
       setProductFormData({
         code: '',
         name: '',
-        type: 'product',
+        type: 'finished_good' as any,
         sale_price: 0,
         cost_price: 0,
         description: '',
@@ -2012,8 +2047,9 @@ export const PurchaseInvoices: React.FC = () => {
                       <Hash className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
                       <input
                         required
+                        readOnly
                         type="text"
-                        className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono`}
+                        className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-100 border border-zinc-200 rounded-xl focus:ring-0 outline-none transition-all font-mono opacity-70 cursor-not-allowed`}
                         value={productFormData.code}
                         onChange={(e) => setProductFormData({ ...productFormData, code: e.target.value })}
                       />
@@ -2044,9 +2080,10 @@ export const PurchaseInvoices: React.FC = () => {
                       value={productFormData.type}
                       onChange={(e) => setProductFormData({ ...productFormData, type: e.target.value as any })}
                     >
-                      <option value="product">{t('products.product')}</option>
-                      <option value="service">{t('products.service')}</option>
-                      <option value="commodity">{t('products.commodity')}</option>
+                      <option value="finished_good">{t('products.type_finished_good')}</option>
+                      <option value="service">{t('products.type_service')}</option>
+                      <option value="raw_material">{t('products.type_raw_material')}</option>
+                      <option value="commodity">{t('products.type_commodity')}</option>
                     </select>
                   </div>
                 </div>
