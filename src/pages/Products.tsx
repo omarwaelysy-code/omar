@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Product, Account } from '../types';
-import { Search, Plus, Edit2, Trash2, X, Package, History, FileText, Paperclip, Lock, LayoutGrid, List, ChevronRight, ChevronLeft, Hash, Wallet } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, X, Package, History, FileText, Paperclip, Lock, LayoutGrid, List, ChevronRight, ChevronLeft, Hash, Wallet, Layers, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';

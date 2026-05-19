@@ -6,7 +6,7 @@ import { Customer, Account, JournalEntry } from '../types';
 import { 
   Search, Plus, Edit2, Trash2, X, History, FileText, User, 
   Hash, Box, Wallet, Calendar, Phone, Mail, MapPin, Lock,
-  LayoutGrid, List, ChevronRight, ChevronLeft
+  LayoutGrid, List, ChevronRight, ChevronLeft, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';

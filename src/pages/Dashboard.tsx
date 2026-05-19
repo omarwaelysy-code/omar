@@ -95,6 +95,15 @@ const StatCard = ({ title, value, subtitle, icon: Icon, trend, colorClass }: any
   </motion.div>
 );
 
+const masterDataItems = [
+  { id: 'customers', label: 'العملاء', icon: UsersIcon, color: 'from-blue-500/20 to-blue-600/20', iconColor: 'text-blue-600' },
+  { id: 'suppliers', label: 'الموردين', icon: Truck, color: 'from-emerald-500/20 to-emerald-600/20', iconColor: 'text-emerald-600' },
+  { id: 'products', label: 'المنتجات', icon: Package, color: 'from-amber-500/20 to-amber-600/20', iconColor: 'text-amber-600' },
+  { id: 'accounts', label: 'الحسابات', icon: Wallet, color: 'from-purple-500/20 to-purple-600/20', iconColor: 'text-purple-600' },
+  { id: 'payment_methods', label: 'وسائل الدفع', icon: CreditCard, color: 'from-indigo-500/20 to-indigo-600/20', iconColor: 'text-indigo-600' },
+  { id: 'company_settings', label: 'الإعدادات', icon: Settings, color: 'from-slate-500/20 to-slate-600/20', iconColor: 'text-slate-600' },
+];
+
 export const Dashboard: React.FC = () => {
   const { user, isSuperAdmin, isCompanyAdmin } = useAuth();
   const { activeTabId, setCurrentPage } = useNavigation();

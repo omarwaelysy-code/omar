@@ -577,14 +577,5 @@ export function CompanySettings() {
         </div>
       </form>
     </div>
-  );w-5 h-5 animate-spin" />
-            ) : (
-              <Save className="w-5 h-5" />
-            )}
-            {t('common.save')}
-          </button>
-        </div>
-      </form>
-    </div>
   );
 }
