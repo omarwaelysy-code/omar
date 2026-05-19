@@ -234,7 +234,7 @@ export const ExpensesReport: React.FC = () => {
       {/* Header section with glass effect */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white/50 backdrop-blur-md p-8 rounded-[2rem] border border-zinc-200/50 shadow-xl shadow-zinc-200/20">
         <div className="flex items-center gap-5">
-          <div className="w-14 h-14 bg-rose-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-rose-200 transform -rotate-3">
+          <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-200 transform -rotate-3">
             <TrendingDown size={28} />
           </div>
           <div>
@@ -246,7 +246,7 @@ export const ExpensesReport: React.FC = () => {
         <div className="flex items-center gap-3">
           <button 
             onClick={fetchData}
-            className="p-3 bg-white border border-zinc-200 text-zinc-600 rounded-2xl hover:bg-zinc-50 hover:text-indigo-600 transition-all hover:scale-105 active:scale-95 shadow-sm"
+            className="p-3 bg-white border border-zinc-200 text-zinc-600 rounded-2xl hover:bg-zinc-50 hover:text-emerald-600 transition-all hover:scale-105 active:scale-95 shadow-sm"
           >
             <RefreshCcw size={20} className={loading ? 'animate-spin' : ''} />
           </button>
@@ -280,7 +280,7 @@ export const ExpensesReport: React.FC = () => {
             <Calendar className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
             <input
               type="date"
-              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-bold text-zinc-700`}
+              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold text-zinc-700`}
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
             />
@@ -293,7 +293,7 @@ export const ExpensesReport: React.FC = () => {
             <Calendar className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
             <input
               type="date"
-              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-bold text-zinc-700`}
+              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold text-zinc-700`}
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
             />
@@ -301,19 +301,19 @@ export const ExpensesReport: React.FC = () => {
         </div>
 
         <div className="md:col-span-2 flex items-end">
-            <div className="w-full bg-rose-50 p-4 rounded-2xl border border-rose-100 flex items-center justify-between">
+            <div className="w-full bg-emerald-50 p-4 rounded-2xl border border-emerald-100 flex items-center justify-between">
                 <div>
-                   <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest">{t('reports.total_expenses')}</p>
-                   <p className="text-2xl font-black text-rose-600">{formatMoney(totalExpenses)}</p>
+                   <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">{t('reports.total_expenses')}</p>
+                   <p className="text-2xl font-black text-emerald-600">{formatMoney(totalExpenses)}</p>
                 </div>
-                <PieChart size={32} className="text-rose-200" />
+                <PieChart size={32} className="text-emerald-200" />
             </div>
         </div>
       </div>
 
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[2rem] border border-zinc-200 border-dashed">
-          <RefreshCcw className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
+          <RefreshCcw className="w-12 h-12 text-emerald-600 animate-spin mb-4" />
           <p className="text-zinc-500 font-bold text-lg animate-pulse">{t('common.loading')}</p>
         </div>
       ) : (
@@ -355,7 +355,7 @@ export const ExpensesReport: React.FC = () => {
                         >
                           <td className="pl-6 py-5 text-center">
                             {row.subItems && row.subItems.length > 0 && (
-                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${expandedRows.has(row.id) ? 'bg-rose-500 text-white rotate-180 shadow-md' : 'bg-zinc-100 text-zinc-400 group-hover:bg-zinc-200'}`}>
+                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${expandedRows.has(row.id) ? 'bg-emerald-500 text-white rotate-180 shadow-md' : 'bg-zinc-100 text-zinc-400 group-hover:bg-zinc-200'}`}>
                                     <ChevronDown size={18} />
                                 </div>
                             )}
@@ -377,10 +377,10 @@ export const ExpensesReport: React.FC = () => {
                                 <motion.div 
                                   initial={{ width: 0 }}
                                   animate={{ width: `${(row.amount / totalExpenses * 100).toFixed(1)}%` }}
-                                  className={`h-full ${row.type === 'misc' ? 'bg-zinc-400' : 'bg-rose-500'} rounded-full`}
+                                  className={`h-full ${row.type === 'misc' ? 'bg-zinc-400' : 'bg-emerald-500'} rounded-full`}
                                 />
                               </div>
-                              <span className={`text-[11px] font-black min-w-[40px] text-left ${row.type === 'misc' ? 'text-zinc-500' : 'text-rose-500 underline'}`}>
+                              <span className={`text-[11px] font-black min-w-[40px] text-left ${row.type === 'misc' ? 'text-zinc-500' : 'text-emerald-500 underline'}`}>
                                 {(row.amount / totalExpenses * 100).toFixed(1)}%
                               </span>
                             </div>
@@ -401,11 +401,11 @@ export const ExpensesReport: React.FC = () => {
                               exit={{ opacity: 0, height: 0 }}
                             >
                               <td colSpan={5} className="p-0 bg-zinc-50/30">
-                                <div className="px-14 pb-4 pt-1 space-y-1.5 border-r-2 border-rose-200/50 m-4 rounded-r-2xl">
+                                <div className="px-14 pb-4 pt-1 space-y-1.5 border-r-2 border-emerald-200/50 m-4 rounded-r-2xl">
                                   {row.subItems.map(sub => (
-                                    <div key={sub.id} className="flex items-center justify-between p-3 bg-white rounded-xl border border-zinc-100 shadow-sm hover:border-rose-100 transition-colors group/sub">
+                                    <div key={sub.id} className="flex items-center justify-between p-3 bg-white rounded-xl border border-zinc-100 shadow-sm hover:border-emerald-100 transition-colors group/sub">
                                       <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-zinc-50 flex items-center justify-center text-zinc-300 group-hover/sub:bg-rose-50 group-hover/sub:text-rose-400 transition-colors">
+                                        <div className="w-8 h-8 rounded-lg bg-zinc-50 flex items-center justify-center text-zinc-300 group-hover/sub:bg-emerald-50 group-hover/sub:text-emerald-400 transition-colors">
                                             <ArrowRightLeft size={14} />
                                         </div>
                                         <div>
@@ -433,7 +433,7 @@ export const ExpensesReport: React.FC = () => {
                     <td colSpan={4} className="px-8 py-6 text-sm font-black uppercase tracking-widest border-r border-white/5">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-                                <TrendingDown className="text-rose-400" size={20} />
+                                <TrendingDown className="text-emerald-400" size={20} />
                             </div>
                             {t('reports.total_overall')}
                         </div>
@@ -450,7 +450,7 @@ export const ExpensesReport: React.FC = () => {
           {/* Additional Info Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
             <div className="bg-white p-8 rounded-[2rem] border border-zinc-200 shadow-sm flex items-start gap-5">
-              <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-500 shadow-inner">
+              <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-500 shadow-inner">
                 <PieChart size={28} />
               </div>
               <div>

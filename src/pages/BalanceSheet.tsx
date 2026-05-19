@@ -76,11 +76,11 @@ export const BalanceSheet: React.FC = () => {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4 p-8 bg-rose-50 rounded-3xl border border-rose-100 italic text-center">
-        <p className="text-rose-600 font-bold">{error}</p>
+      <div className="flex flex-col items-center justify-center h-64 gap-4 p-8 bg-emerald-50 rounded-3xl border border-emerald-100 italic text-center">
+        <p className="text-emerald-600 font-bold">{error}</p>
         <button 
           onClick={() => window.location.reload()}
-          className="px-6 py-2 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-all shadow-lg shadow-rose-200"
+          className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200"
         >
           {dir === 'rtl' ? 'إعادة المحاولة' : 'Retry'}
         </button>
@@ -142,16 +142,16 @@ export const BalanceSheet: React.FC = () => {
           <div className="space-y-8">
             {/* Liabilities */}
             <div className="bg-white border border-zinc-200 rounded-[2.5rem] overflow-hidden shadow-sm">
-              <div className={`px-8 py-6 bg-rose-50 border-b border-rose-100 flex items-center justify-between ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                <h3 className={`font-black text-rose-700 flex items-center gap-3 text-lg ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+              <div className={`px-8 py-6 bg-emerald-50 border-b border-emerald-100 flex items-center justify-between ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                <h3 className={`font-black text-emerald-700 flex items-center gap-3 text-lg ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                   <CreditCard size={24} />
                   {dir === 'rtl' ? 'الالتزامات (الخصوم)' : 'Liabilities'}
                 </h3>
-                <span className="text-2xl font-black text-rose-600">{formatNumber(data.totalLiabilities)}</span>
+                <span className="text-2xl font-black text-emerald-600">{formatNumber(data.totalLiabilities)}</span>
               </div>
               <div className="p-4 space-y-2">
                 {data.liabilities.map(a => (
-                  <div key={a.id} className={`flex items-center justify-between p-4 hover:bg-rose-50/30 rounded-2xl transition-all border border-transparent hover:border-rose-100 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                  <div key={a.id} className={`flex items-center justify-between p-4 hover:bg-emerald-50/30 rounded-2xl transition-all border border-transparent hover:border-emerald-100 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                     <span className="font-bold text-zinc-600">{a.name}</span>
                     <span className="font-black text-zinc-900">{formatNumber(Math.abs(a.balance))}</span>
                   </div>
@@ -195,7 +195,7 @@ export const BalanceSheet: React.FC = () => {
             <div className={`p-8 rounded-[2.5rem] border-2 flex items-center justify-between shadow-lg ${
               data.isBalanced 
                 ? 'bg-emerald-500 border-emerald-400 text-white shadow-emerald-500/20' 
-                : 'bg-rose-500 border-rose-400 text-white shadow-rose-500/20'
+                : 'bg-emerald-500 border-emerald-400 text-white shadow-emerald-500/20'
             }`}>
               <div className={`flex items-center gap-4 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse text-left'}`}>
                 <Shield size={32} />
@@ -239,14 +239,14 @@ export const BalanceSheet: React.FC = () => {
 
                 {data.diagnostics.unbalancedEntries.length > 0 && (
                   <div className="space-y-3 bg-white/50 p-4 rounded-2xl border border-amber-100">
-                    <p className={`text-sm font-black text-rose-600 flex items-center gap-2 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                    <p className={`text-sm font-black text-emerald-600 flex items-center gap-2 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                       <ArrowLeftRight size={16} />
                       {t('balance_sheet.unbalanced_entries')}
                     </p>
                     <ul className={`list-none text-sm text-zinc-600 font-medium space-y-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                       {data.diagnostics.unbalancedEntries.map((e, i) => (
                         <li key={i} className="flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                           {e}
                         </li>
                       ))}
@@ -273,14 +273,14 @@ export const BalanceSheet: React.FC = () => {
 
                 {data.diagnostics.missingAccountType.length > 0 && (
                   <div className="space-y-3 bg-white/50 p-4 rounded-2xl border border-amber-100">
-                    <p className={`text-sm font-black text-rose-600 flex items-center gap-2 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                    <p className={`text-sm font-black text-emerald-600 flex items-center gap-2 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                       <Search size={16} />
                       {dir === 'rtl' ? 'حسابات تفتقر لنوع حساب' : 'Accounts missing Type'}
                     </p>
                     <ul className={`list-none text-sm text-zinc-600 font-medium space-y-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                       {data.diagnostics.missingAccountType.map((e, i) => (
                         <li key={i} className="flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                           {e}
                         </li>
                       ))}

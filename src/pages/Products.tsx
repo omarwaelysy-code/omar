@@ -455,7 +455,7 @@ export const Products: React.FC = () => {
           {canCreate && (
             <button 
               onClick={() => openModal()}
-              className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-2xl font-bold hover:from-orange-600 hover:to-orange-700 transition-all active:scale-95 shadow-lg shadow-orange-200"
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-2xl font-bold hover:from-emerald-600 hover:to-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
             >
               <Plus size={20} />
               {t('products.add')}

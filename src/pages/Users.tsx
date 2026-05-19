@@ -308,7 +308,7 @@ export const Users: React.FC = () => {
         {users.map((user) => (
           <div key={user.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all group relative">
             <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${user.role === 'admin' ? 'bg-indigo-50 text-indigo-600 shadow-inner' : user.role === 'manager' ? 'bg-blue-50 text-blue-600 shadow-inner' : 'bg-slate-50 text-slate-400 shadow-inner'}`}>
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${user.role === 'admin' ? 'bg-emerald-50 text-emerald-600 shadow-inner' : user.role === 'manager' ? 'bg-blue-50 text-blue-600 shadow-inner' : 'bg-slate-50 text-slate-400 shadow-inner'}`}>
                 {user.role === 'admin' ? <Shield size={24} /> : <UserIcon size={24} />}
               </div>
               <div className="text-right flex-1 min-w-0">
@@ -344,7 +344,7 @@ export const Users: React.FC = () => {
               {user.id !== currentUser?.id && (
                 <button 
                   onClick={() => handleDelete(user.id)}
-                  className="p-3 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all active:scale-90"
+                  className="p-3 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all active:scale-90"
                 >
                   <Trash2 size={18} />
                 </button>
@@ -388,8 +388,8 @@ export const Users: React.FC = () => {
 
             <div className="flex-1 overflow-y-auto p-6 bg-slate-50/30 custom-scrollbar">
               {selectedUser.role === 'admin' ? (
-                <div className="bg-indigo-50/50 border border-indigo-100 p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-4 text-indigo-700">
-                  <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mb-2">
+                <div className="bg-emerald-50/50 border border-emerald-100 p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-4 text-emerald-700">
+                  <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-2">
                     <Shield size={40} className="shrink-0" />
                   </div>
                   <div className="max-w-md">
@@ -440,7 +440,7 @@ export const Users: React.FC = () => {
                         <div className="col-span-2 flex justify-center">
                           <button 
                             onClick={() => togglePermission(module.id, 'delete')}
-                            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90 ${tempPermissions[module.id]?.delete ? 'bg-rose-600 text-white shadow-lg shadow-rose-500/20' : 'bg-slate-100 text-slate-300 hover:bg-slate-200'}`}
+                            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90 ${tempPermissions[module.id]?.delete ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20' : 'bg-slate-100 text-slate-300 hover:bg-slate-200'}`}
                           >
                             <Check size={18} />
                           </button>
@@ -542,7 +542,7 @@ export const Users: React.FC = () => {
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" dir="rtl">
           <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 duration-200 border border-slate-200 text-center">
-            <div className="w-20 h-20 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+            <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
               <Trash2 size={32} />
             </div>
             <h3 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">{t('users.delete_confirm_title')}</h3>
@@ -559,7 +559,7 @@ export const Users: React.FC = () => {
               </button>
               <button 
                 onClick={confirmDelete}
-                className="flex-1 py-4 bg-rose-600 text-white rounded-2xl font-bold hover:bg-rose-700 transition-all shadow-xl shadow-rose-500/20 active:scale-95"
+                className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95"
               >
                 {t('common.delete')}
               </button>

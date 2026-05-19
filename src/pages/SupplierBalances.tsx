@@ -188,11 +188,11 @@ export const SupplierBalances: React.FC = () => {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4 p-8 bg-rose-50 rounded-3xl border border-rose-100 italic text-center">
-        <p className="text-rose-600 font-bold">{error}</p>
+      <div className="flex flex-col items-center justify-center h-64 gap-4 p-8 bg-emerald-50 rounded-3xl border border-emerald-100 italic text-center">
+        <p className="text-emerald-600 font-bold">{error}</p>
         <button 
           onClick={fetchData}
-          className="px-6 py-2 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-all shadow-lg shadow-rose-200"
+          className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200"
         >
           إعادة المحاولة
         </button>
@@ -295,7 +295,7 @@ export const SupplierBalances: React.FC = () => {
                   </td>
                   <td className="px-4 py-4 text-zinc-500 text-sm">{formatBalance(supplier.openingBalance)}</td>
                   <td className="px-4 py-4 text-emerald-600 font-medium text-sm">{formatBalance(supplier.totalInvoices)}</td>
-                  <td className="px-4 py-4 text-rose-600 font-medium text-sm">{formatBalance(-supplier.totalReturns)}</td>
+                  <td className="px-4 py-4 text-emerald-600 font-medium text-sm">{formatBalance(-supplier.totalReturns)}</td>
                   <td className="px-4 py-4 text-amber-600 font-medium text-sm">{formatBalance(-supplier.totalDiscounts)}</td>
                   <td className="px-4 py-4 text-blue-600 font-medium text-sm">{formatBalance(-supplier.totalVouchers)}</td>
                   <td className="px-4 py-4 text-zinc-600 font-medium text-sm">{formatBalance(supplier.manualJournalImpact)}</td>
@@ -353,7 +353,7 @@ export const SupplierBalances: React.FC = () => {
                 </div>
                 <div className="flex justify-between border-b border-zinc-50 pb-1">
                   <span className="text-zinc-400">مرتجع (-):</span>
-                  <span className="text-rose-600 font-medium">{formatNumber(supplier.totalReturns)}</span>
+                  <span className="text-emerald-600 font-medium">{formatNumber(supplier.totalReturns)}</span>
                 </div>
                 <div className="flex justify-between border-b border-zinc-50 pb-1">
                   <span className="text-zinc-400">سداد (-):</span>

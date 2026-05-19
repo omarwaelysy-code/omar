@@ -79,11 +79,11 @@ export const IncomeStatement: React.FC = () => {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4 p-8 bg-rose-50 rounded-3xl border border-rose-100 italic text-center">
-        <p className="text-rose-600 font-bold">{error}</p>
+      <div className="flex flex-col items-center justify-center h-64 gap-4 p-8 bg-emerald-50 rounded-3xl border border-emerald-100 italic text-center">
+        <p className="text-emerald-600 font-bold">{error}</p>
         <button 
           onClick={() => window.location.reload()}
-          className="px-6 py-2 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-all shadow-lg shadow-rose-200"
+          className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200"
         >
           {dir === 'rtl' ? 'إعادة المحاولة' : 'Retry'}
         </button>
@@ -148,12 +148,12 @@ export const IncomeStatement: React.FC = () => {
 
           {/* Costs Section */}
           <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
-            <div className={`px-6 py-4 bg-rose-50 border-b border-rose-100 flex items-center justify-between ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-              <h3 className={`font-black text-rose-700 flex items-center gap-2 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+            <div className={`px-6 py-4 bg-emerald-50 border-b border-emerald-100 flex items-center justify-between ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+              <h3 className={`font-black text-emerald-700 flex items-center gap-2 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                 <TrendingDown size={20} />
                 {t('income.costs')}
               </h3>
-              <span className="text-lg font-black text-rose-600">{formatNumber(data.totalCosts)}</span>
+              <span className="text-lg font-black text-emerald-600">{formatNumber(data.totalCosts)}</span>
             </div>
             <div className="p-2">
               {data.costs.map(a => (
@@ -201,7 +201,7 @@ export const IncomeStatement: React.FC = () => {
               </div>
               <div className={`pt-4 border-t border-white/10 flex items-center justify-between ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                 <span className="font-black text-lg">{t('income.net')}</span>
-                <span className={`text-3xl font-black ${data.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                <span className={`text-3xl font-black ${data.netProfit >= 0 ? 'text-emerald-400' : 'text-emerald-400'}`}>
                   {formatNumber(data.netProfit)}
                 </span>
               </div>

@@ -163,7 +163,7 @@ export function CostCenters() {
                         fetchData();
                       }
                     }}
-                    className="p-2 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                    className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
                   >
                     <Trash2 size={16} />
                   </button>

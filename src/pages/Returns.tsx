@@ -748,7 +748,7 @@ export const Returns: React.FC = () => {
           />
           <button 
             onClick={() => openModal()}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-600 text-white rounded-2xl font-bold hover:bg-orange-700 transition-all active:scale-95 shadow-lg shadow-orange-200"
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
           >
             <Plus size={20} />
             {t('returns.add')}
@@ -763,7 +763,7 @@ export const Returns: React.FC = () => {
             <input
               type="text"
               placeholder={t('returns.search_placeholder')}
-              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-orange-500 transition-all`}
+              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -774,7 +774,7 @@ export const Returns: React.FC = () => {
           <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
             <thead>
               <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                <th className={`px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('return_number')}>
+                <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('return_number')}>
                   <div className="flex items-center gap-1">
                     {t('returns.column_number')}
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -782,7 +782,7 @@ export const Returns: React.FC = () => {
                     </span>
                   </div>
                 </th>
-                <th className={`px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('customer_name')}>
+                <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('customer_name')}>
                   <div className="flex items-center gap-1">
                     {t('returns.column_customer')}
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -790,7 +790,7 @@ export const Returns: React.FC = () => {
                     </span>
                   </div>
                 </th>
-                <th className={`px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('date')}>
+                <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('date')}>
                   <div className="flex items-center gap-1">
                     {t('returns.column_date')}
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -798,7 +798,7 @@ export const Returns: React.FC = () => {
                     </span>
                   </div>
                 </th>
-                <th className={`px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('payment_type')}>
+                <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('payment_type')}>
                   <div className="flex items-center gap-1">
                     {t('returns.column_type')}
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -806,7 +806,7 @@ export const Returns: React.FC = () => {
                     </span>
                   </div>
                 </th>
-                <th className={`px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('total_amount')}>
+                <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('total_amount')}>
                   <div className="flex items-center gap-1">
                     {t('returns.column_total')}
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -826,11 +826,11 @@ export const Returns: React.FC = () => {
                   <td className="px-6 py-4 font-bold text-zinc-900">{ret.customer_name}</td>
                   <td className="px-6 py-4 text-zinc-500">{formatDate(ret.date)}</td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${ret.payment_type === 'cash' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-orange-50 text-orange-600 border border-orange-100'}`}>
+                    <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${ret.payment_type === 'cash' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
                       {ret.payment_type === 'cash' ? t('returns.payment_cash') : t('returns.payment_credit')}
                     </span>
                   </td>
-                  <td className="px-6 py-4 font-bold text-orange-600">{formatNumber(ret.total_amount)} {t('returns.currency')}</td>
+                  <td className="px-6 py-4 font-bold text-emerald-600">{formatNumber(ret.total_amount)} {t('returns.currency')}</td>
                   <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                     <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
                       <button 
@@ -852,7 +852,7 @@ export const Returns: React.FC = () => {
                       </button>
                       <button 
                         onClick={() => handleViewReturn(ret)}
-                        className="p-2 text-zinc-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-all no-pdf"
+                        className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
                         title={t('common.view')}
                       >
                         <Eye size={18} />
@@ -884,11 +884,11 @@ export const Returns: React.FC = () => {
             <div key={ret.id} className="p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex flex-col gap-1">
-                  <span className="font-mono text-[10px] bg-orange-50 px-2 py-1 rounded text-orange-700 font-bold w-fit">{ret.return_number}</span>
+                  <span className="font-mono text-[10px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold w-fit">{ret.return_number}</span>
                   <h4 className="font-bold text-zinc-900 text-lg">{ret.customer_name}</h4>
                 </div>
                 <div className={dir === 'rtl' ? 'text-left' : 'text-right'}>
-                  <p className="font-bold text-orange-600 text-lg">{formatNumber(ret.total_amount)} {t('returns.currency')}</p>
+                  <p className="font-bold text-emerald-600 text-lg">{formatNumber(ret.total_amount)} {t('returns.currency')}</p>
                   <span className="text-xs text-zinc-400">{formatDate(ret.date)}</span>
                 </div>
               </div>
@@ -950,7 +950,7 @@ export const Returns: React.FC = () => {
               <button 
                 type="button"
                 onClick={() => setShowSidePanel(!showSidePanel)}
-                className={`flex items-center gap-3 px-6 py-2.5 rounded-2xl text-sm font-black transition-all border shadow-sm ${showSidePanel ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'}`}
+                className={`flex items-center gap-3 px-6 py-2.5 rounded-2xl text-sm font-black transition-all border shadow-sm ${showSidePanel ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'}`}
               >
                 <History size={18} />
                 <span>{language === 'ar' ? 'قيد اليومية \\ سجل التعديلات' : 'Journal Entry / Activity Log'}</span>
@@ -1032,7 +1032,7 @@ export const Returns: React.FC = () => {
                 <div className="lg:col-span-3 space-y-6">
                   {/* Card 1: Basic Info */}
                   <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                    <div className="absolute top-4 right-4 flex items-center gap-2 text-orange-600 bg-orange-50 px-3 py-1 rounded-full border border-orange-100">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
                       <FileText className="w-4 h-4" />
                       <span className="text-xs font-bold">{t('returns.basic_info')}</span>
                     </div>
@@ -1057,7 +1057,7 @@ export const Returns: React.FC = () => {
                           <User className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <select 
                             required
-                            className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
+                            className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
                             value={selectedCustomerId}
                             onChange={(e) => {
                               if (e.target.value === 'new_customer') {
@@ -1071,7 +1071,7 @@ export const Returns: React.FC = () => {
                             {customers.map(c => (
                               <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
                             ))}
-                            <option value="new_customer" className="font-bold text-orange-600">+ {t('customers.add')}</option>
+                            <option value="new_customer" className="font-bold text-emerald-600">+ {t('customers.add')}</option>
                           </select>
                           <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                         </div>
@@ -1084,7 +1084,7 @@ export const Returns: React.FC = () => {
                           <input 
                             required
                             type="date"
-                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
                             value={date}
                             onChange={(e) => setDate(e.target.value)}
                           />
@@ -1095,7 +1095,7 @@ export const Returns: React.FC = () => {
 
                   {/* Card 2: Payment settings */}
                   <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                    <div className="absolute top-4 right-4 flex items-center gap-2 text-orange-600 bg-orange-50 px-3 py-1 rounded-full border border-orange-100">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
                       <Wallet className="w-4 h-4" />
                       <span className="text-xs font-bold">{t('returns.payment_settings')}</span>
                     </div>
@@ -1107,7 +1107,7 @@ export const Returns: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setPaymentType('cash')}
-                            className={`py-2 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm ${paymentType === 'cash' ? 'bg-white text-orange-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+                            className={`py-2 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm ${paymentType === 'cash' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
                           >
                             <Wallet size={16} />
                             {t('returns.payment_cash')}
@@ -1115,7 +1115,7 @@ export const Returns: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setPaymentType('credit')}
-                            className={`py-2 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm ${paymentType === 'credit' ? 'bg-white text-orange-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+                            className={`py-2 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm ${paymentType === 'credit' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
                           >
                             <Layers size={16} />
                             {t('returns.payment_credit')}
@@ -1130,7 +1130,7 @@ export const Returns: React.FC = () => {
                             <CreditCard className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                             <select 
                               required
-                              className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
+                              className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
                               value={paymentMethodId}
                               onChange={(e) => setPaymentMethodId(e.target.value)}
                             >
@@ -1148,7 +1148,7 @@ export const Returns: React.FC = () => {
 
                   {/* Card 3: Items */}
                   <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                    <div className="absolute top-4 right-4 flex items-center gap-2 text-orange-600 bg-orange-50 px-3 py-1 rounded-full border border-orange-100">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
                       <Package className="w-4 h-4" />
                       <span className="text-xs font-bold">{t('returns.form_items')}</span>
                     </div>
@@ -1160,7 +1160,7 @@ export const Returns: React.FC = () => {
                           onClick={() => {
                             setIsProductModalOpen(true);
                           }}
-                          className="px-4 py-2 bg-orange-50 text-orange-600 rounded-xl text-xs font-bold border border-orange-100 hover:bg-orange-100 transition-all"
+                          className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-bold border border-emerald-100 hover:bg-emerald-100 transition-all"
                         >
                           + {t('products.add')}
                         </button>
@@ -1207,7 +1207,7 @@ export const Returns: React.FC = () => {
                               <td className="px-6 py-3">
                                 <div className="relative">
                                   <select 
-                                    className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2.5 outline-none font-bold text-zinc-800 appearance-none text-xs focus:ring-2 focus:ring-orange-500 transition-all"
+                                    className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2.5 outline-none font-bold text-zinc-800 appearance-none text-xs focus:ring-2 focus:ring-emerald-500 transition-all"
                                     value={item.product_id}
                                     onChange={(e) => updateItem(index, 'product_id', e.target.value)}
                                   >
@@ -1221,7 +1221,7 @@ export const Returns: React.FC = () => {
                                 <input 
                                   type="number"
                                   step="any"
-                                  className="w-full bg-zinc-50 border border-transparent focus:bg-white focus:ring-2 focus:ring-orange-500 rounded-xl px-4 py-2.5 text-xs outline-none text-center font-bold text-zinc-800 transition-all"
+                                  className="w-full bg-zinc-50 border border-transparent focus:bg-white focus:ring-2 focus:ring-emerald-500 rounded-xl px-4 py-2.5 text-xs outline-none text-center font-bold text-zinc-800 transition-all"
                                   value={Number(item.quantity) || 0}
                                   onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
                                 />
@@ -1230,7 +1230,7 @@ export const Returns: React.FC = () => {
                                 <input 
                                   type="number"
                                   step="any"
-                                  className="w-full bg-zinc-50 border border-transparent focus:bg-white focus:ring-2 focus:ring-orange-500 rounded-xl px-4 py-2.5 text-xs outline-none text-center font-bold text-zinc-800 transition-all"
+                                  className="w-full bg-zinc-50 border border-transparent focus:bg-white focus:ring-2 focus:ring-emerald-500 rounded-xl px-4 py-2.5 text-xs outline-none text-center font-bold text-zinc-800 transition-all"
                                   value={Number(item.unit_price) || 0}
                                   onChange={(e) => updateItem(index, 'unit_price', Number(e.target.value))}
                                 />
@@ -1260,7 +1260,7 @@ export const Returns: React.FC = () => {
                           <span>{t('returns.summary_total')}</span>
                         </div>
                         <div className="flex justify-between items-baseline gap-4">
-                          <span className="text-4xl font-black tracking-tighter text-orange-400">
+                          <span className="text-4xl font-black tracking-tighter text-emerald-400">
                             {formatNumber(items.reduce((sum, item) => sum + (item.total || 0), 0))}
                           </span>
                           <span className="font-bold text-zinc-400">{t('returns.currency')}</span>
@@ -1284,7 +1284,7 @@ export const Returns: React.FC = () => {
                 <button 
                   type="submit"
                   disabled={items.length === 0 || selectedCustomerId === '' || isSaving}
-                  className="flex-[2] py-4 bg-orange-600 text-white rounded-2xl font-black uppercase tracking-wider hover:bg-orange-700 transition-all shadow-lg shadow-orange-500/20 active:scale-95 flex items-center justify-center gap-3"
+                  className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-3"
                 >
                   {isSaving ? (
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -1378,7 +1378,7 @@ export const Returns: React.FC = () => {
                     <tfoot className="bg-slate-50/50 font-bold border-t border-slate-100">
                       <tr className="bg-slate-900 text-white font-bold">
                         <td colSpan={4} className={`px-6 py-5 ${dir === 'rtl' ? 'text-left' : 'text-right'} font-black text-lg uppercase tracking-tight`}>{t('returns.summary_total')}</td>
-                        <td className="px-6 py-5 text-2xl font-black text-orange-400">{formatNumber(viewReturn.total_amount)} {t('returns.currency')}</td>
+                        <td className="px-6 py-5 text-2xl font-black text-emerald-400">{formatNumber(viewReturn.total_amount)} {t('returns.currency')}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -1430,7 +1430,7 @@ export const Returns: React.FC = () => {
                       <input
                         required
                         type="text"
-                        className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all`}
+                        className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                         value={customerFormData.name}
                         onChange={(e) => setCustomerFormData({ ...customerFormData, name: e.target.value })}
                       />
@@ -1444,7 +1444,7 @@ export const Returns: React.FC = () => {
                         required
                         type="tel"
                         pattern="[0-9]{11,}"
-                        className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all text-left`}
+                        className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-left`}
                         value={customerFormData.mobile}
                         onChange={(e) => setCustomerFormData({ ...customerFormData, mobile: e.target.value })}
                       />
@@ -1456,7 +1456,7 @@ export const Returns: React.FC = () => {
                       <Mail className={`${dir === 'rtl' ? 'right-3' : 'left-3'} absolute top-3 text-zinc-400`} size={18} />
                       <input
                         type="email"
-                        className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all text-left`}
+                        className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-left`}
                         value={customerFormData.email}
                         onChange={(e) => setCustomerFormData({ ...customerFormData, email: e.target.value })}
                       />
@@ -1465,7 +1465,7 @@ export const Returns: React.FC = () => {
                   <div>
                     <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('customers.form_address')}</label>
                     <textarea
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                       rows={2}
                       value={customerFormData.address}
                       onChange={(e) => setCustomerFormData({ ...customerFormData, address: e.target.value })}
@@ -1478,7 +1478,7 @@ export const Returns: React.FC = () => {
                         <Wallet className={`${dir === 'rtl' ? 'right-3' : 'left-3'} absolute top-3 text-zinc-400`} size={18} />
                         <input 
                           type="number" 
-                          className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all`}
+                          className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                           value={customerFormData.opening_balance}
                           onChange={(e) => setCustomerFormData({ ...customerFormData, opening_balance: Number(e.target.value) })}
                         />
@@ -1490,7 +1490,7 @@ export const Returns: React.FC = () => {
                         <Calendar className={`${dir === 'rtl' ? 'right-3' : 'left-3'} absolute top-3 text-zinc-400`} size={18} />
                         <input 
                           type="date" 
-                          className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all`}
+                          className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
                           value={customerFormData.opening_balance_date}
                           onChange={(e) => setCustomerFormData({ ...customerFormData, opening_balance_date: e.target.value })}
                         />
@@ -1501,7 +1501,7 @@ export const Returns: React.FC = () => {
                     <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('customers.form_account')}</label>
                     <select
                       required
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                       value={customerFormData.account_id}
                       onChange={(e) => setCustomerFormData({ ...customerFormData, account_id: e.target.value })}
                     >
@@ -1518,7 +1518,7 @@ export const Returns: React.FC = () => {
                       <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('customers.form_counter_account')}</label>
                       <select
                         required
-                        className="w-full px-4 py-3 bg-orange-50 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                        className="w-full px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                         value={customerFormData.counter_account_id}
                         onChange={(e) => setCustomerFormData({ ...customerFormData, counter_account_id: e.target.value })}
                       >
@@ -1529,14 +1529,14 @@ export const Returns: React.FC = () => {
                           </option>
                         ))}
                       </select>
-                      <p className="text-[10px] text-orange-600 mt-1 font-medium">{t('customers.form_counter_account_hint')}</p>
+                      <p className="text-[10px] text-emerald-600 mt-1 font-medium">{t('customers.form_counter_account_hint')}</p>
                     </div>
                   )}
                 </div>
                 <div className="pt-4 flex gap-3">
                   <button 
                     type="submit"
-                    className="flex-1 py-4 bg-orange-500 text-white rounded-2xl font-bold hover:bg-orange-600 transition-all shadow-lg shadow-orange-500/20 active:scale-95"
+                    className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
                   >
                     {t('common.save')}
                   </button>
@@ -1570,7 +1570,7 @@ export const Returns: React.FC = () => {
                     <input
                       required
                       type="text"
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                       value={productFormData.name}
                       onChange={(e) => setProductFormData({ ...productFormData, name: e.target.value })}
                     />
@@ -1579,7 +1579,7 @@ export const Returns: React.FC = () => {
                     <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_code')}</label>
                     <input
                       type="text"
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                       value={productFormData.code}
                       onChange={(e) => setProductFormData({ ...productFormData, code: e.target.value })}
                     />
@@ -1588,7 +1588,7 @@ export const Returns: React.FC = () => {
                     <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_category')}</label>
                     <input
                       type="text"
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                       value={productFormData.category}
                       onChange={(e) => setProductFormData({ ...productFormData, category: e.target.value })}
                     />
@@ -1596,7 +1596,7 @@ export const Returns: React.FC = () => {
                   <div>
                     <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_unit')}</label>
                     <select
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                       value={productFormData.unit}
                       onChange={(e) => setProductFormData({ ...productFormData, unit: e.target.value })}
                     >
@@ -1613,7 +1613,7 @@ export const Returns: React.FC = () => {
                     <input
                       required
                       type="number"
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                       value={productFormData.cost_price}
                       onChange={(e) => setProductFormData({ ...productFormData, cost_price: Number(e.target.value) })}
                     />
@@ -1623,7 +1623,7 @@ export const Returns: React.FC = () => {
                     <input
                       required
                       type="number"
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                       value={productFormData.sale_price}
                       onChange={(e) => setProductFormData({ ...productFormData, sale_price: Number(e.target.value) })}
                     />
@@ -1632,7 +1632,7 @@ export const Returns: React.FC = () => {
                     <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_stock_quantity')}</label>
                     <input
                       type="number"
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                       value={productFormData.stock}
                       onChange={(e) => setProductFormData({ ...productFormData, stock: Number(e.target.value) })}
                     />
@@ -1641,7 +1641,7 @@ export const Returns: React.FC = () => {
                     <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('products.form_min_stock')}</label>
                     <input
                       type="number"
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                       value={productFormData.min_stock}
                       onChange={(e) => setProductFormData({ ...productFormData, min_stock: Number(e.target.value) })}
                     />
@@ -1651,7 +1651,7 @@ export const Returns: React.FC = () => {
               <div className="p-4 md:p-6 border-t border-zinc-50 bg-zinc-50/50 flex gap-3 sticky bottom-0">
                 <button 
                   type="submit"
-                  className="flex-1 py-4 bg-orange-500 text-white rounded-2xl font-bold hover:bg-orange-600 transition-all shadow-lg shadow-orange-500/20 active:scale-95"
+                  className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
                 >
                   {t('common.save')}
                 </button>

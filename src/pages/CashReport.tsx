@@ -283,7 +283,7 @@ export const CashReport: React.FC = () => {
                       <td className="px-4 py-3 text-sm font-mono">-</td>
                       <td className="px-4 py-3 text-sm">{t('reports.brought_forward')}</td>
                       <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance > 0 ? formatMoney(startBalance) : '-'}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-rose-600">{startBalance < 0 ? formatMoney(Math.abs(startBalance)) : '-'}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance < 0 ? formatMoney(Math.abs(startBalance)) : '-'}</td>
                       <td className="px-4 py-3 text-sm font-bold text-zinc-900">{formatMoney(startBalance)}</td>
                     </tr>
                     {transactions.map((t) => (
@@ -291,7 +291,7 @@ export const CashReport: React.FC = () => {
                         <td className="px-4 py-3 text-sm font-mono">{formatDate(t.date)}</td>
                         <td className="px-4 py-3 text-sm">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            t.in > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+                            t.in > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-emerald-50 text-emerald-600'
                           }`}>
                             {t.type}
                           </span>
@@ -299,7 +299,7 @@ export const CashReport: React.FC = () => {
                         <td className="px-4 py-3 text-sm font-mono">{t.reference}</td>
                         <td className="px-4 py-3 text-sm">{t.notes}</td>
                         <td className="px-4 py-3 text-sm font-bold text-emerald-600">{t.in > 0 ? formatMoney(t.in) : '-'}</td>
-                        <td className="px-4 py-3 text-sm font-bold text-rose-600">{t.out > 0 ? formatMoney(t.out) : '-'}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-emerald-600">{t.out > 0 ? formatMoney(t.out) : '-'}</td>
                         <td className="px-4 py-3 text-sm font-bold text-zinc-900">{t.balance !== undefined ? formatMoney(t.balance) : '-'}</td>
                       </tr>
                     ))}

@@ -72,7 +72,7 @@ function SearchableSelect({ options, value, onChange, label, placeholder, icon, 
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-4 py-2 bg-white border border-zinc-200 rounded-lg hover:border-indigo-500 transition-all outline-none"
+        className="w-full flex items-center justify-between px-4 py-2 bg-white border border-zinc-200 rounded-lg hover:border-emerald-500 transition-all outline-none"
       >
         <div className="flex items-center gap-2 overflow-hidden">
           {icon}
@@ -100,7 +100,7 @@ function SearchableSelect({ options, value, onChange, label, placeholder, icon, 
                   type="text"
                   autoFocus
                   placeholder={dir === 'rtl' ? 'بحث...' : 'Search...'}
-                  className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 bg-white border border-zinc-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm`}
+                  className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 bg-white border border-zinc-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm`}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />
@@ -117,7 +117,7 @@ function SearchableSelect({ options, value, onChange, label, placeholder, icon, 
                       setIsOpen(false);
                       setQuery('');
                     }}
-                    className={`w-full flex items-center justify-between px-4 py-2.5 hover:bg-zinc-50 transition-colors text-sm ${value === option.code ? 'bg-indigo-50 text-indigo-600' : 'text-zinc-700'}`}
+                    className={`w-full flex items-center justify-between px-4 py-2.5 hover:bg-zinc-50 transition-colors text-sm ${value === option.code ? 'bg-emerald-50 text-emerald-600' : 'text-zinc-700'}`}
                   >
                     <div className="flex items-center gap-2">
                        {renderOption(option)}
@@ -272,7 +272,7 @@ export function CompanySettings() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
       </div>
     );
   }
@@ -287,7 +287,7 @@ export function CompanySettings() {
       <form onSubmit={handleSave} className="space-y-6">
         {/* Logo Section */}
         <section className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm">
-          <div className="flex items-center gap-2 mb-4 text-indigo-600">
+          <div className="flex items-center gap-2 mb-4 text-emerald-600">
             <ImageIcon className="w-5 h-5" />
             <h2 className="font-semibold">{t('company_settings.logo')}</h2>
           </div>
@@ -313,7 +313,7 @@ export function CompanySettings() {
                 <button 
                   type="button"
                   onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
-                  className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-bold hover:bg-indigo-100 transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-lg text-sm font-bold hover:bg-emerald-100 transition-colors flex items-center gap-2"
                 >
                   <Upload className="w-4 h-4" />
                   {t('common.add')}
@@ -322,7 +322,7 @@ export function CompanySettings() {
                     <button 
                         type="button" 
                         onClick={() => setData(prev => ({ ...prev, logo_url: '' }))}
-                        className="px-4 py-2 text-rose-600 hover:bg-rose-50 rounded-lg text-sm font-bold transition-colors"
+                        className="px-4 py-2 text-emerald-600 hover:bg-emerald-50 rounded-lg text-sm font-bold transition-colors"
                     >
                         {t('common.delete')}
                     </button>
@@ -334,7 +334,7 @@ export function CompanySettings() {
 
         {/* Basic Info */}
         <section className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm">
-          <div className="flex items-center gap-2 mb-6 text-indigo-600">
+          <div className="flex items-center gap-2 mb-6 text-emerald-600">
             <FileText className="w-5 h-5" />
             <h2 className="font-semibold">{language === 'ar' ? 'المعلومات الأساسية' : 'Basic Information'}</h2>
           </div>
@@ -347,7 +347,7 @@ export function CompanySettings() {
                 type="text"
                 value={data.name}
                 onChange={(e) => setData({ ...data, name: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800"
+                className="w-full px-4 py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800"
               />
             </div>
             <div>
@@ -358,7 +358,7 @@ export function CompanySettings() {
                 type="text"
                 value={data.commercial_register}
                 onChange={(e) => setData({ ...data, commercial_register: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800"
+                className="w-full px-4 py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800"
               />
             </div>
             <div>
@@ -369,7 +369,7 @@ export function CompanySettings() {
                 type="text"
                 value={data.tax_number}
                 onChange={(e) => setData({ ...data, tax_number: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800"
+                className="w-full px-4 py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800"
               />
             </div>
             
@@ -404,7 +404,7 @@ export function CompanySettings() {
                   value={data.address}
                   onChange={(e) => setData({ ...data, address: e.target.value })}
                   rows={3}
-                  className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800`}
+                  className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800`}
                 />
               </div>
             </div>
@@ -413,7 +413,7 @@ export function CompanySettings() {
 
         {/* Financial Info */}
         <section className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm text-right">
-          <div className="flex items-center gap-2 mb-6 text-indigo-600">
+          <div className="flex items-center gap-2 mb-6 text-emerald-600">
             <Coins className="w-5 h-5" />
             <h2 className="font-semibold">{language === 'ar' ? 'الإعدادات المالية' : 'Financial Settings'}</h2>
           </div>
@@ -460,7 +460,7 @@ export function CompanySettings() {
                             fiscal_year_day: data.fiscal_year_day > maxDays ? maxDays : data.fiscal_year_day
                         });
                     }}
-                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none appearance-none font-bold text-zinc-700"
+                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none appearance-none font-bold text-zinc-700"
                   >
                     {MONTHS.map(m => (
                       <option key={m.value} value={m.value}>
@@ -474,7 +474,7 @@ export function CompanySettings() {
                   <select
                     value={data.fiscal_year_day}
                     onChange={(e) => setData({ ...data, fiscal_year_day: parseInt(e.target.value) })}
-                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none appearance-none font-bold text-zinc-700"
+                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none appearance-none font-bold text-zinc-700"
                   >
                     {Array.from({ length: daysInMonth(data.fiscal_year_month) }, (_, i) => i + 1).map(d => (
                       <option key={d} value={d}>{d}</option>
@@ -497,7 +497,7 @@ export function CompanySettings() {
                 onClick={() => setData(prev => ({ ...prev, enable_multi_currency: !prev.enable_multi_currency }))}
               >
                 <div 
-                  className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${data.enable_multi_currency ? 'bg-indigo-600' : 'bg-zinc-200'}`}
+                  className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${data.enable_multi_currency ? 'bg-emerald-600' : 'bg-zinc-200'}`}
                 >
                   <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-200 ${
                     dir === 'rtl'
@@ -524,7 +524,7 @@ export function CompanySettings() {
           <button
             type="submit"
             disabled={saving}
-            className="px-10 py-3 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 hover:scale-105 active:scale-95 disabled:opacity-50 transition-all flex items-center gap-3 font-black uppercase tracking-wider"
+            className="px-10 py-3 bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 hover:scale-105 active:scale-95 disabled:opacity-50 transition-all flex items-center gap-3 font-black uppercase tracking-wider"
           >
             {saving ? (
               <Loader2 className="w-5 h-5 animate-spin" />

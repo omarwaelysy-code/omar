@@ -200,7 +200,7 @@ export const JournalEntries: React.FC = () => {
           <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'} border-collapse`}>
             <thead>
               <tr className="bg-zinc-50 border-b border-zinc-200">
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700 cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('date')}>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('date')}>
                   <div className="flex items-center gap-1">
                     {t('journal.column_date')}
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -209,7 +209,7 @@ export const JournalEntries: React.FC = () => {
                   </div>
                 </th>
                 <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_description')}</th>
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700 cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('reference_number')}>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('reference_number')}>
                   <div className="flex items-center gap-1">
                     {t('journal.column_reference')}
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -217,7 +217,7 @@ export const JournalEntries: React.FC = () => {
                     </span>
                   </div>
                 </th>
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('total_debit')}>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('total_debit')}>
                   <div className="flex items-center gap-1 justify-center">
                     {t('journal.column_debit')}
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -225,7 +225,7 @@ export const JournalEntries: React.FC = () => {
                     </span>
                   </div>
                 </th>
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('total_credit')}>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('total_credit')}>
                   <div className="flex items-center gap-1 justify-center">
                     {t('journal.column_credit')}
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -247,7 +247,7 @@ export const JournalEntries: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{formatMoney(entry.total_debit)}</td>
-                  <td className="px-6 py-4 text-sm font-black text-rose-600 text-center">{formatMoney(entry.total_credit)}</td>
+                  <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{formatMoney(entry.total_credit)}</td>
                   <td className="px-6 py-4 text-center">
                     <div className="flex items-center justify-center gap-2">
                       <button 
@@ -259,7 +259,7 @@ export const JournalEntries: React.FC = () => {
                       </button>
                       <button 
                         onClick={() => handleDelete(entry.id)}
-                        className="p-2 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                        className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
                         title={language === 'ar' ? 'حذف' : 'Delete'}
                       >
                         <Trash2 size={18} />
@@ -338,9 +338,9 @@ export const JournalEntries: React.FC = () => {
                     <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">{t('journal.column_debit')}</p>
                     <p className="text-sm font-black text-emerald-600">{formatMoney(selectedEntry.total_debit)}</p>
                   </div>
-                  <div className={`p-4 bg-rose-50 rounded-2xl ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1">{t('journal.column_credit')}</p>
-                    <p className="text-sm font-black text-rose-600">{formatMoney(selectedEntry.total_credit)}</p>
+                  <div className={`p-4 bg-emerald-50 rounded-2xl ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                    <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">{t('journal.column_credit')}</p>
+                    <p className="text-sm font-black text-emerald-600">{formatMoney(selectedEntry.total_credit)}</p>
                   </div>
                 </div>
 
@@ -373,7 +373,7 @@ export const JournalEntries: React.FC = () => {
                           <td className="px-4 py-3 text-sm font-black text-emerald-600 text-center">
                             {item.debit > 0 ? formatMoney(item.debit) : '-'}
                           </td>
-                          <td className="px-4 py-3 text-sm font-black text-rose-600 text-center">
+                          <td className="px-4 py-3 text-sm font-black text-emerald-600 text-center">
                             {item.credit > 0 ? formatMoney(item.credit) : '-'}
                           </td>
                         </tr>
@@ -411,7 +411,7 @@ export const JournalEntries: React.FC = () => {
               className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-8 text-center"
               dir={dir}
             >
-              <div className="w-20 h-20 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Trash2 size={40} />
               </div>
               <h3 className="text-2xl font-black text-zinc-900 mb-2">{t('common.delete_confirm')}</h3>
@@ -425,7 +425,7 @@ export const JournalEntries: React.FC = () => {
                 </button>
                 <button 
                   onClick={confirmDelete}
-                  className="flex-1 py-4 bg-rose-600 text-white rounded-2xl font-black hover:bg-rose-700 transition-all shadow-lg shadow-rose-200"
+                  className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200"
                 >
                   {language === 'ar' ? 'تأكيد الحذف' : 'Confirm Delete'}
                 </button>

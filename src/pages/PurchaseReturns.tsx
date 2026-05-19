@@ -767,7 +767,7 @@ export const PurchaseReturns: React.FC = () => {
           />
           <button 
             onClick={openModal}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-600 text-white rounded-2xl font-bold hover:bg-orange-700 transition-all active:scale-95 shadow-lg shadow-orange-200"
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
           >
             <Plus size={20} />
             إضافة مرتجع
@@ -793,7 +793,7 @@ export const PurchaseReturns: React.FC = () => {
           <table className="w-full text-right">
             <thead>
               <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('return_number')}>
+                <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('return_number')}>
                   <div className="flex items-center gap-1">
                     رقم المرتجع
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -801,7 +801,7 @@ export const PurchaseReturns: React.FC = () => {
                     </span>
                   </div>
                 </th>
-                <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('supplier_name')}>
+                <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('supplier_name')}>
                   <div className="flex items-center gap-1">
                     المورد
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -809,7 +809,7 @@ export const PurchaseReturns: React.FC = () => {
                     </span>
                   </div>
                 </th>
-                <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('date')}>
+                <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('date')}>
                   <div className="flex items-center gap-1">
                     التاريخ
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -817,7 +817,7 @@ export const PurchaseReturns: React.FC = () => {
                     </span>
                   </div>
                 </th>
-                <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('payment_type')}>
+                <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('payment_type')}>
                   <div className="flex items-center gap-1">
                     النوع
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -825,7 +825,7 @@ export const PurchaseReturns: React.FC = () => {
                     </span>
                   </div>
                 </th>
-                <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('total_amount')}>
+                <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('total_amount')}>
                   <div className="flex items-center gap-1">
                     المبلغ
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -849,7 +849,7 @@ export const PurchaseReturns: React.FC = () => {
                   <td className="px-6 py-4 font-bold text-zinc-900">{ret.supplier_name}</td>
                   <td className="px-6 py-4 text-zinc-500">{formatDate(ret.date)}</td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${ret.payment_type === 'cash' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-orange-50 text-orange-600 border border-orange-100'}`}>
+                    <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${ret.payment_type === 'cash' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
                       {ret.payment_type === 'cash' ? 'نقدي' : 'آجل'}
                     </span>
                   </td>
@@ -988,7 +988,7 @@ export const PurchaseReturns: React.FC = () => {
                 onClick={() => setShowSidePanel(!showSidePanel)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
                   showSidePanel 
-                    ? 'bg-orange-50 text-orange-600 border-orange-100 shadow-sm' 
+                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-sm' 
                     : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200 border-transparent'
                 } border`}
               >
@@ -1072,7 +1072,7 @@ export const PurchaseReturns: React.FC = () => {
                 <div className="lg:col-span-3 space-y-6">
                   {/* Card 1: Basic Info */}
                   <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                    <div className="absolute top-4 right-4 flex items-center gap-2 text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-100">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
                       <FileText className="w-4 h-4" />
                       <span className="text-xs font-bold">البيانات الأساسية</span>
                     </div>
@@ -1097,7 +1097,7 @@ export const PurchaseReturns: React.FC = () => {
                           <User className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <select 
                             required
-                            className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-rose-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
+                            className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
                             value={returnData.supplier_id}
                             onChange={(e) => {
                               if (e.target.value === 'new') {
@@ -1122,7 +1122,7 @@ export const PurchaseReturns: React.FC = () => {
                           <input 
                             required
                             type="date"
-                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-rose-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
                             value={returnData.date}
                             onChange={(e) => setReturnData({...returnData, date: e.target.value})}
                           />
@@ -1133,7 +1133,7 @@ export const PurchaseReturns: React.FC = () => {
 
                   {/* Card 2: Payment settings */}
                   <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                    <div className="absolute top-4 right-4 flex items-center gap-2 text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-100">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
                       <Wallet className="w-4 h-4" />
                       <span className="text-xs font-bold">إعدادات الدفع</span>
                     </div>
@@ -1145,7 +1145,7 @@ export const PurchaseReturns: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setReturnData({ ...returnData, payment_type: 'cash' })}
-                            className={`py-2 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm ${returnData.payment_type === 'cash' ? 'bg-white text-rose-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+                            className={`py-2 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm ${returnData.payment_type === 'cash' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
                           >
                             <Wallet size={16} />
                             نقدي
@@ -1153,7 +1153,7 @@ export const PurchaseReturns: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setReturnData({ ...returnData, payment_type: 'credit' })}
-                            className={`py-2 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm ${returnData.payment_type === 'credit' ? 'bg-white text-rose-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+                            className={`py-2 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm ${returnData.payment_type === 'credit' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
                           >
                             <Layers size={16} />
                             آجل
@@ -1168,7 +1168,7 @@ export const PurchaseReturns: React.FC = () => {
                             <CreditCard className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                             <select 
                               required
-                              className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-rose-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
+                              className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
                               value={returnData.payment_method_id}
                               onChange={(e) => {
                                 if (e.target.value === 'new') {
@@ -1193,7 +1193,7 @@ export const PurchaseReturns: React.FC = () => {
                       <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">ملاحظات</label>
                       <textarea 
                         rows={2}
-                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-rose-500 outline-none transition-all resize-none text-sm font-bold text-zinc-800"
+                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none text-sm font-bold text-zinc-800"
                         placeholder="سبب الارتجاع أو أي ملاحظات..."
                         value={returnData.notes}
                         onChange={(e) => setReturnData({...returnData, notes: e.target.value})}
@@ -1203,7 +1203,7 @@ export const PurchaseReturns: React.FC = () => {
 
                   {/* Card 3: Items */}
                   <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                    <div className="absolute top-4 right-4 flex items-center gap-2 text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-100">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
                       <Package className="w-4 h-4" />
                       <span className="text-xs font-bold">الأصناف المرتجعة</span>
                     </div>
@@ -1215,7 +1215,7 @@ export const PurchaseReturns: React.FC = () => {
                           onClick={() => {
                             setIsProductModalOpen(true);
                           }}
-                          className="px-4 py-2 bg-rose-50 text-rose-600 rounded-xl text-xs font-bold border border-rose-100 hover:bg-rose-100 transition-all"
+                          className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-bold border border-emerald-100 hover:bg-emerald-100 transition-all"
                         >
                           + إضافة صنف جديد
                         </button>
@@ -1262,7 +1262,7 @@ export const PurchaseReturns: React.FC = () => {
                               <td className="px-6 py-3">
                                 <div className="relative">
                                   <select 
-                                    className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2.5 outline-none font-bold text-zinc-800 appearance-none text-xs focus:ring-2 focus:ring-rose-500 transition-all"
+                                    className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2.5 outline-none font-bold text-zinc-800 appearance-none text-xs focus:ring-2 focus:ring-emerald-500 transition-all"
                                     value={item.product_id}
                                     onChange={(e) => {
                                       if (e.target.value === 'new_product') {
@@ -1283,7 +1283,7 @@ export const PurchaseReturns: React.FC = () => {
                                 <input 
                                   type="number"
                                   step="any"
-                                  className="w-full bg-zinc-50 border border-transparent focus:bg-white focus:ring-2 focus:ring-rose-500 rounded-xl px-4 py-2.5 text-xs outline-none text-center font-bold text-zinc-800 transition-all"
+                                  className="w-full bg-zinc-50 border border-transparent focus:bg-white focus:ring-2 focus:ring-emerald-500 rounded-xl px-4 py-2.5 text-xs outline-none text-center font-bold text-zinc-800 transition-all"
                                   value={item.quantity}
                                   onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
                                 />
@@ -1292,7 +1292,7 @@ export const PurchaseReturns: React.FC = () => {
                                 <input 
                                   type="number"
                                   step="any"
-                                  className="w-full bg-zinc-50 border border-transparent focus:bg-white focus:ring-2 focus:ring-rose-500 rounded-xl px-4 py-2.5 text-xs outline-none text-center font-bold text-zinc-800 transition-all"
+                                  className="w-full bg-zinc-50 border border-transparent focus:bg-white focus:ring-2 focus:ring-emerald-500 rounded-xl px-4 py-2.5 text-xs outline-none text-center font-bold text-zinc-800 transition-all"
                                   value={item.cost_price}
                                   onChange={(e) => updateItem(index, 'cost_price', Number(e.target.value))}
                                 />
@@ -1322,7 +1322,7 @@ export const PurchaseReturns: React.FC = () => {
                           <span>إجمالي المرتجع</span>
                         </div>
                         <div className="flex justify-between items-baseline gap-4">
-                          <span className="text-4xl font-black tracking-tighter text-rose-400">
+                          <span className="text-4xl font-black tracking-tighter text-emerald-400">
                             {formatNumber(calculateTotal())}
                           </span>
                           <span className="font-bold text-zinc-400">ج.م</span>
@@ -1345,7 +1345,7 @@ export const PurchaseReturns: React.FC = () => {
                 <button 
                   type="submit"
                   disabled={items.length === 0 || returnData.supplier_id === ''}
-                  className="flex-[2] py-4 bg-rose-600 text-white rounded-2xl font-black uppercase tracking-wider hover:bg-rose-700 transition-all shadow-lg shadow-rose-500/20 active:scale-95 flex items-center justify-center gap-3"
+                  className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-3"
                 >
                   <Save className="w-6 h-6" />
                   {editingReturn ? 'حفظ التعديلات' : 'حفظ المرتجع'}
@@ -1453,7 +1453,7 @@ export const PurchaseReturns: React.FC = () => {
                     <tfoot className="bg-slate-50/50 font-bold border-t border-slate-100">
                       <tr className="bg-slate-900 text-white font-bold">
                         <td colSpan={4} className="px-6 py-5 text-right font-black text-lg uppercase tracking-tight">الإجمالي الكلي</td>
-                        <td className="px-6 py-5 text-2xl font-black text-rose-400">{formatNumber(viewReturn.total_amount)} ج.م</td>
+                        <td className="px-6 py-5 text-2xl font-black text-emerald-400">{formatNumber(viewReturn.total_amount)} ج.م</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -1587,7 +1587,7 @@ export const PurchaseReturns: React.FC = () => {
                       <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">حساب مقابل رصيد أول المدة</label>
                       <select
                         required
-                        className="w-full px-4 py-3 bg-orange-50 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                        className="w-full px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                         value={supplierFormData.counter_account_id}
                         onChange={(e) => setSupplierFormData({ ...supplierFormData, counter_account_id: e.target.value })}
                       >
@@ -1598,7 +1598,7 @@ export const PurchaseReturns: React.FC = () => {
                           </option>
                         ))}
                       </select>
-                      <p className="text-[10px] text-orange-600 mt-1 font-medium">يستخدم هذا الحساب لإنشاء قيد رصيد أول المدة (مثلاً: رأس المال أو الأرباح المرحلة)</p>
+                      <p className="text-[10px] text-emerald-600 mt-1 font-medium">يستخدم هذا الحساب لإنشاء قيد رصيد أول المدة (مثلاً: رأس المال أو الأرباح المرحلة)</p>
                     </div>
                   )}
                 </div>

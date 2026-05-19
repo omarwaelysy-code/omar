@@ -242,11 +242,11 @@ export const CashBalances: React.FC = () => {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4 p-8 bg-rose-50 rounded-3xl border border-rose-100 italic">
-        <p className="text-rose-600 font-bold">{error}</p>
+      <div className="flex flex-col items-center justify-center h-64 gap-4 p-8 bg-emerald-50 rounded-3xl border border-emerald-100 italic">
+        <p className="text-emerald-600 font-bold">{error}</p>
         <button 
           onClick={() => window.location.reload()}
-          className="px-6 py-2 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-all"
+          className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all"
         >
           إعادة المحاولة
         </button>
@@ -313,13 +313,13 @@ export const CashBalances: React.FC = () => {
                 <tr key={b.id} className="hover:bg-zinc-50/50 transition-colors">
                   <td className="px-6 py-4 text-sm font-bold text-zinc-900 border-l border-zinc-100">{b.name}</td>
                   <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.opening.in > 0 ? formatNumber(b.opening.in) : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-rose-600 text-center border-l border-zinc-100">{b.opening.out > 0 ? formatNumber(b.opening.out) : '-'}</td>
+                  <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.opening.out > 0 ? formatNumber(b.opening.out) : '-'}</td>
                   <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.movement.in > 0 ? formatNumber(b.movement.in) : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-rose-600 text-center border-l border-zinc-100">{b.movement.out > 0 ? formatNumber(b.movement.out) : '-'}</td>
+                  <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.movement.out > 0 ? formatNumber(b.movement.out) : '-'}</td>
                   <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.closing.in > 0 ? formatNumber(b.closing.in) : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-rose-600 text-center border-l border-zinc-100">{b.closing.out > 0 ? formatNumber(b.closing.out) : '-'}</td>
+                  <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.closing.out > 0 ? formatNumber(b.closing.out) : '-'}</td>
                   <td className="px-4 py-4 text-sm font-black text-zinc-900 text-center">
-                    <span className={b.closing.balance >= 0 ? 'text-emerald-600' : 'text-rose-600'}>
+                    <span className={b.closing.balance >= 0 ? 'text-emerald-600' : 'text-emerald-600'}>
                       {formatNumber(b.closing.balance)}
                     </span>
                   </td>

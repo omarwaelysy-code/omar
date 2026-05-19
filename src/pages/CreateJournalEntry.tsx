@@ -338,7 +338,7 @@ export const CreateJournalEntry: React.FC = () => {
               <div className="w-px h-8 bg-zinc-200" />
               <div className="text-center">
                 <p className="text-[10px] font-black text-zinc-400 uppercase tracking-wider mb-1">الفرق</p>
-                <p className={`text-xl font-black ${difference === 0 ? 'text-emerald-500' : 'text-orange-500'}`}>
+                <p className={`text-xl font-black ${difference === 0 ? 'text-emerald-500' : 'text-emerald-500'}`}>
                   {formatNumber(difference)}
                 </p>
               </div>
@@ -348,7 +348,7 @@ export const CreateJournalEntry: React.FC = () => {
 
         <div className="flex items-center justify-end gap-4">
           {difference !== 0 && (
-            <div className="flex items-center gap-2 text-orange-600 bg-orange-50 px-4 py-2 rounded-xl text-sm font-bold animate-pulse">
+            <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl text-sm font-bold animate-pulse">
               <AlertCircle size={18} />
               <span>القيد غير متزن حالياً</span>
             </div>

@@ -368,7 +368,7 @@ export const Suppliers: React.FC = () => {
           />
           <button 
             onClick={() => openModal()}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-600 to-orange-500 text-white rounded-2xl font-bold hover:from-orange-700 hover:to-orange-600 transition-all active:scale-95 shadow-lg shadow-orange-200 border border-orange-400/20"
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-2xl font-bold hover:from-emerald-700 hover:to-emerald-600 transition-all active:scale-95 shadow-lg shadow-emerald-200 border border-emerald-400/20"
           >
             <Plus size={20} />
             {t('suppliers.add')}
@@ -432,12 +432,12 @@ export const Suppliers: React.FC = () => {
                     <td className={`px-6 py-4 text-zinc-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{supplier.email}</td>
                     <td className={`px-6 py-4 text-zinc-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{supplier.address}</td>
                     <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                      <span className={`font-medium ${supplier.opening_balance >= 0 ? 'text-zinc-600' : 'text-rose-500'}`}>
+                      <span className={`font-medium ${supplier.opening_balance >= 0 ? 'text-zinc-600' : 'text-emerald-500'}`}>
                         {formatBalance(supplier.opening_balance || 0)}
                       </span>
                     </td>
                     <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                      <span className={`font-black ${getSupplierBalance(supplier.id) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      <span className={`font-black ${getSupplierBalance(supplier.id) >= 0 ? 'text-emerald-600' : 'text-emerald-600'}`}>
                         {formatBalance(getSupplierBalance(supplier.id))}
                       </span>
                     </td>
@@ -480,7 +480,7 @@ export const Suppliers: React.FC = () => {
         ) : (
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredSuppliers.map((supplier) => (
-              <div key={supplier.id} className="p-6 bg-zinc-50/50 rounded-3xl border border-zinc-100 hover:border-orange-200 hover:shadow-xl hover:shadow-orange-500/5 transition-all group relative overflow-hidden">
+              <div key={supplier.id} className="p-6 bg-zinc-50/50 rounded-3xl border border-zinc-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden">
                 <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button 
                     onClick={() => openModal(supplier)}
@@ -499,7 +499,7 @@ export const Suppliers: React.FC = () => {
                 <div className="flex justify-between items-start">
                   <div className="flex flex-col gap-1">
                     <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-zinc-600 font-bold w-fit border border-zinc-200">{supplier.code}</span>
-                    <h4 className="font-bold text-zinc-900 group-hover:text-orange-700 transition-colors text-xl mt-1 tracking-tight">{supplier.name}</h4>
+                    <h4 className="font-bold text-zinc-900 group-hover:text-emerald-700 transition-colors text-xl mt-1 tracking-tight">{supplier.name}</h4>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-200/50 mt-4">
@@ -509,14 +509,14 @@ export const Suppliers: React.FC = () => {
                   </div>
                   <div className="space-y-1">
                     <p className="text-zinc-400 text-[10px] uppercase font-black tracking-widest">رصيد أول</p>
-                    <p className={`font-bold text-sm ${supplier.opening_balance >= 0 ? 'text-zinc-600' : 'text-rose-500'}`}>
+                    <p className={`font-bold text-sm ${supplier.opening_balance >= 0 ? 'text-zinc-600' : 'text-emerald-500'}`}>
                       {formatBalance(supplier.opening_balance || 0)}
                     </p>
                   </div>
                   <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-zinc-200/50 flex justify-between items-end">
                     <div>
                       <p className="text-zinc-400 text-[10px] uppercase font-black tracking-widest">الرصيد الحالي</p>
-                      <p className={`font-black text-2xl tracking-tighter ${getSupplierBalance(supplier.id) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      <p className={`font-black text-2xl tracking-tighter ${getSupplierBalance(supplier.id) >= 0 ? 'text-emerald-600' : 'text-emerald-600'}`}>
                         {formatBalance(getSupplierBalance(supplier.id))}
                       </p>
                     </div>
@@ -571,13 +571,13 @@ export const Suppliers: React.FC = () => {
                 </div>
                 <div className="space-y-1">
                   <p className="text-zinc-400 text-[10px] uppercase font-bold tracking-wider">رصيد أول</p>
-                  <p className={`font-bold ${supplier.opening_balance >= 0 ? 'text-zinc-600' : 'text-rose-500'}`}>
+                  <p className={`font-bold ${supplier.opening_balance >= 0 ? 'text-zinc-600' : 'text-emerald-500'}`}>
                     {formatBalance(supplier.opening_balance || 0)}
                   </p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-zinc-400 text-[10px] uppercase font-bold tracking-wider">الرصيد الحالي</p>
-                  <p className={`font-black ${getSupplierBalance(supplier.id) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  <p className={`font-black ${getSupplierBalance(supplier.id) >= 0 ? 'text-emerald-600' : 'text-emerald-600'}`}>
                     {formatBalance(getSupplierBalance(supplier.id))}
                   </p>
                 </div>

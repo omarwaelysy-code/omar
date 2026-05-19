@@ -318,7 +318,7 @@ export const SupplierStatement: React.FC = () => {
                         <td className="px-4 py-3 text-sm"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600">رصيد</span></td>
                         <td className="px-4 py-3 text-sm font-mono">-</td>
                         <td className="px-4 py-3 text-sm">{startDate ? 'رصيد منقول' : 'رصيد افتتاحي'}</td>
-                        <td className="px-4 py-3 text-sm font-bold text-rose-600">{startBalance > 0 ? formatNumber(startBalance) : '-'}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance > 0 ? formatNumber(startBalance) : '-'}</td>
                         <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance < 0 ? formatNumber(Math.abs(startBalance)) : '-'}</td>
                         <td className="px-4 py-3 text-sm font-bold text-zinc-900">{formatBalance(startBalance)}</td>
                       </tr>
@@ -330,7 +330,7 @@ export const SupplierStatement: React.FC = () => {
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                             item.type === 'purchase_invoice' ? 'bg-emerald-50 text-emerald-600' :
                             item.type === 'payment_voucher' ? 'bg-amber-50 text-amber-600' :
-                            item.type === 'purchase_return' ? 'bg-rose-50 text-rose-600' :
+                            item.type === 'purchase_return' ? 'bg-emerald-50 text-emerald-600' :
                             item.type === 'manual' ? 'bg-blue-50 text-blue-600' :
                             item.type === 'opening_balance' ? 'bg-zinc-100 text-zinc-600' :
                             'bg-zinc-100 text-zinc-600'
@@ -346,7 +346,7 @@ export const SupplierStatement: React.FC = () => {
                         <td className="px-4 py-3 text-sm font-mono">{item.reference}</td>
                         <td className="px-4 py-3 text-sm">{item.notes}</td>
                         <td className="px-4 py-3 text-sm font-bold text-emerald-600">{item.debit > 0 ? formatNumber(item.debit) : '-'}</td>
-                        <td className="px-4 py-3 text-sm font-bold text-rose-600">{item.credit > 0 ? formatNumber(item.credit) : '-'}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-emerald-600">{item.credit > 0 ? formatNumber(item.credit) : '-'}</td>
                         <td className="px-4 py-3 text-sm font-bold text-zinc-900">{formatBalance(item.balance || 0)}</td>
                       </tr>
                     ))}

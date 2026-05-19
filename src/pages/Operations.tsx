@@ -335,7 +335,7 @@ export function Operations() {
                   )}
                   <button 
                     onClick={() => onChange('')}
-                    className="absolute -top-2 -left-2 w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                    className="absolute -top-2 -left-2 w-6 h-6 bg-emerald-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
                   >
                     ✕
                   </button>
@@ -392,7 +392,7 @@ export function Operations() {
                   <img src={value as string} alt="Signature" className="max-h-full max-w-full grayscale contrast-125" />
                   <button 
                     onClick={() => onChange('')}
-                    className="absolute top-4 left-4 p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors font-bold text-xs"
+                    className="absolute top-4 left-4 p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors font-bold text-xs"
                   >
                     إعادة التوقيع
                   </button>
@@ -591,7 +591,7 @@ export function Operations() {
                         fetchInitialData();
                       }
                     }}
-                    className="p-2 text-zinc-400 hover:text-rose-600 transition-colors"
+                    className="p-2 text-zinc-400 hover:text-emerald-600 transition-colors"
                   >
                     <Trash2 size={18} />
                   </button>
@@ -779,7 +779,7 @@ export function Operations() {
                               : ""
                             }>
                               <label className="block text-xs font-black text-zinc-500 mb-2 mr-1">
-                                {field.label} {field.is_required && <span className="text-rose-500">*</span>}
+                                {field.label} {field.is_required && <span className="text-emerald-500">*</span>}
                               </label>
                               {renderDynamicField(field)}
                               {field.description && <p className="mt-1 text-[10px] text-zinc-400 font-medium mr-1">{field.description}</p>}
@@ -787,7 +787,7 @@ export function Operations() {
                           );
                         } catch (e) {
                           console.error('Error rendering dynamic field:', field.name, e);
-                          return <div key={field.id} className="text-rose-500 text-xs font-bold p-2 bg-rose-50 rounded-lg">Error rendering {field.label}</div>;
+                          return <div key={field.id} className="text-emerald-500 text-xs font-bold p-2 bg-emerald-50 rounded-lg">Error rendering {field.label}</div>;
                         }
                       })}
                     </div>

@@ -641,7 +641,7 @@ export const Receipts: React.FC = () => {
           />
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-600 text-white rounded-2xl font-bold hover:bg-orange-700 transition-all active:scale-95 shadow-lg shadow-orange-200"
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
           >
             <Plus size={20} />
             {t('receipts.add')}
@@ -684,7 +684,7 @@ export const Receipts: React.FC = () => {
             <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
               <thead>
                 <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('voucher_number')}>
+                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('voucher_number')}>
                     <div className="flex items-center gap-1">
                       الرقم
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -693,7 +693,7 @@ export const Receipts: React.FC = () => {
                     </div>
                   </th>
                   <th className="px-6 py-4 font-bold">العميل</th>
-                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('date')}>
+                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('date')}>
                     <div className="flex items-center gap-1">
                       التاريخ
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -702,7 +702,7 @@ export const Receipts: React.FC = () => {
                     </div>
                   </th>
                   <th className="px-6 py-4 font-bold">طريقة السداد</th>
-                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('amount')}>
+                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('amount')}>
                     <div className="flex items-center gap-1">
                       المبلغ
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -862,7 +862,7 @@ export const Receipts: React.FC = () => {
                 onClick={() => setShowSidePanel(!showSidePanel)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
                   showSidePanel 
-                    ? 'bg-orange-50 text-orange-600 border-orange-100 shadow-sm' 
+                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-sm' 
                     : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200 border-transparent'
                 } border`}
               >
@@ -1307,7 +1307,7 @@ export const Receipts: React.FC = () => {
                       <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">حساب مقابل رصيد أول المدة</label>
                       <select
                         required
-                        className="w-full px-4 py-3 bg-orange-50 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                        className="w-full px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                         value={customerFormData.counter_account_id}
                         onChange={(e) => setCustomerFormData({ ...customerFormData, counter_account_id: e.target.value })}
                       >
@@ -1318,7 +1318,7 @@ export const Receipts: React.FC = () => {
                           </option>
                         ))}
                       </select>
-                      <p className="text-[10px] text-orange-600 mt-1 font-medium">يستخدم هذا الحساب لإنشاء قيد رصيد أول المدة (مثلاً: رأس المال أو الأرباح المرحلة)</p>
+                      <p className="text-[10px] text-emerald-600 mt-1 font-medium">يستخدم هذا الحساب لإنشاء قيد رصيد أول المدة (مثلاً: رأس المال أو الأرباح المرحلة)</p>
                     </div>
                   )}
                 </div>

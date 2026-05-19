@@ -451,12 +451,12 @@ export const Customers: React.FC = () => {
                     <td className={`px-6 py-4 text-slate-400 text-xs truncate max-w-[150px] ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={customer.email || undefined}>{customer.email}</td>
                     <td className={`px-6 py-4 text-slate-400 text-xs truncate max-w-[200px] ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={customer.address || undefined}>{customer.address}</td>
                     <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                      <span className={`font-bold text-sm ${customer.opening_balance >= 0 ? 'text-slate-600' : 'text-rose-500'}`}>
+                      <span className={`font-bold text-sm ${customer.opening_balance >= 0 ? 'text-slate-600' : 'text-emerald-500'}`}>
                         {formatBalance(customer.opening_balance || 0)}
                       </span>
                     </td>
                     <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                      <span className={`font-black text-sm px-3 py-1 rounded-full ${getCustomerBalance(customer.id) >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                      <span className={`font-black text-sm px-3 py-1 rounded-full ${getCustomerBalance(customer.id) >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-emerald-50 text-emerald-600'}`}>
                         {formatBalance(getCustomerBalance(customer.id))}
                       </span>
                     </td>
@@ -483,7 +483,7 @@ export const Customers: React.FC = () => {
                         {canDelete && (
                           <button 
                             onClick={() => handleDelete(customer.id)}
-                            className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                            className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
                           >
                             <Trash2 size={18} />
                           </button>
@@ -523,7 +523,7 @@ export const Customers: React.FC = () => {
                   {canDelete && (
                     <button 
                       onClick={() => handleDelete(customer.id)}
-                      className="p-2 bg-white text-rose-600 rounded-xl border border-rose-50 shadow-sm hover:bg-rose-50 transition-all font-bold"
+                      className="p-2 bg-white text-emerald-600 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -543,14 +543,14 @@ export const Customers: React.FC = () => {
                   </div>
                   <div className="space-y-1">
                     <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">رصيد أول</p>
-                    <p className={`font-bold text-sm ${customer.opening_balance >= 0 ? 'text-slate-600' : 'text-rose-500'}`}>
+                    <p className={`font-bold text-sm ${customer.opening_balance >= 0 ? 'text-slate-600' : 'text-emerald-500'}`}>
                       {formatBalance(customer.opening_balance || 0)}
                     </p>
                   </div>
                   <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-slate-200/50 flex justify-between items-end">
                     <div>
                       <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">الرصيد الحالي</p>
-                      <p className={`font-black text-2xl tracking-tighter ${getCustomerBalance(customer.id) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      <p className={`font-black text-2xl tracking-tighter ${getCustomerBalance(customer.id) >= 0 ? 'text-emerald-600' : 'text-emerald-600'}`}>
                         {formatBalance(getCustomerBalance(customer.id))}
                       </p>
                     </div>
@@ -595,7 +595,7 @@ export const Customers: React.FC = () => {
                   {canDelete && (
                     <button 
                       onClick={() => handleDelete(customer.id)}
-                      className="p-3 text-rose-600 bg-rose-50 rounded-2xl border border-rose-100 active:scale-95 transition-transform"
+                      className="p-3 text-emerald-600 bg-emerald-50 rounded-2xl border border-emerald-100 active:scale-95 transition-transform"
                     >
                       <Trash2 size={18} />
                     </button>
@@ -609,13 +609,13 @@ export const Customers: React.FC = () => {
                 </div>
                 <div className="space-y-1">
                   <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">رصيد أول</p>
-                  <p className={`font-bold text-sm ${customer.opening_balance >= 0 ? 'text-slate-600' : 'text-rose-500'}`}>
+                  <p className={`font-bold text-sm ${customer.opening_balance >= 0 ? 'text-slate-600' : 'text-emerald-500'}`}>
                     {formatBalance(customer.opening_balance || 0)}
                   </p>
                 </div>
                 <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-slate-200/50">
                   <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">الرصيد الحالي</p>
-                  <p className={`font-black text-lg tracking-tighter ${getCustomerBalance(customer.id) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  <p className={`font-black text-lg tracking-tighter ${getCustomerBalance(customer.id) >= 0 ? 'text-emerald-600' : 'text-emerald-600'}`}>
                     {formatBalance(getCustomerBalance(customer.id))}
                   </p>
                 </div>
@@ -861,7 +861,7 @@ export const Customers: React.FC = () => {
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" dir={dir}>
           <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 duration-200 border border-slate-200 text-center">
-            <div className="w-20 h-20 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+            <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
                <Trash2 size={32} />
             </div>
             <h3 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">{t('common.delete_confirm')}</h3>
@@ -878,7 +878,7 @@ export const Customers: React.FC = () => {
               </button>
               <button 
                 onClick={confirmDelete}
-                className="flex-1 py-4 bg-rose-600 text-white rounded-2xl font-bold hover:bg-rose-700 transition-all shadow-xl shadow-rose-500/20 active:scale-95"
+                className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95"
               >
                 {language === 'ar' ? 'تأكيد الحذف' : 'Delete Now'}
               </button>

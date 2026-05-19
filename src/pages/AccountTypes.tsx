@@ -221,7 +221,7 @@ export const AccountTypes: React.FC = () => {
                 <div className="flex items-center gap-2 mt-1">
                   <span className="inline-block text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md uppercase tracking-wider">{type.code}</span>
                   <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
-                    type.statement_type === 'balance_sheet' ? 'text-blue-600 bg-blue-50' : 'text-orange-600 bg-orange-50'
+                    type.statement_type === 'balance_sheet' ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50'
                   }`}>
                     {type.statement_type === 'balance_sheet' ? 'الميزانية' : 'قائمة الدخل'}
                   </span>

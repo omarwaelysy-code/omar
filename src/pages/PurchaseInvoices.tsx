@@ -1070,7 +1070,7 @@ export const PurchaseInvoices: React.FC = () => {
                 {t('pi.total_amount')}: {formatMoney(serverSummary.total_amount)} {t('common.currency')}
               </span>
               {serverSummary.total_discount !== undefined && (
-                <span className="bg-rose-50 text-rose-700 px-3 py-1 rounded-full border border-rose-100 font-bold">
+                <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
                    إجمالي الخصومات: {formatMoney(serverSummary.total_discount)} {t('common.currency')}
                 </span>
               )}
@@ -1097,7 +1097,7 @@ export const PurchaseInvoices: React.FC = () => {
           />
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-600 text-white rounded-2xl font-bold hover:bg-orange-700 transition-all active:scale-95 shadow-lg shadow-orange-200"
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
           >
             <Plus size={20} />
             {t('pi.add_invoice')}
@@ -1346,7 +1346,7 @@ export const PurchaseInvoices: React.FC = () => {
           >
             <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/50">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-orange-100 text-orange-600 rounded-2xl">
+                <div className="p-3 bg-emerald-100 text-emerald-600 rounded-2xl">
                   <ShoppingCart size={24} />
                 </div>
                 <div>
@@ -1578,7 +1578,7 @@ export const PurchaseInvoices: React.FC = () => {
                             <button 
                               type="button"
                               onClick={() => setShowSidePanel(!showSidePanel)}
-                              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${showSidePanel ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}`}
+                              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${showSidePanel ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}`}
                             >
                               <History size={14} />
                               {t('pi.toggle_side_panel')}
@@ -1694,7 +1694,7 @@ export const PurchaseInvoices: React.FC = () => {
                                     <button 
                                       type="button"
                                       onClick={() => removeItem(index)}
-                                      className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                      className="p-1.5 text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                                     >
                                       <Trash2 size={14} />
                                     </button>
@@ -1723,7 +1723,7 @@ export const PurchaseInvoices: React.FC = () => {
                                 onChange={(e) => setInvoiceData({ ...invoiceData, discount: parseFloat(e.target.value) || 0 })}
                               />
                             </div>
-                            <span className="text-rose-500">
+                            <span className="text-emerald-500">
                               -{formatNumber(invoiceData.discount)} {companyData?.settings?.currency || ''}
                             </span>
                           </div>
@@ -1993,7 +1993,7 @@ export const PurchaseInvoices: React.FC = () => {
                       <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('suppliers.opening_balance_counter_account')}</label>
                       <select
                         required
-                        className={`w-full px-4 py-3 bg-orange-50 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
+                        className={`w-full px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
                         value={supplierFormData.counter_account_id}
                         onChange={(e) => setSupplierFormData({ ...supplierFormData, counter_account_id: e.target.value })}
                       >
@@ -2004,7 +2004,7 @@ export const PurchaseInvoices: React.FC = () => {
                           </option>
                         ))}
                       </select>
-                      <p className="text-[10px] text-orange-600 mt-1 font-medium">{t('suppliers.counter_account_note')}</p>
+                      <p className="text-[10px] text-emerald-600 mt-1 font-medium">{t('suppliers.counter_account_note')}</p>
                     </div>
                   )}
                 </div>

@@ -184,7 +184,7 @@ export const IntegrityDashboard: React.FC = () => {
           {isReposting ? <RefreshCw className="animate-spin" size={20} /> : <Database size={20} />}
           Repledge All (Sync Ledger)
         </button>
-        <button onClick={handleLoadTest} disabled={isTesting} className="p-4 bg-zinc-100 hover:bg-zinc-200 rounded-2xl font-bold transition-all text-rose-600">
+        <button onClick={handleLoadTest} disabled={isTesting} className="p-4 bg-zinc-100 hover:bg-zinc-200 rounded-2xl font-bold transition-all text-emerald-600">
           Run Load Test
         </button>
         <button onClick={handleCreateSnapshot} className="p-4 bg-zinc-100 hover:bg-zinc-200 rounded-2xl font-bold transition-all text-emerald-600 font-sans">
@@ -200,10 +200,10 @@ export const IntegrityDashboard: React.FC = () => {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className={`p-6 rounded-[2rem] border-2 shadow-lg ${globalBalance.isBalanced ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}
+          className={`p-6 rounded-[2rem] border-2 shadow-lg ${globalBalance.isBalanced ? 'bg-emerald-50 border-emerald-100' : 'bg-emerald-50 border-emerald-100'}`}
         >
           <div className="flex items-center gap-4 mb-4">
-            <div className={`p-3 rounded-2xl ${globalBalance.isBalanced ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
+            <div className={`p-3 rounded-2xl ${globalBalance.isBalanced ? 'bg-emerald-500 text-white' : 'bg-emerald-500 text-white'}`}>
               <Activity size={24} />
             </div>
             <div>
@@ -214,7 +214,7 @@ export const IntegrityDashboard: React.FC = () => {
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-zinc-500">Difference:</span>
-              <span className={`font-black ${globalBalance.isBalanced ? 'text-emerald-600' : 'text-rose-600'}`}>
+              <span className={`font-black ${globalBalance.isBalanced ? 'text-emerald-600' : 'text-emerald-600'}`}>
                 {formatNumber(globalBalance.difference)}
               </span>
             </div>
@@ -226,10 +226,10 @@ export const IntegrityDashboard: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className={`p-6 rounded-[2rem] border-2 shadow-lg ${balanceSheet.isBalanced ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}
+          className={`p-6 rounded-[2rem] border-2 shadow-lg ${balanceSheet.isBalanced ? 'bg-emerald-50 border-emerald-100' : 'bg-emerald-50 border-emerald-100'}`}
         >
           <div className="flex items-center gap-4 mb-4">
-            <div className={`p-3 rounded-2xl ${balanceSheet.isBalanced ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
+            <div className={`p-3 rounded-2xl ${balanceSheet.isBalanced ? 'bg-emerald-500 text-white' : 'bg-emerald-500 text-white'}`}>
               <ShieldAlert size={24} />
             </div>
             <div>
@@ -263,7 +263,7 @@ export const IntegrityDashboard: React.FC = () => {
       <div className="bg-white rounded-[2.5rem] border border-zinc-200 shadow-sm overflow-hidden">
         <div className="p-8 border-b border-zinc-100">
           <h3 className="text-xl font-black text-zinc-900 flex items-center gap-2">
-            <AlertCircle className="text-rose-500" />
+            <AlertCircle className="text-emerald-500" />
             Detected Anomalies
           </h3>
         </div>
@@ -271,25 +271,25 @@ export const IntegrityDashboard: React.FC = () => {
           {balanceSheet.diagnostics.unbalancedEntries.map((err, i) => (
             <div key={i} className="p-6 flex items-center justify-between hover:bg-zinc-50 transition-colors">
               <div className="flex items-center gap-4">
-                <div className="w-2 h-2 rounded-full bg-rose-500" />
+                <div className="w-2 h-2 rounded-full bg-emerald-500" />
                 <div>
                   <p className="font-bold text-zinc-900">Unbalanced Journal Entry</p>
                   <p className="text-sm text-zinc-500">{err}</p>
                 </div>
               </div>
-              <span className="text-xs font-black px-3 py-1 bg-rose-100 text-rose-700 rounded-full uppercase">Critical</span>
+              <span className="text-xs font-black px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full uppercase">Critical</span>
             </div>
           ))}
           {balanceSheet.diagnostics.missingAccountType.map((err, i) => (
             <div key={i} className="p-6 flex items-center justify-between hover:bg-zinc-50 transition-colors">
               <div className="flex items-center gap-4">
-                <div className="w-2 h-2 rounded-full bg-rose-500" />
+                <div className="w-2 h-2 rounded-full bg-emerald-500" />
                 <div>
                   <p className="font-bold text-zinc-900">Account Missing Type</p>
-                  <p className="text-sm text-zinc-500 text-rose-600 font-bold">{err}</p>
+                  <p className="text-sm text-zinc-500 text-emerald-600 font-bold">{err}</p>
                 </div>
               </div>
-              <span className="text-xs font-black px-3 py-1 bg-rose-100 text-rose-700 rounded-full uppercase">Critical</span>
+              <span className="text-xs font-black px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full uppercase">Critical</span>
             </div>
           ))}
           {balanceSheet.diagnostics.orphanedAccounts.map((err, i) => (

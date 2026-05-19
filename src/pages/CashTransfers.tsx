@@ -506,7 +506,7 @@ export const CashTransfers: React.FC = () => {
           <table className="w-full text-right border-collapse">
             <thead>
               <tr className="bg-zinc-50/50">
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('date')}>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('date')}>
                   <div className="flex items-center gap-1">
                     التاريخ
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -514,7 +514,7 @@ export const CashTransfers: React.FC = () => {
                     </span>
                   </div>
                 </th>
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('from_payment_method_name')}>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('from_payment_method_name')}>
                   <div className="flex items-center gap-1">
                     من خزينة
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -522,7 +522,7 @@ export const CashTransfers: React.FC = () => {
                     </span>
                   </div>
                 </th>
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('to_payment_method_name')}>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('to_payment_method_name')}>
                   <div className="flex items-center gap-1">
                     إلى خزينة
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -530,7 +530,7 @@ export const CashTransfers: React.FC = () => {
                     </span>
                   </div>
                 </th>
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('amount')}>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('amount')}>
                   <div className="flex items-center gap-1">
                     المبلغ
                     <span className="opacity-0 group-hover:opacity-100 transition-opacity">

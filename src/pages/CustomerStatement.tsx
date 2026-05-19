@@ -332,7 +332,7 @@ export const CustomerStatement: React.FC = () => {
                             entry.type === 'invoice' ? 'bg-emerald-50 text-emerald-600' :
                             entry.type === 'receipt' ? 'bg-amber-50 text-amber-600' :
                             entry.type === 'receipt_voucher' ? 'bg-amber-50 text-amber-600' :
-                            entry.type === 'return' ? 'bg-rose-50 text-rose-600' :
+                            entry.type === 'return' ? 'bg-emerald-50 text-emerald-600' :
                             entry.type === 'journal' ? 'bg-blue-50 text-blue-600' :
                             entry.type === 'manual' ? 'bg-blue-50 text-blue-600' :
                             entry.type === 'opening_balance' ? 'bg-zinc-100 text-zinc-600' :
@@ -351,7 +351,7 @@ export const CustomerStatement: React.FC = () => {
                         <td className="px-4 py-3 text-sm font-mono">{entry.reference}</td>
                         <td className="px-4 py-3 text-sm">{entry.description}</td>
                         <td className="px-4 py-3 text-sm font-bold text-emerald-600">{entry.debit > 0 ? formatNumber(entry.debit) : '-'}</td>
-                        <td className="px-4 py-3 text-sm font-bold text-rose-600">{entry.credit > 0 ? formatNumber(entry.credit) : '-'}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-emerald-600">{entry.credit > 0 ? formatNumber(entry.credit) : '-'}</td>
                         <td className="px-4 py-3 text-sm font-bold text-zinc-900">{formatBalance(entry.balance)}</td>
                       </tr>
                     ))}

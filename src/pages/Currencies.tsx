@@ -282,7 +282,7 @@ export default function Currencies() {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+        <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -292,7 +292,7 @@ export default function Currencies() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900 flex items-center gap-2">
-            <Coins className="w-8 h-8 text-indigo-600" />
+            <Coins className="w-8 h-8 text-emerald-600" />
             {t('currencies.title')}
           </h1>
           <p className="text-zinc-500 text-sm mt-1">
@@ -306,7 +306,7 @@ export default function Currencies() {
             <input
               type="text"
               placeholder={language === 'ar' ? 'بحث في العملات والقيمة...' : 'Search currencies and value...'}
-              className="w-full bg-white border border-zinc-200 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+              className="w-full bg-white border border-zinc-200 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
               value={mainSearchQuery}
               onChange={e => setMainSearchQuery(e.target.value)}
             />
@@ -317,7 +317,7 @@ export default function Currencies() {
               onClick={() => setViewMode('grid')}
               className={`p-1.5 rounded-md transition-all ${
                 viewMode === 'grid' 
-                  ? 'bg-white text-indigo-600 shadow-sm' 
+                  ? 'bg-white text-emerald-600 shadow-sm' 
                   : 'text-zinc-400 hover:text-zinc-600'
               }`}
               title={language === 'ar' ? 'عرض شبكي' : 'Grid View'}
@@ -328,7 +328,7 @@ export default function Currencies() {
               onClick={() => setViewMode('list')}
               className={`p-1.5 rounded-md transition-all ${
                 viewMode === 'list' 
-                  ? 'bg-white text-indigo-600 shadow-sm' 
+                  ? 'bg-white text-emerald-600 shadow-sm' 
                   : 'text-zinc-400 hover:text-zinc-600'
               }`}
               title={language === 'ar' ? 'عرض قائمة' : 'List View'}
@@ -338,7 +338,7 @@ export default function Currencies() {
           </div>
           <button
             onClick={() => setIsAddCurrencyOpen(true)}
-            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors w-full md:w-auto justify-center whitespace-nowrap"
+            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors w-full md:w-auto justify-center whitespace-nowrap"
           >
             <Plus className="w-5 h-5" />
             {t('currencies.add')}
@@ -368,9 +368,9 @@ export default function Currencies() {
               <div key={curr.id} className="bg-white border border-zinc-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center relative overflow-hidden">
+                    <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center relative overflow-hidden">
                       <span className="text-2xl absolute -top-1 -right-1 opacity-20 select-none">{curr.flag}</span>
-                      <span className="text-indigo-600 font-bold text-lg z-10">{curr.symbol}</span>
+                      <span className="text-emerald-600 font-bold text-lg z-10">{curr.symbol}</span>
                     </div>
                     <div>
                       <h3 className="font-bold text-zinc-900 flex items-center gap-2">
@@ -472,7 +472,7 @@ export default function Currencies() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center font-mono text-zinc-500 uppercase">{curr.code}</td>
-                      <td className="px-6 py-4 text-center font-bold text-indigo-600">{curr.symbol}</td>
+                      <td className="px-6 py-4 text-center font-bold text-emerald-600">{curr.symbol}</td>
                       <td className="px-6 py-4 text-center">
                         {latestRate ? (
                           <div className="flex flex-col">
@@ -502,7 +502,7 @@ export default function Currencies() {
                               setSelectedCurrency(curr);
                               setIsAddRateOpen(true);
                             }}
-                            className="p-2 text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                            className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
                             title={t('currencies.add_rate')}
                           >
                             <PlusCircle className="w-5 h-5" />
@@ -513,7 +513,7 @@ export default function Currencies() {
                               setIsHistoryOpen(true);
                               loadHistory(curr.id);
                             }}
-                            className="p-2 text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                            className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
                             title={t('currencies.history')}
                           >
                             <History className="w-5 h-5" />
@@ -563,7 +563,7 @@ export default function Currencies() {
                   <input
                     type="text"
                     placeholder={language === 'ar' ? 'ابحث عن عملة عالمية...' : 'Search global currencies...'}
-                    className="w-full bg-zinc-50 border border-zinc-100 rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                    className="w-full bg-zinc-50 border border-zinc-100 rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                   />
@@ -586,7 +586,7 @@ export default function Currencies() {
                           onClick={() => !isDisabled && selectWorldCurrency(curr)}
                           disabled={isDisabled}
                           className={`w-full px-4 py-3 text-right flex items-center justify-between group transition-colors border-b border-zinc-50 last:border-0 ${
-                            isDisabled ? 'opacity-50 cursor-not-allowed bg-zinc-50/50' : 'hover:bg-indigo-50/50'
+                            isDisabled ? 'opacity-50 cursor-not-allowed bg-zinc-50/50' : 'hover:bg-emerald-50/50'
                           }`}
                           style={{ direction: dir }}
                         >
@@ -602,14 +602,14 @@ export default function Currencies() {
                                   </span>
                                 )}
                                 {isAdded && !isBase && (
-                                  <span className="mx-1 text-indigo-600 font-bold bg-indigo-50 px-1 rounded">
+                                  <span className="mx-1 text-emerald-600 font-bold bg-emerald-50 px-1 rounded">
                                     {language === 'ar' ? 'مضافة مسبقاً' : 'Added'}
                                   </span>
                                 )}
                               </p>
                             </div>
                           </div>
-                          {!isDisabled && <PlusCircle className="w-5 h-5 text-zinc-200 group-hover:text-indigo-600 transition-colors" />}
+                          {!isDisabled && <PlusCircle className="w-5 h-5 text-zinc-200 group-hover:text-emerald-600 transition-colors" />}
                         </button>
                       );
                     })}
@@ -617,8 +617,8 @@ export default function Currencies() {
                 )}
 
                 {searchQuery && (
-                  <div className="bg-white border border-indigo-100 rounded-xl max-h-60 overflow-y-auto shadow-lg z-20 relative">
-                    <div className="sticky top-0 bg-indigo-50 px-4 py-2 text-[10px] font-bold text-indigo-400 uppercase tracking-widest border-b border-indigo-100">
+                  <div className="bg-white border border-emerald-100 rounded-xl max-h-60 overflow-y-auto shadow-lg z-20 relative">
+                    <div className="sticky top-0 bg-emerald-50 px-4 py-2 text-[10px] font-bold text-emerald-400 uppercase tracking-widest border-b border-emerald-100">
                       {language === 'ar' ? 'نتائج البحث' : 'Search Results'}
                     </div>
                     {filteredWorldCurrencies.length > 0 ? (
@@ -634,7 +634,7 @@ export default function Currencies() {
                             onClick={() => !isDisabled && selectWorldCurrency(curr)}
                             disabled={isDisabled}
                             className={`w-full px-4 py-3 text-right flex items-center justify-between group transition-colors border-b border-zinc-50 last:border-0 ${
-                              isDisabled ? 'opacity-50 cursor-not-allowed bg-zinc-50/50' : 'hover:bg-indigo-50/50'
+                              isDisabled ? 'opacity-50 cursor-not-allowed bg-zinc-50/50' : 'hover:bg-emerald-50/50'
                             }`}
                             style={{ direction: dir }}
                           >
@@ -650,14 +650,14 @@ export default function Currencies() {
                                     </span>
                                   )}
                                   {isAdded && !isBase && (
-                                    <span className="mx-1 text-indigo-600 font-bold bg-indigo-50 px-1 rounded">
+                                    <span className="mx-1 text-emerald-600 font-bold bg-emerald-50 px-1 rounded">
                                       {language === 'ar' ? 'مضافة مسبقاً' : 'Added'}
                                     </span>
                                   )}
                                 </p>
                               </div>
                             </div>
-                            {!isDisabled && <PlusCircle className="w-5 h-5 text-zinc-200 group-hover:text-indigo-600 transition-colors" />}
+                            {!isDisabled && <PlusCircle className="w-5 h-5 text-zinc-200 group-hover:text-emerald-600 transition-colors" />}
                           </button>
                         );
                       })
@@ -750,7 +750,7 @@ export default function Currencies() {
                   className={`w-full font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 mt-6 ${
                     !newCurrency.code 
                       ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed' 
-                      : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                      : 'bg-emerald-600 text-white hover:bg-emerald-700'
                   }`}
                 >
                   <Save className="w-5 h-5" />
@@ -768,8 +768,8 @@ export default function Currencies() {
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-indigo-600" />
+                <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-emerald-600" />
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-zinc-900">{t('currencies.add_rate')}</h2>
@@ -787,7 +787,7 @@ export default function Currencies() {
                   required
                   type="number"
                   step="0.000001"
-                  className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                  className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
                   value={newRate.exchange_rate}
                   onChange={e => setNewRate({ ...newRate, exchange_rate: e.target.value })}
                 />
@@ -799,7 +799,7 @@ export default function Currencies() {
                   <input
                     required
                     type="date"
-                    className="w-full bg-zinc-50 border border-zinc-100 rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                    className="w-full bg-zinc-50 border border-zinc-100 rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
                     value={newRate.rate_date}
                     onChange={e => setNewRate({ ...newRate, rate_date: e.target.value })}
                   />
@@ -809,14 +809,14 @@ export default function Currencies() {
                 <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{t('common.notes')}</label>
                 <textarea
                   rows={3}
-                  className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                  className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
                   value={newRate.notes}
                   onChange={e => setNewRate({ ...newRate, notes: e.target.value })}
                 />
               </div>
               <button
                 type="submit"
-                className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 mt-6"
+                className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 mt-6"
               >
                 <Save className="w-5 h-5" />
                 {t('common.save')}
@@ -832,8 +832,8 @@ export default function Currencies() {
           <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[80vh] flex flex-col">
             <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center">
-                  <History className="w-6 h-6 text-indigo-600" />
+                <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center">
+                  <History className="w-6 h-6 text-emerald-600" />
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-zinc-900">{t('currencies.exchange_rates')}</h2>
@@ -857,7 +857,7 @@ export default function Currencies() {
                 <input
                   type="text"
                   placeholder={language === 'ar' ? 'بحث في القيمة أو الملاحظات...' : 'Search rate or notes...'}
-                  className="w-full bg-white border border-zinc-200 rounded-lg pl-10 pr-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                  className="w-full bg-white border border-zinc-200 rounded-lg pl-10 pr-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
                   value={historySearchQuery}
                   onChange={e => setHistorySearchQuery(e.target.value)}
                 />
@@ -893,7 +893,7 @@ export default function Currencies() {
             <div className="flex-1 overflow-y-auto p-0">
               {loadingHistory ? (
                 <div className="flex flex-col items-center justify-center p-12 space-y-4">
-                  <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
                   <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest animate-pulse">
                     {language === 'ar' ? 'جاري تحميل السجل...' : 'Loading history...'}
                   </p>
@@ -918,7 +918,7 @@ export default function Currencies() {
                   return filteredRates.map((rate, idx) => (
                     <div 
                       key={rate.id} 
-                      className={`px-6 py-4 grid grid-cols-4 items-center text-sm border-b border-zinc-100 last:border-0 hover:bg-zinc-50 transition-colors ${idx === 0 && !historySearchQuery && !historyDateFrom && !historyDateTo ? 'bg-indigo-50/30' : ''}`}
+                      className={`px-6 py-4 grid grid-cols-4 items-center text-sm border-b border-zinc-100 last:border-0 hover:bg-zinc-50 transition-colors ${idx === 0 && !historySearchQuery && !historyDateFrom && !historyDateTo ? 'bg-emerald-50/30' : ''}`}
                     >
                       <div className="col-span-1 font-bold text-zinc-800">{rate.exchange_rate.toLocaleString()}</div>
                       <div className="col-span-1 text-zinc-500 font-mono text-xs">{format(new Date(rate.rate_date), 'dd/MM/yyyy')}</div>

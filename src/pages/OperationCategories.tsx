@@ -223,7 +223,7 @@ export function OperationCategories() {
                   </button>
                   <button
                     onClick={() => handleDelete(category.id)}
-                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                    className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
                   >
                     <Trash2 size={18} />
                   </button>

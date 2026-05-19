@@ -65,7 +65,7 @@ export const ActivityLogPage: React.FC = () => {
 
   const getActionColor = (action: string) => {
     if (action.includes('CREATE') || action.includes('RESTORE')) return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-    if (action.includes('DELETE') || action.includes('FAILED')) return 'bg-rose-100 text-rose-700 border-rose-200';
+    if (action.includes('DELETE') || action.includes('FAILED')) return 'bg-emerald-100 text-emerald-700 border-emerald-200';
     if (action.includes('UPDATE')) return 'bg-amber-100 text-amber-700 border-amber-200';
     return 'bg-blue-100 text-blue-700 border-blue-200';
   };

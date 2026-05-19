@@ -387,7 +387,7 @@ export const Dashboard: React.FC = () => {
           subtitle="التكاليف والمصروفات"
           icon={Zap} 
           trend={-2.1}
-          colorClass="from-rose-500 to-rose-600 text-rose-500"
+          colorClass="from-emerald-500 to-emerald-600 text-emerald-500"
         />
       </div>
 
@@ -455,8 +455,8 @@ export const Dashboard: React.FC = () => {
                   {formatMoney(stats?.totalSupplierBalances || 0)} 
                 </h3>
               </div>
-              <div className="flex items-center gap-2 text-rose-500 text-[9px] font-bold uppercase tracking-wider relative z-10 bg-rose-50 self-start px-3 py-1.5 rounded-full border border-rose-100">
-                <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+              <div className="flex items-center gap-2 text-emerald-500 text-[9px] font-bold uppercase tracking-wider relative z-10 bg-emerald-50 self-start px-3 py-1.5 rounded-full border border-emerald-100">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 {t('dashboard.outstanding_debts')}
               </div>
             </motion.div>
@@ -545,7 +545,7 @@ export const Dashboard: React.FC = () => {
                 <div className="flex items-center gap-4">
                   <div className={`w-12 h-12 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm ${
                     tx.type === 'invoice' || tx.type === 'receipt' ? 'bg-emerald-50 text-emerald-600' : 
-                    tx.type === 'return' || tx.type === 'payment' ? 'bg-rose-50 text-rose-600' : 
+                    tx.type === 'return' || tx.type === 'payment' ? 'bg-emerald-50 text-emerald-600' : 
                     'bg-slate-50 text-slate-600'
                   }`}>
                     {tx.type === 'invoice' || tx.type === 'receipt' ? <TrendingUp size={20} /> : 
@@ -557,7 +557,7 @@ export const Dashboard: React.FC = () => {
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
                         tx.type === 'invoice' ? 'bg-emerald-100 text-emerald-700' : 
-                        tx.type === 'return' ? 'bg-rose-100 text-rose-700' : 
+                        tx.type === 'return' ? 'bg-emerald-100 text-emerald-700' : 
                         'bg-slate-100 text-slate-600'
                       }`}>
                         {tx.type === 'invoice' ? t('dashboard.invoice') : 
@@ -571,7 +571,7 @@ export const Dashboard: React.FC = () => {
                   </div>
                 </div>
                 <div className={`text-right ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                  <p className={`font-bold text-sm tracking-tight ${tx.type === 'invoice' || tx.type === 'receipt' ? 'text-slate-900' : 'text-rose-600'}`}>
+                  <p className={`font-bold text-sm tracking-tight ${tx.type === 'invoice' || tx.type === 'receipt' ? 'text-slate-900' : 'text-emerald-600'}`}>
                     {tx.type === 'invoice' || tx.type === 'receipt' ? '' : '-'}{formatMoney(tx.total_amount || 0)}
                   </p>
                   <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">{formatDate(tx.date)}</p>

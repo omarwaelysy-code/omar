@@ -114,11 +114,11 @@ export const TrialBalance: React.FC = () => {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4 p-8 bg-rose-50 rounded-3xl border border-rose-100 italic text-center">
-        <p className="text-rose-600 font-bold">{error}</p>
+      <div className="flex flex-col items-center justify-center h-64 gap-4 p-8 bg-emerald-50 rounded-3xl border border-emerald-100 italic text-center">
+        <p className="text-emerald-600 font-bold">{error}</p>
         <button 
           onClick={() => window.location.reload()}
-          className="px-6 py-2 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-all shadow-lg shadow-rose-200"
+          className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200"
         >
           {dir === 'rtl' ? 'إعادة المحاولة' : 'Retry'}
         </button>
@@ -186,11 +186,11 @@ export const TrialBalance: React.FC = () => {
                   <td className={`px-6 py-4 text-sm font-bold text-zinc-500 ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.code}</td>
                   <td className={`px-6 py-4 text-sm font-bold text-zinc-900 ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.name}</td>
                   <td className={`px-4 py-4 text-sm font-black text-emerald-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.opening.debit > 0 ? formatNumber(a.opening.debit) : '-'}</td>
-                  <td className={`px-4 py-4 text-sm font-black text-rose-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.opening.credit > 0 ? formatNumber(a.opening.credit) : '-'}</td>
+                  <td className={`px-4 py-4 text-sm font-black text-emerald-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.opening.credit > 0 ? formatNumber(a.opening.credit) : '-'}</td>
                   <td className={`px-4 py-4 text-sm font-black text-emerald-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.movement.debit > 0 ? formatNumber(a.movement.debit) : '-'}</td>
-                  <td className={`px-4 py-4 text-sm font-black text-rose-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.movement.credit > 0 ? formatNumber(a.movement.credit) : '-'}</td>
+                  <td className={`px-4 py-4 text-sm font-black text-emerald-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.movement.credit > 0 ? formatNumber(a.movement.credit) : '-'}</td>
                   <td className={`px-4 py-4 text-sm font-black text-emerald-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.closing.debit > 0 ? formatNumber(a.closing.debit) : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-rose-600 text-center">{a.closing.credit > 0 ? formatNumber(a.closing.credit) : '-'}</td>
+                  <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center">{a.closing.credit > 0 ? formatNumber(a.closing.credit) : '-'}</td>
                 </tr>
               ))}
               <tr className="bg-zinc-900 text-white font-black">
@@ -211,7 +211,7 @@ export const TrialBalance: React.FC = () => {
       <div className={`p-8 rounded-[2.5rem] border-2 flex items-center justify-between shadow-lg ${
         globalBalance.isBalanced 
           ? 'bg-emerald-500 border-emerald-400 text-white shadow-emerald-500/20' 
-          : 'bg-rose-500 border-rose-400 text-white shadow-rose-500/20'
+          : 'bg-emerald-500 border-emerald-400 text-white shadow-emerald-500/20'
       }`}>
         <div className={`flex items-center gap-4 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse text-left'}`}>
           {globalBalance.isBalanced ? <CheckCircle2 size={32} /> : <AlertTriangle size={32} />}

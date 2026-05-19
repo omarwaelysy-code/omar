@@ -172,7 +172,7 @@ export const ChartOfAccounts: React.FC = () => {
         {/* Income Statement Section */}
         <div className="bg-white p-6 rounded-3xl border border-zinc-100 shadow-sm space-y-4">
           <div className="flex items-center gap-3 pb-4 border-b border-zinc-50">
-            <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center shadow-lg shadow-orange-500/20">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20">
               <BarChart3 size={20} />
             </div>
             <h3 className="text-xl font-bold text-zinc-900">قائمة الدخل</h3>

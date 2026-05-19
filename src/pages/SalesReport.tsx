@@ -266,7 +266,7 @@ export const SalesReport: React.FC = () => {
           />
           <button 
             onClick={fetchData}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-600 text-white rounded-2xl font-bold hover:bg-orange-700 transition-all active:scale-95 shadow-lg shadow-orange-200"
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
           >
             <TrendingUp size={20} />
             {t('reports.update_report')}
@@ -431,11 +431,11 @@ export const SalesReport: React.FC = () => {
 
         <div className="overflow-x-auto">
           {error && (
-            <div className="flex flex-col items-center justify-center p-12 bg-rose-50 rounded-3xl border border-rose-100 italic text-center mb-6">
-              <p className="text-rose-600 font-bold mb-4">{error}</p>
+            <div className="flex flex-col items-center justify-center p-12 bg-emerald-50 rounded-3xl border border-emerald-100 italic text-center mb-6">
+              <p className="text-emerald-600 font-bold mb-4">{error}</p>
               <button 
                 onClick={fetchData}
-                className="px-6 py-2 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-all shadow-lg shadow-rose-200"
+                className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200"
               >
                 {t('reports.update_report')}
               </button>

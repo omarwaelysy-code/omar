@@ -1419,7 +1419,7 @@ export const Invoices: React.FC = () => {
                 <button 
                   type="button"
                   onClick={() => setShowSidePanel(!showSidePanel)}
-                  className={`flex items-center gap-3 px-6 py-2.5 rounded-2xl text-sm font-black transition-all border shadow-sm ${showSidePanel ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-zinc-50'}`}
+                  className={`flex items-center gap-3 px-6 py-2.5 rounded-2xl text-sm font-black transition-all border shadow-sm ${showSidePanel ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-zinc-50'}`}
                 >
                   <History size={18} />
                   <span>قيد اليومية \ سجل التعديلات</span>
@@ -1495,7 +1495,7 @@ export const Invoices: React.FC = () => {
                   <form id="invoice-form" onSubmit={handleSubmit} className="space-y-8">
                     {/* Card 1: المعلومات الأساسية */}
                     <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                      <div className="absolute top-4 right-4 flex items-center gap-2 text-indigo-600 bg-indigo-50/50 px-3 py-1 rounded-full border border-indigo-100">
+                      <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50/50 px-3 py-1 rounded-full border border-emerald-100">
                         <FileText className="w-4 h-4" />
                         <span className="text-xs font-bold">invoices.basic_info</span>
                       </div>
@@ -1507,7 +1507,7 @@ export const Invoices: React.FC = () => {
                             <input
                               required
                               type="date"
-                              className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800 text-sm`}
+                              className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-sm`}
                               value={date}
                               onChange={(e) => setDate(e.target.value)}
                             />
@@ -1520,7 +1520,7 @@ export const Invoices: React.FC = () => {
                           <div className="relative group">
                             <select 
                               required
-                              className={`w-full ${dir === 'rtl' ? 'pr-12' : 'pl-12'} py-3 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm`}
+                              className={`w-full ${dir === 'rtl' ? 'pr-12' : 'pl-12'} py-3 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm`}
                               value={selectedCustomerId}
                               onChange={(e) => {
                                 if (e.target.value === 'new_customer') {
@@ -1532,7 +1532,7 @@ export const Invoices: React.FC = () => {
                             >
                               <option value="">{t('common.select_customer')}</option>
                               {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                              <option value="new_customer" className="font-bold text-indigo-600 italic">+ {t('customers.add')}</option>
+                              <option value="new_customer" className="font-bold text-emerald-600 italic">+ {t('customers.add')}</option>
                             </select>
                             <Building2 className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                             <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
@@ -1545,7 +1545,7 @@ export const Invoices: React.FC = () => {
                             <input
                               required
                               type="text"
-                              className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800 text-sm`}
+                              className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-sm`}
                               value={invoiceNumber}
                               onChange={(e) => setInvoiceNumber(e.target.value)}
                             />
@@ -1557,7 +1557,7 @@ export const Invoices: React.FC = () => {
                       <div className="pt-4 border-t border-zinc-100">
                         <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'موضوع الفاتورة' : 'Invoice Subject'}</label>
                         <textarea
-                          className="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800 min-h-[100px] resize-none text-sm placeholder:text-zinc-300"
+                          className="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 min-h-[100px] resize-none text-sm placeholder:text-zinc-300"
                           placeholder={language === 'ar' ? 'أدخل وصفاً عاماً يظهر في أعلى الفاتورة...' : 'Enter a general description...'}
                           value={description}
                           onChange={(e) => setDescription(e.target.value)}
@@ -1567,7 +1567,7 @@ export const Invoices: React.FC = () => {
 
                     {/* Card 2: إعدادات الدفع */}
                     <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                      <div className="absolute top-4 right-4 flex items-center gap-2 text-indigo-600 bg-indigo-50/50 px-3 py-1 rounded-full border border-indigo-100">
+                      <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50/50 px-3 py-1 rounded-full border border-emerald-100">
                         <Wallet className="w-4 h-4" />
                         <span className="text-xs font-bold">invoices.payment_settings</span>
                       </div>
@@ -1576,7 +1576,7 @@ export const Invoices: React.FC = () => {
                         <button 
                           type="button"
                           onClick={() => setPaymentType('cash')}
-                          className={`flex-1 py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-3 border ${paymentType === 'cash' ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg scale-[1.02]' : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'}`}
+                          className={`flex-1 py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-3 border ${paymentType === 'cash' ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg scale-[1.02]' : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'}`}
                         >
                           <Wallet size={18} />
                           {t('invoices.payment_cash')}
@@ -1584,7 +1584,7 @@ export const Invoices: React.FC = () => {
                         <button 
                           type="button"
                           onClick={() => setPaymentType('credit')}
-                          className={`flex-1 py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-3 border ${paymentType === 'credit' ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg scale-[1.02]' : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'}`}
+                          className={`flex-1 py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-3 border ${paymentType === 'credit' ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg scale-[1.02]' : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'}`}
                         >
                           <CreditCard size={18} />
                           {t('invoices.payment_credit')}
@@ -1600,7 +1600,7 @@ export const Invoices: React.FC = () => {
                                 <CreditCard className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 w-4 h-4 text-zinc-400 Transition-colors`} />
                                 <select 
                                   required
-                                  className={`w-full ${dir === 'rtl' ? 'pr-10' : 'pl-10'} py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer`}
+                                  className={`w-full ${dir === 'rtl' ? 'pr-10' : 'pl-10'} py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer`}
                                   value={paymentMethodId}
                                   onChange={(e) => {
                                     if (e.target.value === 'new_payment_method') {
@@ -1612,7 +1612,7 @@ export const Invoices: React.FC = () => {
                                 >
                                   <option value="">{t('common.select_method')}</option>
                                   {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
-                                  <option value="new_payment_method" className="font-bold text-indigo-600 italic">+ {t('payment_methods.add')}</option>
+                                  <option value="new_payment_method" className="font-bold text-emerald-600 italic">+ {t('payment_methods.add')}</option>
                                 </select>
                                 <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 w-4 h-4 text-zinc-400 pointer-events-none`} />
                               </div>
@@ -1627,7 +1627,7 @@ export const Invoices: React.FC = () => {
                     {/* Card 3: الأصناف */}
                     <section className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-6">
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
-                        <div className="flex items-center gap-2 text-indigo-600">
+                        <div className="flex items-center gap-2 text-emerald-600">
                           <Package className="w-5 h-5" />
                           <h2 className="font-semibold text-zinc-900">{t('invoices.form_items')}</h2>
                         </div>
@@ -1639,7 +1639,7 @@ export const Invoices: React.FC = () => {
                               setInvoiceType('items');
                               setItems([]);
                             }}
-                            className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${invoiceType === 'items' ? 'bg-white text-indigo-600 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
+                            className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${invoiceType === 'items' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
                           >
                             مبيعات سلع
                           </button>
@@ -1649,7 +1649,7 @@ export const Invoices: React.FC = () => {
                               setInvoiceType('services');
                               setItems([]);
                             }}
-                            className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${invoiceType === 'services' ? 'bg-white text-indigo-600 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
+                            className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${invoiceType === 'services' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
                           >
                             مبيعات خدمات
                           </button>
@@ -1658,7 +1658,7 @@ export const Invoices: React.FC = () => {
                         <button 
                           type="button"
                           onClick={() => addEmptyRow()}
-                          className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-sm text-sm"
+                          className="px-6 py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-all flex items-center gap-2 shadow-sm text-sm"
                         >
                           <Plus size={18} />
                           {t('invoices.form_add_item')}
@@ -1685,7 +1685,7 @@ export const Invoices: React.FC = () => {
                                   {invoiceType === 'items' ? (
                                     <div className="relative">
                                       <select 
-                                        className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2 outline-none font-bold text-zinc-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none transition-all"
+                                        className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2 outline-none font-bold text-zinc-800 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 appearance-none transition-all"
                                         value={item.product_id}
                                         onChange={(e) => updateItem(index, 'product_id', e.target.value)}
                                       >
@@ -1697,7 +1697,7 @@ export const Invoices: React.FC = () => {
                                   ) : (
                                     <input 
                                       type="text" 
-                                      className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2 outline-none font-bold text-zinc-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-bold"
+                                      className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2 outline-none font-bold text-zinc-800 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold"
                                       placeholder="وصف الخدمة..."
                                       value={item.product_name || ''}
                                       onChange={(e) => updateItem(index, 'product_name', e.target.value)}
@@ -1741,7 +1741,7 @@ export const Invoices: React.FC = () => {
                                     <input 
                                       type="text" 
                                       placeholder="الباركود..."
-                                      className="w-full bg-white border border-zinc-200 rounded-lg px-2 py-1 text-center font-bold text-xs text-zinc-800 outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-mono"
+                                      className="w-full bg-white border border-zinc-200 rounded-lg px-2 py-1 text-center font-bold text-xs text-zinc-800 outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-mono"
                                       value={item.barcode || ''}
                                       onChange={(e) => updateItem(index, 'barcode', e.target.value)}
                                     />
@@ -1761,7 +1761,7 @@ export const Invoices: React.FC = () => {
                                 <td className="px-6 py-4">
                                   <input 
                                     type="number" 
-                                    className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2 text-center font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-bold"
+                                    className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2 text-center font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-bold"
                                     value={item.quantity}
                                     onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
                                   />
@@ -1769,19 +1769,19 @@ export const Invoices: React.FC = () => {
                                 <td className="px-6 py-4">
                                   <input 
                                     type="number" 
-                                    className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2 text-center font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-bold"
+                                    className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2 text-center font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-bold"
                                     value={item.unit_price}
                                     onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
                                   />
                                 </td>
-                                <td className="px-6 py-4 text-left font-black text-indigo-600 text-lg">
+                                <td className="px-6 py-4 text-left font-black text-emerald-600 text-lg">
                                   {formatMoney(item.total)}
                                 </td>
                                 <td className="px-6 py-4 text-center">
                                   <button 
                                     type="button"
                                     onClick={() => removeItem(index)}
-                                    className="p-2 text-zinc-300 hover:text-rose-500 transition-colors"
+                                    className="p-2 text-zinc-300 hover:text-emerald-500 transition-colors"
                                   >
                                     <Trash2 size={18} />
                                   </button>
@@ -1803,7 +1803,7 @@ export const Invoices: React.FC = () => {
                     {/* Totals & Notes Section */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                       <section className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-6">
-                        <div className="flex items-center gap-2 mb-4 text-indigo-600">
+                        <div className="flex items-center gap-2 mb-4 text-emerald-600">
                           <Layers className="w-5 h-5" />
                           <h2 className="font-semibold text-zinc-900">ملخص الفاتورة</h2>
                         </div>
@@ -1815,19 +1815,19 @@ export const Invoices: React.FC = () => {
                               {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}
                             </span>
                           </div>
-                          <div className="flex justify-between items-center text-rose-600">
+                          <div className="flex justify-between items-center text-emerald-600">
                             <div className="flex items-center gap-4">
                               <span className="font-medium text-sm">{t('invoices.summary_discount')}</span>
                               <input 
                                 type="number" 
-                                className="w-24 bg-white border border-zinc-200 rounded-lg px-2 py-1 text-center font-bold text-rose-600 focus:ring-2 focus:ring-rose-500 outline-none"
+                                className="w-24 bg-white border border-zinc-200 rounded-lg px-2 py-1 text-center font-bold text-emerald-600 focus:ring-2 focus:ring-emerald-500 outline-none"
                                 value={Number(discount)}
                                 onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
                               />
                             </div>
                             <span className="font-bold text-lg">-{formatMoney(discount)}</span>
                           </div>
-                          <div className="flex justify-between items-center text-indigo-600">
+                          <div className="flex justify-between items-center text-emerald-600">
                             <span className="font-black text-lg">{t('invoices.summary_total')}</span>
                             <div className="flex flex-col items-end">
                               <span className="font-black text-2xl tracking-tighter text-left">
@@ -1840,12 +1840,12 @@ export const Invoices: React.FC = () => {
 
                       {/* Notes Card */}
                       <section className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-6">
-                        <div className="flex items-center gap-2 mb-4 text-indigo-600">
+                        <div className="flex items-center gap-2 mb-4 text-emerald-600">
                           <Tag className="w-5 h-5" />
                           <h2 className="font-semibold text-zinc-900">{language === 'ar' ? 'الملاحظات' : 'Notes'}</h2>
                         </div>
                         <textarea 
-                          className="w-full min-h-[150px] bg-zinc-50 border border-zinc-200 rounded-lg p-4 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-zinc-700 font-bold"
+                          className="w-full min-h-[150px] bg-zinc-50 border border-zinc-200 rounded-lg p-4 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500 transition-all font-medium text-zinc-700 font-bold"
                           placeholder={language === 'ar' ? 'أدخل أي ملاحظات إضافية هنا...' : 'Enter any additional notes...'}
                           value={description}
                           onChange={(e) => setDescription(e.target.value)}
@@ -1873,7 +1873,7 @@ export const Invoices: React.FC = () => {
                 type="submit"
                 form="invoice-form"
                 onClick={handleSubmit}
-                className="flex-1 py-4 rounded-2xl bg-indigo-600 text-white font-black hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 shadow-xl shadow-indigo-600/20 active:scale-95"
+                className="flex-1 py-4 rounded-2xl bg-emerald-600 text-white font-black hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 shadow-xl shadow-emerald-600/20 active:scale-95"
               >
                 <Save size={20} />
                 حفظ

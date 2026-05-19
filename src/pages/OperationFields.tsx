@@ -213,7 +213,7 @@ export function OperationFields() {
                   </td>
                   <td className="px-6 py-4 text-center">
                     {field.is_required ? (
-                      <span className="text-rose-600 text-[10px] font-bold bg-rose-50 px-2.5 py-1 rounded-full border border-rose-100">إجباري</span>
+                      <span className="text-emerald-600 text-[10px] font-bold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">إجباري</span>
                     ) : (
                       <span className="text-slate-300 text-xs">-</span>
                     )}
@@ -254,7 +254,7 @@ export function OperationFields() {
                             fetchData();
                           }
                         }}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                        className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
                       >
                         <Trash2 size={16} />
                       </button>
@@ -530,7 +530,7 @@ export function OperationFields() {
                           type="checkbox"
                           checked={formData.is_required}
                           onChange={e => setFormData({ ...formData, is_required: e.target.checked })}
-                          className="w-6 h-6 rounded-lg border-slate-300 text-rose-500 focus:ring-rose-500 transition-all cursor-pointer"
+                          className="w-6 h-6 rounded-lg border-slate-300 text-emerald-500 focus:ring-emerald-500 transition-all cursor-pointer"
                         />
                       </div>
                       <div className="flex-1">

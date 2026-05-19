@@ -935,7 +935,7 @@ export const PaymentVouchers: React.FC = () => {
           />
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-600 text-white rounded-2xl font-bold hover:bg-orange-700 transition-all active:scale-95 shadow-lg shadow-orange-200"
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
           >
             <Plus size={20} />
             {t('payments.add')}
@@ -978,7 +978,7 @@ export const PaymentVouchers: React.FC = () => {
             <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
               <thead>
                 <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('voucher_number')}>
+                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('voucher_number')}>
                     <div className="flex items-center gap-1">
                       رقم السند / المرجع
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -986,7 +986,7 @@ export const PaymentVouchers: React.FC = () => {
                       </span>
                     </div>
                   </th>
-                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('voucher_type')}>
+                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('voucher_type')}>
                     <div className="flex items-center gap-1">
                       النوع
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -995,7 +995,7 @@ export const PaymentVouchers: React.FC = () => {
                     </div>
                   </th>
                   <th className="px-6 py-4 font-bold">المستفيد / الفئة</th>
-                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('date')}>
+                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('date')}>
                     <div className="flex items-center gap-1">
                       التاريخ
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1004,7 +1004,7 @@ export const PaymentVouchers: React.FC = () => {
                     </div>
                   </th>
                   <th className="px-6 py-4 font-bold">الوصف</th>
-                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-orange-600 transition-colors group" onClick={() => handleSort('amount')}>
+                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('amount')}>
                     <div className="flex items-center gap-1">
                       المبلغ
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1214,7 +1214,7 @@ export const PaymentVouchers: React.FC = () => {
                 onClick={() => setShowSidePanel(!showSidePanel)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
                   showSidePanel 
-                    ? 'bg-orange-50 text-orange-600 border-orange-100 shadow-sm' 
+                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-sm' 
                     : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200 border-transparent'
                 } border`}
               >
@@ -1315,7 +1315,7 @@ export const PaymentVouchers: React.FC = () => {
                 <div className="lg:col-span-3 space-y-6">
                   {/* Card 1: Basic Info */}
                   <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                    <div className="absolute top-4 right-4 flex items-center gap-2 text-orange-600 bg-orange-50 px-3 py-1 rounded-full border border-orange-100">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
                       <FileText className="w-4 h-4" />
                       <span className="text-xs font-bold">البيانات الأساسية</span>
                     </div>
@@ -1327,7 +1327,7 @@ export const PaymentVouchers: React.FC = () => {
                           <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <input 
                             type="text" 
-                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl font-bold text-zinc-800 text-sm outline-none font-mono focus:ring-2 focus:ring-orange-500 transition-all`}
+                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl font-bold text-zinc-800 text-sm outline-none font-mono focus:ring-2 focus:ring-emerald-500 transition-all`}
                             value={editingVoucher ? voucherData.internal_reference : (internalRef || voucherData.internal_reference)}
                             onChange={(e) => {
                               if (editingVoucher) {
@@ -1347,7 +1347,7 @@ export const PaymentVouchers: React.FC = () => {
                           <input 
                             type="text" 
                             placeholder="ادخل رقم المرجع اليدوي..."
-                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
                             value={voucherData.manual_reference}
                             onChange={(e) => setVoucherData({...voucherData, manual_reference: e.target.value})}
                           />
@@ -1361,7 +1361,7 @@ export const PaymentVouchers: React.FC = () => {
                           <input 
                             required
                             type="date"
-                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
                             value={voucherData.date}
                             onChange={(e) => setVoucherData({...voucherData, date: e.target.value})}
                           />
@@ -1375,7 +1375,7 @@ export const PaymentVouchers: React.FC = () => {
                         <CreditCard className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                         <select 
                           required
-                          className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
+                          className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
                           value={voucherData.payment_method_id}
                           onChange={(e) => {
                             if (e.target.value === 'new_payment_method') {
@@ -1387,7 +1387,7 @@ export const PaymentVouchers: React.FC = () => {
                         >
                           <option value="">اختر الطريقة...</option>
                           {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
-                          <option value="new_payment_method" className="font-bold text-orange-600">+ إضافة طريقة دفع جديدة...</option>
+                          <option value="new_payment_method" className="font-bold text-emerald-600">+ إضافة طريقة دفع جديدة...</option>
                         </select>
                         <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                       </div>
@@ -1396,7 +1396,7 @@ export const PaymentVouchers: React.FC = () => {
 
                   {/* Card 2: Beneficiaries & Amounts */}
                   <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                    <div className="absolute top-4 right-4 flex items-center gap-2 text-orange-600 bg-orange-50 px-3 py-1 rounded-full border border-orange-100">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
                       <Layers className="w-4 h-4" />
                       <span className="text-xs font-bold">بنود الصرف</span>
                     </div>
@@ -1410,7 +1410,7 @@ export const PaymentVouchers: React.FC = () => {
                             ...voucherData,
                             items: [...voucherData.items, { type: 'supplier', entity_id: '', amount: 0, description: '' }]
                           })}
-                          className="flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-600 rounded-xl text-xs font-black border border-orange-100 hover:bg-orange-100 transition-all shadow-sm"
+                          className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-black border border-emerald-100 hover:bg-emerald-100 transition-all shadow-sm"
                         >
                           <Plus size={16} />
                           <span>إضافة بند صرف جديد</span>
@@ -1469,7 +1469,7 @@ export const PaymentVouchers: React.FC = () => {
                                   <ChevronDown size={12} className="absolute right-4 top-4 text-zinc-400 pointer-events-none" />
                                   {item.type === 'account' && accounts.find(a => a.id === item.entity_id)?.required_sub_account && (
                                     <select
-                                      className="w-full px-2 py-2 mt-1 bg-orange-50 border border-orange-200 rounded-xl text-[10px] font-bold outline-none"
+                                      className="w-full px-2 py-2 mt-1 bg-emerald-50 border border-emerald-200 rounded-xl text-[10px] font-bold outline-none"
                                       value={item.sub_account_id || ''}
                                       onChange={(e) => {
                                         const newItems = [...voucherData.items];
@@ -1488,7 +1488,7 @@ export const PaymentVouchers: React.FC = () => {
                                 <td className="px-1 py-1">
                                   <input 
                                     type="number" 
-                                    className="w-full px-2 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-black text-orange-600 outline-none text-center"
+                                    className="w-full px-2 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-black text-emerald-600 outline-none text-center"
                                     placeholder="0"
                                     value={item.amount || ''}
                                     onChange={(e) => {
@@ -1533,8 +1533,8 @@ export const PaymentVouchers: React.FC = () => {
                           </tbody>
                           <tfoot>
                             <tr className="bg-zinc-50/50">
-                              <td colSpan={2} className="px-4 py-4 font-black text-zinc-900 border-t border-zinc-100 text-sm italic tracking-tighter uppercase underline decoration-orange-300 decoration-2 underline-offset-4 tracking-tight">إجمالي المبلغ المنصرف:</td>
-                              <td className="px-2 py-4 font-black text-2xl text-orange-600 border-t border-zinc-100 text-center tracking-tighter">
+                              <td colSpan={2} className="px-4 py-4 font-black text-zinc-900 border-t border-zinc-100 text-sm italic tracking-tighter uppercase underline decoration-emerald-300 decoration-2 underline-offset-4 tracking-tight">إجمالي المبلغ المنصرف:</td>
+                              <td className="px-2 py-4 font-black text-2xl text-emerald-600 border-t border-zinc-100 text-center tracking-tighter">
                                 {formatNumber(voucherData.items.reduce((sum, item) => sum + item.amount, 0))}
                               </td>
                               <td colSpan={2} className="border-t border-zinc-100"></td>
@@ -1548,7 +1548,7 @@ export const PaymentVouchers: React.FC = () => {
                       <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase">البيان العام / ملاحظات إضافية</label>
                       <textarea 
                         rows={3}
-                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-3xl focus:ring-2 focus:ring-orange-500 outline-none transition-all resize-none font-bold text-sm text-zinc-800"
+                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-3xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none font-bold text-sm text-zinc-800"
                         placeholder="اكتب ملاحظات السند هنا..."
                         value={voucherData.notes}
                         onChange={(e) => setVoucherData({...voucherData, notes: e.target.value})}
@@ -1570,7 +1570,7 @@ export const PaymentVouchers: React.FC = () => {
                 <button 
                   type="submit"
                   disabled={voucherData.items.reduce((sum, item) => sum + item.amount, 0) <= 0 || !voucherData.payment_method_id}
-                  className="flex-[2] py-4 bg-orange-600 text-white rounded-2xl font-black uppercase tracking-wider hover:bg-orange-700 transition-all shadow-lg shadow-orange-500/20 active:scale-95 flex items-center justify-center gap-3"
+                  className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-3"
                 >
                   <Save className="w-6 h-6" />
                   {editingVoucher ? 'حفظ التعديلات' : 'حفظ السند'}
@@ -1823,7 +1823,7 @@ export const PaymentVouchers: React.FC = () => {
                       <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">حساب مقابل رصيد أول المدة</label>
                       <select
                         required
-                        className="w-full px-4 py-3 bg-orange-50 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                        className="w-full px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                         value={supplierFormData.counter_account_id}
                         onChange={(e) => setSupplierFormData({ ...supplierFormData, counter_account_id: e.target.value })}
                       >
@@ -1834,7 +1834,7 @@ export const PaymentVouchers: React.FC = () => {
                           </option>
                         ))}
                       </select>
-                      <p className="text-[10px] text-orange-600 mt-1 font-medium">يستخدم هذا الحساب لإنشاء قيد رصيد أول المدة (مثلاً: رأس المال أو الأرباح المرحلة)</p>
+                      <p className="text-[10px] text-emerald-600 mt-1 font-medium">يستخدم هذا الحساب لإنشاء قيد رصيد أول المدة (مثلاً: رأس المال أو الأرباح المرحلة)</p>
                     </div>
                   )}
                 </div>
