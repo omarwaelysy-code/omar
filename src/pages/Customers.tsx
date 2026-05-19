@@ -361,44 +361,46 @@ export const Customers: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col space-y-6 animate-in fade-in duration-500 overflow-hidden" dir={dir}>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 bg-emerald-600 text-white rounded-3xl flex items-center justify-center shadow-xl shadow-emerald-500/20">
-            <User size={28} />
+      {!isModalOpen && (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-emerald-600 text-white rounded-3xl flex items-center justify-center shadow-xl shadow-emerald-500/20">
+              <User size={28} />
+            </div>
+            <div>
+              <h2 className="text-3xl font-black tracking-tight text-slate-900 italic serif">{t('customers.title')}</h2>
+              <p className="text-slate-500 font-medium">{t('customers.subtitle')}</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-3xl font-black tracking-tight text-slate-900 italic serif">{t('customers.title')}</h2>
-            <p className="text-slate-500 font-medium">{t('customers.subtitle')}</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <button 
-            onClick={() => setIsActivityLogOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
-            title={language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
-          >
-            <History size={20} />
-            <span className="hidden md:inline">{language === 'ar' ? 'سجل النشاط' : 'Activity Log'}</span>
-          </button>
-          <ExportButtons 
-            onExportExcel={handleExportExcel} 
-            onExportPDF={handleExportPDF} 
-          />
-          {canCreate && (
+          <div className="flex flex-wrap items-center gap-3">
             <button 
-              onClick={() => openModal()}
-              className={`flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95 border border-emerald-500/50 ${isModalOpen ? 'opacity-50 pointer-events-none' : ''}`}
+              onClick={() => setIsActivityLogOpen(true)}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+              title={language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
             >
-              <Plus size={20} />
-              {t('customers.add')}
+              <History size={20} />
+              <span className="hidden md:inline">{language === 'ar' ? 'سجل النشاط' : 'Activity Log'}</span>
             </button>
-          )}
+            <ExportButtons 
+              onExportExcel={handleExportExcel} 
+              onExportPDF={handleExportPDF} 
+            />
+            {canCreate && (
+              <button 
+                onClick={() => openModal()}
+                className={`flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95 border border-emerald-500/50 ${isModalOpen ? 'opacity-50 pointer-events-none' : ''}`}
+              >
+                <Plus size={20} />
+                {t('customers.add')}
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden pb-4">
         {/* Main List Column */}
-        <div className={`flex-1 flex flex-col transition-all duration-700 ease-in-out ${isModalOpen ? 'hidden lg:flex lg:w-1/2 xl:w-2/3' : 'w-full'}`}>
+        <div className={`flex-1 flex flex-col transition-all duration-700 ease-in-out ${isModalOpen ? 'hidden' : 'w-full'}`}>
           <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full">
             <div className="p-6 border-b border-slate-100 flex items-center gap-4 bg-slate-50/30">
               <div className="relative flex-1 group">
@@ -543,7 +545,7 @@ export const Customers: React.FC = () => {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: dir === 'rtl' ? -500 : 500, opacity: 0 }}
             transition={{ type: 'spring', damping: 32, stiffness: 280 }}
-            className="w-full lg:w-1/2 xl:w-2/5 flex flex-col h-full bg-white rounded-[2.5rem] border border-slate-200 shadow-2xl overflow-hidden relative z-[40]"
+            className="w-full flex flex-col h-full bg-white rounded-[2.5rem] border border-slate-200 shadow-2xl overflow-hidden relative z-[40]"
           >
               {/* Form Side */}
               <div className="flex-1 flex flex-col overflow-hidden bg-white">
