@@ -335,7 +335,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
     <div className={`min-h-screen bg-[#f8fafc] flex flex-col overflow-hidden font-sans selection:bg-brand-primary/20 ${language === 'en' ? 'font-sans' : ''}`} dir={dir}>
       {/* Change Password Modal */}
       {showChangePasswordModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-200">
             <div className={`p-8 border-b border-slate-100 bg-slate-50/50 flex items-center gap-4 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
               <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
@@ -409,7 +409,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       )}
 
       {/* Desktop Top Navigation */}
-      <header className="hidden md:flex sticky top-0 z-30 bg-white border-b border-slate-200 h-16 items-center px-8 shadow-sm">
+      <header className="hidden md:flex sticky top-0 z-[150] bg-white border-b border-slate-200 h-16 items-center px-8 shadow-sm">
         <div className={`flex items-center gap-4 ${dir === 'rtl' ? 'ml-6' : 'mr-6'}`}>
           {company?.logo_url ? (
             <div className="flex items-center gap-3">
@@ -449,7 +449,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                   </button>
                   
                   {/* Dropdown */}
-                  <div className={`absolute top-full ${dir === 'rtl' ? 'right-0' : 'left-0'} pt-2 opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-200 z-[70]`}>
+                  <div className={`absolute top-full ${dir === 'rtl' ? 'right-0' : 'left-0'} pt-2 opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-200 z-[160]`}>
                     <div className="bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 min-w-[200px]">
                       {item.subItems.map((sub: any) => (
                         <button
@@ -530,14 +530,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 {isCompanyMenuOpen && (
                   <>
                     <div 
-                      className="fixed inset-0 z-[65]" 
+                      className="fixed inset-0 z-[155]" 
                       onClick={() => setIsCompanyMenuOpen(false)}
                     />
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 10 }}
-                      className={`absolute top-full ${dir === 'rtl' ? 'left-0' : 'right-0'} mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-[70]`}
+                      className={`absolute top-full ${dir === 'rtl' ? 'left-0' : 'right-0'} mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-[160]`}
                     >
                       <p className="text-[10px] font-black text-slate-400 px-3 py-2 uppercase tracking-widest">{t('common.switch_company')}</p>
                       <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar">
@@ -823,13 +823,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] md:hidden"
+                  className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] md:hidden"
                 />
                 <motion.div
                   initial={{ x: '100%' }}
                   animate={{ x: 0 }}
                   exit={{ x: '100%' }}
-                  className="fixed inset-y-0 right-0 w-[85%] max-w-sm bg-white z-[70] md:hidden flex flex-col shadow-2xl"
+                  className="fixed inset-y-0 right-0 w-[85%] max-w-sm bg-white z-[210] md:hidden flex flex-col shadow-2xl"
                 >
                   <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                     <div className="flex items-center gap-3">
