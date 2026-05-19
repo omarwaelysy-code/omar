@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Account, AccountType } from '../types';
-import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, BookOpen, User, Layers } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, BookOpen, User, Layers, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
@@ -305,216 +305,225 @@ export const Accounts: React.FC = () => {
 
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-[140] flex justify-end overflow-hidden" dir={dir}>
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 md:p-6" dir={dir}>
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={closeModal}
-              className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm"
+              className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm"
             />
             <motion.div 
-              initial={{ x: dir === 'rtl' ? '-100%' : '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: dir === 'rtl' ? '-100%' : '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="relative w-full max-w-4xl bg-white shadow-2xl h-full flex flex-col border-s border-slate-200"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-5xl bg-slate-50 shadow-2xl rounded-[3rem] overflow-hidden flex flex-col md:flex-row max-h-[95vh] border border-white"
             >
-              <div className={`p-6 md:p-8 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white z-10 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                     <BookOpen size={24} />
+              {/* Form Side */}
+              <div className="flex-1 flex flex-col overflow-hidden bg-white">
+                <div className={`p-8 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white z-10 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-emerald-600 text-white rounded-[1.5rem] flex items-center justify-center shadow-xl shadow-emerald-500/20">
+                       <BookOpen size={28} />
+                    </div>
+                    <div>
+                       <h3 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-1">{editingAccount ? t('accounts.edit') : t('accounts.add')}</h3>
+                       <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">{language === 'ar' ? 'إدخال بيانات الحساب المحاسبي' : 'General Ledger Account Data'}</p>
+                    </div>
                   </div>
-                  <div>
-                     <h3 className="text-2xl font-black text-slate-900 tracking-tight">{editingAccount ? t('accounts.edit') : t('accounts.add')}</h3>
-                     <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">General Ledger Account</p>
-                  </div>
-                </div>
-                <button onClick={closeModal} className="text-slate-400 hover:text-slate-900 p-2.5 hover:bg-slate-50 rounded-full transition-all">
-                  <X size={24} />
-                </button>
-              </div>
-              
-              <div className="p-6 md:p-10 bg-emerald-50/30 border-b border-emerald-100/50" dir={dir}>
-                <div className={`flex items-center gap-3 mb-4 text-emerald-800 font-black text-xs uppercase tracking-widest ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse text-right'}`}>
-                  <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                     <Sparkles size={16} />
-                  </div>
-                  <span>{t('accounts.ai_input')}</span>
-                </div>
-                <div className={`flex flex-col md:flex-row gap-3 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                  <input 
-                    type="text"
-                    placeholder={t('accounts.ai_placeholder')}
-                    className={`flex-1 px-6 py-4 bg-white border border-emerald-200 rounded-[1.25rem] focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none font-bold text-slate-900 placeholder:text-slate-400 shadow-sm ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                    value={aiText}
-                    onChange={(e) => setAiText(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleAiParse()}
-                  />
-                  <button 
-                     onClick={handleAiParse}
-                     disabled={isAiParsing || !aiText.trim()}
-                     className="px-8 py-4 bg-emerald-600 text-white rounded-[1.25rem] font-black text-sm hover:bg-emerald-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 border border-emerald-500/50 active:scale-95"
-                  >
-                    {isAiParsing ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        {t('accounts.ai_analyzing')}
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles size={18} />
-                        {t('accounts.ai_analyze')}
-                      </>
-                    )}
+                  <button onClick={closeModal} className="text-slate-300 hover:text-slate-900 p-3 hover:bg-slate-50 rounded-full transition-all">
+                    <X size={24} />
                   </button>
                 </div>
-              </div>
-  
-              <div className="flex-1 flex flex-col overflow-hidden bg-slate-50/10">
-                <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-                  <form onSubmit={handleSubmit} className="p-6 md:p-10 space-y-8 flex-1 overflow-y-auto pb-32 custom-scrollbar" dir={dir}>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div className="md:col-span-2">
-                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.form_name')}</label>
-                        <div className="relative group">
-                          <FileText className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
-                          <input 
-                            required
-                            type="text" 
-                            className="premium-input font-bold"
-                            placeholder={language === 'ar' ? 'مثال: البنك الأهلي، الموردين، المبيعات' : 'e.g., National Bank, Suppliers, Sales'}
-                            value={formData.name}
-                            onChange={(e) => setFormData({...formData, name: e.target.value})}
-                          />
-                        </div>
+                
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                  <div className="p-8 md:p-12 space-y-10">
+                    {/* AI Section (Matching Transactions look) */}
+                    <div className="bg-emerald-50/50 p-6 rounded-[2rem] border border-emerald-100/50" dir={dir}>
+                      <div className={`flex items-center gap-3 mb-4 text-emerald-800 font-black text-xs uppercase tracking-widest ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse text-right'}`}>
+                        <Sparkles size={16} className="text-emerald-600" />
+                        <span>{t('accounts.ai_input')}</span>
                       </div>
-  
-                      <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.form_code')}</label>
-                        <div className="relative group">
-                          <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
-                          <input 
-                            required
-                            type="text" 
-                            className="premium-input font-mono font-bold tracking-widest"
-                            placeholder={language === 'ar' ? 'مثال: 1101، 1201، 2101' : 'e.g., 1101, 1201, 2101'}
-                            value={formData.code}
-                            onChange={(e) => setFormData({...formData, code: e.target.value})}
-                          />
-                        </div>
+                      <div className={`flex flex-col md:flex-row gap-3 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                        <input 
+                          type="text"
+                          placeholder={t('accounts.ai_placeholder')}
+                          className={`flex-1 px-6 py-4 bg-white border border-emerald-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none font-bold text-slate-900 placeholder:text-slate-400 shadow-sm ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
+                          value={aiText}
+                          onChange={(e) => setAiText(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && handleAiParse()}
+                        />
+                        <button 
+                           onClick={handleAiParse}
+                           disabled={isAiParsing || !aiText.trim()}
+                           className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-sm hover:bg-emerald-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 border border-emerald-500/50 active:scale-95"
+                        >
+                          {isAiParsing ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Sparkles size={18} />}
+                          {isAiParsing ? t('accounts.ai_analyzing') : t('accounts.ai_analyze')}
+                        </button>
                       </div>
-  
-                      <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.form_type')}</label>
-                        <div className="relative group">
-                           <BookOpen className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
-                           <select 
-                            required
-                            className="premium-input font-bold appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGZpbGw9Im5vbmUiIHZpZXdCb3g9IjAgMCAyNCAyNCIgc3Ryb2tlPSIjOTRhM2I4IiBzdHJva2Utd2lkdGg9IjIiPjxwYXRoIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZD0iTTE5IDlsLTcgNy03LTciLz48L3N2Zz4=')] bg-[8px_center] bg-[length:16px] bg-no-repeat"
-                            value={formData.type_id}
-                            onChange={(e) => setFormData({...formData, type_id: e.target.value, parent_id: ''})}
-                          >
-                            <option value="">{language === 'ar' ? 'اختر النوع...' : 'Select type...'}</option>
-                            {types.map(t => (
-                              <option key={t.id} value={t.id}>{t.name}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-  
-                      <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الحساب الرئيسي' : 'Parent Account'}</label>
-                        <div className="relative group">
-                           <BookOpen className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
-                           <select 
-                            className="premium-input font-bold appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGZpbGw9Im5vbmUiIHZpZXdCb3g9IjAgMCAyNCAyNCIgc3Ryb2tlPSIjOTRhM2I4IiBzdHJva2Utd2lkdGg9IjIiPjxwYXRoIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZD0iTTE5IDlsLTcgNy03LTciLz48L3N2Zz4=')] bg-[8px_center] bg-[length:16px] bg-no-repeat"
-                            value={formData.parent_id}
-                            onChange={(e) => setFormData({...formData, parent_id: e.target.value})}
-                          >
-                            <option value="">{language === 'ar' ? 'حساب رئيسي (مستوى أول)' : 'Main Account (Level 1)'}</option>
-                            {accounts
-                              .filter(a => a.type_id === formData.type_id && a.id !== editingAccount?.id)
-                              .map(a => (
-                                <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                              ))}
-                          </select>
-                        </div>
-                      </div>
-  
-                      <div className="md:col-span-2">
-                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}</label>
-                        <div className="relative group">
-                          <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
-                          <input 
-                            required
-                            type="number" 
-                            step="0.01"
-                            className="premium-input font-black"
-                            placeholder="0.00"
-                            value={formData.opening_balance}
-                            onChange={(e) => setFormData({...formData, opening_balance: parseFloat(e.target.value) || 0})}
-                          />
-                        </div>
-                        <p className="text-[10px] text-slate-400 mt-3 font-bold italic px-4 py-2 bg-slate-100 rounded-xl w-fit border border-slate-200 mb-6">{language === 'ar' ? 'القيمة الموجبة للمدين والسالبة للدائن' : 'Positive for Debit, Negative for Credit'}</p>
-                        
-                        <div className={`p-6 bg-white border border-slate-200 rounded-[2rem] flex items-center justify-between group-within:border-emerald-500 transition-all shadow-sm group hover:shadow-md ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                          <div className="flex items-center gap-4">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${formData.required_sub_account ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 scale-110' : 'bg-slate-100 text-slate-400'}`}>
-                               <User size={24} />
-                            </div>
-                            <div>
-                               <p className="font-black text-slate-900 text-lg leading-tight">{language === 'ar' ? 'يلزم حساب فرعي' : 'Required Sub-account'}</p>
-                               <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{language === 'ar' ? 'إسأل عن العميل/المورد عند التسجيل' : 'Ask for Customer/Supplier on Entry'}</p>
-                            </div>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer">
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="space-y-10">
+                      {/* Basic Fields Section */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
+                        <div className="md:col-span-2">
+                          <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.form_name')}</label>
+                          <div className="relative group">
+                            <FileText className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
                             <input 
-                              type="checkbox" 
-                              id="required_sub_account_switch"
-                              className="sr-only peer" 
-                              checked={formData.required_sub_account}
-                              onChange={(e) => {
-                                const val = e.target.checked;
-                                setFormData({...formData, required_sub_account: val});
-                              }}
+                              required
+                              type="text" 
+                              className="w-full px-6 py-4 bg-white border border-slate-100 rounded-2xl text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none placeholder:text-slate-300 ps-14"
+                              placeholder={language === 'ar' ? 'مثال: البنك الأهلي، الموردين، المبيعات' : 'e.g., National Bank, Suppliers, Sales'}
+                              value={formData.name}
+                              onChange={(e) => setFormData({...formData, name: e.target.value})}
                             />
-                            <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] peer-checked:after:left-[auto] peer-checked:after:right-[4px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                          </label>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.form_code')}</label>
+                          <div className="relative group">
+                            <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                            <input 
+                              required
+                              type="text" 
+                              className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-mono text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14 tracking-widest"
+                              placeholder="1101"
+                              value={formData.code}
+                              onChange={(e) => setFormData({...formData, code: e.target.value})}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.form_type')}</label>
+                          <div className="relative group">
+                             <Layers className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                             <select 
+                              required
+                              className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14 appearance-none"
+                              value={formData.type_id}
+                              onChange={(e) => setFormData({...formData, type_id: e.target.value, parent_id: ''})}
+                            >
+                              <option value="">{t('common.select_category')}</option>
+                              {types.map(t => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="md:col-span-2">
+                           <div className="flex items-center gap-3 mb-6 p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                              <AlertCircle size={20} className="text-amber-600" />
+                              <p className="text-[11px] font-bold text-amber-800 leading-tight">
+                                {language === 'ar' 
+                                  ? 'تأكد من صحة الحساب الرئيسي، حيث يؤثر ذلك على شجرة الحسابات والتقارير الختامية.' 
+                                  : 'Ensure the parent account is correct as it affects the chart of accounts and final reports.'}
+                              </p>
+                           </div>
+
+                          <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الحساب الرئيسي (اختياري)' : 'Parent Account (Optional)'}</label>
+                          <div className="relative group">
+                             <BookOpen className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                             <select 
+                              className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14 appearance-none"
+                              value={formData.parent_id}
+                              onChange={(e) => setFormData({...formData, parent_id: e.target.value})}
+                            >
+                              <option value="">{language === 'ar' ? 'حساب رئيسي (مستوى أول)' : 'Main Account (Level 1)'}</option>
+                              {accounts
+                                .filter(a => a.type_id === formData.type_id && a.id !== editingAccount?.id)
+                                .map(a => (
+                                  <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                                ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="md:col-span-2 space-y-8">
+                          <div className="p-8 bg-slate-50/50 rounded-[2.5rem] border border-slate-100">
+                            <label className={`block text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}</label>
+                            <div className="relative group mb-4">
+                              <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                              <input 
+                                required
+                                type="number" 
+                                step="0.01"
+                                className="w-full px-6 py-5 bg-white border border-slate-200 rounded-2xl text-3xl font-black text-emerald-600 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14"
+                                placeholder="0.00"
+                                value={formData.opening_balance}
+                                onChange={(e) => setFormData({...formData, opening_balance: parseFloat(e.target.value) || 0})}
+                              />
+                            </div>
+                            <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl w-fit border border-emerald-100/50 mx-auto">
+                               <Sparkles size={14} />
+                               <span className="text-[10px] font-black uppercase tracking-widest">{language === 'ar' ? 'القيمة الموجبة للمدين والسالبة للدائن' : 'Positive for Debit, Negative for Credit'}</span>
+                            </div>
+                          </div>
+                          
+                          <div 
+                            className={`p-8 bg-white border border-slate-200 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-200 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}
+                            onClick={() => setFormData({...formData, required_sub_account: !formData.required_sub_account})}
+                          >
+                            <div className="flex items-center gap-5">
+                              <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center transition-all duration-500 ${formData.required_sub_account ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-500/30 rotate-6' : 'bg-slate-100 text-slate-400'}`}>
+                                 <User size={32} />
+                              </div>
+                              <div>
+                                 <p className="font-black text-slate-900 text-xl leading-tight mb-1">{language === 'ar' ? 'يلزم حساب فرعي' : 'Required Sub-account'}</p>
+                                 <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">{language === 'ar' ? 'المطالبة باختيار عميل أو مورد عند القيد' : 'Demand a customer or supplier selection on entry'}</p>
+                              </div>
+                            </div>
+                            <div className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 ${formData.required_sub_account ? 'bg-emerald-500' : 'bg-slate-200'}`}>
+                               <div className={`w-6 h-6 bg-white rounded-full transition-transform duration-300 shadow-md ${formData.required_sub_account ? (dir === 'rtl' ? '-translate-x-6' : 'translate-x-6') : 'translate-x-0'}`} />
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-  
-                    <div className="pt-10 flex gap-4 sticky bottom-0 bg-white/80 backdrop-blur-md pb-4 z-20">
-                      <button 
-                        type="submit"
-                        className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-lg hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95 border border-emerald-500/50"
-                      >
-                        {editingAccount ? (language === 'ar' ? 'تحديث بيانات الحساب' : 'Update Data') : (language === 'ar' ? 'تأكيد وحفظ الحساب' : 'Confirm & Save Account')}
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={closeModal}
-                        className="px-8 py-4 bg-slate-50 text-slate-500 rounded-2xl font-black hover:bg-slate-100 transition-all active:scale-95 border border-slate-200"
-                      >
-                        {language === 'ar' ? 'إلغاء' : 'Cancel'}
-                      </button>
-                    </div>
-                  </form>
-  
-                  {editingAccount && (
-                    <div className="hidden lg:block w-96 border-s border-slate-100 bg-slate-50/20 shadow-inner overflow-y-auto custom-scrollbar">
-                      <div className="p-4 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10 text-center">
-                         <div className="flex items-center justify-center gap-2">
-                             <History size={16} className="text-slate-400" />
-                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">سجل نشاط الحساب</span>
-                          </div>
+
+                      {/* Footer Actions */}
+                      <div className="pt-12 pb-6 flex gap-4 sticky bottom-0 bg-white/90 backdrop-blur-md z-20">
+                        <button 
+                          type="submit"
+                          className="flex-1 py-5 bg-zinc-900 text-white rounded-[1.5rem] font-black text-xl hover:bg-zinc-800 transition-all shadow-2xl active:scale-95 border border-white/10"
+                        >
+                          {editingAccount ? (language === 'ar' ? 'تحديث البيانات' : 'Update Data') : (language === 'ar' ? 'حفظ الحساب' : 'Save Account')}
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={closeModal}
+                          className="px-10 py-5 bg-slate-100 text-slate-500 rounded-[1.5rem] font-black hover:bg-slate-200 transition-all active:scale-95 border border-slate-200"
+                        >
+                          {t('common.cancel')}
+                        </button>
                       </div>
-                      <InlineActivityLog category="accounts" documentId={editingAccount.id} />
-                    </div>
-                  )}
+                    </form>
+                  </div>
                 </div>
               </div>
+
+              {/* Activity Side (Only when editing) */}
+              {editingAccount && (
+                <div className="hidden lg:flex w-[400px] flex-col bg-slate-50 border-s border-slate-200 overflow-hidden">
+                  <div className="p-8 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
+                     <div className="flex items-center gap-3">
+                         <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-slate-400">
+                           <History size={20} />
+                         </div>
+                         <div>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block leading-none mb-1">Audit Trail</span>
+                            <span className="font-black text-slate-900">{language === 'ar' ? 'سجل نشاط الحساب' : 'Activity Log'}</span>
+                         </div>
+                      </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar">
+                     <InlineActivityLog category="accounts" documentId={editingAccount.id} />
+                  </div>
+                </div>
+              )}
             </motion.div>
           </div>
         )}

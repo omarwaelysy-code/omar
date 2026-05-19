@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -309,97 +310,135 @@ export const Expenses: React.FC = () => {
         </div>
       )}
 
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className={`bg-white w-full h-full md:h-auto ${editingCategory ? 'md:max-w-6xl' : 'md:max-w-lg'} md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
-            <div className={`p-6 border-b border-zinc-50 flex items-center justify-between bg-zinc-50/50 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-              <h3 className="text-xl font-bold text-zinc-900">{editingCategory ? t('expenses.edit') : t('expenses.add')}</h3>
-              <button onClick={closeModal} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-full transition-all">
-                <X size={24} />
-              </button>
-            </div>
-            
-            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-              <form onSubmit={handleSubmit} className="p-8 space-y-5 flex-1 overflow-y-auto" dir={dir}>
-                <div className="space-y-5">
-                  <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('expenses.form_code')}</label>
-                    <div className="relative">
-                      <Hash className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
-                      <input 
-                        required
-                        type="text" 
-                        className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all`}
-                        placeholder={language === 'ar' ? 'مثال: EXP-001' : 'e.g., EXP-001'}
-                        value={formData.code}
-                        onChange={(e) => setFormData({...formData, code: e.target.value})}
-                      />
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-6" dir={dir}>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closeModal}
+              className="fixed inset-0 bg-zinc-900/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-4xl bg-white shadow-2xl md:rounded-[2.5rem] h-full md:h-auto max-h-[90vh] flex flex-col md:flex-row overflow-hidden border border-zinc-200"
+            >
+              <div className="flex-1 flex flex-col overflow-hidden bg-white">
+                <div className={`p-6 md:p-10 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-10 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                  <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-emerald-500/20 ring-4 ring-emerald-50">
+                       <Wallet size={28} />
+                    </div>
+                    <div>
+                       <h3 className="text-3xl font-black text-zinc-900 tracking-tight">{editingCategory ? t('expenses.edit') : t('expenses.add')}</h3>
+                       <p className="text-[10px] text-zinc-400 font-black uppercase tracking-widest mt-1">إعدادات المصروفات • بند جديد</p>
                     </div>
                   </div>
-                  <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('expenses.form_name')}</label>
-                    <input 
-                      required
-                      type="text" 
-                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                      placeholder={language === 'ar' ? 'مثال: إيجار، كهرباء، رواتب...' : 'e.g., Rent, Electricity, Salaries...'}
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('expenses.form_description')}</label>
-                    <textarea 
-                      rows={3}
-                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                      placeholder={language === 'ar' ? 'وصف إضافي لبند المصروف...' : 'Additional description for the expense item...'}
-                      value={formData.description}
-                      onChange={(e) => setFormData({...formData, description: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('expenses.form_account')}</label>
-                    <select
-                      required
-                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                      value={formData.account_id}
-                      onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
-                    >
-                      <option value="">{language === 'ar' ? 'اختر الحساب...' : 'Select account...'}</option>
-                      {accounts.map(account => (
-                        <option key={account.id} value={account.id}>
-                          {account.code} - {account.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <button onClick={closeModal} className="text-zinc-400 hover:text-zinc-900 p-3 hover:bg-zinc-50 rounded-2xl transition-all"><X size={24} /></button>
                 </div>
-                <div className="pt-4 pb-8 md:pb-0 flex flex-col md:flex-row gap-3">
+                
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                  <form onSubmit={handleSubmit} className="p-6 md:p-12 space-y-8" dir={dir}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                       <div className="md:col-span-1">
+                        <label className={`block text-[10px] font-black text-zinc-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('expenses.form_code')}</label>
+                        <div className="relative group">
+                          <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-zinc-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                          <input 
+                            required
+                            type="text" 
+                            className={`premium-input ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} font-mono font-black h-14`}
+                            placeholder="EXP-001"
+                            value={formData.code}
+                            onChange={(e) => setFormData({...formData, code: e.target.value})}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-1">
+                        <label className={`block text-[10px] font-black text-zinc-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('expenses.form_name')}</label>
+                        <input 
+                          required
+                          type="text" 
+                          className="premium-input font-bold text-lg h-14"
+                          placeholder="اسم بند المصروف"
+                          value={formData.name}
+                          onChange={(e) => setFormData({...formData, name: e.target.value})}
+                        />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className={`block text-[10px] font-black text-zinc-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('expenses.form_account')}</label>
+                        <select
+                          required
+                          className="premium-input font-bold appearance-none h-14"
+                          value={formData.account_id}
+                          onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
+                        >
+                          <option value="">اختر الحساب المحاسبي المرتبط...</option>
+                          {accounts.map(account => (
+                            <option key={account.id} value={account.id}>
+                              {account.code} - {account.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className={`block text-[10px] font-black text-zinc-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('expenses.form_description')}</label>
+                        <textarea 
+                          rows={3}
+                          className="premium-input py-4 font-medium min-h-[100px]"
+                          placeholder="تفاصيل إضافية عن نوع المصروف..."
+                          value={formData.description}
+                          onChange={(e) => setFormData({...formData, description: e.target.value})}
+                        />
+                      </div>
+                    </div>
+                  </form>
+                </div>
+
+                <div className="p-6 md:p-10 bg-white border-t border-zinc-50 flex gap-4 sticky bottom-0 z-20">
                   <button 
-                    type="submit"
-                    className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+                    onClick={handleSubmit}
+                    className="flex-1 py-5 bg-zinc-900 text-white rounded-[1.5rem] font-black text-xl hover:bg-zinc-800 transition-all shadow-2xl active:scale-95 border border-zinc-800"
                   >
-                    {editingCategory ? (language === 'ar' ? 'تحديث البيانات' : 'Update Data') : (language === 'ar' ? 'حفظ البند' : 'Save Item')}
+                    {editingCategory ? 'تحديث البيانات' : 'حفظ البند'}
                   </button>
                   <button 
                     type="button"
                     onClick={closeModal}
-                    className="px-8 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all active:scale-95"
+                    className="px-10 py-5 bg-zinc-50 text-zinc-500 rounded-[1.5rem] font-black text-lg hover:bg-zinc-200 transition-all active:scale-95 border border-zinc-200"
                   >
-                    {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                    تجاهل
                   </button>
                 </div>
-              </form>
+              </div>
 
               {editingCategory && (
-                <div className="hidden md:block w-80 border-r border-zinc-100 bg-zinc-50/30">
-                  <InlineActivityLog category="expense_categories" documentId={editingCategory.id} />
+                <div className="hidden lg:block w-80 border-s border-zinc-100 bg-zinc-50/30 overflow-hidden flex flex-col">
+                   <div className="p-8 border-b border-zinc-100 bg-white/50 backdrop-blur-md">
+                    <div className="flex items-center gap-3">
+                       <div className="w-10 h-10 bg-zinc-900 text-white rounded-xl flex items-center justify-center shadow-lg">
+                          <History size={20} />
+                       </div>
+                       <div>
+                          <h4 className="text-lg font-black text-zinc-900 tracking-tight">سجل الرقابة</h4>
+                       </div>
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
+                    <InlineActivityLog category="expense_categories" documentId={editingCategory.id} />
+                  </div>
                 </div>
               )}
-            </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (

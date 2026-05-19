@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { PaymentMethod, Account } from '../types';
-import { Search, Plus, Trash2, Edit2, X, CreditCard, Wallet, Calendar, Hash, History, Layers, Box } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, X, CreditCard, Wallet, Calendar, Hash, History, Layers, Box, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
@@ -308,192 +308,220 @@ export const PaymentMethods: React.FC = () => {
 
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-[140] flex justify-end overflow-hidden" dir="rtl">
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 md:p-6" dir="rtl">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={closeModal}
-              className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm"
+              className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm"
             />
             <motion.div 
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="relative w-full max-w-2xl bg-white shadow-2xl h-full flex flex-col border-s border-slate-200"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-5xl bg-slate-50 shadow-2xl rounded-[3rem] overflow-hidden flex flex-col md:flex-row max-h-[95vh] border border-white"
             >
-              <div className="p-6 md:p-8 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white z-10 flex-row">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                     <CreditCard size={24} />
-                  </div>
-                  <div>
-                     <h3 className="text-2xl font-black text-slate-900 tracking-tight">{editingMethod ? 'تعديل طريقة سداد' : 'إضافة طريقة سداد'}</h3>
-                     <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">إدارة الخزائن والحسابات البنكية</p>
-                  </div>
-                </div>
-                <button onClick={closeModal} className="text-slate-400 hover:text-slate-900 p-2.5 hover:bg-slate-50 rounded-full transition-all"><X size={24} /></button>
-              </div>
-              
+              {/* Form Side */}
               <div className="flex-1 flex flex-col overflow-hidden bg-white">
-                <form onSubmit={handleSubmit} className="p-6 md:p-10 space-y-8 flex-1 overflow-y-auto pb-32 custom-scrollbar" dir="rtl">
-                  <div className="grid grid-cols-1 gap-8">
+                <div className="p-8 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white z-10 flex-row">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-emerald-600 text-white rounded-[1.5rem] flex items-center justify-center shadow-xl shadow-emerald-500/20">
+                       <CreditCard size={28} />
+                    </div>
                     <div>
-                      <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 text-right">كود الطريقة / الخزينة</label>
-                      <div className="relative group">
-                        <Hash className="absolute start-4 top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
+                       <h3 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-1">{editingMethod ? 'تعديل طريقة سداد' : 'إضافة طريقة سداد'}</h3>
+                       <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">إدارة الخزائن والحسابات البنكية</p>
+                    </div>
+                  </div>
+                  <button onClick={closeModal} className="text-slate-300 hover:text-slate-900 p-3 hover:bg-slate-50 rounded-full transition-all">
+                    <X size={24} />
+                  </button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                  <form onSubmit={handleSubmit} className="p-8 md:p-12 space-y-10" dir="rtl">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
+                      <div className="md:col-span-2">
+                        <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 text-right">اسم الطريقة / الخزينة</label>
                         <input
                           required
                           type="text"
-                          placeholder="مثال: CASH-01، BANK-01"
-                          className="premium-input ps-12 font-mono font-black tracking-widest"
-                          value={formData.code}
-                          onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                          placeholder="مثال: الخزينة الرئيسية، بنك مصر..."
+                          className="w-full px-6 py-4 bg-white border border-slate-100 rounded-2xl text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none placeholder:text-slate-300"
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         />
                       </div>
-                    </div>
-  
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 text-right">اسم الطريقة / الخزينة</label>
-                      <input
-                        required
-                        type="text"
-                        placeholder="مثال: الخزينة الرئيسية، بنك مصر..."
-                        className="premium-input font-bold text-lg"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      />
-                    </div>
-  
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
                       <div>
-                        <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 text-right">الرصيد الافتتاحي</label>
+                        <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 text-right">كود الطريقة / الخزينة</label>
                         <div className="relative group">
-                          <Wallet className="absolute start-4 top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
-                          <input 
-                            type="number" 
-                            className="premium-input ps-12 font-black"
-                            value={formData.opening_balance}
-                            onChange={(e) => setFormData({ ...formData, opening_balance: Number(e.target.value) })}
+                          <Hash className="absolute start-4 top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors" size={20} />
+                          <input
+                            required
+                            type="text"
+                            placeholder="CASH-01"
+                            className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-mono text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-12 tracking-widest"
+                            value={formData.code}
+                            onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                           />
                         </div>
                       </div>
-  
+
                       <div>
-                        <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 text-right">تاريخ الرصيد</label>
+                        <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 text-right">الحساب المحاسبي المرتبط</label>
                         <div className="relative group">
-                          <Calendar className="absolute start-4 top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
-                          <input 
-                            type="date" 
-                            className="premium-input ps-12 font-bold"
-                            value={formData.opening_balance_date}
-                            onChange={(e) => setFormData({ ...formData, opening_balance_date: e.target.value })}
-                          />
+                           <Box className="absolute start-4 top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors" size={20} />
+                           <select
+                            required
+                            className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-12 appearance-none"
+                            value={formData.account_id}
+                            onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
+                          >
+                            <option value="">اختر الحساب...</option>
+                            {accounts.map(account => (
+                              <option key={account.id} value={account.id}>
+                                {account.code} - {account.name}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       </div>
-                    </div>
-  
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 text-right">الحساب المحاسبي المرتبط</label>
-                      <div className="relative group">
-                         <Box className="absolute start-4 top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
-                         <select
-                          required
-                          className="premium-input ps-12 font-bold appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGZpbGw9Im5vbmUiIHZpZXdCb3g9IjAgMCAyNCAyNCIgc3Ryb2tlPSIjOTRhM2I4IiBzdHJva2Utd2lkdGg9IjIiPjxwYXRoIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZD0iTTE5IDlsLTcgNy03LTciLz48L3N2Zz4=')] bg-[8px_center] bg-[length:16px] bg-no-repeat"
-                          value={formData.account_id}
-                          onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
-                        >
-                          <option value="">اختر الحساب المحاسبي المرتبط...</option>
-                          {accounts.map(account => (
-                            <option key={account.id} value={account.id}>
-                              {account.code} - {account.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-  
-                    {formData.opening_balance !== 0 && (
-                      <div className="p-6 bg-emerald-50/50 rounded-3xl border border-emerald-100/50 space-y-6 animate-in slide-in-from-top-4 duration-300">
-                        <div className="flex items-center gap-3">
-                           <div className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                              <Wallet size={20} />
+
+                      <div className="md:col-span-2 space-y-8">
+                        <div className="p-8 bg-slate-50/50 rounded-[2.5rem] border border-slate-100">
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                              <div>
+                                <label className="block text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest px-1 text-right">الرصيد الافتتاحي</label>
+                                <div className="relative group">
+                                  <Wallet className="absolute start-4 top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors" size={20} />
+                                  <input 
+                                    type="number" 
+                                    className="w-full px-6 py-5 bg-white border border-slate-200 rounded-2xl text-2xl font-black text-emerald-600 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-12"
+                                    value={formData.opening_balance}
+                                    onChange={(e) => setFormData({ ...formData, opening_balance: Number(e.target.value) })}
+                                  />
+                                </div>
+                              </div>
+          
+                              <div>
+                                <label className="block text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest px-1 text-right">تاريخ الرصيد</label>
+                                <div className="relative group">
+                                  <Calendar className="absolute start-4 top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors" size={20} />
+                                  <input 
+                                    type="date" 
+                                    className="w-full px-6 py-5 bg-white border border-slate-200 rounded-2xl text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-12"
+                                    value={formData.opening_balance_date}
+                                    onChange={(e) => setFormData({ ...formData, opening_balance_date: e.target.value })}
+                                  />
+                                </div>
+                              </div>
                            </div>
-                           <h4 className="text-sm font-black text-emerald-800 uppercase tracking-widest">إعدادات الرصيد الافتتاحي</h4>
                         </div>
-  
-                        <div className="space-y-4">
-                          <div>
-                            <label className="block text-[10px] font-black text-emerald-700/60 mb-2 uppercase tracking-widest px-1 text-right">حساب الطرف الآخر</label>
-                            <select
-                              required
-                              className="premium-input border-emerald-200 focus:border-emerald-500 focus:ring-emerald-500/10 font-bold"
-                              value={formData.counter_account_id}
-                              onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}
-                            >
-                              <option value="">اختر حساب الطرف الآخر...</option>
-                              {accounts.map(account => (
-                                <option key={account.id} value={account.id}>
-                                  {account.code} - {account.name}
-                                </option>
-                              ))}
-                            </select>
-                            <p className="text-[10px] text-emerald-600/70 mt-2 font-bold italic bg-white/50 px-3 py-1.5 rounded-lg w-fit border border-emerald-100">سيتم إنشاء قيد يومية آلي لموازنة الرصيد الافتتاحي للطريقة.</p>
+
+                        {formData.opening_balance !== 0 && (
+                          <div className="p-8 bg-emerald-50 shadow-sm rounded-[2.5rem] border border-emerald-100/50 space-y-8 animate-in slide-in-from-top-4 duration-300">
+                            <div className="flex items-center gap-4">
+                               <div className="w-14 h-14 bg-white text-emerald-600 rounded-[1.25rem] flex items-center justify-center shadow-lg shadow-emerald-500/5">
+                                  <Wallet size={28} />
+                               </div>
+                               <div>
+                                  <h4 className="text-xl font-black text-emerald-900 leading-none mb-1 text-right">إعدادات الرصيد الافتتاحي</h4>
+                                  <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest">موازنة الحساب آلياً</p>
+                               </div>
+                            </div>
+      
+                            <div className="space-y-6">
+                              <div>
+                                <label className="block text-[10px] font-black text-emerald-700/60 mb-3 uppercase tracking-widest px-1 text-right">حساب الطرف الآخر</label>
+                                <div className="relative group">
+                                   <Layers className="absolute start-4 top-4 text-emerald-300 group-focus-within:text-emerald-500 transition-colors" size={20} />
+                                   <select
+                                    required
+                                    className="w-full px-6 py-4 bg-white border border-emerald-200 rounded-2xl text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-12 appearance-none"
+                                    value={formData.counter_account_id}
+                                    onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}
+                                  >
+                                    <option value="">اختر حساب الطرف الآخر...</option>
+                                    {accounts.map(account => (
+                                      <option key={account.id} value={account.id}>
+                                        {account.code} - {account.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div className="mt-4 flex items-center gap-3 p-4 bg-white/60 rounded-2xl border border-emerald-100">
+                                   <AlertCircle size={18} className="text-emerald-500 flex-shrink-0" />
+                                   <p className="text-[11px] font-bold text-emerald-800 leading-tight">سيتم إنشاء قيد يومية آلي لموازنة الرصيد الافتتاحي لهذه الطريقة عند الحفظ.</p>
+                                </div>
+                              </div>
+                              {formData.counter_account_id && (
+                                <div className="bg-white/80 rounded-[2rem] overflow-hidden border border-emerald-100 shadow-inner">
+                                  <JournalEntryPreview 
+                                    title="معاينة القيد المحاسبي"
+                                    items={[
+                                      {
+                                        account_name: accounts.find(a => a.id === formData.account_id)?.name || 'حساب المصرف/الخزينة',
+                                        debit: formData.opening_balance > 0 ? formData.opening_balance : 0,
+                                        credit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
+                                        description: 'رصيد افتتاحي'
+                                      },
+                                      {
+                                        account_name: accounts.find(a => a.id === formData.counter_account_id)?.name || 'حساب موازنة الرصيد',
+                                        debit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
+                                        credit: formData.opening_balance > 0 ? formData.opening_balance : 0,
+                                        description: `رصيد افتتاحي : ${formData.name}`
+                                      }
+                                    ]}
+                                  />
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          {formData.counter_account_id && (
-                            <JournalEntryPreview 
-                              title="معاينة قيد الرصيد الافتتاحي"
-                              items={[
-                                {
-                                  account_name: accounts.find(a => a.id === formData.account_id)?.name || 'حساب طريقة الدفع',
-                                  debit: formData.opening_balance > 0 ? formData.opening_balance : 0,
-                                  credit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
-                                  description: 'رصيد افتتاحي'
-                                },
-                                {
-                                  account_name: accounts.find(a => a.id === formData.counter_account_id)?.name || 'حساب الطرف الآخر',
-                                  debit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
-                                  credit: formData.opening_balance > 0 ? formData.opening_balance : 0,
-                                  description: `رصيد افتتاحي لطريقة الدفع: ${formData.name}`
-                                }
-                              ]}
-                            />
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-  
-                  <div className="pt-10 flex gap-4 sticky bottom-0 bg-white/80 backdrop-blur-md pb-4 z-20">
-                    <button 
-                      type="submit"
-                      className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-lg hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95 border border-emerald-500/50"
-                    >
-                      {editingMethod ? 'تحديث البيانات' : 'إضافة طريقة سداد'}
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={closeModal}
-                      className="px-8 py-4 bg-slate-50 text-slate-500 rounded-2xl font-black hover:bg-slate-100 transition-all active:scale-95 border border-slate-200"
-                    >
-                      إلغاء
-                    </button>
-                  </div>
-                </form>
-  
-                {editingMethod && (
-                  <div className="hidden lg:block w-96 border-s border-slate-100 bg-slate-50/20 shadow-inner overflow-y-auto custom-scrollbar">
-                    <div className="p-4 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                         <History size={16} className="text-slate-400" />
-                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">سجل نشاط الطريقة</span>
+                        )}
                       </div>
                     </div>
+
+                    {/* Footer Actions */}
+                    <div className="pt-12 pb-6 flex gap-4 sticky bottom-0 bg-white/90 backdrop-blur-md z-20">
+                      <button 
+                        type="submit"
+                        className="flex-1 py-5 bg-zinc-900 text-white rounded-[1.5rem] font-black text-xl hover:bg-zinc-800 transition-all shadow-2xl active:scale-95 border border-white/10"
+                      >
+                        {editingMethod ? 'تحديث البيانات' : 'حفظ طريقة السداد'}
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={closeModal}
+                        className="px-10 py-5 bg-slate-100 text-slate-500 rounded-[1.5rem] font-black hover:bg-slate-200 transition-all active:scale-95 border border-slate-200"
+                      >
+                        إلغاء
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+
+              {/* Activity Side */}
+              {editingMethod && (
+                <div className="hidden lg:flex w-[400px] flex-col bg-slate-50 border-s border-slate-200 overflow-hidden">
+                  <div className="p-8 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
+                     <div className="flex items-center gap-3">
+                         <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-slate-400">
+                           <History size={20} />
+                         </div>
+                         <div>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block leading-none mb-1 text-right">Audit Trail</span>
+                            <span className="font-black text-slate-900">سجل نشاط الطريقة</span>
+                         </div>
+                      </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar">
                     <InlineActivityLog category="payment_methods" documentId={editingMethod.id} />
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </motion.div>
           </div>
         )}

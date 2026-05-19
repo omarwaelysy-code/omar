@@ -593,247 +593,215 @@ export const Suppliers: React.FC = () => {
 
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-[140] flex justify-end overflow-hidden" dir={dir}>
+          <div className="fixed inset-0 z-[140] flex items-center justify-center p-0 md:p-6" dir={dir}>
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={closeModal}
-              className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm"
+              className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm"
             />
             <motion.div 
-              initial={{ x: dir === 'rtl' ? '-100%' : '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: dir === 'rtl' ? '-100%' : '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="relative w-full max-w-2xl bg-white shadow-2xl h-full flex flex-col border-s border-slate-200"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-5xl bg-white shadow-2xl md:rounded-[2.5rem] h-full md:h-[min(850px,90vh)] flex flex-col md:flex-row overflow-hidden border border-slate-200"
             >
-              <div className={`p-6 md:p-8 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white z-10 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                     <Truck size={24} />
-                  </div>
-                  <div>
-                     <h3 className="text-2xl font-black text-slate-900 tracking-tight">{editingSupplier ? t('suppliers.edit') : t('suppliers.add')}</h3>
-                     <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">إدارة بيانات الموردين</p>
-                  </div>
-                </div>
-                <button onClick={closeModal} className="text-slate-400 hover:text-slate-900 p-2.5 hover:bg-slate-50 rounded-full transition-all"><X size={24} /></button>
-              </div>
-              
               <div className="flex-1 flex flex-col overflow-hidden bg-white">
-                <form onSubmit={handleSubmit} className="p-6 md:p-10 space-y-8 flex-1 overflow-y-auto pb-32 custom-scrollbar" dir={dir}>
-                  <div className="grid grid-cols-1 gap-8">
-                    <div>
-                      <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_name')}</label>
-                      <div className="relative group">
-                        <User className="absolute start-4 top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
-                        <input
-                          required
-                          type="text"
-                          placeholder="اسم المورد / الشركة"
-                          className="premium-input ps-12 font-bold text-lg"
-                          value={formData.name}
-                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        />
-                      </div>
+                <div className={`p-6 md:p-10 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-10 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                  <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-emerald-500/20 ring-4 ring-emerald-50">
+                       <Truck size={28} />
                     </div>
-  
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {editingSupplier && (
-                        <div>
-                          <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_code')}</label>
-                          <div className="relative">
-                            <Hash className="absolute start-4 top-3.5 text-slate-300" size={20} />
-                            <input
-                              disabled
-                              type="text"
-                              className="premium-input ps-12 bg-slate-50 text-slate-400 cursor-not-allowed font-mono font-black"
-                              value={editingSupplier.code}
-                            />
+                    <div>
+                       <h3 className="text-3xl font-black text-slate-900 tracking-tight">{editingSupplier ? t('suppliers.edit') : t('suppliers.add')}</h3>
+                       <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">إدارة بيانات الموردين • ملف المورد</p>
+                    </div>
+                  </div>
+                  <button onClick={closeModal} className="text-slate-400 hover:text-slate-900 p-3 hover:bg-slate-50 rounded-2xl transition-all"><X size={24} /></button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                  <form onSubmit={handleSubmit} className="p-6 md:p-12 space-y-10 pb-32" dir={dir}>
+                    <div className="grid grid-cols-1 gap-10">
+                      <div className="space-y-4">
+                        <label className={`block text-[11px] font-black text-slate-400 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                          بيانات المورد الأساسية
+                        </label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="md:col-span-1">
+                            <label className={`block text-[10px] font-bold text-slate-500 mb-2 uppercase px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_name')}</label>
+                            <div className="relative group">
+                              <User className="absolute start-4 top-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
+                              <input
+                                required
+                                type="text"
+                                placeholder="اسم المورد / الشركة"
+                                className="premium-input ps-12 font-bold text-lg h-14"
+                                value={formData.name}
+                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                              />
+                            </div>
                           </div>
-                        </div>
-                      )}
-  
-                      <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_mobile')}</label>
-                        <div className="relative group">
-                          <Phone className="absolute start-4 top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
-                          <input
-                            required
-                            type="tel"
-                            maxLength={11}
-                            placeholder="01234567890"
-                            className="premium-input ps-12 font-bold tracking-widest"
-                            value={formData.mobile}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/\D/g, '');
-                              setFormData({ ...formData, mobile: value });
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-  
-                    <div>
-                      <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_email')}</label>
-                      <div className="relative group">
-                        <Mail className="absolute start-4 top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
-                        <input
-                          type="email"
-                          placeholder="supplier@example.com"
-                          className="premium-input ps-12 font-bold"
-                          value={formData.email}
-                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        />
-                      </div>
-                    </div>
-  
-                    <div>
-                      <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_address')}</label>
-                      <div className="relative group">
-                        <MapPin className="absolute start-4 top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
-                        <textarea
-                          placeholder="العنوان التفصيلي للمورد"
-                          className="premium-input ps-12 font-bold min-h-[80px]"
-                          rows={2}
-                          value={formData.address}
-                          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                        />
-                      </div>
-                    </div>
-  
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_opening_balance')}</label>
-                        <div className="relative group">
-                          <Wallet className="absolute start-4 top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
-                          <input 
-                            type="number" 
-                            className="premium-input ps-12 font-black"
-                            value={formData.opening_balance}
-                            onChange={(e) => setFormData({ ...formData, opening_balance: Number(e.target.value) })}
-                          />
-                          <p className="text-[10px] text-slate-400 mt-1 italic px-1">
-                            {language === 'ar' ? 'المبلغ الموجب (+) يعني أنك مدين للمورد، والسالب (-) يعني أنك دائن للمورد.' : 'Positive (+) means you owe supplier, Negative (-) means supplier owes you.'}
-                          </p>
-                        </div>
-                      </div>
-  
-                      <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_balance_date')}</label>
-                        <div className="relative group">
-                          <Calendar className="absolute start-4 top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
-                          <input 
-                            type="date" 
-                            className="premium-input ps-12 font-bold"
-                            value={formData.opening_balance_date}
-                            onChange={(e) => setFormData({ ...formData, opening_balance_date: e.target.value })}
-                          />
-                        </div>
-                      </div>
-                    </div>
-  
-                    <div>
-                      <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_account')}</label>
-                      <div className="relative group">
-                         <Box className="absolute start-4 top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
-                         <select
-                          required
-                          className="premium-input ps-12 font-bold appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGZpbGw9Im5vbmUiIHZpZXdCb3g9IjAgMCAyNCAyNCIgc3Ryb2tlPSIjOTRhM2I4IiBzdHJva2Utd2lkdGg9IjIiPjxwYXRoIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZD0iTTE5IDlsLTcgNy03LTciLz48L3N2Zz4=')] bg-[8px_center] bg-[length:16px] bg-no-repeat"
-                          value={formData.account_id}
-                          onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
-                        >
-                          <option value="">{language === 'ar' ? 'اختر الحساب المحاسبي المرتبط...' : 'Select associated account...'}</option>
-                          {accounts.map(account => (
-                            <option key={account.id} value={account.id}>
-                              {account.code} - {account.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-  
-                    {formData.opening_balance !== 0 && (
-                      <div className="p-6 bg-emerald-50/50 rounded-3xl border border-emerald-100/50 space-y-6 animate-in slide-in-from-top-4 duration-300">
-                        <div className="flex items-center gap-3">
-                           <div className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                              <Wallet size={20} />
-                           </div>
-                           <h4 className="text-sm font-black text-emerald-800 uppercase tracking-widest">{language === 'ar' ? 'إعدادات الرصيد الافتتاحي' : 'Opening Balance Settings'}</h4>
-                        </div>
-  
-                        <div className="space-y-4">
+                          
                           <div>
-                            <label className={`block text-[10px] font-black text-emerald-700/60 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_counter_account')}</label>
-                            <select
-                              required
-                              className="premium-input border-emerald-200 focus:border-emerald-500 focus:ring-emerald-500/10 font-bold"
-                              value={formData.counter_account_id}
-                              onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}
-                            >
-                              <option value="">{language === 'ar' ? 'اختر حساب الطرف الآخر...' : 'Select counter account...'}</option>
-                              {accounts.map(account => (
-                                <option key={account.id} value={account.id}>
-                                  {account.code} - {account.name}
-                                </option>
-                              ))}
-                            </select>
-                            <p className="text-[10px] text-emerald-600/70 mt-2 font-bold italic bg-white/50 px-3 py-1.5 rounded-lg w-fit border border-emerald-100">{language === 'ar' ? 'سيتم إنشاء قيد يومية آلي لموازنة الرصيد الافتتاحي.' : 'An automatic journal entry will be created to balance the opening balance.'}</p>
+                            <label className={`block text-[10px] font-bold text-slate-500 mb-2 uppercase px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_code')}</label>
+                            <div className="relative group">
+                              <Hash className="absolute start-4 top-4 text-slate-400" size={20} />
+                              <input
+                                disabled
+                                type="text"
+                                className="premium-input ps-12 bg-slate-50 text-slate-400 cursor-not-allowed font-mono font-black h-14"
+                                value={editingSupplier?.code || '---'}
+                              />
+                            </div>
                           </div>
-                          {formData.counter_account_id && (
-                            <JournalEntryPreview 
-                              title={language === 'ar' ? 'معاينة قيد الرصيد الافتتاحي' : 'Opening Balance Entry Preview'}
-                              items={[
-                                {
-                                  account_name: accounts.find(a => a.id === formData.account_id)?.name || (language === 'ar' ? 'حساب المورد' : 'Supplier Account'),
-                                  debit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
-                                  credit: formData.opening_balance > 0 ? formData.opening_balance : 0,
-                                  description: language === 'ar' ? 'رصيد افتتاحي' : 'Opening Balance'
-                                },
-                                {
-                                  account_name: accounts.find(a => a.id === formData.counter_account_id)?.name || (language === 'ar' ? 'حساب الطرف الآخر' : 'Counter Account'),
-                                  debit: formData.opening_balance > 0 ? formData.opening_balance : 0,
-                                  credit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
-                                  description: language === 'ar' ? `رصيد افتتاحي للمورد: ${formData.name}` : `Opening balance for supplier: ${formData.name}`
-                                }
-                              ]}
-                            />
-                          )}
                         </div>
                       </div>
-                    )}
-                  </div>
-  
-                  <div className="pt-10 flex gap-4 sticky bottom-0 bg-white/80 backdrop-blur-md pb-4 z-20">
-                    <button 
-                      type="submit"
-                      className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-lg hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95 border border-emerald-500/50"
-                    >
-                      {editingSupplier ? (language === 'ar' ? 'تحديث بيانات المورد' : 'Update Supplier') : (language === 'ar' ? 'إضافة مورد جديد' : 'Add New Supplier')}
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={closeModal}
-                      className="px-8 py-4 bg-slate-50 text-slate-500 rounded-2xl font-black hover:bg-slate-100 transition-all active:scale-95 border border-slate-200"
-                    >
-                      {language === 'ar' ? 'إلغاء' : 'Cancel'}
-                    </button>
-                  </div>
-                </form>
-  
-                {editingSupplier && (
-                  <div className="hidden lg:block w-96 border-s border-slate-100 bg-slate-50/20 shadow-inner overflow-y-auto custom-scrollbar">
-                    <div className="p-4 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
-                      <div className="flex items-center gap-2">
-                         <History size={16} className="text-slate-400" />
-                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">سجل نشاط المورد</span>
+
+                      <div className="space-y-4">
+                        <label className={`block text-[11px] font-black text-slate-400 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                          بيانات التواصل
+                        </label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <label className={`block text-[10px] font-bold text-slate-500 mb-2 uppercase px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_mobile')}</label>
+                            <div className="relative group">
+                              <Phone className="absolute start-4 top-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
+                              <input
+                                required
+                                type="tel"
+                                maxLength={11}
+                                placeholder="01234567890"
+                                className="premium-input ps-12 font-bold tracking-widest h-14"
+                                value={formData.mobile}
+                                onChange={(e) => {
+                                  const value = e.target.value.replace(/\D/g, '');
+                                  setFormData({ ...formData, mobile: value });
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className={`block text-[10px] font-bold text-slate-500 mb-2 uppercase px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_email')}</label>
+                            <div className="relative group">
+                              <Mail className="absolute start-4 top-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
+                              <input
+                                type="email"
+                                placeholder="supplier@example.com"
+                                className="premium-input ps-12 font-bold h-14"
+                                value={formData.email}
+                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className={`block text-[10px] font-bold text-slate-500 mb-2 uppercase px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_address')}</label>
+                            <div className="relative group">
+                              <MapPin className="absolute start-4 top-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
+                              <textarea
+                                placeholder="العنوان التفصيلي للمورد"
+                                className="premium-input ps-12 font-bold min-h-[100px] py-4"
+                                rows={2}
+                                value={formData.address}
+                                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <label className={`block text-[11px] font-black text-slate-400 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                          الحسابات والأرصدة
+                        </label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/50 p-8 rounded-[2.5rem] border border-slate-100">
+                          <div>
+                            <label className={`block text-[10px] font-bold text-slate-500 mb-2 uppercase px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_opening_balance')}</label>
+                            <div className="relative group">
+                              <Wallet className="absolute start-4 top-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
+                              <input 
+                                type="number" 
+                                className="premium-input ps-12 font-black h-14"
+                                value={formData.opening_balance}
+                                onChange={(e) => setFormData({ ...formData, opening_balance: Number(e.target.value) })}
+                              />
+                            </div>
+                          </div>
+      
+                          <div>
+                            <label className={`block text-[10px] font-bold text-slate-500 mb-2 uppercase px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_balance_date')}</label>
+                            <div className="relative group">
+                              <Calendar className="absolute start-4 top-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
+                              <input 
+                                type="date" 
+                                className="premium-input ps-12 font-bold h-14"
+                                value={formData.opening_balance_date}
+                                onChange={(e) => setFormData({ ...formData, opening_balance_date: e.target.value })}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="md:col-span-2">
+                             <label className={`block text-[10px] font-bold text-slate-500 mb-2 uppercase px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_account')}</label>
+                             <div className="relative group">
+                                <Box className="absolute start-4 top-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
+                                <select
+                                 required
+                                 className="premium-input ps-12 font-bold appearance-none h-14"
+                                 value={formData.account_id}
+                                 onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
+                               >
+                                 <option value="">{language === 'ar' ? 'اختر الحساب المحاسبي المرتبط...' : 'Select associated account...'}</option>
+                                 {accounts.map(account => (
+                                   <option key={account.id} value={account.id}>
+                                     {account.code} - {account.name}
+                                   </option>
+                                 ))}
+                               </select>
+                             </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
+                  </form>
+                </div>
+
+                <div className="p-6 md:p-10 bg-white border-t border-slate-50 flex gap-4 sticky bottom-0 z-20">
+                  <button 
+                    onClick={handleSubmit}
+                    className="flex-1 py-5 bg-slate-900 text-white rounded-[1.5rem] font-black text-xl hover:bg-slate-800 transition-all shadow-2xl active:scale-95 border border-slate-800"
+                  >
+                    {editingSupplier ? 'حفظ التعديلات' : 'إضافة المورد'}
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={closeModal}
+                    className="px-10 py-5 bg-slate-50 text-slate-500 rounded-[1.5rem] font-black text-lg hover:bg-slate-100 transition-all active:scale-95 border border-slate-200"
+                  >
+                    تجاهل
+                  </button>
+                </div>
+              </div>
+
+              {editingSupplier && (
+                <div className="hidden xl:block w-[400px] border-s border-slate-100 bg-slate-50/20 overflow-hidden flex flex-col">
+                  <div className="p-8 border-b border-slate-100 bg-white/50 backdrop-blur-md">
+                    <div className="flex items-center gap-3">
+                       <div className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-lg">
+                          <History size={20} />
+                       </div>
+                       <div>
+                          <h4 className="text-lg font-black text-slate-900 tracking-tight">سجل الرقابة</h4>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">تتبع التغييرات والنشاط</p>
+                       </div>
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
                     <InlineActivityLog category="suppliers" documentId={editingSupplier.id} />
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </motion.div>
           </div>
         )}

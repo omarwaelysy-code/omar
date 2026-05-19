@@ -744,94 +744,101 @@ export const Products: React.FC = () => {
 
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-[140] flex justify-end overflow-hidden" dir={dir}>
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 md:p-6" dir={dir}>
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={closeModal}
-              className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm"
+              className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm"
             />
             <motion.div 
-              initial={{ x: dir === 'rtl' ? '-100%' : '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: dir === 'rtl' ? '-100%' : '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="relative w-full max-w-4xl bg-white shadow-2xl h-full flex flex-col border-s border-slate-200"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-6xl bg-slate-50 shadow-2xl rounded-[3rem] overflow-hidden flex flex-col md:flex-row max-h-[95vh] border border-white"
             >
-              <div className={`p-6 md:p-8 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white z-10 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                     <Package size={24} />
-                  </div>
-                  <div>
-                     <h3 className="text-2xl font-black text-slate-900 tracking-tight">{editingProduct ? t('products.edit') : t('products.add')}</h3>
-                     <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">إدارة المخزون والأصناف</p>
-                  </div>
-                </div>
-                <button onClick={closeModal} className="text-slate-400 hover:text-slate-900 p-2.5 hover:bg-slate-50 rounded-full transition-all"><X size={24} /></button>
-              </div>
-              
+              {/* Form Side */}
               <div className="flex-1 flex flex-col overflow-hidden bg-white">
-                <form onSubmit={handleSubmit} className="p-0 flex-1 overflow-hidden flex flex-col md:flex-row" dir={dir}>
-                  <div className="p-6 md:p-10 space-y-8 flex-1 overflow-y-auto pb-32 custom-scrollbar">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_code')}</label>
-                        <div className="relative">
-                          <Hash className="absolute start-4 top-3.5 text-slate-300" size={20} />
-                          <input
-                            required
-                            readOnly
-                            type="text"
-                            className="premium-input ps-12 bg-slate-50 text-slate-400 cursor-not-allowed font-mono font-black"
-                            value={formData.code}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_name')}</label>
+                <div className={`p-8 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white z-10 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-emerald-600 text-white rounded-[1.5rem] flex items-center justify-center shadow-xl shadow-emerald-500/20">
+                       <Package size={28} />
+                    </div>
+                    <div>
+                       <h3 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-1">{editingProduct ? t('products.edit') : t('products.add')}</h3>
+                       <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">{language === 'ar' ? 'إدخال بيانات الصنف والمخزون' : 'Product & Inventory Data Entry'}</p>
+                    </div>
+                  </div>
+                  <button onClick={closeModal} className="text-slate-300 hover:text-slate-900 p-3 hover:bg-slate-50 rounded-full transition-all">
+                    <X size={24} />
+                  </button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                  <form onSubmit={handleSubmit} className="p-8 md:p-12 space-y-12">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
+                      {/* Name & Code */}
+                      <div className="md:col-span-2">
+                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_name')}</label>
                         <input
                           required
                           type="text"
-                          placeholder="اسم الصنف / المنتج"
-                          className="premium-input font-bold text-lg"
+                          placeholder={language === 'ar' ? 'اسم الصنف / المنتج' : 'Product Name'}
+                          className="w-full px-8 py-5 bg-white border border-slate-100 rounded-[1.5rem] text-xl font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none placeholder:text-slate-300"
                           value={formData.name}
                           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         />
                       </div>
-                    </div>
-  
-                    <div>
-                      <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_type')}</label>
-                      <select
-                        required
-                        className="premium-input font-bold appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGZpbGw9Im5vbmUiIHZpZXdCb3g9IjAgMCAyNCAyNCIgc3Ryb2tlPSIjOTRhM2I4IiBzdHJva2Utd2lkdGg9IjIiPjxwYXRoIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZD0iTTE5IDlsLTcgNy03LTciLz48L3N2Zz4=')] bg-[8px_center] bg-[length:16px] bg-no-repeat"
-                        value={formData.type}
-                        onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
-                      >
-                        <option value="finished_good">{t('products.type_finished_good')}</option>
-                        <option value="service">{t('products.type_service')}</option>
-                        <option value="raw_material">{t('products.type_raw_material')}</option>
-                        <option value="commodity">{t('products.type_commodity')}</option>
-                      </select>
-                    </div>
-  
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+
                       <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_category')}</label>
+                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_code')}</label>
+                        <div className="relative group">
+                          <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                          <input
+                            required
+                            readOnly
+                            type="text"
+                            className="w-full px-8 py-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-mono text-lg font-black text-slate-400 cursor-not-allowed ps-14 tracking-widest"
+                            value={formData.code}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_type')}</label>
+                        <div className="relative group">
+                          <LayoutGrid className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                          <select
+                            required
+                            className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14 appearance-none"
+                            value={formData.type}
+                            onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
+                          >
+                            <option value="finished_good">{t('products.type_finished_good')}</option>
+                            <option value="service">{t('products.type_service')}</option>
+                            <option value="raw_material">{t('products.type_raw_material')}</option>
+                            <option value="commodity">{t('products.type_commodity')}</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Category & Unit */}
+                      <div>
+                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_category')}</label>
                         <input
                           type="text"
-                          placeholder="الفئة / التصنيف"
-                          className="premium-input font-bold"
+                          placeholder={language === 'ar' ? 'الفئة / التصنيف' : 'Category'}
+                          className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none"
                           value={formData.category}
                           onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                         />
                       </div>
+
                       <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_unit')}</label>
+                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_unit')}</label>
                         <select
-                          className="premium-input font-bold"
+                          className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none appearance-none"
                           value={formData.unit}
                           onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                         >
@@ -843,253 +850,297 @@ export const Products: React.FC = () => {
                           <option value="كرتونة">{t('products.unit_carton')}</option>
                         </select>
                       </div>
-                    </div>
-  
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_sale_price')}</label>
-                        <div className="relative group">
-                          <input
-                            required
-                            type="number"
-                            step="0.01"
-                            className="premium-input font-black text-emerald-600"
-                            value={isNaN(formData.sale_price) ? '' : formData.sale_price}
-                            onChange={(e) => setFormData({ ...formData, sale_price: parseFloat(e.target.value) })}
-                          />
+
+                      {/* Pricing Section */}
+                      <div className="md:col-span-2 p-10 bg-slate-50/50 rounded-[3rem] border border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-10">
+                        <div>
+                          <label className={`block text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_sale_price')}</label>
+                          <div className="relative group">
+                            <Wallet className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-emerald-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                            <input
+                              required
+                              type="number"
+                              step="0.01"
+                              className="w-full px-8 py-5 bg-white border border-emerald-100 rounded-[1.5rem] text-3xl font-black text-emerald-600 shadow-sm transition-all focus:ring-8 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14"
+                              value={isNaN(formData.sale_price) ? '' : formData.sale_price}
+                              onChange={(e) => setFormData({ ...formData, sale_price: parseFloat(e.target.value) })}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className={`block text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_cost_price')}</label>
+                          <div className="relative group">
+                            <Wallet className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-slate-500 transition-colors`} size={20} />
+                            <input
+                              required
+                              type="number"
+                              step="0.01"
+                              className="w-full px-8 py-5 bg-white border border-slate-200 rounded-[1.5rem] text-3xl font-black text-slate-600 shadow-sm transition-all focus:ring-8 focus:ring-slate-500/5 focus:border-slate-500/50 outline-none ps-14"
+                              value={isNaN(formData.cost_price) ? '' : formData.cost_price}
+                              onChange={(e) => setFormData({ ...formData, cost_price: parseFloat(e.target.value) })}
+                            />
+                          </div>
                         </div>
                       </div>
+
+                      {/* Stock Section */}
                       <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_cost_price')}</label>
-                        <input
-                          required
-                          type="number"
-                          step="0.01"
-                          className="premium-input font-black text-slate-600"
-                          value={isNaN(formData.cost_price) ? '' : formData.cost_price}
-                          onChange={(e) => setFormData({ ...formData, cost_price: parseFloat(e.target.value) })}
-                        />
-                      </div>
-                    </div>
-  
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_stock_quantity')}</label>
+                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_stock_quantity')}</label>
                         <input
                           type="number"
                           step="0.01"
-                          className="premium-input font-black"
+                          className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none"
                           value={isNaN(formData.stock) ? '' : formData.stock}
                           onChange={(e) => setFormData({ ...formData, stock: parseFloat(e.target.value) })}
                         />
                       </div>
+
                       <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_min_stock')}</label>
+                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_min_stock')}</label>
                         <input
                           type="number"
                           step="0.01"
-                          className="premium-input font-black"
+                          className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none placeholder:text-amber-500/50"
+                          placeholder={language === 'ar' ? 'التنبيه عند انخفاض المخزون' : 'Min alert level'}
                           value={isNaN(formData.min_stock) ? '' : formData.min_stock}
                           onChange={(e) => setFormData({ ...formData, min_stock: parseFloat(e.target.value) })}
                         />
                       </div>
-                    </div>
-  
-                    <div>
-                      <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_description')}</label>
-                      <textarea
-                        className="premium-input font-bold min-h-[100px]"
-                        rows={3}
-                        value={formData.description}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      />
-                    </div>
-  
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_attachment')}</label>
-                        <div className="relative group">
-                          <input
-                            type="file"
-                            accept="image/*,application/pdf"
-                            onChange={handleFileChange}
-                            className="hidden"
-                            id="product-attachment"
-                          />
-                          <label 
-                            htmlFor="product-attachment"
-                            className="flex items-center justify-center gap-4 w-full p-4 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl cursor-pointer hover:bg-slate-100 hover:border-emerald-500 transition-all group"
-                          >
-                            <Paperclip size={24} className="text-slate-400 group-hover:text-emerald-500 transition-colors" />
-                            <span className="text-sm text-slate-500 group-hover:text-emerald-900 font-black">
-                              {formData.image_url ? (language === 'ar' ? 'تغيير المرفق' : 'Change Attachment') : (language === 'ar' ? 'رفع صورة الصنف' : 'Upload Image')}
-                            </span>
-                          </label>
-                        </div>
-                        {formData.image_url && (
-                          <div className="mt-4 relative flex justify-center bg-white p-4 rounded-3xl border border-slate-100 overflow-hidden shadow-inner">
-                            <button 
-                              type="button"
-                              onClick={() => setFormData({ ...formData, image_url: '' })}
-                              className="absolute top-2 right-2 text-red-500 hover:bg-red-50 p-2 rounded-full bg-white/80 backdrop-blur-sm shadow-sm z-10"
-                            >
-                              <X size={18} />
-                            </button>
-                            {formData.image_url.startsWith('data:application/pdf') ? (
-                              <div className="flex flex-col items-center gap-2 py-4">
-                                <FileText size={48} className="text-red-500" />
-                                <span className="text-xs font-black text-slate-500">DOCUMENT (PDF)</span>
-                              </div>
-                            ) : (
-                              <img 
-                                src={formData.image_url} 
-                                alt="Preview" 
-                                className="max-h-32 w-auto rounded-xl object-contain shadow-lg"
-                                referrerPolicy="no-referrer"
-                              />
-                            )}
-                          </div>
-                        )}
+
+                      <div className="md:col-span-2">
+                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_description')}</label>
+                        <textarea
+                          className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.5rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none min-h-[120px]"
+                          rows={3}
+                          value={formData.description}
+                          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        />
                       </div>
-                      <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_barcode')}</label>
-                        <div className="space-y-4">
-                          <input
-                            type="text"
-                            placeholder="باركود الصنف"
-                            className="premium-input font-bold"
-                            value={formData.barcode}
-                            onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                          />
+
+                      {/* Image & Barcode Section */}
+                      <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-10">
+                        <div>
+                          <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_attachment')}</label>
+                          <div className="relative group mb-4">
+                            <input
+                              type="file"
+                              accept="image/*,application/pdf"
+                              onChange={handleFileChange}
+                              className="hidden"
+                              id="product-attachment"
+                            />
+                            <label 
+                              htmlFor="product-attachment"
+                              className="flex flex-col items-center justify-center gap-4 w-full p-10 bg-slate-50 border-[3px] border-dashed border-slate-100 rounded-[2.5rem] cursor-pointer hover:bg-slate-100 hover:border-emerald-200 transition-all group shadow-inner"
+                            >
+                              <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-300 group-hover:text-emerald-500 transition-all group-hover:scale-110">
+                                <Paperclip size={32} />
+                              </div>
+                              <span className="text-sm text-slate-400 font-black uppercase tracking-widest group-hover:text-emerald-600">
+                                {formData.image_url ? (language === 'ar' ? 'تغيير المرفق' : 'Change Attachment') : (language === 'ar' ? 'رفع صورة الصنف' : 'Upload Image')}
+                              </span>
+                            </label>
+                          </div>
+                          {formData.image_url && (
+                            <div className="relative flex justify-center bg-white p-6 rounded-[2rem] border border-slate-100 overflow-hidden shadow-xl shadow-slate-200/50 group">
+                              <button 
+                                type="button"
+                                onClick={() => setFormData({ ...formData, image_url: '' })}
+                                className="absolute top-4 right-4 text-red-500 hover:bg-red-50 p-2 rounded-full bg-white shadow-lg transition-all active:scale-90 z-20"
+                              >
+                                <X size={20} />
+                              </button>
+                              {formData.image_url.startsWith('data:application/pdf') ? (
+                                <div className="flex flex-col items-center gap-3 py-6">
+                                  <FileText size={64} className="text-red-500" />
+                                  <span className="text-xs font-black text-slate-500 tracking-widest uppercase">File Preview (PDF)</span>
+                                </div>
+                              ) : (
+                                <img 
+                                  src={formData.image_url} 
+                                  alt="Preview" 
+                                  className="max-h-56 w-auto rounded-2xl object-contain shadow-2xl transition-transform group-hover:scale-105 duration-500"
+                                  referrerPolicy="no-referrer"
+                                />
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-6">
+                          <div>
+                            <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_barcode')}</label>
+                            <input
+                              type="text"
+                              placeholder={language === 'ar' ? 'باركود الصنف' : 'Barcode'}
+                              className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none"
+                              value={formData.barcode}
+                              onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                            />
+                          </div>
                           {formData.barcode && (
-                            <div className="flex justify-center bg-white p-4 rounded-3xl border border-slate-100 overflow-hidden shadow-inner">
-                              <Barcode 
-                                value={formData.barcode} 
-                                width={1.5} 
-                                height={60} 
-                                fontSize={12}
-                                background="transparent"
-                              />
+                            <div className="flex flex-col items-center justify-center gap-4 bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50">
+                              <div className="p-4 bg-slate-50 rounded-2xl overflow-hidden shadow-inner flex items-center justify-center w-full">
+                                <Barcode 
+                                  value={formData.barcode} 
+                                  width={1.8} 
+                                  height={80} 
+                                  fontSize={14}
+                                  background="transparent"
+                                />
+                              </div>
+                              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">{formData.barcode}</span>
                             </div>
                           )}
                         </div>
                       </div>
-                    </div>
-  
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_revenue_account')}</label>
-                        <select
-                          required
-                          className="premium-input font-bold"
-                          value={formData.revenue_account_id}
-                          onChange={(e) => setFormData({ ...formData, revenue_account_id: e.target.value })}
-                        >
-                          <option value="">{language === 'ar' ? 'اختر حساب الإيرادات...' : 'Select revenue account...'}</option>
-                          {accounts.map(account => (
-                            <option key={account.id} value={account.id}>
-                              {account.code} - {account.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_cost_account')}</label>
-                        <select
-                          required
-                          className="premium-input font-bold"
-                          value={formData.cost_account_id}
-                          onChange={(e) => setFormData({ ...formData, cost_account_id: e.target.value })}
-                        >
-                          <option value="">{language === 'ar' ? 'اختر حساب التكلفة...' : 'Select cost account...'}</option>
-                          {accounts.map(account => (
-                            <option key={account.id} value={account.id}>
-                              {account.code} - {account.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-  
-                    {formData.stock > 0 && (
-                      <div className="p-6 bg-emerald-50/50 rounded-3xl border border-emerald-100/50 space-y-6 animate-in slide-in-from-top-4 duration-300">
-                        <div className="flex items-center gap-3">
-                           <div className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                              <Wallet size={20} />
-                           </div>
-                           <h4 className="text-sm font-black text-emerald-800 uppercase tracking-widest">{t('products.form_stock_settings')}</h4>
-                        </div>
-                        <div className="space-y-4">
+
+                      {/* Accounts Section */}
+                      <div className="md:col-span-2 p-10 bg-slate-50/50 rounded-[3rem] border border-slate-100 space-y-10">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                           <div>
-                            <label className={`block text-[10px] font-black text-emerald-700/60 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_counter_account')}</label>
-                            <select
-                              required
-                              className="premium-input border-emerald-200 focus:border-emerald-500 focus:ring-emerald-500/10 font-bold"
-                              value={formData.counter_account_id}
-                              onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}
-                            >
-                              <option value="">{language === 'ar' ? 'اختر حساب الطرف الآخر...' : 'Select counter account...'}</option>
-                              {accounts.map(account => (
-                                <option key={account.id} value={account.id}>
-                                  {account.code} - {account.name}
-                                </option>
-                              ))}
-                            </select>
-                            <p className="text-[10px] text-emerald-600/70 mt-2 font-bold italic bg-white/50 px-3 py-1.5 rounded-lg w-fit border border-emerald-100">{language === 'ar' ? 'سيتم إنشاء قيد يومية آلي لموازنة قيمة المخزون الافتتاحي.' : 'An automatic journal entry will be created to balance the opening stock value.'}</p>
+                            <label className={`block text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_revenue_account')}</label>
+                            <div className="relative group">
+                               <Layers className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-emerald-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                               <select
+                                required
+                                className="w-full px-8 py-4 bg-white border border-emerald-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14 appearance-none"
+                                value={formData.revenue_account_id}
+                                onChange={(e) => setFormData({ ...formData, revenue_account_id: e.target.value })}
+                              >
+                                <option value="">{t('common.select_category')}</option>
+                                {accounts.map(account => (
+                                  <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
-                          {formData.counter_account_id && (
-                            <JournalEntryPreview 
-                              title={language === 'ar' ? 'معاينة قيد المخزون الافتتاحي' : 'Opening Stock Entry Preview'}
-                              items={[
-                                {
-                                  account_name: accounts.find(a => a.name.includes('مخزون') || a.name.includes('بضاعة'))?.name || (language === 'ar' ? 'حساب المخزون' : 'Inventory Account'),
-                                  debit: formData.stock * formData.cost_price,
-                                  credit: 0,
-                                  description: language === 'ar' ? 'مخزون افتتاحي' : 'Opening Stock'
-                                },
-                                {
-                                  account_name: accounts.find(a => a.id === formData.counter_account_id)?.name || (language === 'ar' ? 'حساب الطرف الآخر' : 'Counter Account'),
-                                  debit: 0,
-                                  credit: formData.stock * formData.cost_price,
-                                  description: language === 'ar' ? `مخزون افتتاحي للصنف: ${formData.name}` : `Opening stock for product: ${formData.name}`
-                                }
-                              ]}
-                            />
-                          )}
+
+                          <div>
+                            <label className={`block text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_cost_account')}</label>
+                            <div className="relative group">
+                               <Layers className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-slate-500 transition-colors`} size={20} />
+                               <select
+                                required
+                                className="w-full px-8 py-4 bg-white border border-slate-200 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm focus:ring-4 focus:ring-slate-500/5 focus:border-slate-500/50 outline-none ps-14 appearance-none"
+                                value={formData.cost_account_id}
+                                onChange={(e) => setFormData({ ...formData, cost_account_id: e.target.value })}
+                              >
+                                <option value="">{t('common.select_category')}</option>
+                                {accounts.map(account => (
+                                  <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
                         </div>
+
+                        {formData.stock > 0 && (
+                          <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+                             <div className="flex items-center gap-4">
+                                <div className="w-14 h-14 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-emerald-500/20">
+                                   <Wallet size={28} />
+                                </div>
+                                <div>
+                                   <h4 className="text-xl font-black text-slate-900 leading-none mb-1">{t('products.form_stock_settings')}</h4>
+                                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">تحميل القيمة الافتتاحية للمخزون</p>
+                                </div>
+                             </div>
+
+                             <div className="space-y-6">
+                                <div>
+                                  <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_counter_account')}</label>
+                                  <div className="relative group">
+                                     <Layers className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                                     <select
+                                      required
+                                      className="w-full px-8 py-4 bg-white border border-slate-200 rounded-2xl text-lg font-black text-slate-900 shadow-sm focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14 appearance-none"
+                                      value={formData.counter_account_id}
+                                      onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}
+                                    >
+                                      <option value="">{language === 'ar' ? 'اختر حساب الطرف الآخر...' : 'Select counter account...'}</option>
+                                      {accounts.map(account => (
+                                        <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div className="mt-4 p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-center gap-3">
+                                     <AlertCircle size={20} className="text-amber-500 flex-shrink-0" />
+                                     <p className="text-[11px] font-bold text-amber-900 leading-tight">
+                                       {language === 'ar' 
+                                         ? 'سيتم إنشاء قيد يومية مالي آلي لموازنة قيمة المخزون الافتتاحي المدخلة.' 
+                                         : 'An automatic journal entry will be created to balance the entered opening stock value.'}
+                                     </p>
+                                  </div>
+                                </div>
+
+                                {formData.counter_account_id && (
+                                   <div className="bg-slate-50/50 p-6 rounded-[2.5rem] border border-slate-100 shadow-inner">
+                                      <JournalEntryPreview 
+                                        title={language === 'ar' ? 'قيد الرصيد الافتتاحي' : 'Opening Entry Preview'}
+                                        items={[
+                                          {
+                                            account_name: accounts.find(a => a.name.includes('مخزون') || a.name.includes('بضاعة'))?.name || (language === 'ar' ? 'حساب المخزون' : 'Inventory Account'),
+                                            debit: formData.stock * (formData.cost_price || 0),
+                                            credit: 0,
+                                            description: language === 'ar' ? 'مخزون افتتاحي' : 'Opening Stock'
+                                          },
+                                          {
+                                            account_name: accounts.find(a => a.id === formData.counter_account_id)?.name || (language === 'ar' ? 'حساب الطرف الآخر' : 'Counter Account'),
+                                            debit: 0,
+                                            credit: formData.stock * (formData.cost_price || 0),
+                                            description: language === 'ar' ? `مخزون افتتاحي : ${formData.name}` : `Opening stock: ${formData.name}`
+                                          }
+                                        ]}
+                                      />
+                                   </div>
+                                )}
+                             </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-  
-                    <div className="pt-10 flex gap-4 sticky bottom-0 bg-white/80 backdrop-blur-md pb-4 z-20">
+                    </div>
+
+                    {/* Footer Actions */}
+                    <div className="pt-12 pb-6 flex gap-6 sticky bottom-0 bg-white/95 backdrop-blur-md z-30">
                       <button 
                         type="submit"
-                        className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-lg hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95 border border-emerald-500/50"
+                        className="flex-1 py-6 bg-zinc-900 text-white rounded-[2rem] font-black text-2xl hover:bg-zinc-800 transition-all shadow-2xl active:scale-[0.98] border border-white/10"
                       >
-                        {editingProduct ? (language === 'ar' ? 'تحديث بيانات الصنف' : 'Update Product') : (language === 'ar' ? 'إضافة صنف جديد' : 'Add New Product')}
+                        {editingProduct ? (language === 'ar' ? 'تحديث البيانات' : 'Update Item') : (language === 'ar' ? 'حفظ الصنف' : 'Save Item')}
                       </button>
                       <button 
                         type="button"
                         onClick={closeModal}
-                        className="px-8 py-4 bg-slate-50 text-slate-500 rounded-2xl font-black hover:bg-slate-100 transition-all active:scale-95 border border-slate-200"
+                        className="px-14 py-6 bg-slate-100 text-slate-500 rounded-[2rem] font-black text-lg hover:bg-slate-200 transition-all active:scale-95 border border-slate-200"
                       >
-                        {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                        {t('common.cancel')}
                       </button>
                     </div>
-                  </div>
-  
-                  {editingProduct && (
-                    <div className="hidden lg:block w-96 border-s border-slate-100 bg-slate-50/20 shadow-inner overflow-y-auto custom-scrollbar">
-                      <div className="p-4 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
-                        <div className="flex items-center gap-2">
-                           <History size={16} className="text-slate-400" />
-                           <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">سجل نشاط الصنف</span>
-                        </div>
-                      </div>
-                      <InlineActivityLog category="products" documentId={editingProduct.id} />
-                    </div>
-                  )}
-                </form>
+                  </form>
+                </div>
               </div>
+
+              {/* Audit Side */}
+              {editingProduct && (
+                <div className="hidden lg:flex w-[450px] flex-col bg-slate-50 border-s border-white overflow-hidden">
+                  <div className="p-10 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
+                     <div className="flex items-center gap-4">
+                         <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-400">
+                           <History size={24} />
+                         </div>
+                         <div>
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block leading-none mb-1">Audit Trail</span>
+                            <span className="font-black text-slate-900 text-lg">{language === 'ar' ? 'سجل نشاط الصنف' : 'Activity Log'}</span>
+                         </div>
+                      </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar">
+                     <InlineActivityLog category="products" documentId={editingProduct.id} />
+                  </div>
+                </div>
+              )}
             </motion.div>
           </div>
         )}

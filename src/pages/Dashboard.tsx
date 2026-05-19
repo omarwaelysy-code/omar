@@ -11,7 +11,11 @@ import {
   Zap,
   Users as UsersIcon,
   Calendar,
-  Wallet
+  Wallet,
+  Truck,
+  Package,
+  CreditCard,
+  Settings
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -93,7 +97,7 @@ const StatCard = ({ title, value, subtitle, icon: Icon, trend, colorClass }: any
 
 export const Dashboard: React.FC = () => {
   const { user, isSuperAdmin, isCompanyAdmin } = useAuth();
-  const { activeTabId } = useNavigation();
+  const { activeTabId, setCurrentPage } = useNavigation();
   const { t, dir, language } = useLanguage();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -356,6 +360,30 @@ export const Dashboard: React.FC = () => {
           </div>
         </motion.div>
       )}
+
+      {/* Master Data Shortcuts Integration */}
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-3 lg:gap-4">
+        {masterDataItems.map((item) => (
+          <motion.button
+            key={item.id}
+            whileHover={{ y: -4, scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setCurrentPage(item.id)}
+            className="group relative flex flex-col items-center justify-center p-4 lg:p-6 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-xl hover:border-brand-primary/30 transition-all overflow-hidden"
+          >
+            <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-br ${item.color} rounded-full -mr-8 -mt-8 opacity-50 group-hover:scale-150 transition-transform duration-500`} />
+            <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-slate-50 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm border border-slate-100 relative z-10`}>
+              <item.icon size={22} className={item.iconColor} />
+            </div>
+            <span className={`text-[10px] lg:text-xs font-bold text-slate-600 uppercase tracking-tight relative z-10 group-hover:text-slate-900 transition-colors`}>
+              {item.label}
+            </span>
+            <div className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-10 transition-opacity">
+              <Sparkles size={12} className="text-brand-primary" />
+            </div>
+          </motion.button>
+        ))}
+      </div>
 
       {/* Stats Cards Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">

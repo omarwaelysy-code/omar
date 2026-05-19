@@ -278,256 +278,306 @@ export function CompanySettings() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6" dir={dir}>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-zinc-900 mb-2">{t('company_settings.title')}</h1>
-        <p className="text-zinc-500 font-medium italic">{t('company_settings.subtitle')}</p>
+    <div className="max-w-6xl mx-auto p-4 md:p-10 space-y-12 animate-in fade-in duration-700" dir={dir}>
+      <div className="flex flex-col md:flex-row items-center justify-between gap-8 pb-4 border-b border-slate-100">
+        <div>
+          <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter mb-3 leading-none italic serif">
+            {t('company_settings.title')}
+          </h1>
+          <p className="text-slate-400 font-bold uppercase tracking-[0.3em] text-xs">
+            {t('company_settings.subtitle')}
+          </p>
+        </div>
+        <div className="w-20 h-20 bg-emerald-600 text-white rounded-[2rem] flex items-center justify-center shadow-2xl shadow-emerald-500/20 active:scale-95 transition-all">
+          <Building2 size={36} />
+        </div>
       </div>
 
-      <form onSubmit={handleSave} className="space-y-6">
-        {/* Logo Section */}
-        <section className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm">
-          <div className="flex items-center gap-2 mb-4 text-emerald-600">
-            <ImageIcon className="w-5 h-5" />
-            <h2 className="font-semibold">{t('company_settings.logo')}</h2>
-          </div>
-          <div className="flex flex-col md:flex-row items-center gap-6">
-            <div className="w-32 h-32 rounded-lg border-2 border-dashed border-zinc-200 flex items-center justify-center bg-zinc-50 relative overflow-hidden group">
-              {data.logo_url ? (
-                <img src={data.logo_url} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-              ) : (
-                <Building2 className="w-12 h-12 text-zinc-300" />
-              )}
-              <label className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                <Upload className="w-6 h-6 text-white" />
-                <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
-              </label>
-            </div>
-            <div className="flex-1 text-center md:text-right">
-              <p className="text-sm text-zinc-500 mb-4">
-                {language === 'ar' 
-                  ? 'يفضل استخدام صورة مربعة بحجم 512x512 بيكسل على الأقل' 
-                  : 'Prefer a square image, at least 512x512 pixels'}
-              </p>
-              <div className="flex items-center justify-center md:justify-end gap-3">
-                <button 
-                  type="button"
-                  onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
-                  className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-lg text-sm font-bold hover:bg-emerald-100 transition-colors flex items-center gap-2"
-                >
-                  <Upload className="w-4 h-4" />
-                  {t('common.add')}
-                </button>
-                {data.logo_url && (
-                    <button 
-                        type="button" 
-                        onClick={() => setData(prev => ({ ...prev, logo_url: '' }))}
-                        className="px-4 py-2 text-emerald-600 hover:bg-emerald-50 rounded-lg text-sm font-bold transition-colors"
-                    >
-                        {t('common.delete')}
-                    </button>
+      <form onSubmit={handleSave} className="space-y-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+          {/* Logo Section */}
+          <div className="lg:col-span-1 space-y-6">
+            <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col items-center text-center">
+              <div className="w-full aspect-square bg-slate-50 rounded-[2.5rem] border-4 border-dashed border-slate-200 flex items-center justify-center relative overflow-hidden group transition-all hover:border-emerald-500/50 hover:bg-emerald-50/30">
+                {data.logo_url ? (
+                  <img src={data.logo_url} alt="Logo" className="w-full h-full object-contain p-4" referrerPolicy="no-referrer" />
+                ) : (
+                  <Building2 className="w-20 h-20 text-slate-200" />
                 )}
+                <label className="absolute inset-0 bg-slate-900/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer backdrop-blur-sm">
+                  <div className="bg-white text-slate-900 p-4 rounded-2xl shadow-2xl flex flex-col items-center gap-2 transform translate-y-4 group-hover:translate-y-0 transition-all duration-300">
+                    <Upload size={24} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">{language === 'ar' ? 'رفع شعار' : 'Upload Logo'}</span>
+                  </div>
+                  <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
+                </label>
               </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Basic Info */}
-        <section className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm">
-          <div className="flex items-center gap-2 mb-6 text-emerald-600">
-            <FileText className="w-5 h-5" />
-            <h2 className="font-semibold">{language === 'ar' ? 'المعلومات الأساسية' : 'Basic Information'}</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-2">
-                {t('company_settings.name')}
-              </label>
-              <input
-                type="text"
-                value={data.name}
-                onChange={(e) => setData({ ...data, name: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-2">
-                {t('company_settings.commercial_register')}
-              </label>
-              <input
-                type="text"
-                value={data.commercial_register}
-                onChange={(e) => setData({ ...data, commercial_register: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-2">
-                {t('company_settings.tax_number')}
-              </label>
-              <input
-                type="text"
-                value={data.tax_number}
-                onChange={(e) => setData({ ...data, tax_number: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800"
-              />
-            </div>
-            
-            <SearchableSelect
-              label={t('company_settings.country')}
-              placeholder={t('common.select_category')}
-              value={data.country}
-              onChange={(val) => setData({ ...data, country: val })}
-              options={COUNTRIES}
-              dir={dir}
-              icon={<Globe className="w-4 h-4 text-zinc-400" />}
-              renderOption={(o) => (
-                <div className="flex items-center gap-2 whitespace-nowrap">
-                  <span className="text-lg">{o.flag}</span>
-                  <span className="font-bold">{language === 'ar' ? o.nameAr : o.name}</span>
+              
+              <div className="mt-8 space-y-4 w-full">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
+                  {language === 'ar' 
+                    ? 'يفضل استخدام صورة مربعة بحجم 512x512 بيكسل' 
+                    : 'Prefer a square image, 512x512px'}
+                </p>
+                <div className="flex flex-col gap-3">
+                   <button 
+                    type="button"
+                    onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
+                    className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black transition-all shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 active:scale-95 text-sm"
+                  >
+                    {language === 'ar' ? 'تغيير الشعار' : 'Change Logo'}
+                  </button>
+                  {data.logo_url && (
+                      <button 
+                          type="button" 
+                          onClick={() => setData(prev => ({ ...prev, logo_url: '' }))}
+                          className="w-full py-4 bg-slate-50 text-red-500 hover:bg-red-50 rounded-2xl font-black transition-all border border-slate-100 text-sm"
+                      >
+                          {t('common.delete')}
+                      </button>
+                  )}
                 </div>
-              )}
-              filterFn={(o, q) => 
-                o.name.toLowerCase().includes(q.toLowerCase()) || 
-                o.nameAr.includes(q) || 
-                o.code.toLowerCase().includes(q.toLowerCase())
-              }
-            />
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-zinc-700 mb-2">
-                {t('company_settings.address')}
-              </label>
-              <div className="relative">
-                <MapPin className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 w-4 h-4 text-zinc-400 pointer-events-none`} />
-                <textarea
-                  value={data.address}
-                  onChange={(e) => setData({ ...data, address: e.target.value })}
-                  rows={3}
-                  className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800`}
-                />
               </div>
             </div>
           </div>
-        </section>
 
-        {/* Financial Info */}
-        <section className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm text-right">
-          <div className="flex items-center gap-2 mb-6 text-emerald-600">
-            <Coins className="w-5 h-5" />
-            <h2 className="font-semibold">{language === 'ar' ? 'الإعدادات المالية' : 'Financial Settings'}</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <SearchableSelect
-              label={t('company_settings.currency')}
-              placeholder={t('common.select_category')}
-              value={data.currency}
-              onChange={(val) => setData({ ...data, currency: val })}
-              options={CURRENCIES}
-              dir={dir}
-              icon={<Coins className="w-4 h-4 text-zinc-400" />}
-              renderOption={(o) => (
-                <div className="flex items-center gap-3">
-                  <span className="text-lg">{o.flag}</span>
-                  <div className="flex flex-col">
-                    <span className="font-bold text-sm">{language === 'ar' ? o.nameAr : o.name}</span>
-                    <span className="text-[10px] text-zinc-400 font-mono">{o.code} ({o.symbol})</span>
+          {/* Details Section */}
+          <div className="lg:col-span-2 space-y-12">
+            {/* Basic Info */}
+            <div className="bg-white p-10 md:p-14 rounded-[3.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 space-y-10">
+              <div className="flex items-center gap-4 border-b border-slate-50 pb-8">
+                 <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shadow-inner">
+                    <FileText size={24} />
+                 </div>
+                 <h2 className="text-2xl font-black text-slate-900 leading-none tracking-tight">
+                    {language === 'ar' ? 'المعلومات الأساسية' : 'Basic Information'}
+                 </h2>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
+                <div className="md:col-span-2">
+                  <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-[0.2em] px-1">
+                    {t('company_settings.name')}
+                  </label>
+                  <input
+                    type="text"
+                    value={data.name}
+                    onChange={(e) => setData({ ...data, name: e.target.value })}
+                    className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[1.5rem] text-xl font-black text-slate-900 shadow-inner focus:bg-white focus:ring-8 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-[0.2em] px-1">
+                    {t('company_settings.commercial_register')}
+                  </label>
+                  <input
+                    type="text"
+                    value={data.commercial_register}
+                    onChange={(e) => setData({ ...data, commercial_register: e.target.value })}
+                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-lg font-black text-slate-900 focus:bg-white focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-[0.2em] px-1">
+                    {t('company_settings.tax_number')}
+                  </label>
+                  <input
+                    type="text"
+                    value={data.tax_number}
+                    onChange={(e) => setData({ ...data, tax_number: e.target.value })}
+                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-lg font-black text-slate-900 focus:bg-white focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all"
+                  />
+                </div>
+                
+                <div className="md:col-span-2">
+                  <SearchableSelect
+                    label={t('company_settings.country')}
+                    placeholder={t('common.select_category')}
+                    value={data.country}
+                    onChange={(val) => setData({ ...data, country: val })}
+                    options={COUNTRIES}
+                    dir={dir}
+                    icon={<Globe className="w-5 h-5 text-slate-400" />}
+                    renderOption={(o) => (
+                      <div className="flex items-center gap-3 whitespace-nowrap">
+                        <span className="text-2xl">{o.flag}</span>
+                        <span className="font-black text-lg">{language === 'ar' ? o.nameAr : o.name}</span>
+                      </div>
+                    )}
+                    filterFn={(o, q) => 
+                      o.name.toLowerCase().includes(q.toLowerCase()) || 
+                      o.nameAr.includes(q) || 
+                      o.code.toLowerCase().includes(q.toLowerCase())
+                    }
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-[0.2em] px-1">
+                    {t('company_settings.address')}
+                  </label>
+                  <div className="relative group">
+                    <MapPin className={`absolute ${dir === 'rtl' ? 'right-5' : 'left-5'} top-5 w-5 h-5 text-slate-300 group-focus-within:text-emerald-500 transition-colors pointer-events-none`} />
+                    <textarea
+                      value={data.address}
+                      onChange={(e) => setData({ ...data, address: e.target.value })}
+                      rows={3}
+                      className={`w-full ${dir === 'rtl' ? 'pr-14 pl-6' : 'pl-14 pr-6'} py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-lg font-black text-slate-900 focus:bg-white focus:ring-8 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none transition-all shadow-inner min-h-[120px]`}
+                    />
                   </div>
                 </div>
-              )}
-              filterFn={(o, q) => 
-                o.name.toLowerCase().includes(q.toLowerCase()) || 
-                o.nameAr.includes(q) || 
-                o.code.toLowerCase().includes(q.toLowerCase())
-              }
-            />
-
-            <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-2">
-                {t('company_settings.fiscal_year_end')}
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="relative">
-                  <select
-                    value={data.fiscal_year_month}
-                    onChange={(e) => {
-                        const m = parseInt(e.target.value);
-                        const maxDays = daysInMonth(m);
-                        setData({ 
-                            ...data, 
-                            fiscal_year_month: m,
-                            fiscal_year_day: data.fiscal_year_day > maxDays ? maxDays : data.fiscal_year_day
-                        });
-                    }}
-                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none appearance-none font-bold text-zinc-700"
-                  >
-                    {MONTHS.map(m => (
-                      <option key={m.value} value={m.value}>
-                        {language === 'ar' ? m.nameAr : m.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none`} />
-                </div>
-                <div className="relative">
-                  <select
-                    value={data.fiscal_year_day}
-                    onChange={(e) => setData({ ...data, fiscal_year_day: parseInt(e.target.value) })}
-                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none appearance-none font-bold text-zinc-700"
-                  >
-                    {Array.from({ length: daysInMonth(data.fiscal_year_month) }, (_, i) => i + 1).map(d => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none`} />
-                </div>
               </div>
-              <p className="text-[10px] text-zinc-400 mt-2 italic">
-                  {language === 'ar' 
-                    ? '* سيتم تعيين السنة المالية لتنتهي في هذا التاريخ من كل عام.' 
-                    : '* Fiscal year will be set to end on this date every year.'}
-              </p>
             </div>
 
-            {/* Enable Multi-Currency Toggle */}
-            <div className="md:col-span-2 pt-4 border-t border-zinc-50">
-              <div 
-                className="flex items-center gap-3 cursor-pointer group select-none"
-                onClick={() => setData(prev => ({ ...prev, enable_multi_currency: !prev.enable_multi_currency }))}
-              >
-                <div 
-                  className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${data.enable_multi_currency ? 'bg-emerald-600' : 'bg-zinc-200'}`}
-                >
-                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-200 ${
-                    dir === 'rtl'
-                      ? (data.enable_multi_currency ? 'right-7' : 'right-1')
-                      : (data.enable_multi_currency ? 'left-7' : 'left-1')
-                  }`} />
+            {/* Financial Info */}
+            <div className="bg-slate-900 p-10 md:p-14 rounded-[3.5rem] shadow-2xl relative overflow-hidden group">
+              {/* Abstract decorative elements */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+
+              <div className="relative z-10 space-y-10">
+                <div className="flex items-center gap-4 border-b border-white/5 pb-8">
+                   <div className="w-12 h-12 bg-white/10 text-emerald-400 rounded-2xl flex items-center justify-center backdrop-blur-md">
+                      <Coins size={24} />
+                   </div>
+                   <h2 className="text-2xl font-black text-white leading-none tracking-tight">
+                      {language === 'ar' ? 'الإعدادات المالية' : 'Financial Settings'}
+                   </h2>
                 </div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-zinc-800 text-sm">
-                    {language === 'ar' ? 'تفعيل العملات المتعددة' : 'Enable Multi-Currency'}
-                  </span>
-                  <span className="text-xs text-zinc-400">
-                    {language === 'ar' 
-                      ? 'عند التفعيل، ستتمكن من إدارة عملات متعددة وأسعار الصرف.' 
-                      : 'When enabled, you will be able to manage multiple currencies and exchange rates.'}
-                  </span>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                  <div className="premium-dark-select">
+                    <SearchableSelect
+                      label={t('company_settings.currency')}
+                      placeholder={t('common.select_category')}
+                      value={data.currency}
+                      onChange={(val) => setData({ ...data, currency: val })}
+                      options={CURRENCIES}
+                      dir={dir}
+                      icon={<Coins className="w-5 h-5 text-white/40" />}
+                      renderOption={(o) => (
+                        <div className="flex items-center gap-4">
+                          <span className="text-2xl">{o.flag}</span>
+                          <div className="flex flex-col">
+                            <span className="font-black text-slate-900 leading-tight">{language === 'ar' ? o.nameAr : o.name}</span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{o.code} ({o.symbol})</span>
+                          </div>
+                        </div>
+                      )}
+                      filterFn={(o, q) => 
+                        o.name.toLowerCase().includes(q.toLowerCase()) || 
+                        o.nameAr.includes(q) || 
+                        o.code.toLowerCase().includes(q.toLowerCase())
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-4">
+                    <label className="block text-[10px] font-black text-white/40 uppercase tracking-[0.2em] px-1">
+                      {t('company_settings.fiscal_year_end')}
+                    </label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="relative group">
+                        <select
+                          value={data.fiscal_year_month}
+                          onChange={(e) => {
+                              const m = parseInt(e.target.value);
+                              const maxDays = daysInMonth(m);
+                              setData({ 
+                                  ...data, 
+                                  fiscal_year_month: m,
+                                  fiscal_year_day: data.fiscal_year_day > maxDays ? maxDays : data.fiscal_year_day
+                              });
+                          }}
+                          className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-black hover:bg-white/10 transition-all outline-none appearance-none group-focus-within:ring-4 group-focus-within:ring-emerald-500/20"
+                        >
+                          {MONTHS.map(m => (
+                            <option key={m.value} value={m.value} className="text-slate-900">
+                              {language === 'ar' ? m.nameAr : m.name}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none transition-transform group-focus-within:rotate-180`} />
+                      </div>
+                      <div className="relative group">
+                        <select
+                          value={data.fiscal_year_day}
+                          onChange={(e) => setData({ ...data, fiscal_year_day: parseInt(e.target.value) })}
+                          className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-black hover:bg-white/10 transition-all outline-none appearance-none group-focus-within:ring-4 group-focus-within:ring-emerald-500/20"
+                        >
+                          {Array.from({ length: daysInMonth(data.fiscal_year_month) }, (_, i) => i + 1).map(d => (
+                            <option key={d} value={d} className="text-slate-900">{d}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none transition-transform group-focus-within:rotate-180`} />
+                      </div>
+                    </div>
+                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-start gap-3">
+                       <Calendar size={18} className="text-emerald-400 mt-0.5 flex-shrink-0" />
+                       <p className="text-[10px] font-bold text-emerald-100/70 leading-relaxed uppercase tracking-widest italic">
+                          {language === 'ar' 
+                            ? 'سيتم إقفال السنة المالية آلياً في هذا اليوم من كل عام.' 
+                            : 'Fiscal year will close automatically on this day annually.'}
+                       </p>
+                    </div>
+                  </div>
+
+                  {/* Multi-Currency Toggle */}
+                  <div className="md:col-span-2 p-8 bg-white/5 border border-white/10 rounded-[2.5rem] transition-all hover:bg-white/[0.07] group/toggle overflow-hidden relative">
+                    <div 
+                      className="flex items-center justify-between cursor-pointer select-none relative z-10"
+                      onClick={() => setData(prev => ({ ...prev, enable_multi_currency: !prev.enable_multi_currency }))}
+                    >
+                      <div className="flex flex-col gap-1">
+                        <span className="font-black text-white text-xl tracking-tight">
+                          {language === 'ar' ? 'تفعيل العملات المتعددة' : 'Enable Multi-Currency'}
+                        </span>
+                        <span className="text-xs font-bold text-emerald-400/60 uppercase tracking-widest italic">
+                          {language === 'ar' 
+                            ? 'إدارة حسابات الصرف والتحويل الدولي.' 
+                            : 'Manage international exchange rates.'}
+                        </span>
+                      </div>
+                      <div 
+                        className={`relative w-20 h-10 rounded-full transition-all duration-300 shadow-2xl ${data.enable_multi_currency ? 'bg-emerald-500' : 'bg-white/10'}`}
+                      >
+                        <div className={`absolute top-1.5 w-7 h-7 bg-white rounded-full shadow-lg transition-all duration-300 transform ${
+                          dir === 'rtl'
+                            ? (data.enable_multi_currency ? 'translate-x-[-120%]' : 'translate-x-[-5%]')
+                            : (data.enable_multi_currency ? 'translate-x-[120%]' : 'translate-x-[5%]')
+                        }`} />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
+            </div>
+
+            {/* Submit Action */}
+            <div className="pt-10 flex justify-end pb-20">
+              <button
+                type="submit"
+                disabled={saving}
+                className="group relative px-16 py-6 bg-zinc-900 border border-white/10 text-white rounded-[2rem] shadow-2xl overflow-hidden transition-all hover:bg-zinc-800 active:scale-95 disabled:opacity-50"
+              >
+                <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="relative z-10 flex items-center gap-4 font-black uppercase tracking-widest text-xl">
+                  {saving ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    <Save className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+                  )}
+                  {t('common.save')}
+                </div>
+              </button>
             </div>
           </div>
-        </section>
-
-        <div className="flex justify-end gap-4 pb-12">
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-10 py-3 bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 hover:scale-105 active:scale-95 disabled:opacity-50 transition-all flex items-center gap-3 font-black uppercase tracking-wider"
-          >
-            {saving ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+        </div>
+      </form>
+    </div>
+  );w-5 h-5 animate-spin" />
             ) : (
               <Save className="w-5 h-5" />
             )}
