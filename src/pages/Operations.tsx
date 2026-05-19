@@ -446,20 +446,15 @@ export const Operations: React.FC = () => {
           </motion.div>
         ) : (
           <motion.div 
-            key="modal"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-0 md:p-8 overflow-y-auto"
+            key="form"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="flex-1 flex flex-col space-y-8 overflow-hidden max-w-7xl mx-auto w-full p-4"
           >
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="bg-white w-full max-w-7xl rounded-none md:rounded-[3.5rem] shadow-2xl flex flex-col md:flex-row overflow-hidden min-h-screen md:min-h-0 md:max-h-[90vh]"
-            >
+            <div className="bg-white flex-1 rounded-[3.5rem] shadow-xl shadow-slate-200/40 flex flex-col md:flex-row overflow-hidden border border-slate-100 transition-all duration-500">
               <div className="flex-1 flex flex-col h-full overflow-hidden">
-                {/* Modal Header */}
+                {/* Header */}
                 <div className="p-10 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-20">
                   <div className={`flex items-center gap-6 ${dir === 'rtl' ? 'flex-row' : 'flex-row'}`}>
                     <div className="w-16 h-16 bg-indigo-600 text-white rounded-[2rem] flex items-center justify-center shadow-xl shadow-indigo-500/20">
@@ -482,7 +477,7 @@ export const Operations: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Modal Content */}
+                {/* Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-10 md:p-14">
                   <form id="op-form" onSubmit={handleSubmit} className="space-y-16" dir={dir}>
                      {/* Section: Primary */}
@@ -628,7 +623,7 @@ export const Operations: React.FC = () => {
                   </div>
                 </div>
               )}
-            </motion.div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

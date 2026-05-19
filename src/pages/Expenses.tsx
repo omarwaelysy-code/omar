@@ -216,17 +216,13 @@ export const Expenses: React.FC = () => {
           </motion.div>
         ) : (
           <motion.div 
-            key="modal"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 md:p-8 overflow-y-auto"
+            key="form"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="flex-1 flex flex-col space-y-8 overflow-hidden max-w-7xl mx-auto w-full p-4"
           >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              className="bg-white w-full max-w-7xl rounded-[3.5rem] shadow-2xl flex flex-col md:flex-row overflow-hidden max-h-[90vh]"
-            >
+            <div className="bg-white flex-1 rounded-[3.5rem] shadow-xl shadow-slate-200/40 flex flex-col md:flex-row overflow-hidden border border-slate-100 transition-all duration-500">
               {/* Form Side */}
               <div className="flex-1 flex flex-col h-full overflow-hidden bg-white">
                 <div className="p-10 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-20">
@@ -315,7 +311,7 @@ export const Expenses: React.FC = () => {
                   </div>
                 </div>
               )}
-            </motion.div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

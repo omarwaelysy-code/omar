@@ -389,19 +389,15 @@ export const Products: React.FC = () => {
           </motion.div>
         ) : (
           <motion.div 
-            key="modal"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 md:p-8 overflow-y-auto"
+            key="form"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="flex-1 flex flex-col space-y-8 overflow-hidden max-w-7xl mx-auto w-full p-4"
           >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              className="bg-white w-full max-w-7xl rounded-[3.5rem] shadow-2xl flex flex-col md:flex-row overflow-hidden max-h-[90vh]"
-            >
+            <div className="bg-white flex-1 rounded-[3.5rem] shadow-xl shadow-slate-200/40 flex flex-col md:flex-row overflow-hidden border border-slate-100 transition-all duration-500">
               <div className="flex-1 flex flex-col h-full overflow-hidden bg-white">
-                {/* Modal Header */}
+                {/* Header */}
                 <div className="p-10 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-20">
                   <div className={`flex items-center gap-6 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                     <div className="w-16 h-16 bg-emerald-600 text-white rounded-[2rem] flex items-center justify-center shadow-xl shadow-emerald-500/20">
@@ -424,7 +420,7 @@ export const Products: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Modal Content */}
+                {/* Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-10 md:p-14">
                   <form id="product-form" onSubmit={handleSubmit} className="space-y-16" dir={dir}>
                      {/* Base Data Section */}
@@ -607,7 +603,7 @@ export const Products: React.FC = () => {
                   </div>
                 </div>
               )}
-            </motion.div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
