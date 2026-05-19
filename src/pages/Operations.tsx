@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Plus, Trash2, X, History, ChevronRight, ChevronLeft, 
-  Wallet, Layers, MapPin, Camera, FileUp, Smartphone, Globe, User, Calendar
+  Wallet, Layers, MapPin, Camera, FileUp, Smartphone, Globe, User, Calendar, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import SignatureCanvas from 'react-signature-canvas';
@@ -315,72 +315,78 @@ export const Operations: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col space-y-6 animate-in fade-in duration-500 overflow-hidden" dir={dir}>
+    <div className="h-full flex flex-col space-y-8 animate-in fade-in duration-700 overflow-hidden" dir={dir}>
       <AnimatePresence mode="wait">
         {!isModalOpen ? (
           <motion.div 
             key="list"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="flex-1 flex flex-col space-y-6 overflow-hidden"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="flex-1 flex flex-col space-y-8 overflow-hidden max-w-7xl mx-auto w-full p-4"
           >
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-indigo-600 text-white rounded-3xl flex items-center justify-center shadow-xl shadow-indigo-500/20">
-                  <Layers size={28} />
-                </div>
-                <div>
-                  <h2 className="text-3xl font-black tracking-tight text-slate-900 italic serif">{t('operations.title') || 'نظام العمليات المرن'}</h2>
-                  <p className="text-slate-500 font-medium">إدارة المشروعات والعمليات التشغيلية الذكية</p>
-                </div>
+            {/* Header - Styled like Discount Settings */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-8 pb-6 border-b border-slate-100">
+              <div className={dir === 'rtl' ? 'text-right' : 'text-left'}>
+                <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter mb-3 leading-none italic serif">
+                  {t('operations.title') || 'نظام العمليات المرن'}
+                </h1>
+                <p className="text-slate-400 font-bold uppercase tracking-[0.3em] text-xs">
+                  إدارة المشروعات والعمليات التشغيلية الذكية
+                </p>
               </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <button onClick={() => setIsActivityLogOpen(true)} className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm">
-                  <History size={20} />
-                  <span className="hidden md:inline">{t('common.activity_log')}</span>
+              <div className="flex items-center gap-4">
+                <button onClick={() => setIsActivityLogOpen(true)} className="w-14 h-14 bg-white text-slate-400 border border-slate-100 rounded-2xl flex items-center justify-center shadow-sm hover:text-indigo-600 hover:border-indigo-100 transition-all active:scale-95">
+                  <History size={24} />
                 </button>
-                <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-500/20 active:scale-95 border border-indigo-500/50">
-                  <Plus size={20} />
-                  {t('operations.add') || 'عملية جديدة'}
+                <button 
+                  onClick={() => { resetForm(); setIsModalOpen(true); }}
+                  className="group relative px-8 py-4 bg-zinc-900 text-white rounded-[1.5rem] shadow-xl overflow-hidden transition-all hover:bg-zinc-800 active:scale-95"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="relative z-10 flex items-center gap-3 font-black uppercase tracking-widest text-sm">
+                    <Plus size={20} className="group-hover:rotate-90 transition-transform" />
+                    {t('operations.add') || 'عملية جديدة'}
+                  </div>
                 </button>
               </div>
             </div>
 
-            {/* List Control */}
-            <div className="flex-1 flex flex-col h-full bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden transition-all duration-500">
-              <div className="p-6 border-b border-slate-100 flex items-center gap-4 bg-slate-50/30">
+            {/* List Table View - Clean & Spacious */}
+            <div className="flex-1 bg-white rounded-[3.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden flex flex-col transition-all duration-500">
+              <div className="p-8 border-b border-slate-50 flex items-center gap-4 bg-slate-50/20">
                 <div className="relative flex-1 group">
-                  <Search className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors pointer-events-none`} size={20} />
+                  <Search className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-4 text-slate-300 group-focus-within:text-indigo-500 transition-colors pointer-events-none`} size={24} />
                   <input
                     type="text"
                     placeholder={t('operations.search_placeholder') || 'بحث في العمليات...'}
-                    className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500/50 outline-none font-bold text-slate-900 placeholder:text-slate-400 shadow-sm`}
+                    className={`w-full ${dir === 'rtl' ? 'pr-16 pl-6' : 'pl-16 pr-6'} py-4 bg-white border border-slate-100 rounded-[2rem] outline-none font-bold text-slate-900 placeholder:text-slate-300 focus:ring-8 focus:ring-indigo-500/5 focus:border-indigo-500/50 transition-all shadow-inner`}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
-                <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
-                  <button onClick={() => { setSortBy('operation_date'); setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC'); }} className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${sortBy === 'operation_date' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                    {t('common.date')} {sortBy === 'operation_date' && (sortOrder === 'ASC' ? '↑' : '↓')}
-                  </button>
-                </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {loading ? (
                   <div className="flex flex-col items-center justify-center h-full gap-4 text-indigo-500">
-                    <div className="w-12 h-12 border-[6px] border-indigo-600 border-t-transparent rounded-full animate-spin shadow-inner"></div>
-                    <span className="font-black text-xs uppercase tracking-widest animate-pulse">Loading Records</span>
+                    <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="font-black text-[10px] uppercase tracking-[0.3em]">Loading Operations</span>
+                  </div>
+                ) : operations.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-slate-300 gap-6">
+                    <Layers size={64} className="opacity-20" />
+                    <p className="font-black uppercase tracking-widest text-sm">No operations found</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 p-10">
                     {operations.map((op) => (
                       <motion.div
                         layout
                         key={op.id}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        whileHover={{ y: -5 }}
                         onClick={async () => {
                           setEditingOperation(op);
                           setFormData({ ...op });
@@ -391,43 +397,40 @@ export const Operations: React.FC = () => {
                           setFormData((prev: any) => ({ ...prev, ...extraFormData }));
                           setIsModalOpen(true);
                         }}
-                        className="bg-slate-50/50 border border-slate-100 rounded-[2.5rem] p-8 hover:shadow-2xl hover:border-indigo-200 hover:bg-white transition-all group relative cursor-pointer overflow-hidden"
+                        className="p-8 space-y-6 rounded-[3rem] border bg-white border-slate-100 hover:border-indigo-200 hover:shadow-2xl transition-all group cursor-pointer relative overflow-hidden"
                       >
-                        <div className="flex items-start justify-between mb-8">
-                           <div className="w-16 h-16 bg-white rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-indigo-600 group-hover:scale-110 transition-all duration-500">
-                             <Layers size={28} />
-                             <span className="text-[9px] font-black mt-1 opacity-50 uppercase">{op.operation_number?.split('-')?.[1] || '---'}</span>
+                        <div className="flex items-start justify-between">
+                           <div className="w-20 h-20 bg-slate-50 rounded-[2rem] shadow-inner border border-slate-100 flex items-center justify-center text-slate-300 group-hover:text-indigo-600 transition-all duration-500">
+                             <Layers size={32} />
                            </div>
-                           <div className="flex flex-col items-end gap-2">
-                              <span className={`px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ring-1 ${
-                                op.status === 'completed' ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' :
-                                op.status === 'in_progress' ? 'bg-amber-50 text-amber-700 ring-amber-100' :
-                                'bg-slate-100 text-slate-500 ring-slate-200'
-                              }`}>
-                                {t(`common.status_${op.status}`) || op.status}
-                              </span>
-                           </div>
+                           <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                             op.status === 'completed' ? 'bg-emerald-50 text-emerald-700' :
+                             op.status === 'in_progress' ? 'bg-amber-50 text-amber-700' :
+                             'bg-slate-100 text-slate-400'
+                           }`}>
+                             {t(`common.status_${op.status}`) || op.status}
+                           </span>
                         </div>
 
-                        <div className="space-y-4">
-                           <h3 className="text-2xl font-black text-slate-900 leading-tight group-hover:text-indigo-700 transition-colors line-clamp-1">{op.customer_name || 'Individual Client'}</h3>
+                        <div className="space-y-3">
+                           <h3 className="text-2xl font-black text-slate-900 italic serif tracking-tighter group-hover:text-indigo-700 transition-colors uppercase line-clamp-1">{op.customer_name || 'Individual Client'}</h3>
                            <div className="flex flex-wrap gap-2">
-                              <span className="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-widest ring-1 ring-indigo-100">
+                              <span className="px-3 py-1 bg-slate-50 text-slate-400 rounded-lg text-[10px] font-black uppercase tracking-widest border border-slate-100">
                                  {categories.find(c => c.id === op.category_id)?.name || 'General Operation'}
                               </span>
                            </div>
-                           <p className="text-sm text-slate-500 font-medium line-clamp-2 min-h-[40px] leading-relaxed">
-                              {op.description || 'No detailed description provided...'}
+                           <p className="text-sm text-slate-500 font-medium line-clamp-2 leading-relaxed min-h-[40px]">
+                              {op.description || '...'}
                            </p>
                         </div>
 
-                        <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between">
-                           <div className="flex items-center gap-2 text-slate-400">
-                              <Calendar size={16} />
-                              <span className="text-[11px] font-black uppercase tracking-widest">{new Date(op.operation_date || op.date).toLocaleDateString()}</span>
+                        <div className="pt-6 border-t border-slate-50 flex items-center justify-between">
+                           <div className="flex items-center gap-2 text-slate-300">
+                              <Calendar size={18} />
+                              <span className="text-[10px] font-black uppercase tracking-widest">{new Date(op.operation_date || op.date).toLocaleDateString()}</span>
                            </div>
-                           <div className="p-3 bg-white rounded-xl text-slate-300 group-hover:text-indigo-600 shadow-sm border border-slate-100 transition-all">
-                              {dir === 'rtl' ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+                           <div className="p-3 bg-slate-50 rounded-2xl text-slate-300 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                              {dir === 'rtl' ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}
                            </div>
                         </div>
                       </motion.div>
@@ -436,7 +439,7 @@ export const Operations: React.FC = () => {
                 )}
               </div>
 
-              <div className="p-6 border-t border-slate-100 bg-white sticky bottom-0">
+              <div className="p-8 border-t border-slate-50 bg-white sticky bottom-0">
                 <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
               </div>
             </div>
@@ -448,161 +451,184 @@ export const Operations: React.FC = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[60] bg-white flex flex-col md:flex-row overflow-hidden h-full w-full"
+            className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-0 md:p-8 overflow-y-auto"
           >
-            {/* Form Side */}
-            <div className="flex-1 flex flex-col h-full overflow-hidden bg-white">
-              <div className="p-10 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-20">
-                <div className={`flex items-center gap-6 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                  <div className="w-16 h-16 bg-indigo-600 text-white rounded-[2rem] flex items-center justify-center shadow-2xl shadow-indigo-500/30">
-                     <Layers size={32} />
-                  </div>
-                  <div className={dir === 'rtl' ? 'text-right' : 'text-left'}>
-                     <h3 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-2 font-serif italic">
-                       {editingOperation ? (language === 'ar' ? 'تعديل بيانات العملية' : 'Edit Operation') : (language === 'ar' ? 'تسجيل عملية جديدة' : 'New Operation')}
-                     </h3>
-                     <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em] leading-none">{editingOperation?.operation_number || 'SYSTEM FLOW : NEW'}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <button type="submit" form="op-form" className="px-10 py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black text-lg hover:bg-indigo-700 transition-all shadow-2xl shadow-indigo-500/20 active:scale-95 border border-indigo-500/50">
-                     {editingOperation ? t('common.save') : t('common.add')}
-                  </button>
-                  <button onClick={() => { setIsModalOpen(false); resetForm(); }} className="w-14 h-14 flex items-center justify-center bg-slate-100 text-slate-400 rounded-[1.5rem] hover:bg-rose-50 hover:text-rose-500 transition-all active:rotate-90">
-                     <X size={28} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto custom-scrollbar">
-                <form id="op-form" onSubmit={handleSubmit} className="p-8 md:p-16 space-y-16" dir={dir}>
-                   {/* Base Data Section */}
-                   <div className="space-y-10">
-                      <div className="flex items-center gap-3">
-                         <div className="w-2 h-8 bg-indigo-600 rounded-full" />
-                         <h4 className="text-xl font-black text-slate-900 tracking-tight uppercase">{language === 'ar' ? 'المعلومات الأساسية' : 'Primary Information'}</h4>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
-                         <div className="md:col-span-2">
-                            <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest ps-1">{t('common.customer')}</label>
-                            <div className="relative group">
-                               <User className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-indigo-500 transition-colors`} size={20} />
-                               <select 
-                                 value={formData.customer_id} 
-                                 onChange={e => setFormData({ ...formData, customer_id: e.target.value })} 
-                                 className="w-full p-4 bg-white border border-slate-100 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all font-black appearance-none ps-14 shadow-sm"
-                               >
-                                 <option value="">{language === 'ar' ? 'اختر العميل...' : 'Select Customer...'}</option>
-                                 {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                               </select>
-                            </div>
-                         </div>
-
-                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest ps-1">{language === 'ar' ? 'الإدارة' : 'Department'}</label>
-                            <select required value={formData.department_id} onChange={e => setFormData({ ...formData, department_id: e.target.value })} className="w-full p-4 bg-white border border-slate-100 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all font-black appearance-none shadow-sm">
-                              <option value="">Select Department...</option>
-                              {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                            </select>
-                         </div>
-
-                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest ps-1">{language === 'ar' ? 'مركز التكلفة' : 'Cost Center'}</label>
-                            <select required value={formData.cost_center_id} onChange={e => setFormData({ ...formData, cost_center_id: e.target.value })} className="w-full p-4 bg-white border border-slate-100 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all font-black appearance-none shadow-sm">
-                              <option value="">Select Cost Center...</option>
-                              {costCenters.map(cc => <option key={cc.id} value={cc.id}>{cc.name}</option>)}
-                            </select>
-                         </div>
-
-                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest ps-1">{language === 'ar' ? 'تصنيف العملية' : 'Category'}</label>
-                            <select required value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="w-full p-4 bg-white border border-slate-100 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all font-black appearance-none shadow-sm">
-                              <option value="">Select Category...</option>
-                              {categories.sort((a,b) => (a.full_path || a.name).localeCompare(b.full_path || b.name)).map(c => (
-                                <option key={c.id} value={c.id} disabled={!c.is_final}>{c.full_path || c.name}</option>
-                              ))}
-                            </select>
-                         </div>
-
-                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest ps-1">{language === 'ar' ? 'تاريخ التنفيذ' : 'Operation Date'}</label>
-                            <input type="date" required value={formData.operation_date} onChange={e => setFormData({ ...formData, operation_date: e.target.value, date: e.target.value })} className="w-full p-4 bg-white border border-slate-100 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all font-black shadow-sm" />
-                         </div>
-                      </div>
-                   </div>
-
-                   {/* Dynamic Fields Section */}
-                   {dynamicFields.length > 0 && (
-                      <div className="space-y-10 pt-10 border-t border-slate-50">
-                         <div className="flex items-center gap-3">
-                            <div className="w-2 h-8 bg-emerald-600 rounded-full" />
-                            <h4 className="text-xl font-black text-slate-900 tracking-tight uppercase">{language === 'ar' ? 'المواصفات الديناميكية' : 'Dynamic Specifications'}</h4>
-                         </div>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
-                            {dynamicFields.map(field => (
-                              <div key={field.id} className={['textarea', 'rich_text', 'image', 'file', 'signature', 'qr', 'barcode'].includes(field.type) ? "md:col-span-2" : ""}>
-                                <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest ps-1">
-                                  {field.label} {field.is_required && <span className="text-rose-500">*</span>}
-                                </label>
-                                {renderDynamicField(field)}
-                                {field.description && <p className="mt-2 text-[10px] text-slate-300 font-bold italic ps-1 opacity-70">{field.description}</p>}
-                              </div>
-                            ))}
-                         </div>
-                      </div>
-                   )}
-
-                   {/* Description Section */}
-                   <div className="space-y-10 pt-10 border-t border-slate-50">
-                      <div className="flex items-center gap-3">
-                         <div className="w-2 h-8 bg-slate-400 rounded-full" />
-                         <h4 className="text-xl font-black text-slate-900 tracking-tight uppercase">{language === 'ar' ? 'ملاحظات إضافية' : 'Additional Notes'}</h4>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
-                         <div className="md:col-span-2">
-                            <textarea 
-                              value={formData.description} 
-                              onChange={e => setFormData({ ...formData, description: e.target.value })} 
-                              rows={3} 
-                              className="w-full p-6 bg-slate-50/50 border border-slate-100 rounded-[2rem] focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all font-medium text-slate-800 placeholder:text-slate-300" 
-                              placeholder="Details..." 
-                            />
-                         </div>
-                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest ps-1">{language === 'ar' ? 'الحالة الحالية' : 'Execution Status'}</label>
-                            <select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })} className="w-full p-4 bg-white border border-slate-100 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all font-black appearance-none shadow-sm">
-                              <option value="pending">Pending</option>
-                              <option value="in_progress">In Progress</option>
-                              <option value="completed">Completed</option>
-                              <option value="cancelled">Cancelled</option>
-                            </select>
-                         </div>
-                      </div>
-                   </div>
-                </form>
-              </div>
-            </div>
-
-            {/* Activity Side (Visible when editing) */}
-            {editingOperation && (
-              <div className="hidden lg:flex w-[450px] flex-col bg-slate-50 border-s border-white overflow-hidden shadow-2xl">
-                <div className="p-10 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
-                   <div className="flex items-center gap-4">
-                       <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-400">
-                         <History size={24} />
-                       </div>
-                       <div className={dir === 'rtl' ? 'text-right' : 'text-left'}>
-                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block leading-none mb-1">Audit Trail</span>
-                          <span className="font-black text-slate-900 text-lg uppercase tracking-wider">{language === 'ar' ? 'سجل النشاط' : 'Activity Log'}</span>
-                       </div>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="bg-white w-full max-w-7xl rounded-none md:rounded-[3.5rem] shadow-2xl flex flex-col md:flex-row overflow-hidden min-h-screen md:min-h-0 md:max-h-[90vh]"
+            >
+              <div className="flex-1 flex flex-col h-full overflow-hidden">
+                {/* Modal Header */}
+                <div className="p-10 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-20">
+                  <div className={`flex items-center gap-6 ${dir === 'rtl' ? 'flex-row' : 'flex-row'}`}>
+                    <div className="w-16 h-16 bg-indigo-600 text-white rounded-[2rem] flex items-center justify-center shadow-xl shadow-indigo-500/20">
+                       <Layers size={32} />
                     </div>
+                    <div className={dir === 'rtl' ? 'text-right' : 'text-left'}>
+                       <h3 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-1 font-serif italic">
+                         {editingOperation ? (language === 'ar' ? 'تعديل العملية' : 'Edit Operation') : (language === 'ar' ? 'عملية جديدة' : 'New Operation')}
+                       </h3>
+                       <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em] leading-none">{editingOperation?.operation_number || 'SYSTEM FLOW : NEW'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button type="submit" form="op-form" className="px-10 py-5 bg-zinc-900 text-white rounded-[1.5rem] font-black hover:bg-zinc-800 transition-all active:scale-95 shadow-xl">
+                       {editingOperation ? t('common.save') : t('common.add')}
+                    </button>
+                    <button onClick={() => { setIsModalOpen(false); resetForm(); }} className="w-14 h-14 flex items-center justify-center bg-slate-50 text-slate-400 rounded-[1.5rem] hover:bg-rose-50 hover:text-rose-500 transition-all">
+                       <X size={28} />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
-                   <InlineActivityLog category="operations" documentId={editingOperation.id} />
+
+                {/* Modal Content */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-10 md:p-14">
+                  <form id="op-form" onSubmit={handleSubmit} className="space-y-16" dir={dir}>
+                     {/* Section: Primary */}
+                     <div className="space-y-12">
+                        <div className="flex items-center gap-4 border-b border-slate-50 pb-8">
+                           <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shadow-inner">
+                              <User size={24} />
+                           </div>
+                           <h2 className="text-2xl font-black text-slate-900 leading-none tracking-tight uppercase">
+                              {language === 'ar' ? 'المعلومات الأساسية' : 'Primary Information'}
+                           </h2>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-right">
+                           <div className="md:col-span-2 space-y-4">
+                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('common.customer')}</label>
+                              <div className="relative group">
+                                 <User className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300 group-focus-within:text-indigo-500 transition-colors pointer-events-none`} size={24} />
+                                 <select 
+                                   value={formData.customer_id} 
+                                   onChange={e => setFormData({ ...formData, customer_id: e.target.value })} 
+                                   className="w-full pr-16 pl-6 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black text-slate-900 appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-indigo-500/5 focus:border-indigo-500/50 transition-all shadow-inner"
+                                 >
+                                   <option value="">{language === 'ar' ? 'اختر العميل...' : 'Select Customer...'}</option>
+                                   {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                 </select>
+                              </div>
+                           </div>
+
+                           <div className="space-y-4">
+                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'الإدارة' : 'Department'}</label>
+                              <select required value={formData.department_id} onChange={e => setFormData({ ...formData, department_id: e.target.value })} className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-lg font-black appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-indigo-500/5 transition-all shadow-inner">
+                                <option value="">Select Department...</option>
+                                {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                              </select>
+                           </div>
+
+                           <div className="space-y-4">
+                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'مركز التكلفة' : 'Cost Center'}</label>
+                              <select required value={formData.cost_center_id} onChange={e => setFormData({ ...formData, cost_center_id: e.target.value })} className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-lg font-black appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-indigo-500/5 transition-all shadow-inner">
+                                <option value="">Select Cost Center...</option>
+                                {costCenters.map(cc => <option key={cc.id} value={cc.id}>{cc.name}</option>)}
+                              </select>
+                           </div>
+                        </div>
+                     </div>
+
+                     {/* Section: Category & Date */}
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-right">
+                        <div className="space-y-4">
+                           <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'تصنيف العملية' : 'Category'}</label>
+                           <select required value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-lg font-black appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner">
+                             <option value="">Select Category...</option>
+                             {categories.sort((a,b) => (a.full_path || a.name).localeCompare(b.full_path || b.name)).map(c => (
+                               <option key={c.id} value={c.id} disabled={!c.is_final}>{c.full_path || c.name}</option>
+                             ))}
+                           </select>
+                        </div>
+
+                        <div className="space-y-4">
+                           <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'تاريخ التنفيذ' : 'Operation Date'}</label>
+                           <input type="date" required value={formData.operation_date} onChange={e => setFormData({ ...formData, operation_date: e.target.value, date: e.target.value })} className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-lg font-black outline-none focus:bg-white focus:ring-8 focus:ring-indigo-500/5 transition-all shadow-inner" />
+                        </div>
+                     </div>
+
+                     {/* Section: Dynamic */}
+                     {dynamicFields.length > 0 && (
+                        <div className="space-y-12">
+                           <div className="flex items-center gap-4 border-b border-slate-50 pb-8">
+                              <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shadow-inner">
+                                 <Layers size={24} />
+                              </div>
+                              <h2 className="text-2xl font-black text-slate-900 leading-none tracking-tight uppercase">
+                                 {language === 'ar' ? 'المواصفات الديناميكية' : 'Dynamic Specifications'}
+                              </h2>
+                           </div>
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-right">
+                              {dynamicFields.map(field => (
+                                <div key={field.id} className={['textarea', 'rich_text', 'image', 'file', 'signature', 'qr', 'barcode'].includes(field.type) ? "md:col-span-2" : ""}>
+                                  <label className="block text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest px-1">
+                                    {field.label} {field.is_required && <span className="text-rose-500">*</span>}
+                                  </label>
+                                  {renderDynamicField(field)}
+                                  {field.description && <p className="mt-3 text-[10px] text-slate-300 font-bold italic px-1 opacity-70 leading-relaxed">{field.description}</p>}
+                                </div>
+                              ))}
+                           </div>
+                        </div>
+                     )}
+
+                     {/* Section: Status & Notes */}
+                     <div className="space-y-12">
+                        <div className="flex items-center gap-4 border-b border-slate-50 pb-8">
+                           <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center shadow-inner">
+                              <AlertCircle size={24} />
+                           </div>
+                           <h2 className="text-2xl font-black text-slate-900 leading-none tracking-tight uppercase">
+                              {language === 'ar' ? 'الحالة والملاحظات' : 'Status & Notes'}
+                           </h2>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-right">
+                           <div className="md:col-span-2 space-y-4">
+                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'ملاحظات إضافية' : 'Details'}</label>
+                              <textarea 
+                                value={formData.description} 
+                                onChange={e => setFormData({ ...formData, description: e.target.value })} 
+                                rows={4} 
+                                className="w-full p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] outline-none font-medium text-slate-800 placeholder:text-slate-300 focus:bg-white focus:ring-8 focus:ring-indigo-500/5 transition-all shadow-inner" 
+                                placeholder="..." 
+                              />
+                           </div>
+                           <div className="space-y-4">
+                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'الحالة الحالية' : 'Execution Status'}</label>
+                              <select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })} className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-lg font-black appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-indigo-500/5 transition-all shadow-inner">
+                                <option value="pending">Pending</option>
+                                <option value="in_progress">In Progress</option>
+                                <option value="completed">Completed</option>
+                                <option value="cancelled">Cancelled</option>
+                              </select>
+                           </div>
+                        </div>
+                     </div>
+                  </form>
                 </div>
               </div>
-            )}
+
+              {/* Activity Log Panel for editing */}
+              {editingOperation && (
+                <div className="hidden lg:flex w-[400px] flex-col bg-slate-50 border-s border-slate-100 overflow-hidden shadow-inner">
+                  <div className="p-10 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10 text-right">
+                     <div className="flex items-center gap-4">
+                         <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-400">
+                           <History size={24} />
+                         </div>
+                         <div>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">النشاط الأخير</span>
+                            <h3 className="font-black text-slate-900 text-lg">سجل التعديلات</h3>
+                         </div>
+                      </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar">
+                     <InlineActivityLog category="operations" documentId={editingOperation.id} />
+                  </div>
+                </div>
+              )}
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
