@@ -3,7 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Product, Account } from '../types';
-import { Search, Plus, Edit2, Trash2, X, Package, History, FileText, Paperclip, Lock, LayoutGrid, List } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, X, Package, History, FileText, Paperclip, Lock, LayoutGrid, List, ChevronRight, ChevronLeft, Hash, Wallet } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
@@ -741,304 +742,358 @@ export const Products: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-[90vh] md:max-w-6xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
-            <div className={`p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between bg-white z-10 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-              <h3 className="text-lg md:text-xl font-bold text-zinc-900">{editingProduct ? t('products.edit') : t('products.add')}</h3>
-              <button onClick={closeModal} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-xl transition-all"><X size={24} /></button>
-            </div>
-            
-            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-              <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden" dir={dir}>
-                <div className="p-4 md:p-8 space-y-5 flex-1 overflow-y-auto">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_code')}</label>
-                    <input
-                      required
-                      readOnly
-                      type="text"
-                      className={`w-full px-4 py-3 bg-zinc-100 border border-zinc-200 rounded-xl focus:ring-0 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'} opacity-70 cursor-not-allowed`}
-                      value={formData.code}
-                      onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    />
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-[140] flex justify-end overflow-hidden" dir={dir}>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closeModal}
+              className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ x: dir === 'rtl' ? '-100%' : '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: dir === 'rtl' ? '-100%' : '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="relative w-full max-w-4xl bg-white shadow-2xl h-full flex flex-col border-s border-slate-200"
+            >
+              <div className={`p-6 md:p-8 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white z-10 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                     <Package size={24} />
                   </div>
                   <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_name')}</label>
-                    <input
-                      required
-                      type="text"
-                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    />
+                     <h3 className="text-2xl font-black text-slate-900 tracking-tight">{editingProduct ? t('products.edit') : t('products.add')}</h3>
+                     <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">إدارة المخزون والأصناف</p>
                   </div>
                 </div>
-                <div>
-                  <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_type')}</label>
-                  <select
-                    required
-                    className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                    value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
-                  >
-                    <option value="finished_good">{t('products.type_finished_good')}</option>
-                    <option value="service">{t('products.type_service')}</option>
-                    <option value="raw_material">{t('products.type_raw_material')}</option>
-                    <option value="commodity">{t('products.type_commodity')}</option>
-                  </select>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_category')}</label>
-                    <input
-                      type="text"
-                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_unit')}</label>
-                    <select
-                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                      value={formData.unit}
-                      onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    >
-                      <option value="قطعة">{t('products.unit_piece')}</option>
-                      <option value="كيلو">{t('products.unit_kg')}</option>
-                      <option value="متر">{t('products.unit_meter')}</option>
-                      <option value="لتر">{t('products.unit_liter')}</option>
-                      <option value="علبة">{t('products.unit_box')}</option>
-                      <option value="كرتونة">{t('products.unit_carton')}</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_sale_price')}</label>
-                    <input
-                      required
-                      type="number"
-                      step="0.01"
-                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                      value={isNaN(formData.sale_price) ? '' : formData.sale_price}
-                      onChange={(e) => setFormData({ ...formData, sale_price: parseFloat(e.target.value) })}
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_cost_price')}</label>
-                    <input
-                      required
-                      type="number"
-                      step="0.01"
-                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                      value={isNaN(formData.cost_price) ? '' : formData.cost_price}
-                      onChange={(e) => setFormData({ ...formData, cost_price: parseFloat(e.target.value) })}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_stock_quantity')}</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                      value={isNaN(formData.stock) ? '' : formData.stock}
-                      onChange={(e) => setFormData({ ...formData, stock: parseFloat(e.target.value) })}
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_min_stock')}</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                      value={isNaN(formData.min_stock) ? '' : formData.min_stock}
-                      onChange={(e) => setFormData({ ...formData, min_stock: parseFloat(e.target.value) })}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_description')}</label>
-                  <textarea
-                    className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                    rows={3}
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_attachment')}</label>
-                    <div className="relative group">
-                      <input
-                        type="file"
-                        accept="image/*,application/pdf"
-                        onChange={handleFileChange}
-                        className="hidden"
-                        id="product-attachment"
-                      />
-                      <label 
-                        htmlFor="product-attachment"
-                        className={`flex items-center justify-center gap-2 w-full px-4 py-3 bg-zinc-50 border border-zinc-200 border-dashed rounded-xl cursor-pointer hover:bg-zinc-100 hover:border-emerald-500 transition-all ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}
-                      >
-                        <Paperclip size={18} className="text-zinc-400 group-hover:text-emerald-500" />
-                        <span className="text-sm text-zinc-500 group-hover:text-emerald-900 font-bold">
-                          {formData.image_url ? (language === 'ar' ? 'تغيير المرفق' : 'Change Attachment') : (language === 'ar' ? 'اختر ملفاً...' : 'Choose file...')}
-                        </span>
-                      </label>
-                    </div>
-                    {formData.image_url && (
-                      <div className="mt-2 relative flex justify-center bg-white p-2 rounded-lg border border-zinc-100 overflow-hidden">
-                        <button 
-                          type="button"
-                          onClick={() => setFormData({ ...formData, image_url: '' })}
-                          className={`absolute top-1 ${dir === 'rtl' ? 'right-1' : 'left-1'} text-red-500 hover:bg-red-50 p-1 rounded-full bg-white/80 backdrop-blur-sm shadow-sm z-10`}
-                        >
-                          <X size={14} />
-                        </button>
-                        {formData.image_url.startsWith('data:application/pdf') ? (
-                          <div className="flex flex-col items-center gap-1">
-                            <FileText size={24} className="text-red-500" />
-                            <span className="text-[10px] font-bold text-zinc-500">PDF</span>
-                          </div>
-                        ) : (
-                          <img 
-                            src={formData.image_url} 
-                            alt="Preview" 
-                            className="h-10 w-auto rounded object-contain"
-                            referrerPolicy="no-referrer"
+                <button onClick={closeModal} className="text-slate-400 hover:text-slate-900 p-2.5 hover:bg-slate-50 rounded-full transition-all"><X size={24} /></button>
+              </div>
+              
+              <div className="flex-1 flex flex-col overflow-hidden bg-white">
+                <form onSubmit={handleSubmit} className="p-0 flex-1 overflow-hidden flex flex-col md:flex-row" dir={dir}>
+                  <div className="p-6 md:p-10 space-y-8 flex-1 overflow-y-auto pb-32 custom-scrollbar">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div>
+                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_code')}</label>
+                        <div className="relative">
+                          <Hash className="absolute start-4 top-3.5 text-slate-300" size={20} />
+                          <input
+                            required
+                            readOnly
+                            type="text"
+                            className="premium-input ps-12 bg-slate-50 text-slate-400 cursor-not-allowed font-mono font-black"
+                            value={formData.code}
                           />
-                        )}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_barcode')}</label>
-                    <input
-                      type="text"
-                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                      value={formData.barcode}
-                      onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                    />
-                    {formData.barcode && (
-                      <div className="mt-2 flex justify-center bg-white p-2 rounded-lg border border-zinc-100 overflow-hidden">
-                        <Barcode 
-                          value={formData.barcode} 
-                          width={1} 
-                          height={40} 
-                          fontSize={10}
-                          background="transparent"
+                      <div>
+                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_name')}</label>
+                        <input
+                          required
+                          type="text"
+                          placeholder="اسم الصنف / المنتج"
+                          className="premium-input font-bold text-lg"
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         />
                       </div>
-                    )}
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_revenue_account')}</label>
-                    <select
-                      required
-                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                      value={formData.revenue_account_id}
-                      onChange={(e) => setFormData({ ...formData, revenue_account_id: e.target.value })}
-                    >
-                      <option value="">{language === 'ar' ? 'اختر الحساب...' : 'Select account...'}</option>
-                      {accounts.map(account => (
-                        <option key={account.id} value={account.id}>
-                          {account.code} - {account.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_cost_account')}</label>
-                    <select
-                      required
-                      className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                      value={formData.cost_account_id}
-                      onChange={(e) => setFormData({ ...formData, cost_account_id: e.target.value })}
-                    >
-                      <option value="">{language === 'ar' ? 'اختر الحساب...' : 'Select account...'}</option>
-                      {accounts.map(account => (
-                        <option key={account.id} value={account.id}>
-                          {account.code} - {account.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                {formData.stock > 0 && (
-                  <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                    <p className={`text-xs font-black text-emerald-800 uppercase tracking-widest ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_stock_settings')}</p>
+                    </div>
+  
                     <div>
-                      <label className={`block text-sm font-bold text-emerald-700 mb-1 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_counter_account')}</label>
+                      <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_type')}</label>
                       <select
                         required
-                        className={`w-full px-4 py-3 bg-white border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                        value={formData.counter_account_id}
-                        onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}
+                        className="premium-input font-bold appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGZpbGw9Im5vbmUiIHZpZXdCb3g9IjAgMCAyNCAyNCIgc3Ryb2tlPSIjOTRhM2I4IiBzdHJva2Utd2lkdGg9IjIiPjxwYXRoIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZD0iTTE5IDlsLTcgNy03LTciLz48L3N2Zz4=')] bg-[8px_center] bg-[length:16px] bg-no-repeat"
+                        value={formData.type}
+                        onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
                       >
-                        <option value="">{language === 'ar' ? 'اختر حساب الطرف الآخر...' : 'Select counter account...'}</option>
-                        {accounts.map(account => (
-                          <option key={account.id} value={account.id}>
-                            {account.code} - {account.name}
-                          </option>
-                        ))}
+                        <option value="finished_good">{t('products.type_finished_good')}</option>
+                        <option value="service">{t('products.type_service')}</option>
+                        <option value="raw_material">{t('products.type_raw_material')}</option>
+                        <option value="commodity">{t('products.type_commodity')}</option>
                       </select>
-                      <p className={`text-[10px] text-emerald-600 mt-1 font-medium italic ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'سيتم إنشاء قيد يومية آلي لموازنة قيمة المخزون الافتتاحي.' : 'An automatic journal entry will be created to balance the opening stock value.'}</p>
                     </div>
-                    {formData.counter_account_id && (
-                      <JournalEntryPreview 
-                        title={language === 'ar' ? 'معاينة قيد المخزون الافتتاحي' : 'Opening Stock Entry Preview'}
-                        items={[
-                          {
-                            account_name: accounts.find(a => a.name.includes('مخزون') || a.name.includes('بضاعة'))?.name || (language === 'ar' ? 'حساب المخزون' : 'Inventory Account'),
-                            debit: formData.stock * formData.cost_price,
-                            credit: 0,
-                            description: language === 'ar' ? 'مخزون افتتاحي' : 'Opening Stock'
-                          },
-                          {
-                            account_name: accounts.find(a => a.id === formData.counter_account_id)?.name || (language === 'ar' ? 'حساب الطرف الآخر' : 'Counter Account'),
-                            debit: 0,
-                            credit: formData.stock * formData.cost_price,
-                            description: language === 'ar' ? `مخزون افتتاحي للصنف: ${formData.name}` : `Opening stock for product: ${formData.name}`
-                          }
-                        ]}
+  
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div>
+                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_category')}</label>
+                        <input
+                          type="text"
+                          placeholder="الفئة / التصنيف"
+                          className="premium-input font-bold"
+                          value={formData.category}
+                          onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_unit')}</label>
+                        <select
+                          className="premium-input font-bold"
+                          value={formData.unit}
+                          onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                        >
+                          <option value="قطعة">{t('products.unit_piece')}</option>
+                          <option value="كيلو">{t('products.unit_kg')}</option>
+                          <option value="متر">{t('products.unit_meter')}</option>
+                          <option value="لتر">{t('products.unit_liter')}</option>
+                          <option value="علبة">{t('products.unit_box')}</option>
+                          <option value="كرتونة">{t('products.unit_carton')}</option>
+                        </select>
+                      </div>
+                    </div>
+  
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div>
+                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_sale_price')}</label>
+                        <div className="relative group">
+                          <input
+                            required
+                            type="number"
+                            step="0.01"
+                            className="premium-input font-black text-emerald-600"
+                            value={isNaN(formData.sale_price) ? '' : formData.sale_price}
+                            onChange={(e) => setFormData({ ...formData, sale_price: parseFloat(e.target.value) })}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_cost_price')}</label>
+                        <input
+                          required
+                          type="number"
+                          step="0.01"
+                          className="premium-input font-black text-slate-600"
+                          value={isNaN(formData.cost_price) ? '' : formData.cost_price}
+                          onChange={(e) => setFormData({ ...formData, cost_price: parseFloat(e.target.value) })}
+                        />
+                      </div>
+                    </div>
+  
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div>
+                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_stock_quantity')}</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="premium-input font-black"
+                          value={isNaN(formData.stock) ? '' : formData.stock}
+                          onChange={(e) => setFormData({ ...formData, stock: parseFloat(e.target.value) })}
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_min_stock')}</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="premium-input font-black"
+                          value={isNaN(formData.min_stock) ? '' : formData.min_stock}
+                          onChange={(e) => setFormData({ ...formData, min_stock: parseFloat(e.target.value) })}
+                        />
+                      </div>
+                    </div>
+  
+                    <div>
+                      <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_description')}</label>
+                      <textarea
+                        className="premium-input font-bold min-h-[100px]"
+                        rows={3}
+                        value={formData.description}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       />
+                    </div>
+  
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div>
+                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_attachment')}</label>
+                        <div className="relative group">
+                          <input
+                            type="file"
+                            accept="image/*,application/pdf"
+                            onChange={handleFileChange}
+                            className="hidden"
+                            id="product-attachment"
+                          />
+                          <label 
+                            htmlFor="product-attachment"
+                            className="flex items-center justify-center gap-4 w-full p-4 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl cursor-pointer hover:bg-slate-100 hover:border-emerald-500 transition-all group"
+                          >
+                            <Paperclip size={24} className="text-slate-400 group-hover:text-emerald-500 transition-colors" />
+                            <span className="text-sm text-slate-500 group-hover:text-emerald-900 font-black">
+                              {formData.image_url ? (language === 'ar' ? 'تغيير المرفق' : 'Change Attachment') : (language === 'ar' ? 'رفع صورة الصنف' : 'Upload Image')}
+                            </span>
+                          </label>
+                        </div>
+                        {formData.image_url && (
+                          <div className="mt-4 relative flex justify-center bg-white p-4 rounded-3xl border border-slate-100 overflow-hidden shadow-inner">
+                            <button 
+                              type="button"
+                              onClick={() => setFormData({ ...formData, image_url: '' })}
+                              className="absolute top-2 right-2 text-red-500 hover:bg-red-50 p-2 rounded-full bg-white/80 backdrop-blur-sm shadow-sm z-10"
+                            >
+                              <X size={18} />
+                            </button>
+                            {formData.image_url.startsWith('data:application/pdf') ? (
+                              <div className="flex flex-col items-center gap-2 py-4">
+                                <FileText size={48} className="text-red-500" />
+                                <span className="text-xs font-black text-slate-500">DOCUMENT (PDF)</span>
+                              </div>
+                            ) : (
+                              <img 
+                                src={formData.image_url} 
+                                alt="Preview" 
+                                className="max-h-32 w-auto rounded-xl object-contain shadow-lg"
+                                referrerPolicy="no-referrer"
+                              />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_barcode')}</label>
+                        <div className="space-y-4">
+                          <input
+                            type="text"
+                            placeholder="باركود الصنف"
+                            className="premium-input font-bold"
+                            value={formData.barcode}
+                            onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                          />
+                          {formData.barcode && (
+                            <div className="flex justify-center bg-white p-4 rounded-3xl border border-slate-100 overflow-hidden shadow-inner">
+                              <Barcode 
+                                value={formData.barcode} 
+                                width={1.5} 
+                                height={60} 
+                                fontSize={12}
+                                background="transparent"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+  
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div>
+                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_revenue_account')}</label>
+                        <select
+                          required
+                          className="premium-input font-bold"
+                          value={formData.revenue_account_id}
+                          onChange={(e) => setFormData({ ...formData, revenue_account_id: e.target.value })}
+                        >
+                          <option value="">{language === 'ar' ? 'اختر حساب الإيرادات...' : 'Select revenue account...'}</option>
+                          {accounts.map(account => (
+                            <option key={account.id} value={account.id}>
+                              {account.code} - {account.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className={`block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_cost_account')}</label>
+                        <select
+                          required
+                          className="premium-input font-bold"
+                          value={formData.cost_account_id}
+                          onChange={(e) => setFormData({ ...formData, cost_account_id: e.target.value })}
+                        >
+                          <option value="">{language === 'ar' ? 'اختر حساب التكلفة...' : 'Select cost account...'}</option>
+                          {accounts.map(account => (
+                            <option key={account.id} value={account.id}>
+                              {account.code} - {account.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+  
+                    {formData.stock > 0 && (
+                      <div className="p-6 bg-emerald-50/50 rounded-3xl border border-emerald-100/50 space-y-6 animate-in slide-in-from-top-4 duration-300">
+                        <div className="flex items-center gap-3">
+                           <div className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                              <Wallet size={20} />
+                           </div>
+                           <h4 className="text-sm font-black text-emerald-800 uppercase tracking-widest">{t('products.form_stock_settings')}</h4>
+                        </div>
+                        <div className="space-y-4">
+                          <div>
+                            <label className={`block text-[10px] font-black text-emerald-700/60 mb-2 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_counter_account')}</label>
+                            <select
+                              required
+                              className="premium-input border-emerald-200 focus:border-emerald-500 focus:ring-emerald-500/10 font-bold"
+                              value={formData.counter_account_id}
+                              onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}
+                            >
+                              <option value="">{language === 'ar' ? 'اختر حساب الطرف الآخر...' : 'Select counter account...'}</option>
+                              {accounts.map(account => (
+                                <option key={account.id} value={account.id}>
+                                  {account.code} - {account.name}
+                                </option>
+                              ))}
+                            </select>
+                            <p className="text-[10px] text-emerald-600/70 mt-2 font-bold italic bg-white/50 px-3 py-1.5 rounded-lg w-fit border border-emerald-100">{language === 'ar' ? 'سيتم إنشاء قيد يومية آلي لموازنة قيمة المخزون الافتتاحي.' : 'An automatic journal entry will be created to balance the opening stock value.'}</p>
+                          </div>
+                          {formData.counter_account_id && (
+                            <JournalEntryPreview 
+                              title={language === 'ar' ? 'معاينة قيد المخزون الافتتاحي' : 'Opening Stock Entry Preview'}
+                              items={[
+                                {
+                                  account_name: accounts.find(a => a.name.includes('مخزون') || a.name.includes('بضاعة'))?.name || (language === 'ar' ? 'حساب المخزون' : 'Inventory Account'),
+                                  debit: formData.stock * formData.cost_price,
+                                  credit: 0,
+                                  description: language === 'ar' ? 'مخزون افتتاحي' : 'Opening Stock'
+                                },
+                                {
+                                  account_name: accounts.find(a => a.id === formData.counter_account_id)?.name || (language === 'ar' ? 'حساب الطرف الآخر' : 'Counter Account'),
+                                  debit: 0,
+                                  credit: formData.stock * formData.cost_price,
+                                  description: language === 'ar' ? `مخزون افتتاحي للصنف: ${formData.name}` : `Opening stock for product: ${formData.name}`
+                                }
+                              ]}
+                            />
+                          )}
+                        </div>
+                      </div>
                     )}
+  
+                    <div className="pt-10 flex gap-4 sticky bottom-0 bg-white/80 backdrop-blur-md pb-4 z-20">
+                      <button 
+                        type="submit"
+                        className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-lg hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95 border border-emerald-500/50"
+                      >
+                        {editingProduct ? (language === 'ar' ? 'تحديث بيانات الصنف' : 'Update Product') : (language === 'ar' ? 'إضافة صنف جديد' : 'Add New Product')}
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={closeModal}
+                        className="px-8 py-4 bg-slate-50 text-slate-500 rounded-2xl font-black hover:bg-slate-100 transition-all active:scale-95 border border-slate-200"
+                      >
+                        {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                      </button>
+                    </div>
                   </div>
-                )}
-                </div>
-
-                <div className={`p-4 md:p-6 border-t border-zinc-50 bg-zinc-50/50 flex gap-3 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                  <button 
-                    type="submit"
-                    className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
-                  >
-                    {editingProduct ? (language === 'ar' ? 'تحديث الصنف' : 'Update Product') : (language === 'ar' ? 'حفظ الصنف' : 'Save Product')}
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={closeModal}
-                    className="px-8 py-4 bg-zinc-200 text-zinc-700 rounded-2xl font-bold hover:bg-zinc-300 transition-all active:scale-95"
-                  >
-                    {language === 'ar' ? 'إلغاء' : 'Cancel'}
-                  </button>
-                </div>
-              </form>
-
-              <div className="hidden md:block w-80 border-r border-zinc-100 bg-zinc-50/30">
-                <InlineActivityLog category="products" documentId={editingProduct?.id} />
+  
+                  {editingProduct && (
+                    <div className="hidden lg:block w-96 border-s border-slate-100 bg-slate-50/20 shadow-inner overflow-y-auto custom-scrollbar">
+                      <div className="p-4 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
+                        <div className="flex items-center gap-2">
+                           <History size={16} className="text-slate-400" />
+                           <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">سجل نشاط الصنف</span>
+                        </div>
+                      </div>
+                      <InlineActivityLog category="products" documentId={editingProduct.id} />
+                    </div>
+                  )}
+                </form>
               </div>
-            </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
