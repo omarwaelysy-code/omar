@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Product, Account } from '../types';
-import { Search, Plus, Edit2, Trash2, X, Package, History, FileText, Paperclip, Lock, LayoutGrid, List, ChevronRight, ChevronLeft, Hash, Wallet, Layers, AlertCircle } from 'lucide-react';
+import { Search, Plus, Trash2, X, Package, History, FileText, Paperclip, Lock, LayoutGrid, List, ChevronRight, ChevronLeft, Hash, Wallet, Layers, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
@@ -22,7 +22,7 @@ export const Products: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
-  const { canView, canCreate, canEdit, canDelete } = usePermissions('products');
+  const { canView, canCreate, canDelete } = usePermissions('products');
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -37,27 +37,6 @@ export const Products: React.FC = () => {
   const [view, setView] = useViewPreference('products', 'table');
   const [isAutoCode, setIsAutoCode] = useState(true);
 
-  const handleExportExcel = () => {
-    const headers = {
-      'code': t('products.column_code'),
-      'name': t('products.column_name'),
-      'barcode': t('products.form_barcode'),
-      'sale_price': t('products.column_sale_price'),
-      'cost_price': t('products.column_cost_price'),
-      'description': t('products.form_description')
-    };
-    const formattedData = formatDataForExcel(products, headers);
-    exportToExcel(formattedData, { filename: 'Products_Inventory', sheetName: t('products.title') });
-  };
-
-  const handleExportPDF = async () => {
-    if (tableRef.current) {
-      await exportToPDFUtil(tableRef.current, { 
-        filename: 'Products_Inventory',
-        reportTitle: t('products.list_title')
-      });
-    }
-  };
   const [formData, setFormData] = useState({ 
     code: '', 
     name: '', 
@@ -80,61 +59,6 @@ export const Products: React.FC = () => {
   const [returns, setReturns] = useState<any[]>([]);
   const [purchaseInvoices, setPurchaseInvoices] = useState<any[]>([]);
   const [purchaseReturns, setPurchaseReturns] = useState<any[]>([]);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.type === 'application/pdf') {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setFormData({ ...formData, image_url: reader.result as string });
-        };
-        reader.readAsDataURL(file);
-        return;
-      }
-
-      if (file.size > 10 * 1024 * 1024) { // Warning if > 10MB
-        showNotification('الصورة كبيرة جداً، سيتم ضغطها تلقائياً', 'info');
-      }
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-
-          // Max dimensions
-          const MAX_WIDTH = 1200;
-          const MAX_HEIGHT = 1200;
-
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          
-          // Compress to JPEG with 0.8 quality
-          const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-          setFormData({ ...formData, image_url: resizedDataUrl });
-        };
-        img.src = reader.result as string;
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
   useEffect(() => {
     if (user) {
@@ -173,8 +97,6 @@ export const Products: React.FC = () => {
       };
       
       const prefix = prefixMap[formData.type] || 'PRD';
-      
-      // Filter products of this type to find the next sequential number
       const typeProducts = products.filter(p => p.type === formData.type);
       
       let maxNum = 0;
@@ -182,16 +104,11 @@ export const Products: React.FC = () => {
         const parts = p.code?.split('-');
         if (parts && parts.length > 1) {
           const num = parseInt(parts[1]);
-          if (!isNaN(num) && num > maxNum) {
-            maxNum = num;
-          }
+          if (!isNaN(num) && num > maxNum) maxNum = num;
         } else if (p.code?.startsWith(prefix)) {
-          // Alternative check for codes like "FG0001"
           const numStr = p.code.substring(prefix.length);
           const num = parseInt(numStr);
-          if (!isNaN(num) && num > maxNum) {
-            maxNum = num;
-          }
+          if (!isNaN(num) && num > maxNum) maxNum = num;
         }
       });
       
@@ -203,6 +120,46 @@ export const Products: React.FC = () => {
       }
     }
   }, [formData.type, editingProduct, isModalOpen, products, isAutoCode]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type === 'application/pdf') {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setFormData({ ...formData, image_url: reader.result as string });
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const MAX_WIDTH = 1200;
+          const MAX_HEIGHT = 1200;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+          } else {
+            if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          setFormData({ ...formData, image_url: canvas.toDataURL('image/jpeg', 0.8) });
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -234,40 +191,27 @@ export const Products: React.FC = () => {
           { field: 'description', label: 'الوصف' },
           { field: 'barcode', label: 'الباركود' },
           { field: 'revenue_account_name', label: 'حساب الإيرادات' },
-          { field: 'cost_account_name', label: 'حساب التكلفة' },
-          { field: 'counter_account_id', label: 'حساب الطرف الآخر' }
+          { field: 'cost_account_name', label: 'حساب التكلفة' }
         ];
         await dbService.updateWithLog(
-          'products', 
-          editingProduct.id, 
-          dataToSave,
+          'products', id = editingProduct.id, dataToSave,
           { id: user.id, username: user.username, company_id: user.company_id },
-          'تعديل صنف',
-          'products',
-          fieldsToTrack
+          'تعديل صنف', 'products', fieldsToTrack
         );
-        id = editingProduct.id;
       } else {
-        id = await dbService.add('products', { 
-          ...dataToSave, 
-          company_id: user.company_id 
-        });
+        id = await dbService.add('products', { ...dataToSave, company_id: user.company_id });
       }
 
-      // Success notification and modal close early
       showNotification(editingProduct ? 'تم تحديث بيانات الصنف بنجاح' : 'تم إضافة الصنف بنجاح', 'success');
       closeModal();
 
-      // Background post-save hooks
       try {
         if (editingProduct) {
-          // Always handle journal entry to ensure consistency
           await dbService.deleteJournalEntryByReference(id, user.company_id);
         } else {
           await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة صنف', `إضافة صنف جديد: ${formData.name}`, 'products', id);
         }
 
-        // Create initial stock entry
         if (formData.stock > 0 && formData.cost_price > 0) {
           const totalValue = formData.stock * formData.cost_price;
           const inventoryAccount = accounts.find(a => a.name.includes('مخزون') || a.name.includes('بضاعة'));
@@ -281,15 +225,15 @@ export const Products: React.FC = () => {
             reference_type: 'initial_stock',
             items: [
               {
-                account_id: inventoryAccount?.id || 'inventory_account_default',
-                account_name: inventoryAccount?.name || 'حساب المخزون (افتراضي)',
+                account_id: inventoryAccount?.id || '',
+                account_name: inventoryAccount?.name || 'حساب المخزون',
                 debit: totalValue,
                 credit: 0,
                 description: 'مخزون افتتاحي'
               },
               {
                 account_id: formData.counter_account_id,
-                account_name: counterAccount?.name || 'حساب الميزانية الافتتاحية',
+                account_name: counterAccount?.name || 'حساب الطرف الآخر',
                 debit: 0,
                 credit: totalValue,
                 description: `مخزون افتتاحي للصنف: ${formData.name}`
@@ -301,520 +245,248 @@ export const Products: React.FC = () => {
             created_by: user.id
           });
         }
-      } catch (postError) {
-        console.error('Post-save operations failed:', postError);
-      }
-    } catch (e) {
-      console.error(e);
-      showNotification('حدث خطأ أثناء حفظ البيانات', 'error');
-    }
+      } catch (err) { console.error('Post-save failed:', err); }
+    } catch (e) { console.error(e); showNotification('حدث خطأ أثناء حفظ البيانات', 'error'); }
   };
 
-  const handleDelete = (id: string) => {
-    setProductToDelete(id);
-    setIsDeleteModalOpen(true);
-  };
+  const handleDelete = (id: string) => { setProductToDelete(id); setIsDeleteModalOpen(true); };
 
   const confirmDelete = async () => {
     if (!productToDelete || !user) return;
     try {
-      const product = products.find(p => p.id === productToDelete);
-      
-      // Check for associated transactions
-      const hasSalesInvoices = invoices.some(i => i.items?.some((item: any) => item.product_id === productToDelete));
-      const hasSalesReturns = returns.some(r => r.items?.some((item: any) => item.product_id === productToDelete));
-      const hasPurchaseInvoices = purchaseInvoices.some(i => i.items?.some((item: any) => item.product_id === productToDelete));
-      const hasPurchaseReturns = purchaseReturns.some(r => r.items?.some((item: any) => item.product_id === productToDelete));
+      const hasTransactions = [invoices, returns, purchaseInvoices, purchaseReturns].some(coll => 
+        coll.some(doc => doc.items?.some((item: any) => item.product_id === productToDelete))
+      );
 
-      if (hasSalesInvoices || hasSalesReturns || hasPurchaseInvoices || hasPurchaseReturns) {
-        showNotification(
-          language === 'ar' 
-            ? 'لا يمكن حذف الصنف لوجود معاملات مرتبطة به (فواتير بيع، شراء، أو مرتجعات).' 
-            : 'Cannot delete product because it is used in transactions (sales, purchases, or returns).',
-          'error'
-        );
-        setIsDeleteModalOpen(false);
-        setProductToDelete(null);
-        return;
+      if (hasTransactions) {
+        showNotification(language === 'ar' ? 'لا يمكن حذف الصنف لوجود معاملات مرتبطة به.' : 'Cannot delete product with associated transactions.', 'error');
+        setIsDeleteModalOpen(false); return;
       }
 
-      // Delete associated journal entry first
       await dbService.deleteJournalEntryByReference(productToDelete, user.company_id);
-      
       await dbService.delete('products', productToDelete);
-      await dbService.logActivity(user.id, user.username, user.company_id, 'حذف صنف', `حذف الصنف: ${product?.name}`, 'products');
+      await dbService.logActivity(user.id, user.username, user.company_id, 'حذف صنف', `حذف الصنف`, 'products');
       showNotification('تم حذف الصنف بنجاح', 'success');
-      setIsDeleteModalOpen(false);
-      setProductToDelete(null);
-    } catch (e: any) {
-      console.error(e);
-      showNotification(e.message || 'حدث خطأ أثناء حذف الصنف', 'error');
-    }
+      setIsDeleteModalOpen(false); setProductToDelete(null);
+    } catch (e: any) { showNotification(e.message || 'حدث خطأ أثناء حذف الصنف', 'error'); }
   };
 
   const openModal = async (product: Product | null = null) => {
     if (product) {
-      console.log('[EDIT] Opening edit modal for product ID:', product.id);
       try {
         const fullData = await dbService.get<Product>('products', product.id);
-        console.log('[EDIT] Product details from API:', fullData);
-        
         if (!fullData) throw new Error('Product not found');
-
         setEditingProduct(fullData);
         setIsAutoCode(false);
         setFormData({ 
-          code: fullData.code, 
-          name: fullData.name, 
+          code: fullData.code, name: fullData.name, 
           type: (fullData.type as any) === 'product' ? 'finished_good' : fullData.type,
-          category: fullData.category || '',
-          unit: fullData.unit || 'قطعة',
-          sale_price: fullData.sale_price, 
-          cost_price: fullData.cost_price, 
-          description: fullData.description || '',
-          image_url: fullData.image_url || '',
-          barcode: fullData.barcode || '',
-          stock: fullData.stock || 0,
-          min_stock: fullData.min_stock || 0,
-          revenue_account_id: fullData.revenue_account_id || '',
-          cost_account_id: fullData.cost_account_id || '',
+          category: fullData.category || '', unit: fullData.unit || 'قطعة',
+          sale_price: fullData.sale_price, cost_price: fullData.cost_price, 
+          description: fullData.description || '', image_url: fullData.image_url || '', 
+          barcode: fullData.barcode || '', stock: fullData.stock || 0, min_stock: fullData.min_stock || 0,
+          revenue_account_id: fullData.revenue_account_id || '', cost_account_id: fullData.cost_account_id || '',
           counter_account_id: fullData.counter_account_id || ''
         });
-        
-        console.log('[EDIT] Form updated with product:', fullData.id);
-      } catch (error: any) {
-        console.error('[EDIT] Error loading product:', error);
-        showNotification('فشل تحميل بيانات المنتج', 'error');
-        return;
-      }
+      } catch (error: any) { showNotification('فشل تحميل بيانات المنتج', 'error'); return; }
     } else {
-      setEditingProduct(null);
-      setIsAutoCode(true);
+      setEditingProduct(null); setIsAutoCode(true);
       setFormData({ 
-        code: '', 
-        name: '', 
-        type: 'finished_good',
-        category: '',
-        unit: 'قطعة',
-        sale_price: 0, 
-        cost_price: 0, 
-        description: '', 
-        image_url: '', 
-        barcode: '',
-        stock: 0,
-        min_stock: 0,
-        revenue_account_id: '',
-        cost_account_id: '',
-        counter_account_id: ''
+        code: '', name: '', type: 'finished_good', category: '', unit: 'قطعة',
+        sale_price: 0, cost_price: 0, description: '', image_url: '', 
+        barcode: '', stock: 0, min_stock: 0, revenue_account_id: '', 
+        cost_account_id: '', counter_account_id: ''
       });
     }
     setIsModalOpen(true);
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setEditingProduct(null);
+  const closeModal = () => { setIsModalOpen(false); setEditingProduct(null); };
+
+  const handleExportExcel = () => {
+    const headers = { 'code': t('products.column_code'), 'name': t('products.column_name'), 'barcode': t('products.form_barcode'), 'sale_price': t('products.column_sale_price'), 'cost_price': t('products.column_cost_price') };
+    exportToExcel(formatDataForExcel(products, headers), { filename: 'Products_Inventory', sheetName: t('products.title') });
   };
 
-  const filteredProducts = products.filter(p => 
-    (p.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
-    (p.code?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+  const handleExportPDF = async () => { if (tableRef.current) await exportToPDFUtil(tableRef.current, { filename: 'Products_Inventory', reportTitle: t('products.list_title') }); };
+
+  const filteredProducts = products.filter(p => (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (p.code || '').toLowerCase().includes(searchTerm.toLowerCase()));
+
+  if (!canView) return (
+    <div className="flex flex-col items-center justify-center h-[60vh] text-zinc-500 gap-4">
+      <Lock size={40} />
+      <h3 className="text-xl font-bold">عذراً، ليس لديك صلاحية للوصول إلى هذه الصفحة</h3>
+    </div>
   );
 
-  if (!canView) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[60vh] text-zinc-500 gap-4">
-        <div className="w-20 h-20 bg-zinc-100 rounded-full flex items-center justify-center text-zinc-400">
-          <Lock size={40} />
-        </div>
-        <h3 className="text-xl font-bold">عذراً، ليس لديك صلاحية للوصول إلى هذه الصفحة</h3>
-        <p className="text-sm">يرجى التواصل مع مدير النظام للحصول على الصلاحيات اللازمة.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('products.title')}</h2>
-          <p className="text-zinc-500">{t('products.subtitle')}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button 
-            onClick={() => setIsActivityLogOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-zinc-600 border border-zinc-200 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm"
-            title={language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
-          >
-            <History size={20} />
-            <span className="hidden md:inline">{language === 'ar' ? 'سجل النشاط' : 'Activity Log'}</span>
-          </button>
-          <ExportButtons 
-            onExportExcel={handleExportExcel} 
-            onExportPDF={handleExportPDF} 
-          />
-          {canCreate && (
-            <button 
-              onClick={() => openModal()}
-              className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-2xl font-bold hover:from-emerald-600 hover:to-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
-            >
-              <Plus size={20} />
-              {t('products.add')}
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-zinc-50 flex items-center gap-4">
-          <div className="relative flex-1">
-            <Search className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 text-zinc-400`} size={18} />
-            <input
-              type="text"
-              placeholder={t('products.search_placeholder')}
-              className={`w-full ${dir === 'rtl' ? 'pl-10 pr-4' : 'pr-10 pl-4'} py-2 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all`}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+    <div className="h-full flex flex-col space-y-6 animate-in fade-in duration-500 overflow-hidden" dir={dir}>
+      {!isModalOpen && (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-emerald-600 text-white rounded-3xl flex items-center justify-center shadow-xl shadow-emerald-500/20">
+              <Package size={28} />
+            </div>
+            <div>
+              <h2 className="text-3xl font-black tracking-tight text-slate-900 italic serif">{t('products.title')}</h2>
+              <p className="text-slate-500 font-medium">{t('products.subtitle')}</p>
+            </div>
           </div>
-          <div className="flex bg-zinc-100 p-1 rounded-xl">
-            <button
-              onClick={() => setView('table')}
-              className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
-              title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
-            >
-              <List size={20} />
+          <div className="flex flex-wrap items-center gap-3">
+            <button onClick={() => setIsActivityLogOpen(true)} className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm">
+              <History size={20} />
+              <span className="hidden md:inline">{t('common.activity_log')}</span>
             </button>
-            <button
-              onClick={() => setView('card')}
-              className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
-              title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
-            >
-              <LayoutGrid size={20} />
-            </button>
-          </div>
-        </div>
-
-        {view === 'table' ? (
-          <div className="overflow-x-auto hidden md:block">
-            <table ref={tableRef} className="w-full">
-              <thead>
-                <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_code')}</th>
-                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_name')}</th>
-                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_type')}</th>
-                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_sale_price')}</th>
-                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_cost_price')}</th>
-                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-50">
-                {filteredProducts.map((product) => (
-                  <tr key={product.id} className="hover:bg-zinc-50/50 transition-colors group">
-                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                      <span className="font-mono text-xs bg-zinc-100 px-2 py-1 rounded text-zinc-600">{product.code}</span>
-                    </td>
-                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                      <div className={`flex items-center gap-3 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse justify-end'}`}>
-                        <div className="w-10 h-10 rounded-lg bg-zinc-100 text-zinc-400 flex items-center justify-center overflow-hidden border border-zinc-50">
-                          {product.image_url ? (
-                            product.image_url.startsWith('data:application/pdf') ? (
-                              <FileText size={20} className="text-red-500" />
-                            ) : (
-                              <img 
-                                src={product.image_url} 
-                                alt={product.name} 
-                                className="w-full h-full object-cover"
-                                referrerPolicy="no-referrer"
-                              />
-                            )
-                          ) : (
-                            <Package size={20} />
-                          )}
-                        </div>
-                        <span className="font-bold text-zinc-900">{product.name}</span>
-                      </div>
-                    </td>
-                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                      <span className="text-xs font-bold text-zinc-500 bg-zinc-100 px-2 py-1 rounded-lg">
-                        {product.type === 'service' ? t('products.type_service') : 
-                         product.type === 'finished_good' ? t('products.type_finished_good') :
-                         product.type === 'raw_material' ? t('products.type_raw_material') :
-                         product.type === 'commodity' ? t('products.type_commodity') : 
-                         (product.type as any) === 'product' ? t('products.type_finished_good') : t('products.type_finished_good')}
-                      </span>
-                    </td>
-                    <td className={`px-6 py-4 font-bold text-emerald-600 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatNumber(Number(product.sale_price) || 0)} {t('invoices.currency')}</td>
-                    <td className={`px-6 py-4 text-zinc-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatNumber(Number(product.cost_price) || 0)} {t('invoices.currency')}</td>
-                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                      <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity no-pdf`}>
-                        <button 
-                          onClick={() => {
-                            setActivityLogDocumentId(product.id);
-                            setIsActivityLogOpen(true);
-                          }}
-                          className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
-                          title={language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
-                        >
-                          <History size={18} />
-                        </button>
-                        {canEdit && (
-                          <button 
-                            onClick={() => openModal(product)}
-                            className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-                          >
-                            <Edit2 size={18} />
-                          </button>
-                        )}
-                        {canDelete && (
-                          <button 
-                            onClick={() => handleDelete(product.id)}
-                            className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {filteredProducts.length === 0 && !loading && (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-zinc-500 italic">{language === 'ar' ? 'لا توجد أصناف.' : 'No products found.'}</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="p-6 md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 space-y-4 md:space-y-0">
-            {filteredProducts.map((product) => (
-              <div key={product.id} className="bg-zinc-50/50 rounded-3xl p-6 border border-zinc-100 hover:border-emerald-200 transition-all group flex flex-col gap-4 relative overflow-hidden">
-                <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                   {canEdit && (
-                    <button 
-                      onClick={() => openModal(product)}
-                      className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                  )}
-                  {canDelete && (
-                    <button 
-                      onClick={() => handleDelete(product.id)}
-                      className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-white text-zinc-400 flex items-center justify-center overflow-hidden border border-zinc-100 shadow-sm">
-                    {product.image_url ? (
-                      product.image_url.startsWith('data:application/pdf') ? (
-                        <FileText size={28} className="text-red-500" />
-                      ) : (
-                        <img 
-                          src={product.image_url} 
-                          alt={product.name} 
-                          className="w-full h-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
-                      )
-                    ) : (
-                      <Package size={28} />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-zinc-500 border border-zinc-100 font-bold mb-1 inline-block">{product.code}</span>
-                    <h4 className="font-bold text-zinc-900 group-hover:text-emerald-700 transition-colors truncate">{product.name}</h4>
-                    <span className="text-[10px] font-bold text-zinc-400 bg-zinc-200/50 px-2 py-0.5 rounded-full uppercase">
-                      {product.type === 'service' ? t('products.type_service') : 
-                       product.type === 'finished_good' ? t('products.type_finished_good') :
-                       product.type === 'raw_material' ? t('products.type_raw_material') :
-                       product.type === 'commodity' ? t('products.type_commodity') : 
-                       (product.type as any) === 'product' ? t('products.type_finished_good') : t('products.type_finished_good')}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-zinc-100">
-                  <div className="space-y-1">
-                    <p className="text-zinc-400 text-[10px] uppercase font-bold tracking-wider">{t('products.column_sale_price')}</p>
-                    <p className="font-bold text-emerald-600">{formatNumber(Number(product.sale_price) || 0)} {t('invoices.currency')}</p>
-                  </div>
-                  <div className={`space-y-1 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                    <p className="text-zinc-400 text-[10px] uppercase font-bold tracking-wider">{t('products.column_cost_price')}</p>
-                    <p className="font-bold text-zinc-700">{formatNumber(Number(product.cost_price) || 0)} {t('invoices.currency')}</p>
-                  </div>
-                </div>
-
-                <button 
-                  onClick={() => {
-                    setActivityLogDocumentId(product.id);
-                    setIsActivityLogOpen(true);
-                  }}
-                  className="mt-2 w-full py-2 bg-white text-zinc-400 text-[10px] font-bold uppercase tracking-widest rounded-xl border border-zinc-100 hover:bg-zinc-100 hover:text-emerald-600 transition-all flex items-center justify-center gap-2"
-                >
-                  <History size={14} />
-                  {language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
-                </button>
-              </div>
-            ))}
-            {filteredProducts.length === 0 && !loading && (
-              <div className="col-span-full py-12 text-center text-zinc-500 italic">{language === 'ar' ? 'لا توجد أصناف.' : 'No products found.'}</div>
+            <ExportButtons onExportExcel={handleExportExcel} onExportPDF={handleExportPDF} />
+            {canCreate && (
+              <button onClick={() => openModal()} className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95 border border-emerald-500/50">
+                <Plus size={20} />
+                {t('products.add')}
+              </button>
             )}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Mobile List View - This is essentially a Card view already, but we can wrap it or unify it */}
-        <div className="md:hidden divide-y divide-zinc-50">
-          {filteredProducts.map((product) => (
-            <div key={product.id} className="p-4 space-y-4" dir={dir}>
-              <div className={`flex justify-between items-start ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                <div className={`flex items-center gap-3 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse text-left'}`}>
-                  <div className="w-12 h-12 rounded-2xl bg-zinc-100 text-zinc-400 flex items-center justify-center overflow-hidden border border-zinc-50">
-                    {product.image_url ? (
-                      product.image_url.startsWith('data:application/pdf') ? (
-                        <FileText size={24} className="text-red-500" />
-                      ) : (
-                        <img 
-                          src={product.image_url} 
-                          alt={product.name} 
-                          className="w-full h-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
-                      )
-                    ) : (
-                      <Package size={24} />
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="font-mono text-[10px] bg-zinc-100 px-2 py-1 rounded text-zinc-600 font-bold w-fit">{product.code}</span>
-                    <h4 className="font-bold text-zinc-900 text-lg">{product.name}</h4>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => {
-                      setActivityLogDocumentId(product.id);
-                      setIsActivityLogOpen(true);
-                    }}
-                    className="p-3 text-zinc-500 bg-zinc-50 rounded-2xl border border-zinc-100 active:scale-95 transition-transform"
-                    title={language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
-                  >
-                    <History size={18} />
-                  </button>
-                  {canEdit && (
-                    <button 
-                      onClick={() => openModal(product)}
-                      className="p-3 text-blue-500 bg-blue-50 rounded-2xl border border-blue-100 active:scale-95 transition-transform"
-                    >
-                      <Edit2 size={18} />
-                    </button>
-                  )}
-                  {canDelete && (
-                    <button 
-                      onClick={() => handleDelete(product.id)}
-                      className="p-3 text-red-500 bg-red-50 rounded-2xl border border-red-100 active:scale-95 transition-transform"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  )}
-                </div>
+      <div className="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden pb-4">
+        <div className={`flex-1 flex flex-col transition-all duration-700 ease-in-out ${isModalOpen ? 'hidden' : 'w-full'}`}>
+          <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full">
+            <div className="p-6 border-b border-slate-100 flex items-center gap-4 bg-slate-50/30">
+              <div className="relative flex-1 group">
+                <Search className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors pointer-events-none`} size={20} />
+                <input
+                  type="text"
+                  placeholder={t('products.search_placeholder')}
+                  className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none font-bold text-slate-900 placeholder:text-slate-400 shadow-sm`}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
               </div>
-              <div className={`flex justify-between items-center pt-2 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                <div className="space-y-1">
-                  <p className={`text-zinc-400 text-[10px] uppercase font-bold tracking-wider ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_sale_price')}</p>
-                  <p className="font-bold text-emerald-600 text-lg">{formatNumber(Number(product.sale_price) || 0)} {t('invoices.currency')}</p>
-                </div>
-                <div className={`space-y-1 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                  <p className={`text-zinc-400 text-[10px] uppercase font-bold tracking-wider ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('products.column_cost_price')}</p>
-                  <p className="font-bold text-zinc-700 text-lg">{formatNumber(Number(product.cost_price) || 0)} {t('invoices.currency')}</p>
-                </div>
+              <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
+                <button onClick={() => setView('table')} className={`p-2 rounded-xl transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}><List size={22} /></button>
+                <button onClick={() => setView('card')} className={`p-2 rounded-xl transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}><LayoutGrid size={22} /></button>
               </div>
             </div>
-          ))}
-          {filteredProducts.length === 0 && !loading && (
-            <div className="p-8 text-center text-zinc-500 italic">{language === 'ar' ? 'لا توجد أصناف حالياً' : 'No products available currently'}</div>
-          )}
-        </div>
-      </div>
 
-      <AnimatePresence>
-        {isModalOpen && (
-          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 md:p-6" dir={dir}>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={closeModal}
-              className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm"
-            />
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+              {view === 'table' ? (
+                <div className="hidden md:block overflow-x-auto h-full">
+                  <table ref={tableRef} className="w-full">
+                    <thead className="sticky top-0 bg-white/80 backdrop-blur-md z-10 border-b border-slate-100">
+                      <tr className="text-slate-500 text-[10px] uppercase font-black tracking-[0.2em]">
+                        <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_code')}</th>
+                        <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_name')}</th>
+                        <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_sale_price')}</th>
+                        <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {filteredProducts.map((product) => (
+                        <tr 
+                          key={product.id} 
+                          onClick={() => openModal(product)}
+                          className="hover:bg-emerald-50/40 transition-all group cursor-pointer"
+                        >
+                          <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <span className="font-mono text-[10px] bg-slate-100 px-3 py-1 rounded-lg text-slate-500 font-black border border-slate-200 group-hover:border-emerald-200 transition-all">{product.code}</span>
+                          </td>
+                          <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                             <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center overflow-hidden border border-slate-200">
+                                  {product.image_url ? <img src={product.image_url} alt="" className="w-full h-full object-cover" /> : <Package size={20} />}
+                                </div>
+                                <div className="flex flex-col">
+                                   <span className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors">{product.name}</span>
+                                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{t(`products.type_${product.type}`)}</span>
+                                </div>
+                             </div>
+                          </td>
+                          <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <span className="font-black text-emerald-600 text-lg">{formatNumber(product.sale_price || 0)} <span className="text-[10px] text-slate-400 italic ms-1">{t('invoices.currency')}</span></span>
+                          </td>
+                          <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                             <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1 opacity-0 group-hover:opacity-100 transition-all`}>
+                                <button onClick={(e) => { e.stopPropagation(); handleDelete(product.id); }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"><Trash2 size={18} /></button>
+                                <div className="p-2 text-emerald-400 bg-emerald-50 rounded-xl">{dir === 'rtl' ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}</div>
+                             </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="p-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                  {filteredProducts.map((product) => (
+                    <div key={product.id} onClick={() => openModal(product)} className="p-8 space-y-6 rounded-[2.5rem] border bg-slate-50/40 border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:bg-white transition-all cursor-pointer group">
+                      <div className="flex justify-between items-start">
+                        <div className="flex flex-col gap-2">
+                          <span className="font-mono text-[10px] bg-white px-3 py-1 rounded-lg text-slate-500 font-black w-fit border border-slate-200">{product.code}</span>
+                          <h4 className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors text-2xl tracking-tighter leading-none">{product.name}</h4>
+                          <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{t(`products.type_${product.type}`)}</span>
+                        </div>
+                        <div className="w-20 h-20 rounded-[2rem] bg-white text-slate-300 flex items-center justify-center overflow-hidden border border-slate-100 group-hover:scale-105 transition-all">
+                           {product.image_url ? <img src={product.image_url} alt="" className="w-full h-full object-cover" /> : <Package size={32} />}
+                        </div>
+                      </div>
+                      <div className="pt-6 border-t border-slate-200/5 flex justify-between items-end">
+                        <div>
+                          <p className="text-slate-400 text-[10px] uppercase font-black tracking-[0.2em] mb-2">{t('products.column_sale_price')}</p>
+                          <p className="font-black text-4xl tracking-tighter leading-none text-emerald-600">{formatNumber(product.sale_price || 0)} <span className="text-sm font-normal text-slate-300 italic">{t('invoices.currency')}</span></p>
+                        </div>
+                        <div className="p-3 bg-white border border-slate-100 rounded-2xl text-slate-300 group-hover:text-emerald-500 transition-all">{dir === 'rtl' ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <AnimatePresence mode="wait">
+          {isModalOpen && (
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-6xl bg-slate-50 shadow-2xl rounded-[3rem] overflow-hidden flex flex-col md:flex-row max-h-[95vh] border border-white"
+              initial={{ x: dir === 'rtl' ? -500 : 500, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: dir === 'rtl' ? -500 : 500, opacity: 0 }}
+              transition={{ type: 'spring', damping: 32, stiffness: 280 }}
+              className="w-full flex flex-col lg:flex-row h-full bg-white rounded-[2.5rem] border border-slate-200 shadow-2xl overflow-hidden relative z-[40]"
             >
-              {/* Form Side */}
               <div className="flex-1 flex flex-col overflow-hidden bg-white">
                 <div className={`p-8 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white z-10 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 text-right">
                     <div className="w-14 h-14 bg-emerald-600 text-white rounded-[1.5rem] flex items-center justify-center shadow-xl shadow-emerald-500/20">
                        <Package size={28} />
                     </div>
                     <div>
                        <h3 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-1">{editingProduct ? t('products.edit') : t('products.add')}</h3>
-                       <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">{language === 'ar' ? 'إدخال بيانات الصنف والمخزون' : 'Product & Inventory Data Entry'}</p>
+                       <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">{t('products.subtitle')}</p>
                     </div>
                   </div>
-                  <button onClick={closeModal} className="text-slate-300 hover:text-slate-900 p-3 hover:bg-slate-50 rounded-full transition-all">
-                    <X size={24} />
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button type="submit" form="product-form" className="px-8 py-4 bg-emerald-600 text-white rounded-[1.25rem] font-black hover:bg-emerald-700 transition-all shadow-xl active:scale-95 border border-emerald-500/50">{editingProduct ? t('common.save') : t('common.add')}</button>
+                    <button onClick={closeModal} className="text-slate-300 hover:text-slate-900 p-3 hover:bg-slate-50 rounded-full transition-all"><X size={24} /></button>
+                  </div>
                 </div>
                 
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
-                  <form onSubmit={handleSubmit} className="p-8 md:p-12 space-y-12">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
-                      {/* Name & Code */}
+                  <form id="product-form" onSubmit={handleSubmit} className="p-8 md:p-12 space-y-12" dir={dir}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10 text-right">
                       <div className="md:col-span-2">
-                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_name')}</label>
-                        <input
-                          required
-                          type="text"
-                          placeholder={language === 'ar' ? 'اسم الصنف / المنتج' : 'Product Name'}
-                          className="w-full px-8 py-5 bg-white border border-slate-100 rounded-[1.5rem] text-xl font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none placeholder:text-slate-300"
-                          value={formData.name}
-                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        />
+                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1`}>{t('products.form_name')}</label>
+                        <input required type="text" placeholder={language === 'ar' ? 'اسم الصنف / المنتج' : 'Product Name'} className="w-full px-8 py-5 bg-white border border-slate-100 rounded-[1.5rem] text-xl font-black text-slate-900 shadow-sm transition-all outline-none" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
                       </div>
-
                       <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_code')}</label>
+                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1`}>{t('products.form_code')}</label>
                         <div className="relative group">
-                          <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
-                          <input
-                            required
-                            readOnly
-                            type="text"
-                            className="w-full px-8 py-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-mono text-lg font-black text-slate-400 cursor-not-allowed ps-14 tracking-widest"
-                            value={formData.code}
-                          />
+                          <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300`} size={20} />
+                          <input required readOnly type="text" className="w-full px-8 py-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] font-mono text-lg font-black text-slate-400 ps-14 tracking-widest" value={formData.code} />
                         </div>
                       </div>
-
                       <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_type')}</label>
+                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1`}>{t('products.form_type')}</label>
                         <div className="relative group">
-                          <LayoutGrid className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
-                          <select
-                            required
-                            className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14 appearance-none"
-                            value={formData.type}
-                            onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
-                          >
+                          <LayoutGrid className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300`} size={20} />
+                          <select required className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm ps-14 appearance-none" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}>
                             <option value="finished_good">{t('products.type_finished_good')}</option>
                             <option value="service">{t('products.type_service')}</option>
                             <option value="raw_material">{t('products.type_raw_material')}</option>
@@ -822,366 +494,118 @@ export const Products: React.FC = () => {
                           </select>
                         </div>
                       </div>
-
-                      {/* Category & Unit */}
                       <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_category')}</label>
-                        <input
-                          type="text"
-                          placeholder={language === 'ar' ? 'الفئة / التصنيف' : 'Category'}
-                          className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none"
-                          value={formData.category}
-                          onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                        />
+                        <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1">{t('products.form_category')}</label>
+                        <input type="text" placeholder={t('products.form_category')} className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} />
                       </div>
-
                       <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_unit')}</label>
-                        <select
-                          className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none appearance-none"
-                          value={formData.unit}
-                          onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                        >
+                        <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1">{t('products.form_unit')}</label>
+                        <select className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm appearance-none" value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value })}>
                           <option value="قطعة">{t('products.unit_piece')}</option>
                           <option value="كيلو">{t('products.unit_kg')}</option>
                           <option value="متر">{t('products.unit_meter')}</option>
                           <option value="لتر">{t('products.unit_liter')}</option>
-                          <option value="علبة">{t('products.unit_box')}</option>
-                          <option value="كرتونة">{t('products.unit_carton')}</option>
                         </select>
                       </div>
-
-                      {/* Pricing Section */}
                       <div className="md:col-span-2 p-10 bg-slate-50/50 rounded-[3rem] border border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-10">
                         <div>
-                          <label className={`block text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_sale_price')}</label>
+                          <label className="block text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest px-1">{t('products.form_sale_price')}</label>
                           <div className="relative group">
-                            <Wallet className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-emerald-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
-                            <input
-                              required
-                              type="number"
-                              step="0.01"
-                              className="w-full px-8 py-5 bg-white border border-emerald-100 rounded-[1.5rem] text-3xl font-black text-emerald-600 shadow-sm transition-all focus:ring-8 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14"
-                              value={isNaN(formData.sale_price) ? '' : formData.sale_price}
-                              onChange={(e) => setFormData({ ...formData, sale_price: parseFloat(e.target.value) })}
-                            />
+                            <Wallet className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-emerald-300`} size={20} />
+                            <input required type="number" step="0.01" className="w-full px-8 py-5 bg-white border border-emerald-100 rounded-[1.5rem] text-3xl font-black text-emerald-600 ps-14" value={formData.sale_price || ''} onChange={(e) => setFormData({ ...formData, sale_price: parseFloat(e.target.value) || 0 })} />
                           </div>
                         </div>
-
                         <div>
-                          <label className={`block text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_cost_price')}</label>
+                          <label className="block text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest px-1">{t('products.form_cost_price')}</label>
                           <div className="relative group">
-                            <Wallet className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-slate-500 transition-colors`} size={20} />
-                            <input
-                              required
-                              type="number"
-                              step="0.01"
-                              className="w-full px-8 py-5 bg-white border border-slate-200 rounded-[1.5rem] text-3xl font-black text-slate-600 shadow-sm transition-all focus:ring-8 focus:ring-slate-500/5 focus:border-slate-500/50 outline-none ps-14"
-                              value={isNaN(formData.cost_price) ? '' : formData.cost_price}
-                              onChange={(e) => setFormData({ ...formData, cost_price: parseFloat(e.target.value) })}
-                            />
+                            <Wallet className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300`} size={20} />
+                            <input required type="number" step="0.01" className="w-full px-8 py-5 bg-white border border-slate-200 rounded-[1.5rem] text-3xl font-black text-slate-900 ps-14" value={formData.cost_price || ''} onChange={(e) => setFormData({ ...formData, cost_price: parseFloat(e.target.value) || 0 })} />
                           </div>
                         </div>
                       </div>
-
-                      {/* Stock Section */}
                       <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_stock_quantity')}</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none"
-                          value={isNaN(formData.stock) ? '' : formData.stock}
-                          onChange={(e) => setFormData({ ...formData, stock: parseFloat(e.target.value) })}
-                        />
+                        <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1">{t('products.form_stock_quantity')}</label>
+                        <input type="number" className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black" value={formData.stock || ''} onChange={(e) => setFormData({ ...formData, stock: parseFloat(e.target.value) || 0 })} />
                       </div>
-
                       <div>
-                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_min_stock')}</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none placeholder:text-amber-500/50"
-                          placeholder={language === 'ar' ? 'التنبيه عند انخفاض المخزون' : 'Min alert level'}
-                          value={isNaN(formData.min_stock) ? '' : formData.min_stock}
-                          onChange={(e) => setFormData({ ...formData, min_stock: parseFloat(e.target.value) })}
-                        />
+                        <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1">{t('products.form_min_stock')}</label>
+                        <input type="number" className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black" value={formData.min_stock || ''} onChange={(e) => setFormData({ ...formData, min_stock: parseFloat(e.target.value) || 0 })} />
                       </div>
-
                       <div className="md:col-span-2">
-                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_description')}</label>
-                        <textarea
-                          className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.5rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none min-h-[120px]"
-                          rows={3}
-                          value={formData.description}
-                          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        />
+                        <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1">{t('products.form_description')}</label>
+                        <textarea className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.5rem] text-lg font-black min-h-[100px]" rows={2} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
                       </div>
-
-                      {/* Image & Barcode Section */}
                       <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-10">
                         <div>
-                          <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_attachment')}</label>
+                          <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1">{t('products.form_attachment')}</label>
                           <div className="relative group mb-4">
-                            <input
-                              type="file"
-                              accept="image/*,application/pdf"
-                              onChange={handleFileChange}
-                              className="hidden"
-                              id="product-attachment"
-                            />
-                            <label 
-                              htmlFor="product-attachment"
-                              className="flex flex-col items-center justify-center gap-4 w-full p-10 bg-slate-50 border-[3px] border-dashed border-slate-100 rounded-[2.5rem] cursor-pointer hover:bg-slate-100 hover:border-emerald-200 transition-all group shadow-inner"
-                            >
-                              <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-300 group-hover:text-emerald-500 transition-all group-hover:scale-110">
-                                <Paperclip size={32} />
-                              </div>
-                              <span className="text-sm text-slate-400 font-black uppercase tracking-widest group-hover:text-emerald-600">
-                                {formData.image_url ? (language === 'ar' ? 'تغيير المرفق' : 'Change Attachment') : (language === 'ar' ? 'رفع صورة الصنف' : 'Upload Image')}
-                              </span>
+                            <input type="file" accept="image/*,application/pdf" onChange={handleFileChange} className="hidden" id="product-attachment" />
+                            <label htmlFor="product-attachment" className="flex flex-col items-center justify-center gap-4 w-full p-10 bg-slate-50 border-[3px] border-dashed border-slate-100 rounded-[2.5rem] cursor-pointer hover:bg-slate-100 transition-all">
+                              <Paperclip size={32} className="text-slate-300" />
+                              <span className="text-sm text-slate-400 font-black uppercase tracking-widest">{formData.image_url ? t('common.edit') : t('common.upload')}</span>
                             </label>
                           </div>
-                          {formData.image_url && (
-                            <div className="relative flex justify-center bg-white p-6 rounded-[2rem] border border-slate-100 overflow-hidden shadow-xl shadow-slate-200/50 group">
-                              <button 
-                                type="button"
-                                onClick={() => setFormData({ ...formData, image_url: '' })}
-                                className="absolute top-4 right-4 text-red-500 hover:bg-red-50 p-2 rounded-full bg-white shadow-lg transition-all active:scale-90 z-20"
-                              >
-                                <X size={20} />
-                              </button>
-                              {formData.image_url.startsWith('data:application/pdf') ? (
-                                <div className="flex flex-col items-center gap-3 py-6">
-                                  <FileText size={64} className="text-red-500" />
-                                  <span className="text-xs font-black text-slate-500 tracking-widest uppercase">File Preview (PDF)</span>
-                                </div>
-                              ) : (
-                                <img 
-                                  src={formData.image_url} 
-                                  alt="Preview" 
-                                  className="max-h-56 w-auto rounded-2xl object-contain shadow-2xl transition-transform group-hover:scale-105 duration-500"
-                                  referrerPolicy="no-referrer"
-                                />
-                              )}
-                            </div>
-                          )}
+                          {formData.image_url && <img src={formData.image_url} alt="" className="max-h-32 mx-auto rounded-lg" />}
                         </div>
-
                         <div className="space-y-6">
-                          <div>
-                            <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_barcode')}</label>
-                            <input
-                              type="text"
-                              placeholder={language === 'ar' ? 'باركود الصنف' : 'Barcode'}
-                              className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none"
-                              value={formData.barcode}
-                              onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                            />
-                          </div>
-                          {formData.barcode && (
-                            <div className="flex flex-col items-center justify-center gap-4 bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50">
-                              <div className="p-4 bg-slate-50 rounded-2xl overflow-hidden shadow-inner flex items-center justify-center w-full">
-                                <Barcode 
-                                  value={formData.barcode} 
-                                  width={1.8} 
-                                  height={80} 
-                                  fontSize={14}
-                                  background="transparent"
-                                />
-                              </div>
-                              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">{formData.barcode}</span>
-                            </div>
-                          )}
+                          <label className="block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1">{t('products.form_barcode')}</label>
+                          <input type="text" className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black" value={formData.barcode} onChange={(e) => setFormData({ ...formData, barcode: e.target.value })} />
+                          {formData.barcode && <div className="p-4 bg-white border border-slate-100 rounded-2xl flex justify-center"><Barcode value={formData.barcode} width={1.2} height={50} fontSize={12} /></div>}
                         </div>
                       </div>
-
-                      {/* Accounts Section */}
-                      <div className="md:col-span-2 p-10 bg-slate-50/50 rounded-[3rem] border border-slate-100 space-y-10">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                          <div>
-                            <label className={`block text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_revenue_account')}</label>
-                            <div className="relative group">
-                               <Layers className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-emerald-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
-                               <select
-                                required
-                                className="w-full px-8 py-4 bg-white border border-emerald-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14 appearance-none"
-                                value={formData.revenue_account_id}
-                                onChange={(e) => setFormData({ ...formData, revenue_account_id: e.target.value })}
-                              >
-                                <option value="">{t('common.select_category')}</option>
-                                {accounts.map(account => (
-                                  <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className={`block text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.form_cost_account')}</label>
-                            <div className="relative group">
-                               <Layers className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-slate-500 transition-colors`} size={20} />
-                               <select
-                                required
-                                className="w-full px-8 py-4 bg-white border border-slate-200 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm focus:ring-4 focus:ring-slate-500/5 focus:border-slate-500/50 outline-none ps-14 appearance-none"
-                                value={formData.cost_account_id}
-                                onChange={(e) => setFormData({ ...formData, cost_account_id: e.target.value })}
-                              >
-                                <option value="">{t('common.select_category')}</option>
-                                {accounts.map(account => (
-                                  <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
+                      <div className="md:col-span-2 p-10 bg-slate-50/50 rounded-[3rem] border border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-10">
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest px-1">{t('products.form_revenue_account')}</label>
+                          <select required className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black appearance-none" value={formData.revenue_account_id} onChange={(e) => setFormData({ ...formData, revenue_account_id: e.target.value })}>
+                            <option value="">{t('common.select_category')}</option>
+                            {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                          </select>
                         </div>
-
-                        {formData.stock > 0 && (
-                          <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-                             <div className="flex items-center gap-4">
-                                <div className="w-14 h-14 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-emerald-500/20">
-                                   <Wallet size={28} />
-                                </div>
-                                <div>
-                                   <h4 className="text-xl font-black text-slate-900 leading-none mb-1">{t('products.form_stock_settings')}</h4>
-                                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">تحميل القيمة الافتتاحية للمخزون</p>
-                                </div>
-                             </div>
-
-                             <div className="space-y-6">
-                                <div>
-                                  <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_counter_account')}</label>
-                                  <div className="relative group">
-                                     <Layers className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
-                                     <select
-                                      required
-                                      className="w-full px-8 py-4 bg-white border border-slate-200 rounded-2xl text-lg font-black text-slate-900 shadow-sm focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14 appearance-none"
-                                      value={formData.counter_account_id}
-                                      onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}
-                                    >
-                                      <option value="">{language === 'ar' ? 'اختر حساب الطرف الآخر...' : 'Select counter account...'}</option>
-                                      {accounts.map(account => (
-                                        <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                  <div className="mt-4 p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-center gap-3">
-                                     <AlertCircle size={20} className="text-amber-500 flex-shrink-0" />
-                                     <p className="text-[11px] font-bold text-amber-900 leading-tight">
-                                       {language === 'ar' 
-                                         ? 'سيتم إنشاء قيد يومية مالي آلي لموازنة قيمة المخزون الافتتاحي المدخلة.' 
-                                         : 'An automatic journal entry will be created to balance the entered opening stock value.'}
-                                     </p>
-                                  </div>
-                                </div>
-
-                                {formData.counter_account_id && (
-                                   <div className="bg-slate-50/50 p-6 rounded-[2.5rem] border border-slate-100 shadow-inner">
-                                      <JournalEntryPreview 
-                                        title={language === 'ar' ? 'قيد الرصيد الافتتاحي' : 'Opening Entry Preview'}
-                                        items={[
-                                          {
-                                            account_name: accounts.find(a => a.name.includes('مخزون') || a.name.includes('بضاعة'))?.name || (language === 'ar' ? 'حساب المخزون' : 'Inventory Account'),
-                                            debit: formData.stock * (formData.cost_price || 0),
-                                            credit: 0,
-                                            description: language === 'ar' ? 'مخزون افتتاحي' : 'Opening Stock'
-                                          },
-                                          {
-                                            account_name: accounts.find(a => a.id === formData.counter_account_id)?.name || (language === 'ar' ? 'حساب الطرف الآخر' : 'Counter Account'),
-                                            debit: 0,
-                                            credit: formData.stock * (formData.cost_price || 0),
-                                            description: language === 'ar' ? `مخزون افتتاحي : ${formData.name}` : `Opening stock: ${formData.name}`
-                                          }
-                                        ]}
-                                      />
-                                   </div>
-                                )}
-                             </div>
-                          </div>
-                        )}
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest px-1">{t('products.form_cost_account')}</label>
+                          <select required className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black appearance-none" value={formData.cost_account_id} onChange={(e) => setFormData({ ...formData, cost_account_id: e.target.value })}>
+                            <option value="">{t('common.select_category')}</option>
+                            {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                          </select>
+                        </div>
                       </div>
-                    </div>
-
-                    {/* Footer Actions */}
-                    <div className="pt-12 pb-6 flex gap-6 sticky bottom-0 bg-white/95 backdrop-blur-md z-30">
-                      <button 
-                        type="submit"
-                        className="flex-1 py-6 bg-zinc-900 text-white rounded-[2rem] font-black text-2xl hover:bg-zinc-800 transition-all shadow-2xl active:scale-[0.98] border border-white/10"
-                      >
-                        {editingProduct ? (language === 'ar' ? 'تحديث البيانات' : 'Update Item') : (language === 'ar' ? 'حفظ الصنف' : 'Save Item')}
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={closeModal}
-                        className="px-14 py-6 bg-slate-100 text-slate-500 rounded-[2rem] font-black text-lg hover:bg-slate-200 transition-all active:scale-95 border border-slate-200"
-                      >
-                        {t('common.cancel')}
-                      </button>
                     </div>
                   </form>
                 </div>
               </div>
 
-              {/* Audit Side */}
               {editingProduct && (
                 <div className="hidden lg:flex w-[450px] flex-col bg-slate-50 border-s border-white overflow-hidden">
-                  <div className="p-10 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
-                     <div className="flex items-center gap-4">
-                         <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-400">
-                           <History size={24} />
-                         </div>
-                         <div>
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block leading-none mb-1">Audit Trail</span>
-                            <span className="font-black text-slate-900 text-lg">{language === 'ar' ? 'سجل نشاط الصنف' : 'Activity Log'}</span>
-                         </div>
-                      </div>
+                  <div className="p-8 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10 text-right">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">Audit Trail</span>
+                    <span className="font-black text-slate-900 text-lg">{t('common.activity_log')}</span>
                   </div>
                   <div className="flex-1 overflow-y-auto custom-scrollbar">
-                     <InlineActivityLog category="products" documentId={editingProduct.id} />
+                    <InlineActivityLog category="products" documentId={editingProduct.id} />
                   </div>
                 </div>
               )}
             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+      </div>
 
-      {/* Delete Confirmation Modal */}
+      <PageActivityLog category="products" isOpen={isActivityLogOpen} onClose={() => setIsActivityLogOpen(false)} documentId={activityLogDocumentId} />
+
       {isDeleteModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 animate-in zoom-in-95 duration-200" dir={dir}>
-            <h3 className="text-xl font-bold text-zinc-900 mb-4">{t('common.delete_confirm')}</h3>
-            <p className="text-zinc-500 mb-6">{language === 'ar' ? 'هل أنت متأكد من رغبتك في حذف هذا الصنف؟ لا يمكن التراجع عن هذا الإجراء.' : 'Are you sure you want to delete this product? This action cannot be undone.'}</p>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsDeleteModalOpen(false)} />
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative bg-white rounded-[2.5rem] p-10 max-w-md w-full shadow-2xl text-center border border-slate-100">
+            <div className="w-20 h-20 bg-rose-50 text-rose-500 rounded-3xl flex items-center justify-center mx-auto mb-6"><Trash2 size={40} /></div>
+            <h3 className="text-2xl font-black text-slate-900 mb-2">{t('common.delete')}؟</h3>
+            <p className="text-slate-500 mb-8">{t('common.confirm_action')}</p>
             <div className="flex gap-4">
-              <button 
-                onClick={() => {
-                  setIsDeleteModalOpen(false);
-                  setProductToDelete(null);
-                }}
-                className="flex-1 py-3 bg-zinc-100 text-zinc-600 rounded-xl font-bold hover:bg-zinc-200 transition-all"
-              >
-                {language === 'ar' ? 'إلغاء' : 'Cancel'}
-              </button>
-              <button 
-                onClick={confirmDelete}
-                className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all shadow-lg shadow-red-500/20"
-              >
-                {language === 'ar' ? 'حذف' : 'Delete'}
-              </button>
+              <button onClick={() => setIsDeleteModalOpen(false)} className="flex-1 px-6 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold">{t('common.cancel')}</button>
+              <button onClick={confirmDelete} className="flex-1 px-6 py-4 bg-rose-600 text-white rounded-2xl font-bold">{t('common.delete')}</button>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
-
-      <PageActivityLog 
-        category="products" 
-        isOpen={isActivityLogOpen} 
-        onClose={() => {
-          setIsActivityLogOpen(false);
-          setActivityLogDocumentId(undefined);
-        }} 
-        documentId={activityLogDocumentId}
-      />
     </div>
   );
 };
