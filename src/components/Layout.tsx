@@ -198,7 +198,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
     const navItems = [
       ...(isSuperAdmin ? [{ id: 'super_admin_dashboard', label: t('nav.super_admin_dashboard'), icon: Shield, path: '/super-admin@m@r2020' }] : []),
       { id: 'dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
-      { id: 'currencies', label: t('nav.currencies'), icon: Coins },
       { 
         id: 'master_data', 
         label: t('nav.master_data'), 
@@ -247,7 +246,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         subItems: [
           { id: 'account_types', label: t('nav.account_types'), icon: PieChart },
           { id: 'accounts', label: t('nav.accounts'), icon: BookOpen },
-          ...(company?.settings?.enable_multi_currency || isSuperAdmin ? [{ id: 'currencies', label: t('nav.currencies'), icon: Coins }] : []),
           { id: 'chart_of_accounts', label: t('nav.chart_of_accounts'), icon: PieChart },
           { id: 'create_journal_entry', label: t('nav.create_journal_entry'), icon: Plus },
           { id: 'journal_entries', label: t('nav.journal_entries'), icon: FileText },
@@ -282,7 +280,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'integrity_dashboard', label: t('nav.integrity_check') || 'Integrity Check', icon: ShieldCheck },
           { id: 'backup_restore', label: t('nav.backup_restore'), icon: Database },
           { id: 'activity_log', label: t('nav.activity_log'), icon: History },
-          ...(company?.settings?.enable_multi_currency || (company?.settings as any)?.enable_multi_currency === 'true' || isSuperAdmin ? [{ id: 'currencies', label: t('nav.currencies'), icon: Coins }] : [])
         ]
       }
     ];
@@ -291,7 +288,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       { id: 'dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
       { id: 'companies', label: t('nav.companies'), icon: Building2 },
       { id: 'users', label: t('nav.users'), icon: UsersIcon },
-      { id: 'currencies', label: t('nav.currencies'), icon: Coins },
       { id: 'system_check', label: 'System Integrity', icon: ShieldCheck },
       { id: 'activity_log', label: 'Audit Logs', icon: History },
     ];
@@ -305,11 +301,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
     return navItems.map(item => {
       // Check if top-level item should be visible
-      const canView = hasPermission(item.id, 'view') || item.id === 'currencies';
+      const canView = hasPermission(item.id, 'view');
       
       if (item.subItems) {
         const visibleSubItems = item.subItems.filter(sub => {
-          if (sub.id === 'currencies') return true; // Always allow currencies if it reached here
           return hasPermission(sub.id, 'view');
         });
         if (visibleSubItems.length > 0) {
