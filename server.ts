@@ -77,11 +77,20 @@ async function startServer() {
       // Other
       'ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "required_sub_account" BOOLEAN DEFAULT FALSE',
       
+      // Products specific columns from arabic request
+      'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "inventory_account_id" VARCHAR(36)',
+      'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "inventory_account_name" VARCHAR(255)',
+      'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "vat_account_id" VARCHAR(36)',
+      'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "vat_account_name" VARCHAR(255)',
+      'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "vat_rate" DECIMAL(10,4) DEFAULT 0',
+      
       // Companies
       'ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "logo_url" TEXT',
       'ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "country" VARCHAR(100)',
       'ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "currency" VARCHAR(50)',
       'ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "fiscal_year_end" DATE',
+      'ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "vat_enabled" BOOLEAN DEFAULT FALSE',
+      'ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "wht_enabled" BOOLEAN DEFAULT FALSE',
       
       // Currencies
       'ALTER TABLE "currencies" ADD COLUMN IF NOT EXISTS "flag" VARCHAR(20)'
