@@ -13,7 +13,9 @@ import {
   Image as ImageIcon,
   Search,
   ChevronDown,
-  Check
+  Check,
+  Boxes,
+  Info
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -33,6 +35,7 @@ interface CompanyData {
   fiscal_year_day: number;
   fiscal_year_month: number;
   enable_multi_currency: boolean;
+  inventory_cost_method?: 'wac' | 'fifo';
 }
 
 // Searchable Select Component
@@ -155,7 +158,8 @@ export function CompanySettings() {
     currency: 'EGP',
     fiscal_year_day: 31,
     fiscal_year_month: 12,
-    enable_multi_currency: false
+    enable_multi_currency: false,
+    inventory_cost_method: 'wac'
   });
 
   useEffect(() => {
@@ -198,7 +202,8 @@ export function CompanySettings() {
             currency: company.settings?.currency || company.currency || 'EGP',
             fiscal_year_day: fday,
             fiscal_year_month: fmonth,
-            enable_multi_currency: company.settings?.enable_multi_currency || false
+            enable_multi_currency: company.settings?.enable_multi_currency || false,
+            inventory_cost_method: company.settings?.inventory_cost_method || 'wac'
           });
       }
     } catch (error) {
@@ -234,7 +239,8 @@ export function CompanySettings() {
         settings: {
           ...originalSettings,
           currency: data.currency,
-          enable_multi_currency: data.enable_multi_currency
+          enable_multi_currency: data.enable_multi_currency,
+          inventory_cost_method: data.inventory_cost_method || 'wac'
         }
       });
       
@@ -242,7 +248,8 @@ export function CompanySettings() {
       setOriginalSettings({
         ...originalSettings,
         currency: data.currency,
-        enable_multi_currency: data.enable_multi_currency
+        enable_multi_currency: data.enable_multi_currency,
+        inventory_cost_method: data.inventory_cost_method || 'wac'
       });
       
       toast.success(t('company_settings.save_success'));
@@ -548,6 +555,92 @@ export function CompanySettings() {
                             ? (data.enable_multi_currency ? 'translate-x-[-120%]' : 'translate-x-[-5%]')
                             : (data.enable_multi_currency ? 'translate-x-[120%]' : 'translate-x-[5%]')
                         }`} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Inventory Costing Policy Selection */}
+                  <div className="md:col-span-2 p-8 bg-white/5 border border-white/10 rounded-[2.5rem] transition-all relative space-y-6">
+                    <div className="flex items-center gap-3 border-b border-white/5 pb-4">
+                      <div className="w-10 h-10 bg-white/10 text-emerald-400 rounded-xl flex items-center justify-center backdrop-blur-md">
+                        <Boxes size={20} />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-black text-white text-xl tracking-tight">
+                          {t('company_settings.inventory_cost_method')}
+                        </span>
+                        <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest italic">
+                          {language === 'ar' ? 'حدد الأسلوب المحاسبي لتقييم وطلب بضاعة المخازن.' : 'Select the accounting method used to evaluate stock and calculate COGS.'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* WAC Option */}
+                      <button
+                        type="button"
+                        onClick={() => setData(prev => ({ ...prev, inventory_cost_method: 'wac' }))}
+                        className={`p-6 rounded-2xl border transition-all duration-300 flex flex-col gap-2 ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
+                          data.inventory_cost_method === 'wac'
+                            ? 'bg-emerald-500/10 border-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.15)]'
+                            : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/[0.08] hover:border-white/25'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="font-black text-lg text-white">
+                            {t('company_settings.inventory_cost_method.wac')}
+                          </span>
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                            data.inventory_cost_method === 'wac' ? 'border-emerald-500' : 'border-zinc-600'
+                          }`}>
+                            {data.inventory_cost_method === 'wac' && <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />}
+                          </div>
+                        </div>
+                        <span className="text-xs text-zinc-400 leading-relaxed font-semibold">
+                          {language === 'ar' ? 'أكثر شيوعاً واستقراراً للأسعار المستمرة.' : 'More common and stable for fluctuating prices.'}
+                        </span>
+                      </button>
+
+                      {/* FIFO Option */}
+                      <button
+                        type="button"
+                        onClick={() => setData(prev => ({ ...prev, inventory_cost_method: 'fifo' }))}
+                        className={`p-6 rounded-2xl border transition-all duration-300 flex flex-col gap-2 ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
+                          data.inventory_cost_method === 'fifo'
+                            ? 'bg-emerald-500/10 border-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.15)]'
+                            : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/[0.08] hover:border-white/25'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="font-black text-lg text-white">
+                            {t('company_settings.inventory_cost_method.fifo')}
+                          </span>
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                            data.inventory_cost_method === 'fifo' ? 'border-emerald-500' : 'border-zinc-600'
+                          }`}>
+                            {data.inventory_cost_method === 'fifo' && <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />}
+                          </div>
+                        </div>
+                        <span className="text-xs text-zinc-400 leading-relaxed font-semibold">
+                          {language === 'ar' ? 'مثالي في حالات توريد بضاعة ذات صلاحية محددة.' : 'Ideal for perishable goods and highly accurate matching.'}
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Policy Definition Display */}
+                    <div className="p-5 bg-white/5 border border-white/5 rounded-2xl flex gap-4 transition-all duration-300">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Info size={16} />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <h4 className="text-xs font-black text-white uppercase tracking-widest">
+                          {language === 'ar' ? 'تعريف وتفاصيل السياسة المحددة:' : 'Policy definition & details:'}
+                        </h4>
+                        <p className="text-xs font-semibold text-zinc-300 leading-relaxed">
+                          {data.inventory_cost_method === 'fifo'
+                            ? t('company_settings.inventory_cost_method.fifo.desc')
+                            : t('company_settings.inventory_cost_method.wac.desc')}
+                        </p>
                       </div>
                     </div>
                   </div>

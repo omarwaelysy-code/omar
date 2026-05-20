@@ -924,6 +924,11 @@ export const ar = {
   'company_settings.address': 'العنوان',
   'company_settings.currency': 'العملة',
   'company_settings.fiscal_year_end': 'تاريخ انتهاء السنة المالية',
+  'company_settings.inventory_cost_method': 'سياسة تكلفة المخزون',
+  'company_settings.inventory_cost_method.wac': 'متوسط التكلفة (WAC)',
+  'company_settings.inventory_cost_method.fifo': 'الوارد أولاً، يصرف أولاً (FIFO)',
+  'company_settings.inventory_cost_method.wac.desc': 'سياسة متوسط التكلفة (Weighted Average Cost): تعتمد هذه السياسة على إعادة حساب متوسط تكلفة الوحدة في المخزون بعد كل عملية شراء جديدة، حيث تتوزع المصاريف والخصومات والضرائب على الوحدات وتُباع البضائع أو تُخزن بهذا المتوسط.',
+  'company_settings.inventory_cost_method.fifo.desc': 'سياسة الوارد أولاً، يصرف أولاً (First-In, First-Out): تفترض هذه السياسة أن السلع والمنتجات التي يتم شراؤها أو إنتاجها أولاً هي التي تباع أولاً، مما يجعل تقييم المخزون المتبقي يقارب السعر السوقي الحالي نظراً لأنه يتكون من أحدث المشتريات.',
   'company_settings.save_success': 'تم حفظ بيانات الشركة بنجاح',
 
   'currencies.title': 'إدارة العملات والعملات المتعددة',
