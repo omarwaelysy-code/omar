@@ -615,7 +615,7 @@ export const Products: React.FC = () => {
                                  value={formData.inventory_account_id} 
                                  onChange={(e) => setFormData({ ...formData, inventory_account_id: e.target.value })}
                                >
-                                 <option value="">{t('common.select_category')}</option>
+                                 <option value="">{t('common.select_account')}</option>
                                  {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                                </select>
                              </div>
@@ -633,7 +633,7 @@ export const Products: React.FC = () => {
                                    value={formData.vat_account_id} 
                                    onChange={(e) => setFormData({ ...formData, vat_account_id: e.target.value })}
                                  >
-                                   <option value="">{t('common.select_category')}</option>
+                                   <option value="">{t('common.select_account')}</option>
                                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                                  </select>
                                </div>

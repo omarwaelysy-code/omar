@@ -11,7 +11,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'logo_url', 'website', 'country', 'currency', 'fiscal_year_end',
     'subscription_status', 'subscription_plan', 'subscription_start',
     'subscription_end', 'subscription_expiry', 'subscription_days', 'users_limit', 
-    'transactions_limit', 'company_status', 'features', 'settings', 'created_at', 'updated_at'
+    'transactions_limit', 'company_status', 'features', 'settings', 'vat_enabled', 'wht_enabled', 'created_at', 'updated_at'
   ],
   users: [
     'id', 'username', 'name', 'email', 'password_hash', 'mobile', 'role', 'company_id',
@@ -28,7 +28,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   products: [
     'id', 'company_id', 'revenue_account_id', 'cost_account_id', 'revenue_account_name', 'cost_account_name', 'name', 'code', 'barcode',
     'type', 'description', 'image_url', 'category', 'unit', 'cost_price', 'sale_price', 'stock', 'min_stock', 
-    'current_stock', 'is_service', 'counter_account_id', 'created_at'
+    'current_stock', 'is_service', 'counter_account_id', 'inventory_account_id', 'inventory_account_name', 'vat_account_id', 'vat_account_name', 'vat_rate', 'created_at'
   ],
   accounts: [
     'id', 'company_id', 'type_id', 'parent_id', 'code', 'name', 'opening_balance', 'opening_balance_date', 'required_sub_account', 'is_active', 'created_at'
