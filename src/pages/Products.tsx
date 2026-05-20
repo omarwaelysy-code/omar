@@ -13,7 +13,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { useViewPreference } from '../hooks/useViewPreference';
-import { Product, Account } from '../types';
+import { Product, Account, Company } from '../types';
 import { PaginationControls } from '../components/PaginationControls';
 import { ExportButtons } from '../components/ExportButtons';
 import { PageActivityLog } from '../components/PageActivityLog';
@@ -30,6 +30,7 @@ export const Products: React.FC = () => {
   
   const [products, setProducts] = useState<Product[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -40,6 +41,7 @@ export const Products: React.FC = () => {
   const [isAutoCode, setIsAutoCode] = useState(true);
   
   const tableRef = useRef<HTMLTableElement>(null);
+  const isVatEnabled = company?.settings?.vat_enabled || company?.vat_enabled || false;
 
   const [formData, setFormData] = useState({ 
     code: '', 
@@ -56,6 +58,9 @@ export const Products: React.FC = () => {
     min_stock: 0,
     revenue_account_id: '',
     cost_account_id: '',
+    inventory_account_id: '',
+    vat_account_id: '',
+    vat_rate: 0,
     counter_account_id: ''
   });
 
@@ -70,9 +75,14 @@ export const Products: React.FC = () => {
         setAccounts(data);
       });
 
+      const unsubscribeCompany = dbService.listen<Company>('companies', user.company_id, (compData) => {
+        setCompany(compData);
+      });
+
       return () => {
         unsubscribe();
         unsubscribeAccounts();
+        unsubscribeCompany();
       };
     }
   }, [user]);
@@ -150,13 +160,23 @@ export const Products: React.FC = () => {
         return;
       }
 
+      const isPhysicalProduct = ['finished_good', 'raw_material', 'commodity'].includes(formData.type);
+      if (isPhysicalProduct && !formData.inventory_account_id) {
+        toast.error(language === 'ar' ? 'الرجاء اختيار حساب المخزون للصنف' : 'Please select the inventory account for the product');
+        return;
+      }
+
       const revenueAccount = accounts.find(a => a.id === formData.revenue_account_id);
       const costAccount = accounts.find(a => a.id === formData.cost_account_id);
+      const inventoryAccount = accounts.find(a => a.id === formData.inventory_account_id);
+      const vatAccount = accounts.find(a => a.id === formData.vat_account_id);
       
       const dataToSave = {
         ...formData,
         revenue_account_name: revenueAccount?.name || '',
-        cost_account_name: costAccount?.name || ''
+        cost_account_name: costAccount?.name || '',
+        inventory_account_name: inventoryAccount?.name || '',
+        vat_account_name: vatAccount?.name || ''
       };
 
       if (editingProduct) {
@@ -179,7 +199,8 @@ export const Products: React.FC = () => {
       code: '', name: '', type: 'finished_good', category: '', unit: 'قطعة',
       sale_price: 0, cost_price: 0, description: '', image_url: '', 
       barcode: '', stock: 0, min_stock: 0, revenue_account_id: '', 
-      cost_account_id: '', counter_account_id: ''
+      cost_account_id: '', inventory_account_id: '', vat_account_id: '',
+      vat_rate: 0, counter_account_id: ''
     });
   };
 
@@ -197,6 +218,9 @@ export const Products: React.FC = () => {
         barcode: product.barcode || '',
         revenue_account_id: product.revenue_account_id || '',
         cost_account_id: product.cost_account_id || '',
+        inventory_account_id: product.inventory_account_id || '',
+        vat_account_id: product.vat_account_id || '',
+        vat_rate: product.vat_rate || 0,
         counter_account_id: product.counter_account_id || ''
       } as any);
     } else {
@@ -578,6 +602,58 @@ export const Products: React.FC = () => {
                                 {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                               </select>
                            </div>
+
+                           {/* Inventory Account (Mandatory for finished goods, raw materials, commodity) */}
+                           {['finished_good', 'raw_material', 'commodity'].includes(formData.type) && (
+                             <div className="space-y-4 md:col-span-2">
+                               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                                 {t('products.form_inventory_account')} <span className="text-rose-500 font-bold">*</span>
+                               </label>
+                               <select 
+                                 required
+                                 className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner" 
+                                 value={formData.inventory_account_id} 
+                                 onChange={(e) => setFormData({ ...formData, inventory_account_id: e.target.value })}
+                               >
+                                 <option value="">{t('common.select_category')}</option>
+                                 {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                               </select>
+                             </div>
+                           )}
+
+                           {/* VAT Fields if Company is VAT registered */}
+                           {isVatEnabled && (
+                             <>
+                               <div className="space-y-4">
+                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                                   {t('products.form_vat_account')}
+                                 </label>
+                                 <select 
+                                   className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner" 
+                                   value={formData.vat_account_id} 
+                                   onChange={(e) => setFormData({ ...formData, vat_account_id: e.target.value })}
+                                 >
+                                   <option value="">{t('common.select_category')}</option>
+                                   {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                 </select>
+                               </div>
+                               <div className="space-y-4">
+                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                                   {t('products.form_vat_rate')}
+                                 </label>
+                                 <input 
+                                   type="number" 
+                                   step="0.01" 
+                                   min="0" 
+                                   max="100" 
+                                   placeholder="0" 
+                                   className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner text-left" 
+                                   value={formData.vat_rate || ''} 
+                                   onChange={(e) => setFormData({ ...formData, vat_rate: parseFloat(e.target.value) || 0 })} 
+                                 />
+                               </div>
+                             </>
+                           )}
                         </div>
                      </div>
                   </form>

@@ -74,12 +74,17 @@ export interface Company {
   company_status: 'active' | 'suspended';
   features: string[]; // List of enabled feature IDs
   created_at: string;
+  vat_enabled?: boolean;
+  wht_enabled?: boolean;
   settings: {
     currency: string;
     timezone: string;
     language: 'ar' | 'en';
     fiscal_year_start: string;
     enable_multi_currency?: boolean;
+    inventory_cost_method?: 'wac' | 'fifo';
+    vat_enabled?: boolean;
+    wht_enabled?: boolean;
   };
 }
 
@@ -230,6 +235,11 @@ export interface Product {
   revenue_account_name?: string;
   cost_account_id?: string;
   cost_account_name?: string;
+  inventory_account_id?: string;
+  inventory_account_name?: string;
+  vat_account_id?: string;
+  vat_account_name?: string;
+  vat_rate?: number;
   counter_account_id?: string;
   company_id: string;
 }
