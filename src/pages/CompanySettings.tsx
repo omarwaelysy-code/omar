@@ -439,23 +439,19 @@ export function CompanySettings() {
             </div>
 
             {/* Financial Info */}
-            <div className="bg-slate-900 p-10 md:p-14 rounded-[3.5rem] shadow-2xl relative overflow-hidden group">
-              {/* Abstract decorative elements */}
-              <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-              <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
-
+            <div className="bg-white p-10 md:p-14 rounded-[3.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 space-y-10 relative overflow-hidden group">
               <div className="relative z-10 space-y-10">
-                <div className="flex items-center gap-4 border-b border-white/5 pb-8">
-                   <div className="w-12 h-12 bg-white/10 text-emerald-400 rounded-2xl flex items-center justify-center backdrop-blur-md">
+                <div className="flex items-center gap-4 border-b border-slate-50 pb-8">
+                   <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shadow-inner">
                       <Coins size={24} />
                    </div>
-                   <h2 className="text-2xl font-black text-white leading-none tracking-tight">
+                   <h2 className="text-2xl font-black text-slate-900 leading-none tracking-tight">
                       {language === 'ar' ? 'الإعدادات المالية' : 'Financial Settings'}
                    </h2>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                  <div className="premium-dark-select">
+                  <div>
                     <SearchableSelect
                       label={t('company_settings.currency')}
                       placeholder={t('common.select_category')}
@@ -463,7 +459,7 @@ export function CompanySettings() {
                       onChange={(val) => setData({ ...data, currency: val })}
                       options={CURRENCIES}
                       dir={dir}
-                      icon={<Coins className="w-5 h-5 text-white/40" />}
+                      icon={<Coins className="w-5 h-5 text-slate-400" />}
                       renderOption={(o) => (
                         <div className="flex items-center gap-4">
                           <span className="text-2xl">{o.flag}</span>
@@ -482,7 +478,7 @@ export function CompanySettings() {
                   </div>
 
                   <div className="space-y-4">
-                    <label className="block text-[10px] font-black text-white/40 uppercase tracking-[0.2em] px-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">
                       {t('company_settings.fiscal_year_end')}
                     </label>
                     <div className="grid grid-cols-2 gap-4">
@@ -498,7 +494,7 @@ export function CompanySettings() {
                                   fiscal_year_day: data.fiscal_year_day > maxDays ? maxDays : data.fiscal_year_day
                               });
                           }}
-                          className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-black hover:bg-white/10 transition-all outline-none appearance-none group-focus-within:ring-4 group-focus-within:ring-emerald-500/20"
+                          className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-slate-900 font-black hover:bg-slate-100 transition-all outline-none appearance-none focus:ring-4 focus:ring-emerald-500/5"
                         >
                           {MONTHS.map(m => (
                             <option key={m.value} value={m.value} className="text-slate-900">
@@ -506,24 +502,24 @@ export function CompanySettings() {
                             </option>
                           ))}
                         </select>
-                        <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none transition-transform group-focus-within:rotate-180`} />
+                        <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform group-focus-within:rotate-180`} />
                       </div>
                       <div className="relative group">
                         <select
                           value={data.fiscal_year_day}
                           onChange={(e) => setData({ ...data, fiscal_year_day: parseInt(e.target.value) })}
-                          className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-black hover:bg-white/10 transition-all outline-none appearance-none group-focus-within:ring-4 group-focus-within:ring-emerald-500/20"
+                          className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-slate-900 font-black hover:bg-slate-100 transition-all outline-none appearance-none focus:ring-4 focus:ring-emerald-500/5"
                         >
                           {Array.from({ length: daysInMonth(data.fiscal_year_month) }, (_, i) => i + 1).map(d => (
                             <option key={d} value={d} className="text-slate-900">{d}</option>
                           ))}
                         </select>
-                        <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none transition-transform group-focus-within:rotate-180`} />
+                        <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform group-focus-within:rotate-180`} />
                       </div>
                     </div>
-                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-start gap-3">
-                       <Calendar size={18} className="text-emerald-400 mt-0.5 flex-shrink-0" />
-                       <p className="text-[10px] font-bold text-emerald-100/70 leading-relaxed uppercase tracking-widest italic">
+                    <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-start gap-3">
+                       <Calendar size={18} className="text-emerald-600 mt-0.5 flex-shrink-0" />
+                       <p className="text-[10px] font-bold text-emerald-800 leading-relaxed uppercase tracking-widest italic">
                           {language === 'ar' 
                             ? 'سيتم إقفال السنة المالية آلياً في هذا اليوم من كل عام.' 
                             : 'Fiscal year will close automatically on this day annually.'}
@@ -532,25 +528,25 @@ export function CompanySettings() {
                   </div>
 
                   {/* Multi-Currency Toggle */}
-                  <div className="md:col-span-2 p-8 bg-white/5 border border-white/10 rounded-[2.5rem] transition-all hover:bg-white/[0.07] group/toggle overflow-hidden relative">
+                  <div className="md:col-span-2 p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] transition-all hover:bg-slate-100 group/toggle overflow-hidden relative">
                     <div 
                       className="flex items-center justify-between cursor-pointer select-none relative z-10"
                       onClick={() => setData(prev => ({ ...prev, enable_multi_currency: !prev.enable_multi_currency }))}
                     >
                       <div className="flex flex-col gap-1">
-                        <span className="font-black text-white text-xl tracking-tight">
+                        <span className="font-black text-slate-900 text-xl tracking-tight">
                           {language === 'ar' ? 'تفعيل العملات المتعددة' : 'Enable Multi-Currency'}
                         </span>
-                        <span className="text-xs font-bold text-emerald-400/60 uppercase tracking-widest italic">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest italic">
                           {language === 'ar' 
                             ? 'إدارة حسابات الصرف والتحويل الدولي.' 
                             : 'Manage international exchange rates.'}
                         </span>
                       </div>
                       <div 
-                        className={`relative w-20 h-10 rounded-full transition-all duration-300 shadow-2xl ${data.enable_multi_currency ? 'bg-emerald-500' : 'bg-white/10'}`}
+                        className={`relative w-20 h-10 rounded-full transition-all duration-300 shadow-inner ${data.enable_multi_currency ? 'bg-emerald-600' : 'bg-slate-200'}`}
                       >
-                        <div className={`absolute top-1.5 w-7 h-7 bg-white rounded-full shadow-lg transition-all duration-300 transform ${
+                        <div className={`absolute top-1.5 w-7 h-7 bg-white rounded-full shadow-md transition-all duration-300 transform ${
                           dir === 'rtl'
                             ? (data.enable_multi_currency ? 'translate-x-[-120%]' : 'translate-x-[-5%]')
                             : (data.enable_multi_currency ? 'translate-x-[120%]' : 'translate-x-[5%]')
@@ -560,16 +556,16 @@ export function CompanySettings() {
                   </div>
 
                   {/* Inventory Costing Policy Selection */}
-                  <div className="md:col-span-2 p-8 bg-white/5 border border-white/10 rounded-[2.5rem] transition-all relative space-y-6">
-                    <div className="flex items-center gap-3 border-b border-white/5 pb-4">
-                      <div className="w-10 h-10 bg-white/10 text-emerald-400 rounded-xl flex items-center justify-center backdrop-blur-md">
+                  <div className="md:col-span-2 p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] transition-all relative space-y-6">
+                    <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+                      <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
                         <Boxes size={20} />
                       </div>
                       <div className="flex flex-col">
-                        <span className="font-black text-white text-xl tracking-tight">
+                        <span className="font-black text-slate-900 text-xl tracking-tight">
                           {t('company_settings.inventory_cost_method')}
                         </span>
-                        <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest italic">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest italic">
                           {language === 'ar' ? 'حدد الأسلوب المحاسبي لتقييم وطلب بضاعة المخازن.' : 'Select the accounting method used to evaluate stock and calculate COGS.'}
                         </span>
                       </div>
@@ -582,21 +578,21 @@ export function CompanySettings() {
                         onClick={() => setData(prev => ({ ...prev, inventory_cost_method: 'wac' }))}
                         className={`p-6 rounded-2xl border transition-all duration-300 flex flex-col gap-2 ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
                           data.inventory_cost_method === 'wac'
-                            ? 'bg-emerald-500/10 border-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.15)]'
-                            : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/[0.08] hover:border-white/25'
+                            ? 'bg-emerald-50 border-emerald-500 text-slate-900 shadow-md shadow-emerald-500/5'
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100/50 hover:border-slate-300'
                         }`}
                       >
                         <div className="flex items-center justify-between w-full">
-                          <span className="font-black text-lg text-white">
+                          <span className="font-black text-lg text-slate-900">
                             {t('company_settings.inventory_cost_method.wac')}
                           </span>
                           <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                            data.inventory_cost_method === 'wac' ? 'border-emerald-500' : 'border-zinc-600'
+                            data.inventory_cost_method === 'wac' ? 'border-emerald-500' : 'border-slate-300'
                           }`}>
                             {data.inventory_cost_method === 'wac' && <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />}
                           </div>
                         </div>
-                        <span className="text-xs text-zinc-400 leading-relaxed font-semibold">
+                        <span className="text-xs text-slate-500 leading-relaxed font-semibold">
                           {language === 'ar' ? 'أكثر شيوعاً واستقراراً للأسعار المستمرة.' : 'More common and stable for fluctuating prices.'}
                         </span>
                       </button>
@@ -607,36 +603,36 @@ export function CompanySettings() {
                         onClick={() => setData(prev => ({ ...prev, inventory_cost_method: 'fifo' }))}
                         className={`p-6 rounded-2xl border transition-all duration-300 flex flex-col gap-2 ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
                           data.inventory_cost_method === 'fifo'
-                            ? 'bg-emerald-500/10 border-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.15)]'
-                            : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/[0.08] hover:border-white/25'
+                            ? 'bg-emerald-50 border-emerald-500 text-slate-900 shadow-md shadow-emerald-500/5'
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100/50 hover:border-slate-300'
                         }`}
                       >
                         <div className="flex items-center justify-between w-full">
-                          <span className="font-black text-lg text-white">
+                          <span className="font-black text-lg text-slate-900">
                             {t('company_settings.inventory_cost_method.fifo')}
                           </span>
                           <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                            data.inventory_cost_method === 'fifo' ? 'border-emerald-500' : 'border-zinc-600'
+                            data.inventory_cost_method === 'fifo' ? 'border-emerald-500' : 'border-slate-300'
                           }`}>
                             {data.inventory_cost_method === 'fifo' && <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />}
                           </div>
                         </div>
-                        <span className="text-xs text-zinc-400 leading-relaxed font-semibold">
+                        <span className="text-xs text-slate-500 leading-relaxed font-semibold">
                           {language === 'ar' ? 'مثالي في حالات توريد بضاعة ذات صلاحية محددة.' : 'Ideal for perishable goods and highly accurate matching.'}
                         </span>
                       </button>
                     </div>
 
                     {/* Policy Definition Display */}
-                    <div className="p-5 bg-white/5 border border-white/5 rounded-2xl flex gap-4 transition-all duration-300">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <div className="p-5 bg-white border border-slate-200 rounded-2xl flex gap-4 transition-all duration-300">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0 mt-0.5">
                         <Info size={16} />
                       </div>
                       <div className="flex-1 space-y-1">
-                        <h4 className="text-xs font-black text-white uppercase tracking-widest">
+                        <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest">
                           {language === 'ar' ? 'تعريف وتفاصيل السياسة المحددة:' : 'Policy definition & details:'}
                         </h4>
-                        <p className="text-xs font-semibold text-zinc-300 leading-relaxed">
+                        <p className="text-xs font-semibold text-slate-600 leading-relaxed">
                           {data.inventory_cost_method === 'fifo'
                             ? t('company_settings.inventory_cost_method.fifo.desc')
                             : t('company_settings.inventory_cost_method.wac.desc')}
@@ -653,17 +649,14 @@ export function CompanySettings() {
               <button
                 type="submit"
                 disabled={saving}
-                className="group relative px-16 py-6 bg-zinc-900 border border-white/10 text-white rounded-[2rem] shadow-2xl overflow-hidden transition-all hover:bg-zinc-800 active:scale-95 disabled:opacity-50"
+                className="flex items-center gap-2 bg-indigo-600 text-white px-8 py-4 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20 font-bold active:scale-95 disabled:opacity-50"
               >
-                <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="relative z-10 flex items-center gap-4 font-black uppercase tracking-widest text-xl">
-                  {saving ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : (
-                    <Save className="w-6 h-6 group-hover:rotate-12 transition-transform" />
-                  )}
-                  {t('common.save')}
-                </div>
+                {saving ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
+                <span>{t('common.save')}</span>
               </button>
             </div>
           </div>
