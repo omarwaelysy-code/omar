@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Edit2, Trash2, PieChart, Landmark, DollarSign } from 'lucide-react';
+import { Plus, Edit2, Trash2, PieChart, Landmark, DollarSign, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
 
@@ -94,237 +94,254 @@ export function CostCenters() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-zinc-900">مراكز التكلفة</h1>
-          <p className="text-zinc-500">توزيع المصروفات والميزانيات على مراكز التكلفة</p>
-        </div>
-        <button
-          onClick={() => {
-            setEditingCC(null);
-            setFormData({
-              code: '',
-              name: '',
-              description: '',
-              department_id: null,
-              budget: 0,
-              currency: 'USD',
-              is_active: true
-            });
-            setIsModalOpen(true);
-          }}
-          className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
-        >
-          <Plus size={20} />
-          <span>إضافة مركز تكلفة</span>
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="flex justify-center py-20">
-          <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {costCenters.map((cc) => (
-            <motion.div
-              key={cc.id}
-              layout
-              className="bg-white border border-zinc-200 rounded-3xl p-6 hover:shadow-xl hover:shadow-zinc-200/50 transition-all group"
-            >
-              <div className="flex justify-between items-start mb-4">
-                <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600">
-                  <PieChart size={24} />
-                </div>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => {
-                      setEditingCC(cc);
-                      setFormData({
-                        code: cc.code,
-                        name: cc.name,
-                        description: cc.description || '',
-                        department_id: cc.department_id,
-                        budget: cc.budget || 0,
-                        currency: cc.currency || 'USD',
-                        is_active: cc.is_active
-                      });
-                      setIsModalOpen(true);
-                    }}
-                    className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                  <button
-                    onClick={async () => {
-                      if (window.confirm(t('common.confirm_delete'))) {
-                        await dbService.delete('cost_centers', cc.id);
-                        fetchData();
-                      }
-                    }}
-                    className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
+    <div className="p-6 max-w-6xl mx-auto h-full flex flex-col overflow-hidden">
+      <AnimatePresence mode="wait">
+        {!isModalOpen ? (
+          <motion.div
+            key="list"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            className="flex-1 flex flex-col space-y-8 overflow-hidden"
+          >
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h1 className="text-2xl font-bold text-zinc-900">مراكز التكلفة</h1>
+                <p className="text-zinc-500">توزيع المصروفات والميزانيات على مراكز التكلفة</p>
               </div>
+              <button
+                onClick={() => {
+                  setEditingCC(null);
+                  setFormData({
+                    code: '',
+                    name: '',
+                    description: '',
+                    department_id: null,
+                    budget: 0,
+                    currency: 'USD',
+                    is_active: true
+                  });
+                  setIsModalOpen(true);
+                }}
+                className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
+              >
+                <Plus size={20} />
+                <span>إضافة مركز تكلفة</span>
+              </button>
+            </div>
 
-              <div className="text-right" dir="rtl">
-                <div className="text-[10px] font-mono text-amber-600 font-bold mb-1">{cc.code}</div>
-                <h3 className="font-bold text-lg text-zinc-900 mb-1">{cc.name}</h3>
-                
-                <div className="mt-4 space-y-3 pt-4 border-t border-zinc-50">
-                  <div className="flex items-center justify-between text-xs text-zinc-500">
-                    <span className="flex items-center gap-1">
-                      <Landmark size={14} />
-                      الإدارة المرتبطة
-                    </span>
-                    <span className="font-medium text-zinc-900">
-                      {departments.find(d => d.id === cc.department_id)?.name || 'عام'}
-                    </span>
-                  </div>
-                  
-                  <div className="bg-zinc-50 p-3 rounded-2xl">
-                    <div className="text-[10px] text-zinc-400 mb-1">الميزانية المعتمدة</div>
-                    <div className="flex items-center gap-1 text-emerald-700 font-bold">
-                      <DollarSign size={14} />
-                      {formatCurrency(cc.budget, cc.currency)}
+            {loading ? (
+              <div className="flex justify-center py-20">
+                <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pr-1">
+                {costCenters.map((cc) => (
+                  <motion.div
+                    key={cc.id}
+                    layout
+                    className="bg-white border border-zinc-200 rounded-3xl p-6 hover:shadow-xl hover:shadow-zinc-200/50 transition-all group"
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600">
+                        <PieChart size={24} />
+                      </div>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => {
+                            setEditingCC(cc);
+                            setFormData({
+                              code: cc.code,
+                              name: cc.name,
+                              description: cc.description || '',
+                              department_id: cc.department_id,
+                              budget: cc.budget || 0,
+                              currency: cc.currency || 'USD',
+                              is_active: cc.is_active
+                            });
+                            setIsModalOpen(true);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (window.confirm(t('common.confirm_delete'))) {
+                              await dbService.delete('cost_centers', cc.id);
+                              fetchData();
+                            }
+                          }}
+                          className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center justify-between text-xs">
-                    <span>الحالة</span>
-                    <span className={`px-2 py-0.5 rounded-full font-bold ${cc.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-zinc-100 text-zinc-500'}`}>
-                      {cc.is_active ? 'نشط' : 'معطل'}
-                    </span>
-                  </div>
-                </div>
+                    <div className="text-right" dir="rtl">
+                      <div className="text-[10px] font-mono text-amber-600 font-bold mb-1">{cc.code}</div>
+                      <h3 className="font-bold text-lg text-zinc-900 mb-1">{cc.name}</h3>
+                      
+                      <div className="mt-4 space-y-3 pt-4 border-t border-zinc-50">
+                        <div className="flex items-center justify-between text-xs text-zinc-500">
+                          <span className="flex items-center gap-1">
+                            <Landmark size={14} />
+                            الإدارة المرتبطة
+                          </span>
+                          <span className="font-medium text-zinc-900">
+                            {departments.find(d => d.id === cc.department_id)?.name || 'عام'}
+                          </span>
+                        </div>
+                        
+                        <div className="bg-zinc-50 p-3 rounded-2xl">
+                          <div className="text-[10px] text-zinc-400 mb-1">الميزانية المعتمدة</div>
+                          <div className="flex items-center gap-1 text-emerald-700 font-bold">
+                            <DollarSign size={14} />
+                            {formatCurrency(cc.budget, cc.currency)}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs">
+                          <span>الحالة</span>
+                          <span className={`px-2 py-0.5 rounded-full font-bold ${cc.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-zinc-100 text-zinc-500'}`}>
+                            {cc.is_active ? 'نشط' : 'معطل'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
               </div>
-            </motion.div>
-          ))}
-        </div>
-      )}
-
-      {/* Modal */}
-      <AnimatePresence>
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl"
-            >
-              <div className="p-6 border-b border-zinc-100">
+            )}
+          </motion.div>
+        ) : (
+          <motion.div
+            key="form"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="flex-1 flex flex-col space-y-8 overflow-hidden max-w-4xl mx-auto w-full p-4"
+          >
+            <div className="bg-white flex-1 rounded-3xl shadow-xl shadow-slate-200/40 flex flex-col overflow-hidden border border-slate-100 transition-all duration-500">
+              <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-slate-50/50">
                 <h2 className="text-xl font-bold text-zinc-900">
                   {editingCC ? 'تعديل مركز التكلفة' : 'إضافة مركز تكلفة جديد'}
                 </h2>
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-900 p-2 hover:bg-slate-100 rounded-full transition-all"
+                >
+                  <X size={20} />
+                </button>
               </div>
-              <form onSubmit={handleSubmit} className="p-6 space-y-4 text-right" dir="rtl">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 mb-1">كود المركز</label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.code}
-                      onChange={e => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                      className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono font-bold"
-                      placeholder="CC-400"
-                    />
+              <div className="flex-1 overflow-y-auto p-6">
+                <form onSubmit={handleSubmit} className="space-y-6 text-right" dir="rtl">
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-semibold text-zinc-700 mb-2">كود المركز</label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.code}
+                        onChange={e => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                        className="w-full p-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-mono font-bold"
+                        placeholder="CC-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-zinc-700 mb-2">اسم المركز</label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.name}
+                        onChange={e => setFormData({ ...formData, name: e.target.value })}
+                        className="w-full p-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 mb-1">اسم المركز</label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.name}
-                      onChange={e => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold"
-                    />
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 mb-1">الميزانية</label>
-                    <input
-                      type="number"
-                      value={formData.budget}
-                      onChange={e => setFormData({ ...formData, budget: parseFloat(e.target.value) || 0 })}
-                      className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold"
-                    />
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-semibold text-zinc-700 mb-2">الميزانية</label>
+                      <input
+                        type="number"
+                        value={formData.budget}
+                        onChange={e => setFormData({ ...formData, budget: parseFloat(e.target.value) || 0 })}
+                        className="w-full p-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-zinc-700 mb-2">العملة</label>
+                      <select
+                        value={formData.currency}
+                        onChange={e => setFormData({ ...formData, currency: e.target.value })}
+                        className="w-full p-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold"
+                      >
+                        <option value="USD">USD</option>
+                        <option value="">--</option>
+                        <option value="EGP">EGP</option>
+                        <option value="AED">AED</option>
+                      </select>
+                    </div>
                   </div>
+
                   <div>
-                    <label className="block text-sm font-medium text-zinc-700 mb-1">العملة</label>
+                    <label className="block text-sm font-semibold text-zinc-700 mb-2">الإدارة المسؤولة</label>
                     <select
-                      value={formData.currency}
-                      onChange={e => setFormData({ ...formData, currency: e.target.value })}
-                      className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold"
+                      value={formData.department_id || ''}
+                      onChange={e => setFormData({ ...formData, department_id: e.target.value || null })}
+                      className="w-full p-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold"
                     >
-                      <option value="USD">USD</option>
-                      <option value="">--</option>
-                      <option value="EGP">EGP</option>
-                      <option value="AED">AED</option>
+                      <option value="">عام (لكافة الإدارات)</option>
+                      {departments.map(dept => (
+                        <option key={dept.id} value={dept.id}>{dept.name}</option>
+                      ))}
                     </select>
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">الإدارة المسؤولة</label>
-                  <select
-                    value={formData.department_id || ''}
-                    onChange={e => setFormData({ ...formData, department_id: e.target.value || null })}
-                    className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-bold"
-                  >
-                    <option value="">عام (لكافة الإدارات)</option>
-                    {departments.map(dept => (
-                      <option key={dept.id} value={dept.id}>{dept.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">الوصف</label>
-                  <textarea
-                    value={formData.description}
-                    onChange={e => setFormData({ ...formData, description: e.target.value })}
-                    rows={3}
-                    className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                  />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-3 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      checked={formData.is_active}
-                      onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
-                      className="w-5 h-5 rounded-lg border-zinc-300 text-emerald-600 focus:ring-emerald-500 transition-all"
+                  <div>
+                    <label className="block text-sm font-semibold text-zinc-700 mb-2">الوصف</label>
+                    <textarea
+                      value={formData.description}
+                      onChange={e => setFormData({ ...formData, description: e.target.value })}
+                      rows={3}
+                      className="w-full p-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all"
                     />
-                    <span className="text-zinc-700 font-bold">نشط</span>
-                  </label>
-                </div>
+                  </div>
 
-                <div className="flex items-center gap-3 mt-8">
-                  <button
-                    type="submit"
-                    className="flex-1 bg-emerald-600 text-white h-12 rounded-xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
-                  >
-                    {t('common.save')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="flex-1 bg-zinc-100 text-zinc-600 h-12 rounded-xl font-bold hover:bg-zinc-200 transition-colors"
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={formData.is_active}
+                        onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
+                        className="w-5 h-5 rounded-lg border-zinc-300 text-emerald-600 focus:ring-emerald-500 transition-all"
+                      />
+                      <span className="text-zinc-700 font-bold">نشط</span>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-4 pt-4 border-t border-zinc-100">
+                    <button
+                      type="submit"
+                      className="flex-1 bg-emerald-600 text-white h-12 rounded-2xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
+                    >
+                      {t('common.save')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsModalOpen(false)}
+                      className="flex-1 bg-zinc-100 text-zinc-600 h-12 rounded-2xl font-bold hover:bg-zinc-200 transition-colors"
+                    >
+                      إلغاء
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Edit2, Trash2, Settings, List, CheckSquare, Type, Hash, Calendar, Layers, Search, Info } from 'lucide-react';
+import { Plus, Edit2, Trash2, Settings, List, CheckSquare, Type, Hash, Calendar, Layers, Search, Info, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
 
@@ -140,156 +140,164 @@ export function OperationFields() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">تعريف حقول العمليات</h1>
-          <p className="text-slate-500 font-medium">إدارة الحقول الديناميكية للنظام المرن</p>
-        </div>
-        <button
-          onClick={() => {
-            setEditingField(null);
-            setFormData({
-              code: '',
-              name: '',
-              label: '',
-              description: '',
-              type: 'text',
-              category_id: null,
-              category_ids: [],
-              sort_order: 0,
-              is_required: false,
-              options: '',
-              unit: '',
-              default_value: ''
-            });
-            setIsModalOpen(true);
-          }}
-          className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
-        >
-          <Plus size={20} />
-          <span className="font-bold">إضافة تعريف حقل</span>
-        </button>
-      </div>
+    <div className="p-6 max-w-6xl mx-auto h-full flex flex-col overflow-hidden">
+      <AnimatePresence mode="wait">
+        {!isModalOpen ? (
+          <motion.div
+            key="list"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            className="flex-1 flex flex-col space-y-8 overflow-hidden"
+          >
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900">تعريف حقول العمليات</h1>
+                <p className="text-slate-500 font-medium">إدارة الحقول الديناميكية للنظام المرن</p>
+              </div>
+              <button
+                onClick={() => {
+                  setEditingField(null);
+                  setFormData({
+                    code: '',
+                    name: '',
+                    label: '',
+                    description: '',
+                    type: 'text',
+                    category_id: null,
+                    category_ids: [],
+                    sort_order: 0,
+                    is_required: false,
+                    options: '',
+                    unit: '',
+                    default_value: ''
+                  });
+                  setIsModalOpen(true);
+                }}
+                className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+              >
+                <Plus size={20} />
+                <span className="font-bold">إضافة تعريف حقل</span>
+              </button>
+            </div>
 
-      {loading ? (
-        <div className="flex justify-center py-20">
-          <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-        </div>
-      ) : (
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto text-right shadow-sm" dir="rtl">
-          <table className="w-full">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider">كود/اسم</th>
-                <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider">العنوان</th>
-                <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider">النوع/الوحدة</th>
-                <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider text-center">مطلوب</th>
-                <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider">الإجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {fields.sort((a,b) => (a.sort_order || 0) - (b.sort_order || 0)).map((field) => (
-                <tr key={field.id} className="hover:bg-slate-50/80 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="font-mono text-xs text-emerald-600 font-bold">{field.code || '-'}</div>
-                    <div className="text-[10px] text-slate-400 font-bold font-mono uppercase">{field.name}</div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="font-bold text-slate-900">{field.label}</div>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {getFieldCategories(field.id).map(cat => (
-                        <span key={cat.id} className="text-[9px] bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded font-bold border border-sky-100">
-                          {cat.full_path || cat.name}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2 text-slate-600 text-sm font-bold">
-                      {getFieldIcon(field.type)}
-                      <span className="text-xs">{getFieldLabel(field.type)} {field.unit && `(${field.unit})`}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    {field.is_required ? (
-                      <span className="text-emerald-600 text-[10px] font-bold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">إجباري</span>
-                    ) : (
-                      <span className="text-slate-300 text-xs">-</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => {
-                          setEditingField(field);
-                          const linkedCatIds = fieldMappings
-                            .filter(m => m.field_id === field.id)
-                            .map(m => m.category_id);
-                          
-                          setFormData({
-                            code: field.code || '',
-                            name: field.name,
-                            label: field.label,
-                            description: field.description || '',
-                            type: field.type,
-                            category_id: field.category_id,
-                            category_ids: linkedCatIds,
-                            sort_order: field.sort_order || 0,
-                            is_required: field.is_required || false,
-                            options: Array.isArray(field.options) ? field.options.join(', ') : '',
-                            unit: field.unit || '',
-                            default_value: field.default_value || ''
-                          });
-                          setIsModalOpen(true);
-                        }}
-                        className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (window.confirm(t('common.confirm_delete'))) {
-                            await dbService.delete('operation_fields', field.id);
-                            fetchData();
-                          }
-                        }}
-                        className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Modal */}
-      <AnimatePresence>
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-2 md:p-4 transition-all">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.98, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.98, y: 10 }}
-              className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200"
-            >
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
+            {loading ? (
+              <div className="flex justify-center py-20">
+                <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : (
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-y-auto pr-1 text-right shadow-sm" dir="rtl">
+                <table className="w-full">
+                  <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-[5]">
+                    <tr>
+                      <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider">كود/اسم</th>
+                      <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider">العنوان</th>
+                      <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider">النوع/الوحدة</th>
+                      <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider text-center">مطلوب</th>
+                      <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider mr-auto text-left">الإجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {fields.sort((a,b) => (a.sort_order || 0) - (b.sort_order || 0)).map((field) => (
+                      <tr key={field.id} className="hover:bg-slate-50/80 transition-colors group">
+                        <td className="px-6 py-4">
+                          <div className="font-mono text-xs text-emerald-600 font-bold">{field.code || '-'}</div>
+                          <div className="text-[10px] text-slate-400 font-bold font-mono uppercase">{field.name}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-slate-900">{field.label}</div>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {getFieldCategories(field.id).map(cat => (
+                              <span key={cat.id} className="text-[9px] bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded font-bold border border-sky-100">
+                                {cat.full_path || cat.name}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2 text-slate-600 text-sm font-bold">
+                            {getFieldIcon(field.type)}
+                            <span className="text-xs">{getFieldLabel(field.type)} {field.unit && `(${field.unit})`}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {field.is_required ? (
+                            <span className="text-emerald-600 text-[10px] font-bold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">إجباري</span>
+                          ) : (
+                            <span className="text-slate-300 text-xs">-</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-left">
+                          <div className="flex items-center gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => {
+                                setEditingField(field);
+                                const linkedCatIds = fieldMappings
+                                  .filter(m => m.field_id === field.id)
+                                  .map(m => m.category_id);
+                                
+                                setFormData({
+                                  code: field.code || '',
+                                  name: field.name,
+                                  label: field.label,
+                                  description: field.description || '',
+                                  type: field.type,
+                                  category_id: field.category_id,
+                                  category_ids: linkedCatIds,
+                                  sort_order: field.sort_order || 0,
+                                  is_required: field.is_required || false,
+                                  options: Array.isArray(field.options) ? field.options.join(', ') : '',
+                                  unit: field.unit || '',
+                                  default_value: field.default_value || ''
+                                });
+                                setIsModalOpen(true);
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (window.confirm(t('common.confirm_delete'))) {
+                                  await dbService.delete('operation_fields', field.id);
+                                  fetchData();
+                                }
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </motion.div>
+        ) : (
+          <motion.div
+            key="form"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="flex-1 flex flex-col space-y-8 overflow-hidden max-w-4xl mx-auto w-full p-4"
+          >
+            <div className="bg-white flex-1 rounded-3xl shadow-xl shadow-slate-200/40 flex flex-col overflow-hidden border border-slate-100 transition-all duration-500">
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
                 <h2 className="text-xl font-bold text-slate-900">
                   {editingField ? 'تعديل تعريف الحقل' : 'إضافة حقل جديد للنظام'}
                 </h2>
                 <button 
                   onClick={() => setIsModalOpen(false)}
-                  className="p-2 hover:bg-slate-50 rounded-full transition-colors text-slate-400"
+                  className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-slate-950"
                 >
-                  <Plus className="rotate-45" size={24} />
+                  <X size={20} />
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-slate-50/50">
+              <div className="flex-1 overflow-y-auto p-6">
                 <form id="fieldForm" onSubmit={handleSubmit} className="space-y-8 text-right" dir="rtl">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-1">
@@ -359,7 +367,7 @@ export function OperationFields() {
 
                           return (
                             <div key={category.id} className="space-y-3">
-                              <div className={`sticky top-0 z-[5] py-2 bg-white/95 backdrop-blur-sm flex items-center gap-2 text-[9px] font-bold uppercase tracking-wider ${category.color} border-b border-current/10`}>
+                              <div className="sticky top-0 z-[5] py-2 bg-white/95 backdrop-blur-sm flex items-center gap-2 text-[9px] font-bold uppercase tracking-wider text-slate-500 border-b border-current/10">
                                 <category.icon size={14} />
                                 <span>{category.label_ar}</span>
                               </div>
@@ -539,27 +547,26 @@ export function OperationFields() {
                       </div>
                     </label>
                   </div>
+
+                  <div className="flex items-center gap-4 pt-4 border-t border-zinc-100">
+                    <button
+                      type="submit"
+                      className="flex-1 bg-emerald-600 text-white h-12 rounded-2xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
+                    >
+                      {t('common.save')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsModalOpen(false)}
+                      className="flex-1 bg-zinc-100 text-zinc-600 h-12 rounded-2xl font-bold hover:bg-zinc-200 transition-colors"
+                    >
+                      إلغاء
+                    </button>
+                  </div>
                 </form>
               </div>
-
-              <div className="p-6 bg-white border-t border-slate-100 shrink-0 flex items-center gap-3">
-                <button
-                  type="submit"
-                  form="fieldForm"
-                  className="flex-1 bg-emerald-600 text-white h-12 rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 text-sm active:scale-95"
-                >
-                  {t('common.save')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="flex-[0.4] bg-slate-50 border border-slate-200 text-slate-600 h-12 rounded-xl font-bold hover:bg-slate-100 transition-all text-sm"
-                >
-                  إلغاء
-                </button>
-              </div>
-            </motion.div>
-          </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
