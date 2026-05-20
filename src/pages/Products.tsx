@@ -641,16 +641,21 @@ export const Products: React.FC = () => {
                                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
                                    {t('products.form_vat_rate')}
                                  </label>
-                                 <input 
-                                   type="number" 
-                                   step="0.01" 
-                                   min="0" 
-                                   max="100" 
-                                   placeholder="0" 
-                                   className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner text-left" 
-                                   value={formData.vat_rate || ''} 
-                                   onChange={(e) => setFormData({ ...formData, vat_rate: parseFloat(e.target.value) || 0 })} 
-                                 />
+                                 <div className="relative">
+                                   <input 
+                                     type="number" 
+                                     step="0.01" 
+                                     min="0" 
+                                     max="100" 
+                                     placeholder="0" 
+                                     className="w-full pl-8 pr-16 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner text-left" 
+                                     value={formData.vat_rate || ''} 
+                                     onChange={(e) => setFormData({ ...formData, vat_rate: parseFloat(e.target.value) || 0 })} 
+                                   />
+                                   <span className="absolute right-8 top-1/2 -translate-y-1/2 text-rose-500 font-extrabold text-2xl select-none pointer-events-none">
+                                     %
+                                   </span>
+                                 </div>
                                </div>
                              </>
                            )}
