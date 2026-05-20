@@ -932,6 +932,8 @@ export const ar = {
   'company_settings.save_success': 'تم حفظ بيانات الشركة بنجاح',
   'company_settings.vat_enabled': 'هل الشركة تعمل بنظام القيمة المضافة؟',
   'company_settings.vat_enabled_desc': 'تفعيل حساب ضريبة القيمة المضافة للمعاملات والفواتير.',
+  'company_settings.wht_enabled': 'هل الشركة تعمل بنظام ضرائب الخصم والاضافة؟',
+  'company_settings.wht_enabled_desc': 'تفعيل حساب ضريبة الخصم والإضافة في المعاملات والفواتير.',
 
   'currencies.title': 'إدارة العملات والعملات المتعددة',
   'currencies.subtitle': 'إدارة العملات المتاحة وأسعار الصرف للفواتير والقيود.',

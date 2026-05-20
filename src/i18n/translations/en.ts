@@ -931,6 +931,8 @@ export const en = {
   'company_settings.save_success': 'Company settings saved successfully',
   'company_settings.vat_enabled': 'Does the company operate under the VAT system?',
   'company_settings.vat_enabled_desc': 'Enable Value Added Tax calculations for transactions and invoices.',
+  'company_settings.wht_enabled': 'Does the company operate under the Withholding Tax (WHT) system?',
+  'company_settings.wht_enabled_desc': 'Enable Withholding Tax calculations for transactions and invoices.',
 
   'currencies.title': 'Currency Management',
   'currencies.subtitle': 'Manage available currencies and exchange rates for invoices and entries.',

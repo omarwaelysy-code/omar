@@ -37,6 +37,7 @@ interface CompanyData {
   enable_multi_currency: boolean;
   inventory_cost_method?: 'wac' | 'fifo';
   vat_enabled: boolean;
+  wht_enabled: boolean;
 }
 
 // Searchable Select Component
@@ -161,7 +162,8 @@ export function CompanySettings() {
     fiscal_year_month: 12,
     enable_multi_currency: false,
     inventory_cost_method: 'wac',
-    vat_enabled: false
+    vat_enabled: false,
+    wht_enabled: false
   });
 
   useEffect(() => {
@@ -206,7 +208,8 @@ export function CompanySettings() {
             fiscal_year_month: fmonth,
             enable_multi_currency: company.settings?.enable_multi_currency || false,
             inventory_cost_method: company.settings?.inventory_cost_method || 'wac',
-            vat_enabled: company.settings?.vat_enabled || company.vat_enabled || false
+            vat_enabled: company.settings?.vat_enabled || company.vat_enabled || false,
+            wht_enabled: company.settings?.wht_enabled || company.wht_enabled || false
           });
       }
     } catch (error) {
@@ -240,12 +243,14 @@ export function CompanySettings() {
         address: data.address,
         fiscal_year_end: fiscalYearEnd,
         vat_enabled: data.vat_enabled,
+        wht_enabled: data.wht_enabled,
         settings: {
           ...originalSettings,
           currency: data.currency,
           enable_multi_currency: data.enable_multi_currency,
           inventory_cost_method: data.inventory_cost_method || 'wac',
-          vat_enabled: data.vat_enabled
+          vat_enabled: data.vat_enabled,
+          wht_enabled: data.wht_enabled
         }
       });
       
@@ -255,7 +260,8 @@ export function CompanySettings() {
         currency: data.currency,
         enable_multi_currency: data.enable_multi_currency,
         inventory_cost_method: data.inventory_cost_method || 'wac',
-        vat_enabled: data.vat_enabled
+        vat_enabled: data.vat_enabled,
+        wht_enabled: data.wht_enabled
       });
       
       toast.success(t('company_settings.save_success'));
@@ -451,6 +457,29 @@ export function CompanySettings() {
                   dir === 'rtl'
                     ? (data.vat_enabled ? 'translate-x-[-120%]' : 'translate-x-[-10%]')
                     : (data.vat_enabled ? 'translate-x-[120%]' : 'translate-x-[10%]')
+                }`} />
+              </div>
+            </div>
+
+            {/* WHT Toggle inside Card 2 */}
+            <div className="md:col-span-2 pt-6 border-t border-slate-100 flex items-center justify-between cursor-pointer select-none"
+              onClick={() => setData(prev => ({ ...prev, wht_enabled: !prev.wht_enabled }))}
+            >
+              <div className="flex flex-col gap-0.5">
+                <span className="font-bold text-slate-800 text-base">
+                  {t('company_settings.wht_enabled')}
+                </span>
+                <span className="text-xs font-semibold text-slate-400">
+                  {t('company_settings.wht_enabled_desc')}
+                </span>
+              </div>
+              <div 
+                className={`relative w-14 h-8 rounded-full transition-all duration-300 shadow-inner ${data.wht_enabled ? 'bg-indigo-600' : 'bg-slate-200'}`}
+              >
+                <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
+                  dir === 'rtl'
+                    ? (data.wht_enabled ? 'translate-x-[-120%]' : 'translate-x-[-10%]')
+                    : (data.wht_enabled ? 'translate-x-[120%]' : 'translate-x-[10%]')
                 }`} />
               </div>
             </div>
