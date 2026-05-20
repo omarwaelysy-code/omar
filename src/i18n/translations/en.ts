@@ -929,6 +929,8 @@ export const en = {
   'company_settings.inventory_cost_method.wac.desc': 'Weighted Average Cost (WAC): This policy is based on recalculating the average unit cost in inventory after each new purchase. Expenses, discounts, and taxes are distributed across units, and goods are sold or stored at this weighted average.',
   'company_settings.inventory_cost_method.fifo.desc': 'First-In, First-Out (FIFO): This policy assumes that products purchased or produced first are sold first, which makes the ending inventory value closely match the current market prices since it comprises the most recent purchases.',
   'company_settings.save_success': 'Company settings saved successfully',
+  'company_settings.vat_enabled': 'Does the company operate under the VAT system?',
+  'company_settings.vat_enabled_desc': 'Enable Value Added Tax calculations for transactions and invoices.',
 
   'currencies.title': 'Currency Management',
   'currencies.subtitle': 'Manage available currencies and exchange rates for invoices and entries.',

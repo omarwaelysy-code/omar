@@ -36,6 +36,7 @@ interface CompanyData {
   fiscal_year_month: number;
   enable_multi_currency: boolean;
   inventory_cost_method?: 'wac' | 'fifo';
+  vat_enabled: boolean;
 }
 
 // Searchable Select Component
@@ -159,7 +160,8 @@ export function CompanySettings() {
     fiscal_year_day: 31,
     fiscal_year_month: 12,
     enable_multi_currency: false,
-    inventory_cost_method: 'wac'
+    inventory_cost_method: 'wac',
+    vat_enabled: false
   });
 
   useEffect(() => {
@@ -203,7 +205,8 @@ export function CompanySettings() {
             fiscal_year_day: fday,
             fiscal_year_month: fmonth,
             enable_multi_currency: company.settings?.enable_multi_currency || false,
-            inventory_cost_method: company.settings?.inventory_cost_method || 'wac'
+            inventory_cost_method: company.settings?.inventory_cost_method || 'wac',
+            vat_enabled: company.settings?.vat_enabled || company.vat_enabled || false
           });
       }
     } catch (error) {
@@ -236,11 +239,13 @@ export function CompanySettings() {
         country: data.country,
         address: data.address,
         fiscal_year_end: fiscalYearEnd,
+        vat_enabled: data.vat_enabled,
         settings: {
           ...originalSettings,
           currency: data.currency,
           enable_multi_currency: data.enable_multi_currency,
-          inventory_cost_method: data.inventory_cost_method || 'wac'
+          inventory_cost_method: data.inventory_cost_method || 'wac',
+          vat_enabled: data.vat_enabled
         }
       });
       
@@ -249,7 +254,8 @@ export function CompanySettings() {
         ...originalSettings,
         currency: data.currency,
         enable_multi_currency: data.enable_multi_currency,
-        inventory_cost_method: data.inventory_cost_method || 'wac'
+        inventory_cost_method: data.inventory_cost_method || 'wac',
+        vat_enabled: data.vat_enabled
       });
       
       toast.success(t('company_settings.save_success'));
@@ -423,6 +429,29 @@ export function CompanySettings() {
                   rows={3}
                   className={`w-full ${dir === 'rtl' ? 'pr-12 pl-5' : 'pl-12 pr-5'} py-3.5 bg-white border border-slate-200 rounded-2xl text-slate-800 font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all min-h-[100px]`}
                 />
+              </div>
+            </div>
+
+            {/* VAT Toggle inside Card 2 */}
+            <div className="md:col-span-2 pt-6 border-t border-slate-100 flex items-center justify-between cursor-pointer select-none"
+              onClick={() => setData(prev => ({ ...prev, vat_enabled: !prev.vat_enabled }))}
+            >
+              <div className="flex flex-col gap-0.5">
+                <span className="font-bold text-slate-800 text-base">
+                  {t('company_settings.vat_enabled')}
+                </span>
+                <span className="text-xs font-semibold text-slate-400">
+                  {t('company_settings.vat_enabled_desc')}
+                </span>
+              </div>
+              <div 
+                className={`relative w-14 h-8 rounded-full transition-all duration-300 shadow-inner ${data.vat_enabled ? 'bg-indigo-600' : 'bg-slate-200'}`}
+              >
+                <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
+                  dir === 'rtl'
+                    ? (data.vat_enabled ? 'translate-x-[-120%]' : 'translate-x-[-10%]')
+                    : (data.vat_enabled ? 'translate-x-[120%]' : 'translate-x-[10%]')
+                }`} />
               </div>
             </div>
           </div>
