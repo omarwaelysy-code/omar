@@ -35,7 +35,7 @@ interface CompanyData {
   fiscal_year_day: number;
   fiscal_year_month: number;
   enable_multi_currency: boolean;
-  inventory_cost_method?: 'wac' | 'fifo';
+  inventory_cost_method?: 'wac' | 'fifo' | 'lifo';
   vat_enabled: boolean;
   wht_enabled: boolean;
 }
@@ -606,7 +606,7 @@ export function CompanySettings() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* WAC Option */}
                 <button
                   type="button"
@@ -653,7 +653,32 @@ export function CompanySettings() {
                     </div>
                   </div>
                   <span className="text-xs text-slate-400 leading-relaxed font-semibold">
-                    {language === 'ar' ? 'مثالي في حالات توريد بضاعة ذات صلاحية محددة.' : 'Ideal for perishable goods.'}
+                    {language === 'ar' ? 'الوارد أولاً، يصرف أولاً (FIFO) مثالي في حالات توريد بضاعة ذات صلاحية محددة.' : 'Ideal for perishable goods.'}
+                  </span>
+                </button>
+
+                {/* LIFO Option */}
+                <button
+                  type="button"
+                  onClick={() => setData(prev => ({ ...prev, inventory_cost_method: 'lifo' }))}
+                  className={`p-5 rounded-2xl border transition-all duration-300 flex flex-col gap-2 ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
+                    data.inventory_cost_method === 'lifo'
+                      ? 'bg-indigo-50/40 border-indigo-500 text-indigo-900 shadow-sm shadow-indigo-500/5'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="font-bold text-base text-slate-900">
+                      {t('company_settings.inventory_cost_method.lifo')}
+                    </span>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                      data.inventory_cost_method === 'lifo' ? 'border-indigo-500' : 'border-slate-300'
+                    }`}>
+                      {data.inventory_cost_method === 'lifo' && <div className="w-2.5 h-2.5 rounded-full bg-indigo-600" />}
+                    </div>
+                  </div>
+                  <span className="text-xs text-slate-400 leading-relaxed font-semibold">
+                    {language === 'ar' ? 'الوارد أخيراً، يصرف أولاً (LIFO) مثالي لمواجهة تضخم الأسعار.' : 'Ideal in inflationary environments.'}
                   </span>
                 </button>
               </div>
@@ -668,6 +693,8 @@ export function CompanySettings() {
                   <p className="text-xs font-semibold text-slate-500 leading-relaxed">
                     {data.inventory_cost_method === 'fifo'
                       ? t('company_settings.inventory_cost_method.fifo.desc')
+                      : data.inventory_cost_method === 'lifo'
+                      ? t('company_settings.inventory_cost_method.lifo.desc')
                       : t('company_settings.inventory_cost_method.wac.desc')}
                   </p>
                 </div>

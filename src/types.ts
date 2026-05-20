@@ -82,7 +82,7 @@ export interface Company {
     language: 'ar' | 'en';
     fiscal_year_start: string;
     enable_multi_currency?: boolean;
-    inventory_cost_method?: 'wac' | 'fifo';
+    inventory_cost_method?: 'wac' | 'fifo' | 'lifo';
     vat_enabled?: boolean;
     wht_enabled?: boolean;
   };
