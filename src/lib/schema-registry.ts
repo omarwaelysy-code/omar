@@ -40,7 +40,8 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   invoice_items: [
     'id', 'invoice_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
-    'product_name', 'product_code', 'product_image_url', 'image_url', 'barcode'
+    'product_name', 'product_code', 'product_image_url', 'image_url', 'barcode',
+    'unit_cost', 'total_cost', 'costing_method_used', 'company_id'
   ],
   returns: [
     'id', 'company_id', 'customer_id', 'customer_name', 'return_number', 'date', 'total_amount', 
@@ -141,5 +142,13 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   exchange_rates: [
     'id', 'company_id', 'currency_id', 'exchange_rate', 'rate_date', 'notes', 'created_by', 'created_at'
+  ],
+  inventory_movements: [
+    'id', 'company_id', 'product_id', 'movement_type', 'reference_id', 'reference_type',
+    'reference_number', 'date', 'quantity', 'unit_cost', 'total_cost', 'created_at'
+  ],
+  inventory_layers: [
+    'id', 'company_id', 'product_id', 'purchase_date', 'original_qty', 'qty_remaining',
+    'unit_cost', 'reference_type', 'reference_id', 'created_at'
   ]
 };

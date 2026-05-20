@@ -494,9 +494,44 @@ export async function initDatabase() {
         "product_name" VARCHAR(255),
         "product_code" VARCHAR(100),
         "product_image_url" TEXT,
+        "unit_cost" DECIMAL(18, 4) DEFAULT 0,
+        "total_cost" DECIMAL(18, 4) DEFAULT 0,
+        "costing_method_used" VARCHAR(50),
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `, 'invoice_items table');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "inventory_movements" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id"),
+        "product_id" VARCHAR(36) REFERENCES "products"("id"),
+        "movement_type" VARCHAR(50) NOT NULL,
+        "reference_id" VARCHAR(36) NOT NULL,
+        "reference_type" VARCHAR(50) NOT NULL,
+        "reference_number" VARCHAR(100),
+        "date" DATE NOT NULL,
+        "quantity" DECIMAL(18, 4) NOT NULL,
+        "unit_cost" DECIMAL(18, 4) NOT NULL,
+        "total_cost" DECIMAL(18, 4) NOT NULL,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'inventory_movements table');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "inventory_layers" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id"),
+        "product_id" VARCHAR(36) REFERENCES "products"("id"),
+        "purchase_date" DATE NOT NULL,
+        "original_qty" DECIMAL(18, 4) NOT NULL,
+        "qty_remaining" DECIMAL(18, 4) NOT NULL,
+        "unit_cost" DECIMAL(18, 4) NOT NULL,
+        "reference_type" VARCHAR(50) NOT NULL,
+        "reference_id" VARCHAR(36) NOT NULL,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'inventory_layers table');
 
     await safeQuery(`
       CREATE TABLE IF NOT EXISTS "return_items" (

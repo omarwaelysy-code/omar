@@ -1,0 +1,458 @@
+import { PoolClient } from 'pg';
+import { v4 as uuidv4 } from 'uuid';
+
+/**
+ * Inventory Costing Engine
+ * Supports FIFO, LIFO, and Moving Average (WAC) costing methods.
+ */
+
+export interface CostingResult {
+  unitCost: number;
+  totalCost: number;
+  methodUsed: 'wac' | 'fifo' | 'lifo';
+}
+
+/**
+ * Gets the configured company inventory cost method.
+ */
+async function getCompanyCostMethod(client: PoolClient, companyId: string): Promise<'wac' | 'fifo' | 'lifo'> {
+  const companyRes = await client.query('SELECT settings FROM companies WHERE id = $1', [companyId]);
+  if (companyRes.rows[0]) {
+    const settings = companyRes.rows[0].settings || {};
+    const method = settings.inventory_cost_method;
+    if (method === 'fifo' || method === 'lifo' || method === 'wac') {
+      return method;
+    }
+  }
+  return 'wac';
+}
+
+/**
+ * Updates product current stock and cost price inside products table
+ */
+async function updateProductDetails(
+  client: PoolClient,
+  productId: string,
+  stockDelta: number,
+  newCostPrice?: number
+): Promise<void> {
+  if (newCostPrice !== undefined && newCostPrice > 0) {
+    await client.query(
+      `UPDATE products 
+       SET current_stock = current_stock + $1, stock = stock + $1, cost_price = $2, updated_at = NOW() 
+       WHERE id = $3`,
+      [stockDelta, newCostPrice, productId]
+    );
+  } else {
+    await client.query(
+      `UPDATE products 
+       SET current_stock = current_stock + $1, stock = stock + $1, updated_at = NOW() 
+       WHERE id = $2`,
+      [stockDelta, productId]
+    );
+  }
+}
+
+/**
+ * Records a Purchase movement (Inflow) and updates product average cost or layers
+ */
+export async function recordPurchase(
+  client: PoolClient,
+  companyId: string,
+  productId: string,
+  quantity: number,
+  unitCost: number,
+  referenceId: string,
+  referenceNumber: string,
+  date: string
+): Promise<CostingResult> {
+  const method = await getCompanyCostMethod(client, companyId);
+  const totalCost = quantity * unitCost;
+
+  // Retrieve product details
+  const productRes = await client.query('SELECT cost_price, stock FROM products WHERE id = $1', [productId]);
+  if (productRes.rows.length === 0) {
+    throw new Error(`Product not found: ${productId}`);
+  }
+  const product = productRes.rows[0];
+  const oldStock = parseFloat(product.stock || '0');
+  const oldCost = parseFloat(product.cost_price || '0');
+
+  let newCost = oldCost;
+
+  if (method === 'wac') {
+    // Moving Average calculation
+    const totalOldValue = oldStock > 0 ? oldStock * oldCost : 0;
+    const totalNewValue = totalCost;
+    const newStock = oldStock + quantity;
+    if (newStock > 0) {
+      newCost = (totalOldValue + totalNewValue) / newStock;
+    } else {
+      newCost = unitCost;
+    }
+  } else {
+    // For FIFO or LIFO, create an inventory layer
+    const layerId = uuidv4();
+    await client.query(
+      `INSERT INTO inventory_layers (id, company_id, product_id, purchase_date, original_qty, qty_remaining, unit_cost, reference_type, reference_id, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+      [layerId, companyId, productId, date, quantity, quantity, unitCost, 'purchase_invoice', referenceId]
+    );
+    // Cost price is updated to latest purchase unit cost
+    newCost = unitCost;
+  }
+
+  // Insert into inventory_movements
+  const movementId = uuidv4();
+  await client.query(
+    `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
+    [movementId, companyId, productId, 'purchase', referenceId, 'purchase_invoice', referenceNumber, date, quantity, unitCost, totalCost]
+  );
+
+  // Update product stock and cost price
+  await updateProductDetails(client, productId, quantity, newCost);
+
+  return {
+    unitCost,
+    totalCost,
+    methodUsed: method
+  };
+}
+
+/**
+ * Records a Sale movement (Outflow), deducts from stock and applies costing
+ */
+export async function recordSale(
+  client: PoolClient,
+  companyId: string,
+  productId: string,
+  quantity: number,
+  referenceId: string,
+  referenceNumber: string,
+  date: string
+): Promise<CostingResult> {
+  const method = await getCompanyCostMethod(client, companyId);
+
+  // Retrieve product details
+  const productRes = await client.query('SELECT cost_price, stock FROM products WHERE id = $1', [productId]);
+  if (productRes.rows.length === 0) {
+    throw new Error(`Product not found: ${productId}`);
+  }
+  const product = productRes.rows[0];
+  const costPrice = parseFloat(product.cost_price || '0');
+
+  let totalCost = 0;
+  let unitCost = costPrice;
+
+  if (method === 'wac') {
+    // For WAC, the sale cost is the current average cost of the product
+    unitCost = costPrice;
+    totalCost = quantity * costPrice;
+  } else {
+    // For FIFO/LIFO, pull from layers
+    const orderDirection = method === 'fifo' ? 'ASC' : 'DESC';
+    const layersRes = await client.query(
+      `SELECT * FROM inventory_layers 
+       WHERE product_id = $1 AND qty_remaining > 0 
+       ORDER BY purchase_date ${orderDirection}, created_at ${orderDirection}`,
+      [productId]
+    );
+
+    let rem = quantity;
+    for (const layer of layersRes.rows) {
+      if (rem <= 0) break;
+      const layerQty = parseFloat(layer.qty_remaining || '0');
+      const layerCost = parseFloat(layer.unit_cost || '0');
+      const take = Math.min(rem, layerQty);
+
+      await client.query(
+        `UPDATE inventory_layers SET qty_remaining = qty_remaining - $1 WHERE id = $2`,
+        [take, layer.id]
+      );
+
+      totalCost += take * layerCost;
+      rem -= take;
+    }
+
+    if (rem > 0) {
+      // Out of stock gracefully: cover using latest product cost_price
+      totalCost += rem * costPrice;
+    }
+
+    unitCost = quantity > 0 ? totalCost / quantity : costPrice;
+  }
+
+  // Insert into inventory_movements
+  const movementId = uuidv4();
+  await client.query(
+    `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
+    [movementId, companyId, productId, 'sale', referenceId, 'invoice', referenceNumber, date, -quantity, unitCost, -totalCost]
+  );
+
+  // Update stock (cost price remains unchanged on sale)
+  await updateProductDetails(client, productId, -quantity);
+
+  return {
+    unitCost,
+    totalCost,
+    methodUsed: method
+  };
+}
+
+/**
+ * Records a Sales Return (Inflow of goods returned by customer)
+ */
+export async function recordSalesReturn(
+  client: PoolClient,
+  companyId: string,
+  productId: string,
+  quantity: number,
+  returnUnitCost: number, // Use the unit_cost registered in invoice_items originally
+  referenceId: string,
+  referenceNumber: string,
+  date: string
+): Promise<CostingResult> {
+  const method = await getCompanyCostMethod(client, companyId);
+  const totalCost = quantity * returnUnitCost;
+
+  // Retrieve product details
+  const productRes = await client.query('SELECT cost_price, stock FROM products WHERE id = $1', [productId]);
+  if (productRes.rows.length === 0) {
+    throw new Error(`Product not found: ${productId}`);
+  }
+  const product = productRes.rows[0];
+  const oldStock = parseFloat(product.stock || '0');
+  const oldCost = parseFloat(product.cost_price || '0');
+
+  let newCost = oldCost;
+
+  if (method === 'wac') {
+    // Add back returned inventory at its original cost price
+    const totalOldValue = oldStock > 0 ? oldStock * oldCost : 0;
+    const totalNewValue = totalCost;
+    const newStock = oldStock + quantity;
+    if (newStock > 0) {
+      newCost = (totalOldValue + totalNewValue) / newStock;
+    } else {
+      newCost = returnUnitCost;
+    }
+  } else {
+    // Return back to inventory layers: create a special layer for returned goods
+    const layerId = uuidv4();
+    await client.query(
+      `INSERT INTO inventory_layers (id, company_id, product_id, purchase_date, original_qty, qty_remaining, unit_cost, reference_type, reference_id, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+      [layerId, companyId, productId, date, quantity, quantity, returnUnitCost, 'returns', referenceId]
+    );
+  }
+
+  // Insert into inventory_movements
+  const movementId = uuidv4();
+  await client.query(
+    `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
+    [movementId, companyId, productId, 'sales_return', referenceId, 'returns', referenceNumber, date, quantity, returnUnitCost, totalCost]
+  );
+
+  // Update stock and cost price
+  await updateProductDetails(client, productId, quantity, newCost);
+
+  return {
+    unitCost: returnUnitCost,
+    totalCost,
+    methodUsed: method
+  };
+}
+
+/**
+ * Records a Purchase Return (Outflow of goods returned to supplier)
+ */
+export async function recordPurchaseReturn(
+  client: PoolClient,
+  companyId: string,
+  productId: string,
+  quantity: number,
+  returnUnitCost: number, // Unit cost from original purchase
+  referenceId: string,
+  referenceNumber: string,
+  date: string
+): Promise<CostingResult> {
+  const method = await getCompanyCostMethod(client, companyId);
+  const totalCost = quantity * returnUnitCost;
+
+  // Retrieve product details
+  const productRes = await client.query('SELECT cost_price, stock FROM products WHERE id = $1', [productId]);
+  if (productRes.rows.length === 0) {
+    throw new Error(`Product not found: ${productId}`);
+  }
+  const product = productRes.rows[0];
+  const oldStock = parseFloat(product.stock || '0');
+  const oldCost = parseFloat(product.cost_price || '0');
+
+  let newCost = oldCost;
+
+  if (method === 'wac') {
+    const newStock = oldStock - quantity;
+    if (newStock > 0) {
+      const totalOldValue = oldStock * oldCost;
+      const totalNewValue = totalCost;
+      newCost = (totalOldValue - totalNewValue) / newStock;
+    }
+  } else {
+    // Dedect from existing layers starting from original purchase reference_id if available or any matching unit cost layers
+    const layersRes = await client.query(
+      `SELECT * FROM inventory_layers 
+       WHERE product_id = $1 AND qty_remaining > 0 
+       ORDER BY purchase_date DESC, created_at DESC`,
+      [productId]
+    );
+
+    let rem = quantity;
+    for (const layer of layersRes.rows) {
+      if (rem <= 0) break;
+      const layerQty = parseFloat(layer.qty_remaining || '0');
+      const take = Math.min(rem, layerQty);
+
+      await client.query(
+        `UPDATE inventory_layers SET qty_remaining = qty_remaining - $1 WHERE id = $2`,
+        [take, layer.id]
+      );
+      rem -= take;
+    }
+  }
+
+  // Insert into inventory_movements
+  const movementId = uuidv4();
+  await client.query(
+    `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
+    [movementId, companyId, productId, 'purchase_return', referenceId, 'purchase_returns', referenceNumber, date, -quantity, returnUnitCost, -totalCost]
+  );
+
+  // Update stock
+  await updateProductDetails(client, productId, -quantity);
+
+  return {
+    unitCost: returnUnitCost,
+    totalCost,
+    methodUsed: method
+  };
+}
+
+/**
+ * Records an inventory Adjustment (plus/minus correction)
+ */
+export async function recordAdjustment(
+  client: PoolClient,
+  companyId: string,
+  productId: string,
+  quantity: number, // positive for addition, negative for deduction
+  unitCost: number, // cost of adding or standard cost
+  referenceId: string,
+  referenceNumber: string,
+  date: string
+): Promise<CostingResult> {
+  const method = await getCompanyCostMethod(client, companyId);
+  const totalCost = quantity * unitCost;
+
+  if (quantity > 0) {
+    // Inflow
+    const productRes = await client.query('SELECT cost_price, stock FROM products WHERE id = $1', [productId]);
+    if (productRes.rows.length === 0) {
+      throw new Error(`Product not found: ${productId}`);
+    }
+    const product = productRes.rows[0];
+    const oldStock = parseFloat(product.stock || '0');
+    const oldCost = parseFloat(product.cost_price || '0');
+
+    let newCost = oldCost;
+
+    if (method === 'wac') {
+      const totalOldValue = oldStock > 0 ? oldStock * oldCost : 0;
+      const totalNewValue = totalCost;
+      const newStock = oldStock + quantity;
+      if (newStock > 0) {
+        newCost = (totalOldValue + totalNewValue) / newStock;
+      } else {
+        newCost = unitCost;
+      }
+    } else {
+      // Create layer
+      const layerId = uuidv4();
+      await client.query(
+        `INSERT INTO inventory_layers (id, company_id, product_id, purchase_date, original_qty, qty_remaining, unit_cost, reference_type, reference_id, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+        [layerId, companyId, productId, date, quantity, quantity, unitCost, 'adjustment', referenceId]
+      );
+    }
+
+    // Insert into inventory_movements
+    const movementId = uuidv4();
+    await client.query(
+      `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
+      [movementId, companyId, productId, 'adjustment', referenceId, 'adjustment', referenceNumber, date, quantity, unitCost, totalCost]
+    );
+
+    // Update stock and cost
+    await updateProductDetails(client, productId, quantity, newCost);
+  } else {
+    // Outflow
+    const remQty = Math.abs(quantity);
+    let calculatedCost = 0;
+    let actualUnitCost = unitCost;
+
+    if (method === 'wac') {
+      calculatedCost = remQty * unitCost;
+    } else {
+      const orderDirection = method === 'fifo' ? 'ASC' : 'DESC';
+      const layersRes = await client.query(
+        `SELECT * FROM inventory_layers 
+         WHERE product_id = $1 AND qty_remaining > 0 
+         ORDER BY purchase_date ${orderDirection}, created_at ${orderDirection}`,
+        [productId]
+      );
+
+      let rem = remQty;
+      for (const layer of layersRes.rows) {
+        if (rem <= 0) break;
+        const layerQty = parseFloat(layer.qty_remaining || '0');
+        const layerCost = parseFloat(layer.unit_cost || '0');
+        const take = Math.min(rem, layerQty);
+
+        await client.query(
+          `UPDATE inventory_layers SET qty_remaining = qty_remaining - $1 WHERE id = $2`,
+          [take, layer.id]
+        );
+
+        calculatedCost += take * layerCost;
+        rem -= take;
+      }
+
+      if (rem > 0) {
+        calculatedCost += rem * unitCost;
+      }
+
+      actualUnitCost = remQty > 0 ? calculatedCost / remQty : unitCost;
+    }
+
+    // Insert into inventory_movements
+    const movementId = uuidv4();
+    await client.query(
+      `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
+      [movementId, companyId, productId, 'adjustment', referenceId, 'adjustment', referenceNumber, date, -remQty, actualUnitCost, -calculatedCost]
+    );
+
+    // Update stock only
+    await updateProductDetails(client, productId, -remQty);
+  }
+
+  return {
+    unitCost,
+    totalCost,
+    methodUsed: method
+  };
+}

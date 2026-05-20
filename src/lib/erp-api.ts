@@ -10,6 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import * as XLSX from 'xlsx';
 import multer from 'multer';
+import { recordPurchase, recordSale, recordSalesReturn, recordPurchaseReturn } from './cost-engine';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -1112,6 +1113,23 @@ modules.forEach(moduleName => {
           const { id } = req.params;
           const companyId = req.user?.company_id;
 
+          if (moduleName === 'companies') {
+            const currentRes = await pool.query('SELECT settings FROM companies WHERE id = $1', [id]);
+            const currentSettings = currentRes.rows[0]?.settings || {};
+            const newSettings = req.body.settings || {};
+            
+            const currentMethod = currentSettings.inventory_cost_method || 'wac';
+            const newMethod = newSettings.inventory_cost_method || 'wac';
+            
+            if (currentMethod !== newMethod) {
+              const movementsCheck = await pool.query('SELECT COUNT(*) FROM inventory_movements WHERE company_id = $1', [companyId || id]);
+              const movementsCount = parseInt(movementsCheck.rows[0]?.count || '0', 10);
+              if (movementsCount > 0) {
+                return sendError(res, 400, 'لا يمكن تغيير طريقة تقييم المخزون بعد تسجيل حركات مخزنية بالفعل.');
+              }
+            }
+          }
+
           const sanitizedData = sanitizeData(moduleName, req.body);
           delete (sanitizedData as any).id;
           if (moduleName !== 'companies') delete (sanitizedData as any).company_id;
@@ -1332,12 +1350,92 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
     );
 
     console.log(`[ERP] Saving ${items?.length || 0} Invoice Items...`);
+    const cogsLines: { account_id: string; account_name: string; debit: number; credit: number; description: string }[] = [];
+
     // Insert Items
     for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('invoice_items', item);
       const itemId = uuidv4();
       const itemData = { ...sanitizedItem, id: itemId, invoice_id: invoiceId };
       if (invData.company_id) itemData.company_id = invData.company_id;
+
+      // Cost Calculation and Layer satisfying
+      // Fetch product details
+      const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
+      if (prodRes.rows.length > 0) {
+        const prod = prodRes.rows[0];
+        if (prod.type !== 'service' && !prod.is_service) {
+          // Perform recordSale
+          const quantity = parseFloat(item.quantity || '0');
+          if (quantity > 0) {
+            const costInfo = await recordSale(
+              client,
+              companyId,
+              item.product_id,
+              quantity,
+              invoiceId,
+              invoiceData.invoice_number,
+              invoiceData.date
+            );
+            
+            itemData.unit_cost = costInfo.unitCost;
+            itemData.total_cost = costInfo.totalCost;
+            itemData.costing_method_used = costInfo.methodUsed;
+
+            // Prepare perpetual queue / continuous inventory posting
+            if (costInfo.totalCost > 0) {
+              // Find accounts
+              // 1. Cost of Goods Sold (COGS) Account
+              let costAccId = prod.cost_account_id;
+              let costAccName = prod.cost_account_name || 'تكلفة المبيعات';
+              
+              // 2. Inventory Account
+              let invAccId = prod.inventory_account_id;
+              let invAccName = prod.inventory_account_name || 'المخزون';
+
+              // Fallbacks if not configured on the product specifically
+              if (!costAccId || !invAccId) {
+                const accountsRes = await client.query('SELECT * FROM accounts WHERE company_id = $1', [companyId]);
+                const accounts = accountsRes.rows;
+                
+                if (!costAccId) {
+                  const fallbackCostAcc = accounts.find((a: any) => a.name.includes('تكلفة المبيعات') || a.name.includes('تكلفة مبيعات') || a.name.includes('تكلفة البضاعة المباعة'));
+                  if (fallbackCostAcc) {
+                    costAccId = fallbackCostAcc.id;
+                    costAccName = fallbackCostAcc.name;
+                  }
+                }
+                if (!invAccId) {
+                  const fallbackInvAcc = accounts.find((a: any) => a.name.includes('مخزون') || a.name.includes('مخازن'));
+                  if (fallbackInvAcc) {
+                    invAccId = fallbackInvAcc.id;
+                    invAccName = fallbackInvAcc.name;
+                  }
+                }
+              }
+
+              if (costAccId) {
+                cogsLines.push({
+                  account_id: costAccId,
+                  account_name: costAccName,
+                  debit: costInfo.totalCost,
+                  credit: 0,
+                  description: `تكلفة البضاعة المباعة صنف: ${prod.name} - فاتورة ${invoiceData.invoice_number}`
+                });
+              }
+              if (invAccId) {
+                cogsLines.push({
+                  account_id: invAccId,
+                  account_name: invAccName,
+                  debit: 0,
+                  credit: costInfo.totalCost,
+                  description: `تخفيض المخزون صنف: ${prod.name} - فاتورة ${invoiceData.invoice_number}`
+                });
+              }
+            }
+          }
+        }
+      }
 
       const itemKeys = Object.keys(itemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
@@ -1353,7 +1451,7 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
     
     // Fetch dependencies
     const { rows: customers } = await client.query('SELECT * FROM customers WHERE company_id = $1', [companyId]);
-    const { rows: products } = await client.query('SELECT * FROM products WHERE company_id = $1', [companyId]);
+    const { rows: productsList } = await client.query('SELECT * FROM products WHERE company_id = $1', [companyId]);
     const { rows: accounts } = await client.query('SELECT * FROM accounts WHERE company_id = $1', [companyId]);
     const { rows: paymentMethods } = await client.query('SELECT * FROM payment_methods WHERE company_id = $1', [companyId]);
     
@@ -1420,13 +1518,29 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
       });
     }
 
+    // Append standard perpetual inventory lines (COGS and reduced inventory asset)
+    for (const line of cogsLines) {
+      journalItems.push({
+        account_id: line.account_id,
+        account_name: line.account_name,
+        debit: line.debit,
+        credit: line.credit,
+        description: line.description,
+        customer_id: null,
+        sub_account_id: null,
+        sub_account_type: null
+      });
+    }
+
     if (journalItems.length > 0) {
       console.log(`[ERP] Creating Journal Entry with ${journalItems.length} lines`);
       const journalEntryId = uuidv4();
+      const finalTotalSum = journalItems.reduce((sum, line) => sum + parseFloat(line.debit || 0), 0);
+      
       await client.query(
         `INSERT INTO journal_entries (id, company_id, date, description, reference_id, reference_type, reference_number, total_debit, total_credit, status)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-        [journalEntryId, companyId, invoiceData.date, `قيد فاتورة مبيعات رقم: ${invoiceData.invoice_number}`, invoiceId, 'invoice', invoiceData.invoice_number, totalAmount + discount, totalAmount + discount, 'posted']
+        [journalEntryId, companyId, invoiceData.date, `قيد فاتورة مبيعات رقم: ${invoiceData.invoice_number}`, invoiceId, 'invoice', invoiceData.invoice_number, finalTotalSum, finalTotalSum, 'posted']
       );
 
       for (const line of journalItems) {
@@ -1555,6 +1669,36 @@ router.post('/returns', authenticateToken, async (req: AuthRequest, res) => {
       const itemData = { ...sanitizedItem, id: itemId, return_id: returnId };
       if (rData.company_id) itemData.company_id = rData.company_id;
 
+      // Cost and Layer integration for sales return
+      const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
+      if (prodRes.rows.length > 0) {
+        const prod = prodRes.rows[0];
+        if (prod.type !== 'service' && !prod.is_service) {
+          const quantity = parseFloat(item.quantity || '0');
+          if (quantity > 0) {
+            // Retrieve last unit cost sold of this product
+            const lastSaleRes = await client.query(
+              `SELECT unit_cost FROM invoice_items 
+               WHERE product_id = $1 AND company_id = $2 AND unit_cost > 0 
+               ORDER BY created_at DESC LIMIT 1`,
+              [item.product_id, companyId]
+            );
+            const returnUnitCost = lastSaleRes.rows[0] ? parseFloat(lastSaleRes.rows[0].unit_cost) : parseFloat(prod.cost_price || '0');
+            
+            await recordSalesReturn(
+              client,
+              companyId,
+              item.product_id,
+              quantity,
+              returnUnitCost,
+              returnId,
+              returnData.return_number || `RET-${returnId}`,
+              returnData.date
+            );
+          }
+        }
+      }
+
       const itemKeys = Object.keys(itemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       
@@ -1663,6 +1807,28 @@ router.post('/purchase_invoices', authenticateToken, async (req: AuthRequest, re
       const itemData = { ...sanitizedItem, id: itemId, invoice_id: invoiceId };
       if (invData.company_id) itemData.company_id = invData.company_id;
 
+      // Costing and stock update integration for purchases
+      const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
+      if (prodRes.rows.length > 0) {
+        const prod = prodRes.rows[0];
+        if (prod.type !== 'service' && !prod.is_service) {
+          const qty = parseFloat(item.quantity || '0');
+          const unitPrice = parseFloat(item.unit_price || '0');
+          if (qty > 0) {
+            await recordPurchase(
+              client,
+              companyId,
+              item.product_id,
+              qty,
+              unitPrice,
+              invoiceId,
+              invoiceData.invoice_number || `PINV-${invoiceId}`,
+              invoiceData.date
+            );
+          }
+        }
+      }
+
       const itemKeys = Object.keys(itemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
       
@@ -1769,6 +1935,28 @@ router.post('/purchase_returns', authenticateToken, async (req: AuthRequest, res
       const itemId = uuidv4();
       const itemData = { ...sanitizedItem, id: itemId, return_id: returnId };
       if (rData.company_id) itemData.company_id = rData.company_id;
+
+      // Cost and stock integration for purchase return
+      const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
+      if (prodRes.rows.length > 0) {
+        const prod = prodRes.rows[0];
+        if (prod.type !== 'service' && !prod.is_service) {
+          const qty = parseFloat(item.quantity || '0');
+          if (qty > 0) {
+            const returnUnitCost = parseFloat(item.unit_price || '0') || parseFloat(prod.cost_price || '0');
+            await recordPurchaseReturn(
+              client,
+              companyId,
+              item.product_id,
+              qty,
+              returnUnitCost,
+              returnId,
+              returnData.return_number || `PRET-${returnId}`,
+              returnData.date
+            );
+          }
+        }
+      }
 
       const itemKeys = Object.keys(itemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');

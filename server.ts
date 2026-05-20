@@ -83,6 +83,9 @@ async function startServer() {
       'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "vat_account_id" VARCHAR(36)',
       'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "vat_account_name" VARCHAR(255)',
       'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "vat_rate" DECIMAL(10,4) DEFAULT 0',
+      'ALTER TABLE "invoice_items" ADD COLUMN IF NOT EXISTS "unit_cost" DECIMAL(18, 4) DEFAULT 0',
+      'ALTER TABLE "invoice_items" ADD COLUMN IF NOT EXISTS "total_cost" DECIMAL(18, 4) DEFAULT 0',
+      'ALTER TABLE "invoice_items" ADD COLUMN IF NOT EXISTS "costing_method_used" VARCHAR(50)',
       
       // Companies
       'ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "logo_url" TEXT',
