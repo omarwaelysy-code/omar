@@ -39,14 +39,14 @@ async function updateProductDetails(
   if (newCostPrice !== undefined && newCostPrice > 0) {
     await client.query(
       `UPDATE products 
-       SET current_stock = current_stock + $1, stock = stock + $1, cost_price = $2, updated_at = NOW() 
+       SET current_stock = current_stock + $1, stock = stock + $1, cost_price = $2 
        WHERE id = $3`,
       [stockDelta, newCostPrice, productId]
     );
   } else {
     await client.query(
       `UPDATE products 
-       SET current_stock = current_stock + $1, stock = stock + $1, updated_at = NOW() 
+       SET current_stock = current_stock + $1, stock = stock + $1 
        WHERE id = $2`,
       [stockDelta, productId]
     );
