@@ -123,9 +123,26 @@ export const Customers: React.FC = () => {
         showNotification('يجب اختيار الحساب المحاسبي للعميل', 'error');
         return;
       }
-      const selectedAccount = accounts.find(a => a.id === formData.account_id);
+
+      let finalAccountId = formData.account_id;
+      let finalCounterAccountId = formData.counter_account_id;
+
+      const account1 = accounts.find(a => a.id === finalAccountId);
+      const account2 = accounts.find(a => a.id === finalCounterAccountId);
+
+      const isAccountCustomer = (acc: any) => acc && (acc.name.includes('عملاء') || acc.name.includes('العملاء') || acc.code?.startsWith('12'));
+      const isAccountOpening = (acc: any) => acc && (acc.name.includes('رصيد') || acc.name.includes('ميزانية') || acc.name.includes('رأس') || acc.name.includes('راس') || acc.code?.startsWith('3'));
+
+      if (isAccountOpening(account1) && isAccountCustomer(account2)) {
+        finalAccountId = formData.counter_account_id;
+        finalCounterAccountId = formData.account_id;
+      }
+
+      const selectedAccount = accounts.find(a => a.id === finalAccountId);
       const dataToSave = {
         ...formData,
+        account_id: finalAccountId,
+        counter_account_id: finalCounterAccountId,
         account_name: selectedAccount?.name || '',
         company_id: user.company_id
       };
@@ -188,7 +205,7 @@ export const Customers: React.FC = () => {
 
         // Create Journal Entry if balance is not zero
         if (formData.opening_balance !== 0) {
-          const counterAccount = accounts.find(a => a.id === formData.counter_account_id);
+          const counterAccount = accounts.find(a => a.id === finalCounterAccountId);
           const absBalance = Math.abs(formData.opening_balance);
           const isNegative = formData.opening_balance < 0;
 
@@ -200,7 +217,7 @@ export const Customers: React.FC = () => {
             reference_type: 'opening_balance',
             items: [
               {
-                account_id: formData.account_id,
+                account_id: finalAccountId,
                 account_name: selectedAccount?.name || '',
                 debit: isNegative ? 0 : absBalance,
                 credit: isNegative ? absBalance : 0,
@@ -209,7 +226,7 @@ export const Customers: React.FC = () => {
                 customer_name: formData.name
               },
               {
-                account_id: formData.counter_account_id,
+                account_id: finalCounterAccountId,
                 account_name: counterAccount?.name || '',
                 debit: isNegative ? absBalance : 0,
                 credit: isNegative ? 0 : absBalance,
@@ -737,27 +754,46 @@ export const Customers: React.FC = () => {
                                 </div>
                               </div>
 
-                              {formData.counter_account_id && (
-                                 <div className="bg-slate-50/50 p-6 rounded-[2.5rem] border border-slate-100 shadow-inner">
-                                    <JournalEntryPreview 
-                                      title={language === 'ar' ? 'معاينة قيد الرصيد' : 'Entry Preview'}
-                                      items={[
-                                        {
-                                          account_name: accounts.find(a => a.id === formData.account_id)?.name || '',
-                                          debit: formData.opening_balance > 0 ? formData.opening_balance : 0,
-                                          credit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
-                                          description: language === 'ar' ? `رصيد أول: ${formData.name}` : `Opening: ${formData.name}`
-                                        },
-                                        {
-                                          account_name: accounts.find(a => a.id === formData.counter_account_id)?.name || '',
-                                          debit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
-                                          credit: formData.opening_balance > 0 ? formData.opening_balance : 0,
-                                          description: language === 'ar' ? `الطرف المقابل: ${formData.name}` : `Counter: ${formData.name}`
-                                        }
-                                      ]}
-                                    />
-                                 </div>
-                              )}
+                              {formData.counter_account_id && (() => {
+                                 let finalAccountId = formData.account_id;
+                                 let finalCounterAccountId = formData.counter_account_id;
+
+                                 const account1 = accounts.find(a => a.id === finalAccountId);
+                                 const account2 = accounts.find(a => a.id === finalCounterAccountId);
+
+                                 const isAccountCustomer = (acc: any) => acc && (acc.name.includes('عملاء') || acc.name.includes('العملاء') || acc.code?.startsWith('12'));
+                                 const isAccountOpening = (acc: any) => acc && (acc.name.includes('رصيد') || acc.name.includes('ميزانية') || acc.name.includes('رأس') || acc.name.includes('راس') || acc.code?.startsWith('3'));
+
+                                 if (isAccountOpening(account1) && isAccountCustomer(account2)) {
+                                   finalAccountId = formData.counter_account_id;
+                                   finalCounterAccountId = formData.account_id;
+                                 }
+
+                                 const customerAccount = accounts.find(a => a.id === finalAccountId);
+                                 const counterAccount = accounts.find(a => a.id === finalCounterAccountId);
+
+                                 return (
+                                   <div className="bg-slate-50/50 p-6 rounded-[2.5rem] border border-slate-100 shadow-inner">
+                                      <JournalEntryPreview 
+                                        title={language === 'ar' ? 'معاينة قيد الرصيد' : 'Entry Preview'}
+                                        items={[
+                                          {
+                                            account_name: customerAccount?.name || '',
+                                            debit: formData.opening_balance > 0 ? formData.opening_balance : 0,
+                                            credit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
+                                            description: language === 'ar' ? `رصيد أول: ${formData.name}` : `Opening: ${formData.name}`
+                                          },
+                                          {
+                                            account_name: counterAccount?.name || '',
+                                            debit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
+                                            credit: formData.opening_balance > 0 ? formData.opening_balance : 0,
+                                            description: language === 'ar' ? `الطرف المقابل: ${formData.name}` : `Counter: ${formData.name}`
+                                          }
+                                        ]}
+                                      />
+                                   </div>
+                                 );
+                              })()}
                            </div>
                         </div>
                       )}
