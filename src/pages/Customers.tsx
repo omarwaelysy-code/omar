@@ -301,6 +301,8 @@ export const Customers: React.FC = () => {
         return;
       }
     } else {
+      const defaultAccount = accounts.find(a => a.name.includes('عملاء') || a.name.includes('العملاء'));
+      const defaultCounterAccount = accounts.find(a => a.name.includes('رصيد أول') || a.name.includes('رصيد اول') || a.name.includes('ميزانية افتتاحي') || a.name.includes('رأس المال') || a.name.includes('راس المال'));
       setEditingCustomer(null);
       setFormData({ 
         name: '', 
@@ -309,9 +311,9 @@ export const Customers: React.FC = () => {
         address: '',
         opening_balance: 0,
         opening_balance_date: new Date().toISOString().slice(0, 10),
-        account_id: '',
-        account_name: '',
-        counter_account_id: ''
+        account_id: defaultAccount?.id || '',
+        account_name: defaultAccount?.name || '',
+        counter_account_id: defaultCounterAccount?.id || ''
       });
     }
     setIsModalOpen(true);

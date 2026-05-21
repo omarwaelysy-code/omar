@@ -81,8 +81,8 @@ export class AccountingEngine {
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
 
-    let openingDebit = Number(account.opening_balance) > 0 ? Number(account.opening_balance) : 0;
-    let openingCredit = Number(account.opening_balance) < 0 ? Math.abs(Number(account.opening_balance)) : 0;
+    let openingDebit = (entityIds && entityIds.length > 0) ? 0 : (Number(account.opening_balance) > 0 ? Number(account.opening_balance) : 0);
+    let openingCredit = (entityIds && entityIds.length > 0) ? 0 : (Number(account.opening_balance) < 0 ? Math.abs(Number(account.opening_balance)) : 0);
     
     const relevantEntries: LedgerLine[] = [];
 
