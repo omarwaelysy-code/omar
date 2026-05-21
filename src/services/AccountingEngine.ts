@@ -1,4 +1,4 @@
-import { JournalEntry, Account, TrialBalanceItem, LedgerLine, AccountType } from '../types';
+import { JournalEntry, Account, TrialBalanceItem, LedgerLine, AccountType, Customer, Supplier } from '../types';
 
 export class AccountingEngine {
   /**
@@ -73,7 +73,9 @@ export class AccountingEngine {
     entries: JournalEntry[],
     startDate: string,
     endDate: string,
-    entityIds?: string[]
+    entityIds?: string[],
+    customers?: Customer[],
+    suppliers?: Supplier[]
   ): { lines: LedgerLine[]; openingBalance: number } {
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -103,6 +105,29 @@ export class AccountingEngine {
             openingDebit += debit;
             openingCredit += credit;
           } else if (entryDate >= start && entryDate <= end) {
+            let entityName = item.customer_name || item.supplier_name || '';
+            if (!entityName) {
+              if (item.customer_id && customers) {
+                const found = customers.find(c => c.id === item.customer_id);
+                if (found) entityName = found.name;
+              }
+              if (!entityName && item.supplier_id && suppliers) {
+                const found = suppliers.find(s => s.id === item.supplier_id);
+                if (found) entityName = found.name;
+              }
+              if (!entityName && item.sub_account_id && customers && (item.sub_account_type === 'customer' || !item.sub_account_type)) {
+                const found = customers.find(c => c.id === item.sub_account_id);
+                if (found) entityName = found.name;
+              }
+              if (!entityName && item.sub_account_id && suppliers && (item.sub_account_type === 'supplier' || !item.sub_account_type)) {
+                const found = suppliers.find(s => s.id === item.sub_account_id);
+                if (found) entityName = found.name;
+              }
+            }
+            if (!entityName) {
+              entityName = item.sub_account_type === 'payment_method' ? 'خزينة/بنك' : '';
+            }
+
             relevantEntries.push({
               id: entry.id || '',
               date: entry.date,
@@ -111,7 +136,7 @@ export class AccountingEngine {
               debit: debit,
               credit: credit,
               balance: 0,
-              entity_name: item.customer_name || item.supplier_name || (item.sub_account_type === 'payment_method' ? 'خزينة/بنك' : '')
+              entity_name: entityName
             });
           }
         }

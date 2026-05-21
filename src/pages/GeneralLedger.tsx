@@ -54,7 +54,9 @@ export const GeneralLedger: React.FC = () => {
         entries,
         dateRange.start,
         dateRange.end,
-        selectedEntityIds
+        selectedEntityIds,
+        customers,
+        suppliers
       )
     : { lines: [], openingBalance: 0 };
 

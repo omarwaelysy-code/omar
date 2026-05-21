@@ -1483,6 +1483,7 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
         credit: 0,
         description: `فاتورة مبيعات رقم ${invoiceData.invoice_number}`,
         customer_id: invoiceData.customer_id,
+        customer_name: customer?.name || null,
         sub_account_id: invoiceData.payment_type === 'cash' ? invoiceData.payment_method_id : invoiceData.customer_id,
         sub_account_type: invoiceData.payment_type === 'cash' ? 'payment_method' : 'customer'
       });
@@ -1545,9 +1546,9 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
 
       for (const line of journalItems) {
         await client.query(
-          `INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, company_id, customer_id, sub_account_id, sub_account_type)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-          [uuidv4(), journalEntryId, line.account_id, line.account_name, line.description, line.debit, line.credit, companyId, line.customer_id, line.sub_account_id || null, line.sub_account_type || null]
+          `INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, company_id, customer_id, sub_account_id, sub_account_type, customer_name, supplier_name)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+          [uuidv4(), journalEntryId, line.account_id, line.account_name, line.description, line.debit, line.credit, companyId, line.customer_id, line.sub_account_id || null, line.sub_account_type || null, line.customer_name || null, line.supplier_name || null]
         );
       }
     }
