@@ -876,7 +876,11 @@ export const PurchaseReturns: React.FC = () => {
                   <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 italic">لا توجد مرتجعات مشتريات حالياً</td>
                 </tr>
               ) : filteredReturns.map((ret) => (
-                <tr key={ret.id} className="hover:bg-zinc-50/50 transition-colors group">
+                <tr 
+                  key={ret.id} 
+                  className="hover:bg-zinc-50/50 transition-colors group cursor-pointer"
+                  onClick={() => handleEdit(ret)}
+                >
                   <td className="px-6 py-4">
                     <span className="font-mono text-xs bg-red-50 px-2 py-1 rounded text-red-700 font-bold">{ret.return_number}</span>
                   </td>
@@ -891,7 +895,8 @@ export const PurchaseReturns: React.FC = () => {
                   <td className="px-6 py-4 text-left">
                     <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setActivityLogDocumentId(ret.id);
                           setIsActivityLogOpen(true);
                         }}
@@ -901,26 +906,38 @@ export const PurchaseReturns: React.FC = () => {
                         <History size={18} />
                       </button>
                       <button 
-                        onClick={() => handleViewReturn(ret.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewReturn(ret.id);
+                        }}
                         className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all no-pdf"
                       >
                         <Eye size={18} />
                       </button>
                       <button 
-                        onClick={() => handleEdit(ret)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(ret);
+                        }}
                         className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all no-pdf"
                         title="تعديل"
                       >
                         <Edit size={18} />
                       </button>
                       <button 
-                        onClick={() => exportToPDF(ret)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          exportToPDF(ret);
+                        }}
                         className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all no-pdf"
                       >
                         <Download size={18} />
                       </button>
                       <button 
-                        onClick={() => handleDelete(ret.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(ret.id);
+                        }}
                         className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all no-pdf"
                       >
                         <Trash2 size={18} />
@@ -940,7 +957,11 @@ export const PurchaseReturns: React.FC = () => {
             <div className="px-6 py-12 text-center text-zinc-400 italic">لا توجد مرتجعات مشتريات حالياً</div>
           ) : (
             filteredReturns.map((ret) => (
-              <div key={ret.id} className="p-4 space-y-3 active:bg-zinc-50 transition-colors">
+              <div 
+                key={ret.id} 
+                onClick={() => handleEdit(ret)}
+                className="p-4 space-y-3 hover:bg-zinc-50 transition-colors cursor-pointer"
+              >
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs bg-red-50 px-2 py-1 rounded text-red-700 font-bold">{ret.return_number}</span>
                   <span className="text-xs text-zinc-500 flex items-center gap-1">
@@ -957,7 +978,7 @@ export const PurchaseReturns: React.FC = () => {
                   </div>
                   <span className="font-bold text-red-600">{formatNumber(ret.total_amount)} ج.م</span>
                 </div>
-                <div className="flex items-center justify-end gap-2 pt-2">
+                <div className="flex items-center justify-end gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
                   <button 
                     onClick={() => {
                       setActivityLogDocumentId(ret.id);

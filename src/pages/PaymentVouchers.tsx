@@ -1059,7 +1059,11 @@ export const PaymentVouchers: React.FC = () => {
                     <td colSpan={6} className="px-6 py-12 text-center text-zinc-400 italic">لا توجد سندات صرف حالياً</td>
                   </tr>
                 ) : filteredVouchers.map((voucher) => (
-                  <tr key={voucher.id} className="hover:bg-zinc-50/50 transition-colors group">
+                  <tr 
+                    key={voucher.id} 
+                    className="hover:bg-zinc-50/50 transition-colors group cursor-pointer"
+                    onClick={() => openEditModal(voucher)}
+                  >
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1">
                         <span className="font-mono text-[10px] bg-zinc-100 px-2 py-1 rounded text-zinc-700 font-bold w-fit">{voucher.internal_reference || voucher.voucher_number || voucher.number}</span>
@@ -1099,7 +1103,8 @@ export const PaymentVouchers: React.FC = () => {
                     <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                       <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity no-pdf`}>
                         <button 
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setActivityLogDocumentId(voucher.id);
                             setIsActivityLogOpen(true);
                           }}
@@ -1109,19 +1114,28 @@ export const PaymentVouchers: React.FC = () => {
                           <History size={18} />
                         </button>
                         <button 
-                          onClick={() => handleViewVoucher(voucher.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewVoucher(voucher.id);
+                          }}
                           className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
                         >
                           <Eye size={18} />
                         </button>
                         <button 
-                          onClick={() => openEditModal(voucher)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditModal(voucher);
+                          }}
                           className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
                         >
                           <Pencil size={18} />
                         </button>
                         <button 
-                          onClick={() => handleDelete(voucher.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(voucher.id);
+                          }}
                           className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
                         >
                           <Trash2 size={18} />
@@ -1137,22 +1151,35 @@ export const PaymentVouchers: React.FC = () => {
         ) : (
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredVouchers.map((voucher) => (
-              <div key={voucher.id} className="p-6 bg-zinc-50/50 rounded-3xl border border-zinc-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden">
+              <div 
+                key={voucher.id} 
+                onClick={() => openEditModal(voucher)}
+                className="p-6 bg-zinc-50/50 rounded-3xl border border-zinc-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden cursor-pointer"
+              >
                 <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button 
-                    onClick={() => handleViewVoucher(voucher.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleViewVoucher(voucher.id);
+                    }}
                     className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
                   >
                     <Eye size={16} />
                   </button>
                   <button 
-                    onClick={() => openEditModal(voucher)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openEditModal(voucher);
+                    }}
                     className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
                   >
                     <Pencil size={16} />
                   </button>
                   <button 
-                    onClick={() => handleDelete(voucher.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(voucher.id);
+                    }}
                     className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
                   >
                     <Trash2 size={16} />
@@ -1212,7 +1239,8 @@ export const PaymentVouchers: React.FC = () => {
                   </div>
                   <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-zinc-200/50 flex justify-end">
                     <button 
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setActivityLogDocumentId(voucher.id);
                         setIsActivityLogOpen(true);
                       }}

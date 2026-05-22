@@ -853,7 +853,11 @@ export const Returns: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-zinc-50">
               {filteredReturns.map((ret) => (
-                <tr key={ret.id} className="hover:bg-zinc-50/50 transition-colors group">
+                <tr 
+                  key={ret.id} 
+                  className="hover:bg-zinc-50/50 transition-colors group cursor-pointer"
+                  onClick={() => openModal(ret)}
+                >
                   <td className="px-6 py-4">
                     <span className="font-mono text-xs bg-zinc-100 px-2 py-1 rounded text-zinc-600">{ret.return_number}</span>
                   </td>
@@ -868,7 +872,8 @@ export const Returns: React.FC = () => {
                   <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                     <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
                       <button 
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setActivityLogDocumentId(ret.id);
                           setIsActivityLogOpen(true);
                         }}
@@ -878,21 +883,30 @@ export const Returns: React.FC = () => {
                         <History size={18} />
                       </button>
                       <button 
-                        onClick={() => openModal(ret)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openModal(ret);
+                        }}
                         className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
                         title={t('common.edit')}
                       >
                         <FileText size={18} />
                       </button>
                       <button 
-                        onClick={() => handleViewReturn(ret)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewReturn(ret);
+                        }}
                         className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
                         title={t('common.view')}
                       >
                         <Eye size={18} />
                       </button>
                       <button 
-                        onClick={() => handleDelete(ret.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(ret.id);
+                        }}
                         className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
                         title={t('common.delete')}
                       >
@@ -915,7 +929,11 @@ export const Returns: React.FC = () => {
         {/* Mobile List View */}
         <div className="md:hidden divide-y divide-zinc-50">
           {filteredReturns.map((ret) => (
-            <div key={ret.id} className="p-4 space-y-4">
+            <div 
+              key={ret.id} 
+              onClick={() => openModal(ret)}
+              className="p-4 space-y-4 cursor-pointer hover:bg-zinc-50 transition-colors"
+            >
               <div className="flex items-center justify-between">
                 <div className="flex flex-col gap-1">
                   <span className="font-mono text-[10px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold w-fit">{ret.return_number}</span>
@@ -926,7 +944,7 @@ export const Returns: React.FC = () => {
                   <span className="text-xs text-zinc-400">{formatDate(ret.date)}</span>
                 </div>
               </div>
-              <div className="flex items-center gap-2 pt-2">
+              <div className="flex items-center gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
                 <button 
                   onClick={() => {
                     setActivityLogDocumentId(ret.id);

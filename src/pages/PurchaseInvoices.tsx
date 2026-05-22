@@ -1215,7 +1215,11 @@ export const PurchaseInvoices: React.FC = () => {
                     <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 italic">{t('pi.no_invoices')}</td>
                   </tr>
                 ) : filteredInvoices.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-zinc-50/50 transition-colors group">
+                  <tr 
+                    key={inv.id} 
+                    className="hover:bg-zinc-50/50 transition-colors group cursor-pointer"
+                    onClick={() => openModal(inv)}
+                  >
                     <td className="px-6 py-4">
                       <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold">{inv.invoice_number}</span>
                     </td>
@@ -1227,7 +1231,8 @@ export const PurchaseInvoices: React.FC = () => {
                     <td className={`px-6 py-4 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'}`}>
                       <div className={`flex items-center ${t('dir') === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
                         <button 
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setActivityLogDocumentId(inv.id);
                             setIsActivityLogOpen(true);
                           }}
@@ -1237,19 +1242,28 @@ export const PurchaseInvoices: React.FC = () => {
                           <History size={18} />
                         </button>
                         <button 
-                          onClick={() => setViewInvoice(inv)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewInvoice(inv);
+                          }}
                           className="p-2 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50 rounded-xl transition-all no-pdf"
                         >
                           <Eye size={18} />
                         </button>
                         <button 
-                          onClick={() => openModal(inv)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openModal(inv);
+                          }}
                           className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all no-pdf"
                         >
                           <Pencil size={18} />
                         </button>
                         <button 
-                          onClick={() => handleDelete(inv.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(inv.id);
+                          }}
                           className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all no-pdf"
                         >
                           <Trash2 size={18} />
@@ -1266,22 +1280,35 @@ export const PurchaseInvoices: React.FC = () => {
         ) : (
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredInvoices.map((inv) => (
-              <div key={inv.id} className="p-6 bg-zinc-50/50 rounded-3xl border border-zinc-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden">
+              <div 
+                key={inv.id} 
+                onClick={() => openModal(inv)}
+                className="p-6 bg-zinc-50/50 rounded-3xl border border-zinc-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden cursor-pointer"
+              >
                 <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button 
-                    onClick={() => setViewInvoice(inv)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setViewInvoice(inv);
+                    }}
                     className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
                   >
                     <Eye size={16} />
                   </button>
                   <button 
-                    onClick={() => openModal(inv)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openModal(inv);
+                    }}
                     className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
                   >
                     <Pencil size={16} />
                   </button>
                   <button 
-                    onClick={() => handleDelete(inv.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(inv.id);
+                    }}
                     className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
                   >
                     <Trash2 size={16} />
@@ -1307,7 +1334,8 @@ export const PurchaseInvoices: React.FC = () => {
                   </div>
                   <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-zinc-200/50 flex justify-end">
                     <button 
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setActivityLogDocumentId(inv.id);
                         setIsActivityLogOpen(true);
                       }}
@@ -1329,7 +1357,11 @@ export const PurchaseInvoices: React.FC = () => {
         {/* Mobile List View */}
         <div className="md:hidden divide-y divide-zinc-50">
           {filteredInvoices.map((inv) => (
-            <div key={inv.id} className="p-4 space-y-4">
+            <div 
+              key={inv.id} 
+              onClick={() => openModal(inv)}
+              className="p-4 space-y-4 cursor-pointer hover:bg-zinc-50 transition-colors"
+            >
               <div className="flex items-center justify-between">
                 <div className="flex flex-col gap-1">
                   <span className="font-mono text-[10px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold w-fit">{inv.invoice_number}</span>
@@ -1342,7 +1374,7 @@ export const PurchaseInvoices: React.FC = () => {
                   <span className="text-xs text-zinc-400">{formatDate(inv.date)}</span>
                 </div>
               </div>
-              <div className="flex items-center gap-2 pt-2">
+              <div className="flex items-center gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
                 <button 
                   onClick={() => setViewInvoice(inv)}
                   className="flex-1 flex items-center justify-center gap-2 py-3 bg-zinc-50 text-zinc-600 rounded-2xl text-sm font-bold border border-zinc-100 active:scale-95 transition-transform"
