@@ -4,6 +4,7 @@ import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Customers } from './pages/Customers';
 import { Products } from './pages/Products';
+import { ItemGroups } from './pages/ItemGroups';
 import { Suppliers } from './pages/Suppliers';
 import { Expenses } from './pages/Expenses';
 import { PaymentMethods } from './pages/PaymentMethods';
@@ -154,6 +155,7 @@ export default function App() {
       case 'dashboard': return <Dashboard />;
       case 'customers': return <Customers />;
       case 'products': return <Products />;
+      case 'item_groups': return <ItemGroups />;
       case 'suppliers': return <Suppliers />;
       case 'expenses': return <Expenses />;
       case 'payment_methods': return <PaymentMethods />;

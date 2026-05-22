@@ -206,6 +206,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'customers', label: t('nav.customers'), icon: UsersIcon },
           { id: 'suppliers', label: t('nav.suppliers'), icon: Truck },
           { id: 'products', label: t('nav.products'), icon: Package },
+          { id: 'item_groups', label: t('nav.item_groups'), icon: Folder },
           { id: 'expenses', label: t('nav.expenses'), icon: Wallet },
           { id: 'payment_methods', label: t('nav.payment_methods'), icon: CreditCard },
           { id: 'discount_settings', label: t('nav.discount_settings'), icon: Settings },

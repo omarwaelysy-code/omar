@@ -5,6 +5,7 @@ export const ar = {
   'nav.customers': 'العملاء',
   'nav.suppliers': 'الموردين',
   'nav.products': 'الأصناف',
+  'nav.item_groups': 'مجموعات الأصناف',
   'nav.expenses': 'بنود المصروفات',
   'nav.payment_methods': 'طرق السداد',
   'nav.discount_settings': 'إعدادات الخصومات',

@@ -597,7 +597,7 @@ router.post('/auth/logout', (req, res) => {
 
 // --- Generic CRUD Factory ---
 const modules = [
-  'customers', 'suppliers', 'products', 'payment_methods', 
+  'customers', 'suppliers', 'products', 'item_groups', 'payment_methods', 
   'expense_categories', 'accounts', 'account_types', 'settings', 'users', 'companies',
   'invoices', 'invoice_items', 'journal_entries', 'journal_entry_lines', 'activity_logs',
   'returns', 'return_items', 'purchase_invoices', 'purchase_returns', 

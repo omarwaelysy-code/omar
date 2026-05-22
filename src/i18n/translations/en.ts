@@ -5,6 +5,7 @@ export const en = {
   'nav.customers': 'Customers',
   'nav.suppliers': 'Suppliers',
   'nav.products': 'Products',
+  'nav.item_groups': 'Item Groups',
   'nav.expenses': 'Expense Categories',
   'nav.payment_methods': 'Payment Methods',
   'nav.discount_settings': 'Discount Settings',

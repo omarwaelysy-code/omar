@@ -311,6 +311,19 @@ export async function initDatabase() {
       );
     `, 'products table');
 
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "item_groups" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id"),
+        "name" VARCHAR(255) NOT NULL,
+        "code" VARCHAR(100) NOT NULL,
+        "type" VARCHAR(100) NOT NULL,
+        "sequence_number" INTEGER NOT NULL DEFAULT 1,
+        "description" TEXT,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'item_groups table');
+
     // Phase 4: Core Transactions
     await safeQuery(`
       CREATE TABLE IF NOT EXISTS "journal_entries" (
