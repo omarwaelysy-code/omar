@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Search, Plus, Trash2, X, Folder, Layers, Hash, 
+  ChevronRight, ChevronLeft, LayoutGrid, List, Lock, FileText
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'react-hot-toast';
 import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Edit2, Trash2, Folder, Layers, Search, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import { toast } from 'react-hot-toast';
+import { PaginationControls } from '../components/PaginationControls';
 
 interface ItemGroup {
   id: string;
@@ -18,17 +22,18 @@ interface ItemGroup {
 }
 
 export function ItemGroups() {
-  const { language, t } = useLanguage();
   const { user } = useAuth();
+  const { t, dir, language } = useLanguage();
   
   const [itemGroups, setItemGroups] = useState<ItemGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [view, setView] = useState<'table' | 'card'>('table');
   
-  // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<ItemGroup | null>(null);
+  
   const [formData, setFormData] = useState({
     name: '',
     type: 'finished_product' as 'finished_product' | 'service' | 'raw_material' | 'commodity',
@@ -38,35 +43,30 @@ export function ItemGroups() {
     code: ''
   });
 
-  useEffect(() => {
-    fetchData();
-  }, [user?.company_id]);
+  const tableRef = useRef<HTMLTableElement>(null);
 
-  const fetchData = async () => {
-    if (!user?.company_id) return;
-    try {
+  useEffect(() => {
+    if (user?.company_id) {
       setLoading(true);
-      const data = await dbService.list<ItemGroup>('item_groups', { company_id: user.company_id });
-      setItemGroups(data || []);
-    } catch (error) {
-      console.error('Failed to fetch item groups:', error);
-      toast.error(language === 'ar' ? 'فشل تحميل مجموعات الأصناف' : 'Failed to fetch item groups');
-    } finally {
-      setLoading(false);
+      const unsubscribe = dbService.subscribe<ItemGroup>('item_groups', user.company_id, (data) => {
+        setItemGroups(data || []);
+        setLoading(false);
+      });
+      return () => unsubscribe();
     }
-  };
+  }, [user]);
 
   // Helper translations for types
   const getTypeLabel = (type: string) => {
     switch (type) {
       case 'finished_product':
-        return language === 'ar' ? 'منتج تام' : 'Finished Product';
+        return language === 'ar' ? 'منتج تام (TAM)' : 'Finished Product (TAM)';
       case 'service':
-        return language === 'ar' ? 'خدمة' : 'Service';
+        return language === 'ar' ? 'خدمة (SRV)' : 'Service (SRV)';
       case 'raw_material':
-        return language === 'ar' ? 'مواد خام' : 'Raw Material';
+        return language === 'ar' ? 'مواد خام (RAW)' : 'Raw Material (RAW)';
       case 'commodity':
-        return language === 'ar' ? 'سلعة' : 'Commodity';
+        return language === 'ar' ? 'سلعة (COM)' : 'Commodity (COM)';
       default:
         return type;
     }
@@ -84,30 +84,34 @@ export function ItemGroups() {
 
   // Run auto-generation of code during input changes
   useEffect(() => {
-    // Only auto-generate standard pattern if user has not loaded an editing group, or if they are changing the editing fields
-    const typeAcronym = getTypeAcronym(formData.type);
-    const sanitizedLetters = formData.letter_code.toUpperCase().replace(/[^A-Z0-9\u0600-\u06FF]/g, '');
-    
-    let nextNum = formData.sequence_number;
-    if (!editingGroup) {
-      // Calculate next index based on matching types
-      const matching = itemGroups.filter(g => g.type === formData.type);
-      nextNum = matching.length > 0 
-        ? Math.max(...matching.map(g => g.sequence_number || 0)) + 1 
-        : 1;
+    if (isModalOpen) {
+      const typeAcronym = getTypeAcronym(formData.type);
+      const sanitizedLetters = formData.letter_code.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      
+      let nextNum = formData.sequence_number;
+      if (!editingGroup) {
+        const typeGroups = itemGroups.filter(g => g.type === formData.type);
+        let maxNum = 0;
+        typeGroups.forEach(g => {
+          if (g.sequence_number && g.sequence_number > maxNum) {
+            maxNum = g.sequence_number;
+          }
+        });
+        nextNum = maxNum + 1;
+      }
+
+      const paddedNum = String(nextNum).padStart(3, '0');
+      const combinedCode = sanitizedLetters 
+        ? `${typeAcronym}-${sanitizedLetters}-${paddedNum}`
+        : `${typeAcronym}-${paddedNum}`;
+
+      setFormData(prev => ({
+        ...prev,
+        sequence_number: nextNum,
+        code: combinedCode
+      }));
     }
-
-    const paddedNum = String(nextNum).padStart(3, '0');
-    const combinedCode = sanitizedLetters 
-      ? `${typeAcronym}-${sanitizedLetters}-${paddedNum}`
-      : `${typeAcronym}-${paddedNum}`;
-
-    setFormData(prev => ({
-      ...prev,
-      sequence_number: nextNum,
-      code: combinedCode
-    }));
-  }, [formData.type, formData.letter_code, itemGroups, editingGroup]);
+  }, [formData.type, formData.letter_code, itemGroups, editingGroup, isModalOpen]);
 
   const handleOpenCreate = () => {
     setEditingGroup(null);
@@ -125,15 +129,11 @@ export function ItemGroups() {
   const handleOpenEdit = (group: ItemGroup) => {
     setEditingGroup(group);
     
-    // Parse the letter letters from their code if possible, or leave blank to recalculate
-    // Standard code is like: TAM-ABC-001
+    // Parse letters from code if has "TAM-ABC-001" pattern
     const parts = group.code.split('-');
     let parsedLetters = '';
     if (parts.length === 3) {
       parsedLetters = parts[1];
-    } else if (parts.length === 2 && isNaN(Number(parts[0]))) {
-      // Could be prefix-number pattern
-      parsedLetters = '';
     }
 
     setFormData({
@@ -145,6 +145,11 @@ export function ItemGroups() {
       code: group.code
     });
     setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingGroup(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -175,18 +180,18 @@ export function ItemGroups() {
         await dbService.update('item_groups', editingGroup.id, payload);
         toast.success(language === 'ar' ? 'تم تحديث المجموعة بنجاح' : 'Group updated successfully');
       } else {
-        await dbService.create('item_groups', payload);
+        await dbService.add('item_groups', payload);
         toast.success(language === 'ar' ? 'تمت إضافة المجموعة بنجاح' : 'Group created successfully');
       }
-      setIsModalOpen(false);
-      fetchData();
+      closeModal();
     } catch (error: any) {
       console.error('Error saving item groups:', error);
       toast.error(language === 'ar' ? 'فشل حفظ المجموعة' : 'Failed to save group');
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     const confirmMsg = language === 'ar'
       ? 'هل أنت متأكد من رغبتك في حذف هذه المجموعة؟'
       : 'Are you sure you want to delete this group?';
@@ -195,7 +200,6 @@ export function ItemGroups() {
       try {
         await dbService.delete('item_groups', id);
         toast.success(language === 'ar' ? 'تم حذف المجموعة بنجاح' : 'Group deleted successfully');
-        fetchData();
       } catch (error) {
         console.error('Failed to delete item group:', error);
         toast.error(language === 'ar' ? 'فشل حذف المجموعة' : 'Failed to delete group');
@@ -214,267 +218,326 @@ export function ItemGroups() {
   });
 
   return (
-    <div className="p-6 max-w-6xl mx-auto h-full flex flex-col overflow-hidden">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">
-            {language === 'ar' ? 'إدارة مجموعات الأصناف' : 'Item Groups Management'}
-          </h1>
-          <p className="text-xs md:text-sm text-zinc-500 mt-1">
-            {language === 'ar' 
-              ? 'تصنيف وتعريف مجموعات الأصناف حسب الأنواع الأساسية لتسهيل جردها وتصنيفها' 
-              : 'Classify and define commodity groups based on core types to ease classification and tracking.'}
-          </p>
-        </div>
-        
-        <button
-          onClick={handleOpenCreate}
-          className="inline-flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition duration-150 shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{language === 'ar' ? 'مجموعة جديدة' : 'New Group'}</span>
-        </button>
-      </div>
-
-      {/* Grid of filtering & search tool indicators */}
-      <div className="bg-white p-4 rounded-2xl border border-zinc-100 shadow-xs flex flex-col md:flex-row gap-4 items-center mb-6">
-        <div className="relative w-full md:flex-1">
-          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 w-4 h-4" />
-          <input
-            type="text"
-            placeholder={language === 'ar' ? 'بحث عن مجموعة...' : 'Search groups...'}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-10 py-2 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-zinc-900"
-          />
-        </div>
-        
-        <div className="flex gap-2 w-full md:w-auto">
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="w-full md:w-48 px-3 py-2 border border-zinc-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900"
+    <div className="h-full flex flex-col space-y-8 animate-in fade-in duration-700 overflow-hidden" dir={dir}>
+      <AnimatePresence mode="wait">
+        {!isModalOpen ? (
+          <motion.div 
+            key="list"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="flex-1 flex flex-col space-y-8 overflow-hidden max-w-7xl mx-auto w-full p-4"
           >
-            <option value="all">{language === 'ar' ? 'كل الأنواع' : 'All Types'}</option>
-            <option value="finished_product">{language === 'ar' ? 'منتج تام' : 'Finished Product'}</option>
-            <option value="service">{language === 'ar' ? 'خدمة' : 'Service'}</option>
-            <option value="raw_material">{language === 'ar' ? 'مواد خام' : 'Raw Material'}</option>
-            <option value="commodity">{language === 'ar' ? 'سلعة' : 'Commodity'}</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Primary items table */}
-      <div className="flex-1 overflow-auto bg-white border border-zinc-100 rounded-2xl shadow-xs">
-        {loading ? (
-          <div className="flex items-center justify-center p-20 text-zinc-400 text-sm">
-            {language === 'ar' ? 'جاري تحميل المجموعات...' : 'Loading groups...'}
-          </div>
-        ) : filteredGroups.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-16 text-center text-zinc-400">
-            <Folder className="w-12 h-12 text-zinc-200 mb-3" />
-            <span className="text-sm font-medium">
-              {language === 'ar' ? 'لا توجد مجموعات أصناف للاستعراض' : 'No Item Groups Found'}
-            </span>
-            <p className="text-xs text-zinc-400 max-w-sm mt-1">
-              {language === 'ar' 
-                ? 'اضغط على زر "مجموعة جديدة" في الأعلى لبدء تعريف مجموعات الأصناف والسلع والخدمات.' 
-                : 'Click "New Group" above to start defining product groups, material categories and active services.'}
-            </p>
-          </div>
-        ) : (
-          <table className="w-full text-right border-collapse">
-            <thead>
-              <tr className="bg-zinc-50 border-b border-zinc-100 text-xs text-zinc-500 font-semibold uppercase">
-                <th className="px-6 py-4 text-right">{language === 'ar' ? 'كود المجموعة المبرمج' : 'Autogen Group Code'}</th>
-                <th className="px-6 py-4 text-right">{language === 'ar' ? 'اسم المجموعة' : 'Group Name'}</th>
-                <th className="px-6 py-4 text-right">{language === 'ar' ? 'نوع الصنف' : 'Type'}</th>
-                <th className="px-6 py-4 text-right">{language === 'ar' ? 'توصيف المجموعة' : 'Description'}</th>
-                <th className="px-6 py-4 text-center w-28">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-50 text-sm">
-              <AnimatePresence>
-                {filteredGroups.map((group) => (
-                  <motion.tr
-                    key={group.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="hover:bg-zinc-50/50 transition duration-150"
-                  >
-                    <td className="px-6 py-4">
-                      <span className="font-mono text-xs text-zinc-900 bg-zinc-100 px-2 py-1 rounded-md font-semibold">
-                        {group.code}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 font-medium text-zinc-900">{group.name}</td>
-                    <td className="px-6 py-4 text-zinc-600">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-50 text-zinc-700">
-                        <Layers className="w-3 h-3 text-zinc-400" />
-                        <span>{getTypeLabel(group.type)}</span>
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-zinc-500 max-w-xs truncate" title={group.description}>
-                      {group.description || '-'}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          onClick={() => handleOpenEdit(group)}
-                          title={language === 'ar' ? 'تعديل' : 'Edit'}
-                          className="p-1 px-1.5 rounded-lg text-zinc-600 hover:bg-zinc-100 transition"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(group.id)}
-                          title={language === 'ar' ? 'حذف' : 'Delete'}
-                          className="p-1 px-1.5 rounded-lg text-red-600 hover:bg-red-50 transition"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </motion.tr>
-                ))}
-              </AnimatePresence>
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* Beautiful slider drawer modal for creation/edition */}
-      <AnimatePresence>
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/40 backdrop-blur-xs">
-            <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="w-full max-w-md h-full bg-white shadow-2xl flex flex-col p-6 overflow-y-auto"
-            >
-              <div className="flex items-center justify-between mb-6 pb-4 border-b border-zinc-100">
-                <h2 className="text-lg font-bold text-zinc-900">
-                  {editingGroup 
-                    ? (language === 'ar' ? 'تعديل مجموعة أصناف' : 'Edit Item Group')
-                    : (language === 'ar' ? 'إضافة مجموعة جديدة' : 'Add Item Group')}
-                </h2>
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="p-1.5 rounded-full hover:bg-zinc-100 transition text-zinc-400"
+            {/* Header - Styled like Products layout */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-8 pb-6 border-b border-slate-100">
+              <div className={dir === 'rtl' ? 'text-right' : 'text-left'}>
+                <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter mb-3 leading-none italic serif">
+                  {language === 'ar' ? 'مجموعات الأصناف' : 'Item Groups'}
+                </h1>
+                <p className="text-slate-400 font-bold uppercase tracking-[0.3em] text-xs">
+                  {language === 'ar' ? 'تصنيف وتعريف المجموعات بناءً على الأنواع الأساسية' : 'Classify and index groups by core types'}
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={handleOpenCreate}
+                  className="group relative px-8 py-4 bg-zinc-900 text-white rounded-[1.5rem] shadow-xl overflow-hidden transition-all hover:bg-zinc-800 active:scale-95"
                 >
-                  <X className="w-4.5 h-4.5" />
+                  <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="relative z-10 flex items-center gap-3 font-black uppercase tracking-widest text-sm">
+                    <Plus size={20} className="group-hover:rotate-90 transition-transform" />
+                    {language === 'ar' ? 'مجموعة جديدة' : 'New Group'}
+                  </div>
                 </button>
               </div>
+            </div>
 
-              <form onSubmit={handleSubmit} className="flex-1 flex flex-col gap-5">
-                {/* Name */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-zinc-700">
-                    {language === 'ar' ? 'اسم المجموعة *' : 'Group Name *'}
-                  </label>
+            {/* List Controls and View Settings */}
+            <div className="flex-1 bg-white rounded-[3.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden flex flex-col transition-all duration-500">
+              <div className="p-8 border-b border-slate-50 flex items-center gap-4 bg-slate-50/20">
+                <div className="relative flex-1 group">
+                  <Search className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors pointer-events-none`} size={24} />
                   <input
                     type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full border border-zinc-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-zinc-900"
-                    placeholder={language === 'ar' ? 'مثال: قطع غيار المحركات' : 'e.g. Engine Spare Parts'}
+                    placeholder={language === 'ar' ? 'بحث عن مجموعة أصناف...' : 'Search item groups...'}
+                    className={`w-full ${dir === 'rtl' ? 'pr-16 pl-6' : 'pl-16 pr-6'} py-4 bg-white border border-slate-100 rounded-[2rem] outline-none font-bold text-slate-900 placeholder:text-slate-300 focus:ring-8 focus:ring-emerald-500/5 focus:border-emerald-500/50 transition-all shadow-inner`}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
 
-                {/* Type Selection */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-zinc-700">
-                    {language === 'ar' ? 'نوع الأصناف للمجموعة *' : 'Group Commodity Type *'}
-                  </label>
+                <div className="flex gap-2">
                   <select
-                    value={formData.type}
-                    onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
-                    className="w-full border border-zinc-200 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value)}
+                    className="px-6 py-4 border border-slate-100 bg-white rounded-[2rem] outline-none font-bold text-slate-900 focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-md text-sm"
                   >
-                    <option value="finished_product">{language === 'ar' ? 'منتج تام (TAM)' : 'Finished Product (TAM)'}</option>
-                    <option value="service">{language === 'ar' ? 'خدمة (SRV)' : 'Service (SRV)'}</option>
-                    <option value="raw_material">{language === 'ar' ? 'مواد خام (RAW)' : 'Raw Material (RAW)'}</option>
-                    <option value="commodity">{language === 'ar' ? 'سلعة (COM)' : 'Commodity (COM)'}</option>
+                    <option value="all">{language === 'ar' ? 'كل الأنواع' : 'All Types'}</option>
+                    <option value="finished_product">{language === 'ar' ? 'منتج تام (TAM)' : 'Finished Product'}</option>
+                    <option value="service">{language === 'ar' ? 'خدمة (SRV)' : 'Service'}</option>
+                    <option value="raw_material">{language === 'ar' ? 'مواد خام (RAW)' : 'Raw Material'}</option>
+                    <option value="commodity">{language === 'ar' ? 'سلعة (COM)' : 'Commodity'}</option>
                   </select>
                 </div>
 
-                {/* Letters Input */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-zinc-700">
-                    {language === 'ar' ? 'حروف كود المجموعة المميزة (حروف إنجليزية) *' : 'Short Identifier Letters (A-Z) *'}
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={10}
-                    value={formData.letter_code}
-                    onChange={(e) => setFormData(prev => ({ ...prev, letter_code: e.target.value.toUpperCase() }))}
-                    className="w-full border border-zinc-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-zinc-900 font-mono tracking-wider text-left"
-                    placeholder="e.g. ENG, ELEC, SER"
-                  />
-                  <p className="text-[10px] text-zinc-400">
-                    {language === 'ar' 
-                      ? 'يتم استخدام هذه الأحروف لتشكيل الكود النهائي للمجموعة.'
-                      : 'These letters distinguish the generated group code.'}
-                  </p>
+                <div className="flex bg-white p-1.5 rounded-2xl border border-slate-100 shadow-sm">
+                  <button onClick={() => setView('table')} className={`p-2.5 rounded-xl transition-all ${view === 'table' ? 'bg-zinc-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}><List size={22} /></button>
+                  <button onClick={() => setView('card')} className={`p-2.5 rounded-xl transition-all ${view === 'card' ? 'bg-zinc-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}><LayoutGrid size={22} /></button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
+                {view === 'table' ? (
+                  <div className="overflow-x-auto h-full p-8">
+                    <table ref={tableRef} className="w-full">
+                      <thead className="bg-slate-50/50 rounded-2xl">
+                        <tr className="text-slate-400 text-[10px] uppercase font-black tracking-[0.2em]">
+                          <th className={`px-8 py-6 rounded-s-2xl ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'كود المجموعة المبرمج' : 'Autogen Code'}</th>
+                          <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'اسم المجموعة' : 'Group Name'}</th>
+                          <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'نوع الصنف' : 'Classification Type'}</th>
+                          <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'التوصيف' : 'Description'}</th>
+                          <th className={`px-8 py-6 rounded-e-2xl ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {loading ? (
+                          <tr><td colSpan={5} className="py-20 text-center"><div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>
+                        ) : filteredGroups.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="py-20 text-center text-slate-400 font-bold">
+                              <Folder className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+                              {language === 'ar' ? 'لم يتم العثور على مجموعات أصناف' : 'No Item Groups Found'}
+                            </td>
+                          </tr>
+                        ) : filteredGroups.map((group) => (
+                          <tr 
+                            key={group.id} 
+                            onClick={() => handleOpenEdit(group)}
+                            className="hover:bg-slate-50 transition-all group cursor-pointer"
+                          >
+                            <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              <span className="font-mono text-xs bg-slate-100 px-3 py-1 rounded-lg text-slate-500 font-black border border-slate-200 group-hover:border-emerald-200 transition-all">{group.code}</span>
+                            </td>
+                            <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              <span className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors">{group.name}</span>
+                            </td>
+                            <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-50 border border-slate-100 text-slate-600">
+                                <Layers size={14} className="text-slate-400" />
+                                <span>{getTypeLabel(group.type)}</span>
+                              </span>
+                            </td>
+                            <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'} text-slate-400 font-medium max-w-sm truncate`} title={group.description}>
+                              {group.description || '-'}
+                            </td>
+                            <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                              <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1 opacity-0 group-hover:opacity-100 transition-all`}>
+                                <button 
+                                  onClick={(e) => handleDelete(group.id, e)} 
+                                  className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                                <div className="p-2 text-emerald-400 bg-white rounded-xl shadow-sm border border-slate-100">
+                                  {dir === 'rtl' ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-10 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                    {filteredGroups.length === 0 ? (
+                      <div className="col-span-full py-20 text-center text-slate-400 font-bold">
+                        <Folder className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+                        {language === 'ar' ? 'لم يتم العثور على مجموعات أصناف' : 'No Item Groups Found'}
+                      </div>
+                    ) : filteredGroups.map((group) => (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        whileHover={{ y: -5 }}
+                        key={group.id} 
+                        onClick={() => handleOpenEdit(group)} 
+                        className="p-8 space-y-6 rounded-[3rem] border bg-white border-slate-100 hover:border-emerald-200 hover:shadow-2xl transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex flex-col gap-2 text-right">
+                            <span className="font-mono text-xs bg-slate-50 px-3 py-1 rounded-lg text-slate-400 font-black w-fit border border-slate-100 uppercase tracking-widest">{group.code}</span>
+                            <h4 className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors text-2xl tracking-tighter leading-none italic serif">{group.name}</h4>
+                            <span className="text-xs text-slate-400 font-bold uppercase tracking-widest leading-none mt-1">{getTypeLabel(group.type)}</span>
+                          </div>
+                          <div className="w-16 h-16 rounded-[1.5rem] bg-slate-50 text-slate-300 flex items-center justify-center overflow-hidden border border-slate-100 group-hover:scale-105 transition-all shadow-inner">
+                            <Folder size={26} className="text-slate-400 group-hover:text-emerald-600 transition-colors" />
+                          </div>
+                        </div>
+                        {group.description && (
+                          <p className="text-sm text-slate-400 italic line-clamp-2 mt-2">{group.description}</p>
+                        )}
+                        <div className="pt-6 border-t border-slate-50 flex justify-between items-end mt-4">
+                          <span className="text-[10px] uppercase font-black tracking-widest text-slate-300">
+                            {language === 'ar' ? 'تعديل التفاصيل' : 'Edit details'}
+                          </span>
+                          <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl text-slate-300 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                            {dir === 'rtl' ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="p-8 border-t border-slate-50 bg-white sticky bottom-0">
+                <PaginationControls page={1} limit={100} total={filteredGroups.length} onPageChange={() => {}} onLimitChange={() => {}} />
+              </div>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div 
+            key="form"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="flex-1 flex flex-col space-y-8 overflow-hidden max-w-7xl mx-auto w-full p-4"
+          >
+            {/* The beautiful form layout replacing the screen, matching Products.tsx exactly */}
+            <div className="bg-white flex-1 rounded-[3.5rem] shadow-xl shadow-slate-200/40 flex flex-col overflow-hidden border border-slate-100 transition-all duration-500">
+              <div className="flex-1 flex flex-col h-full overflow-hidden bg-white">
+                {/* Header panel */}
+                <div className="p-10 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-20">
+                  <div className={`flex items-center gap-6 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                    <div className="w-16 h-16 bg-emerald-600 text-white rounded-[2rem] flex items-center justify-center shadow-xl shadow-emerald-500/20">
+                      <Folder size={32} />
+                    </div>
+                    <div className={dir === 'rtl' ? 'text-right' : 'text-left'}>
+                      <h3 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-1 font-serif italic">
+                        {editingGroup ? (language === 'ar' ? 'تعديل مجموعة الأصناف' : 'Edit Item Group') : (language === 'ar' ? 'إضافة مجموعة جديدة' : 'Add Item Group')}
+                      </h3>
+                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em] leading-none">
+                        {editingGroup?.code || 'SYSTEM FLOW : NEW GROUP'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button type="submit" form="group-form" className="px-10 py-5 bg-zinc-900 text-white rounded-[1.5rem] font-black hover:bg-zinc-800 transition-all active:scale-95 shadow-xl">
+                      {editingGroup ? (language === 'ar' ? 'حفظ' : 'Save') : (language === 'ar' ? 'إضافة' : 'Add')}
+                    </button>
+                    <button onClick={closeModal} className="w-14 h-14 flex items-center justify-center bg-slate-50 text-slate-400 rounded-[1.5rem] hover:bg-rose-50 hover:text-rose-500 transition-all">
+                      <X size={28} />
+                    </button>
+                  </div>
                 </div>
 
-                {/* Readonly combined code */}
-                <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-100 flex flex-col gap-1">
-                  <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
-                    {language === 'ar' ? 'كود المجموعة النهائي المقترح (تلقائي)' : 'Program Autogenerated Code (Read-Only)'}
-                  </span>
-                  <input
-                    type="text"
-                    readOnly
-                    value={formData.code}
-                    className="bg-transparent border-none text-zinc-900 font-mono text-sm font-bold focus:outline-none p-0 cursor-not-allowed select-none"
-                    title={language === 'ar' ? 'كود النظام لا يمكن كتابته في الحفظ' : 'Autogenerated system code - cannot be modified directly'}
-                  />
-                  <span className="text-[9px] text-zinc-400 mt-0.5">
-                    {language === 'ar'
-                      ? 'يحتوي على: اسم الاختصار، وحروف الكود، والترقيم التسلسلي.'
-                      : 'Contains the type acronym, your code letters, and sequential index.'}
-                  </span>
-                </div>
+                {/* Content form fields */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-10 md:p-14 mb-[4rem]">
+                  <form id="group-form" onSubmit={handleSubmit} className="space-y-16" dir={dir}>
+                    <div className="space-y-10">
+                      <div className="flex items-center gap-4 border-b border-slate-50 pb-8">
+                        <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shadow-inner">
+                          <Folder size={24} />
+                        </div>
+                        <h2 className="text-2xl font-black text-slate-900 leading-none tracking-tight uppercase">
+                          {language === 'ar' ? 'المعلومات الأساسية للمجموعة' : 'Primary Group Information'}
+                        </h2>
+                      </div>
 
-                {/* Description */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-zinc-700">
-                    {language === 'ar' ? 'توصيف ووصف المجموعة' : 'Description'}
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={formData.description}
-                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full border border-zinc-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-zinc-900"
-                    placeholder={language === 'ar' ? 'اكتب بيانات إضافية حول أنواع البضائع لتسهيل تصنيفها...' : 'Optional details or remarks...'}
-                  />
-                </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-right">
+                        {/* Group Name input */}
+                        <div className="md:col-span-2 space-y-4">
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                            {language === 'ar' ? 'اسم المجموعة *' : 'Group Name *'}
+                          </label>
+                          <input 
+                            required 
+                            type="text" 
+                            placeholder={language === 'ar' ? 'مثال: قطع غيار المحركات' : 'e.g. Engine Spare Parts'} 
+                            className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black text-slate-900 outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 focus:border-emerald-500/50 transition-all shadow-inner" 
+                            value={formData.name} 
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
+                          />
+                        </div>
 
-                {/* Buttons block */}
-                <div className="flex gap-3 mt-auto pt-4 border-t border-zinc-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="flex-1 py-2.5 border border-zinc-200 text-zinc-700 font-medium text-sm rounded-xl hover:bg-zinc-50 transition"
-                  >
-                    {language === 'ar' ? 'إلغاء' : 'Cancel'}
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 py-2.5 bg-zinc-900 text-white font-medium text-sm rounded-xl hover:bg-zinc-800 transition"
-                  >
-                    {language === 'ar' ? 'حفظ المجموعة' : 'Save Group'}
-                  </button>
+                        {/* Commodity Type select */}
+                        <div className="space-y-4">
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                            {language === 'ar' ? 'نوع الصنف للمجموعة *' : 'Group Commodity Classification *'}
+                          </label>
+                          <div className="relative group">
+                            <Layers className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300`} size={24} />
+                            <select 
+                              required 
+                              className="w-full pr-16 pl-6 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black text-slate-900 appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner" 
+                              value={formData.type} 
+                              onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
+                            >
+                              <option value="finished_product">{language === 'ar' ? 'منتج تام (TAM)' : 'Finished Product (TAM)'}</option>
+                              <option value="service">{language === 'ar' ? 'خدمة (SRV)' : 'Service (SRV)'}</option>
+                              <option value="raw_material">{language === 'ar' ? 'مواد خام (RAW)' : 'Raw Material (RAW)'}</option>
+                              <option value="commodity">{language === 'ar' ? 'سلعة (COM)' : 'Commodity (COM)'}</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Unique distinctive letters of the items Group */}
+                        <div className="space-y-4">
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                            {language === 'ar' ? 'الحروف المميزة للمجموعة (A-Z) *' : 'Short Distinctive Identifiers (A-Z) *'}
+                          </label>
+                          <input 
+                            required 
+                            type="text" 
+                            maxLength={10} 
+                            placeholder="e.g. ENG, ELEC, SER"
+                            className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black text-slate-900 outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner font-mono tracking-widest text-left uppercase" 
+                            value={formData.letter_code} 
+                            onChange={(e) => setFormData({ ...formData, letter_code: e.target.value.toUpperCase() })} 
+                          />
+                        </div>
+
+                        {/* Automatic code (Read Only as requested) */}
+                        <div className="space-y-4 md:col-span-2">
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                            {language === 'ar' ? 'كود المجموعة المبرمج (تلقائي لا يمكن تعديله)' : 'Autogenerated Group Code (Read-Only)'}
+                          </label>
+                          <div className="relative group">
+                            <Lock className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300`} size={24} />
+                            <input 
+                              readOnly 
+                              required
+                              type="text" 
+                              className="w-full pr-16 pl-6 py-5 bg-slate-100 border border-slate-200 rounded-[2rem] font-mono text-xl font-black text-slate-400 outline-none shadow-inner tracking-widest" 
+                              value={formData.code} 
+                            />
+                          </div>
+                          <span className="text-xs text-slate-400 font-bold tracking-tight block px-1 mt-1">
+                            {language === 'ar' ? 'يتكون كود المجموعة تلقائياً من: [نوع الصنف] - [الحروف المميزة] - [الترقيم التسلسلي]' : 'The group code is automatically compiled of: [Type Acronym] - [Distinct Letters] - [Sequential Number]'}
+                          </span>
+                        </div>
+
+                        {/* Description input */}
+                        <div className="md:col-span-2 space-y-4">
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                            {language === 'ar' ? 'توصيف ووصف المجموعة' : 'Description & Scope'}
+                          </label>
+                          <textarea 
+                            rows={3} 
+                            placeholder="..."
+                            className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-lg font-bold text-slate-900 outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner" 
+                            value={formData.description} 
+                            onChange={(e) => setFormData({ ...formData, description: e.target.value })} 
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </form>
                 </div>
-              </form>
-            </motion.div>
-          </div>
+              </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
