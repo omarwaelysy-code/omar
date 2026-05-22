@@ -140,15 +140,29 @@ export function CostCenters() {
                   <motion.div
                     key={cc.id}
                     layout
-                    className="bg-white border border-zinc-200 rounded-3xl p-6 hover:shadow-xl hover:shadow-zinc-200/50 transition-all group"
+                    onClick={() => {
+                      setEditingCC(cc);
+                      setFormData({
+                        code: cc.code,
+                        name: cc.name,
+                        description: cc.description || '',
+                        department_id: cc.department_id,
+                        budget: cc.budget || 0,
+                        currency: cc.currency || 'USD',
+                        is_active: cc.is_active
+                      });
+                      setIsModalOpen(true);
+                    }}
+                    className="bg-white border border-zinc-200 rounded-3xl p-6 hover:shadow-xl hover:shadow-zinc-200/50 transition-all group cursor-pointer"
                   >
                     <div className="flex justify-between items-start mb-4">
                       <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600">
                         <PieChart size={24} />
                       </div>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                         <button
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setEditingCC(cc);
                             setFormData({
                               code: cc.code,
@@ -166,7 +180,8 @@ export function CostCenters() {
                           <Edit2 size={16} />
                         </button>
                         <button
-                          onClick={async () => {
+                          onClick={async (e) => {
+                            e.stopPropagation();
                             if (window.confirm(t('common.confirm_delete'))) {
                               await dbService.delete('cost_centers', cc.id);
                               fetchData();

@@ -151,13 +151,29 @@ export function OperationCategories() {
           
           return (
             <div key={category.id} className="group">
-              <div className={`
-                flex items-center justify-between p-3 rounded-2xl border transition-all duration-200
-                ${category.is_final ? 'bg-emerald-50/40 border-emerald-100 font-bold' : 'bg-white border-slate-100 hover:border-slate-200 shadow-sm'}
-              `}>
+              <div 
+                onClick={() => {
+                  setEditingCategory(category);
+                  setFormData({ 
+                    name: category.name, 
+                    code: category.code || '', 
+                    parent_id: category.parent_id,
+                    is_final: category.is_final || false,
+                    description: category.description || ''
+                  });
+                  setIsModalOpen(true);
+                }}
+                className={`
+                  flex items-center justify-between p-3 rounded-2xl border transition-all duration-200 cursor-pointer
+                  ${category.is_final ? 'bg-emerald-50/40 border-emerald-100 font-bold hover:bg-emerald-50' : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/50 shadow-sm'}
+                `}
+              >
                 <div className="flex items-center gap-3 overflow-hidden">
                   <button 
-                    onClick={() => toggleNode(category.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleNode(category.id);
+                    }}
                     className={`p-1 rounded-lg transition-colors ${hasChildren ? 'text-slate-600 hover:bg-slate-50' : 'text-slate-300 cursor-default'}`}
                   >
                     {hasChildren ? (isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />) : <div className="w-[18px]" />}
@@ -191,10 +207,11 @@ export function OperationCategories() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                   {!category.is_final && !searchTerm && (
                     <button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         resetForm();
                         setFormData(prev => ({ ...prev, parent_id: category.id }));
                         setIsModalOpen(true);
@@ -206,7 +223,8 @@ export function OperationCategories() {
                     </button>
                   )}
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setEditingCategory(category);
                       setFormData({ 
                         name: category.name, 
@@ -222,7 +240,10 @@ export function OperationCategories() {
                     <Edit2 size={18} />
                   </button>
                   <button
-                    onClick={() => handleDelete(category.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(category.id);
+                    }}
                     className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
                   >
                     <Trash2 size={18} />

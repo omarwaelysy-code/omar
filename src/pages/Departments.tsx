@@ -126,15 +126,28 @@ export function Departments() {
                   <motion.div
                     key={dept.id}
                     layout
-                    className="bg-white border border-zinc-200 rounded-3xl p-6 hover:shadow-xl hover:shadow-zinc-200/50 transition-all group"
+                    onClick={() => {
+                      setEditingDept(dept);
+                      setFormData({
+                        code: dept.code,
+                        name: dept.name,
+                        description: dept.description || '',
+                        parent_id: dept.parent_id,
+                        manager_user_id: dept.manager_user_id,
+                        is_active: dept.is_active
+                      });
+                      setIsModalOpen(true);
+                    }}
+                    className="bg-white border border-zinc-200 rounded-3xl p-6 hover:shadow-xl hover:shadow-zinc-200/50 transition-all group cursor-pointer"
                   >
                     <div className="flex justify-between items-start mb-4">
                       <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600">
                         <Briefcase size={24} />
                       </div>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                         <button
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setEditingDept(dept);
                             setFormData({
                               code: dept.code,
@@ -151,7 +164,8 @@ export function Departments() {
                           <Edit2 size={16} />
                         </button>
                         <button
-                          onClick={async () => {
+                          onClick={async (e) => {
+                            e.stopPropagation();
                             if (window.confirm(t('common.confirm_delete'))) {
                               await dbService.delete('departments', dept.id);
                               fetchData();

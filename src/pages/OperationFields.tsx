@@ -199,7 +199,32 @@ export function OperationFields() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {fields.sort((a,b) => (a.sort_order || 0) - (b.sort_order || 0)).map((field) => (
-                      <tr key={field.id} className="hover:bg-slate-50/80 transition-colors group">
+                      <tr 
+                        key={field.id} 
+                        onClick={() => {
+                          setEditingField(field);
+                          const linkedCatIds = fieldMappings
+                            .filter(m => m.field_id === field.id)
+                            .map(m => m.category_id);
+                          
+                          setFormData({
+                            code: field.code || '',
+                            name: field.name,
+                            label: field.label,
+                            description: field.description || '',
+                            type: field.type,
+                            category_id: field.category_id,
+                            category_ids: linkedCatIds,
+                            sort_order: field.sort_order || 0,
+                            is_required: field.is_required || false,
+                            options: Array.isArray(field.options) ? field.options.join(', ') : '',
+                            unit: field.unit || '',
+                            default_value: field.default_value || ''
+                          });
+                          setIsModalOpen(true);
+                        }}
+                        className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
+                      >
                         <td className="px-6 py-4">
                           <div className="font-mono text-xs text-emerald-600 font-bold">{field.code || '-'}</div>
                           <div className="text-[10px] text-slate-400 font-bold font-mono uppercase">{field.name}</div>
@@ -228,9 +253,10 @@ export function OperationFields() {
                           )}
                         </td>
                         <td className="px-6 py-4 text-left">
-                          <div className="flex items-center gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex items-center gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setEditingField(field);
                                 const linkedCatIds = fieldMappings
                                   .filter(m => m.field_id === field.id)
@@ -257,7 +283,8 @@ export function OperationFields() {
                               <Edit2 size={16} />
                             </button>
                             <button
-                              onClick={async () => {
+                              onClick={async (e) => {
+                                e.stopPropagation();
                                 if (window.confirm(t('common.confirm_delete'))) {
                                   await dbService.delete('operation_fields', field.id);
                                   fetchData();
