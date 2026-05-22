@@ -8,7 +8,7 @@ import {
   Search, Plus, Trash2, X, ArrowLeftRight, Pencil, 
   Download, Eye, FileText, History, Printer, 
   Wallet, Calendar, Hash, Layers, Save,
-  Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, User, ChevronDown
+  Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, User, ChevronDown, LayoutGrid, List
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
@@ -36,6 +36,7 @@ export const CashTransfers: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [transferToDelete, setTransferToDelete] = useState<string | null>(null);
   const [viewTransfer, setViewTransfer] = useState<CashTransfer | null>(null);
+  const [view, setView] = useState<'table' | 'card'>('table');
   const handleSort = (field: string) => {
     if (sortBy === field) {
       setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
@@ -500,135 +501,243 @@ export const CashTransfers: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/50 shadow-inner w-fit">
+            <button
+              onClick={() => setView('table')}
+              className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+              title="عرض الجدول"
+            >
+              <List size={18} />
+            </button>
+            <button
+              onClick={() => setView('card')}
+              className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+              title="عرض الكروت"
+            >
+              <LayoutGrid size={18} />
+            </button>
+          </div>
         </div>
 
-        <div className="overflow-x-auto" ref={tableRef}>
-          <table className="w-full text-right border-collapse">
-            <thead>
-              <tr className="bg-zinc-50/50">
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('date')}>
-                  <div className="flex items-center gap-1">
-                    التاريخ
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                    </span>
-                  </div>
-                </th>
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('from_payment_method_name')}>
-                  <div className="flex items-center gap-1">
-                    من خزينة
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      {sortBy === 'from_payment_method_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                    </span>
-                  </div>
-                </th>
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('to_payment_method_name')}>
-                  <div className="flex items-center gap-1">
-                    إلى خزينة
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      {sortBy === 'to_payment_method_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                    </span>
-                  </div>
-                </th>
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('amount')}>
-                  <div className="flex items-center gap-1">
-                    المبلغ
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      {sortBy === 'amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                    </span>
-                  </div>
-                </th>
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100">الوصف</th>
-                <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100">الإجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-50">
-              {filteredTransfers.map((transfer) => (
-                <tr 
-                  key={transfer.id} 
-                  className="hover:bg-zinc-50/50 transition-colors group cursor-pointer"
-                  onClick={() => {
-                    setEditingTransfer(transfer);
-                    setFormData({
-                      date: transfer.date ? transfer.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
-                      amount: transfer.amount,
-                      from_payment_method_id: transfer.from_payment_method_id,
-                      to_payment_method_id: transfer.to_payment_method_id,
-                      description: transfer.description
-                    });
-                    setIsModalOpen(true);
-                  }}
-                >
-                  <td className="px-6 py-4 text-zinc-900 font-bold">{formatDate(transfer.date)}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-red-50 text-red-600 rounded-lg flex items-center justify-center">
-                        <Wallet size={16} />
-                      </div>
-                      <span className="text-zinc-700 font-bold">{transfer.from_payment_method_name}</span>
+        {view === 'table' ? (
+          <div className="overflow-x-auto" ref={tableRef}>
+            <table className="w-full text-right border-collapse">
+              <thead>
+                <tr className="bg-zinc-50/50">
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('date')}>
+                    <div className="flex items-center gap-1">
+                      التاريخ
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
                     </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center">
-                        <Wallet size={16} />
-                      </div>
-                      <span className="text-zinc-700 font-bold">{transfer.to_payment_method_name}</span>
+                  </th>
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('from_payment_method_name')}>
+                    <div className="flex items-center gap-1">
+                      من خزينة
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'from_payment_method_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
                     </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-emerald-600 font-black">{formatNumber(transfer.amount)} ج.م</span>
-                  </td>
-                  <td className="px-6 py-4 text-zinc-500 font-medium max-w-xs truncate">{transfer.description}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setViewTransfer(transfer);
-                          setShowSidePanel(true);
-                        }}
-                        className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
-                        title="عرض التفاصيل"
-                      >
-                        <Eye size={18} />
-                      </button>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingTransfer(transfer);
-                          setFormData({
-                            date: transfer.date ? transfer.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
-                            amount: transfer.amount,
-                            from_payment_method_id: transfer.from_payment_method_id,
-                            to_payment_method_id: transfer.to_payment_method_id,
-                            description: transfer.description
-                          });
-                          setIsModalOpen(true);
-                        }}
-                        className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
-                        title="تعديل"
-                      >
-                        <Pencil size={18} />
-                      </button>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setTransferToDelete(transfer.id);
-                          setIsDeleteModalOpen(true);
-                        }}
-                        className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                        title="حذف"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                  </th>
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('to_payment_method_name')}>
+                    <div className="flex items-center gap-1">
+                      إلى خزينة
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'to_payment_method_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
                     </div>
-                  </td>
+                  </th>
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('amount')}>
+                    <div className="flex items-center gap-1">
+                      المبلغ
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100">الوصف</th>
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100">الإجراءات</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-zinc-50">
+                {filteredTransfers.map((transfer) => (
+                  <tr 
+                    key={transfer.id} 
+                    className="hover:bg-zinc-50/50 transition-colors group cursor-pointer"
+                    onClick={() => {
+                      setEditingTransfer(transfer);
+                      setFormData({
+                        date: transfer.date ? transfer.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+                        amount: transfer.amount,
+                        from_payment_method_id: transfer.from_payment_method_id,
+                        to_payment_method_id: transfer.to_payment_method_id,
+                        description: transfer.description
+                      });
+                      setIsModalOpen(true);
+                    }}
+                  >
+                    <td className="px-6 py-4 text-zinc-900 font-bold">{formatDate(transfer.date)}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-red-50 text-red-600 rounded-lg flex items-center justify-center">
+                          <Wallet size={16} />
+                        </div>
+                        <span className="text-zinc-700 font-bold">{transfer.from_payment_method_name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center">
+                          <Wallet size={16} />
+                        </div>
+                        <span className="text-zinc-700 font-bold">{transfer.to_payment_method_name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-emerald-600 font-black">{formatNumber(transfer.amount)} ج.م</span>
+                    </td>
+                    <td className="px-6 py-4 text-zinc-500 font-medium max-w-xs truncate">{transfer.description}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewTransfer(transfer);
+                            setShowSidePanel(true);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
+                          title="عرض التفاصيل"
+                        >
+                          <Eye size={18} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTransfer(transfer);
+                            setFormData({
+                              date: transfer.date ? transfer.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+                              amount: transfer.amount,
+                              from_payment_method_id: transfer.from_payment_method_id,
+                              to_payment_method_id: transfer.to_payment_method_id,
+                              description: transfer.description
+                            });
+                            setIsModalOpen(true);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
+                          title="تعديل"
+                        >
+                          <Pencil size={18} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTransferToDelete(transfer.id);
+                            setIsDeleteModalOpen(true);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                          title="حذف"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredTransfers.map((transfer) => (
+              <div 
+                key={transfer.id} 
+                className="p-6 bg-zinc-50/50 rounded-3xl border border-zinc-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden cursor-pointer flex flex-col justify-between"
+                onClick={() => {
+                  setEditingTransfer(transfer);
+                  setFormData({
+                    date: transfer.date ? transfer.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+                    amount: transfer.amount,
+                    from_payment_method_id: transfer.from_payment_method_id,
+                    to_payment_method_id: transfer.to_payment_method_id,
+                    description: transfer.description
+                  });
+                  setIsModalOpen(true);
+                }}
+              >
+                <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setViewTransfer(transfer);
+                      setShowSidePanel(true);
+                    }}
+                    className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
+                  >
+                    <Eye size={16} />
+                  </button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingTransfer(transfer);
+                      setFormData({
+                        date: transfer.date ? transfer.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+                        amount: transfer.amount,
+                        from_payment_method_id: transfer.from_payment_method_id,
+                        to_payment_method_id: transfer.to_payment_method_id,
+                        description: transfer.description
+                      });
+                      setIsModalOpen(true);
+                    }}
+                    className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTransferToDelete(transfer.id);
+                      setIsDeleteModalOpen(true);
+                    }}
+                    className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+                
+                <div className="flex flex-col h-full justify-between">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between border-b border-zinc-100/60 pb-2">
+                      <span className="text-xs text-zinc-400 font-semibold">{formatDate(transfer.date)}</span>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 justify-between">
+                        <span className="text-xs text-zinc-400">من خزينة:</span>
+                        <span className="text-xs font-semibold text-zinc-700 bg-zinc-100 rounded-lg px-2 py-1">{transfer.from_payment_method_name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 justify-between">
+                        <span className="text-xs text-zinc-400 font-bold text-emerald-600">إلى خزينة:</span>
+                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg px-2 py-1">{transfer.to_payment_method_name}</span>
+                      </div>
+                    </div>
+
+                    {transfer.description && (
+                      <p className="text-xs text-zinc-500 font-medium max-w-xs truncate border-t border-zinc-100/60 pt-2">{transfer.description}</p>
+                    )}
+                  </div>
+                  
+                  <div className="mt-4 pt-4 border-t border-zinc-100 flex items-center justify-between">
+                    <span className="text-zinc-500 text-xs font-bold">المبلغ المحول</span>
+                    <span className="font-black text-emerald-600 text-lg">
+                      {formatNumber(transfer.amount)} ج.م
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
       </div>
 

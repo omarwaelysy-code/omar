@@ -5,7 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { TransactionManager } from '../services/TransactionManager';
 import { ReturnSchema, JournalEntrySchema } from '../lib/schemas';
 import { Return, Customer, Product, ReturnItem, JournalEntry, JournalEntryItem, Account, PaymentMethod } from '../types';
-import { Search, Plus, Trash2, X, Eye, Download, FileText, RotateCcw, History, Printer, Phone, Mail, MapPin, Wallet, Calendar, Box, CreditCard, User, ChevronDown, Layers, Save, Package, ChevronRight, ChevronLeft, Maximize2, Minimize2 } from 'lucide-react';
+import { Search, Plus, Trash2, X, Eye, Download, FileText, RotateCcw, History, Printer, Phone, Mail, MapPin, Wallet, Calendar, Box, CreditCard, User, ChevronDown, Layers, Save, Package, ChevronRight, ChevronLeft, Maximize2, Minimize2, LayoutGrid, List } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
@@ -51,6 +51,7 @@ export const Returns: React.FC = () => {
   const [maxSeqGenerated, setMaxSeqGenerated] = useState<number>(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewReturn, setViewReturn] = useState<Return | null>(null);
+  const [view, setView] = useState<'table' | 'card'>('table');
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [returnToDelete, setReturnToDelete] = useState<string | null>(null);
@@ -791,7 +792,7 @@ export const Returns: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-zinc-50 flex items-center gap-4">
+        <div className="p-6 border-b border-zinc-50 flex items-center justify-between gap-4">
           <div className="relative flex-1">
             <Search className={`${dir === 'rtl' ? 'right-3' : 'left-3'} absolute top-3 text-zinc-400`} size={18} />
             <input
@@ -802,129 +803,215 @@ export const Returns: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/50 shadow-inner">
+            <button
+              onClick={() => setView('table')}
+              className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+              title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
+            >
+              <List size={18} />
+            </button>
+            <button
+              onClick={() => setView('card')}
+              className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+              title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
+            >
+              <LayoutGrid size={18} />
+            </button>
+          </div>
         </div>
 
-        <div ref={tableRef} id="returns-list-table" className="overflow-x-auto hidden md:block">
-          <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-            <thead>
-              <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('return_number')}>
-                  <div className="flex items-center gap-1">
-                    {t('returns.column_number')}
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      {sortBy === 'return_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                    </span>
-                  </div>
-                </th>
-                <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('customer_name')}>
-                  <div className="flex items-center gap-1">
-                    {t('returns.column_customer')}
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      {sortBy === 'customer_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                    </span>
-                  </div>
-                </th>
-                <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('date')}>
-                  <div className="flex items-center gap-1">
-                    {t('returns.column_date')}
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                    </span>
-                  </div>
-                </th>
-                <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('payment_type')}>
-                  <div className="flex items-center gap-1">
-                    {t('returns.column_type')}
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      {sortBy === 'payment_type' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                    </span>
-                  </div>
-                </th>
-                <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('total_amount')}>
-                  <div className="flex items-center gap-1">
-                    {t('returns.column_total')}
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      {sortBy === 'total_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                    </span>
-                  </div>
-                </th>
-                <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.actions')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-50">
-              {filteredReturns.map((ret) => (
-                <tr 
-                  key={ret.id} 
-                  className="hover:bg-zinc-50/50 transition-colors group cursor-pointer"
-                  onClick={() => openModal(ret)}
-                >
-                  <td className="px-6 py-4">
-                    <span className="font-mono text-xs bg-zinc-100 px-2 py-1 rounded text-zinc-600">{ret.return_number}</span>
-                  </td>
-                  <td className="px-6 py-4 font-bold text-zinc-900">{ret.customer_name}</td>
-                  <td className="px-6 py-4 text-zinc-500">{formatDate(ret.date)}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${ret.payment_type === 'cash' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
-                      {ret.payment_type === 'cash' ? t('returns.payment_cash') : t('returns.payment_credit')}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 font-bold text-emerald-600">{formatNumber(ret.total_amount)} {t('returns.currency')}</td>
-                  <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                    <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActivityLogDocumentId(ret.id);
-                          setIsActivityLogOpen(true);
-                        }}
-                        className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-all no-pdf"
-                        title={t('common.activity_log')}
-                      >
-                        <History size={18} />
-                      </button>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openModal(ret);
-                        }}
-                        className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
-                        title={t('common.edit')}
-                      >
-                        <FileText size={18} />
-                      </button>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleViewReturn(ret);
-                        }}
-                        className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
-                        title={t('common.view')}
-                      >
-                        <Eye size={18} />
-                      </button>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(ret.id);
-                        }}
-                        className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
-                        title={t('common.delete')}
-                      >
-                        <Trash2 size={18} />
-                      </button>
+        {view === 'table' ? (
+          <div ref={tableRef} id="returns-list-table" className="overflow-x-auto hidden md:block">
+            <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+              <thead>
+                <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
+                  <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('return_number')}>
+                    <div className="flex items-center gap-1">
+                      {t('returns.column_number')}
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'return_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
                     </div>
-                  </td>
+                  </th>
+                  <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('customer_name')}>
+                    <div className="flex items-center gap-1">
+                      {t('returns.column_customer')}
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'customer_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
+                  <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('date')}>
+                    <div className="flex items-center gap-1">
+                      {t('returns.column_date')}
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
+                  <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('payment_type')}>
+                    <div className="flex items-center gap-1">
+                      {t('returns.column_type')}
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'payment_type' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
+                  <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('total_amount')}>
+                    <div className="flex items-center gap-1">
+                      {t('returns.column_total')}
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'total_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.actions')}</th>
                 </tr>
-              ))}
-              {filteredReturns.length === 0 && !loading && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-zinc-500">{t('common.no_data')}</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
-        </div>
+              </thead>
+              <tbody className="divide-y divide-zinc-50">
+                {filteredReturns.map((ret) => (
+                  <tr 
+                    key={ret.id} 
+                    className="hover:bg-zinc-50/50 transition-colors group cursor-pointer"
+                    onClick={() => openModal(ret)}
+                  >
+                    <td className="px-6 py-4">
+                      <span className="font-mono text-xs bg-zinc-100 px-2 py-1 rounded text-zinc-600">{ret.return_number}</span>
+                    </td>
+                    <td className="px-6 py-4 font-bold text-zinc-900">{ret.customer_name}</td>
+                    <td className="px-6 py-4 text-zinc-500">{formatDate(ret.date)}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${ret.payment_type === 'cash' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
+                        {ret.payment_type === 'cash' ? t('returns.payment_cash') : t('returns.payment_credit')}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 font-bold text-emerald-600">{formatNumber(ret.total_amount)} {t('returns.currency')}</td>
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                      <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActivityLogDocumentId(ret.id);
+                            setIsActivityLogOpen(true);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-all no-pdf"
+                          title={t('common.activity_log')}
+                        >
+                          <History size={18} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openModal(ret);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
+                          title={t('common.edit')}
+                        >
+                          <FileText size={18} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewReturn(ret);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
+                          title={t('common.view')}
+                        >
+                          <Eye size={18} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(ret.id);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
+                          title={t('common.delete')}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredReturns.length === 0 && !loading && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-zinc-500">{t('common.no_data')}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
+          </div>
+        ) : (
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredReturns.map((ret) => (
+              <div 
+                key={ret.id} 
+                onClick={() => openModal(ret)}
+                className="p-6 bg-zinc-50/50 rounded-3xl border border-zinc-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden cursor-pointer flex flex-col justify-between"
+              >
+                <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleViewReturn(ret);
+                    }}
+                    className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
+                  >
+                    <Eye size={16} />
+                  </button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openModal(ret);
+                    }}
+                    className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
+                  >
+                    <FileText size={16} />
+                  </button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(ret.id);
+                    }}
+                    className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+                
+                <div className="flex flex-col h-full justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-xs bg-zinc-100 px-2 py-1 rounded text-zinc-600 font-bold">{ret.return_number}</span>
+                      <span className="text-xs text-zinc-400 font-medium">{formatDate(ret.date)}</span>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-zinc-900 group-hover:text-emerald-600 transition-colors">{ret.customer_name}</h4>
+                      <p className="text-xs text-zinc-400 mt-1">
+                        {ret.payment_type === 'cash' ? t('returns.payment_cash') : t('returns.payment_credit')}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 pt-4 border-t border-zinc-100 flex items-center justify-between">
+                    <span className="text-zinc-500 text-xs font-bold">{t('returns.column_total')}</span>
+                    <span className="font-black text-emerald-600 text-lg">
+                      {formatNumber(ret.total_amount)} {t('returns.currency')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {filteredReturns.length === 0 && !loading && (
+              <div className="col-span-full py-12 text-center text-zinc-500 italic">{t('common.no_data')}</div>
+            )}
+            <div className="col-span-full">
+              <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
+            </div>
+          </div>
+        )}
 
         {/* Mobile List View */}
         <div className="md:hidden divide-y divide-zinc-50">
