@@ -544,7 +544,21 @@ export const CashTransfers: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-zinc-50">
               {filteredTransfers.map((transfer) => (
-                <tr key={transfer.id} className="hover:bg-zinc-50/50 transition-colors group">
+                <tr 
+                  key={transfer.id} 
+                  className="hover:bg-zinc-50/50 transition-colors group cursor-pointer"
+                  onClick={() => {
+                    setEditingTransfer(transfer);
+                    setFormData({
+                      date: transfer.date ? transfer.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+                      amount: transfer.amount,
+                      from_payment_method_id: transfer.from_payment_method_id,
+                      to_payment_method_id: transfer.to_payment_method_id,
+                      description: transfer.description
+                    });
+                    setIsModalOpen(true);
+                  }}
+                >
                   <td className="px-6 py-4 text-zinc-900 font-bold">{formatDate(transfer.date)}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
@@ -567,9 +581,10 @@ export const CashTransfers: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 text-zinc-500 font-medium max-w-xs truncate">{transfer.description}</td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                       <button 
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setViewTransfer(transfer);
                           setShowSidePanel(true);
                         }}
@@ -579,7 +594,8 @@ export const CashTransfers: React.FC = () => {
                         <Eye size={18} />
                       </button>
                       <button 
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setEditingTransfer(transfer);
                           setFormData({
                             date: transfer.date ? transfer.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
@@ -596,7 +612,8 @@ export const CashTransfers: React.FC = () => {
                         <Pencil size={18} />
                       </button>
                       <button 
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setTransferToDelete(transfer.id);
                           setIsDeleteModalOpen(true);
                         }}
