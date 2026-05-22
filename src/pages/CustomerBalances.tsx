@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Customer } from '../types';
-import { FileSpreadsheet, Download, Search, User, Wallet, ArrowUpRight } from 'lucide-react';
+import { FileSpreadsheet, Download, Search, User, Wallet, ArrowUpRight, RefreshCcw } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
@@ -209,6 +209,13 @@ export const CustomerBalances: React.FC = () => {
           <p className="text-zinc-500">ملخص مديونيات كافة العملاء مع تفاصيل الحركات.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button 
+            onClick={fetchData}
+            className="p-3 bg-white border border-zinc-200 text-zinc-600 rounded-2xl hover:bg-zinc-50 hover:text-emerald-600 transition-all hover:scale-105 active:scale-95 shadow-sm"
+            title="تحديث البيانات"
+          >
+            <RefreshCcw size={20} className={loading ? 'animate-spin' : ''} />
+          </button>
           <button 
             onClick={exportExcel}
             disabled={customers.length === 0}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Customer, Invoice, ReceiptVoucher, Return } from '../types';
-import { Search, FileText, Download, Calendar, User, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { Search, FileText, Download, Calendar, User, ArrowUpRight, ArrowDownLeft, RefreshCcw } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
@@ -292,13 +292,23 @@ export const CustomerStatement: React.FC = () => {
               />
             </div>
           </div>
-          <button 
-            onClick={generateStatement}
-            disabled={loading || !selectedCustomerId}
-            className="flex items-center justify-center gap-2 px-6 py-2 bg-zinc-900 text-white rounded-xl hover:bg-zinc-800 transition-all disabled:opacity-50 h-[42px]"
-          >
-            {loading ? 'جاري التحميل...' : 'عرض التقرير'}
-          </button>
+          <div className="flex gap-2">
+            <button 
+              onClick={generateStatement}
+              disabled={loading || !selectedCustomerId}
+              className="flex-grow flex items-center justify-center gap-2 px-6 py-2 bg-zinc-900 text-white rounded-xl hover:bg-zinc-800 transition-all disabled:opacity-50 h-[42px] font-bold text-sm"
+            >
+              {loading ? 'جاري التحميل...' : 'عرض التقرير'}
+            </button>
+            <button 
+              onClick={generateStatement}
+              disabled={loading || !selectedCustomerId}
+              className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 hover:text-emerald-600 transition-all active:scale-95 shadow-sm disabled:opacity-50 h-[42px] flex items-center justify-center"
+              title="تحديث البيانات"
+            >
+              <RefreshCcw size={20} className={loading ? 'animate-spin' : ''} />
+            </button>
+          </div>
         </div>
 
         {entries.length > 0 && (

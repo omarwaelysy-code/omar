@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Supplier, PurchaseInvoice, PaymentVoucher, PurchaseReturn } from '../types';
-import { Search, Calendar, FileText, Download, User, ArrowUpRight, ArrowDownLeft, Wallet } from 'lucide-react';
+import { Search, Calendar, FileText, Download, User, ArrowUpRight, ArrowDownLeft, Wallet, RefreshCcw } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
@@ -279,13 +279,23 @@ export const SupplierStatement: React.FC = () => {
               />
             </div>
           </div>
-          <button 
-            onClick={fetchStatement}
-            disabled={loading || !selectedSupplierId}
-            className="flex items-center justify-center gap-2 px-6 py-2 bg-zinc-900 text-white rounded-xl hover:bg-zinc-800 transition-all disabled:opacity-50 h-[42px]"
-          >
-            {loading ? 'جاري التحميل...' : 'عرض التقرير'}
-          </button>
+          <div className="flex gap-2">
+            <button 
+              onClick={fetchStatement}
+              disabled={loading || !selectedSupplierId}
+              className="flex-grow flex items-center justify-center gap-2 px-6 py-2 bg-zinc-900 text-white rounded-xl hover:bg-zinc-800 transition-all disabled:opacity-50 h-[42px] font-bold text-sm"
+            >
+              {loading ? 'جاري التحميل...' : 'عرض التقرير'}
+            </button>
+            <button 
+              onClick={fetchStatement}
+              disabled={loading || !selectedSupplierId}
+              className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 hover:text-emerald-600 transition-all active:scale-95 shadow-sm disabled:opacity-50 h-[42px] flex items-center justify-center"
+              title="تحديث البيانات"
+            >
+              <RefreshCcw size={20} className={loading ? 'animate-spin' : ''} />
+            </button>
+          </div>
         </div>
 
         {(statement.length > 0 || startBalance !== 0) && (

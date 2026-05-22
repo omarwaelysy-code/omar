@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { PaymentMethod, JournalEntry } from '../types';
-import { Calendar, Download, Printer, Wallet, ArrowLeftRight, BarChart3 } from 'lucide-react';
+import { Calendar, Download, Printer, Wallet, ArrowLeftRight, BarChart3, RefreshCcw } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
@@ -37,6 +37,7 @@ export const CashBalances: React.FC = () => {
   const [balances, setBalances] = useState<CashBalanceData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     if (user) {
@@ -56,7 +57,7 @@ export const CashBalances: React.FC = () => {
     } else {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, refreshTrigger]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -195,7 +196,12 @@ export const CashBalances: React.FC = () => {
     };
 
     fetchData();
-  }, [user, paymentMethods, dateRange]);
+  }, [user, paymentMethods, dateRange, refreshTrigger]);
+
+  const handleRefresh = () => {
+    setLoading(true);
+    setRefreshTrigger(prev => prev + 1);
+  };
 
   const totals = balances.reduce((acc, b) => ({
     opIn: Number(acc.opIn) + Number(b.opening.in),
@@ -262,6 +268,13 @@ export const CashBalances: React.FC = () => {
           <p className="text-zinc-500 font-medium mt-1">عرض أرصدة وحركات كافة الخزائن والبنوك</p>
         </div>
         <div className="flex items-center gap-2">
+          <button 
+            onClick={handleRefresh}
+            className="p-3 bg-white border border-zinc-200 text-zinc-600 rounded-2xl hover:bg-zinc-50 hover:text-emerald-600 transition-all hover:scale-105 active:scale-95 shadow-sm"
+            title="تحديث البيانات"
+          >
+            <RefreshCcw size={20} className={loading ? 'animate-spin' : ''} />
+          </button>
           <button onClick={handleExportPDF} className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 transition-all shadow-sm"><Printer size={20} /></button>
           <button onClick={handleExportExcel} className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 transition-all shadow-sm"><Download size={20} /></button>
         </div>

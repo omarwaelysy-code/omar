@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
 import { JournalEntry, Account, AccountType } from '../types';
-import { Search, Calendar, FileText, Download, Printer, Filter, PieChart, ArrowLeftRight, TrendingUp, TrendingDown } from 'lucide-react';
+import { Search, Calendar, FileText, Download, Printer, Filter, PieChart, ArrowLeftRight, TrendingUp, TrendingDown, RefreshCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
@@ -23,6 +23,7 @@ export const IncomeStatement: React.FC = () => {
     start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
   });
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     if (!user) {
@@ -48,7 +49,12 @@ export const IncomeStatement: React.FC = () => {
     subscriptions.push(dbService.subscribe<AccountType>('account_types', user.company_id, setAccountTypes, onError));
 
     return () => subscriptions.forEach(unsub => unsub());
-  }, [user]);
+  }, [user, refreshTrigger]);
+
+  const handleRefresh = () => {
+    setLoading(true);
+    setRefreshTrigger(prev => prev + 1);
+  };
 
   const data = AccountingEngine.calculateIncomeStatement(
     accounts,
@@ -99,6 +105,13 @@ export const IncomeStatement: React.FC = () => {
           <p className="text-zinc-500 font-medium mt-1">{t('income.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
+          <button 
+            onClick={handleRefresh}
+            className="p-3 bg-white border border-zinc-200 text-zinc-600 rounded-2xl hover:bg-zinc-50 hover:text-emerald-600 transition-all hover:scale-105 active:scale-95 shadow-sm"
+            title={t('reports.update_data')}
+          >
+            <RefreshCcw size={20} className={loading ? 'animate-spin' : ''} />
+          </button>
           <button onClick={handleExportPDF} className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 transition-all shadow-sm"><Printer size={20} /></button>
         </div>
       </div>
