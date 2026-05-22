@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Search, Calendar, Download, BarChart3, TrendingUp, ShoppingBag, Users, FileText, History } from 'lucide-react';
+import { Search, Calendar, Download, BarChart3, TrendingUp, ShoppingBag, Users, FileText, History, RefreshCcw } from 'lucide-react';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
@@ -260,6 +260,13 @@ export const SalesReport: React.FC = () => {
           <p className="text-zinc-500">{t('reports.sales_subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button 
+            onClick={fetchData}
+            className="p-3 bg-white border border-zinc-200 text-zinc-600 rounded-2xl hover:bg-zinc-50 hover:text-emerald-600 transition-all hover:scale-105 active:scale-95 shadow-sm"
+            title={t('reports.update_data')}
+          >
+            <RefreshCcw size={20} className={loading ? 'animate-spin' : ''} />
+          </button>
           <ExportButtons 
             onExportExcel={handleExportExcel} 
             onExportPDF={handleExportPDF} 
