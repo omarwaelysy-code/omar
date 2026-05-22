@@ -18,11 +18,13 @@ import { ExportButtons } from '../components/ExportButtons';
 import { ActivityLog, Company } from '../types';
 import { PaginationControls } from '../components/PaginationControls';
 import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
+import { useNavigation } from '../contexts/NavigationContext';
 
 export const Returns: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
+  const { pendingViewDoc, setPendingViewDoc } = useNavigation();
   const [returns, setReturns] = useState<Return[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -49,6 +51,37 @@ export const Returns: React.FC = () => {
   const [maxSeqGenerated, setMaxSeqGenerated] = useState<number>(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewReturn, setViewReturn] = useState<Return | null>(null);
+
+  useEffect(() => {
+    if (pendingViewDoc && pendingViewDoc.type === 'return' && user) {
+      const loadPendingDoc = async () => {
+        try {
+          const existing = returns.find(r => r.return_number === pendingViewDoc.idOrNumber || r.id === pendingViewDoc.idOrNumber);
+          if (existing) {
+            setViewReturn(existing);
+            setPendingViewDoc(null);
+            return;
+          }
+          const docs = await dbService.getDocsByFilter<any>('returns', user.company_id, [
+            { field: 'return_number', operator: '==', value: pendingViewDoc.idOrNumber }
+          ]);
+          if (docs && docs.length > 0) {
+            setViewReturn(docs[0]);
+          } else {
+            const docById = await dbService.get<any>('returns', pendingViewDoc.idOrNumber);
+            if (docById) {
+              setViewReturn(docById);
+            }
+          }
+          setPendingViewDoc(null);
+        } catch (err) {
+          console.error("Error loading pending document", err);
+          setPendingViewDoc(null);
+        }
+      };
+      loadPendingDoc();
+    }
+  }, [pendingViewDoc, returns, user, setPendingViewDoc]);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [returnToDelete, setReturnToDelete] = useState<string | null>(null);
   const returnRef = useRef<HTMLDivElement>(null);

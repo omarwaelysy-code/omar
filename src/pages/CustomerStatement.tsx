@@ -7,6 +7,7 @@ import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
 import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useNavigation } from '../contexts/NavigationContext';
 
 interface StatementEntry {
   id: string;
@@ -21,7 +22,27 @@ interface StatementEntry {
 
 export const CustomerStatement: React.FC = () => {
   const { user } = useAuth();
+  const { t, dir, language } = useLanguage();
+  const { setCurrentPage, setPendingViewDoc } = useNavigation();
   const [customers, setCustomers] = useState<Customer[]>([]);
+
+  const handleTransactionClick = (type: string, reference: string) => {
+    if (!reference || reference === '-') return;
+    
+    if (type === 'invoice') {
+      setPendingViewDoc({ type: 'invoice', idOrNumber: reference });
+      setCurrentPage('invoices');
+    } else if (type === 'receipt' || type === 'receipt_voucher') {
+      setPendingViewDoc({ type: 'receipt', idOrNumber: reference });
+      setCurrentPage('receipts');
+    } else if (type === 'return') {
+      setPendingViewDoc({ type: 'return', idOrNumber: reference });
+      setCurrentPage('returns');
+    } else if (type === 'journal' || type === 'manual') {
+      setPendingViewDoc({ type: 'manual', idOrNumber: reference });
+      setCurrentPage('journal_entries');
+    }
+  };
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10));
@@ -188,8 +209,6 @@ export const CustomerStatement: React.FC = () => {
     return balance > 0 ? `+${formatNumber(balance)}` : formatNumber(balance);
   };
 
-  const { language } = useLanguage();
-
   const handleExportExcel = () => {
     if (entries.length === 0 || !customerInfo) return;
     
@@ -328,16 +347,19 @@ export const CustomerStatement: React.FC = () => {
                       <tr key={entry.id} className="border-b border-zinc-50 hover:bg-zinc-50/50 transition-colors">
                         <td className="px-4 py-3 text-sm font-mono">{formatDate(entry.date)}</td>
                         <td className="px-4 py-3 text-sm">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            entry.type === 'invoice' ? 'bg-emerald-50 text-emerald-600' :
-                            entry.type === 'receipt' ? 'bg-amber-50 text-amber-600' :
-                            entry.type === 'receipt_voucher' ? 'bg-amber-50 text-amber-600' :
-                            entry.type === 'return' ? 'bg-emerald-50 text-emerald-600' :
-                            entry.type === 'journal' ? 'bg-blue-50 text-blue-600' :
-                            entry.type === 'manual' ? 'bg-blue-50 text-blue-600' :
-                            entry.type === 'opening_balance' ? 'bg-zinc-100 text-zinc-600' :
-                            'bg-zinc-100 text-zinc-600'
-                          }`}>
+                          <span 
+                            onClick={() => handleTransactionClick(entry.type, entry.reference)}
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer hover:scale-105 transition-transform inline-block ${
+                              entry.type === 'invoice' ? 'bg-emerald-50 text-emerald-600' :
+                              entry.type === 'receipt' ? 'bg-amber-50 text-amber-600' :
+                              entry.type === 'receipt_voucher' ? 'bg-amber-50 text-amber-600' :
+                              entry.type === 'return' ? 'bg-emerald-50 text-emerald-600' :
+                              entry.type === 'journal' ? 'bg-blue-50 text-blue-600' :
+                              entry.type === 'manual' ? 'bg-blue-50 text-blue-600' :
+                              entry.type === 'opening_balance' ? 'bg-zinc-100 text-zinc-600' :
+                              'bg-zinc-100 text-zinc-600'
+                            }`}
+                          >
                             {entry.type === 'invoice' ? 'فاتورة مبيعات' :
                              entry.type === 'receipt' ? 'سند قبض' :
                              entry.type === 'receipt_voucher' ? 'سند قبض' :
@@ -348,7 +370,12 @@ export const CustomerStatement: React.FC = () => {
                              entry.type === 'discount' ? 'خصم' : 'قيد يومية'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm font-mono">{entry.reference}</td>
+                        <td 
+                          onClick={() => handleTransactionClick(entry.type, entry.reference)}
+                          className={`px-4 py-3 text-sm font-bold font-mono transition-colors ${entry.reference !== '-' ? 'text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer' : ''}`}
+                        >
+                          {entry.reference}
+                        </td>
                         <td className="px-4 py-3 text-sm">{entry.description}</td>
                         <td className="px-4 py-3 text-sm font-bold text-emerald-600">{entry.debit > 0 ? formatNumber(entry.debit) : '-'}</td>
                         <td className="px-4 py-3 text-sm font-bold text-emerald-600">{entry.credit > 0 ? formatNumber(entry.credit) : '-'}</td>

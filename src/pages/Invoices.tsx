@@ -31,12 +31,15 @@ import { transactionManager, TransactionManager } from '../services/TransactionM
 import { InvoiceSchema, JournalEntrySchema } from '../lib/schemas';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
+import { useNavigation } from '../contexts/NavigationContext';
 
 export const Invoices: React.FC = () => {
   const { t, dir, language } = useLanguage();
   const { user } = useAuth();
   const { canView, canCreate, canEdit, canDelete } = usePermissions('invoices');
   const { showNotification } = useNotification();
+  const { pendingViewDoc, setPendingViewDoc } = useNavigation();
+
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -63,6 +66,37 @@ export const Invoices: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null);
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
+
+  useEffect(() => {
+    if (pendingViewDoc && pendingViewDoc.type === 'invoice' && user) {
+      const loadPendingDoc = async () => {
+        try {
+          const existing = invoices.find(inv => inv.invoice_number === pendingViewDoc.idOrNumber || inv.id === pendingViewDoc.idOrNumber);
+          if (existing) {
+            setViewInvoice(existing);
+            setPendingViewDoc(null);
+            return;
+          }
+          const docs = await dbService.getDocsByFilter<Invoice>('invoices', user.company_id, [
+            { field: 'invoice_number', operator: '==', value: pendingViewDoc.idOrNumber }
+          ]);
+          if (docs && docs.length > 0) {
+            setViewInvoice(docs[0]);
+          } else {
+            const docById = await dbService.get<Invoice>('invoices', pendingViewDoc.idOrNumber);
+            if (docById) {
+              setViewInvoice(docById);
+            }
+          }
+          setPendingViewDoc(null);
+        } catch (err) {
+          console.error("Error loading pending document", err);
+          setPendingViewDoc(null);
+        }
+      };
+      loadPendingDoc();
+    }
+  }, [pendingViewDoc, invoices, user, setPendingViewDoc]);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
   const [previewJournalEntry, setPreviewJournalEntry] = useState<JournalEntry | null>(null);

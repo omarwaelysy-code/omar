@@ -11,11 +11,13 @@ import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { useNotification } from '../contexts/NotificationContext';
 import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
 import { PaginationControls } from '../components/PaginationControls';
+import { useNavigation } from '../contexts/NavigationContext';
 
 export const JournalEntries: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
+  const { pendingViewDoc, setPendingViewDoc } = useNavigation();
   const reportRef = useRef<HTMLDivElement>(null);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -45,6 +47,40 @@ export const JournalEntries: React.FC = () => {
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (pendingViewDoc && (pendingViewDoc.type === 'journal' || pendingViewDoc.type === 'journal_entry' || pendingViewDoc.type === 'manual' || pendingViewDoc.type === 'journal_entries') && user) {
+      const loadPendingDoc = async () => {
+        try {
+          const existing = entries.find(e => 
+            e.reference_number === pendingViewDoc.idOrNumber || 
+            e.id === pendingViewDoc.idOrNumber
+          );
+          if (existing) {
+            setSelectedEntry(existing);
+            setPendingViewDoc(null);
+            return;
+          }
+          const docs = await dbService.getDocsByFilter<any>('journal_entries', user.company_id, [
+            { field: 'reference_number', operator: '==', value: pendingViewDoc.idOrNumber }
+          ]);
+          if (docs && docs.length > 0) {
+            setSelectedEntry(docs[0]);
+          } else {
+            const docById = await dbService.get<any>('journal_entries', pendingViewDoc.idOrNumber);
+            if (docById) {
+              setSelectedEntry(docById);
+            }
+          }
+          setPendingViewDoc(null);
+        } catch (err) {
+          console.error("Error loading pending document", err);
+          setPendingViewDoc(null);
+        }
+      };
+      loadPendingDoc();
+    }
+  }, [pendingViewDoc, entries, user, setPendingViewDoc]);
 
   useEffect(() => {
     if (!user) return;

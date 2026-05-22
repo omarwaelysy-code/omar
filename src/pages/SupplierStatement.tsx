@@ -7,6 +7,7 @@ import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
 import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useNavigation } from '../contexts/NavigationContext';
 
 interface StatementItem {
   id: string;
@@ -21,7 +22,27 @@ interface StatementItem {
 
 export const SupplierStatement: React.FC = () => {
   const { user } = useAuth();
+  const { t, dir, language } = useLanguage();
+  const { setCurrentPage, setPendingViewDoc } = useNavigation();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+
+  const handleTransactionClick = (type: string, reference: string) => {
+    if (!reference || reference === '-') return;
+    
+    if (type === 'purchase_invoice') {
+      setPendingViewDoc({ type: 'purchase_invoice', idOrNumber: reference });
+      setCurrentPage('purchase_invoices');
+    } else if (type === 'payment_voucher') {
+      setPendingViewDoc({ type: 'payment_voucher', idOrNumber: reference });
+      setCurrentPage('payment_vouchers');
+    } else if (type === 'purchase_return') {
+      setPendingViewDoc({ type: 'purchase_return', idOrNumber: reference });
+      setCurrentPage('purchase_returns');
+    } else if (type === 'journal' || type === 'manual') {
+      setPendingViewDoc({ type: 'manual', idOrNumber: reference });
+      setCurrentPage('journal_entries');
+    }
+  };
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
   const [startDate, setStartDate] = useState<string>(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10));
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().slice(0, 10));
@@ -174,8 +195,6 @@ export const SupplierStatement: React.FC = () => {
     return balance > 0 ? `+${formatNumber(balance)}` : formatNumber(balance);
   };
 
-  const { language } = useLanguage();
-
   const handleExportExcel = () => {
     if (statement.length === 0 || !selectedSupplierId) return;
     const supplier = suppliers.find(s => s.id === selectedSupplierId);
@@ -327,14 +346,17 @@ export const SupplierStatement: React.FC = () => {
                       <tr key={item.id} className="border-b border-zinc-50 hover:bg-zinc-50/50 transition-colors">
                         <td className="px-4 py-3 text-sm font-mono">{formatDate(item.date)}</td>
                         <td className="px-4 py-3 text-sm">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            item.type === 'purchase_invoice' ? 'bg-emerald-50 text-emerald-600' :
-                            item.type === 'payment_voucher' ? 'bg-amber-50 text-amber-600' :
-                            item.type === 'purchase_return' ? 'bg-emerald-50 text-emerald-600' :
-                            item.type === 'manual' ? 'bg-blue-50 text-blue-600' :
-                            item.type === 'opening_balance' ? 'bg-zinc-100 text-zinc-600' :
-                            'bg-zinc-100 text-zinc-600'
-                          }`}>
+                          <span 
+                            onClick={() => handleTransactionClick(item.type, item.reference)}
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer hover:scale-105 transition-transform inline-block ${
+                              item.type === 'purchase_invoice' ? 'bg-emerald-50 text-emerald-600' :
+                              item.type === 'payment_voucher' ? 'bg-amber-50 text-amber-600' :
+                              item.type === 'purchase_return' ? 'bg-emerald-50 text-emerald-600' :
+                              item.type === 'manual' ? 'bg-blue-50 text-blue-600' :
+                              item.type === 'opening_balance' ? 'bg-zinc-100 text-zinc-600' :
+                              'bg-zinc-100 text-zinc-600'
+                            }`}
+                          >
                             {item.type === 'purchase_invoice' ? 'فاتورة مشتريات' :
                              item.type === 'payment_voucher' ? 'سند صرف' :
                              item.type === 'purchase_return' ? 'مرتجع مشتريات' :
@@ -343,7 +365,12 @@ export const SupplierStatement: React.FC = () => {
                              item.type === 'discount' ? 'خصم' : 'قيد يومية'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm font-mono">{item.reference}</td>
+                        <td 
+                          onClick={() => handleTransactionClick(item.type, item.reference)}
+                          className={`px-4 py-3 text-sm font-bold font-mono transition-colors ${item.reference !== '-' ? 'text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer' : ''}`}
+                        >
+                          {item.reference}
+                        </td>
                         <td className="px-4 py-3 text-sm">{item.notes}</td>
                         <td className="px-4 py-3 text-sm font-bold text-emerald-600">{item.debit > 0 ? formatNumber(item.debit) : '-'}</td>
                         <td className="px-4 py-3 text-sm font-bold text-emerald-600">{item.credit > 0 ? formatNumber(item.credit) : '-'}</td>

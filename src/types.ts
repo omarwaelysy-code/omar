@@ -566,6 +566,7 @@ export interface LedgerLine {
   credit: number;
   balance: number;
   entity_name?: string;
+  reference_type?: string;
 }
 
 export interface Department {

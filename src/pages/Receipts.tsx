@@ -25,11 +25,13 @@ import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { PaginationControls } from '../components/PaginationControls';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
+import { useNavigation } from '../contexts/NavigationContext';
 
 export const Receipts: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
+  const { pendingViewDoc, setPendingViewDoc } = useNavigation();
   const [receipts, setReceipts] = useState<ReceiptVoucher[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -65,6 +67,37 @@ export const Receipts: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [receiptToDelete, setReceiptToDelete] = useState<string | null>(null);
   const [viewReceipt, setViewReceipt] = useState<ReceiptVoucher | null>(null);
+
+  useEffect(() => {
+    if (pendingViewDoc && pendingViewDoc.type === 'receipt' && user) {
+      const loadPendingDoc = async () => {
+        try {
+          const existing = receipts.find(r => r.voucher_number === pendingViewDoc.idOrNumber || r.id === pendingViewDoc.idOrNumber);
+          if (existing) {
+            setViewReceipt(existing);
+            setPendingViewDoc(null);
+            return;
+          }
+          const docs = await dbService.getDocsByFilter<any>('receipt_vouchers', user.company_id, [
+            { field: 'voucher_number', operator: '==', value: pendingViewDoc.idOrNumber }
+          ]);
+          if (docs && docs.length > 0) {
+            setViewReceipt(docs[0]);
+          } else {
+            const docById = await dbService.get<any>('receipt_vouchers', pendingViewDoc.idOrNumber);
+            if (docById) {
+              setViewReceipt(docById);
+            }
+          }
+          setPendingViewDoc(null);
+        } catch (err) {
+          console.error("Error loading pending document", err);
+          setPendingViewDoc(null);
+        }
+      };
+      loadPendingDoc();
+    }
+  }, [pendingViewDoc, receipts, user, setPendingViewDoc]);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [showSidePanel, setShowSidePanel] = useState(false);
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);

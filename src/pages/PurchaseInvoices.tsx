@@ -29,11 +29,13 @@ import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { PaginationControls } from '../components/PaginationControls';
 // Currency import removed for now from view cleanup
+import { useNavigation } from '../contexts/NavigationContext';
 
 export const PurchaseInvoices: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
+  const { pendingViewDoc, setPendingViewDoc } = useNavigation();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
@@ -78,6 +80,37 @@ export const PurchaseInvoices: React.FC = () => {
   const [serverSummary, setServerSummary] = useState<any>({});
   const [maxSeqGenerated, setMaxSeqGenerated] = useState<number>(0);
   const [viewInvoice, setViewInvoice] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (pendingViewDoc && pendingViewDoc.type === 'purchase_invoice' && user) {
+      const loadPendingDoc = async () => {
+        try {
+          const existing = purchaseInvoices.find(inv => inv.invoice_number === pendingViewDoc.idOrNumber || inv.id === pendingViewDoc.idOrNumber);
+          if (existing) {
+            setViewInvoice(existing);
+            setPendingViewDoc(null);
+            return;
+          }
+          const docs = await dbService.getDocsByFilter<any>('purchase_invoices', user.company_id, [
+            { field: 'invoice_number', operator: '==', value: pendingViewDoc.idOrNumber }
+          ]);
+          if (docs && docs.length > 0) {
+            setViewInvoice(docs[0]);
+          } else {
+            const docById = await dbService.get<any>('purchase_invoices', pendingViewDoc.idOrNumber);
+            if (docById) {
+              setViewInvoice(docById);
+            }
+          }
+          setPendingViewDoc(null);
+        } catch (err) {
+          console.error("Error loading pending document", err);
+          setPendingViewDoc(null);
+        }
+      };
+      loadPendingDoc();
+    }
+  }, [pendingViewDoc, purchaseInvoices, user, setPendingViewDoc]);
 
   const [supplierFormData, setSupplierFormData] = useState({
     name: '',

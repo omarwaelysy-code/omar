@@ -9,15 +9,55 @@ import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { AccountingEngine } from '../services/AccountingEngine';
 import { formatNumber, formatDate } from '../utils/formatUtils';
+import { useNavigation } from '../contexts/NavigationContext';
 
 export const GeneralLedger: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
+  const { setCurrentPage, setPendingViewDoc } = useNavigation();
   const reportRef = useRef<HTMLDivElement>(null);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+
+  const handleTransactionClick = (type: string | undefined, reference: string) => {
+    if (!reference || reference === '-' || reference === '') return;
+    
+    let normType = type;
+    if (!normType) {
+      if (reference.startsWith('INV-')) normType = 'invoice';
+      else if (reference.startsWith('PINV-')) normType = 'purchase_invoice';
+      else if (reference.startsWith('RCT-')) normType = 'receipt';
+      else if (reference.startsWith('PAY-')) normType = 'payment_voucher';
+      else if (reference.startsWith('RET-')) normType = 'return';
+      else if (reference.startsWith('PRET-')) normType = 'purchase_return';
+      else normType = 'manual';
+    }
+    
+    if (normType === 'invoice') {
+      setPendingViewDoc({ type: 'invoice', idOrNumber: reference });
+      setCurrentPage('invoices');
+    } else if (normType === 'purchase_invoice') {
+      setPendingViewDoc({ type: 'purchase_invoice', idOrNumber: reference });
+      setCurrentPage('purchase_invoices');
+    } else if (normType === 'receipt' || normType === 'receipt_voucher') {
+      setPendingViewDoc({ type: 'receipt', idOrNumber: reference });
+      setCurrentPage('receipts');
+    } else if (normType === 'payment_voucher') {
+      setPendingViewDoc({ type: 'payment_voucher', idOrNumber: reference });
+      setCurrentPage('payment_vouchers');
+    } else if (normType === 'return') {
+      setPendingViewDoc({ type: 'return', idOrNumber: reference });
+      setCurrentPage('returns');
+    } else if (normType === 'purchase_return') {
+      setPendingViewDoc({ type: 'purchase_return', idOrNumber: reference });
+      setCurrentPage('purchase_returns');
+    } else {
+      setPendingViewDoc({ type: 'manual', idOrNumber: reference });
+      setCurrentPage('journal_entries');
+    }
+  };
   const [loading, setLoading] = useState(true);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [selectedEntityIds, setSelectedEntityIds] = useState<string[]>([]);
@@ -291,9 +331,18 @@ export const GeneralLedger: React.FC = () => {
                         {tx.description}
                       </td>
                       <td className="px-6 py-4">
-                        <span className="px-3 py-1 bg-zinc-100 text-zinc-600 rounded-lg text-xs font-bold">
-                          {tx.reference || '-'}
-                        </span>
+                        {tx.reference && tx.reference !== '-' ? (
+                          <span 
+                            onClick={() => handleTransactionClick(tx.reference_type, tx.reference)}
+                            className="px-3 py-1 bg-zinc-100 text-emerald-600 hover:text-emerald-705 hover:bg-emerald-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95"
+                          >
+                            {tx.reference}
+                          </span>
+                        ) : (
+                          <span className="px-3 py-1 bg-zinc-100 text-zinc-400 rounded-lg text-xs font-bold">
+                            -
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{tx.debit > 0 ? formatNumber(tx.debit) : '-'}</td>
                       <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{tx.credit > 0 ? formatNumber(tx.credit) : '-'}</td>

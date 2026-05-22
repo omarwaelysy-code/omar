@@ -15,6 +15,8 @@ interface NavigationContextType {
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   resetNavigation: () => void;
+  pendingViewDoc: { type: string; idOrNumber: string } | null;
+  setPendingViewDoc: (doc: { type: string; idOrNumber: string } | null) => void;
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
@@ -65,6 +67,7 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [openTabs, setOpenTabs] = useState<Tab[]>([{ id: 'dashboard', label: 'لوحة التحكم' }]);
   const [activeTabId, setActiveTabId] = useState('dashboard');
+  const [pendingViewDoc, setPendingViewDoc] = useState<{ type: string; idOrNumber: string } | null>(null);
 
   const openTab = (id: string, label: string) => {
     setOpenTabs(prev => {
@@ -129,7 +132,9 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       openTab,
       closeTab,
       setActiveTab,
-      resetNavigation
+      resetNavigation,
+      pendingViewDoc,
+      setPendingViewDoc
     }}>
       {children}
     </NavigationContext.Provider>

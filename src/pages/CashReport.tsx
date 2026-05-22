@@ -8,6 +8,7 @@ import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
 import { ExportButtons } from '../components/ExportButtons';
 import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
+import { useNavigation } from '../contexts/NavigationContext';
 
 interface CashTransaction {
   id: string;
@@ -18,11 +19,51 @@ interface CashTransaction {
   out: number;
   notes: string;
   balance?: number;
+  doc_type?: string;
 }
 
 export const CashReport: React.FC = () => {
   const { user } = useAuth();
   const { t, dir } = useLanguage();
+  const { setCurrentPage, setPendingViewDoc } = useNavigation();
+
+  const handleTransactionClick = (type: string | undefined, reference: string) => {
+    if (!reference || reference === '-' || reference === '') return;
+    
+    let normType = type;
+    if (!normType) {
+      if (reference.startsWith('INV-')) normType = 'invoice';
+      else if (reference.startsWith('PINV-')) normType = 'purchase_invoice';
+      else if (reference.startsWith('RCT-')) normType = 'receipt';
+      else if (reference.startsWith('PAY-')) normType = 'payment_voucher';
+      else if (reference.startsWith('RET-')) normType = 'return';
+      else if (reference.startsWith('PRET-')) normType = 'purchase_return';
+      else normType = 'manual';
+    }
+    
+    if (normType === 'invoice') {
+      setPendingViewDoc({ type: 'invoice', idOrNumber: reference });
+      setCurrentPage('invoices');
+    } else if (normType === 'purchase_invoice') {
+      setPendingViewDoc({ type: 'purchase_invoice', idOrNumber: reference });
+      setCurrentPage('purchase_invoices');
+    } else if (normType === 'receipt' || normType === 'receipt_voucher') {
+      setPendingViewDoc({ type: 'receipt', idOrNumber: reference });
+      setCurrentPage('receipts');
+    } else if (normType === 'payment_voucher') {
+      setPendingViewDoc({ type: 'payment_voucher', idOrNumber: reference });
+      setCurrentPage('payment_vouchers');
+    } else if (normType === 'return') {
+      setPendingViewDoc({ type: 'return', idOrNumber: reference });
+      setCurrentPage('returns');
+    } else if (normType === 'purchase_return') {
+      setPendingViewDoc({ type: 'purchase_return', idOrNumber: reference });
+      setCurrentPage('purchase_returns');
+    } else {
+      setPendingViewDoc({ type: 'manual', idOrNumber: reference });
+      setCurrentPage('journal_entries');
+    }
+  };
   const reportRef = useRef<HTMLDivElement>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [selectedMethodId, setSelectedMethodId] = useState<string>('');
@@ -111,7 +152,8 @@ export const CashReport: React.FC = () => {
                   reference: je.reference_number || je.id.slice(-6),
                   in: Number(item.debit) || 0,
                   out: Number(item.credit) || 0,
-                  notes: transNotes
+                  notes: transNotes,
+                  doc_type: je.reference_type
                 });
               }
         });
@@ -290,13 +332,21 @@ export const CashReport: React.FC = () => {
                       <tr key={t.id} className="border-b border-zinc-50 hover:bg-zinc-50/50 transition-colors">
                         <td className="px-4 py-3 text-sm font-mono">{formatDate(t.date)}</td>
                         <td className="px-4 py-3 text-sm">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            t.in > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-emerald-50 text-emerald-600'
-                          }`}>
+                          <span 
+                            onClick={() => handleTransactionClick(t.doc_type, t.reference)}
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer hover:scale-105 transition-all inline-block ${
+                              t.in > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-emerald-50 text-emerald-600'
+                            }`}
+                          >
                             {t.type}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm font-mono">{t.reference}</td>
+                        <td 
+                          onClick={() => handleTransactionClick(t.doc_type, t.reference)}
+                          className={`px-4 py-3 text-sm font-bold font-mono transition-colors ${t.reference && t.reference !== '-' ? 'text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer' : ''}`}
+                        >
+                          {t.reference}
+                        </td>
                         <td className="px-4 py-3 text-sm">{t.notes}</td>
                         <td className="px-4 py-3 text-sm font-bold text-emerald-600">{t.in > 0 ? formatMoney(t.in) : '-'}</td>
                         <td className="px-4 py-3 text-sm font-bold text-emerald-600">{t.out > 0 ? formatMoney(t.out) : '-'}</td>

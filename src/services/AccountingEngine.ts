@@ -136,7 +136,8 @@ export class AccountingEngine {
               debit: debit,
               credit: credit,
               balance: 0,
-              entity_name: entityName
+              entity_name: entityName,
+              reference_type: entry.reference_type
             });
           }
         }
