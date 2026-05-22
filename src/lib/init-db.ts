@@ -307,6 +307,8 @@ export async function initDatabase() {
         "counter_account_id" VARCHAR(36),
         "revenue_account_name" VARCHAR(255),
         "cost_account_name" VARCHAR(255),
+        "item_group_id" VARCHAR(36),
+        "item_group_name" VARCHAR(255),
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `, 'products table');
@@ -738,6 +740,14 @@ export async function initDatabase() {
     await safeQuery('CREATE INDEX IF NOT EXISTS "idx_journal_entries_date" ON "journal_entries"("company_id", "date" DESC);', 'journal_entries date index');
     await safeQuery('CREATE INDEX IF NOT EXISTS "idx_invoices_date" ON "invoices"("company_id", "date" DESC);', 'invoices date index');
     await safeQuery('CREATE INDEX IF NOT EXISTS "idx_accounts_code" ON "accounts"("company_id", "code");', 'accounts code index');
+
+    // Add item_group_id and item_group_name column safeguards if they do not exist
+    if (!(await checkColumnExists('products', 'item_group_id'))) {
+      await safeQuery('ALTER TABLE "products" ADD COLUMN "item_group_id" VARCHAR(36);', 'add item_group_id to products');
+    }
+    if (!(await checkColumnExists('products', 'item_group_name'))) {
+      await safeQuery('ALTER TABLE "products" ADD COLUMN "item_group_name" VARCHAR(255);', 'add item_group_name to products');
+    }
 
     console.log('✅ Base Schema Guardrails active.');
 

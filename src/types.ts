@@ -241,6 +241,8 @@ export interface Product {
   vat_account_name?: string;
   vat_rate?: number;
   counter_account_id?: string;
+  item_group_id?: string;
+  item_group_name?: string;
   company_id: string;
 }
 

@@ -22,6 +22,14 @@ import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { formatNumber } from '../utils/formatUtils';
 
+interface ItemGroup {
+  id: string;
+  company_id: string;
+  name: string;
+  code: string;
+  type: string;
+}
+
 export const Products: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
@@ -30,6 +38,7 @@ export const Products: React.FC = () => {
   
   const [products, setProducts] = useState<Product[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [itemGroups, setItemGroups] = useState<ItemGroup[]>([]);
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -61,7 +70,8 @@ export const Products: React.FC = () => {
     inventory_account_id: '',
     vat_account_id: '',
     vat_rate: 0,
-    counter_account_id: ''
+    counter_account_id: '',
+    item_group_id: ''
   });
 
   useEffect(() => {
@@ -75,6 +85,10 @@ export const Products: React.FC = () => {
         setAccounts(data);
       });
 
+      const unsubscribeItemGroups = dbService.subscribe<ItemGroup>('item_groups', user.company_id, (data) => {
+        setItemGroups(data || []);
+      });
+
       const unsubscribeCompany = dbService.listen<Company>('companies', user.company_id, (compData) => {
         setCompany(compData);
       });
@@ -82,6 +96,7 @@ export const Products: React.FC = () => {
       return () => {
         unsubscribe();
         unsubscribeAccounts();
+        unsubscribeItemGroups();
         unsubscribeCompany();
       };
     }
@@ -155,6 +170,11 @@ export const Products: React.FC = () => {
     if (!user) return;
 
     try {
+      if (!formData.item_group_id) {
+        toast.error(language === 'ar' ? 'الرجاء اختيار مجموعة للصنف' : 'Please select an item group for the product');
+        return;
+      }
+
       if (!formData.revenue_account_id || !formData.cost_account_id) {
         toast.error('يجب اختيار حساب الإيرادات وحساب التكلفة للصنف');
         return;
@@ -170,9 +190,11 @@ export const Products: React.FC = () => {
       const costAccount = accounts.find(a => a.id === formData.cost_account_id);
       const inventoryAccount = accounts.find(a => a.id === formData.inventory_account_id);
       const vatAccount = accounts.find(a => a.id === formData.vat_account_id);
+      const itemGroupObj = itemGroups.find(g => g.id === formData.item_group_id);
       
       const dataToSave = {
         ...formData,
+        item_group_name: itemGroupObj?.name || '',
         revenue_account_name: revenueAccount?.name || '',
         cost_account_name: costAccount?.name || '',
         inventory_account_name: inventoryAccount?.name || '',
@@ -200,7 +222,7 @@ export const Products: React.FC = () => {
       sale_price: 0, cost_price: 0, description: '', image_url: '', 
       barcode: '', stock: 0, min_stock: 0, revenue_account_id: '', 
       cost_account_id: '', inventory_account_id: '', vat_account_id: '',
-      vat_rate: 0, counter_account_id: ''
+      vat_rate: 0, counter_account_id: '', item_group_id: ''
     });
   };
 
@@ -221,7 +243,8 @@ export const Products: React.FC = () => {
         inventory_account_id: product.inventory_account_id || '',
         vat_account_id: product.vat_account_id || '',
         vat_rate: product.vat_rate || 0,
-        counter_account_id: product.counter_account_id || ''
+        counter_account_id: product.counter_account_id || '',
+        item_group_id: product.item_group_id || ''
       } as any);
     } else {
       resetForm();
@@ -460,6 +483,25 @@ export const Products: React.FC = () => {
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-right">
                            <div className="md:col-span-2 space-y-4">
+                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                                {language === 'ar' ? 'مجموعة الصنف *' : 'Item Group *'}
+                              </label>
+                              <div className="relative group mb-12">
+                                <Layers className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300`} size={24} />
+                                <select 
+                                  required 
+                                  className={`w-full ${dir === 'rtl' ? 'pr-16 pl-6' : 'pl-16 pr-6'} py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black text-slate-900 appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner`}
+                                  value={formData.item_group_id} 
+                                  onChange={(e) => setFormData({ ...formData, item_group_id: e.target.value })}
+                                >
+                                  <option value="">{language === 'ar' ? '-- الرجاء اختيار مجموعة الصنف --' : '-- Please select item group --'}</option>
+                                  {itemGroups.map(group => (
+                                    <option key={group.id} value={group.id}>
+                                      {group.name} ({group.code})
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
                               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('products.form_name')}</label>
                               <input required type="text" placeholder="..." className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black text-slate-900 outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 focus:border-emerald-500/50 transition-all shadow-inner" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
                            </div>
