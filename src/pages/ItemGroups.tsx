@@ -37,7 +37,6 @@ export function ItemGroups() {
   const [formData, setFormData] = useState({
     name: '',
     type: 'finished_product' as 'finished_product' | 'service' | 'raw_material' | 'commodity',
-    letter_code: '',
     description: '',
     sequence_number: 1,
     code: ''
@@ -86,7 +85,10 @@ export function ItemGroups() {
   useEffect(() => {
     if (isModalOpen) {
       const typeAcronym = getTypeAcronym(formData.type);
-      const sanitizedLetters = formData.letter_code.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      
+      // Extract the first 3 characters/letters of the group name (ignoring spaces)
+      const sanitizedName = formData.name.trim().replace(/\s+/g, '');
+      const distinctiveLetters = sanitizedName.substring(0, 3).toUpperCase();
       
       let nextNum = formData.sequence_number;
       if (!editingGroup) {
@@ -101,8 +103,10 @@ export function ItemGroups() {
       }
 
       const paddedNum = String(nextNum).padStart(3, '0');
-      const combinedCode = sanitizedLetters 
-        ? `${typeAcronym}-${sanitizedLetters}-${paddedNum}`
+      
+      // Formula: [distinctive name letters] + [type acronym TAM, SRV, RAW, COM] + [index]
+      const combinedCode = distinctiveLetters 
+        ? `${distinctiveLetters}-${typeAcronym}-${paddedNum}`
         : `${typeAcronym}-${paddedNum}`;
 
       setFormData(prev => ({
@@ -111,14 +115,13 @@ export function ItemGroups() {
         code: combinedCode
       }));
     }
-  }, [formData.type, formData.letter_code, itemGroups, editingGroup, isModalOpen]);
+  }, [formData.type, formData.name, itemGroups, editingGroup, isModalOpen]);
 
   const handleOpenCreate = () => {
     setEditingGroup(null);
     setFormData({
       name: '',
       type: 'finished_product',
-      letter_code: '',
       description: '',
       sequence_number: 1,
       code: ''
@@ -129,17 +132,9 @@ export function ItemGroups() {
   const handleOpenEdit = (group: ItemGroup) => {
     setEditingGroup(group);
     
-    // Parse letters from code if has "TAM-ABC-001" pattern
-    const parts = group.code.split('-');
-    let parsedLetters = '';
-    if (parts.length === 3) {
-      parsedLetters = parts[1];
-    }
-
     setFormData({
       name: group.name,
       type: group.type,
-      letter_code: parsedLetters,
       description: group.description || '',
       sequence_number: group.sequence_number || 1,
       code: group.code
@@ -158,11 +153,6 @@ export function ItemGroups() {
 
     if (!formData.name.trim()) {
       toast.error(language === 'ar' ? 'اسم المجموعة مطلوب' : 'Group Name is required');
-      return;
-    }
-
-    if (!formData.letter_code.trim()) {
-      toast.error(language === 'ar' ? 'يرجى إدخال حروف الكود المميزة للمجموعة' : 'Please enter distinct letters for the code');
       return;
     }
 
@@ -462,7 +452,7 @@ export function ItemGroups() {
                         </div>
 
                         {/* Commodity Type select */}
-                        <div className="space-y-4">
+                        <div className="md:col-span-2 space-y-4">
                           <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
                             {language === 'ar' ? 'نوع الصنف للمجموعة *' : 'Group Commodity Classification *'}
                           </label>
@@ -482,39 +472,23 @@ export function ItemGroups() {
                           </div>
                         </div>
 
-                        {/* Unique distinctive letters of the items Group */}
-                        <div className="space-y-4">
-                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                            {language === 'ar' ? 'الحروف المميزة للمجموعة (A-Z) *' : 'Short Distinctive Identifiers (A-Z) *'}
-                          </label>
-                          <input 
-                            required 
-                            type="text" 
-                            maxLength={10} 
-                            placeholder="e.g. ENG, ELEC, SER"
-                            className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black text-slate-900 outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner font-mono tracking-widest text-left uppercase" 
-                            value={formData.letter_code} 
-                            onChange={(e) => setFormData({ ...formData, letter_code: e.target.value.toUpperCase() })} 
-                          />
-                        </div>
-
                         {/* Automatic code (Read Only as requested) */}
                         <div className="space-y-4 md:col-span-2">
                           <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
                             {language === 'ar' ? 'كود المجموعة المبرمج (تلقائي لا يمكن تعديله)' : 'Autogenerated Group Code (Read-Only)'}
                           </label>
-                          <div className="relative group">
-                            <Lock className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300`} size={24} />
+                          <div className="relative group flex items-center">
+                            <Lock className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-emerald-500`} size={24} />
                             <input 
                               readOnly 
                               required
                               type="text" 
-                              className="w-full pr-16 pl-6 py-5 bg-slate-100 border border-slate-200 rounded-[2rem] font-mono text-xl font-black text-slate-400 outline-none shadow-inner tracking-widest" 
+                              className={`w-full ${dir === 'rtl' ? 'pr-16 pl-6' : 'pl-16 pr-6'} py-5 bg-slate-50 border border-emerald-200 rounded-[2rem] font-mono text-xl font-black text-emerald-600 outline-none shadow-sm cursor-not-allowed`} 
                               value={formData.code} 
                             />
                           </div>
                           <span className="text-xs text-slate-400 font-bold tracking-tight block px-1 mt-1">
-                            {language === 'ar' ? 'يتكون كود المجموعة تلقائياً من: [نوع الصنف] - [الحروف المميزة] - [الترقيم التسلسلي]' : 'The group code is automatically compiled of: [Type Acronym] - [Distinct Letters] - [Sequential Number]'}
+                            {language === 'ar' ? 'يتكون كود المجموعة تلقائياً في نفس اللحظة من: [أول 3 حروف من الاسم] - [نوع المجموعة المحاسبي] - [الترقيم التسلسلي]' : 'The group code is automatically compiled of: [First 3 Name Letters] - [Type Acronym] - [Sequential Number]'}
                           </span>
                         </div>
 
