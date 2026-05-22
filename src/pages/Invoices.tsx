@@ -67,36 +67,6 @@ export const Invoices: React.FC = () => {
   const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null);
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
 
-  useEffect(() => {
-    if (pendingViewDoc && pendingViewDoc.type === 'invoice' && user) {
-      const loadPendingDoc = async () => {
-        try {
-          const existing = invoices.find(inv => inv.invoice_number === pendingViewDoc.idOrNumber || inv.id === pendingViewDoc.idOrNumber);
-          if (existing) {
-            setViewInvoice(existing);
-            setPendingViewDoc(null);
-            return;
-          }
-          const docs = await dbService.getDocsByFilter<Invoice>('invoices', user.company_id, [
-            { field: 'invoice_number', operator: '==', value: pendingViewDoc.idOrNumber }
-          ]);
-          if (docs && docs.length > 0) {
-            setViewInvoice(docs[0]);
-          } else {
-            const docById = await dbService.get<Invoice>('invoices', pendingViewDoc.idOrNumber);
-            if (docById) {
-              setViewInvoice(docById);
-            }
-          }
-          setPendingViewDoc(null);
-        } catch (err) {
-          console.error("Error loading pending document", err);
-          setPendingViewDoc(null);
-        }
-      };
-      loadPendingDoc();
-    }
-  }, [pendingViewDoc, invoices, user, setPendingViewDoc]);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
   const [previewJournalEntry, setPreviewJournalEntry] = useState<JournalEntry | null>(null);
@@ -1059,6 +1029,37 @@ export const Invoices: React.FC = () => {
       showNotification('فشل تحميل بيانات الفاتورة: ' + error.message, 'error');
     }
   };
+
+  useEffect(() => {
+    if (pendingViewDoc && pendingViewDoc.type === 'invoice' && user) {
+      const loadPendingDoc = async () => {
+        try {
+          const existing = invoices.find(inv => inv.invoice_number === pendingViewDoc.idOrNumber || inv.id === pendingViewDoc.idOrNumber);
+          if (existing) {
+            openEditModal(existing);
+            setPendingViewDoc(null);
+            return;
+          }
+          const docs = await dbService.getDocsByFilter<Invoice>('invoices', user.company_id, [
+            { field: 'invoice_number', operator: '==', value: pendingViewDoc.idOrNumber }
+          ]);
+          if (docs && docs.length > 0) {
+            openEditModal(docs[0]);
+          } else {
+            const docById = await dbService.get<Invoice>('invoices', pendingViewDoc.idOrNumber);
+            if (docById) {
+              openEditModal(docById);
+            }
+          }
+          setPendingViewDoc(null);
+        } catch (err) {
+          console.error("Error loading pending document", err);
+          setPendingViewDoc(null);
+        }
+      };
+      loadPendingDoc();
+    }
+  }, [pendingViewDoc, invoices, user, setPendingViewDoc]);
 
   const handleNextInvoice = () => {
     if (!editingInvoice) return;

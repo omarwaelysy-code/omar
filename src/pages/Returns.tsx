@@ -52,36 +52,6 @@ export const Returns: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewReturn, setViewReturn] = useState<Return | null>(null);
 
-  useEffect(() => {
-    if (pendingViewDoc && pendingViewDoc.type === 'return' && user) {
-      const loadPendingDoc = async () => {
-        try {
-          const existing = returns.find(r => r.return_number === pendingViewDoc.idOrNumber || r.id === pendingViewDoc.idOrNumber);
-          if (existing) {
-            setViewReturn(existing);
-            setPendingViewDoc(null);
-            return;
-          }
-          const docs = await dbService.getDocsByFilter<any>('returns', user.company_id, [
-            { field: 'return_number', operator: '==', value: pendingViewDoc.idOrNumber }
-          ]);
-          if (docs && docs.length > 0) {
-            setViewReturn(docs[0]);
-          } else {
-            const docById = await dbService.get<any>('returns', pendingViewDoc.idOrNumber);
-            if (docById) {
-              setViewReturn(docById);
-            }
-          }
-          setPendingViewDoc(null);
-        } catch (err) {
-          console.error("Error loading pending document", err);
-          setPendingViewDoc(null);
-        }
-      };
-      loadPendingDoc();
-    }
-  }, [pendingViewDoc, returns, user, setPendingViewDoc]);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [returnToDelete, setReturnToDelete] = useState<string | null>(null);
   const returnRef = useRef<HTMLDivElement>(null);
@@ -682,6 +652,37 @@ export const Returns: React.FC = () => {
     setIsModalOpen(true);
     setIsFullScreen(false);
   };
+
+  useEffect(() => {
+    if (pendingViewDoc && pendingViewDoc.type === 'return' && user) {
+      const loadPendingDoc = async () => {
+        try {
+          const existing = returns.find(r => r.return_number === pendingViewDoc.idOrNumber || r.id === pendingViewDoc.idOrNumber);
+          if (existing) {
+            openModal(existing);
+            setPendingViewDoc(null);
+            return;
+          }
+          const docs = await dbService.getDocsByFilter<any>('returns', user.company_id, [
+            { field: 'return_number', operator: '==', value: pendingViewDoc.idOrNumber }
+          ]);
+          if (docs && docs.length > 0) {
+            openModal(docs[0]);
+          } else {
+            const docById = await dbService.get<any>('returns', pendingViewDoc.idOrNumber);
+            if (docById) {
+              openModal(docById);
+            }
+          }
+          setPendingViewDoc(null);
+        } catch (err) {
+          console.error("Error loading pending document", err);
+          setPendingViewDoc(null);
+        }
+      };
+      loadPendingDoc();
+    }
+  }, [pendingViewDoc, returns, user, setPendingViewDoc]);
 
   const handleViewReturn = (ret: Return) => {
     setViewReturn(ret);

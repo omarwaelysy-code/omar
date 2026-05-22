@@ -64,40 +64,6 @@ export const PaymentVouchers: React.FC = () => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [viewVoucher, setViewVoucher] = useState<any | null>(null);
 
-  useEffect(() => {
-    if (pendingViewDoc && pendingViewDoc.type === 'payment_voucher' && user) {
-      const loadPendingDoc = async () => {
-        try {
-          const existing = vouchers.find(v => 
-            v.voucher_number === pendingViewDoc.idOrNumber || 
-            v.internal_reference === pendingViewDoc.idOrNumber || 
-            v.id === pendingViewDoc.idOrNumber
-          );
-          if (existing) {
-            setViewVoucher(existing);
-            setPendingViewDoc(null);
-            return;
-          }
-          const docs = await dbService.getDocsByFilter<any>('payment_vouchers', user.company_id, [
-            { field: 'voucher_number', operator: '==', value: pendingViewDoc.idOrNumber }
-          ]);
-          if (docs && docs.length > 0) {
-            setViewVoucher(docs[0]);
-          } else {
-            const docById = await dbService.get<any>('payment_vouchers', pendingViewDoc.idOrNumber);
-            if (docById) {
-              setViewVoucher(docById);
-            }
-          }
-          setPendingViewDoc(null);
-        } catch (err) {
-          console.error("Error loading pending document", err);
-          setPendingViewDoc(null);
-        }
-      };
-      loadPendingDoc();
-    }
-  }, [pendingViewDoc, vouchers, user, setPendingViewDoc]);
   const voucherRef = React.useRef<HTMLDivElement>(null);
   const tableRef = React.useRef<HTMLDivElement>(null);
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
@@ -923,6 +889,41 @@ export const PaymentVouchers: React.FC = () => {
       showNotification('فشل تحميل بيانات السند', 'error');
     }
   };
+
+  useEffect(() => {
+    if (pendingViewDoc && pendingViewDoc.type === 'payment_voucher' && user) {
+      const loadPendingDoc = async () => {
+        try {
+          const existing = vouchers.find(v => 
+            v.voucher_number === pendingViewDoc.idOrNumber || 
+            v.internal_reference === pendingViewDoc.idOrNumber || 
+            v.id === pendingViewDoc.idOrNumber
+          );
+          if (existing) {
+            openEditModal(existing);
+            setPendingViewDoc(null);
+            return;
+          }
+          const docs = await dbService.getDocsByFilter<any>('payment_vouchers', user.company_id, [
+            { field: 'voucher_number', operator: '==', value: pendingViewDoc.idOrNumber }
+          ]);
+          if (docs && docs.length > 0) {
+            openEditModal(docs[0]);
+          } else {
+            const docById = await dbService.get<any>('payment_vouchers', pendingViewDoc.idOrNumber);
+            if (docById) {
+              openEditModal(docById);
+            }
+          }
+          setPendingViewDoc(null);
+        } catch (err) {
+          console.error("Error loading pending document", err);
+          setPendingViewDoc(null);
+        }
+      };
+      loadPendingDoc();
+    }
+  }, [pendingViewDoc, vouchers, user, setPendingViewDoc]);
 
   const sortedVouchers = [...vouchers].sort((a, b) => {
     const refA = a.internal_reference || a.voucher_number || '';

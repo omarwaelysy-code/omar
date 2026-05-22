@@ -34,36 +34,6 @@ export const PurchaseReturns: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewReturn, setViewReturn] = useState<any | null>(null);
 
-  useEffect(() => {
-    if (pendingViewDoc && pendingViewDoc.type === 'purchase_return' && user) {
-      const loadPendingDoc = async () => {
-        try {
-          const existing = purchaseReturns.find(r => r.return_number === pendingViewDoc.idOrNumber || r.id === pendingViewDoc.idOrNumber);
-          if (existing) {
-            setViewReturn(existing);
-            setPendingViewDoc(null);
-            return;
-          }
-          const docs = await dbService.getDocsByFilter<any>('purchase_returns', user.company_id, [
-            { field: 'return_number', operator: '==', value: pendingViewDoc.idOrNumber }
-          ]);
-          if (docs && docs.length > 0) {
-            setViewReturn(docs[0]);
-          } else {
-            const docById = await dbService.get<any>('purchase_returns', pendingViewDoc.idOrNumber);
-            if (docById) {
-              setViewReturn(docById);
-            }
-          }
-          setPendingViewDoc(null);
-        } catch (err) {
-          console.error("Error loading pending document", err);
-          setPendingViewDoc(null);
-        }
-      };
-      loadPendingDoc();
-    }
-  }, [pendingViewDoc, purchaseReturns, user, setPendingViewDoc]);
   const [editingReturn, setEditingReturn] = useState<any | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [returnToDelete, setReturnToDelete] = useState<string | null>(null);
@@ -698,6 +668,37 @@ export const PurchaseReturns: React.FC = () => {
       showNotification('فشل تحميل بيانات المرتجع', 'error');
     }
   };
+
+  useEffect(() => {
+    if (pendingViewDoc && pendingViewDoc.type === 'purchase_return' && user) {
+      const loadPendingDoc = async () => {
+        try {
+          const existing = purchaseReturns.find(r => r.return_number === pendingViewDoc.idOrNumber || r.id === pendingViewDoc.idOrNumber);
+          if (existing) {
+            handleEdit(existing);
+            setPendingViewDoc(null);
+            return;
+          }
+          const docs = await dbService.getDocsByFilter<any>('purchase_returns', user.company_id, [
+            { field: 'return_number', operator: '==', value: pendingViewDoc.idOrNumber }
+          ]);
+          if (docs && docs.length > 0) {
+            handleEdit(docs[0]);
+          } else {
+            const docById = await dbService.get<any>('purchase_returns', pendingViewDoc.idOrNumber);
+            if (docById) {
+              handleEdit(docById);
+            }
+          }
+          setPendingViewDoc(null);
+        } catch (err) {
+          console.error("Error loading pending document", err);
+          setPendingViewDoc(null);
+        }
+      };
+      loadPendingDoc();
+    }
+  }, [pendingViewDoc, purchaseReturns, user, setPendingViewDoc]);
 
   const handleDelete = (id: string) => {
     setReturnToDelete(id);

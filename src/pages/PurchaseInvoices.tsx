@@ -81,37 +81,6 @@ export const PurchaseInvoices: React.FC = () => {
   const [maxSeqGenerated, setMaxSeqGenerated] = useState<number>(0);
   const [viewInvoice, setViewInvoice] = useState<any | null>(null);
 
-  useEffect(() => {
-    if (pendingViewDoc && pendingViewDoc.type === 'purchase_invoice' && user) {
-      const loadPendingDoc = async () => {
-        try {
-          const existing = purchaseInvoices.find(inv => inv.invoice_number === pendingViewDoc.idOrNumber || inv.id === pendingViewDoc.idOrNumber);
-          if (existing) {
-            setViewInvoice(existing);
-            setPendingViewDoc(null);
-            return;
-          }
-          const docs = await dbService.getDocsByFilter<any>('purchase_invoices', user.company_id, [
-            { field: 'invoice_number', operator: '==', value: pendingViewDoc.idOrNumber }
-          ]);
-          if (docs && docs.length > 0) {
-            setViewInvoice(docs[0]);
-          } else {
-            const docById = await dbService.get<any>('purchase_invoices', pendingViewDoc.idOrNumber);
-            if (docById) {
-              setViewInvoice(docById);
-            }
-          }
-          setPendingViewDoc(null);
-        } catch (err) {
-          console.error("Error loading pending document", err);
-          setPendingViewDoc(null);
-        }
-      };
-      loadPendingDoc();
-    }
-  }, [pendingViewDoc, purchaseInvoices, user, setPendingViewDoc]);
-
   const [supplierFormData, setSupplierFormData] = useState({
     name: '',
     mobile: '',
@@ -1033,6 +1002,37 @@ export const PurchaseInvoices: React.FC = () => {
     }
     setIsModalOpen(true);
   };
+
+  useEffect(() => {
+    if (pendingViewDoc && pendingViewDoc.type === 'purchase_invoice' && user) {
+      const loadPendingDoc = async () => {
+        try {
+          const existing = purchaseInvoices.find(inv => inv.invoice_number === pendingViewDoc.idOrNumber || inv.id === pendingViewDoc.idOrNumber);
+          if (existing) {
+            openModal(existing);
+            setPendingViewDoc(null);
+            return;
+          }
+          const docs = await dbService.getDocsByFilter<any>('purchase_invoices', user.company_id, [
+            { field: 'invoice_number', operator: '==', value: pendingViewDoc.idOrNumber }
+          ]);
+          if (docs && docs.length > 0) {
+            openModal(docs[0]);
+          } else {
+            const docById = await dbService.get<any>('purchase_invoices', pendingViewDoc.idOrNumber);
+            if (docById) {
+              openModal(docById);
+            }
+          }
+          setPendingViewDoc(null);
+        } catch (err) {
+          console.error("Error loading pending document", err);
+          setPendingViewDoc(null);
+        }
+      };
+      loadPendingDoc();
+    }
+  }, [pendingViewDoc, purchaseInvoices, user, setPendingViewDoc]);
 
   const handleNextInvoice = () => {
     if (!editingInvoice) return;
