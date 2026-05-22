@@ -17,7 +17,44 @@ export const JournalEntries: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
-  const { pendingViewDoc, setPendingViewDoc } = useNavigation();
+  const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
+  const handleTransactionClick = (type: string | undefined, reference: string | undefined) => {
+    if (!reference || reference === '-' || reference === '') return;
+    
+    let normType = type;
+    if (!normType) {
+      if (reference.startsWith('INV-')) normType = 'invoice';
+      else if (reference.startsWith('PINV-')) normType = 'purchase_invoice';
+      else if (reference.startsWith('RCT-')) normType = 'receipt';
+      else if (reference.startsWith('PAY-')) normType = 'payment_voucher';
+      else if (reference.startsWith('RET-')) normType = 'return';
+      else if (reference.startsWith('PRET-')) normType = 'purchase_return';
+      else normType = 'manual';
+    }
+    
+    if (normType === 'invoice') {
+      setPendingViewDoc({ type: 'invoice', idOrNumber: reference });
+      setCurrentPage('invoices');
+    } else if (normType === 'purchase_invoice') {
+      setPendingViewDoc({ type: 'purchase_invoice', idOrNumber: reference });
+      setCurrentPage('purchase_invoices');
+    } else if (normType === 'receipt' || normType === 'receipt_voucher') {
+      setPendingViewDoc({ type: 'receipt', idOrNumber: reference });
+      setCurrentPage('receipts');
+    } else if (normType === 'payment_voucher') {
+      setPendingViewDoc({ type: 'payment_voucher', idOrNumber: reference });
+      setCurrentPage('payment_vouchers');
+    } else if (normType === 'return') {
+      setPendingViewDoc({ type: 'return', idOrNumber: reference });
+      setCurrentPage('returns');
+    } else if (normType === 'purchase_return') {
+      setPendingViewDoc({ type: 'purchase_return', idOrNumber: reference });
+      setCurrentPage('purchase_returns');
+    } else {
+      setSelectedEntry(null);
+      setPendingViewDoc({ type: 'manual', idOrNumber: reference });
+    }
+  };
   const reportRef = useRef<HTMLDivElement>(null);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -278,9 +315,18 @@ export const JournalEntries: React.FC = () => {
                   <td className="px-6 py-4 text-sm font-bold text-zinc-900">{formatDate(entry.date)}</td>
                   <td className="px-6 py-4 text-sm font-medium text-zinc-600 max-w-xs truncate">{entry.description}</td>
                   <td className="px-6 py-4">
-                    <span className="px-3 py-1 bg-zinc-100 text-zinc-600 rounded-lg text-xs font-bold">
-                      {entry.reference_number || '-'}
-                    </span>
+                    {entry.reference_number && entry.reference_number !== '-' ? (
+                      <span 
+                        onClick={() => handleTransactionClick(entry.reference_type, entry.reference_number)}
+                        className="px-3 py-1 bg-zinc-100 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 font-mono"
+                      >
+                        {entry.reference_number}
+                      </span>
+                    ) : (
+                      <span className="px-3 py-1 bg-zinc-100 text-zinc-400 rounded-lg text-xs font-bold font-mono">
+                        -
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{formatMoney(entry.total_debit)}</td>
                   <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{formatMoney(entry.total_credit)}</td>
@@ -349,7 +395,19 @@ export const JournalEntries: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="text-xl font-black text-zinc-900">{t('journal.details')}</h3>
-                    <p className="text-xs text-zinc-500 font-bold mt-0.5">{t('journal.column_reference')}: {selectedEntry.reference_number || '-'}</p>
+                    <p className="text-xs text-zinc-500 font-bold mt-0.5">
+                      {t('journal.column_reference')}:{' '}
+                      {selectedEntry.reference_number && selectedEntry.reference_number !== '-' ? (
+                        <span
+                          onClick={() => handleTransactionClick(selectedEntry.reference_type, selectedEntry.reference_number)}
+                          className="text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer font-black"
+                        >
+                          {selectedEntry.reference_number}
+                        </span>
+                      ) : (
+                        '-'
+                      )}
+                    </p>
                   </div>
                 </div>
                 <button 
