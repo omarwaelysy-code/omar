@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Supplier, Account, JournalEntry, JournalEntryItem } from '../types';
-import { Search, Plus, Trash2, X, Tag, Truck, Calendar, Save, Wallet, CreditCard, History, BookOpen, Phone, Mail, MapPin, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, User, ChevronDown } from 'lucide-react';
+import { Search, Plus, Trash2, X, Tag, Truck, Calendar, Save, Wallet, CreditCard, History, BookOpen, Phone, Mail, MapPin, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, User, ChevronDown, LayoutGrid, List } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
@@ -35,6 +35,7 @@ export const SupplierDiscounts: React.FC = () => {
   const [previewActivityLog, setPreviewActivityLog] = useState<Partial<ActivityLog> | null>(null);
   const [discountToDelete, setDiscountToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [view, setView] = useState<'table' | 'card'>('table');
   
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
@@ -448,7 +449,7 @@ export const SupplierDiscounts: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-zinc-50 flex items-center gap-4">
+        <div className="p-6 border-b border-zinc-50 flex items-center justify-between gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-3 text-zinc-400" size={18} />
             <input
@@ -459,132 +460,175 @@ export const SupplierDiscounts: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <div className="flex bg-zinc-100 p-1 rounded-2xl border border-zinc-200/50 shadow-inner w-fit">
+            <button
+              onClick={() => setView('table')}
+              className={`p-2 px-3 rounded-xl transition-all flex items-center gap-2 font-bold text-sm ${view === 'table' ? 'bg-white text-amber-600 shadow-sm border border-zinc-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+              title="عرض الجدول"
+            >
+              <List size={18} />
+              <span className="hidden md:inline">مسرد</span>
+            </button>
+            <button
+              onClick={() => setView('card')}
+              className={`p-2 px-3 rounded-xl transition-all flex items-center gap-2 font-bold text-sm ${view === 'card' ? 'bg-white text-amber-600 shadow-sm border border-zinc-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+              title="عرض الكروت"
+            >
+              <LayoutGrid size={18} />
+              <span className="hidden md:inline">بطاقات</span>
+            </button>
+          </div>
         </div>
 
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-right">
-            <thead>
-              <tr className="bg-[rgba(244,244,245,0.5)] text-zinc-500 text-xs uppercase tracking-wider">
-                <th className="px-6 py-4 font-bold cursor-pointer hover:text-amber-600 transition-colors group" onClick={() => handleSort('supplier_name')}>
-                  <div className="flex items-center gap-1">
-                    المورد
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      {sortBy === 'supplier_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                    </span>
-                  </div>
-                </th>
-                <th className="px-6 py-4 font-bold cursor-pointer hover:text-amber-600 transition-colors group" onClick={() => handleSort('date')}>
-                  <div className="flex items-center gap-1">
-                    التاريخ
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                    </span>
-                  </div>
-                </th>
-                <th className="px-6 py-4 font-bold cursor-pointer hover:text-amber-600 transition-colors group" onClick={() => handleSort('amount')}>
-                  <div className="flex items-center gap-1">
-                    المبلغ
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      {sortBy === 'amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                    </span>
-                  </div>
-                </th>
-                <th className="px-6 py-4 font-bold">ملاحظات</th>
-                <th className="px-6 py-4 font-bold text-left">الإجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-50">
-              {filteredDiscounts.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 italic">لا توجد خصومات حالياً</td>
-                </tr>
-              ) : filteredDiscounts.map((discount) => (
-                <tr key={discount.id} className="hover:bg-[rgba(244,244,245,0.5)] transition-colors group">
-                  <td className="px-6 py-4 font-bold text-zinc-900">{discount.supplier_name}</td>
-                  <td className="px-6 py-4 text-zinc-500">{formatDate(discount.date)}</td>
-                  <td className="px-6 py-4 font-bold text-amber-600">{formatNumber(discount.amount)} ج.م</td>
-                  <td className="px-6 py-4 text-zinc-500 text-sm">{discount.notes || '-'}</td>
-                  <td className="px-6 py-4 text-left">
-                    <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={() => openEditModal(discount)}
-                        className="p-2 text-zinc-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"
-                        title="تعديل"
-                      >
-                        <Tag size={18} />
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setActivityLogDocumentId(discount.id);
-                          setIsActivityLogOpen(true);
-                        }}
-                        className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all"
-                        title="سجل النشاط"
-                      >
-                        <History size={18} />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(discount.id)}
-                        className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+        {view === 'table' ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-right">
+              <thead>
+                <tr className="bg-[rgba(244,244,245,0.5)] text-zinc-500 text-xs uppercase tracking-wider">
+                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-amber-600 transition-colors group" onClick={() => handleSort('supplier_name')}>
+                    <div className="flex items-center gap-1">
+                      المورد
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'supplier_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
                     </div>
-                  </td>
+                  </th>
+                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-amber-600 transition-colors group" onClick={() => handleSort('date')}>
+                    <div className="flex items-center gap-1">
+                      التاريخ
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-amber-600 transition-colors group" onClick={() => handleSort('amount')}>
+                    <div className="flex items-center gap-1">
+                      المبلغ
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 font-bold">ملاحظات</th>
+                  <th className="px-6 py-4 font-bold text-left">الإجراءات</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
-        </div>
-
-        {/* Mobile Card View */}
-        <div className="md:hidden divide-y divide-zinc-50">
-          {filteredDiscounts.length === 0 ? (
-            <div className="px-6 py-12 text-center text-zinc-400 italic">لا توجد خصومات حالياً</div>
-          ) : filteredDiscounts.map((discount) => (
-            <div key={discount.id} className="p-4 space-y-3">
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="font-bold text-zinc-900 text-lg">{discount.supplier_name}</div>
-                  <div className="text-zinc-500 text-sm flex items-center gap-1">
-                    <Calendar size={14} />
-                    {formatDate(discount.date)}
-                  </div>
+              </thead>
+              <tbody className="divide-y divide-zinc-50">
+                {filteredDiscounts.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 italic">لا توجد خصومات حالياً</td>
+                  </tr>
+                ) : filteredDiscounts.map((discount) => (
+                  <tr key={discount.id} className="hover:bg-[rgba(244,244,245,0.5)] transition-colors group">
+                    <td className="px-6 py-4 font-bold text-zinc-900">{discount.supplier_name}</td>
+                    <td className="px-6 py-4 text-zinc-500">{formatDate(discount.date)}</td>
+                    <td className="px-6 py-4 font-bold text-amber-600">{formatNumber(discount.amount)} ج.م</td>
+                    <td className="px-6 py-4 text-zinc-500 text-sm">{discount.notes || '-'}</td>
+                    <td className="px-6 py-4 text-left">
+                      <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={() => openEditModal(discount)}
+                          className="p-2 text-zinc-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"
+                          title="تعديل"
+                        >
+                          <Tag size={18} />
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setActivityLogDocumentId(discount.id);
+                            setIsActivityLogOpen(true);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all"
+                          title="سجل النشاط"
+                        >
+                          <History size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(discount.id)}
+                          className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
+          </div>
+        ) : (
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredDiscounts.map((discount) => (
+              <div 
+                key={discount.id} 
+                className="p-6 bg-zinc-50/50 rounded-3xl border border-zinc-100 hover:border-amber-200 hover:shadow-xl hover:shadow-amber-500/5 transition-all group relative overflow-hidden cursor-pointer flex flex-col justify-between"
+                onClick={() => openEditModal(discount)}
+              >
+                <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openEditModal(discount);
+                    }}
+                    className="p-2 bg-white text-amber-500 rounded-xl border border-amber-50 shadow-sm hover:bg-amber-50 transition-all font-bold"
+                  >
+                    <Tag size={16} />
+                  </button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActivityLogDocumentId(discount.id);
+                      setIsActivityLogOpen(true);
+                    }}
+                    className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
+                  >
+                    <History size={16} />
+                  </button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(discount.id);
+                    }}
+                    className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
-                <div className="text-left">
-                  <div className="font-bold text-amber-600 text-lg">{formatNumber(discount.amount)} ج.م</div>
-                  <div className="flex items-center justify-end gap-2 mt-2">
-                    <button 
-                      onClick={() => openEditModal(discount)}
-                      className="p-2 text-zinc-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"
-                      title="تعديل"
-                    >
-                      <Tag size={18} />
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setActivityLogDocumentId(discount.id);
-                        setIsActivityLogOpen(true);
-                      }}
-                      className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all"
-                      title="سجل النشاط"
-                    >
-                      <History size={18} />
-                    </button>
-                    <button 
-                      onClick={() => handleDelete(discount.id)}
-                      className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                      title="حذف"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                
+                <div className="flex flex-col h-full justify-between">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between border-b border-zinc-100/60 pb-2">
+                      <span className="text-xs text-zinc-400 font-semibold">{formatDate(discount.date)}</span>
+                      <span className="text-xs font-bold text-zinc-900 bg-zinc-100 rounded-lg px-2 py-1">{discount.number || '-'}</span>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 justify-between">
+                        <span className="text-xs text-zinc-400">المورد:</span>
+                        <span className="text-xs font-semibold text-zinc-700">{discount.supplier_name}</span>
+                      </div>
+                    </div>
+
+                    {discount.notes && (
+                      <p className="text-xs text-zinc-500 font-medium max-w-xs truncate border-t border-zinc-100/60 pt-2">{discount.notes}</p>
+                    )}
+                  </div>
+                  
+                  <div className="mt-4 pt-4 border-t border-zinc-100 flex items-center justify-between font-bold">
+                    <span className="text-zinc-500 text-xs">مبلغ الخصم</span>
+                    <span className="font-black text-amber-600 text-lg">
+                      {formatNumber(discount.amount)} ج.م
+                    </span>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+            {filteredDiscounts.length === 0 && (
+              <div className="col-span-full py-12 text-center text-zinc-400 italic">لا توجد خصومات حالياً</div>
+            )}
+          </div>
+        )}
       </div>
 
       {isModalOpen && (

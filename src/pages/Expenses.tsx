@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Plus, Trash2, X, Wallet, History, ChevronRight, ChevronLeft, 
-  Layers, Hash, Box, AlertCircle
+  Layers, Hash, Box, AlertCircle, LayoutGrid, List, FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
@@ -20,6 +20,7 @@ export const Expenses: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [view, setView] = useState<'card' | 'table'>('card');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ExpenseCategory | null>(null);
@@ -147,7 +148,7 @@ export const Expenses: React.FC = () => {
 
             {/* List Control */}
             <div className="flex-1 bg-white rounded-[3.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden flex flex-col transition-all duration-500">
-              <div className="p-8 border-b border-slate-50 flex items-center gap-4 bg-slate-50/20">
+              <div className="p-8 border-b border-slate-50 flex items-center justify-between gap-4 bg-slate-50/20">
                 <div className="relative flex-1 group">
                   <Search className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-4 text-slate-300 group-focus-within:text-rose-500 transition-colors pointer-events-none`} size={24} />
                   <input
@@ -158,59 +159,140 @@ export const Expenses: React.FC = () => {
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
+                <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200/50 shadow-inner w-fit">
+                  <button
+                    onClick={() => setView('table')}
+                    className={`p-2 px-3 rounded-xl transition-all flex items-center gap-2 font-bold text-sm ${view === 'table' ? 'bg-white text-rose-600 shadow-sm border border-slate-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+                    title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
+                  >
+                    <List size={18} />
+                    <span className="hidden md:inline">{language === 'ar' ? 'مسرد' : 'Table'}</span>
+                  </button>
+                  <button
+                    onClick={() => setView('card')}
+                    className={`p-2 px-3 rounded-xl transition-all flex items-center gap-2 font-bold text-sm ${view === 'card' ? 'bg-white text-rose-600 shadow-sm border border-slate-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+                    title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
+                  >
+                    <LayoutGrid size={18} />
+                    <span className="hidden md:inline">{language === 'ar' ? 'بطاقات' : 'Cards'}</span>
+                  </button>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto custom-scrollbar p-10">
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-                  {loading ? (
-                    <div className="col-span-full py-20 text-center">
-                      <div className="w-12 h-12 border-4 border-rose-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    </div>
-                  ) : filteredCategories.map((category) => (
-                    <motion.div
-                      layout
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      whileHover={{ y: -5 }}
-                      key={category.id}
-                      onClick={() => openModal(category)}
-                      className="p-8 space-y-6 rounded-[3rem] border bg-white border-slate-100 hover:border-rose-200 hover:shadow-2xl transition-all cursor-pointer group relative overflow-hidden"
-                    >
-                      <div className="flex items-start justify-between">
-                         <div className="w-20 h-20 bg-slate-50 rounded-[2rem] shadow-inner border border-slate-100 flex items-center justify-center text-slate-300 group-hover:text-rose-600 transition-all duration-500">
-                           <Wallet size={32} />
-                         </div>
-                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                            <button onClick={async (e) => {
-                              e.stopPropagation();
-                              if (window.confirm(t('common.confirm_delete'))) {
-                                await dbService.delete('expense_categories', category.id);
-                                toast.success(t('common.deleted_successfully'));
-                              }
-                            }} className="p-3 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"><Trash2 size={20} /></button>
-                         </div>
-                      </div>
+                {loading ? (
+                  <div className="py-20 text-center">
+                    <div className="w-12 h-12 border-4 border-rose-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                  </div>
+                ) : view === 'card' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                    {filteredCategories.map((category) => (
+                      <motion.div
+                        layout
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        whileHover={{ y: -5 }}
+                        key={category.id}
+                        onClick={() => openModal(category)}
+                        className="p-8 space-y-6 rounded-[3rem] border bg-white border-slate-100 hover:border-rose-200 hover:shadow-2xl transition-all cursor-pointer group relative overflow-hidden"
+                      >
+                        <div className="flex items-start justify-between">
+                           <div className="w-20 h-20 bg-slate-50 rounded-[2rem] shadow-inner border border-slate-100 flex items-center justify-center text-slate-300 group-hover:text-rose-600 transition-all duration-500">
+                             <Wallet size={32} />
+                           </div>
+                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                              <button onClick={async (e) => {
+                                e.stopPropagation();
+                                if (window.confirm(t('common.confirm_delete'))) {
+                                  await dbService.delete('expense_categories', category.id);
+                                  toast.success(t('common.deleted_successfully'));
+                                }
+                              }} className="p-3 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"><Trash2 size={20} /></button>
+                           </div>
+                        </div>
 
-                      <div className="space-y-3">
-                         <h3 className="text-2xl font-black text-slate-900 italic serif tracking-tighter group-hover:text-rose-700 transition-colors uppercase line-clamp-1">{category.name}</h3>
-                         <span className="inline-block px-3 py-1 bg-slate-100 text-slate-400 rounded-lg text-[10px] font-black uppercase tracking-widest border border-slate-200">{category.code}</span>
-                         <p className="text-sm text-slate-500 font-medium line-clamp-2 leading-relaxed h-[40px]">
-                            {category.description || 'لا يوجد وصف متاح لهذا البند...'}
-                         </p>
-                      </div>
+                        <div className="space-y-3">
+                           <h3 className="text-2xl font-black text-slate-900 italic serif tracking-tighter group-hover:text-rose-700 transition-colors uppercase line-clamp-1">{category.name}</h3>
+                           <span className="inline-block px-3 py-1 bg-slate-100 text-slate-400 rounded-lg text-[10px] font-black uppercase tracking-widest border border-slate-200">{category.code}</span>
+                           <p className="text-sm text-slate-500 font-medium line-clamp-2 leading-relaxed h-[40px]">
+                              {category.description || 'لا يوجد وصف متاح لهذا البند...'}
+                           </p>
+                        </div>
 
-                      <div className="pt-6 border-t border-slate-50 flex items-center justify-between">
-                         <div className="space-y-1">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{language === 'ar' ? 'الحساب المطبق' : 'Linked Account'}</p>
-                            <p className="text-xs font-black text-slate-600 uppercase tracking-tighter truncate max-w-[150px]">{category.account_name}</p>
-                         </div>
-                         <div className="p-3 bg-slate-50 rounded-2xl text-slate-300 group-hover:bg-rose-600 group-hover:text-white transition-all">
-                            {dir === 'rtl' ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}
-                         </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
+                        <div className="pt-6 border-t border-slate-50 flex items-center justify-between">
+                           <div className="space-y-1">
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{language === 'ar' ? 'الحساب المطبق' : 'Linked Account'}</p>
+                              <p className="text-xs font-black text-slate-600 uppercase tracking-tighter truncate max-w-[150px]">{category.account_name}</p>
+                           </div>
+                           <div className="p-3 bg-slate-50 rounded-2xl text-slate-300 group-hover:bg-rose-600 group-hover:text-white transition-all">
+                              {dir === 'rtl' ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}
+                           </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                    {filteredCategories.length === 0 && (
+                      <div className="col-span-full py-12 text-center text-slate-400 font-bold">{language === 'ar' ? 'لا توجد بنود مصاريف حالياً' : 'No expenses found.'}</div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-3xl border border-slate-150">
+                    <table className="w-full text-right border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-100">
+                          <th className="px-6 py-4">{language === 'ar' ? 'كود البند' : 'Code'}</th>
+                          <th className="px-6 py-4">{language === 'ar' ? 'اسم البند' : 'Name'}</th>
+                          <th className="px-6 py-4">{language === 'ar' ? 'الحساب المطبق' : 'Linked Account'}</th>
+                          <th className="px-6 py-4">{language === 'ar' ? 'الوصف' : 'Description'}</th>
+                          <th className="px-6 py-4 text-left">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {filteredCategories.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">{language === 'ar' ? 'لا توجد بنود مصاريف حالياً' : 'No expenses found.'}</td>
+                          </tr>
+                        ) : filteredCategories.map((category) => (
+                          <tr 
+                            key={category.id} 
+                            className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
+                            onClick={() => openModal(category)}
+                          >
+                            <td className="px-6 py-4">
+                              <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded text-slate-600 font-bold border border-slate-200">{category.code}</span>
+                            </td>
+                            <td className="px-6 py-4 font-bold text-slate-900">{category.name}</td>
+                            <td className="px-6 py-4 text-slate-600 font-semibold">{category.account_name}</td>
+                            <td className="px-6 py-4 text-slate-400 max-w-xs truncate">{category.description || '-'}</td>
+                            <td className="px-6 py-4 text-left" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button 
+                                  onClick={() => openModal(category)}
+                                  className="p-2 text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
+                                  title={language === 'ar' ? 'تعديل' : 'Edit'}
+                                >
+                                  <FileText size={18} />
+                                </button>
+                                <button 
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (window.confirm(t('common.confirm_delete'))) {
+                                      await dbService.delete('expense_categories', category.id);
+                                      toast.success(t('common.deleted_successfully'));
+                                    }
+                                  }}
+                                  className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                                  title={language === 'ar' ? 'حذف' : 'Delete'}
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>

@@ -2,14 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { AccountType } from '../types';
-import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, PieChart } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, PieChart, LayoutGrid, List } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { parseAccountType, parseAccountTypesBulk } from '../services/geminiService';
+import { useViewPreference } from '../hooks/useViewPreference';
 
 export const AccountTypes: React.FC = () => {
   const { user } = useAuth();
   const { showNotification } = useNotification();
+  const [view, setView] = useViewPreference('account_types', 'card');
   const [types, setTypes] = useState<AccountType[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -194,7 +196,7 @@ export const AccountTypes: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-3xl border border-zinc-100 shadow-sm flex items-center gap-4">
+      <div className="bg-white p-4 rounded-3xl border border-zinc-100 shadow-sm flex items-center justify-between gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={20} />
           <input 
@@ -205,12 +207,108 @@ export const AccountTypes: React.FC = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+
+        <div className="flex bg-zinc-100 p-1.5 rounded-2xl gap-1 shrink-0">
+          <button 
+            onClick={() => setView('card')} 
+            className={`p-2 rounded-xl transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-700'}`}
+            title="عرض كروت"
+          >
+            <LayoutGrid size={18} />
+          </button>
+          <button 
+            onClick={() => setView('table')} 
+            className={`p-2 rounded-xl transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-700'}`}
+            title="عرض جدول"
+          >
+            <List size={18} />
+          </button>
+        </div>
       </div>
 
       <div className="space-y-4">
         {loading ? (
           [1,2,3].map(i => <div key={i} className="h-20 bg-zinc-100 animate-pulse rounded-2xl" />)
-        ) : filteredTypes.map(type => (
+        ) : view === 'table' ? (
+          <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm" dir="rtl">
+            <table className="w-full text-right border-collapse">
+              <thead>
+                <tr className="bg-zinc-50 border-b border-zinc-200">
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700">الكود</th>
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700">الاسم</th>
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700">نوع القائمة</th>
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700">التصنيف الرئيسي</th>
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-left">الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100 font-medium text-zinc-700">
+                {filteredTypes.map((type) => (
+                  <tr 
+                    key={type.id}
+                    onClick={() => openModal(type)}
+                    className="hover:bg-zinc-50/80 transition-colors group cursor-pointer"
+                  >
+                    <td className="px-6 py-4 font-mono font-bold text-emerald-600 text-sm">
+                      {type.code}
+                    </td>
+                    <td className="px-6 py-4 font-bold text-zinc-900">
+                      {type.name}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                        type.statement_type === 'balance_sheet' ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50'
+                      }`}>
+                        {type.statement_type === 'balance_sheet' ? 'الميزانية' : 'قائمة الدخل'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-zinc-500">
+                      {type.classification === 'asset' ? 'أصل' : 
+                       type.classification === 'liability' ? 'التزام' :
+                       type.classification === 'equity' ? 'حقوق ملكية' :
+                       type.classification === 'liability_equity' ? 'التزام/حقوق ملكية' :
+                       type.classification === 'revenue' ? 'إيراد' :
+                       type.classification === 'cost' ? 'تكلفة' : 'مصروف'}
+                    </td>
+                    <td className="px-6 py-4 text-left">
+                      <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActivityLogDocumentId(type.id);
+                            setIsActivityLogOpen(true);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
+                          title="سجل النشاط"
+                        >
+                          <History size={16} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openModal(type);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(type.id);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          filteredTypes.map(type => (
           <div key={type.id} className="group bg-white p-4 rounded-2xl border border-zinc-100 shadow-sm hover:shadow-md hover:border-emerald-100 transition-all duration-300 flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold shadow-lg shadow-emerald-500/20">
@@ -256,8 +354,9 @@ export const AccountTypes: React.FC = () => {
               </button>
             </div>
           </div>
-        ))}
-      </div>
+        ))
+      )}
+    </div>
 
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">

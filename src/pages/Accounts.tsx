@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Account, AccountType } from '../types';
-import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, BookOpen, User, Layers, AlertCircle } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, BookOpen, User, Layers, AlertCircle, LayoutGrid, List } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
@@ -13,11 +13,13 @@ import { ExportButtons } from '../components/ExportButtons';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { useRef } from 'react';
+import { useViewPreference } from '../hooks/useViewPreference';
 
 export const Accounts: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
+  const [view, setView] = useViewPreference('accounts', 'card');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [types, setTypes] = useState<AccountType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -241,8 +243,8 @@ export const Accounts: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-4 bg-slate-50/30">
-        <div className="relative flex-1 group">
+      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/30">
+        <div className="relative flex-1 group w-full">
           <Search className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
           <input 
             type="text" 
@@ -252,12 +254,97 @@ export const Accounts: React.FC = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+
+        <div className="flex bg-zinc-100 p-1.5 rounded-2xl gap-1 shrink-0">
+          <button 
+            type="button"
+            onClick={() => setView('card')} 
+            className={`p-2 rounded-xl transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-700'}`}
+            title="عرض كروت"
+          >
+            <LayoutGrid size={18} />
+          </button>
+          <button 
+            type="button"
+            onClick={() => setView('table')} 
+            className={`p-2 rounded-xl transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-700'}`}
+            title="عرض جدول"
+          >
+            <List size={18} />
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {loading ? (
-          [1,2,3,4,5,6].map(i => <div key={i} className="h-24 bg-slate-100 animate-pulse rounded-3xl border border-slate-200" />)
-        ) : filteredAccounts.map(account => (
+      {view === 'table' && !loading ? (
+        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm" dir={dir}>
+          <table ref={tableRef} className="w-full text-right border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className={`px-6 py-4 text-sm font-bold text-slate-700 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.column_code')}</th>
+                <th className={`px-6 py-4 text-sm font-bold text-slate-700 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.column_name')}</th>
+                <th className={`px-6 py-4 text-sm font-bold text-slate-700 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.column_type')}</th>
+                <th className="px-6 py-4 text-sm font-bold text-slate-700 text-left no-pdf">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+              {filteredAccounts.map((account) => (
+                <tr 
+                  key={account.id}
+                  onClick={() => openModal(account)}
+                  className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
+                >
+                  <td className="px-6 py-4 font-mono font-bold text-emerald-600 text-sm">
+                    {account.code}
+                  </td>
+                  <td className="px-6 py-4 font-bold text-slate-900">
+                    {account.name}
+                  </td>
+                  <td className="px-6 py-4 text-slate-500">
+                    {account.type_name}
+                  </td>
+                  <td className="px-6 py-4 text-left no-pdf">
+                    <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActivityLogDocumentId(account.id);
+                          setIsActivityLogOpen(true);
+                        }}
+                        className="p-2 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                        title={language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
+                      >
+                        <History size={16} />
+                      </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openModal(account);
+                        }}
+                        className="p-2 text-slate-300 hover:text-sky-600 hover:bg-sky-50 rounded-xl transition-all"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(account.id);
+                        }}
+                        className="p-2 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {loading ? (
+            [1,2,3,4,5,6].map(i => <div key={i} className="h-24 bg-slate-100 animate-pulse rounded-3xl border border-slate-200" />)
+          ) : filteredAccounts.map(account => (
           <div key={account.id} className="group bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 hover:border-emerald-200 transition-all duration-300 flex flex-col justify-between gap-4" dir={dir}>
             <div className="flex items-start justify-between gap-4">
                <div className={`flex items-center gap-3 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse text-left'}`}>
@@ -300,8 +387,10 @@ export const Accounts: React.FC = () => {
                <div className="w-2 h-2 rounded-full bg-slate-200 group-hover:bg-emerald-500 transition-all duration-500 group-hover:scale-125" />
             </div>
           </div>
-        ))}
-      </div>
+        ))
+      }
+    </div>
+  )}
 
       <AnimatePresence>
         {isModalOpen && (

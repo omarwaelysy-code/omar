@@ -2,16 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Edit2, Trash2, Settings, List, CheckSquare, Type, Hash, Calendar, Layers, Search, Info, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Settings, List, CheckSquare, Type, Hash, Calendar, Layers, Search, Info, X, LayoutGrid } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
+import { useViewPreference } from '../hooks/useViewPreference';
 
 import { OperationField, OperationCategory } from '../types';
 import { FIELD_TYPES, FIELD_CATEGORIES } from '../lib/field-types';
 
 export function OperationFields() {
-  const { t } = useLanguage();
+  const { t, dir, language } = useLanguage();
   const { user } = useAuth();
+  const [view, setView] = useViewPreference('operation_fields', 'table');
   const [fields, setFields] = useState<OperationField[]>([]);
   const [categories, setCategories] = useState<OperationCategory[]>([]);
   const [fieldMappings, setFieldMappings] = useState<any[]>([]);
@@ -150,43 +152,184 @@ export function OperationFields() {
             exit={{ opacity: 0, y: -15 }}
             className="flex-1 flex flex-col space-y-8 overflow-hidden"
           >
-            <div className="flex items-center justify-between mb-8">
+            <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 mb-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`} dir={dir}>
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">تعريف حقول العمليات</h1>
                 <p className="text-slate-500 font-medium">إدارة الحقول الديناميكية للنظام المرن</p>
               </div>
-              <button
-                onClick={() => {
-                  setEditingField(null);
-                  setFormData({
-                    code: '',
-                    name: '',
-                    label: '',
-                    description: '',
-                    type: 'text',
-                    category_id: null,
-                    category_ids: [],
-                    sort_order: 0,
-                    is_required: false,
-                    options: '',
-                    unit: '',
-                    default_value: ''
-                  });
-                  setIsModalOpen(true);
-                }}
-                className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
-              >
-                <Plus size={20} />
-                <span className="font-bold">إضافة تعريف حقل</span>
-              </button>
+              <div className="flex items-center gap-4">
+                <div className="flex bg-zinc-100 p-1.5 rounded-2xl gap-1">
+                  <button 
+                    onClick={() => setView('card')} 
+                    className={`p-2 rounded-xl transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-700'}`}
+                    title={language === 'ar' ? 'عرض كروت' : 'Cards View'}
+                  >
+                    <LayoutGrid size={18} />
+                  </button>
+                  <button 
+                    onClick={() => setView('table')} 
+                    className={`p-2 rounded-xl transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-700'}`}
+                    title={language === 'ar' ? 'عرض جدول' : 'Table View'}
+                  >
+                    <List size={18} />
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setEditingField(null);
+                    setFormData({
+                      code: '',
+                      name: '',
+                      label: '',
+                      description: '',
+                      type: 'text',
+                      category_id: null,
+                      category_ids: [],
+                      sort_order: 0,
+                      is_required: false,
+                      options: '',
+                      unit: '',
+                      default_value: ''
+                    });
+                    setIsModalOpen(true);
+                  }}
+                  className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 animate-none"
+                >
+                  <Plus size={20} />
+                  <span className="font-bold">إضافة تعريف حقل</span>
+                </button>
+              </div>
             </div>
 
             {loading ? (
               <div className="flex justify-center py-20">
                 <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
               </div>
+            ) : view === 'card' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pr-1 text-right" dir="rtl">
+                {fields.sort((a,b) => (a.sort_order || 0) - (b.sort_order || 0)).map((field) => (
+                  <motion.div
+                    key={field.id}
+                    layout
+                    onClick={() => {
+                      setEditingField(field);
+                      const linkedCatIds = fieldMappings
+                        .filter(m => m.field_id === field.id)
+                        .map(m => m.category_id);
+                      
+                      setFormData({
+                        code: field.code || '',
+                        name: field.name,
+                        label: field.label,
+                        description: field.description || '',
+                        type: field.type,
+                        category_id: field.category_id,
+                        category_ids: linkedCatIds,
+                        sort_order: field.sort_order || 0,
+                        is_required: field.is_required || false,
+                        options: Array.isArray(field.options) ? field.options.join(', ') : '',
+                        unit: field.unit || '',
+                        default_value: field.default_value || ''
+                      });
+                      setIsModalOpen(true);
+                    }}
+                    className="bg-white border border-slate-200 rounded-3xl p-6 hover:shadow-xl hover:shadow-slate-200/50 transition-all group cursor-pointer relative"
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600">
+                        {getFieldIcon(field.type)}
+                      </div>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingField(field);
+                            const linkedCatIds = fieldMappings
+                              .filter(m => m.field_id === field.id)
+                              .map(m => m.category_id);
+                            
+                            setFormData({
+                              code: field.code || '',
+                              name: field.name,
+                              label: field.label,
+                              description: field.description || '',
+                              type: field.type,
+                              category_id: field.category_id,
+                              category_ids: linkedCatIds,
+                              sort_order: field.sort_order || 0,
+                              is_required: field.is_required || false,
+                              options: Array.isArray(field.options) ? field.options.join(', ') : '',
+                              unit: field.unit || '',
+                              default_value: field.default_value || ''
+                            });
+                            setIsModalOpen(true);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (window.confirm(t('common.confirm_delete'))) {
+                              await dbService.delete('operation_fields', field.id);
+                              // Clean up mapping links
+                              const mappings = fieldMappings.filter(m => m.field_id === field.id);
+                              for (const mapping of mappings) {
+                                await dbService.delete('field_operation_categories', mapping.id);
+                              }
+                              toast.success(t('common.deleted_successfully'));
+                              fetchData();
+                            }
+                          }}
+                          className="p-2 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-[10px] font-mono text-emerald-600 font-bold mb-1 block">
+                        {field.code || '-'} ({field.name})
+                      </span>
+                      <h3 className="font-bold text-lg text-slate-900 mb-1">{field.label}</h3>
+                      {field.description && (
+                        <p className="text-slate-500 text-sm mb-4 line-clamp-2">{field.description}</p>
+                      )}
+
+                      <div className="space-y-2 pt-4 border-t border-slate-100 text-xs text-slate-500">
+                        <div className="flex items-center justify-between">
+                          <span>النوع</span>
+                          <span className="font-bold text-slate-800">{getFieldLabel(field.type)}</span>
+                        </div>
+                        {field.unit && (
+                          <div className="flex items-center justify-between">
+                            <span>الوحدة</span>
+                            <span className="font-bold text-slate-800">{field.unit}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between">
+                          <span>مطلوب</span>
+                          <span className={`px-2 py-0.5 rounded-full font-bold ${field.is_required ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                            {field.is_required ? 'إجباري' : 'اختياري'}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-slate-50">
+                          {getFieldCategories(field.id).map(cat => (
+                            <span key={cat.id} className="text-[9px] bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded font-bold border border-sky-100">
+                              {cat.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
             ) : (
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-y-auto pr-1 text-right shadow-sm" dir="rtl">
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-y-auto pr-1 text-right shadow-sm" dir="rtl" style={{ maxHeight: 'calc(100vh - 250px)' }}>
                 <table className="w-full">
                   <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-[5]">
                     <tr>

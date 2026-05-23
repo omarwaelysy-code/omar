@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Plus, Trash2, X, History, ChevronRight, ChevronLeft, 
-  Wallet, Layers, MapPin, Camera, FileUp, Smartphone, Globe, User, Calendar, AlertCircle
+  Wallet, Layers, MapPin, Camera, FileUp, Smartphone, Globe, User, Calendar, AlertCircle,
+  LayoutGrid, List
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import SignatureCanvas from 'react-signature-canvas';
@@ -16,11 +17,13 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
+import { useViewPreference } from '../hooks/useViewPreference';
 
 export const Operations: React.FC = () => {
   const { t, dir, language } = useLanguage();
   const { user } = useAuth();
   
+  const [view, setView] = useViewPreference('operations', 'card');
   const [operations, setOperations] = useState<Operation[]>([]);
   const [categories, setCategories] = useState<OperationCategory[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -354,8 +357,8 @@ export const Operations: React.FC = () => {
 
             {/* List Table View - Clean & Spacious */}
             <div className="flex-1 bg-white rounded-[3.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden flex flex-col transition-all duration-500">
-              <div className="p-8 border-b border-slate-50 flex items-center gap-4 bg-slate-50/20">
-                <div className="relative flex-1 group">
+              <div className="p-8 border-b border-slate-50 flex flex-col sm:flex-row items-center gap-4 bg-slate-50/20">
+                <div className="relative flex-1 group w-full">
                   <Search className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-4 text-slate-300 group-focus-within:text-indigo-500 transition-colors pointer-events-none`} size={24} />
                   <input
                     type="text"
@@ -364,6 +367,23 @@ export const Operations: React.FC = () => {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
+                </div>
+
+                <div className="flex bg-zinc-100 p-1.5 rounded-2xl gap-1 shrink-0">
+                  <button 
+                    onClick={() => setView('card')} 
+                    className={`p-2.5 rounded-xl transition-all ${view === 'card' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-400 hover:text-slate-700'}`}
+                    title={language === 'ar' ? 'عرض كروت' : 'Cards View'}
+                  >
+                    <LayoutGrid size={20} />
+                  </button>
+                  <button 
+                    onClick={() => setView('table')} 
+                    className={`p-2.5 rounded-xl transition-all ${view === 'table' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-400 hover:text-slate-700'}`}
+                    title={language === 'ar' ? 'عرض جدول' : 'Table View'}
+                  >
+                    <List size={20} />
+                  </button>
                 </div>
               </div>
 
@@ -377,6 +397,81 @@ export const Operations: React.FC = () => {
                   <div className="flex flex-col items-center justify-center h-full text-slate-300 gap-6">
                     <Layers size={64} className="opacity-20" />
                     <p className="font-black uppercase tracking-widest text-sm">No operations found</p>
+                  </div>
+                ) : view === 'table' ? (
+                  <div className="overflow-x-auto text-right p-6" dir="rtl">
+                    <table className="w-full text-right border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200">
+                          <th className="px-6 py-4 text-sm font-bold text-slate-500">{t('operations.number') || 'كود العملية'}</th>
+                          <th className="px-6 py-4 text-sm font-bold text-slate-500">{t('operations.customer') || 'العميل'}</th>
+                          <th className="px-6 py-4 text-sm font-bold text-slate-500">{t('operations.category') || 'التصنيف'}</th>
+                          <th className="px-6 py-4 text-sm font-bold text-slate-500">{t('operations.status') || 'الحالة'}</th>
+                          <th className="px-6 py-4 text-sm font-bold text-slate-500">{t('operations.date') || 'التاريخ'}</th>
+                          <th className="px-6 py-4 text-sm font-bold text-slate-500 text-left">{t('common.actions') || 'الإجراءات'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                        {operations.map((op) => (
+                          <tr 
+                            key={op.id} 
+                            onClick={async () => {
+                              setEditingOperation(op);
+                              setFormData({ ...op });
+                              setSelectedCategory(op.category_id);
+                              const values = await apiRequest<any[]>(`/operations/${op.id}/values`);
+                              const extraFormData: any = {};
+                              values.forEach(v => { extraFormData[v.field_id] = v.value; });
+                              setFormData((prev: any) => ({ ...prev, ...extraFormData }));
+                              setIsModalOpen(true);
+                            }}
+                            className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
+                          >
+                            <td className="px-6 py-4 font-mono font-bold text-indigo-600 text-sm">
+                              {op.operation_number || op.id.slice(0, 8).toUpperCase()}
+                            </td>
+                            <td className="px-6 py-4 font-bold text-slate-900">
+                              {op.customer_name || 'Individual Client'}
+                            </td>
+                            <td className="px-6 py-4 font-bold text-slate-500">
+                              {categories.find(c => c.id === op.category_id)?.name || 'General Operation'}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                op.status === 'completed' ? 'bg-emerald-50 text-emerald-700' :
+                                op.status === 'in_progress' ? 'bg-amber-50 text-amber-700' :
+                                'bg-slate-100 text-slate-400'
+                              }`}>
+                                {t(`common.status_${op.status}`) || op.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-slate-400 font-bold text-xs">
+                              {new Date(op.operation_date || op.date).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4 text-left">
+                              <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    setEditingOperation(op);
+                                    setFormData({ ...op });
+                                    setSelectedCategory(op.category_id);
+                                    const values = await apiRequest<any[]>(`/operations/${op.id}/values`);
+                                    const extraFormData: any = {};
+                                    values.forEach(v => { extraFormData[v.field_id] = v.value; });
+                                    setFormData((prev: any) => ({ ...prev, ...extraFormData }));
+                                    setIsModalOpen(true);
+                                  }}
+                                  className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                                >
+                                  {dir === 'rtl' ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 p-10">

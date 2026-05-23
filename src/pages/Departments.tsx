@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Edit2, Trash2, Users, Briefcase, ChevronRight, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Users, Briefcase, ChevronRight, X, LayoutGrid, List } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
+import { useViewPreference } from '../hooks/useViewPreference';
 
 interface Department {
   id: string;
@@ -18,8 +19,9 @@ interface Department {
 }
 
 export function Departments() {
-  const { t } = useLanguage();
+  const { t, dir, language } = useLanguage();
   const { user } = useAuth();
+  const [view, setView] = useViewPreference('departments', 'card');
   const [departments, setDepartments] = useState<Department[]>([]);
   const [managerUsers, setManagerUsers] = useState<{id: string, name: string}[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,34 +93,140 @@ export function Departments() {
             exit={{ opacity: 0, y: -15 }}
             className="flex-1 flex flex-col space-y-8 overflow-hidden"
           >
-            <div className="flex items-center justify-between mb-8">
+            <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 mb-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`} dir={dir}>
               <div>
                 <h1 className="text-2xl font-bold text-zinc-900">إدارة الإدارات</h1>
                 <p className="text-zinc-500">الهيكل التنظيمي للشركة والإدارات المختلفة</p>
               </div>
-              <button
-                onClick={() => {
-                  setEditingDept(null);
-                  setFormData({
-                    code: '',
-                    name: '',
-                    description: '',
-                    parent_id: null,
-                    manager_user_id: null,
-                    is_active: true
-                  });
-                  setIsModalOpen(true);
-                }}
-                className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
-              >
-                <Plus size={20} />
-                <span>إضافة إدارة</span>
-              </button>
+              <div className="flex items-center gap-4">
+                <div className="flex bg-zinc-100 p-1.5 rounded-2xl gap-1">
+                  <button 
+                    onClick={() => setView('card')} 
+                    className={`p-2 rounded-xl transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-700'}`}
+                    title={language === 'ar' ? 'عرض كروت' : 'Cards View'}
+                  >
+                    <LayoutGrid size={18} />
+                  </button>
+                  <button 
+                    onClick={() => setView('table')} 
+                    className={`p-2 rounded-xl transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-700'}`}
+                    title={language === 'ar' ? 'عرض جدول' : 'Table View'}
+                  >
+                    <List size={18} />
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setEditingDept(null);
+                    setFormData({
+                      code: '',
+                      name: '',
+                      description: '',
+                      parent_id: null,
+                      manager_user_id: null,
+                      is_active: true
+                    });
+                    setIsModalOpen(true);
+                  }}
+                  className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
+                >
+                  <Plus size={20} />
+                  <span>إضافة إدارة</span>
+                </button>
+              </div>
             </div>
 
             {loading ? (
               <div className="flex justify-center py-20">
                 <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : view === 'table' ? (
+              <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm" dir="rtl">
+                <table className="w-full text-right border-collapse">
+                  <thead>
+                    <tr className="bg-zinc-50 border-b border-zinc-200">
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">كود الإدارة</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">اسم الإدارة</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">مدير الإدارة</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">إدارة عليا</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">الحالة</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-left">الإجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100 font-medium text-zinc-700">
+                    {departments.map((dept) => (
+                      <tr 
+                        key={dept.id}
+                        onClick={() => {
+                          setEditingDept(dept);
+                          setFormData({
+                            code: dept.code,
+                            name: dept.name,
+                            description: dept.description || '',
+                            parent_id: dept.parent_id,
+                            manager_user_id: dept.manager_user_id,
+                            is_active: dept.is_active
+                          });
+                          setIsModalOpen(true);
+                        }}
+                        className="hover:bg-zinc-50/80 transition-colors group cursor-pointer"
+                      >
+                        <td className="px-6 py-4 font-mono font-bold text-emerald-600 text-sm">
+                          {dept.code}
+                        </td>
+                        <td className="px-6 py-4 font-bold text-zinc-900">
+                          {dept.name}
+                        </td>
+                        <td className="px-6 py-4 text-zinc-500">
+                          {managerUsers.find(u => u.id === dept.manager_user_id)?.name || 'غير محدد'}
+                        </td>
+                        <td className="px-6 py-4 text-zinc-500">
+                          {departments.find(d => d.id === dept.parent_id)?.name || '-'}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${dept.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-zinc-100 text-zinc-500'}`}>
+                            {dept.is_active ? 'نشط' : 'معطل'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-left">
+                          <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingDept(dept);
+                                setFormData({
+                                  code: dept.code,
+                                  name: dept.name,
+                                  description: dept.description || '',
+                                  parent_id: dept.parent_id,
+                                  manager_user_id: dept.manager_user_id,
+                                  is_active: dept.is_active
+                                });
+                                setIsModalOpen(true);
+                              }}
+                              className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (window.confirm(t('common.confirm_delete'))) {
+                                  await dbService.delete('departments', dept.id);
+                                  fetchData();
+                                }
+                              }}
+                              className="p-2 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pr-1">
