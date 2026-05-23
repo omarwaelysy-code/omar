@@ -69,7 +69,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isCompanyMenuOpen, setIsCompanyMenuOpen] = React.useState(false);
-  const [expandedMenus, setExpandedMenus] = React.useState<string[]>(['transactions']);
+  const [expandedMenus, setExpandedMenus] = React.useState<string[]>(['sales']);
   const [company, setCompany] = useState<Company | null>(null);
   
   // Change Password Modal State
@@ -212,20 +212,42 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'discount_settings', label: t('nav.discount_settings'), icon: Settings },
         ]
       },
-      { 
-        id: 'transactions', 
-        label: t('nav.transactions'), 
-        icon: ArrowLeftRight,
+      {
+        id: 'sales',
+        label: t('nav.sales'),
+        icon: ArrowUpFromLine,
         subItems: [
           { id: 'invoices', label: t('nav.invoices'), icon: ArrowUpFromLine },
           { id: 'returns', label: t('nav.returns'), icon: RotateCcw },
+          { id: 'customer_discounts', label: t('nav.customer_discounts'), icon: Tags },
+          { id: 'customer_statement', label: t('nav.customer_statement'), icon: FileText },
+          { id: 'customer_balances', label: t('nav.customer_balances'), icon: BarChart3 },
+          { id: 'sales_report', label: t('nav.sales_report'), icon: BarChart3 }
+        ]
+      },
+      {
+        id: 'purchases',
+        label: t('nav.purchases'),
+        icon: ArrowDownToLine,
+        subItems: [
           { id: 'purchase_invoices', label: t('nav.purchase_invoices'), icon: ArrowDownToLine },
           { id: 'purchase_returns', label: t('nav.purchase_returns'), icon: RotateCcw },
-          { id: 'customer_discounts', label: t('nav.customer_discounts'), icon: Tags },
           { id: 'supplier_discounts', label: t('nav.supplier_discounts'), icon: Tags },
+          { id: 'supplier_statement', label: t('nav.supplier_statement'), icon: FileText },
+          { id: 'supplier_balances', label: t('nav.supplier_balances'), icon: BarChart3 }
+        ]
+      },
+      {
+        id: 'cash',
+        label: t('nav.cash'),
+        icon: Coins,
+        subItems: [
           { id: 'receipts', label: t('nav.receipts'), icon: Receipt },
           { id: 'payment_vouchers', label: t('nav.payment_vouchers'), icon: CreditCard },
           { id: 'cash_transfers', label: t('nav.cash_transfers'), icon: ArrowLeftRight },
+          { id: 'cash_report', label: t('nav.cash_report'), icon: BarChart3 },
+          { id: 'cash_balances', label: t('nav.cash_balances'), icon: BarChart3 },
+          { id: 'expenses_report', label: t('nav.expenses_report'), icon: BarChart3 }
         ]
       },
       {
@@ -255,21 +277,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'trial_balance', label: t('nav.trial_balance'), icon: BarChart3 },
           { id: 'income_statement', label: t('nav.income_statement'), icon: BarChart3 },
           { id: 'balance_sheet', label: t('nav.balance_sheet'), icon: Shield },
-        ]
-      },
-      {
-        id: 'reports',
-        label: t('nav.reports'),
-        icon: BarChart3,
-        subItems: [
-          { id: 'customer_statement', label: t('nav.customer_statement'), icon: FileText },
-          { id: 'supplier_statement', label: t('nav.supplier_statement'), icon: FileText },
-          { id: 'customer_balances', label: t('nav.customer_balances'), icon: BarChart3 },
-          { id: 'supplier_balances', label: t('nav.supplier_balances'), icon: BarChart3 },
-          { id: 'sales_report', label: t('nav.sales_report'), icon: BarChart3 },
-          { id: 'expenses_report', label: t('nav.expenses_report'), icon: BarChart3 },
-          { id: 'cash_report', label: t('nav.cash_report'), icon: BarChart3 },
-          { id: 'cash_balances', label: t('nav.cash_balances'), icon: BarChart3 },
         ]
       },
       {
