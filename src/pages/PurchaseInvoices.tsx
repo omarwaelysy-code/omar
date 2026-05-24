@@ -466,8 +466,8 @@ export const PurchaseInvoices: React.FC = () => {
           product_id: product?.id || '',
           product_name: product?.name || item.productName,
           quantity: item.quantity || 1,
-          unit_price: item.cost_price,
-          total: (item.quantity || 1) * (item.price || product?.cost_price || 0)
+          cost_price: item.price || item.cost_price || product?.cost_price || 0,
+          total: (item.quantity || 1) * (item.price || item.cost_price || product?.cost_price || 0)
         };
       });
       setItems(newItems);
@@ -974,7 +974,7 @@ export const PurchaseInvoices: React.FC = () => {
           product_name: item.product_name,
           category_name: item.category_name,
           quantity: item.quantity,
-          unit_price: item.unit_price,
+          cost_price: item.unit_price || item.cost_price || 0,
           total: item.total
         })));
         setInvoiceNumber(fullData.invoice_number);

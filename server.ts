@@ -73,6 +73,8 @@ async function startServer() {
       'ALTER TABLE "returns" ADD COLUMN IF NOT EXISTS "description" TEXT',
       'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "description" TEXT',
       'ALTER TABLE "purchase_returns" ADD COLUMN IF NOT EXISTS "description" TEXT',
+      'ALTER TABLE "purchase_invoice_items" ADD COLUMN IF NOT EXISTS "expense_category_id" VARCHAR(36)',
+      'ALTER TABLE "purchase_return_items" ADD COLUMN IF NOT EXISTS "expense_category_id" VARCHAR(36)',
       
       // Other
       'ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "required_sub_account" BOOLEAN DEFAULT FALSE',
@@ -80,6 +82,7 @@ async function startServer() {
       // Products specific columns from arabic request
       'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "inventory_account_id" VARCHAR(36)',
       'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "inventory_account_name" VARCHAR(255)',
+      'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "inventory_cost_method" VARCHAR(20) DEFAULT \'wac\'',
       'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "vat_account_id" VARCHAR(36)',
       'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "vat_account_name" VARCHAR(255)',
       'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "vat_rate" DECIMAL(10,4) DEFAULT 0',

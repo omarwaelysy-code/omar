@@ -104,6 +104,8 @@ CREATE TABLE IF NOT EXISTS products (
     cost_account_id VARCHAR(36) REFERENCES accounts(id),
     revenue_account_name VARCHAR(255),
     cost_account_name VARCHAR(255),
+    inventory_account_id VARCHAR(36) REFERENCES accounts(id),
+    inventory_cost_method VARCHAR(20) DEFAULT 'wac',
     name VARCHAR(255) NOT NULL,
     code VARCHAR(100),
     barcode VARCHAR(100),
