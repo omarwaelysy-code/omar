@@ -218,6 +218,21 @@ export async function initDatabase() {
 
     // Phase 3: Masters
     await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "warehouses" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id") ON DELETE CASCADE,
+        "code" VARCHAR(50) NOT NULL,
+        "name" VARCHAR(255) NOT NULL,
+        "description" TEXT,
+        "address" TEXT,
+        "phone" VARCHAR(50),
+        "storekeeper" VARCHAR(100),
+        "storekeeper_phone" VARCHAR(50),
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'warehouses table');
+
+    await safeQuery(`
       CREATE TABLE IF NOT EXISTS "expense_categories" (
         "id" VARCHAR(36) PRIMARY KEY,
         "company_id" VARCHAR(36) REFERENCES "companies"("id"),

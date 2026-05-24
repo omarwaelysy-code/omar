@@ -142,6 +142,19 @@ export interface Supplier {
   company_id: string;
 }
 
+export interface Warehouse {
+  id: string;
+  company_id: string;
+  code: string;
+  name: string;
+  description?: string;
+  address?: string;
+  phone?: string;
+  storekeeper?: string;
+  storekeeper_phone?: string;
+  created_at?: string;
+}
+
 export interface OperationCategory {
   id: string;
   name: string;

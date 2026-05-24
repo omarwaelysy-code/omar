@@ -5,6 +5,7 @@ export const en = {
   'nav.customers': 'Customers',
   'nav.suppliers': 'Suppliers',
   'nav.products': 'Products',
+  'nav.warehouses': 'Warehouses',
   'nav.item_groups': 'Item Groups',
   'nav.expenses': 'Expense Categories',
   'nav.payment_methods': 'Payment Methods',
@@ -446,6 +447,25 @@ export const en = {
   'products.unit_carton': 'Carton',
   'products.form_stock_quantity': 'Current Stock',
   'products.form_min_stock': 'Min Stock Level',
+
+  // Warehouses
+  'warehouses.title': 'Warehouses',
+  'warehouses.subtitle': 'Manage all company warehouses and define storekeepers.',
+  'warehouses.add': 'Add New Warehouse',
+  'warehouses.edit': 'Edit Warehouse Details',
+  'warehouses.search_placeholder': 'Search by name or code...',
+  'warehouses.list_title': 'Warehouses List',
+  'warehouses.column_code': 'Code',
+  'warehouses.column_name': 'Warehouse Name',
+  'warehouses.column_address': 'Address',
+  'warehouses.column_storekeeper': 'Storekeeper',
+  'warehouses.form_code': 'Warehouse Code',
+  'warehouses.form_name': 'Warehouse Name',
+  'warehouses.form_description': 'Description',
+  'warehouses.form_address': 'Address',
+  'warehouses.form_phone': 'Phone',
+  'warehouses.form_storekeeper': 'Storekeeper',
+  'warehouses.form_storekeeper_phone': 'Storekeeper Phone',
 
   // Expenses
   'expenses.title': 'Expense Categories',

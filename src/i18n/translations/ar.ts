@@ -5,6 +5,7 @@ export const ar = {
   'nav.customers': 'العملاء',
   'nav.suppliers': 'الموردين',
   'nav.products': 'الأصناف',
+  'nav.warehouses': 'المخازن',
   'nav.item_groups': 'مجموعات الأصناف',
   'nav.expenses': 'بنود المصروفات',
   'nav.payment_methods': 'طرق السداد',
@@ -447,6 +448,25 @@ export const ar = {
   'products.unit_carton': 'كرتونة',
   'products.form_stock_quantity': 'الكمية الحالية',
   'products.form_min_stock': 'حد الطلب',
+
+  // Warehouses
+  'warehouses.title': 'المخازن',
+  'warehouses.subtitle': 'إدارة كافة المخازن الخاصة بالشركة وتحديد بيانات أمناء المخازن.',
+  'warehouses.add': 'إضافة مخزن جديد',
+  'warehouses.edit': 'تعديل بيانات المخزن',
+  'warehouses.search_placeholder': 'بحث باسم المخزن أو كود المخزن...',
+  'warehouses.list_title': 'قائمة المخازن',
+  'warehouses.column_code': 'الكود',
+  'warehouses.column_name': 'اسم المخزن',
+  'warehouses.column_address': 'العنوان',
+  'warehouses.column_storekeeper': 'أمين المخزن',
+  'warehouses.form_code': 'كود المخزن',
+  'warehouses.form_name': 'اسم المخزن',
+  'warehouses.form_description': 'الوصف',
+  'warehouses.form_address': 'العنوان',
+  'warehouses.form_phone': 'تليفون المخزن',
+  'warehouses.form_storekeeper': 'أمين المخزن',
+  'warehouses.form_storekeeper_phone': 'تليفون أمين المخزن',
 
   // Expenses
   'expenses.title': 'بنود المصروفات',

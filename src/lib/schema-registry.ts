@@ -33,6 +33,9 @@ export const EXPECTED_SCHEMA: TableSchema = {
   item_groups: [
     'id', 'company_id', 'name', 'code', 'type', 'sequence_number', 'description', 'created_at'
   ],
+  warehouses: [
+    'id', 'company_id', 'code', 'name', 'description', 'address', 'phone', 'storekeeper', 'storekeeper_phone', 'created_at'
+  ],
   accounts: [
     'id', 'company_id', 'type_id', 'parent_id', 'code', 'name', 'opening_balance', 'opening_balance_date', 'required_sub_account', 'is_active', 'created_at'
   ],
