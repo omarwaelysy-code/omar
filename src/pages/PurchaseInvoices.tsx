@@ -291,11 +291,17 @@ export const PurchaseInvoices: React.FC = () => {
 
         if (invoiceData.purchase_type === 'items') {
           const product = products.find(p => p.id === item.product_id);
-          debitAccountId = product?.cost_account_id || '';
-          debitAccountName = product?.cost_account_name || '';
+          
+          if (product?.type !== 'service') {
+            debitAccountId = product?.inventory_account_id || product?.cost_account_id || '';
+            debitAccountName = product?.inventory_account_name || product?.cost_account_name || '';
+          } else {
+            debitAccountId = product?.cost_account_id || '';
+            debitAccountName = product?.cost_account_name || '';
+          }
           
           if (!debitAccountId) {
-            const fallbackAccount = accounts.find(a => a.name.includes('مشتريات') || a.name.toLowerCase().includes('purchase'));
+            const fallbackAccount = accounts.find(a => a.name.includes('مخزون') || a.name.includes('مشتريات') || a.name.toLowerCase().includes('inventory') || a.name.toLowerCase().includes('purchase'));
             debitAccountId = fallbackAccount?.id || 'purchase_account_default';
             debitAccountName = fallbackAccount?.name || t('pi.purchase_account_default');
           }
@@ -816,10 +822,17 @@ export const PurchaseInvoices: React.FC = () => {
 
         if (invoiceData.purchase_type === 'items') {
           const product = products.find(p => p.id === item.product_id);
-          debitAccountId = product?.cost_account_id || '';
-          debitAccountName = product?.cost_account_name || '';
+          
+          if (product?.type !== 'service') {
+            debitAccountId = product?.inventory_account_id || product?.cost_account_id || '';
+            debitAccountName = product?.inventory_account_name || product?.cost_account_name || '';
+          } else {
+            debitAccountId = product?.cost_account_id || '';
+            debitAccountName = product?.cost_account_name || '';
+          }
+          
           if (!debitAccountId) {
-            const fallback = accounts.find(a => a.name.includes('مشتريات') || a.name.includes('تكلفة') || a.name.toLowerCase().includes('purchase'));
+            const fallback = accounts.find(a => a.name.includes('مخزون') || a.name.includes('مشتريات') || a.name.includes('تكلفة') || a.name.toLowerCase().includes('inventory') || a.name.toLowerCase().includes('purchase'));
             debitAccountId = fallback?.id || 'purchase_account_default';
             debitAccountName = fallback?.name || t('pi.purchase_account_default');
           }

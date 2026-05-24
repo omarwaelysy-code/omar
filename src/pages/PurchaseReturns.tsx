@@ -254,12 +254,20 @@ export const PurchaseReturns: React.FC = () => {
       // Credit: Inventory/Cost Accounts (per product)
       (items || []).forEach(item => {
         const product = products.find(p => p.id === item.product_id);
-        let creditAccountId = product?.cost_account_id || '';
-        let creditAccountName = product?.cost_account_name || '';
+        let creditAccountId = '';
+        let creditAccountName = '';
+
+        if (product && product.type !== 'service') {
+          creditAccountId = product.inventory_account_id || product.cost_account_id || '';
+          creditAccountName = product.inventory_account_name || product.cost_account_name || '';
+        } else {
+          creditAccountId = product?.cost_account_id || '';
+          creditAccountName = product?.cost_account_name || '';
+        }
 
         if (!creditAccountId) {
           const fallbackAccount = accounts.find(a => 
-            a.name.includes('مخزون') || a.name.includes('مشتريات')
+            a.name.includes('مخزون') || a.name.includes('مشتريات') || a.name.toLowerCase().includes('inventory')
           );
           creditAccountId = fallbackAccount?.id || 'inventory_account_default';
           creditAccountName = fallbackAccount?.name || 'حساب المخزون (افتراضي)';
@@ -511,10 +519,19 @@ export const PurchaseReturns: React.FC = () => {
 
       sanitizedItems.forEach(item => {
         const product = products.find(p => p.id === item.product_id);
-        let creditAccountId = product?.cost_account_id || '';
-        let creditAccountName = product?.revenue_account_name || '';
+        let creditAccountId = '';
+        let creditAccountName = '';
+        
+        if (product && product.type !== 'service') {
+          creditAccountId = product.inventory_account_id || product.cost_account_id || '';
+          creditAccountName = product.inventory_account_name || product.cost_account_name || product.revenue_account_name || '';
+        } else {
+          creditAccountId = product?.cost_account_id || '';
+          creditAccountName = product?.cost_account_name || product?.revenue_account_name || '';
+        }
+
         if (!creditAccountId) {
-          const fallback = accounts.find(a => a.name.includes('مشتريات') || a.name.includes('تكلفة'));
+          const fallback = accounts.find(a => a.name.includes('مخزون') || a.name.includes('مشتريات') || a.name.includes('تكلفة') || a.name.toLowerCase().includes('inventory'));
           creditAccountId = fallback?.id || 'purchase_account_default';
           creditAccountName = fallback?.name || 'حساب المشتريات (افتراضي)';
         }
