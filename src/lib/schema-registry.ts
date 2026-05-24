@@ -28,7 +28,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   products: [
     'id', 'company_id', 'revenue_account_id', 'cost_account_id', 'revenue_account_name', 'cost_account_name', 'name', 'code', 'barcode',
     'type', 'description', 'image_url', 'category', 'unit', 'cost_price', 'sale_price', 'stock', 'min_stock', 
-    'current_stock', 'is_service', 'counter_account_id', 'inventory_account_id', 'inventory_account_name', 'vat_account_id', 'vat_account_name', 'vat_rate', 'item_group_id', 'item_group_name', 'created_at'
+    'current_stock', 'is_service', 'counter_account_id', 'inventory_account_id', 'inventory_account_name', 'vat_account_id', 'vat_account_name', 'vat_rate', 'inventory_cost_method', 'item_group_id', 'item_group_name', 'created_at'
   ],
   item_groups: [
     'id', 'company_id', 'name', 'code', 'type', 'sequence_number', 'description', 'created_at'
