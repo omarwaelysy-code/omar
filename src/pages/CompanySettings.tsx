@@ -36,6 +36,7 @@ interface CompanyData {
   fiscal_year_month: number;
   enable_multi_currency: boolean;
   inventory_cost_method?: 'wac' | 'fifo' | 'lifo';
+  inventory_cost_method_level?: 'company' | 'item';
   vat_enabled: boolean;
   wht_enabled: boolean;
 }
@@ -162,6 +163,7 @@ export function CompanySettings() {
     fiscal_year_month: 12,
     enable_multi_currency: false,
     inventory_cost_method: 'wac',
+    inventory_cost_method_level: 'company',
     vat_enabled: false,
     wht_enabled: false
   });
@@ -208,6 +210,7 @@ export function CompanySettings() {
             fiscal_year_month: fmonth,
             enable_multi_currency: company.settings?.enable_multi_currency || false,
             inventory_cost_method: company.settings?.inventory_cost_method || 'wac',
+            inventory_cost_method_level: company.settings?.inventory_cost_method_level || 'company',
             vat_enabled: company.settings?.vat_enabled || company.vat_enabled || false,
             wht_enabled: company.settings?.wht_enabled || company.wht_enabled || false
           });
@@ -248,6 +251,7 @@ export function CompanySettings() {
           ...originalSettings,
           currency: data.currency,
           enable_multi_currency: data.enable_multi_currency,
+          inventory_cost_method_level: data.inventory_cost_method_level || 'company',
           inventory_cost_method: data.inventory_cost_method || 'wac',
           vat_enabled: data.vat_enabled,
           wht_enabled: data.wht_enabled
@@ -259,6 +263,7 @@ export function CompanySettings() {
         ...originalSettings,
         currency: data.currency,
         enable_multi_currency: data.enable_multi_currency,
+        inventory_cost_method_level: data.inventory_cost_method_level || 'company',
         inventory_cost_method: data.inventory_cost_method || 'wac',
         vat_enabled: data.vat_enabled,
         wht_enabled: data.wht_enabled
@@ -592,19 +597,59 @@ export function CompanySettings() {
               </div>
             </div>
 
-            {/* Inventory Costing Policy Selection inside Card 3 */}
-            <div className="md:col-span-2 pt-6 border-t border-slate-100 space-y-6">
-              <div className="flex items-center gap-2">
-                <Boxes className="w-5 h-5 text-indigo-500" />
-                <div className="flex flex-col">
-                  <span className="font-bold text-slate-800 text-base">
-                    {t('company_settings.inventory_cost_method')}
-                  </span>
-                  <span className="text-xs text-slate-400 font-semibold">
-                    {language === 'ar' ? 'حدد الأسلوب المحاسبي لتقييم وطلب بضاعة المخازن.' : 'Select the accounting method used to evaluate stock.'}
-                  </span>
-                </div>
+            {/* Inventory Costing Policy Level Selection */}
+            <div className={`md:col-span-2 pt-6 border-t border-slate-100 flex flex-col gap-4 select-none`}>
+              <div className="flex flex-col gap-0.5 w-full">
+                <span className="font-bold text-slate-800 text-base">
+                  {language === 'ar' ? 'مستوى تطبيق سياسة تكلفة المخزون' : 'Inventory Costing Policy Level'}
+                </span>
+                <span className="text-xs font-semibold text-slate-400">
+                  {language === 'ar' 
+                    ? 'اختر هل يتم تطبيق سياسة تكلفة المخزون على مستوى الشركة بالكامل أم يتم اختيارها لكل صنف على حدة.' 
+                    : 'Choose whether the inventory costing policy is applied company-wide or per item.'}
+                </span>
               </div>
+              
+              <div className="flex bg-slate-100 p-1.5 rounded-2xl w-full max-w-sm">
+                <button
+                  type="button"
+                  onClick={() => setData(prev => ({ ...prev, inventory_cost_method_level: 'company' }))}
+                  className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-bold transition-all ${
+                    data.inventory_cost_method_level !== 'item' 
+                      ? 'bg-white text-indigo-600 shadow-sm' 
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {language === 'ar' ? 'على مستوى الشركة' : 'Company Wide'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setData(prev => ({ ...prev, inventory_cost_method_level: 'item' }))}
+                  className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-bold transition-all ${
+                    data.inventory_cost_method_level === 'item' 
+                      ? 'bg-white text-indigo-600 shadow-sm' 
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {language === 'ar' ? 'على مستوى الصنف' : 'Per Item'}
+                </button>
+              </div>
+            </div>
+
+            {/* Inventory Costing Policy Selection inside Card 3 */}
+            {data.inventory_cost_method_level !== 'item' && (
+              <div className="md:col-span-2 pt-6 border-t border-slate-100 space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex items-center gap-2">
+                  <Boxes className="w-5 h-5 text-indigo-500" />
+                  <div className="flex flex-col">
+                    <span className="font-bold text-slate-800 text-base">
+                      {t('company_settings.inventory_cost_method')}
+                    </span>
+                    <span className="text-xs text-slate-400 font-semibold">
+                      {language === 'ar' ? 'حدد الأسلوب المحاسبي لتقييم وطلب بضاعة المخازن.' : 'Select the accounting method used to evaluate stock.'}
+                    </span>
+                  </div>
+                </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* WAC Option */}
@@ -699,7 +744,8 @@ export function CompanySettings() {
                   </p>
                 </div>
               </div>
-            </div>
+             </div>
+            )}
           </div>
         </div>
 

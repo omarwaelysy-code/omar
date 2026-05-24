@@ -83,6 +83,7 @@ export interface Company {
     fiscal_year_start: string;
     enable_multi_currency?: boolean;
     inventory_cost_method?: 'wac' | 'fifo' | 'lifo';
+    inventory_cost_method_level?: 'company' | 'item';
     vat_enabled?: boolean;
     wht_enabled?: boolean;
   };
@@ -240,6 +241,7 @@ export interface Product {
   vat_account_id?: string;
   vat_account_name?: string;
   vat_rate?: number;
+  inventory_cost_method?: 'wac' | 'fifo' | 'lifo';
   counter_account_id?: string;
   item_group_id?: string;
   item_group_name?: string;

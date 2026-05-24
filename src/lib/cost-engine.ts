@@ -13,12 +13,24 @@ export interface CostingResult {
 }
 
 /**
- * Gets the configured company inventory cost method.
+ * Gets the configured company inventory cost method or product specific method.
  */
-async function getCompanyCostMethod(client: PoolClient, companyId: string): Promise<'wac' | 'fifo' | 'lifo'> {
+async function getCompanyCostMethod(client: PoolClient, companyId: string, productId?: string): Promise<'wac' | 'fifo' | 'lifo'> {
   const companyRes = await client.query('SELECT settings FROM companies WHERE id = $1', [companyId]);
   if (companyRes.rows[0]) {
     const settings = companyRes.rows[0].settings || {};
+    
+    // Check if item level is configured and product ID is provided
+    if (settings.inventory_cost_method_level === 'item' && productId) {
+      const productRes = await client.query('SELECT inventory_cost_method FROM products WHERE id = $1', [productId]);
+      if (productRes.rows.length > 0 && productRes.rows[0].inventory_cost_method) {
+        const productMethod = productRes.rows[0].inventory_cost_method;
+        if (productMethod === 'fifo' || productMethod === 'lifo' || productMethod === 'wac') {
+          return productMethod;
+        }
+      }
+    }
+
     const method = settings.inventory_cost_method;
     if (method === 'fifo' || method === 'lifo' || method === 'wac') {
       return method;
@@ -66,7 +78,7 @@ export async function recordPurchase(
   referenceNumber: string,
   date: string
 ): Promise<CostingResult> {
-  const method = await getCompanyCostMethod(client, companyId);
+  const method = await getCompanyCostMethod(client, companyId, productId);
   const totalCost = quantity * unitCost;
 
   // Retrieve product details
@@ -132,7 +144,7 @@ export async function recordSale(
   referenceNumber: string,
   date: string
 ): Promise<CostingResult> {
-  const method = await getCompanyCostMethod(client, companyId);
+  const method = await getCompanyCostMethod(client, companyId, productId);
 
   // Retrieve product details
   const productRes = await client.query('SELECT cost_price, stock FROM products WHERE id = $1', [productId]);
@@ -214,7 +226,7 @@ export async function recordSalesReturn(
   referenceNumber: string,
   date: string
 ): Promise<CostingResult> {
-  const method = await getCompanyCostMethod(client, companyId);
+  const method = await getCompanyCostMethod(client, companyId, productId);
   const totalCost = quantity * returnUnitCost;
 
   // Retrieve product details
@@ -279,7 +291,7 @@ export async function recordPurchaseReturn(
   referenceNumber: string,
   date: string
 ): Promise<CostingResult> {
-  const method = await getCompanyCostMethod(client, companyId);
+  const method = await getCompanyCostMethod(client, companyId, productId);
   const totalCost = quantity * returnUnitCost;
 
   // Retrieve product details
@@ -354,7 +366,7 @@ export async function recordAdjustment(
   referenceNumber: string,
   date: string
 ): Promise<CostingResult> {
-  const method = await getCompanyCostMethod(client, companyId);
+  const method = await getCompanyCostMethod(client, companyId, productId);
   const totalCost = quantity * unitCost;
 
   if (quantity > 0) {

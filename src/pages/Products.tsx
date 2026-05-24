@@ -68,6 +68,7 @@ export const Products: React.FC = () => {
     revenue_account_id: '',
     cost_account_id: '',
     inventory_account_id: '',
+    inventory_cost_method: 'wac',
     vat_account_id: '',
     vat_rate: 0,
     counter_account_id: '',
@@ -221,7 +222,7 @@ export const Products: React.FC = () => {
       code: '', name: '', type: 'finished_good', category: '', unit: 'قطعة',
       sale_price: 0, cost_price: 0, description: '', image_url: '', 
       barcode: '', stock: 0, min_stock: 0, revenue_account_id: '', 
-      cost_account_id: '', inventory_account_id: '', vat_account_id: '',
+      cost_account_id: '', inventory_account_id: '', inventory_cost_method: 'wac', vat_account_id: '',
       vat_rate: 0, counter_account_id: '', item_group_id: ''
     });
   };
@@ -241,6 +242,7 @@ export const Products: React.FC = () => {
         revenue_account_id: product.revenue_account_id || '',
         cost_account_id: product.cost_account_id || '',
         inventory_account_id: product.inventory_account_id || '',
+        inventory_cost_method: product.inventory_cost_method || 'wac',
         vat_account_id: product.vat_account_id || '',
         vat_rate: product.vat_rate || 0,
         counter_account_id: product.counter_account_id || '',
@@ -647,20 +649,39 @@ export const Products: React.FC = () => {
 
                            {/* Inventory Account (Mandatory for finished goods, raw materials, commodity) */}
                            {['finished_good', 'raw_material', 'commodity'].includes(formData.type) && (
-                             <div className="space-y-4 md:col-span-2">
-                               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                                 {t('products.form_inventory_account')} <span className="text-rose-500 font-bold">*</span>
-                               </label>
-                               <select 
-                                 required
-                                 className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner" 
-                                 value={formData.inventory_account_id} 
-                                 onChange={(e) => setFormData({ ...formData, inventory_account_id: e.target.value })}
-                               >
-                                 <option value="">{t('common.select_account')}</option>
-                                 {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
-                               </select>
-                             </div>
+                             <>
+                               <div className={`space-y-4 ${company?.settings?.inventory_cost_method_level === 'item' ? 'md:col-span-1' : 'md:col-span-2'}`}>
+                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                                   {t('products.form_inventory_account')} <span className="text-rose-500 font-bold">*</span>
+                                 </label>
+                                 <select 
+                                   required
+                                   className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner" 
+                                   value={formData.inventory_account_id} 
+                                   onChange={(e) => setFormData({ ...formData, inventory_account_id: e.target.value })}
+                                 >
+                                   <option value="">{t('common.select_account')}</option>
+                                   {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                 </select>
+                               </div>
+
+                               {company?.settings?.inventory_cost_method_level === 'item' && (
+                                 <div className="space-y-4 md:col-span-1">
+                                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                                     {t('company_settings.inventory_cost_method')}
+                                   </label>
+                                   <select 
+                                     className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner" 
+                                     value={formData.inventory_cost_method || 'wac'} 
+                                     onChange={(e) => setFormData({ ...formData, inventory_cost_method: e.target.value as any })}
+                                   >
+                                     <option value="wac">{t('company_settings.inventory_cost_method.wac')}</option>
+                                     <option value="fifo">{t('company_settings.inventory_cost_method.fifo')}</option>
+                                     <option value="lifo">{t('company_settings.inventory_cost_method.lifo')}</option>
+                                   </select>
+                                 </div>
+                               )}
+                             </>
                            )}
 
                            {/* VAT Fields if Company is VAT registered */}
