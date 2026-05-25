@@ -470,7 +470,12 @@ export const PurchaseReturns: React.FC = () => {
       return;
     }
 
-    if (!returnData.warehouse_id) {
+    const hasPhysicalProduct = items.some(item => {
+      const prod = products.find(p => p.id === item.product_id);
+      return prod && prod.type !== 'service';
+    });
+
+    if (hasPhysicalProduct && !returnData.warehouse_id) {
       showNotification('يرجى اختيار المخزن', 'error');
       return;
     }
@@ -497,7 +502,7 @@ export const PurchaseReturns: React.FC = () => {
         return_number,
         supplier_id: returnData.supplier_id,
         supplier_name: supplier?.name || '',
-        warehouse_id: returnData.warehouse_id,
+        warehouse_id: returnData.warehouse_id || null,
         date: returnData.date, 
         items: sanitizedItems,
         total_amount,

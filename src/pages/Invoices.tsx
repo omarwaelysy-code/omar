@@ -489,7 +489,12 @@ export const Invoices: React.FC = () => {
       return;
     }
     
-    if (invoiceType === 'items' && !selectedWarehouseId) {
+    const hasPhysicalProduct = items.some(item => {
+      const prod = products.find(p => p.id === item.product_id);
+      return prod && prod.type !== 'service';
+    });
+
+    if (invoiceType === 'items' && hasPhysicalProduct && !selectedWarehouseId) {
       showNotification('يرجى اختيار المخزن', 'error');
       return;
     }
@@ -529,7 +534,7 @@ export const Invoices: React.FC = () => {
         invoice_number: invoiceNumber,
         customer_id: selectedCustomerId, 
         customer_name: customer?.name || '',
-        warehouse_id: selectedWarehouseId,
+        warehouse_id: selectedWarehouseId || null,
         date, 
         description,
         items: sanitizedItems,

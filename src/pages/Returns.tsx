@@ -447,7 +447,12 @@ export const Returns: React.FC = () => {
       return;
     }
 
-    if (!selectedWarehouseId) {
+    const hasPhysicalProduct = items.some(item => {
+      const prod = products.find(p => p.id === item.product_id);
+      return prod && prod.type !== 'service';
+    });
+
+    if (hasPhysicalProduct && !selectedWarehouseId) {
       showNotification('يرجى اختيار المخزن', 'error');
       return;
     }
@@ -477,7 +482,7 @@ export const Returns: React.FC = () => {
         return_number,
         customer_id: selectedCustomerId, 
         customer_name: customer?.name || '',
-        warehouse_id: selectedWarehouseId,
+        warehouse_id: selectedWarehouseId || null,
         date, 
         items: sanitizedItems,
         total_amount,

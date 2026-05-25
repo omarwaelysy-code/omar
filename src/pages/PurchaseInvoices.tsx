@@ -749,7 +749,12 @@ export const PurchaseInvoices: React.FC = () => {
       return;
     }
 
-    if (invoiceData.purchase_type === 'items' && !invoiceData.warehouse_id) {
+    const hasPhysicalProduct = items.some(item => {
+      const prod = products.find(p => p.id === item.product_id);
+      return prod && prod.type !== 'service';
+    });
+
+    if (invoiceData.purchase_type === 'items' && hasPhysicalProduct && !invoiceData.warehouse_id) {
       showNotification('يرجى اختيار المخزن', 'error');
       return;
     }
@@ -777,7 +782,7 @@ export const PurchaseInvoices: React.FC = () => {
         invoice_number,
         supplier_id: invoiceData.supplier_id,
         supplier_name: supplier?.name || '',
-        warehouse_id: invoiceData.warehouse_id,
+        warehouse_id: invoiceData.warehouse_id || null,
         date: invoiceData.date, 
         subtotal,
         discount_amount,
