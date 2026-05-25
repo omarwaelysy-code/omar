@@ -49,6 +49,17 @@ export const Products: React.FC = () => {
   const [view, setView] = useViewPreference('products', 'table');
   const [isAutoCode, setIsAutoCode] = useState(true);
   
+  // Stock Movement & Cost Ledger States
+  const [movements, setMovements] = useState<any[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [docMap, setDocMap] = useState<Record<string, { partner: string, description: string }>>({});
+  const [loadingMovements, setLoadingMovements] = useState(false);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [filterRefNum, setFilterRefNum] = useState('');
+  const [filterPartner, setFilterPartner] = useState('');
+  
   const tableRef = useRef<HTMLTableElement>(null);
   const isVatEnabled = company?.settings?.vat_enabled || company?.vat_enabled || false;
 
@@ -136,6 +147,66 @@ export const Products: React.FC = () => {
       }
     }
   }, [formData.type, editingProduct, isModalOpen, products, isAutoCode]);
+
+  useEffect(() => {
+    if (user && editingProduct) {
+      const loadMovementData = async () => {
+        setLoadingMovements(true);
+        try {
+          const whs = await dbService.list<any>('warehouses', { company_id: user.company_id });
+          setWarehouses(whs || []);
+
+          const mvs = await dbService.list<any>('inventory_movements', { 
+            company_id: user.company_id,
+            product_id: editingProduct.id 
+          });
+
+          const [invs, pinvs, rets, prets] = await Promise.all([
+            dbService.list<any>('invoices', { company_id: user.company_id }),
+            dbService.list<any>('purchase_invoices', { company_id: user.company_id }),
+            dbService.list<any>('returns', { company_id: user.company_id }),
+            dbService.list<any>('purchase_returns', { company_id: user.company_id })
+          ]);
+
+          const map: Record<string, { partner: string, description: string }> = {};
+          (invs || []).forEach(x => {
+            map[x.id] = { 
+              partner: x.customer_name || t('common.customer') || 'عميل', 
+              description: x.description || '' 
+            };
+          });
+          (pinvs || []).forEach(x => {
+            map[x.id] = { 
+              partner: x.supplier_name || t('common.supplier') || 'مورد', 
+              description: x.description || '' 
+            };
+          });
+          (rets || []).forEach(x => {
+            map[x.id] = { 
+              partner: x.customer_name || t('common.customer') || 'عميل', 
+              description: x.description || '' 
+            };
+          });
+          (prets || []).forEach(x => {
+            map[x.id] = { 
+              partner: x.supplier_name || t('common.supplier') || 'مورد', 
+              description: x.description || '' 
+            };
+          });
+
+          setDocMap(map);
+          setMovements(mvs || []);
+        } catch (e) {
+          console.error("Failed to load product movements", e);
+        } finally {
+          setLoadingMovements(false);
+        }
+      };
+      loadMovementData();
+    } else {
+      setMovements([]);
+    }
+  }, [user, editingProduct]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -225,6 +296,11 @@ export const Products: React.FC = () => {
       cost_account_id: '', inventory_account_id: '', inventory_cost_method: 'wac', vat_account_id: '',
       vat_rate: 0, counter_account_id: '', item_group_id: ''
     });
+    setDateFrom('');
+    setDateTo('');
+    setFilterType('');
+    setFilterRefNum('');
+    setFilterPartner('');
   };
 
   const openModal = (product: Product | null = null) => {
@@ -266,6 +342,76 @@ export const Products: React.FC = () => {
   };
 
   const handleExportPDF = async () => { if (tableRef.current) await exportToPDFUtil(tableRef.current, { filename: 'Products_Inventory', reportTitle: t('products.list_title') }); };
+
+  const getMovementTypeLabel = (type: string) => {
+    switch(type) {
+      case 'purchase': return language === 'ar' ? 'فاتورة شراء' : 'Purchase Invoice';
+      case 'sale': return language === 'ar' ? 'فاتورة بيع' : 'Sales Invoice';
+      case 'sales_return': return language === 'ar' ? 'مردود مبيعات' : 'Sales Return';
+      case 'purchase_return': return language === 'ar' ? 'مردود مشتريات' : 'Purchase Return';
+      default: return type;
+    }
+  };
+
+  const getCostMethodLabel = (method: string) => {
+    switch(method) {
+      case 'wac': return language === 'ar' ? 'متوسط مرجح (WAC)' : 'Weighted Average (WAC)';
+      case 'fifo': return language === 'ar' ? 'الوارد أولاً يصرف أولاً (FIFO)' : 'First In First Out (FIFO)';
+      case 'lifo': return language === 'ar' ? 'الوارد أخيراً يصرف أولاً (LIFO)' : 'Last In First Out (LIFO)';
+      default: return method?.toUpperCase();
+    }
+  };
+
+  const sortedMovements = [...movements].sort((a, b) => {
+    const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+    if (dateDiff !== 0) return dateDiff;
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+  });
+
+  let runningQty = 0;
+  let runningValue = 0;
+
+  const movementsWithBalances = sortedMovements.map(m => {
+    const qty = parseFloat(m.quantity || '0');
+    const cost = parseFloat(m.unit_cost || '0');
+    const totalCost = parseFloat(m.total_cost || '0');
+    
+    // Inflow is positive, Outflow is negative
+    const isIncoming = qty > 0;
+    const qtyIn = isIncoming ? Math.abs(qty) : 0;
+    const qtyOut = !isIncoming ? Math.abs(qty) : 0;
+    
+    const debitVal = isIncoming ? Math.abs(totalCost) : 0;
+    const creditVal = !isIncoming ? Math.abs(totalCost) : 0;
+    
+    runningQty += qty;
+    runningValue += isIncoming ? debitVal : -creditVal;
+    
+    const docInfo = docMap[m.reference_id] || { partner: '', description: '' };
+    const whName = warehouses.find(w => w.id === m.warehouse_id)?.name || 'الرئيسي';
+    
+    return {
+      ...m,
+      qtyIn,
+      qtyOut,
+      debitVal,
+      creditVal,
+      runningQty,
+      runningValue,
+      partner: docInfo.partner,
+      description: m.description || docInfo.description || '',
+      warehouseName: whName
+    };
+  });
+
+  const filteredMovements = movementsWithBalances.filter(m => {
+    if (dateFrom && m.date?.slice(0, 10) < dateFrom) return false;
+    if (dateTo && m.date?.slice(0, 10) > dateTo) return false;
+    if (filterType && m.movement_type !== filterType) return false;
+    if (filterRefNum && !(m.reference_number || '').toLowerCase().includes(filterRefNum.toLowerCase())) return false;
+    if (filterPartner && !(m.partner || '').toLowerCase().includes(filterPartner.toLowerCase())) return false;
+    return true;
+  });
 
   const filteredProducts = products.filter(p => (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (p.code || '').toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -584,7 +730,183 @@ export const Products: React.FC = () => {
                         </div>
                      </div>
 
-                     {/* Attachment & Barcode */}
+                      {/* Stock Ledger Report Section */}
+                      {editingProduct && formData.type !== 'service' && (
+                        <div className="space-y-12 pt-8 border-t border-slate-100">
+                          <div className="flex items-center justify-between border-b border-slate-50 pb-8 flex-wrap gap-4 text-right">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shadow-inner">
+                                <History size={24} />
+                              </div>
+                              <div className="text-right">
+                                <h2 className="text-2xl font-black text-slate-900 leading-none tracking-tight uppercase">
+                                  {language === 'ar' ? 'تقرير حركة وتكلفة الصنف (كارت الصنف)' : 'Product Movement & Cost Report (Stock Card)'}
+                                </h2>
+                                <p className="text-slate-400 text-xs font-bold mt-1">
+                                  {language === 'ar' ? 'تقرير تفصيلي بحركات المخزون والتقييم والسياسة المطبقة' : 'Detailed inventory movement, costing, and valuation ledger'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex bg-slate-100 px-5 py-2.5 rounded-2xl border border-slate-200 text-xs font-black text-slate-600">
+                              <span>{language === 'ar' ? 'السياسة المطبقة: ' : 'Applied Policy: '}</span>
+                              <span className="text-emerald-600 ml-1 mr-1">{getCostMethodLabel(formData.inventory_cost_method)}</span>
+                            </div>
+                          </div>
+
+                          {/* Filters Area */}
+                          <div className="p-8 bg-slate-50/50 rounded-[2.5rem] border border-slate-100 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 text-right">
+                            {/* Date From */}
+                            <div className="space-y-2 text-right">
+                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                                {language === 'ar' ? 'من تاريخ' : 'Date From'}
+                              </label>
+                              <input 
+                                type="date" 
+                                className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 outline-none focus:ring-4 focus:ring-emerald-500/5 transition-all text-right"
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
+                              />
+                            </div>
+
+                            {/* Date To */}
+                            <div className="space-y-2 text-right">
+                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                                {language === 'ar' ? 'إلى تاريخ' : 'Date To'}
+                              </label>
+                              <input 
+                                type="date" 
+                                className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 outline-none focus:ring-4 focus:ring-emerald-500/5 transition-all text-right"
+                                value={dateTo}
+                                onChange={(e) => setDateTo(e.target.value)}
+                              />
+                            </div>
+
+                            {/* Movement Type filter */}
+                            <div className="space-y-2 text-right bg-transparent relative">
+                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                                {language === 'ar' ? 'نوع الحركة' : 'Movement Type'}
+                              </label>
+                              <select 
+                                className="w-full px-5 py-3.5 bg-white border border-slate-200 text-sm font-bold text-slate-800 outline-none focus:ring-4 focus:ring-emerald-500/5 transition-all text-right appearance-none"
+                                value={filterType}
+                                onChange={(e) => setFilterType(e.target.value)}
+                              >
+                                <option value="">{language === 'ar' ? 'الكل' : 'All'}</option>
+                                <option value="purchase">{language === 'ar' ? 'فاتورة شراء' : 'Purchase Invoice'}</option>
+                                <option value="sale">{language === 'ar' ? 'فاتورة بيع' : 'Sales Invoice'}</option>
+                                <option value="sales_return">{language === 'ar' ? 'مردود مبيعات' : 'Sales Return'}</option>
+                                <option value="purchase_return">{language === 'ar' ? 'مردود مشتريات' : 'Purchase Return'}</option>
+                              </select>
+                            </div>
+
+                            {/* Movement Number Filter */}
+                            <div className="space-y-2 text-right">
+                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                                {language === 'ar' ? 'رقم الحركة' : 'Movement Number'}
+                              </label>
+                              <input 
+                                type="text" 
+                                placeholder={language === 'ar' ? 'البحث بالرقم...' : 'Search by number...'}
+                                className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder:text-slate-300 outline-none focus:ring-4 focus:ring-emerald-500/5 transition-all text-right"
+                                value={filterRefNum}
+                                onChange={(e) => setFilterRefNum(e.target.value)}
+                              />
+                            </div>
+
+                            {/* Customer / Supplier Filter */}
+                            <div className="space-y-2 text-right">
+                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                                {language === 'ar' ? 'العميل / المورد' : 'Customer / Supplier'}
+                              </label>
+                              <input 
+                                type="text" 
+                                placeholder={language === 'ar' ? 'اسم العميل أو المورد...' : 'Partner name...'}
+                                className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder:text-slate-300 outline-none focus:ring-4 focus:ring-emerald-500/5 transition-all text-right"
+                                value={filterPartner}
+                                onChange={(e) => setFilterPartner(e.target.value)}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Ledger Table */}
+                          {loadingMovements ? (
+                            <div className="py-20 text-center">
+                              <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                            </div>
+                          ) : filteredMovements.length === 0 ? (
+                            <div className="p-16 text-center border-2 border-dashed border-slate-100 rounded-[2.5rem] bg-slate-50/20">
+                              <p className="text-slate-400 font-bold">{language === 'ar' ? 'لا توجد حركات مسجلة لهذا الصنف تطابق الفلاتر المحددة' : 'No recorded movements matching the filters for this product'}</p>
+                            </div>
+                          ) : (
+                            <div className="overflow-x-auto rounded-[2.5rem] border border-slate-200 shadow-md">
+                              <table className="w-full min-w-[1250px] border-collapse bg-white">
+                                <thead className="bg-slate-50 text-[10px] uppercase font-black tracking-widest text-slate-400 border-b border-slate-200 text-center">
+                                  <tr>
+                                    <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                                    <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'رقم الحركة' : 'Movement No.'}</th>
+                                    <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'نوع الحركة' : 'Movement Type'}</th>
+                                    <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'المخزن' : 'Warehouse'}</th>
+                                    <th rowSpan={2} className="px-5 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'العميل / المورد' : 'Customer/Supplier'}</th>
+                                    <th rowSpan={2} className="px-5 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'الوصف' : 'Description'}</th>
+                                    <th colSpan={3} className="px-1.5 py-1.5 border-r border-b border-slate-200 bg-emerald-50/30 text-emerald-800 font-bold">{language === 'ar' ? 'الكمية' : 'Quantity'}</th>
+                                    <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'سياسة التكلفة' : 'Cost Policy'}</th>
+                                    <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'سعر التكلفة' : 'Unit Cost'}</th>
+                                    <th colSpan={3} className="px-1.5 py-1.5 border-b border-slate-200 bg-sky-50/30 text-sky-800 font-bold">{language === 'ar' ? 'القيم المالية للمخزون' : 'Financial Value'}</th>
+                                  </tr>
+                                  <tr>
+                                    {/* Quantities columns */}
+                                    <th className="px-3 py-1.5 border-r border-slate-200 bg-emerald-50/10 text-emerald-600 font-bold whitespace-nowrap">{language === 'ar' ? 'الوارد (+)' : 'In (+)'}</th>
+                                    <th className="px-3 py-1.5 border-r border-slate-200 bg-rose-50/10 text-rose-600 font-bold whitespace-nowrap">{language === 'ar' ? 'المصرف (-)' : 'Out (-)'}</th>
+                                    <th className="px-3 py-1.5 border-r border-slate-200 bg-emerald-100/30 text-emerald-800 font-black whitespace-nowrap">{language === 'ar' ? 'الرصيد' : 'Balance'}</th>
+                                    
+                                    {/* Values columns */}
+                                    <th className="px-3 py-1.5 border-r border-slate-200 bg-sky-50/10 text-sky-600 font-bold whitespace-nowrap">{language === 'ar' ? 'قيمة مدين (+)' : 'Debit Value'}</th>
+                                    <th className="px-3 py-1.5 border-r border-slate-200 bg-rose-50/10 text-rose-600 font-bold whitespace-nowrap">{language === 'ar' ? 'قيمة دائن (-)' : 'Credit Value'}</th>
+                                    <th className="px-4 py-1.5 bg-blue-100/30 text-blue-800 font-black whitespace-nowrap">{language === 'ar' ? 'الرصيد' : 'Balance Value'}</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 text-xs font-bold text-slate-700 text-center">
+                                  {filteredMovements.map((m, index) => (
+                                    <tr key={m.id || index} className="hover:bg-slate-50 transition-colors">
+                                      <td className="px-4 py-4 border-r border-slate-200 font-mono whitespace-nowrap">{m.date.slice(0, 10)}</td>
+                                      <td className="px-4 py-4 border-r border-slate-200 font-mono whitespace-nowrap text-slate-500">{m.reference_number}</td>
+                                      <td className="px-4 py-4 border-r border-slate-200 whitespace-nowrap">
+                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                          m.movement_type === 'purchase' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                                          m.movement_type === 'sale' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
+                                          m.movement_type === 'sales_return' ? 'bg-teal-50 text-teal-700 border border-teal-100' :
+                                          'bg-amber-50 text-amber-700 border border-amber-100'
+                                        }`}>
+                                          {getMovementTypeLabel(m.movement_type)}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-4 border-r border-slate-200 whitespace-nowrap text-slate-600">{m.warehouseName}</td>
+                                      <td className="px-5 py-4 border-r border-slate-200 whitespace-nowrap text-slate-800 font-black">{m.partner || '-'}</td>
+                                      <td className="px-5 py-4 border-r border-slate-200 text-right text-slate-500 whitespace-normal max-w-[200px] truncate" title={m.description}>{m.description || '-'}</td>
+                                      
+                                      {/* Quantities */}
+                                      <td className="px-3 py-4 border-r border-slate-200 bg-emerald-50/5 font-mono text-slate-800">{m.qtyIn > 0 ? formatNumber(m.qtyIn) : '-'}</td>
+                                      <td className="px-3 py-4 border-r border-slate-200 bg-rose-50/5 font-mono text-slate-800">{m.qtyOut > 0 ? formatNumber(m.qtyOut) : '-'}</td>
+                                      <td className="px-3 py-4 border-r border-slate-200 bg-emerald-50/20 font-black font-mono text-emerald-700">{formatNumber(m.runningQty)}</td>
+                                      
+                                      {/* Cost Policy & Cost Price */}
+                                      <td className="px-4 py-4 border-r border-slate-200 text-[10px] font-bold text-zinc-500 whitespace-nowrap">{getCostMethodLabel(formData.inventory_cost_method)}</td>
+                                      <td className="px-4 py-4 border-r border-slate-200 font-mono text-slate-800">{formatNumber(m.unit_cost)}</td>
+                                      
+                                      {/* Values */}
+                                      <td className="px-3 py-4 border-r border-slate-200 bg-sky-50/5 font-mono text-slate-800">{m.debitVal > 0 ? formatNumber(m.debitVal) : '-'}</td>
+                                      <td className="px-3 py-4 border-r border-slate-200 bg-rose-50/5 font-mono text-slate-800">{m.creditVal > 0 ? formatNumber(m.creditVal) : '-'}</td>
+                                      <td className="px-4 py-4 bg-blue-50/20 font-black font-mono text-blue-700">{formatNumber(m.runningValue)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Attachment & Barcode */}
                      <div className="space-y-12">
                         <div className="flex items-center gap-4 border-b border-slate-50 pb-8">
                            <div className="w-12 h-12 bg-sky-50 text-sky-600 rounded-2xl flex items-center justify-center shadow-inner">
