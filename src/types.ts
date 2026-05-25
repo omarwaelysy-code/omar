@@ -266,6 +266,7 @@ export interface Invoice {
   invoice_number: string;
   customer_id: string;
   customer_name?: string;
+  warehouse_id?: string;
   date: string;
   due_date?: string;
   description?: string;
@@ -291,6 +292,7 @@ export interface PurchaseInvoice {
   invoice_number: string;
   supplier_id: string;
   supplier_name?: string;
+  warehouse_id?: string;
   date: string;
   description?: string;
   subtotal?: number;
@@ -368,6 +370,7 @@ export interface Return {
   return_number: string;
   customer_id: string;
   customer_name?: string;
+  warehouse_id?: string;
   date: string;
   description?: string;
   notes?: string;
@@ -388,6 +391,7 @@ export interface PurchaseReturn {
   return_number: string;
   supplier_id: string;
   supplier_name?: string;
+  warehouse_id?: string;
   date: string;
   description?: string;
   notes?: string;

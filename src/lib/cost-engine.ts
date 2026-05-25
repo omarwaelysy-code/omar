@@ -71,6 +71,7 @@ async function updateProductDetails(
 export async function recordPurchase(
   client: PoolClient,
   companyId: string,
+  warehouseId: string | null,
   productId: string,
   quantity: number,
   unitCost: number,
@@ -106,9 +107,9 @@ export async function recordPurchase(
     // For FIFO or LIFO, create an inventory layer
     const layerId = uuidv4();
     await client.query(
-      `INSERT INTO inventory_layers (id, company_id, product_id, purchase_date, original_qty, qty_remaining, unit_cost, reference_type, reference_id, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
-      [layerId, companyId, productId, date, quantity, quantity, unitCost, 'purchase_invoice', referenceId]
+      `INSERT INTO inventory_layers (id, company_id, product_id, purchase_date, original_qty, qty_remaining, unit_cost, reference_type, reference_id, created_at, warehouse_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+      [layerId, companyId, productId, date, quantity, quantity, unitCost, 'purchase_invoice', referenceId, warehouseId]
     );
     // Cost price is updated to latest purchase unit cost
     newCost = unitCost;
@@ -117,9 +118,9 @@ export async function recordPurchase(
   // Insert into inventory_movements
   const movementId = uuidv4();
   await client.query(
-    `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
-    [movementId, companyId, productId, 'purchase', referenceId, 'purchase_invoice', referenceNumber, date, quantity, unitCost, totalCost]
+    `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at, warehouse_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())`,
+    [movementId, companyId, productId, 'purchase', referenceId, 'purchase_invoice', referenceNumber, date, quantity, unitCost, totalCost, warehouseId]
   );
 
   // Update product stock and cost price
@@ -138,6 +139,7 @@ export async function recordPurchase(
 export async function recordSale(
   client: PoolClient,
   companyId: string,
+  warehouseId: string | null,
   productId: string,
   quantity: number,
   referenceId: string,
@@ -198,9 +200,9 @@ export async function recordSale(
   // Insert into inventory_movements
   const movementId = uuidv4();
   await client.query(
-    `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
-    [movementId, companyId, productId, 'sale', referenceId, 'invoice', referenceNumber, date, -quantity, unitCost, -totalCost]
+    `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at, warehouse_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())`,
+    [movementId, companyId, productId, 'sale', referenceId, 'invoice', referenceNumber, date, -quantity, unitCost, -totalCost, warehouseId]
   );
 
   // Update stock (cost price remains unchanged on sale)
@@ -219,6 +221,7 @@ export async function recordSale(
 export async function recordSalesReturn(
   client: PoolClient,
   companyId: string,
+  warehouseId: string | null,
   productId: string,
   quantity: number,
   returnUnitCost: number, // Use the unit_cost registered in invoice_items originally
@@ -254,18 +257,18 @@ export async function recordSalesReturn(
     // Return back to inventory layers: create a special layer for returned goods
     const layerId = uuidv4();
     await client.query(
-      `INSERT INTO inventory_layers (id, company_id, product_id, purchase_date, original_qty, qty_remaining, unit_cost, reference_type, reference_id, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
-      [layerId, companyId, productId, date, quantity, quantity, returnUnitCost, 'returns', referenceId]
+      `INSERT INTO inventory_layers (id, company_id, product_id, purchase_date, original_qty, qty_remaining, unit_cost, reference_type, reference_id, created_at, warehouse_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+      [layerId, companyId, productId, date, quantity, quantity, returnUnitCost, 'returns', referenceId, warehouseId]
     );
   }
 
   // Insert into inventory_movements
   const movementId = uuidv4();
   await client.query(
-    `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
-    [movementId, companyId, productId, 'sales_return', referenceId, 'returns', referenceNumber, date, quantity, returnUnitCost, totalCost]
+    `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at, warehouse_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())`,
+    [movementId, companyId, productId, 'sales_return', referenceId, 'returns', referenceNumber, date, quantity, returnUnitCost, totalCost, warehouseId]
   );
 
   // Update stock and cost price
@@ -284,6 +287,7 @@ export async function recordSalesReturn(
 export async function recordPurchaseReturn(
   client: PoolClient,
   companyId: string,
+  warehouseId: string | null,
   productId: string,
   quantity: number,
   returnUnitCost: number, // Unit cost from original purchase
@@ -338,9 +342,9 @@ export async function recordPurchaseReturn(
   // Insert into inventory_movements
   const movementId = uuidv4();
   await client.query(
-    `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
-    [movementId, companyId, productId, 'purchase_return', referenceId, 'purchase_returns', referenceNumber, date, -quantity, returnUnitCost, -totalCost]
+    `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at, warehouse_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())`,
+    [movementId, companyId, productId, 'purchase_return', referenceId, 'purchase_returns', referenceNumber, date, -quantity, returnUnitCost, -totalCost, warehouseId]
   );
 
   // Update stock
@@ -359,6 +363,7 @@ export async function recordPurchaseReturn(
 export async function recordAdjustment(
   client: PoolClient,
   companyId: string,
+  warehouseId: string | null,
   productId: string,
   quantity: number, // positive for addition, negative for deduction
   unitCost: number, // cost of adding or standard cost
@@ -394,18 +399,18 @@ export async function recordAdjustment(
       // Create layer
       const layerId = uuidv4();
       await client.query(
-        `INSERT INTO inventory_layers (id, company_id, product_id, purchase_date, original_qty, qty_remaining, unit_cost, reference_type, reference_id, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
-        [layerId, companyId, productId, date, quantity, quantity, unitCost, 'adjustment', referenceId]
+        `INSERT INTO inventory_layers (id, company_id, product_id, purchase_date, original_qty, qty_remaining, unit_cost, reference_type, reference_id, created_at, warehouse_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+        [layerId, companyId, productId, date, quantity, quantity, unitCost, 'adjustment', referenceId, warehouseId]
       );
     }
 
     // Insert into inventory_movements
     const movementId = uuidv4();
     await client.query(
-      `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
-      [movementId, companyId, productId, 'adjustment', referenceId, 'adjustment', referenceNumber, date, quantity, unitCost, totalCost]
+      `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at, warehouse_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())`,
+      [movementId, companyId, productId, 'adjustment', referenceId, 'adjustment', referenceNumber, date, quantity, unitCost, totalCost, warehouseId]
     );
 
     // Update stock and cost
@@ -453,9 +458,9 @@ export async function recordAdjustment(
     // Insert into inventory_movements
     const movementId = uuidv4();
     await client.query(
-      `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
-      [movementId, companyId, productId, 'adjustment', referenceId, 'adjustment', referenceNumber, date, -remQty, actualUnitCost, -calculatedCost]
+      `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at, warehouse_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())`,
+      [movementId, companyId, productId, 'adjustment', referenceId, 'adjustment', referenceNumber, date, -remQty, actualUnitCost, -calculatedCost, warehouseId]
     );
 
     // Update stock only

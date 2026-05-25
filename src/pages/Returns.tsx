@@ -134,10 +134,12 @@ export const Returns: React.FC = () => {
 
   // Form State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [paymentType, setPaymentType] = useState<'credit' | 'cash'>('credit');
   const [paymentMethodId, setPaymentMethodId] = useState<string>('');
   const [items, setItems] = useState<ReturnItem[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -157,6 +159,7 @@ export const Returns: React.FC = () => {
       const unsubProducts = dbService.subscribe<Product>('products', user.company_id, setProducts);
       const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
       const unsubPaymentMethods = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setPaymentMethods);
+      const unsubWarehouses = dbService.subscribe<any>('warehouses', user.company_id, setWarehouses);
       
       setLoading(false);
       return () => {
@@ -165,6 +168,7 @@ export const Returns: React.FC = () => {
         unsubProducts();
         unsubAccounts();
         unsubPaymentMethods();
+        unsubWarehouses();
       };
     }
   }, [user, page, limit, sortBy, sortOrder, searchTerm]);
@@ -442,6 +446,11 @@ export const Returns: React.FC = () => {
       showNotification('يرجى اختيار طريقة الدفع للمرتجع النقدي', 'error');
       return;
     }
+
+    if (!selectedWarehouseId) {
+      showNotification('يرجى اختيار المخزن', 'error');
+      return;
+    }
     
     const validItems = items.filter(item => item.product_id);
     if (validItems.length === 0) {
@@ -468,6 +477,7 @@ export const Returns: React.FC = () => {
         return_number,
         customer_id: selectedCustomerId, 
         customer_name: customer?.name || '',
+        warehouse_id: selectedWarehouseId,
         date, 
         items: sanitizedItems,
         total_amount,
@@ -628,6 +638,7 @@ export const Returns: React.FC = () => {
 
         setEditingReturn(fullData);
         setSelectedCustomerId(fullData.customer_id);
+        setSelectedWarehouseId(fullData.warehouse_id || '');
         setDate(fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10));
         setPaymentType(fullData.payment_type);
         setPaymentMethodId(fullData.payment_method_id || '');
@@ -643,6 +654,7 @@ export const Returns: React.FC = () => {
       setEditingReturn(null);
       const newDate = new Date().toISOString().slice(0, 10);
       setSelectedCustomerId('');
+      setSelectedWarehouseId('');
       setDate(newDate);
       setPaymentType('credit');
       setPaymentMethodId('');
@@ -1176,7 +1188,7 @@ export const Returns: React.FC = () => {
                       <span className="text-xs font-bold">{t('returns.basic_info')}</span>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                       <div>
                         <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('returns.column_number')}</label>
                         <div className="relative">
@@ -1213,6 +1225,23 @@ export const Returns: React.FC = () => {
                             <option value="new_customer" className="font-bold text-emerald-600">+ {t('customers.add')}</option>
                           </select>
                           <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
+                        <div className="relative group">
+                          <Box className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <select 
+                            required
+                            className={`w-full ${dir === 'rtl' ? 'pr-12' : 'pl-12'} py-3 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm`}
+                            value={selectedWarehouseId}
+                            onChange={(e) => setSelectedWarehouseId(e.target.value)}
+                          >
+                            <option value="">{language === 'ar' ? 'اختر المخزن' : 'Select Warehouse'}</option>
+                            {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                          </select>
+                          <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none group-hover:text-emerald-500 transition-colors`} />
                         </div>
                       </div>
 

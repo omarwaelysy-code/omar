@@ -1373,6 +1373,7 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
             const costInfo = await recordSale(
               client,
               companyId,
+              invData.warehouse_id || null,
               item.product_id,
               quantity,
               invoiceId,
@@ -1691,6 +1692,7 @@ router.post('/returns', authenticateToken, async (req: AuthRequest, res) => {
             await recordSalesReturn(
               client,
               companyId,
+              returnData.warehouse_id || null,
               item.product_id,
               quantity,
               returnUnitCost,
@@ -1821,6 +1823,7 @@ router.post('/purchase_invoices', authenticateToken, async (req: AuthRequest, re
             await recordPurchase(
               client,
               companyId,
+              invData.warehouse_id || null,
               item.product_id,
               qty,
               unitPrice,
@@ -1950,6 +1953,7 @@ router.post('/purchase_returns', authenticateToken, async (req: AuthRequest, res
             await recordPurchaseReturn(
               client,
               companyId,
+              returnData.warehouse_id || null,
               item.product_id,
               qty,
               returnUnitCost,

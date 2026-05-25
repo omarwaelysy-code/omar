@@ -38,6 +38,7 @@ export const PurchaseInvoices: React.FC = () => {
   const { pendingViewDoc, setPendingViewDoc } = useNavigation();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -128,6 +129,7 @@ export const PurchaseInvoices: React.FC = () => {
   // Invoice State
   const [invoiceData, setInvoiceData] = useState({
     supplier_id: '',
+    warehouse_id: '',
     date: new Date().toISOString().slice(0, 10),
     payment_type: 'cash' as 'cash' | 'credit',
     payment_method_id: '',
@@ -165,6 +167,7 @@ export const PurchaseInvoices: React.FC = () => {
       const unsubPM = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setPaymentMethods);
       const unsubCategories = dbService.subscribe<ExpenseCategory>('expense_categories', user.company_id, setCategories);
       const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
+      const unsubWarehouses = dbService.subscribe<any>('warehouses', user.company_id, setWarehouses);
       
       const fetchSettings = async () => {
         const docs = await dbService.getDocsByFilter<any>('settings', user.company_id, [
@@ -197,6 +200,7 @@ export const PurchaseInvoices: React.FC = () => {
         unsubPM();
         unsubCategories();
         unsubAccounts();
+        unsubWarehouses();
       };
     }
   }, [user, page, limit, sortBy, sortOrder, searchTerm]);
@@ -745,6 +749,11 @@ export const PurchaseInvoices: React.FC = () => {
       return;
     }
 
+    if (invoiceData.purchase_type === 'items' && !invoiceData.warehouse_id) {
+      showNotification('يرجى اختيار المخزن', 'error');
+      return;
+    }
+
     try {
       const supplier = suppliers.find(s => s.id === invoiceData.supplier_id);
       const paymentMethod = paymentMethods.find(pm => pm.id === invoiceData.payment_method_id);
@@ -768,6 +777,7 @@ export const PurchaseInvoices: React.FC = () => {
         invoice_number,
         supplier_id: invoiceData.supplier_id,
         supplier_name: supplier?.name || '',
+        warehouse_id: invoiceData.warehouse_id,
         date: invoiceData.date, 
         subtotal,
         discount_amount,
@@ -974,6 +984,7 @@ export const PurchaseInvoices: React.FC = () => {
         setEditingInvoice(fullData);
         setInvoiceData({
           supplier_id: fullData.supplier_id.toString(),
+          warehouse_id: fullData.warehouse_id?.toString() || '',
           date: fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
           payment_type: fullData.payment_type || 'cash',
           payment_method_id: fullData.payment_method_id?.toString() || '',
@@ -1002,6 +1013,7 @@ export const PurchaseInvoices: React.FC = () => {
       const newDate = new Date().toISOString().slice(0, 10);
       setInvoiceData({
         supplier_id: '',
+        warehouse_id: '',
         date: newDate,
         payment_type: 'cash',
         payment_method_id: '',
@@ -1089,6 +1101,7 @@ export const PurchaseInvoices: React.FC = () => {
     setEditingInvoice(null);
     setInvoiceData({
       supplier_id: '',
+      warehouse_id: '',
       date: new Date().toISOString().slice(0, 10),
       payment_type: 'cash',
       payment_method_id: '',
@@ -1534,7 +1547,7 @@ export const PurchaseInvoices: React.FC = () => {
                         </button>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
+                      <div className={`grid grid-cols-1 md:grid-cols-2 ${invoiceData.purchase_type === 'items' ? 'lg:grid-cols-3' : ''} gap-6 pt-4 border-t border-slate-100`}>
                         <div>
                           <label className="block text-sm font-medium text-slate-700 mb-2">{t('pi.supplier')}</label>
                           <div className="relative">
@@ -1558,6 +1571,25 @@ export const PurchaseInvoices: React.FC = () => {
                             <ChevronDown className="absolute end-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
                           </div>
                         </div>
+
+                        {invoiceData.purchase_type === 'items' && (
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
+                            <div className="relative">
+                              <Box className="absolute start-3 top-2.5 text-slate-400" size={16} />
+                              <select 
+                                required
+                                className="w-full ps-10 pe-10 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-800 appearance-none"
+                                value={invoiceData.warehouse_id}
+                                onChange={(e) => setInvoiceData({...invoiceData, warehouse_id: e.target.value})}
+                              >
+                                <option value="">{language === 'ar' ? 'اختر المخزن' : 'Select Warehouse'}</option>
+                                {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                              </select>
+                              <ChevronDown className="absolute end-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                            </div>
+                          </div>
+                        )}
 
                         <div>
                           <label className="block text-sm font-medium text-slate-700 mb-2">{t('common.date')}</label>

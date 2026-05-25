@@ -130,6 +130,7 @@ CREATE TABLE IF NOT EXISTS invoices (
     id VARCHAR(36) PRIMARY KEY,
     company_id VARCHAR(36) REFERENCES companies(id),
     customer_id VARCHAR(36) REFERENCES customers(id),
+    warehouse_id VARCHAR(36),
     invoice_number VARCHAR(50) NOT NULL,
     date DATE NOT NULL,
     due_date DATE,

@@ -71,10 +71,16 @@ async function startServer() {
       
       // Returns
       'ALTER TABLE "returns" ADD COLUMN IF NOT EXISTS "description" TEXT',
+      'ALTER TABLE "returns" ADD COLUMN IF NOT EXISTS "warehouse_id" VARCHAR(36)',
       'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "description" TEXT',
+      'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "warehouse_id" VARCHAR(36)',
       'ALTER TABLE "purchase_returns" ADD COLUMN IF NOT EXISTS "description" TEXT',
+      'ALTER TABLE "purchase_returns" ADD COLUMN IF NOT EXISTS "warehouse_id" VARCHAR(36)',
       'ALTER TABLE "purchase_invoice_items" ADD COLUMN IF NOT EXISTS "expense_category_id" VARCHAR(36)',
       'ALTER TABLE "purchase_return_items" ADD COLUMN IF NOT EXISTS "expense_category_id" VARCHAR(36)',
+      'ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "warehouse_id" VARCHAR(36)',
+      'ALTER TABLE "inventory_movements" ADD COLUMN IF NOT EXISTS "warehouse_id" VARCHAR(36)',
+      'ALTER TABLE "inventory_layers" ADD COLUMN IF NOT EXISTS "warehouse_id" VARCHAR(36)',
       
       // Other
       'ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "required_sub_account" BOOLEAN DEFAULT FALSE',

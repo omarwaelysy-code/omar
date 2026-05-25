@@ -81,6 +81,7 @@ export const PurchaseReturns: React.FC = () => {
     setEditingReturn(null);
     setReturnData({
       supplier_id: '',
+      warehouse_id: '',
       date: new Date().toISOString().slice(0, 10),
       payment_type: 'credit',
       payment_method_id: '',
@@ -147,6 +148,7 @@ export const PurchaseReturns: React.FC = () => {
 
   const [returnData, setReturnData] = useState({
     supplier_id: '',
+    warehouse_id: '',
     date: new Date().toISOString().slice(0, 10),
     payment_type: 'credit' as 'credit' | 'cash',
     payment_method_id: '',
@@ -154,6 +156,7 @@ export const PurchaseReturns: React.FC = () => {
   });
 
   const [items, setItems] = useState<{ product_id: string; quantity: number; cost_price: number }[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -173,6 +176,7 @@ export const PurchaseReturns: React.FC = () => {
       const unsubProducts = dbService.subscribe<Product>('products', user.company_id, setProducts);
       const unsubPM = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setPaymentMethods);
       const unsubAccounts = dbService.subscribe<any>('accounts', user.company_id, setAccounts);
+      const unsubWarehouses = dbService.subscribe<any>('warehouses', user.company_id, setWarehouses);
       
       setLoading(false);
       return () => {
@@ -181,6 +185,7 @@ export const PurchaseReturns: React.FC = () => {
         unsubProducts();
         unsubPM();
         unsubAccounts();
+        unsubWarehouses();
       };
     }
   }, [user, page, limit, sortBy, sortOrder, searchTerm]);
@@ -465,6 +470,11 @@ export const PurchaseReturns: React.FC = () => {
       return;
     }
 
+    if (!returnData.warehouse_id) {
+      showNotification('يرجى اختيار المخزن', 'error');
+      return;
+    }
+
     try {
       const supplier = suppliers.find(s => s.id === returnData.supplier_id);
       const paymentMethod = paymentMethods.find(pm => pm.id === returnData.payment_method_id);
@@ -487,6 +497,7 @@ export const PurchaseReturns: React.FC = () => {
         return_number,
         supplier_id: returnData.supplier_id,
         supplier_name: supplier?.name || '',
+        warehouse_id: returnData.warehouse_id,
         date: returnData.date, 
         items: sanitizedItems,
         total_amount,
@@ -645,6 +656,7 @@ export const PurchaseReturns: React.FC = () => {
     const newDate = new Date().toISOString().slice(0, 10);
     setReturnData({
       supplier_id: '',
+      warehouse_id: '',
       date: newDate,
       payment_type: 'credit',
       payment_method_id: '',
@@ -669,6 +681,7 @@ export const PurchaseReturns: React.FC = () => {
       setReturnNumber(fullData.return_number);
       setReturnData({
         supplier_id: fullData.supplier_id,
+        warehouse_id: fullData.warehouse_id || '',
         date: fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
         payment_type: fullData.payment_type || 'credit',
         payment_method_id: fullData.payment_method_id || '',
@@ -1236,7 +1249,7 @@ export const PurchaseReturns: React.FC = () => {
                       <span className="text-xs font-bold">البيانات الأساسية</span>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                       <div>
                         <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">رقم المرتجع</label>
                         <div className="relative">
@@ -1269,6 +1282,23 @@ export const PurchaseReturns: React.FC = () => {
                             <option value="">اختر المورد...</option>
                             {suppliers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
                             <option value="new" className="font-bold text-emerald-600">+ إضافة مورد جديد...</option>
+                          </select>
+                          <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
+                        <div className="relative group">
+                          <Box className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <select 
+                            required
+                            className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
+                            value={returnData.warehouse_id}
+                            onChange={(e) => setReturnData({...returnData, warehouse_id: e.target.value})}
+                          >
+                            <option value="">{language === 'ar' ? 'اختر المخزن...' : 'Select Warehouse...'}</option>
+                            {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                           </select>
                           <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                         </div>

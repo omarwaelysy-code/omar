@@ -40,6 +40,7 @@ describe('Inventory Costing Engine', () => {
     const result = await recordPurchase(
       client,
       mockCompanyId,
+      'test_warehouse_id',
       mockProductId,
       5,
       20,
@@ -68,6 +69,7 @@ describe('Inventory Costing Engine', () => {
     const result = await recordSale(
       client,
       mockCompanyId,
+      'test_warehouse_id',
       mockProductId,
       2,
       'ref-invoice-2',
@@ -97,6 +99,7 @@ describe('Inventory Costing Engine', () => {
     const result = await recordSale(
       client,
       mockCompanyId,
+      'test_warehouse_id',
       mockProductId,
       5,
       'ref-invoice-3',
@@ -135,6 +138,7 @@ describe('Inventory Costing Engine', () => {
     const result = await recordSale(
       client,
       mockCompanyId,
+      'test_warehouse_id',
       mockProductId,
       4,
       'ref-invoice-4',
@@ -160,6 +164,7 @@ describe('Inventory Costing Engine', () => {
     const result = await recordSalesReturn(
       client,
       mockCompanyId,
+      'test_warehouse_id',
       mockProductId,
       2,
       15,
@@ -188,6 +193,7 @@ describe('Inventory Costing Engine', () => {
     const result = await recordPurchaseReturn(
       client,
       mockCompanyId,
+      'test_warehouse_id',
       mockProductId,
       2,
       15,

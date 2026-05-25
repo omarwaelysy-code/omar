@@ -115,6 +115,7 @@ export const Invoices: React.FC = () => {
 
   // Form State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [discount, setDiscount] = useState<number>(0);
@@ -125,6 +126,7 @@ export const Invoices: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [settings, setSettings] = useState<any>(null);
   const [companyData, setCompanyData] = useState<Company | null>(null);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
   const [view, setView] = useViewPreference('invoices', 'table');
   const [invoiceType, setInvoiceType] = useState<'items' | 'services'>('items');
 
@@ -146,6 +148,7 @@ export const Invoices: React.FC = () => {
       const unsubProducts = dbService.subscribe<Product>('products', user.company_id, setProducts);
       const unsubPM = dbService.subscribe<any>('payment_methods', user.company_id, setPaymentMethods);
       const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
+      const unsubWarehouses = dbService.subscribe<any>('warehouses', user.company_id, setWarehouses);
       
       const fetchSettings = async () => {
         const docs = await dbService.getDocsByFilter<any>('settings', user.company_id, [
@@ -176,6 +179,7 @@ export const Invoices: React.FC = () => {
         unsubProducts();
         unsubPM();
         unsubAccounts();
+        unsubWarehouses();
       };
     }
   }, [user, page, limit, sortBy, sortOrder, searchTerm]);
@@ -485,6 +489,11 @@ export const Invoices: React.FC = () => {
       return;
     }
     
+    if (invoiceType === 'items' && !selectedWarehouseId) {
+      showNotification('يرجى اختيار المخزن', 'error');
+      return;
+    }
+    
     const validItems = items.filter(item => item.product_id);
     if (validItems.length === 0) {
       showNotification('يرجى إضافة أصناف مكتملة للفاتورة', 'error');
@@ -520,6 +529,7 @@ export const Invoices: React.FC = () => {
         invoice_number: invoiceNumber,
         customer_id: selectedCustomerId, 
         customer_name: customer?.name || '',
+        warehouse_id: selectedWarehouseId,
         date, 
         description,
         items: sanitizedItems,
@@ -980,6 +990,7 @@ export const Invoices: React.FC = () => {
   const openModal = async () => {
     setEditingInvoice(null);
     setSelectedCustomerId('');
+    setSelectedWarehouseId('');
     const newDate = new Date().toISOString().slice(0, 10);
     setDate(newDate);
     const num = await generateInvoiceNumber(newDate);
@@ -1007,6 +1018,7 @@ export const Invoices: React.FC = () => {
 
       setEditingInvoice(fullData);
       setSelectedCustomerId(fullData.customer_id);
+      setSelectedWarehouseId(fullData.warehouse_id || '');
       setDate(fullData.date.slice(0, 10));
       setInvoiceNumber(fullData.invoice_number);
       setItems(fullData.items || []);
@@ -1567,7 +1579,7 @@ export const Invoices: React.FC = () => {
                         <span className="text-xs font-bold">invoices.basic_info</span>
                       </div>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <div className="order-3 md:order-1">
                           <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('invoices.column_date')}</label>
                           <div className="relative">
@@ -1582,7 +1594,7 @@ export const Invoices: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="order-2 md:order-2">
+                        <div className="order-2 md:order-2 lg:col-span-1">
                           <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('invoices.form_customer')} {selectedCustomerId ? `(ID: ${selectedCustomerId.slice(-4)})` : ''}</label>
                           <div className="relative group">
                             <select 
@@ -1606,7 +1618,26 @@ export const Invoices: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="order-1 md:order-3">
+                        {invoiceType === 'items' && (
+                          <div className="order-3 md:order-3 lg:col-span-1">
+                            <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
+                            <div className="relative group">
+                              <select 
+                                required
+                                className={`w-full ${dir === 'rtl' ? 'pr-12' : 'pl-12'} py-3 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm`}
+                                value={selectedWarehouseId}
+                                onChange={(e) => setSelectedWarehouseId(e.target.value)}
+                              >
+                                <option value="">{language === 'ar' ? 'اختر المخزن' : 'Select Warehouse'}</option>
+                                {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                              </select>
+                              <Box className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                              <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className={`order-1 ${invoiceType === 'items' ? 'md:order-4' : 'md:order-3'}`}>
                           <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('invoices.column_number')}</label>
                           <div className="relative">
                             <input
