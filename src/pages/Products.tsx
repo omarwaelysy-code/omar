@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Plus, Trash2, X, Package, History, ChevronRight, ChevronLeft, 
   Wallet, Layers, Hash, User, Calendar, Paperclip, LayoutGrid, List,
-  Lock, Camera
+  Lock, Camera, Printer, Download, FileText, RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Barcode from 'react-barcode';
@@ -148,65 +148,73 @@ export const Products: React.FC = () => {
     }
   }, [formData.type, editingProduct, isModalOpen, products, isAutoCode]);
 
+  // Dedicated Stock Card Report states
+  const [reportProduct, setReportProduct] = useState<Product | null>(null);
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const reportTableRef = useRef<HTMLTableElement>(null);
+
+  const loadMovementData = async () => {
+    const targetProduct = reportProduct || editingProduct;
+    if (!user || !targetProduct) return;
+    setLoadingMovements(true);
+    try {
+      const whs = await dbService.list<any>('warehouses', { company_id: user.company_id });
+      setWarehouses(whs || []);
+
+      const mvs = await dbService.list<any>('inventory_movements', { 
+        company_id: user.company_id,
+        product_id: targetProduct.id 
+      });
+
+      const [invs, pinvs, rets, prets] = await Promise.all([
+        dbService.list<any>('invoices', { company_id: user.company_id }),
+        dbService.list<any>('purchase_invoices', { company_id: user.company_id }),
+        dbService.list<any>('returns', { company_id: user.company_id }),
+        dbService.list<any>('purchase_returns', { company_id: user.company_id })
+      ]);
+
+      const map: Record<string, { partner: string, description: string }> = {};
+      (invs || []).forEach(x => {
+        map[x.id] = { 
+          partner: x.customer_name || t('common.customer') || 'عميل', 
+          description: x.description || '' 
+        };
+      });
+      (pinvs || []).forEach(x => {
+        map[x.id] = { 
+          partner: x.supplier_name || t('common.supplier') || 'مورد', 
+          description: x.description || '' 
+        };
+      });
+      (rets || []).forEach(x => {
+        map[x.id] = { 
+          partner: x.customer_name || t('common.customer') || 'عميل', 
+          description: x.description || '' 
+        };
+      });
+      (prets || []).forEach(x => {
+        map[x.id] = { 
+          partner: x.supplier_name || t('common.supplier') || 'مورد', 
+          description: x.description || '' 
+        };
+      });
+
+      setDocMap(map);
+      setMovements(mvs || []);
+    } catch (e) {
+      console.error("Failed to load product movements", e);
+    } finally {
+      setLoadingMovements(false);
+    }
+  };
+
   useEffect(() => {
-    if (user && editingProduct) {
-      const loadMovementData = async () => {
-        setLoadingMovements(true);
-        try {
-          const whs = await dbService.list<any>('warehouses', { company_id: user.company_id });
-          setWarehouses(whs || []);
-
-          const mvs = await dbService.list<any>('inventory_movements', { 
-            company_id: user.company_id,
-            product_id: editingProduct.id 
-          });
-
-          const [invs, pinvs, rets, prets] = await Promise.all([
-            dbService.list<any>('invoices', { company_id: user.company_id }),
-            dbService.list<any>('purchase_invoices', { company_id: user.company_id }),
-            dbService.list<any>('returns', { company_id: user.company_id }),
-            dbService.list<any>('purchase_returns', { company_id: user.company_id })
-          ]);
-
-          const map: Record<string, { partner: string, description: string }> = {};
-          (invs || []).forEach(x => {
-            map[x.id] = { 
-              partner: x.customer_name || t('common.customer') || 'عميل', 
-              description: x.description || '' 
-            };
-          });
-          (pinvs || []).forEach(x => {
-            map[x.id] = { 
-              partner: x.supplier_name || t('common.supplier') || 'مورد', 
-              description: x.description || '' 
-            };
-          });
-          (rets || []).forEach(x => {
-            map[x.id] = { 
-              partner: x.customer_name || t('common.customer') || 'عميل', 
-              description: x.description || '' 
-            };
-          });
-          (prets || []).forEach(x => {
-            map[x.id] = { 
-              partner: x.supplier_name || t('common.supplier') || 'مورد', 
-              description: x.description || '' 
-            };
-          });
-
-          setDocMap(map);
-          setMovements(mvs || []);
-        } catch (e) {
-          console.error("Failed to load product movements", e);
-        } finally {
-          setLoadingMovements(false);
-        }
-      };
+    if (user && (reportProduct || editingProduct)) {
       loadMovementData();
     } else {
       setMovements([]);
     }
-  }, [user, editingProduct]);
+  }, [user, reportProduct, editingProduct]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -342,6 +350,84 @@ export const Products: React.FC = () => {
   };
 
   const handleExportPDF = async () => { if (tableRef.current) await exportToPDFUtil(tableRef.current, { filename: 'Products_Inventory', reportTitle: t('products.list_title') }); };
+
+  const handleExportStockCardExcel = () => {
+    if (!reportProduct) return;
+    const headers = language === 'ar' ? [
+      'التاريخ', 'رقم الحركة', 'نوع الحركة', 'المخزن', 'العميل / المورد', 'الوصف', 
+      'الوارد (+)', 'المصرف (-)', 'رصيد الكمية', 
+      'سياسة التكلفة', 'تكلفة الوحدة', 
+      'قيمة مدين (+)', 'قيمة دائن (-)', 'رصيد القيمة'
+    ] : [
+      'Date', 'Ref Number', 'Movement Type', 'Warehouse', 'Customer/Supplier', 'Description', 
+      'In Quantity (+)', 'Out Quantity (-)', 'Running Qty', 
+      'Cost Policy', 'Unit Cost', 
+      'Debit Value (+)', 'Credit Value (-)', 'Running Balance Value'
+    ];
+
+    const data = filteredMovements.map(m => [
+      m.date.slice(0, 10),
+      m.reference_number || '',
+      getMovementTypeLabel(m.movement_type),
+      m.warehouseName || '',
+      m.partner || '',
+      m.description || '',
+      m.qtyIn || 0,
+      m.qtyOut || 0,
+      m.runningQty || 0,
+      getCostMethodLabel(reportProduct.inventory_cost_method || 'wac'),
+      m.unit_cost || 0,
+      m.debitVal || 0,
+      m.creditVal || 0,
+      m.runningValue || 0
+    ]);
+
+    exportToExcel([headers, ...data], { 
+      filename: `Stock_Card_${reportProduct.name}_${new Date().toISOString().slice(0, 10)}`,
+      sheetName: language === 'ar' ? 'كارت الصنف' : 'Stock Card' 
+    });
+  };
+
+  const handleExportStockCardPDF = async () => {
+    if (reportTableRef.current && reportProduct) {
+      await exportToPDFUtil(reportTableRef.current, {
+        filename: `Stock_Card_${reportProduct.name}`,
+        reportTitle: language === 'ar' 
+          ? `كارت حركة وتكلفة الصنف: ${reportProduct.name} (${reportProduct.code})` 
+          : `Stock Card: ${reportProduct.name} (${reportProduct.code})`
+      });
+    }
+  };
+
+  const handlePrintStockCard = () => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @media print {
+        body * {
+          visibility: hidden !important;
+        }
+        #stock-card-report-area, #stock-card-report-area * {
+          visibility: visible !important;
+        }
+        #stock-card-report-area {
+          position: absolute !important;
+          left: 0 !important;
+          top: 0 !important;
+          width: 100% !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          box-shadow: none !important;
+          border: none !important;
+        }
+        .no-print {
+          display: none !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+    window.print();
+    setTimeout(() => document.head.removeChild(style), 1000);
+  };
 
   const getMovementTypeLabel = (type: string) => {
     switch(type) {
@@ -522,6 +608,17 @@ export const Products: React.FC = () => {
                             </td>
                             <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                                <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1 opacity-0 group-hover:opacity-100 transition-all`}>
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setReportProduct(product);
+                                      setIsReportOpen(true);
+                                    }} 
+                                    className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
+                                    title={language === 'ar' ? 'تقرير حركة وتكلفة الصنف (كارت الصنف)' : 'Product stock card report'}
+                                  >
+                                    <History size={18} />
+                                  </button>
                                   {canDelete && (
                                     <button onClick={async (e) => { 
                                       e.stopPropagation(); 
@@ -569,7 +666,20 @@ export const Products: React.FC = () => {
                             <p className="text-slate-400 text-[10px] uppercase font-black tracking-[0.2em] mb-2">{t('products.column_sale_price')}</p>
                             <p className="font-black text-3xl tracking-tighter leading-none text-emerald-600">{formatNumber(product.sale_price || 0)} <span className="text-xs font-normal text-slate-300 italic serif">{t('invoices.currency')}</span></p>
                           </div>
-                          <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl text-slate-300 group-hover:bg-emerald-600 group-hover:text-white transition-all">{dir === 'rtl' ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}</div>
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReportProduct(product);
+                                setIsReportOpen(true);
+                              }} 
+                              className="p-3 bg-slate-50 border border-slate-100 rounded-2xl text-slate-400 hover:bg-emerald-50 hover:text-emerald-500 transition-all"
+                              title={language === 'ar' ? 'تقرير حركة وتكلفة الصنف (كارت الصنف)' : 'Product stock card report'}
+                            >
+                              <History size={20} />
+                            </button>
+                            <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl text-slate-300 group-hover:bg-emerald-600 group-hover:text-white transition-all">{dir === 'rtl' ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}</div>
+                          </div>
                         </div>
                       </motion.div>
                     ))}
@@ -1074,6 +1184,255 @@ export const Products: React.FC = () => {
                 </div>
               )}
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Standalone Stock Card Report Dialog (خارج الشاشة) */}
+      <AnimatePresence>
+        {isReportOpen && reportProduct && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4 md:p-10"
+            dir={dir}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="bg-white w-full max-w-7xl h-[90vh] rounded-[3.5rem] shadow-2xl flex flex-col overflow-hidden border border-slate-100"
+            >
+              {/* Header */}
+              <div className="p-8 md:p-10 border-b border-slate-100 flex flex-col md:flex-row items-center justify-between bg-white relative gap-4">
+                <div className="flex items-center gap-6">
+                  <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-[2rem] flex items-center justify-center shadow-inner">
+                    <History size={32} />
+                  </div>
+                  <div className="text-right">
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-xs bg-slate-100 px-3 py-1 rounded-lg text-slate-500 font-black border border-slate-200">
+                        {reportProduct.code}
+                      </span>
+                      <h2 className="text-3xl font-black text-slate-900 leading-none tracking-tight">
+                        {language === 'ar' ? 'كارت حركة وتكلفة الصنف' : 'Product Stock Card'}
+                      </h2>
+                    </div>
+                    <p className="text-slate-500 text-sm font-bold mt-2">
+                      {language === 'ar' ? `الصنف: ${reportProduct.name}` : `Product: ${reportProduct.name}`}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Actions Toolbar */}
+                <div className="flex items-center gap-3 flex-wrap">
+                  {/* Refresh */}
+                  <button 
+                    onClick={loadMovementData} 
+                    className="p-4 bg-slate-50 text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-2xl shadow-sm border border-slate-100 transition-all flex items-center gap-2 font-black text-xs uppercase tracking-widest"
+                    title={language === 'ar' ? 'تحديث' : 'Refresh'}
+                  >
+                    <RefreshCw size={18} className={loadingMovements ? "animate-spin" : ""} />
+                    <span className="hidden sm:inline">{language === 'ar' ? 'تحديث' : 'Refresh'}</span>
+                  </button>
+
+                  {/* Print */}
+                  <button 
+                    onClick={handlePrintStockCard} 
+                    className="p-4 bg-slate-50 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 border border-slate-100 rounded-2xl shadow-sm transition-all flex items-center gap-2 font-black text-xs uppercase tracking-widest"
+                    title={language === 'ar' ? 'طباعة التقرير' : 'Print'}
+                  >
+                    <Printer size={18} />
+                    <span className="hidden sm:inline">{language === 'ar' ? 'طباعة' : 'Print'}</span>
+                  </button>
+
+                  {/* PDF */}
+                  <button 
+                    onClick={handleExportStockCardPDF} 
+                    className="p-4 bg-slate-50 text-slate-600 hover:text-rose-700 hover:bg-rose-50 border border-slate-100 rounded-2xl shadow-sm transition-all flex items-center gap-2 font-black text-xs uppercase tracking-widest"
+                    title={language === 'ar' ? 'تحميل PDF' : 'Download PDF'}
+                  >
+                    <FileText size={18} />
+                    <span className="hidden sm:inline">PDF</span>
+                  </button>
+
+                  {/* Excel */}
+                  <button 
+                    onClick={handleExportStockCardExcel} 
+                    className="p-4 bg-slate-50 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 border border-slate-100 rounded-2xl shadow-sm transition-all flex items-center gap-2 font-black text-xs uppercase tracking-widest"
+                    title={language === 'ar' ? 'تحميل اكسيل' : 'Download Excel'}
+                  >
+                    <Download size={18} />
+                    <span className="hidden sm:inline">{language === 'ar' ? 'إكسيل' : 'Excel'}</span>
+                  </button>
+
+                  {/* Close button */}
+                  <button 
+                    onClick={() => {
+                      setIsReportOpen(false);
+                      setReportProduct(null);
+                    }} 
+                    className="w-14 h-14 bg-slate-50 hover:bg-rose-50 hover:text-rose-600 text-slate-400 border border-slate-200 rounded-[1.5rem] flex items-center justify-center transition-all shadow-sm"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="p-8 bg-slate-50 border-b border-slate-100 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6 text-right">
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                    {language === 'ar' ? 'من تاريخ' : 'Date From'}
+                  </label>
+                  <input 
+                    type="date" 
+                    className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 outline-none focus:ring-4 focus:ring-emerald-500/5 transition-all text-right shadow-sm"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                    {language === 'ar' ? 'إلى تاريخ' : 'Date To'}
+                  </label>
+                  <input 
+                    type="date" 
+                    className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 outline-none focus:ring-4 focus:ring-emerald-500/5 transition-all text-right shadow-sm"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2 relative">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                    {language === 'ar' ? 'نوع الحركة' : 'Movement Type'}
+                  </label>
+                  <select 
+                    className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 outline-none focus:ring-4 focus:ring-emerald-500/5 transition-all text-right appearance-none shadow-sm"
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value)}
+                  >
+                    <option value="">{language === 'ar' ? 'الكل' : 'All'}</option>
+                    <option value="purchase">{language === 'ar' ? 'فاتورة شراء' : 'Purchase Invoice'}</option>
+                    <option value="sale">{language === 'ar' ? 'فاتورة بيع' : 'Sales Invoice'}</option>
+                    <option value="sales_return">{language === 'ar' ? 'مردود مبيعات' : 'Sales Return'}</option>
+                    <option value="purchase_return">{language === 'ar' ? 'مردود مشتريات' : 'Purchase Return'}</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                    {language === 'ar' ? 'رقم الحركة' : 'Movement Number'}
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder={language === 'ar' ? 'البحث بالرقم...' : 'Search by number...'}
+                    className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder:text-slate-300 outline-none focus:ring-4 focus:ring-emerald-500/5 transition-all text-right shadow-sm"
+                    value={filterRefNum}
+                    onChange={(e) => setFilterRefNum(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                    {language === 'ar' ? 'العميل / المورد' : 'Customer / Supplier'}
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder={language === 'ar' ? 'اسم العميل أو المورد...' : 'Partner name...'}
+                    className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder:text-slate-300 outline-none focus:ring-4 focus:ring-emerald-500/5 transition-all text-right shadow-sm"
+                    value={filterPartner}
+                    onChange={(e) => setFilterPartner(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Scrollable Document Area targeting ID for print */}
+              <div id="stock-card-report-area" className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-zinc-50/50">
+                {/* Print Title (Hidden in screen, visible in print) */}
+                <div className="hidden print:block mb-8 text-center pb-6 border-b border-slate-200">
+                  <h1 className="text-3xl font-black">{language === 'ar' ? 'تقرير حركة وتكلفة الصنف (كارت الصنف)' : 'Product Stock Card Report'}</h1>
+                  <p className="text-slate-500 mt-2 font-black">{language === 'ar' ? `اسم الصنف: ${reportProduct.name} | الرمز: ${reportProduct.code}` : `Product: ${reportProduct.name} | Code: ${reportProduct.code}`}</p>
+                  <p className="text-slate-400 text-xs mt-1">{language === 'ar' ? `تاريخ الطباعة: ${new Date().toLocaleDateString('ar-EG')}` : `Printed on: ${new Date().toLocaleDateString()}`}</p>
+                </div>
+
+                {loadingMovements ? (
+                  <div className="py-20 text-center">
+                    <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  </div>
+                ) : filteredMovements.length === 0 ? (
+                  <div className="p-16 text-center border-2 border-dashed border-slate-100 rounded-[2.5rem] bg-white shadow-sm">
+                    <History className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                    <p className="text-slate-400 font-extrabold text-lg">{language === 'ar' ? 'لا توجد حركات مسجلة لهذا الصنف تطابق الفلاتر المحددة' : 'No recorded movements matching the filters for this product'}</p>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-[2.5rem] border border-slate-200 shadow-md bg-white">
+                    <table ref={reportTableRef} className="w-full min-w-[1250px] border-collapse bg-white">
+                      <thead className="bg-slate-50 text-[10px] uppercase font-black tracking-widest text-slate-400 border-b border-slate-200 text-center select-none">
+                        <tr>
+                          <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                          <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'رقم الحركة' : 'Movement No.'}</th>
+                          <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'نوع الحركة' : 'Movement Type'}</th>
+                          <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'المخزن' : 'Warehouse'}</th>
+                          <th rowSpan={2} className="px-5 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'العميل / المورد' : 'Customer/Supplier'}</th>
+                          <th rowSpan={1} className="px-5 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'الوصف' : 'Description'}</th>
+                          <th colSpan={3} className="px-1.5 py-1.5 border-r border-b border-slate-200 bg-emerald-50/30 text-emerald-800 font-bold">{language === 'ar' ? 'الكمية' : 'Quantity'}</th>
+                          <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'سياسة التكلفة' : 'Cost Policy'}</th>
+                          <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'سعر التكلفة' : 'Unit Cost'}</th>
+                          <th colSpan={3} className="px-1.5 py-1.5 border-b border-slate-200 bg-sky-50/30 text-sky-800 font-bold">{language === 'ar' ? 'القيم المالية للمخزون' : 'Financial Value'}</th>
+                        </tr>
+                        <tr>
+                          <th className="px-5 py-1.5 border-r border-slate-200 whitespace-nowrap text-slate-400 text-[10px]">{language === 'ar' ? 'شرح الحركة' : 'Remark'}</th>
+                          {/* Quantities columns */}
+                          <th className="px-3 py-1.5 border-r border-slate-200 bg-emerald-50/10 text-emerald-600 font-bold whitespace-nowrap">{language === 'ar' ? 'الوارد (+)' : 'In (+)'}</th>
+                          <th className="px-3 py-1.5 border-r border-slate-200 bg-rose-50/10 text-rose-600 font-bold whitespace-nowrap">{language === 'ar' ? 'المصرف (-)' : 'Out (-)'}</th>
+                          <th className="px-3 py-1.5 border-r border-slate-200 bg-emerald-100/30 text-emerald-800 font-black whitespace-nowrap">{language === 'ar' ? 'الرصيد' : 'Balance'}</th>
+                          
+                          {/* Values columns */}
+                          <th className="px-3 py-1.5 border-r border-slate-200 bg-sky-50/10 text-sky-600 font-bold whitespace-nowrap">{language === 'ar' ? 'قيمة مدين (+)' : 'Debit Value'}</th>
+                          <th className="px-3 py-1.5 border-r border-slate-200 bg-rose-50/10 text-rose-600 font-bold whitespace-nowrap">{language === 'ar' ? 'قيمة دائن (-)' : 'Credit Value'}</th>
+                          <th className="px-4 py-1.5 bg-blue-100/30 text-blue-800 font-black whitespace-nowrap">{language === 'ar' ? 'الرصيد' : 'Balance Value'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-xs font-bold text-slate-700 text-center">
+                        {filteredMovements.map((m, index) => (
+                          <tr key={m.id || index} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-4 py-4 border-r border-slate-200 font-mono whitespace-nowrap">{m.date.slice(0, 10)}</td>
+                            <td className="px-4 py-4 border-r border-slate-200 font-mono whitespace-nowrap text-slate-500">{m.reference_number}</td>
+                            <td className="px-4 py-4 border-r border-slate-200 whitespace-nowrap">
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                m.movement_type === 'purchase' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                                m.movement_type === 'sale' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
+                                m.movement_type === 'sales_return' ? 'bg-teal-50 text-teal-700 border border-teal-100' :
+                                'bg-amber-50 text-amber-700 border border-amber-100'
+                              }`}>
+                                {getMovementTypeLabel(m.movement_type)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-4 border-r border-slate-200 whitespace-nowrap text-slate-600">{m.warehouseName}</td>
+                            <td className="px-5 py-4 border-r border-slate-200 whitespace-nowrap text-slate-800 font-black">{m.partner || '-'}</td>
+                            <td className="px-5 py-4 border-r border-slate-200 text-right text-slate-500 whitespace-normal max-w-[200px] truncate" title={m.description}>{m.description || '-'}</td>
+                            
+                            {/* Quantities */}
+                            <td className="px-3 py-4 border-r border-slate-200 bg-emerald-50/5 font-mono text-slate-800">{m.qtyIn > 0 ? formatNumber(m.qtyIn) : '-'}</td>
+                            <td className="px-3 py-4 border-r border-slate-200 bg-rose-50/5 font-mono text-slate-800">{m.qtyOut > 0 ? formatNumber(m.qtyOut) : '-'}</td>
+                            <td className="px-3 py-4 border-r border-slate-200 bg-emerald-50/20 font-black font-mono text-emerald-700">{formatNumber(m.runningQty)}</td>
+                            
+                            {/* Cost Policy & Cost Price */}
+                            <td className="px-4 py-4 border-r border-slate-200 text-[10px] font-bold text-zinc-500 whitespace-nowrap">{getCostMethodLabel(reportProduct.inventory_cost_method || 'wac')}</td>
+                            <td className="px-4 py-4 border-r border-slate-200 font-mono text-slate-800">{formatNumber(m.unit_cost)}</td>
+                            
+                            {/* Values */}
+                            <td className="px-3 py-4 border-r border-slate-200 bg-sky-50/5 font-mono text-slate-800">{m.debitVal > 0 ? formatNumber(m.debitVal) : '-'}</td>
+                            <td className="px-3 py-4 border-r border-slate-200 bg-rose-50/5 font-mono text-slate-800">{m.creditVal > 0 ? formatNumber(m.creditVal) : '-'}</td>
+                            <td className="px-4 py-4 bg-blue-50/20 font-black font-mono text-blue-700">{formatNumber(m.runningValue)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
