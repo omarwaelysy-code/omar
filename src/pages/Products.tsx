@@ -569,14 +569,18 @@ export const Products: React.FC = () => {
                                 </div>
                               </div>
                            </div>
-                           <div className="space-y-4">
-                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('products.form_stock_quantity')}</label>
-                              <input type="number" className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner" value={formData.stock || ''} onChange={(e) => setFormData({ ...formData, stock: parseFloat(e.target.value) || 0 })} />
-                           </div>
-                           <div className="space-y-4">
-                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('products.form_min_stock')}</label>
-                              <input type="number" className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black outline-none focus:bg-white focus:ring-8 focus:ring-rose-500/5 transition-all shadow-inner" value={formData.min_stock || ''} onChange={(e) => setFormData({ ...formData, min_stock: parseFloat(e.target.value) || 0 })} />
-                           </div>
+                           {formData.type !== 'service' && (
+                             <>
+                               <div className="space-y-4">
+                                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('products.form_stock_quantity')}</label>
+                                  <input disabled type="number" className="w-full px-8 py-5 bg-slate-100 border border-slate-100 rounded-[2rem] text-xl font-black outline-none transition-all shadow-inner opacity-60 cursor-not-allowed" value={formData.stock || ''} onChange={(e) => setFormData({ ...formData, stock: parseFloat(e.target.value) || 0 })} />
+                               </div>
+                               <div className="space-y-4">
+                                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('products.form_min_stock')}</label>
+                                  <input type="number" className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black outline-none focus:bg-white focus:ring-8 focus:ring-rose-500/5 transition-all shadow-inner" value={formData.min_stock || ''} onChange={(e) => setFormData({ ...formData, min_stock: parseFloat(e.target.value) || 0 })} />
+                               </div>
+                             </>
+                           )}
                         </div>
                      </div>
 
