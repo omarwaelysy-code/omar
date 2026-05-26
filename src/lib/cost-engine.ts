@@ -24,14 +24,14 @@ async function getCompanyCostMethod(client: PoolClient, companyId: string, produ
     if (settings.inventory_cost_method_level === 'item' && productId) {
       const productRes = await client.query('SELECT inventory_cost_method FROM products WHERE id = $1', [productId]);
       if (productRes.rows.length > 0 && productRes.rows[0].inventory_cost_method) {
-        const productMethod = productRes.rows[0].inventory_cost_method;
+        const productMethod = String(productRes.rows[0].inventory_cost_method).toLowerCase();
         if (productMethod === 'fifo' || productMethod === 'lifo' || productMethod === 'wac') {
-          return productMethod;
+          return productMethod as 'fifo' | 'lifo' | 'wac';
         }
       }
     }
 
-    const method = settings.inventory_cost_method;
+    const method = (settings.inventory_cost_method || '').toLowerCase();
     if (method === 'fifo' || method === 'lifo' || method === 'wac') {
       return method;
     }
@@ -95,10 +95,10 @@ export async function recordPurchase(
 
   if (method === 'wac') {
     // Moving Average calculation
-    const totalOldValue = oldStock > 0 ? oldStock * oldCost : 0;
+    const totalOldValue = oldStock * oldCost;
     const totalNewValue = totalCost;
     const newStock = oldStock + quantity;
-    if (newStock > 0) {
+    if (newStock !== 0) {
       newCost = (totalOldValue + totalNewValue) / newStock;
     } else {
       newCost = unitCost;
@@ -245,10 +245,10 @@ export async function recordSalesReturn(
 
   if (method === 'wac') {
     // Add back returned inventory at its original cost price
-    const totalOldValue = oldStock > 0 ? oldStock * oldCost : 0;
-    const totalNewValue = totalCost;
+    const totalOldValue = oldStock * oldCost;
+    const totalNewValue = quantity * returnUnitCost;
     const newStock = oldStock + quantity;
-    if (newStock > 0) {
+    if (newStock !== 0) {
       newCost = (totalOldValue + totalNewValue) / newStock;
     } else {
       newCost = returnUnitCost;
@@ -311,10 +311,11 @@ export async function recordPurchaseReturn(
 
   if (method === 'wac') {
     const newStock = oldStock - quantity;
-    if (newStock > 0) {
+    if (newStock !== 0) {
       const totalOldValue = oldStock * oldCost;
-      const totalNewValue = totalCost;
+      const totalNewValue = quantity * returnUnitCost;
       newCost = (totalOldValue - totalNewValue) / newStock;
+      if (newCost < 0) newCost = oldCost; // Prevent negative cost bounds anomalies
     }
   } else {
     // Dedect from existing layers starting from original purchase reference_id if available or any matching unit cost layers
@@ -387,10 +388,10 @@ export async function recordAdjustment(
     let newCost = oldCost;
 
     if (method === 'wac') {
-      const totalOldValue = oldStock > 0 ? oldStock * oldCost : 0;
+      const totalOldValue = oldStock * oldCost;
       const totalNewValue = totalCost;
       const newStock = oldStock + quantity;
-      if (newStock > 0) {
+      if (newStock !== 0) {
         newCost = (totalOldValue + totalNewValue) / newStock;
       } else {
         newCost = unitCost;
