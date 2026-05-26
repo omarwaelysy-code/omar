@@ -10,7 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import * as XLSX from 'xlsx';
 import multer from 'multer';
-import { recordPurchase, recordSale, recordSalesReturn, recordPurchaseReturn } from './cost-engine';
+import { recordPurchase, recordSale, recordSalesReturn, recordPurchaseReturn, recalculateProductStock, reverseAndRecalculate } from './cost-engine';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -1208,7 +1208,6 @@ modules.forEach(moduleName => {
         await client.query('BEGIN');
 
         if (transactionalModules.includes(moduleName)) {
-          const { reverseAndRecalculate } = await import('./cost-engine');
           await reverseAndRecalculate(client, companyId || '', id);
         }
 
@@ -2399,8 +2398,6 @@ router.post('/inventory/recalculate_all', authenticateToken, async (req: AuthReq
     if (!companyId) return sendError(res, 401, 'Unauthorized');
     
     await client.query('BEGIN');
-    const { recalculateProductStock } = await import('./cost-engine');
-    
     // Cleanup orphaned inventory movements + layers
     const types = [
        { type: 'invoice', table: 'invoices' },
@@ -2424,7 +2421,56 @@ router.post('/inventory/recalculate_all', authenticateToken, async (req: AuthReq
          DELETE FROM journal_entries 
          WHERE reference_id NOT IN (SELECT id FROM "${table}")
          AND description LIKE $2
-       `, [`%${type}%`]); // This is fragile for JE, but JEs usually aren't hurting stock. The DB schema doesn't have ref_type on JE. 
+       `, [`%${type}%`]); 
+    }
+
+    // Cleanup movements where the item was removed from the invoice (PUT edits)
+    const itemTypes = [
+       { type: 'invoice', itemTable: 'invoice_items', fkey: 'invoice_id' },
+       { type: 'purchase_invoice', itemTable: 'purchase_invoice_items', fkey: 'invoice_id' },
+       { type: 'returns', itemTable: 'return_items', fkey: 'return_id' }, 
+       { type: 'purchase_returns', itemTable: 'purchase_return_items', fkey: 'return_id' }
+    ];
+
+    for (const { type, itemTable, fkey } of itemTypes) {
+       // Only delete if the item was fully removed. If qty changed, recalculateProductStock handles unit_cost/totals.
+       // However, recalculateProductStock can't handle qty changes if it doesn't update the movement qty!
+       // Since the movement qty isn't linked to the item row... wait, if the movement is completely mismatched, it's safer to delete all movements for this reference_id and re-insert?
+       // I can't re-insert here, this is just trying to fix orphaned ones. Let's at least delete ones where the product_id is missing entirely!
+       await client.query(`
+         DELETE FROM inventory_movements m
+         WHERE m.reference_type = $1 AND m.company_id = $2
+         AND NOT EXISTS (
+            SELECT 1 FROM "${itemTable}" i 
+            WHERE i."${fkey}" = m.reference_id 
+            AND i.product_id = m.product_id
+         )
+       `, [type, companyId]);
+       
+       await client.query(`
+         DELETE FROM inventory_layers m
+         WHERE m.reference_type = $1 AND m.company_id = $2
+         AND NOT EXISTS (
+            SELECT 1 FROM "${itemTable}" i 
+            WHERE i."${fkey}" = m.reference_id 
+            AND i.product_id = m.product_id
+         )
+       `, [type, companyId]);
+
+       // Sync quantities
+       // For sales (invoice, purchase_return) quantity is negative in movements.
+       // For purchases (purchase_invoice, returns) quantity is positive.
+       const isNegativeQty = type === 'invoice' || type === 'purchase_returns';
+       
+       await client.query(`
+         UPDATE inventory_movements m
+         SET quantity = i.quantity * ${isNegativeQty ? -1 : 1}
+         FROM "${itemTable}" i
+         WHERE m.reference_type = $1 AND m.company_id = $2
+         AND i."${fkey}" = m.reference_id 
+         AND i.product_id = m.product_id
+         AND ABS(m.quantity) != i.quantity
+       `, [type, companyId]);
     }
     
     const prodRes = await client.query('SELECT id FROM products WHERE company_id = $1 AND COALESCE(is_service, false) = false AND type != \'service\'', [companyId]);
