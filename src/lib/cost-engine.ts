@@ -51,7 +51,7 @@ async function updateProductDetails(
   if (newCostPrice !== undefined && newCostPrice > 0) {
     await client.query(
       `UPDATE products 
-       SET current_stock = current_stock + $1, stock = stock + $1, cost_price = $2 
+       SET current_stock = current_stock + $1, stock = stock + $1, weighted_average_cost = $2 
        WHERE id = $3`,
       [stockDelta, newCostPrice, productId]
     );
@@ -83,13 +83,13 @@ export async function recordPurchase(
   const totalCost = quantity * unitCost;
 
   // Retrieve product details
-  const productRes = await client.query('SELECT cost_price, stock FROM products WHERE id = $1', [productId]);
+  const productRes = await client.query('SELECT cost_price, stock, weighted_average_cost FROM products WHERE id = $1', [productId]);
   if (productRes.rows.length === 0) {
     throw new Error(`Product not found: ${productId}`);
   }
   const product = productRes.rows[0];
   const oldStock = parseFloat(product.stock || '0');
-  const oldCost = parseFloat(product.cost_price || '0');
+  const oldCost = parseFloat(product.weighted_average_cost || '0') || parseFloat(product.cost_price || '0');
 
   let newCost = oldCost;
 
@@ -149,12 +149,12 @@ export async function recordSale(
   const method = await getCompanyCostMethod(client, companyId, productId);
 
   // Retrieve product details
-  const productRes = await client.query('SELECT cost_price, stock FROM products WHERE id = $1', [productId]);
+  const productRes = await client.query('SELECT cost_price, stock, weighted_average_cost FROM products WHERE id = $1', [productId]);
   if (productRes.rows.length === 0) {
     throw new Error(`Product not found: ${productId}`);
   }
   const product = productRes.rows[0];
-  const costPrice = parseFloat(product.cost_price || '0');
+  const costPrice = parseFloat(product.weighted_average_cost || '0') || parseFloat(product.cost_price || '0');
 
   let totalCost = 0;
   let unitCost = costPrice;
@@ -233,13 +233,13 @@ export async function recordSalesReturn(
   const totalCost = quantity * returnUnitCost;
 
   // Retrieve product details
-  const productRes = await client.query('SELECT cost_price, stock FROM products WHERE id = $1', [productId]);
+  const productRes = await client.query('SELECT cost_price, stock, weighted_average_cost FROM products WHERE id = $1', [productId]);
   if (productRes.rows.length === 0) {
     throw new Error(`Product not found: ${productId}`);
   }
   const product = productRes.rows[0];
   const oldStock = parseFloat(product.stock || '0');
-  const oldCost = parseFloat(product.cost_price || '0');
+  const oldCost = parseFloat(product.weighted_average_cost || '0') || parseFloat(product.cost_price || '0');
 
   let newCost = oldCost;
 
@@ -299,13 +299,13 @@ export async function recordPurchaseReturn(
   const totalCost = quantity * returnUnitCost;
 
   // Retrieve product details
-  const productRes = await client.query('SELECT cost_price, stock FROM products WHERE id = $1', [productId]);
+  const productRes = await client.query('SELECT cost_price, stock, weighted_average_cost FROM products WHERE id = $1', [productId]);
   if (productRes.rows.length === 0) {
     throw new Error(`Product not found: ${productId}`);
   }
   const product = productRes.rows[0];
   const oldStock = parseFloat(product.stock || '0');
-  const oldCost = parseFloat(product.cost_price || '0');
+  const oldCost = parseFloat(product.weighted_average_cost || '0') || parseFloat(product.cost_price || '0');
 
   let newCost = oldCost;
 
@@ -377,13 +377,13 @@ export async function recordAdjustment(
 
   if (quantity > 0) {
     // Inflow
-    const productRes = await client.query('SELECT cost_price, stock FROM products WHERE id = $1', [productId]);
+    const productRes = await client.query('SELECT cost_price, stock, weighted_average_cost FROM products WHERE id = $1', [productId]);
     if (productRes.rows.length === 0) {
       throw new Error(`Product not found: ${productId}`);
     }
     const product = productRes.rows[0];
     const oldStock = parseFloat(product.stock || '0');
-    const oldCost = parseFloat(product.cost_price || '0');
+    const oldCost = parseFloat(product.weighted_average_cost || '0') || parseFloat(product.cost_price || '0');
 
     let newCost = oldCost;
 

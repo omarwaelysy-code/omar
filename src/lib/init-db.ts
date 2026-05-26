@@ -743,6 +743,10 @@ export async function initDatabase() {
     // 2. Safe Indices
     console.log('  - Securing Indices...');
 
+    await safeQuery(`
+      ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "weighted_average_cost" DECIMAL(18, 4) DEFAULT 0;
+    `, 'add weighted_average_cost to products');
+
     await safeQuery('CREATE INDEX IF NOT EXISTS "idx_users_email" ON "users"("email");', 'idx_users_email');
     await safeQuery('CREATE INDEX IF NOT EXISTS "idx_users_company_id" ON "users"("company_id");', 'idx_users_company_id');
 

@@ -15,7 +15,7 @@ describe('Inventory Costing Engine', () => {
         if (queryClean.includes('select settings from companies')) {
           return { rows: [{ settings }] };
         }
-        if (queryClean.includes('select cost_price, stock from products') || queryClean.includes('select * from products')) {
+        if (queryClean.includes('select cost_price, stock from products') || queryClean.includes('select cost_price, stock, weighted_average_cost from products') || queryClean.includes('select * from products')) {
           return { rows: [product] };
         }
         if (queryClean.includes('select * from inventory_layers')) {

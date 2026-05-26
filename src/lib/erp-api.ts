@@ -1687,7 +1687,7 @@ router.post('/returns', authenticateToken, async (req: AuthRequest, res) => {
                ORDER BY created_at DESC LIMIT 1`,
               [item.product_id, companyId]
             );
-            const returnUnitCost = lastSaleRes.rows[0] ? parseFloat(lastSaleRes.rows[0].unit_cost) : parseFloat(prod.cost_price || '0');
+            const returnUnitCost = lastSaleRes.rows[0] ? parseFloat(lastSaleRes.rows[0].unit_cost) : (parseFloat(prod.weighted_average_cost || '0') || parseFloat(prod.cost_price || '0'));
             
             await recordSalesReturn(
               client,
@@ -1949,7 +1949,7 @@ router.post('/purchase_returns', authenticateToken, async (req: AuthRequest, res
         if (prod.type !== 'service' && !prod.is_service) {
           const qty = parseFloat(item.quantity || '0');
           if (qty > 0) {
-            const returnUnitCost = parseFloat(item.unit_price || '0') || parseFloat(prod.cost_price || '0');
+            const returnUnitCost = parseFloat(item.unit_price || '0') || parseFloat(prod.weighted_average_cost || '0') || parseFloat(prod.cost_price || '0');
             await recordPurchaseReturn(
               client,
               companyId,
