@@ -1908,6 +1908,11 @@ export const PurchaseInvoices: React.FC = () => {
                   <div>
                     <p className="text-xs font-bold text-[#a1a1aa] uppercase tracking-widest mb-1">{t('pi.invoice_from')}</p>
                     <p className="text-xl font-bold text-[#18181b]">{viewInvoice.supplier_name}</p>
+                    {viewInvoice.warehouse_id && (
+                      <p className="text-xs text-slate-500 font-medium mt-1">
+                        {language === 'ar' ? 'المخزن:' : 'Warehouse:'} <span className="text-emerald-600 font-bold">{warehouses.find((w: any) => w.id === viewInvoice.warehouse_id)?.name || viewInvoice.warehouse_id}</span>
+                      </p>
+                    )}
                   </div>
                   <div className={t('dir') === 'rtl' ? 'text-left' : 'text-right'}>
                     <p className="text-xs font-bold text-[#a1a1aa] uppercase tracking-widest mb-1">{t('common.date')}</p>

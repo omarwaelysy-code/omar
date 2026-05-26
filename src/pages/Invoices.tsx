@@ -1024,6 +1024,18 @@ export const Invoices: React.FC = () => {
       setEditingInvoice(fullData);
       setSelectedCustomerId(fullData.customer_id);
       setSelectedWarehouseId(fullData.warehouse_id || '');
+      
+      // Determine invoice type based on items or warehouse_id
+      if (fullData.warehouse_id) {
+        setInvoiceType('items');
+      } else {
+        const hasPhysical = (fullData.items || []).some((item: any) => {
+          const prod = products.find(p => p.id === item.product_id);
+          return prod && prod.type !== 'service';
+        });
+        setInvoiceType(hasPhysical ? 'items' : 'services');
+      }
+
       setDate(fullData.date.slice(0, 10));
       setInvoiceNumber(fullData.invoice_number);
       setItems(fullData.items || []);
@@ -2008,6 +2020,11 @@ export const Invoices: React.FC = () => {
                     <p className="text-2xl font-black text-slate-900 tracking-tight">{viewInvoice.customer_name}</p>
                     {viewInvoice.customer_id && (
                       <p className="text-xs text-slate-500 font-medium">كود العميل: {viewInvoice.customer_id.slice(-6).toUpperCase()}</p>
+                    )}
+                    {viewInvoice.warehouse_id && (
+                      <p className="text-xs text-slate-500 font-medium">
+                        {language === 'ar' ? 'المخزن:' : 'Warehouse:'} <span className="text-emerald-600 font-bold">{warehouses.find(w => w.id === viewInvoice.warehouse_id)?.name || viewInvoice.warehouse_id}</span>
+                      </p>
                     )}
                   </div>
                   <div className={`flex flex-col ${dir === 'rtl' ? 'items-start' : 'items-end'} justify-center gap-2`}>

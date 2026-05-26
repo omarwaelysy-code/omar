@@ -1590,6 +1590,11 @@ export const PurchaseReturns: React.FC = () => {
                   <div>
                     <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1" style={{ color: '#71717a' }}>المورد</p>
                     <p className="text-lg font-bold text-zinc-900" style={{ color: '#18181b' }}>{viewReturn.supplier_name}</p>
+                    {viewReturn.warehouse_id && (
+                      <p className="text-xs text-slate-500 font-medium mt-1">
+                        {language === 'ar' ? 'المخزن:' : 'Warehouse:'} <span className="text-emerald-600 font-bold">{warehouses.find((w: any) => w.id === viewReturn.warehouse_id)?.name || viewReturn.warehouse_id}</span>
+                      </p>
+                    )}
                   </div>
                   <div className="text-left">
                     <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1" style={{ color: '#71717a' }}>التاريخ</p>
