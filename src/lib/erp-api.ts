@@ -606,7 +606,7 @@ const modules = [
   'customer_discounts', 'supplier_discounts', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers',
   'system_config', 'audit_logs', 'operation_categories', 'operations', 'operation_fields',
   'departments', 'cost_centers', 'operation_field_values', 'field_operation_categories',
-  'currencies', 'exchange_rates'
+  'currencies', 'exchange_rates', 'inventory_movements', 'inventory_layers'
 ];
 
 // --- Flexible Operations Logic ---

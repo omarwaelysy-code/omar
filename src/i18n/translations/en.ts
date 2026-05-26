@@ -38,6 +38,7 @@ export const en = {
   'nav.supplier_statement': 'Supplier Statement',
   'nav.customer_balances': 'Customer Balances',
   'nav.supplier_balances': 'Supplier Balances',
+  'nav.stock_card_report': 'Product Stock Card Report',
   'nav.sales_report': 'Sales Report',
   'nav.expenses_report': 'Expenses Report',
   'nav.cash_report': 'Cash Report',

@@ -11,6 +11,7 @@ import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
+import { useNavigation } from '../contexts/NavigationContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { Product, Account, Company } from '../types';
@@ -35,6 +36,7 @@ export const Products: React.FC = () => {
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
   const { canView, canCreate, canDelete } = usePermissions('products');
+  const { setCurrentPage, setPendingViewDoc } = useNavigation();
   
   const [products, setProducts] = useState<Product[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -611,8 +613,8 @@ export const Products: React.FC = () => {
                                   <button 
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setReportProduct(product);
-                                      setIsReportOpen(true);
+                                      setPendingViewDoc({ type: 'stock_card', idOrNumber: product.id });
+                                      setCurrentPage('stock_card_report');
                                     }} 
                                     className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
                                     title={language === 'ar' ? 'تقرير حركة وتكلفة الصنف (كارت الصنف)' : 'Product stock card report'}
@@ -670,8 +672,8 @@ export const Products: React.FC = () => {
                             <button 
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setReportProduct(product);
-                                setIsReportOpen(true);
+                                setPendingViewDoc({ type: 'stock_card', idOrNumber: product.id });
+                                setCurrentPage('stock_card_report');
                               }} 
                               className="p-3 bg-slate-50 border border-slate-100 rounded-2xl text-slate-400 hover:bg-emerald-50 hover:text-emerald-500 transition-all"
                               title={language === 'ar' ? 'تقرير حركة وتكلفة الصنف (كارت الصنف)' : 'Product stock card report'}
@@ -840,28 +842,42 @@ export const Products: React.FC = () => {
                         </div>
                      </div>
 
-                      {/* Stock Ledger Report Section */}
+                      {/* Stock Ledger Report Shortcut Banner */}
                       {editingProduct && formData.type !== 'service' && (
-                        <div className="space-y-12 pt-8 border-t border-slate-100">
-                          <div className="flex items-center justify-between border-b border-slate-50 pb-8 flex-wrap gap-4 text-right">
+                        <div className="pt-8 border-t border-slate-100 pb-4">
+                          <div className="bg-emerald-50/50 p-6 rounded-3xl border border-emerald-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-right">
                             <div className="flex items-center gap-4">
                               <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shadow-inner">
                                 <History size={24} />
                               </div>
-                              <div className="text-right">
-                                <h2 className="text-2xl font-black text-slate-900 leading-none tracking-tight uppercase">
-                                  {language === 'ar' ? 'تقرير حركة وتكلفة الصنف (كارت الصنف)' : 'Product Movement & Cost Report (Stock Card)'}
-                                </h2>
-                                <p className="text-slate-400 text-xs font-bold mt-1">
-                                  {language === 'ar' ? 'تقرير تفصيلي بحركات المخزون والتقييم والسياسة المطبقة' : 'Detailed inventory movement, costing, and valuation ledger'}
+                              <div>
+                                <h3 className="text-lg font-black text-slate-900 leading-none">
+                                  {language === 'ar' ? 'كارت حركة وتكلفة الصنف' : 'Product Stock Card'}
+                                </h3>
+                                <p className="text-slate-500 text-xs font-bold mt-1">
+                                  {language === 'ar' ? 'تحليل تفصيلي للحركات الواردة والمصروفة والأسعار والقيم المالية للحركات خارج الشاشة' : 'Detailed offline/independent report showing all logs, entries, values and costing'}
                                 </p>
                               </div>
                             </div>
-                            <div className="flex bg-slate-100 px-5 py-2.5 rounded-2xl border border-slate-200 text-xs font-black text-slate-600">
-                              <span>{language === 'ar' ? 'السياسة المطبقة: ' : 'Applied Policy: '}</span>
-                              <span className="text-emerald-600 ml-1 mr-1">{getCostMethodLabel(formData.inventory_cost_method)}</span>
-                            </div>
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                setIsModalOpen(false); // Close current edit modal first
+                                setPendingViewDoc({ type: 'stock_card', idOrNumber: editingProduct.id });
+                                setCurrentPage('stock_card_report');
+                              }}
+                              className="px-6 py-3 bg-emerald-600 text-white hover:bg-emerald-700 rounded-2xl transition-all font-black text-xs flex items-center gap-2 shadow-sm"
+                            >
+                              <History size={16} />
+                              <span>{language === 'ar' ? 'عرض كارت الصنف الكامل 📊' : 'View Full Stock Card Report'}</span>
+                            </button>
                           </div>
+                        </div>
+                      )}
+                      
+                      {/* Hidden old modal content block to preserve syntax integrity with minimal edits */}
+                      {false && editingProduct && formData.type !== 'service' && (
+                        <div className="hidden">
 
                           {/* Filters Area */}
                           <div className="p-8 bg-slate-50/50 rounded-[2.5rem] border border-slate-100 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 text-right">

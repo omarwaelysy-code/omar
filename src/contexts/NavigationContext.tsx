@@ -60,6 +60,7 @@ const pageLabels: { [key: string]: string } = {
   'system_check': 'فحص النظام',
   'backup_restore': 'النسخ الاحتياطي والاستعادة',
   'audit_logs': 'سجل الرقابة',
+  'stock_card_report': 'كارت الصنف',
 };
 
 export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

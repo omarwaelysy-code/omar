@@ -38,6 +38,7 @@ export const ar = {
   'nav.supplier_statement': 'كشف حساب المورد',
   'nav.customer_balances': 'أرصدة العملاء',
   'nav.supplier_balances': 'أرصدة الموردين',
+  'nav.stock_card_report': 'كارت حركة وتكلفة الصنف',
   'nav.sales_report': 'تقرير المبيعات',
   'nav.expenses_report': 'تقرير المصروفات',
   'nav.cash_report': 'تقرير الخزينة',

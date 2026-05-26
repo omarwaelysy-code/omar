@@ -21,6 +21,7 @@ import { CashTransfers } from './pages/CashTransfers';
 import { Users } from './pages/Users';
 import { CustomerStatement } from './pages/CustomerStatement';
 import { SupplierStatement } from './pages/SupplierStatement';
+import { StockCardReport } from './pages/StockCardReport';
 import { CustomerBalances } from './pages/CustomerBalances';
 import { SupplierBalances } from './pages/SupplierBalances';
 import { SalesReport } from './pages/SalesReport';
@@ -173,6 +174,7 @@ export default function App() {
       case 'users': return <Users />;
       case 'customer_statement': return <CustomerStatement />;
       case 'supplier_statement': return <SupplierStatement />;
+      case 'stock_card_report': return <StockCardReport />;
       case 'customer_balances': return <CustomerBalances />;
       case 'supplier_balances': return <SupplierBalances />;
       case 'sales_report': return <SalesReport />;
