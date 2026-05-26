@@ -1,6 +1,79 @@
 import { PoolClient } from 'pg';
 import { v4 as uuidv4 } from 'uuid';
 
+export async function reverseAndRecalculate(client: PoolClient, companyId: string, referenceId: string) {
+  // Find all affected products
+  const movesRes = await client.query('SELECT DISTINCT product_id FROM inventory_movements WHERE reference_id = $1', [referenceId]);
+  const productIds = movesRes.rows.map(r => r.product_id).filter(Boolean);
+
+  // Delete all old impacts
+  await client.query('DELETE FROM inventory_movements WHERE reference_id = $1', [referenceId]);
+  await client.query('DELETE FROM inventory_layers WHERE reference_id = $1', [referenceId]);
+  await client.query('DELETE FROM journal_entries WHERE reference_id = $1', [referenceId]);
+
+  // Recalculate all affected products
+  for (const pid of productIds) {
+    if (pid) await recalculateProductStock(client, companyId, pid);
+  }
+}
+
+export async function recalculateTransactionsCosting(client: PoolClient, companyId: string, productIds: string[]) {
+  // Utility for putting things in order after new items are added
+  for (const pid of productIds) {
+    if (pid) await recalculateProductStock(client, companyId, pid);
+  }
+}
+
+export async function recalculateProductStock(client: PoolClient, companyId: string, productId: string) {
+  const method = await getCompanyCostMethod(client, companyId, productId);
+  if (method === 'wac') {
+    let stock = 0;
+    let wac = 0;
+    let totalValue = 0;
+
+    const movesRes = await client.query(`
+      SELECT * FROM inventory_movements 
+      WHERE product_id = $1 AND company_id = $2 
+      ORDER BY date ASC, created_at ASC
+    `, [productId, companyId]);
+
+    for (const move of movesRes.rows) {
+      const qty = Math.abs(parseFloat(move.quantity || '0'));
+      const isOutflow = ['sale', 'purchase_return'].includes(move.movement_type) || (move.movement_type === 'adjustment' && parseFloat(move.quantity) < 0);
+      
+      if (!isOutflow) {
+        const moveTotal = parseFloat(move.total_cost || '0');
+        const newStock = stock + qty;
+        if (newStock > 0) {
+           wac = (totalValue + moveTotal) / newStock;
+        }
+        stock = newStock;
+        totalValue = stock * wac;
+      } else {
+        const newMoveTotal = qty * wac;
+        
+        await client.query(`
+          UPDATE inventory_movements 
+          SET unit_cost = $1, total_cost = $2 
+          WHERE id = $3
+        `, [wac, newMoveTotal, move.id]); // Note positive total cost to keep consistency
+        
+        stock = stock - qty;
+        totalValue = stock * wac;
+        if (stock <= 0) {
+           totalValue = 0;
+        }
+      }
+    }
+
+    await client.query(`
+      UPDATE products 
+      SET stock = $1, current_stock = $1, weighted_average_cost = $2, cost_price = $2
+      WHERE id = $3
+    `, [stock, wac, productId]);
+  }
+}
+
 /**
  * Inventory Costing Engine
  * Supports FIFO, LIFO, and Moving Average (WAC) costing methods.

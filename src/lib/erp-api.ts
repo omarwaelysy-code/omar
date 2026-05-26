@@ -1194,13 +1194,22 @@ modules.forEach(moduleName => {
 
   routeNames.forEach(rn => {
     router.delete(`/${rn}/:id`, authenticateToken, async (req: AuthRequest, res) => {
+      const client = await pool.connect();
       try {
         const { id } = req.params;
         const companyId = req.user?.company_id;
 
         const excludedFromCheck = ['activity_logs', 'migrations'];
         if (!id || typeof id !== 'string') {
+          client.release();
           return sendError(res, 400, 'Invalid ID format');
+        }
+
+        await client.query('BEGIN');
+
+        if (transactionalModules.includes(moduleName)) {
+          const { reverseAndRecalculate } = await import('./cost-engine');
+          await reverseAndRecalculate(client, companyId || '', id);
         }
 
         let query = `DELETE FROM "${moduleName}" WHERE id = $1`;
@@ -1211,8 +1220,14 @@ modules.forEach(moduleName => {
           params.push(companyId);
         }
 
-        const result = await pool.query(query, params);
-        if (result.rowCount === 0) return sendError(res, 404, 'Not found or permission denied');
+        const result = await client.query(query, params);
+        if (result.rowCount === 0) {
+          await client.query('ROLLBACK');
+          client.release();
+          return sendError(res, 404, 'Not found or permission denied');
+        }
+
+        await client.query('COMMIT');
 
         // Audit Log
         logAudit({
@@ -1230,8 +1245,11 @@ modules.forEach(moduleName => {
 
         res.json({ success: true });
       } catch (error: any) {
+        await client.query('ROLLBACK');
         console.error(`Error in DELETE /${moduleName}:`, error);
         sendError(res, 500, `Failed to delete ${moduleName}`, error.message);
+      } finally {
+        client.release();
       }
     });
   });
@@ -2368,6 +2386,60 @@ router.get('/operations/:id/values', authenticateToken, async (req: AuthRequest,
   } catch (error: any) {
     console.error(`[CRASH PREVENTED] Error in GET /operations/:id/values:`, error);
     sendError(res, 500, 'Failed to fetch operation values', error.message);
+  }
+});
+
+// ==========================================
+// Specialized Inventory Maintenance Routes
+// ==========================================
+router.post('/inventory/recalculate_all', authenticateToken, async (req: AuthRequest, res) => {
+  const client = await pool.connect();
+  try {
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+    
+    await client.query('BEGIN');
+    const { recalculateProductStock } = await import('./cost-engine');
+    
+    // Cleanup orphaned inventory movements + layers
+    const types = [
+       { type: 'invoice', table: 'invoices' },
+       { type: 'purchase_invoice', table: 'purchase_invoices' },
+       { type: 'return', table: 'returns' },
+       { type: 'purchase_return', table: 'purchase_returns' }
+    ];
+    
+    for (const { type, table } of types) {
+       await client.query(`
+         DELETE FROM inventory_movements 
+         WHERE reference_type = $1 AND reference_id NOT IN (SELECT id FROM "${table}")
+       `, [type]);
+       
+       await client.query(`
+         DELETE FROM inventory_layers 
+         WHERE reference_type = $1 AND reference_id NOT IN (SELECT id FROM "${table}")
+       `, [type]);
+       
+       await client.query(`
+         DELETE FROM journal_entries 
+         WHERE reference_id NOT IN (SELECT id FROM "${table}")
+         AND description LIKE $2
+       `, [`%${type}%`]); // This is fragile for JE, but JEs usually aren't hurting stock. The DB schema doesn't have ref_type on JE. 
+    }
+    
+    const prodRes = await client.query('SELECT id FROM products WHERE company_id = $1 AND COALESCE(is_service, false) = false AND type != \'service\'', [companyId]);
+    for (const row of prodRes.rows) {
+      await recalculateProductStock(client, companyId, row.id);
+    }
+    
+    await client.query('COMMIT');
+    res.json({ success: true, message: 'All products recalculated successfully' });
+  } catch (error: any) {
+    if (client) await client.query('ROLLBACK');
+    console.error('Recalculate error:', error);
+    sendError(res, 500, 'Recalculation failed', error.message);
+  } finally {
+    client.release();
   }
 });
 

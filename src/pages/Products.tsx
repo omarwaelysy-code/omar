@@ -535,6 +535,27 @@ export const Products: React.FC = () => {
                 <button onClick={() => setIsActivityLogOpen(true)} className="w-14 h-14 bg-white text-slate-400 border border-slate-100 rounded-2xl flex items-center justify-center shadow-sm hover:text-emerald-600 hover:border-emerald-100 transition-all active:scale-95">
                   <History size={24} />
                 </button>
+                <button 
+                  onClick={async () => {
+                    if (window.confirm("هل أنت متأكد من إعادة حساب وتقييم المخزون بمتوسط التكلفة؟")) {
+                      try {
+                        const token = localStorage.getItem('token');
+                        await fetch('/api/erp/inventory/recalculate_all', {
+                          method: 'POST',
+                          headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        toast.success("تم إعادة حساب التكلفة للمخزون بنجاح");
+                        window.location.reload();
+                      } catch (e) {
+                         toast.error("حدث خطأ أثناء المعالجة");
+                      }
+                    }
+                  }} 
+                  className="px-6 h-14 bg-white text-orange-500 border border-orange-100 rounded-2xl flex items-center justify-center shadow-sm hover:text-white hover:bg-orange-500 transition-all active:scale-95 font-bold gap-2 text-sm"
+                >
+                  <RefreshCw size={20} />
+                  <span>إعادة الحساب</span>
+                </button>
                 <ExportButtons onExportExcel={handleExportExcel} onExportPDF={handleExportPDF} />
                 {canCreate && (
                   <button 
