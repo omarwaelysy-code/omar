@@ -2405,8 +2405,8 @@ router.post('/inventory/recalculate_all', authenticateToken, async (req: AuthReq
     const types = [
        { type: 'invoice', table: 'invoices' },
        { type: 'purchase_invoice', table: 'purchase_invoices' },
-       { type: 'return', table: 'returns' },
-       { type: 'purchase_return', table: 'purchase_returns' }
+       { type: 'returns', table: 'returns' },
+       { type: 'purchase_returns', table: 'purchase_returns' }
     ];
     
     for (const { type, table } of types) {

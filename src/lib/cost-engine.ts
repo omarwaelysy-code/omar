@@ -51,12 +51,14 @@ export async function recalculateProductStock(client: PoolClient, companyId: str
         totalValue = stock * wac;
       } else {
         const newMoveTotal = qty * wac;
+        const origQty = parseFloat(move.quantity || '0');
+        const sign = origQty < 0 ? -1 : 1;
         
         await client.query(`
           UPDATE inventory_movements 
           SET unit_cost = $1, total_cost = $2 
           WHERE id = $3
-        `, [wac, newMoveTotal, move.id]); // Note positive total cost to keep consistency
+        `, [wac, newMoveTotal * sign, move.id]);
         
         stock = stock - qty;
         totalValue = stock * wac;
