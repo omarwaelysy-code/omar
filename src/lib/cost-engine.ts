@@ -108,7 +108,7 @@ export async function recordPurchase(
     const layerId = uuidv4();
     await client.query(
       `INSERT INTO inventory_layers (id, company_id, product_id, purchase_date, original_qty, qty_remaining, unit_cost, reference_type, reference_id, created_at, warehouse_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)`,
       [layerId, companyId, productId, date, quantity, quantity, unitCost, 'purchase_invoice', referenceId, warehouseId]
     );
     // Cost price is updated to latest purchase unit cost
@@ -119,7 +119,7 @@ export async function recordPurchase(
   const movementId = uuidv4();
   await client.query(
     `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at, warehouse_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12)`,
     [movementId, companyId, productId, 'purchase', referenceId, 'purchase_invoice', referenceNumber, date, quantity, unitCost, totalCost, warehouseId]
   );
 
@@ -201,7 +201,7 @@ export async function recordSale(
   const movementId = uuidv4();
   await client.query(
     `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at, warehouse_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12)`,
     [movementId, companyId, productId, 'sale', referenceId, 'invoice', referenceNumber, date, -quantity, unitCost, -totalCost, warehouseId]
   );
 
@@ -258,7 +258,7 @@ export async function recordSalesReturn(
     const layerId = uuidv4();
     await client.query(
       `INSERT INTO inventory_layers (id, company_id, product_id, purchase_date, original_qty, qty_remaining, unit_cost, reference_type, reference_id, created_at, warehouse_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)`,
       [layerId, companyId, productId, date, quantity, quantity, returnUnitCost, 'returns', referenceId, warehouseId]
     );
   }
@@ -267,7 +267,7 @@ export async function recordSalesReturn(
   const movementId = uuidv4();
   await client.query(
     `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at, warehouse_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12)`,
     [movementId, companyId, productId, 'sales_return', referenceId, 'returns', referenceNumber, date, quantity, returnUnitCost, totalCost, warehouseId]
   );
 
@@ -343,7 +343,7 @@ export async function recordPurchaseReturn(
   const movementId = uuidv4();
   await client.query(
     `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at, warehouse_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12)`,
     [movementId, companyId, productId, 'purchase_return', referenceId, 'purchase_returns', referenceNumber, date, -quantity, returnUnitCost, -totalCost, warehouseId]
   );
 
@@ -400,7 +400,7 @@ export async function recordAdjustment(
       const layerId = uuidv4();
       await client.query(
         `INSERT INTO inventory_layers (id, company_id, product_id, purchase_date, original_qty, qty_remaining, unit_cost, reference_type, reference_id, created_at, warehouse_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)`,
         [layerId, companyId, productId, date, quantity, quantity, unitCost, 'adjustment', referenceId, warehouseId]
       );
     }
@@ -409,7 +409,7 @@ export async function recordAdjustment(
     const movementId = uuidv4();
     await client.query(
       `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at, warehouse_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12)`,
       [movementId, companyId, productId, 'adjustment', referenceId, 'adjustment', referenceNumber, date, quantity, unitCost, totalCost, warehouseId]
     );
 
@@ -459,7 +459,7 @@ export async function recordAdjustment(
     const movementId = uuidv4();
     await client.query(
       `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at, warehouse_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12)`,
       [movementId, companyId, productId, 'adjustment', referenceId, 'adjustment', referenceNumber, date, -remQty, actualUnitCost, -calculatedCost, warehouseId]
     );
 
