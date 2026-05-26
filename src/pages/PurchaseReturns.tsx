@@ -1592,7 +1592,7 @@ export const PurchaseReturns: React.FC = () => {
                     <p className="text-lg font-bold text-zinc-900" style={{ color: '#18181b' }}>{viewReturn.supplier_name}</p>
                     {viewReturn.warehouse_id && (
                       <p className="text-xs text-slate-500 font-medium mt-1">
-                        {language === 'ar' ? 'المخزن:' : 'Warehouse:'} <span className="text-emerald-600 font-bold">{warehouses.find((w: any) => w.id === viewReturn.warehouse_id)?.name || viewReturn.warehouse_id}</span>
+                        {language === 'ar' ? 'المخزن:' : 'Warehouse:'} <span className="text-emerald-600 font-bold">{warehouses.find((w: any) => w.id?.toString() === viewReturn.warehouse_id?.toString())?.name || viewReturn.warehouse_id}</span>
                       </p>
                     )}
                   </div>

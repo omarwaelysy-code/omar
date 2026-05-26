@@ -1910,7 +1910,7 @@ export const PurchaseInvoices: React.FC = () => {
                     <p className="text-xl font-bold text-[#18181b]">{viewInvoice.supplier_name}</p>
                     {viewInvoice.warehouse_id && (
                       <p className="text-xs text-slate-500 font-medium mt-1">
-                        {language === 'ar' ? 'المخزن:' : 'Warehouse:'} <span className="text-emerald-600 font-bold">{warehouses.find((w: any) => w.id === viewInvoice.warehouse_id)?.name || viewInvoice.warehouse_id}</span>
+                        {language === 'ar' ? 'المخزن:' : 'Warehouse:'} <span className="text-emerald-600 font-bold">{warehouses.find((w: any) => w.id?.toString() === viewInvoice.warehouse_id?.toString())?.name || viewInvoice.warehouse_id}</span>
                       </p>
                     )}
                   </div>

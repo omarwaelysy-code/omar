@@ -40,7 +40,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'id', 'company_id', 'type_id', 'parent_id', 'code', 'name', 'opening_balance', 'opening_balance_date', 'required_sub_account', 'is_active', 'created_at'
   ],
   invoices: [
-    'id', 'company_id', 'customer_id', 'customer_name', 'invoice_number', 'date', 'due_date', 'subtotal',
+    'id', 'company_id', 'customer_id', 'customer_name', 'warehouse_id', 'invoice_number', 'date', 'due_date', 'subtotal',
     'tax_amount', 'discount_amount', 'total_amount', 'status', 'payment_type', 
     'payment_method_id', 'payment_method_name', 'description', 'notes', 'created_by', 'created_at'
   ],
@@ -50,7 +50,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'unit_cost', 'total_cost', 'costing_method_used', 'company_id'
   ],
   returns: [
-    'id', 'company_id', 'customer_id', 'customer_name', 'return_number', 'date', 'total_amount', 
+    'id', 'company_id', 'customer_id', 'customer_name', 'warehouse_id', 'return_number', 'date', 'total_amount', 
     'payment_type', 'payment_method_id', 'payment_method_name', 'description', 'notes', 'created_at'
   ],
   return_items: [
@@ -58,7 +58,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'product_name', 'product_code', 'product_image_url'
   ],
   purchase_invoices: [
-    'id', 'company_id', 'supplier_id', 'supplier_name', 'invoice_number', 'date', 'due_date', 'subtotal',
+    'id', 'company_id', 'supplier_id', 'supplier_name', 'warehouse_id', 'invoice_number', 'date', 'due_date', 'subtotal',
     'tax_amount', 'discount_amount', 'total_amount', 'status', 'payment_type', 
     'payment_method_id', 'payment_method_name', 'description', 'notes', 'created_at'
   ],
@@ -67,7 +67,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'product_name', 'category_name', 'product_code', 'product_image_url'
   ],
   purchase_returns: [
-    'id', 'company_id', 'supplier_id', 'supplier_name', 'return_number', 'date', 'total_amount', 
+    'id', 'company_id', 'supplier_id', 'supplier_name', 'warehouse_id', 'return_number', 'date', 'total_amount', 
     'payment_type', 'payment_method_id', 'payment_method_name', 'description', 'notes', 'created_at'
   ],
   purchase_return_items: [

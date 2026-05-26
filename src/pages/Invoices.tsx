@@ -2023,7 +2023,7 @@ export const Invoices: React.FC = () => {
                     )}
                     {viewInvoice.warehouse_id && (
                       <p className="text-xs text-slate-500 font-medium">
-                        {language === 'ar' ? 'المخزن:' : 'Warehouse:'} <span className="text-emerald-600 font-bold">{warehouses.find(w => w.id === viewInvoice.warehouse_id)?.name || viewInvoice.warehouse_id}</span>
+                        {language === 'ar' ? 'المخزن:' : 'Warehouse:'} <span className="text-emerald-600 font-bold">{warehouses.find(w => w.id?.toString() === viewInvoice.warehouse_id?.toString())?.name || viewInvoice.warehouse_id}</span>
                       </p>
                     )}
                   </div>
