@@ -153,6 +153,16 @@ export const StockCardReport: React.FC = () => {
     }
   };
 
+  const getMovementCostPolicyLabel = (mType: string, method: string) => {
+    if (mType === 'purchase') {
+      return language === 'ar' ? 'شراء' : 'Purchase';
+    }
+    if (mType === 'purchase_return') {
+      return language === 'ar' ? 'مرتجع شراء' : 'Purchase Return';
+    }
+    return getCostMethodLabel(method);
+  };
+
   // Processing movements calculation sequentially to get correct running balances
   const sortedMovements = [...movements].sort((a, b) => {
     const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
@@ -227,7 +237,7 @@ export const StockCardReport: React.FC = () => {
       m.qtyIn || 0,
       m.qtyOut || 0,
       m.runningQty || 0,
-      getCostMethodLabel(selectedProduct.inventory_cost_method || 'wac'),
+      getMovementCostPolicyLabel(m.movement_type, selectedProduct.inventory_cost_method || 'wac'),
       m.unit_cost || 0,
       m.debitVal || 0,
       m.creditVal || 0,
@@ -528,7 +538,7 @@ export const StockCardReport: React.FC = () => {
                         
                         {/* Cost Policy & Cost Price */}
                         <td className="px-4 py-4 border-r border-slate-200 text-[10px] text-slate-500 whitespace-nowrap">
-                          {getCostMethodLabel(selectedProduct.inventory_cost_method || 'wac')}
+                          {getMovementCostPolicyLabel(m.movement_type, selectedProduct.inventory_cost_method || 'wac')}
                         </td>
                         <td className="px-4 py-4 border-r border-slate-200 font-mono text-slate-800">{formatNumber(m.unit_cost)}</td>
                         
