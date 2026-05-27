@@ -2695,7 +2695,7 @@ router.post('/inventory/recalculate_all', async (req: any, res) => {
     ];
     for (const { type, table } of tables) {
       await client.query(`DELETE FROM inventory_movements WHERE reference_type = $1 AND reference_id NOT IN (SELECT id FROM "${table}")`, [type]);
-      await client.query(`DELETE FROM journal_entries WHERE reference_id NOT IN (SELECT id FROM "${table}") AND description LIKE $2`, [`%${type}%`]);
+      await client.query(`DELETE FROM journal_entries WHERE reference_id NOT IN (SELECT id FROM "${table}") AND description LIKE $1`, [`%${type}%`]);
     }
 
     // 2. Find references that have duplicates or quantity mismatches
@@ -2776,7 +2776,7 @@ router.post('/inventory/recalculate_all', async (req: any, res) => {
 
       for (const item of itemsRes.rows) {
           const qty = parseFloat(item.quantity || '0');
-          if (qty <= 0) continue;
+          if (qty <= 0 || !item.product_id) continue;
           productsToRecalc.add(item.product_id); // Track modified product
 
           if (refType === 'invoice') {

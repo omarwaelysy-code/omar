@@ -201,19 +201,7 @@ async function startServer() {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 Server ready at http://0.0.0.0:${PORT}`);
     
-    // Auto-trigger full recalculation of inventory to fix any data inconsistencies
-    setTimeout(async () => {
-      try {
-        console.log("🔄 Triggering automatic inventory recalculation...");
-        const res = await fetch(`http://127.0.0.1:${PORT}/api/erp/inventory/recalculate_all`, {
-          method: 'POST'
-        });
-        const data = await res.json().catch(() => ({}));
-        console.log("✅ Automatic inventory recalculation completed:", data);
-      } catch (err: any) {
-        console.error("⚠️ Failed to trigger inventory recalculation:", err.message);
-      }
-    }, 2000);
+    // Removed auto trigger
   });
 }
 
