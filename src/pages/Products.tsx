@@ -540,14 +540,19 @@ export const Products: React.FC = () => {
                     if (window.confirm("هل أنت متأكد من إعادة حساب وتقييم المخزون بمتوسط التكلفة؟")) {
                       try {
                         const token = localStorage.getItem('token');
-                        await fetch('/api/erp/inventory/recalculate_all', {
+                        const req = await fetch('/api/erp/inventory/recalculate_all', {
                           method: 'POST',
                           headers: { 'Authorization': `Bearer ${token}` }
                         });
+                        const data = await req.json().catch(() => ({}));
+                        if (!req.ok) {
+                           toast.error(data.details || data.error || "حدث خطأ أثناء إعادة الحساب");
+                           return;
+                        }
                         toast.success("تم إعادة حساب التكلفة للمخزون بنجاح");
                         window.location.reload();
-                      } catch (e) {
-                         toast.error("حدث خطأ أثناء المعالجة");
+                      } catch (e: any) {
+                         toast.error(e.message || "حدث خطأ أثناء الاتصال بالخادم");
                       }
                     }
                   }} 

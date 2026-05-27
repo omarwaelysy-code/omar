@@ -113,6 +113,24 @@ async function startServer() {
     }
 
     await runMigrations();
+    
+    // Auto-fix orphaned movements on startup
+    console.log("🧹 Cleaning up orphaned inventory movements...");
+    try {
+      const tables = [
+        { type: 'invoice', table: 'invoices' },
+        { type: 'purchase_invoice', table: 'purchase_invoices' },
+        { type: 'returns', table: 'returns' },
+        { type: 'purchase_returns', table: 'purchase_returns' }
+      ];
+      for (const { type, table } of tables) {
+        await pool.query(`DELETE FROM inventory_movements WHERE reference_type = $1 AND reference_id NOT IN (SELECT id FROM "${table}")`, [type]);
+      }
+      console.log("✅ Orphan cleanup complete.");
+    } catch(err: any) {
+      console.error("⚠️ Failed to clean orphans:", err.message);
+    }
+    
   } catch (err) {
     console.error("❌ CRITICAL: Failed to initialize PostgreSQL database or run migrations. Server will start but may be degraded.");
   }
@@ -182,6 +200,20 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 Server ready at http://0.0.0.0:${PORT}`);
+    
+    // Auto-trigger full recalculation of inventory to fix any data inconsistencies
+    setTimeout(async () => {
+      try {
+        console.log("🔄 Triggering automatic inventory recalculation...");
+        const res = await fetch(`http://127.0.0.1:${PORT}/api/erp/inventory/recalculate_all`, {
+          method: 'POST'
+        });
+        const data = await res.json().catch(() => ({}));
+        console.log("✅ Automatic inventory recalculation completed:", data);
+      } catch (err: any) {
+        console.error("⚠️ Failed to trigger inventory recalculation:", err.message);
+      }
+    }, 2000);
   });
 }
 

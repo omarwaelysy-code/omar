@@ -2742,6 +2742,8 @@ router.post('/inventory/recalculate_all', async (req: any, res) => {
 
     console.log(`[ERP] Recalculate: Found ${badReferenceIds.size} bad references. Fixing...`);
 
+    const productsToRecalc = new Set<string>();
+
     // For each bad reference, delete its movements and re-insert by calling the appropriate record function
     for (const refId of badReferenceIds) {
       const typeRes = await client.query(`SELECT reference_type FROM inventory_movements WHERE reference_id = $1 LIMIT 1`, [refId]);
@@ -2775,6 +2777,7 @@ router.post('/inventory/recalculate_all', async (req: any, res) => {
       for (const item of itemsRes.rows) {
           const qty = parseFloat(item.quantity || '0');
           if (qty <= 0) continue;
+          productsToRecalc.add(item.product_id); // Track modified product
 
           if (refType === 'invoice') {
              await recordSale(client, companyId, parentDoc.warehouse_id || null, item.product_id, qty, refId, parentDoc.invoice_number, parentDoc.date);
@@ -2788,11 +2791,10 @@ router.post('/inventory/recalculate_all', async (req: any, res) => {
       }
     }
 
-    // Now recalculate stock for ALL products to ensure WAC is correct everywhere
-    console.log(`[ERP] Recalculate: Recalculating WAC for all products in company ${companyId}...`);
-    const allProducts = await client.query(`SELECT id FROM products WHERE company_id = $1 AND COALESCE(is_service, false) = false AND type != 'service'`, [companyId]);
-    for (const p of allProducts.rows) {
-        await recalculateProductStock(client, companyId, p.id);
+    // Now recalculate stock for only the modified products
+    console.log(`[ERP] Recalculate: Recalculating WAC for ${productsToRecalc.size} products in company ${companyId}...`);
+    for (const pid of productsToRecalc) {
+        await recalculateProductStock(client, companyId, pid);
     }
 
     await client.query('COMMIT');
