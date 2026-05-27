@@ -1632,21 +1632,212 @@ router.put('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
 
     // Sync Items
     await client.query('DELETE FROM invoice_items WHERE invoice_id = $1', [invoiceId]);
-    for (const item of (items || [])) {
-      const { id: itemIdTrash, ...itemDataRaw } = item;
-      const itemData = sanitizeData('invoice_items', itemDataRaw);
-      const itemId = uuidv4();
-      const finalItemData = { ...itemData, id: itemId, invoice_id: invoiceId };
-      if (companyId) finalItemData.company_id = companyId;
+    await reverseAndRecalculate(client, companyId || '', invoiceId);
 
-      const itemKeys = Object.keys(finalItemData);
+    const invData = invoiceData;
+    const invoiceId = req.params.id;
+for (const item of (items || [])) {
+      const sanitizedItem = sanitizeData('invoice_items', item);
+      const itemId = uuidv4();
+      const itemData = { ...sanitizedItem, id: itemId, invoice_id: invoiceId };
+      if (invData.company_id) itemData.company_id = invData.company_id;
+
+      // Cost Calculation and Layer satisfying
+      // Fetch product details
+      const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
+      if (prodRes.rows.length > 0) {
+        const prod = prodRes.rows[0];
+        if (prod.type !== 'service' && !prod.is_service) {
+          // Perform recordSale
+          const quantity = parseFloat(item.quantity || '0');
+          if (quantity > 0) {
+            const costInfo = await recordSale(
+              client,
+              companyId,
+              invData.warehouse_id || null,
+              item.product_id,
+              quantity,
+              invoiceId,
+              invoiceData.invoice_number,
+              invoiceData.date
+            );
+            
+            itemData.unit_cost = costInfo.unitCost;
+            itemData.total_cost = costInfo.totalCost;
+            itemData.costing_method_used = costInfo.methodUsed;
+
+            // Prepare perpetual queue / continuous inventory posting
+            if (costInfo.totalCost > 0) {
+              // Find accounts
+              // 1. Cost of Goods Sold (COGS) Account
+              let costAccId = prod.cost_account_id;
+              let costAccName = prod.cost_account_name || 'تكلفة المبيعات';
+              
+              // 2. Inventory Account
+              let invAccId = prod.inventory_account_id;
+              let invAccName = prod.inventory_account_name || 'المخزون';
+
+              // Fallbacks if not configured on the product specifically
+              if (!costAccId || !invAccId) {
+                const accountsRes = await client.query('SELECT * FROM accounts WHERE company_id = $1', [companyId]);
+                const accounts = accountsRes.rows;
+                
+                if (!costAccId) {
+                  const fallbackCostAcc = accounts.find((a: any) => a.name.includes('تكلفة المبيعات') || a.name.includes('تكلفة مبيعات') || a.name.includes('تكلفة البضاعة المباعة'));
+                  if (fallbackCostAcc) {
+                    costAccId = fallbackCostAcc.id;
+                    costAccName = fallbackCostAcc.name;
+                  }
+                }
+                if (!invAccId) {
+                  const fallbackInvAcc = accounts.find((a: any) => a.name.includes('مخزون') || a.name.includes('مخازن'));
+                  if (fallbackInvAcc) {
+                    invAccId = fallbackInvAcc.id;
+                    invAccName = fallbackInvAcc.name;
+                  }
+                }
+              }
+
+              if (costAccId) {
+                cogsLines.push({
+                  account_id: costAccId,
+                  account_name: costAccName,
+                  debit: costInfo.totalCost,
+                  credit: 0,
+                  description: `تكلفة البضاعة المباعة صنف: ${prod.name} - فاتورة ${invoiceData.invoice_number}`
+                });
+              }
+              if (invAccId) {
+                cogsLines.push({
+                  account_id: invAccId,
+                  account_name: invAccName,
+                  debit: 0,
+                  credit: costInfo.totalCost,
+                  description: `تخفيض المخزون صنف: ${prod.name} - فاتورة ${invoiceData.invoice_number}`
+                });
+              }
+            }
+          }
+        }
+      }
+
+      const itemKeys = Object.keys(itemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+      
       await client.query(
-        `INSERT INTO invoice_items (${itemKeys.join(', ')}) VALUES (${itemPlaceholders})`,
-        Object.values(finalItemData)
+        `INSERT INTO "invoice_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
+        Object.values(itemData)
       );
     }
 
+    // --- Generate Journal Entry ---
+    console.log('[ERP] Generating Journal Entry...');
+    
+    // Fetch dependencies
+    const { rows: customers } = await client.query('SELECT * FROM customers WHERE company_id = $1', [companyId]);
+    const { rows: productsList } = await client.query('SELECT * FROM products WHERE company_id = $1', [companyId]);
+    const { rows: accounts } = await client.query('SELECT * FROM accounts WHERE company_id = $1', [companyId]);
+    const { rows: paymentMethods } = await client.query('SELECT * FROM payment_methods WHERE company_id = $1', [companyId]);
+    
+    const customer = customers.find((c: any) => c.id === invoiceData.customer_id);
+    const totalAmount = parseFloat(invoiceData.total_amount);
+    const subtotal = parseFloat(invoiceData.subtotal || invoiceData.total_amount);
+    const discount = parseFloat(invoiceData.discount_amount || 0);
+
+    const journalItems: any[] = [];
+    
+    // Debit: Customer or Cash
+    let debitAccountId = '';
+    let debitAccountName = '';
+    
+    if (invoiceData.payment_type === 'cash') {
+      const pm = paymentMethods.find((p: any) => p.id === invoiceData.payment_method_id);
+      debitAccountId = pm?.account_id || accounts.find((a: any) => a.name.includes('خزينة') || a.name.includes('نقدية'))?.id;
+      debitAccountName = pm?.account_name || 'حساب النقدية';
+    } else {
+      debitAccountId = customer?.account_id || accounts.find((a: any) => a.name.includes('عملاء'))?.id;
+      debitAccountName = customer?.account_name || 'حساب العملاء';
+    }
+
+    if (debitAccountId) {
+      journalItems.push({
+        account_id: debitAccountId,
+        account_name: debitAccountName,
+        debit: totalAmount,
+        credit: 0,
+        description: `فاتورة مبيعات رقم ${invoiceData.invoice_number}`,
+        customer_id: invoiceData.customer_id,
+        customer_name: customer?.name || null,
+        sub_account_id: invoiceData.payment_type === 'cash' ? invoiceData.payment_method_id : invoiceData.customer_id,
+        sub_account_type: invoiceData.payment_type === 'cash' ? 'payment_method' : 'customer'
+      });
+    }
+
+    // Discount
+    if (discount > 0) {
+      const discountAcc = accounts.find((a: any) => a.name.includes('خصم مسموح به'));
+      if (discountAcc) {
+        journalItems.push({
+          account_id: discountAcc.id,
+          account_name: discountAcc.name,
+          debit: discount,
+          credit: 0,
+          description: `خصم مسموح به - فاتورة ${invoiceData.invoice_number}`,
+          sub_account_id: null,
+          sub_account_type: null
+        });
+      }
+    }
+
+    // Credit: Revenue
+    const revenueAcc = accounts.find((a: any) => a.name.includes('مبيعات') || a.name.includes('إيراد'));
+    if (revenueAcc) {
+      journalItems.push({
+        account_id: revenueAcc.id,
+        account_name: revenueAcc.name,
+        debit: 0,
+        credit: subtotal,
+        description: `مبيعات - فاتورة ${invoiceData.invoice_number}`,
+        sub_account_id: null,
+        sub_account_type: null
+      });
+    }
+
+    // Append standard perpetual inventory lines (COGS and reduced inventory asset)
+    for (const line of cogsLines) {
+      journalItems.push({
+        account_id: line.account_id,
+        account_name: line.account_name,
+        debit: line.debit,
+        credit: line.credit,
+        description: line.description,
+        customer_id: null,
+        sub_account_id: null,
+        sub_account_type: null
+      });
+    }
+
+    if (journalItems.length > 0) {
+      console.log(`[ERP] Creating Journal Entry with ${journalItems.length} lines`);
+      const journalEntryId = uuidv4();
+      const finalTotalSum = journalItems.reduce((sum, line) => sum + parseFloat(line.debit || 0), 0);
+      
+      await client.query(
+        `INSERT INTO journal_entries (id, company_id, date, description, reference_id, reference_type, reference_number, total_debit, total_credit, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [journalEntryId, companyId, invoiceData.date, `قيد فاتورة مبيعات رقم: ${invoiceData.invoice_number}`, invoiceId, 'invoice', invoiceData.invoice_number, finalTotalSum, finalTotalSum, 'posted']
+      );
+
+      for (const line of journalItems) {
+        await client.query(
+          `INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, company_id, customer_id, sub_account_id, sub_account_type, customer_name, supplier_name)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+          [uuidv4(), journalEntryId, line.account_id, line.account_name, line.description, line.debit, line.credit, companyId, line.customer_id, line.sub_account_id || null, line.sub_account_type || null, line.customer_name || null, line.supplier_name || null]
+        );
+      }
+    }
+
+    
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
@@ -1770,21 +1961,57 @@ router.put('/returns/:id', authenticateToken, async (req: AuthRequest, res) => {
     }
 
     await client.query('DELETE FROM return_items WHERE return_id = $1', [returnId]);
-    for (const item of (items || [])) {
-      const { id: itemIdTrash, ...itemRawData } = item;
-      const sanitizedItem = sanitizeData('return_items', itemRawData);
-      const itemId = uuidv4();
-      const finalItemData = { ...sanitizedItem, id: itemId, return_id: returnId };
-      if (companyId) finalItemData.company_id = companyId;
+    await reverseAndRecalculate(client, companyId || '', returnId);
 
-      const itemKeys = Object.keys(finalItemData);
+    const returnDataFinal = returnData;
+    const returnId = req.params.id;
+for (const item of (items || [])) {
+      const sanitizedItem = sanitizeData('return_items', item);
+      const itemId = uuidv4();
+      const itemData = { ...sanitizedItem, id: itemId, return_id: returnId };
+      if (rData.company_id) itemData.company_id = rData.company_id;
+
+      // Cost and Layer integration for sales return
+      const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
+      if (prodRes.rows.length > 0) {
+        const prod = prodRes.rows[0];
+        if (prod.type !== 'service' && !prod.is_service) {
+          const quantity = parseFloat(item.quantity || '0');
+          if (quantity > 0) {
+            // Retrieve last unit cost sold of this product
+            const lastSaleRes = await client.query(
+              `SELECT unit_cost FROM invoice_items 
+               WHERE product_id = $1 AND company_id = $2 AND unit_cost > 0 
+               ORDER BY created_at DESC LIMIT 1`,
+              [item.product_id, companyId]
+            );
+            const returnUnitCost = lastSaleRes.rows[0] ? parseFloat(lastSaleRes.rows[0].unit_cost) : (parseFloat(prod.weighted_average_cost || '0') || parseFloat(prod.cost_price || '0'));
+            
+            await recordSalesReturn(
+              client,
+              companyId,
+              returnDataFinal.warehouse_id || null,
+              item.product_id,
+              quantity,
+              returnUnitCost,
+              returnId,
+              returnDataFinal.return_number || `RET-${returnId}`,
+              returnDataFinal.date
+            );
+          }
+        }
+      }
+
+      const itemKeys = Object.keys(itemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+      
       await client.query(
         `INSERT INTO "return_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
-        Object.values(finalItemData)
+        Object.values(itemData)
       );
     }
 
+    
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
@@ -1900,22 +2127,50 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
       return sendError(res, 404, 'Purchase Invoice not found or permission denied');
     }
 
-    await client.query('DELETE FROM purchase_invoice_items WHERE invoice_id = $1', [invoiceId]);
-    for (const item of (items || [])) {
-      const { id: itemIdTrash, ...itemRawData } = item;
-      const sanitizedItem = sanitizeData('purchase_invoice_items', itemRawData);
-      const itemId = uuidv4();
-      const finalItemData = { ...sanitizedItem, id: itemId, invoice_id: invoiceId };
-      if (companyId) finalItemData.company_id = companyId;
+    await client.query('DELETE FROM purchase_invoice_items WHERE purchase_invoice_id = $1', [invoiceId]);
+    await reverseAndRecalculate(client, companyId || '', invoiceId);
 
-      const itemKeys = Object.keys(finalItemData);
+    const invData = invoiceData;
+    const invoiceId = req.params.id;
+for (const item of (items || [])) {
+      const sanitizedItem = sanitizeData('purchase_invoice_items', item);
+      const itemId = uuidv4();
+      const itemData = { ...sanitizedItem, id: itemId, invoice_id: invoiceId };
+      if (invData.company_id) itemData.company_id = invData.company_id;
+
+      // Costing and stock update integration for purchases
+      const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
+      if (prodRes.rows.length > 0) {
+        const prod = prodRes.rows[0];
+        if (prod.type !== 'service' && !prod.is_service) {
+          const qty = parseFloat(item.quantity || '0');
+          const unitPrice = parseFloat(item.unit_price || '0');
+          if (qty > 0) {
+            await recordPurchase(
+              client,
+              companyId,
+              invData.warehouse_id || null,
+              item.product_id,
+              qty,
+              unitPrice,
+              invoiceId,
+              invoiceData.invoice_number || `PINV-${invoiceId}`,
+              invoiceData.date
+            );
+          }
+        }
+      }
+
+      const itemKeys = Object.keys(itemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+      
       await client.query(
         `INSERT INTO "purchase_invoice_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
-        Object.values(finalItemData)
+        Object.values(itemData)
       );
     }
 
+    
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
@@ -2030,22 +2285,50 @@ router.put('/purchase_returns/:id', authenticateToken, async (req: AuthRequest, 
       return sendError(res, 404, 'Purchase Return not found or permission denied');
     }
 
-    await client.query('DELETE FROM purchase_return_items WHERE return_id = $1', [returnId]);
-    for (const item of (items || [])) {
-      const { id: itemIdTrash, ...itemRawData } = item;
-      const sanitizedItem = sanitizeData('purchase_return_items', itemRawData);
-      const itemId = uuidv4();
-      const finalItemData = { ...sanitizedItem, id: itemId, return_id: returnId };
-      if (companyId) finalItemData.company_id = companyId;
+    await client.query('DELETE FROM purchase_return_items WHERE purchase_return_id = $1', [returnId]);
+    await reverseAndRecalculate(client, companyId || '', returnId);
 
-      const itemKeys = Object.keys(finalItemData);
+    const returnDataFinal = returnData;
+    const returnId = req.params.id;
+for (const item of (items || [])) {
+      const sanitizedItem = sanitizeData('purchase_return_items', item);
+      const itemId = uuidv4();
+      const itemData = { ...sanitizedItem, id: itemId, return_id: returnId };
+      if (rData.company_id) itemData.company_id = rData.company_id;
+
+      // Cost and stock integration for purchase return
+      const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
+      if (prodRes.rows.length > 0) {
+        const prod = prodRes.rows[0];
+        if (prod.type !== 'service' && !prod.is_service) {
+          const qty = parseFloat(item.quantity || '0');
+          if (qty > 0) {
+            const returnUnitCost = parseFloat(item.unit_price || '0') || parseFloat(prod.weighted_average_cost || '0') || parseFloat(prod.cost_price || '0');
+            await recordPurchaseReturn(
+              client,
+              companyId,
+              returnDataFinal.warehouse_id || null,
+              item.product_id,
+              qty,
+              returnUnitCost,
+              returnId,
+              returnDataFinal.return_number || `PRET-${returnId}`,
+              returnDataFinal.date
+            );
+          }
+        }
+      }
+
+      const itemKeys = Object.keys(itemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+      
       await client.query(
         `INSERT INTO "purchase_return_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
-        Object.values(finalItemData)
+        Object.values(itemData)
       );
     }
 
+    
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
@@ -2398,86 +2681,116 @@ router.post('/inventory/recalculate_all', authenticateToken, async (req: AuthReq
     if (!companyId) return sendError(res, 401, 'Unauthorized');
     
     await client.query('BEGIN');
-    // Cleanup orphaned inventory movements + layers
-    const types = [
-       { type: 'invoice', table: 'invoices' },
-       { type: 'purchase_invoice', table: 'purchase_invoices' },
-       { type: 'returns', table: 'returns' },
-       { type: 'purchase_returns', table: 'purchase_returns' }
-    ];
     
-    for (const { type, table } of types) {
-       await client.query(`
-         DELETE FROM inventory_movements 
-         WHERE reference_type = $1 AND reference_id NOT IN (SELECT id FROM "${table}")
-       `, [type]);
-       
-       await client.query(`
-         DELETE FROM inventory_layers 
-         WHERE reference_type = $1 AND reference_id NOT IN (SELECT id FROM "${table}")
-       `, [type]);
-       
-       await client.query(`
-         DELETE FROM journal_entries 
-         WHERE reference_id NOT IN (SELECT id FROM "${table}")
-         AND description LIKE $2
-       `, [`%${type}%`]); 
+    // 1. Delete fully orphaned movements (where parent transaction doesn't exist at all)
+    const tables = [
+      { type: 'invoice', table: 'invoices' },
+      { type: 'purchase_invoice', table: 'purchase_invoices' },
+      { type: 'returns', table: 'returns' },
+      { type: 'purchase_returns', table: 'purchase_returns' }
+    ];
+    for (const { type, table } of tables) {
+      await client.query(`DELETE FROM inventory_movements WHERE reference_type = $1 AND reference_id NOT IN (SELECT id FROM "${table}")`, [type]);
+      await client.query(`DELETE FROM journal_entries WHERE reference_id NOT IN (SELECT id FROM "${table}") AND description LIKE $2`, [`%${type}%`]);
     }
 
-    // Cleanup movements where the item was removed from the invoice (PUT edits)
+    // 2. Find references that have duplicates or quantity mismatches
     const itemTypes = [
-       { type: 'invoice', itemTable: 'invoice_items', fkey: 'invoice_id' },
-       { type: 'purchase_invoice', itemTable: 'purchase_invoice_items', fkey: 'invoice_id' },
-       { type: 'returns', itemTable: 'return_items', fkey: 'return_id' }, 
-       { type: 'purchase_returns', itemTable: 'purchase_return_items', fkey: 'return_id' }
+       { type: 'invoice', itemTable: 'invoice_items', fkey: 'invoice_id', isNegative: true },
+       { type: 'purchase_invoice', itemTable: 'purchase_invoice_items', fkey: 'invoice_id', isNegative: false },
+       { type: 'returns', itemTable: 'return_items', fkey: 'return_id', isNegative: false }, 
+       { type: 'purchase_returns', itemTable: 'purchase_return_items', fkey: 'return_id', isNegative: true }
     ];
 
-    for (const { type, itemTable, fkey } of itemTypes) {
-       // Only delete if the item was fully removed. If qty changed, recalculateProductStock handles unit_cost/totals.
-       // However, recalculateProductStock can't handle qty changes if it doesn't update the movement qty!
-       // Since the movement qty isn't linked to the item row... wait, if the movement is completely mismatched, it's safer to delete all movements for this reference_id and re-insert?
-       // I can't re-insert here, this is just trying to fix orphaned ones. Let's at least delete ones where the product_id is missing entirely!
-       await client.query(`
-         DELETE FROM inventory_movements m
-         WHERE m.reference_type = $1 AND m.company_id = $2
-         AND NOT EXISTS (
-            SELECT 1 FROM "${itemTable}" i 
-            WHERE i."${fkey}" = m.reference_id 
-            AND i.product_id = m.product_id
-         )
-       `, [type, companyId]);
-       
-       await client.query(`
-         DELETE FROM inventory_layers m
-         WHERE m.reference_type = $1 AND m.company_id = $2
-         AND NOT EXISTS (
-            SELECT 1 FROM "${itemTable}" i 
-            WHERE i."${fkey}" = m.reference_id 
-            AND i.product_id = m.product_id
-         )
-       `, [type, companyId]);
+    let badReferenceIds = new Set<string>();
 
-       // Sync quantities
-       // For sales (invoice, purchase_return) quantity is negative in movements.
-       // For purchases (purchase_invoice, returns) quantity is positive.
-       const isNegativeQty = type === 'invoice' || type === 'purchase_returns';
-       
-       await client.query(`
-         UPDATE inventory_movements m
-         SET quantity = i.quantity * ${isNegativeQty ? -1 : 1}
-         FROM "${itemTable}" i
+    for (const { type, itemTable, fkey, isNegative } of itemTypes) {
+      // Find movements where product is totally missing from items
+      const missingProd = await client.query(`
+         SELECT m.reference_id FROM inventory_movements m
          WHERE m.reference_type = $1 AND m.company_id = $2
-         AND i."${fkey}" = m.reference_id 
-         AND i.product_id = m.product_id
-         AND ABS(m.quantity) != i.quantity
-       `, [type, companyId]);
+         AND NOT EXISTS (
+            SELECT 1 FROM "${itemTable}" i 
+            WHERE i."${fkey}" = m.reference_id 
+            AND i.product_id = m.product_id
+         )
+      `, [type, companyId]);
+      missingProd.rows.forEach(r => badReferenceIds.add(r.reference_id));
+
+      // Find movements where quantity mismatches
+      const mismatches = await client.query(`
+         SELECT m.reference_id 
+         FROM inventory_movements m
+         JOIN "${itemTable}" i ON i."${fkey}" = m.reference_id AND i.product_id = m.product_id
+         WHERE m.reference_type = $1 AND m.company_id = $2 AND ABS(m.quantity) != i.quantity
+      `, [type, companyId]);
+      mismatches.rows.forEach(r => badReferenceIds.add(r.reference_id));
+
+      // Find duplicates
+      const duplicates = await client.query(`
+         SELECT reference_id FROM inventory_movements
+         WHERE reference_type = $1 AND company_id = $2
+         GROUP BY reference_id, product_id
+         HAVING COUNT(*) > 1
+      `, [type, companyId]);
+      duplicates.rows.forEach(r => badReferenceIds.add(r.reference_id));
     }
-    
-    const prodRes = await client.query('SELECT id FROM products WHERE company_id = $1 AND COALESCE(is_service, false) = false AND type != \'service\'', [companyId]);
-    for (const row of prodRes.rows) {
-      await recalculateProductStock(client, companyId, row.id);
+
+    console.log(`[ERP] Recalculate: Found ${badReferenceIds.size} bad references. Fixing...`);
+
+    // For each bad reference, delete its movements and re-insert by calling the appropriate record function
+    for (const refId of badReferenceIds) {
+      const typeRes = await client.query(`SELECT reference_type FROM inventory_movements WHERE reference_id = $1 LIMIT 1`, [refId]);
+      if (typeRes.rows.length === 0) continue;
+      const refType = typeRes.rows[0].reference_type;
+
+      let parentTable = '';
+      let itemTable = '';
+      let fkey = '';
+
+      if (refType === 'invoice') { parentTable = 'invoices'; itemTable = 'invoice_items'; fkey = 'invoice_id'; }
+      if (refType === 'purchase_invoice') { parentTable = 'purchase_invoices'; itemTable = 'purchase_invoice_items'; fkey = 'invoice_id'; }
+      if (refType === 'returns') { parentTable = 'returns'; itemTable = 'return_items'; fkey = 'return_id'; }
+      if (refType === 'purchase_returns') { parentTable = 'purchase_returns'; itemTable = 'purchase_return_items'; fkey = 'return_id'; }
+
+      // Get parent data
+      const parentRes = await client.query(`SELECT * FROM "${parentTable}" WHERE id = $1 AND company_id = $2`, [refId, companyId]);
+      if (parentRes.rows.length === 0) {
+         await client.query('DELETE FROM inventory_movements WHERE reference_id = $1', [refId]);
+         continue;
+      }
+      const parentDoc = parentRes.rows[0];
+
+      // Delete all old impacts
+      await client.query('DELETE FROM inventory_movements WHERE reference_id = $1', [refId]);
+      await client.query('DELETE FROM inventory_layers WHERE reference_id = $1', [refId]);
+      
+      // Get items
+      const itemsRes = await client.query(`SELECT * FROM "${itemTable}" WHERE "${fkey}" = $1`, [refId]);
+
+      for (const item of itemsRes.rows) {
+          const qty = parseFloat(item.quantity || '0');
+          if (qty <= 0) continue;
+
+          if (refType === 'invoice') {
+             await recordSale(client, companyId, parentDoc.warehouse_id || null, item.product_id, qty, refId, parentDoc.invoice_number, parentDoc.date);
+          } else if (refType === 'purchase_invoice') {
+             await recordPurchase(client, companyId, parentDoc.warehouse_id || null, item.product_id, qty, parseFloat(item.unit_price || item.cost_price || '0'), refId, parentDoc.invoice_number, parentDoc.date);
+          } else if (refType === 'returns') {
+             await recordSalesReturn(client, companyId, parentDoc.warehouse_id || null, item.product_id, qty, refId, parentDoc.return_number, parentDoc.date);
+          } else if (refType === 'purchase_returns') {
+             await recordPurchaseReturn(client, companyId, parentDoc.warehouse_id || null, item.product_id, qty, refId, parentDoc.return_number, parentDoc.date);
+          }
+      }
     }
-    
+
+    // Now recalculate stock for ALL products to ensure WAC is correct everywhere
+    console.log(`[ERP] Recalculate: Recalculating WAC for all products in company ${companyId}...`);
+    const allProducts = await client.query(`SELECT id FROM products WHERE company_id = $1 AND COALESCE(is_service, false) = false AND type != 'service'`, [companyId]);
+    for (const p of allProducts.rows) {
+        await recalculateProductStock(client, companyId, p.id);
+    }
+
     await client.query('COMMIT');
     res.json({ success: true, message: 'All products recalculated successfully' });
   } catch (error: any) {
