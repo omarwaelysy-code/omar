@@ -105,9 +105,9 @@ async function fix() {
           } else if (refType === 'purchase_invoice') {
              await recordPurchase(client, companyId, parentDoc.warehouse_id || null, item.product_id, qty, parseFloat(item.unit_price || item.cost_price || '0'), refId, parentDoc.invoice_number, parentDoc.date);
           } else if (refType === 'returns') {
-             await recordSalesReturn(client, companyId, parentDoc.warehouse_id || null, item.product_id, qty, refId, parentDoc.return_number, parentDoc.date);
+             await recordSalesReturn(client, companyId, parentDoc.warehouse_id || null, item.product_id, qty, parseFloat(item.unit_price || item.unit_cost || item.cost_price || '0'), refId, parentDoc.return_number, parentDoc.date);
           } else if (refType === 'purchase_returns') {
-             await recordPurchaseReturn(client, companyId, parentDoc.warehouse_id || null, item.product_id, qty, refId, parentDoc.return_number, parentDoc.date);
+             await recordPurchaseReturn(client, companyId, parentDoc.warehouse_id || null, item.product_id, qty, parseFloat(item.unit_price || item.unit_cost || item.cost_price || '0'), refId, parentDoc.return_number, parentDoc.date);
           }
       }
     }

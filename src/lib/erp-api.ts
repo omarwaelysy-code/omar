@@ -1635,7 +1635,7 @@ router.put('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
     await reverseAndRecalculate(client, companyId || '', invoiceId);
 
     const invData = invoiceData;
-    const invoiceId = req.params.id;
+    const cogsLines: { account_id: string; account_name: string; debit: number; credit: number; description: string }[] = [];
 for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('invoice_items', item);
       const itemId = uuidv4();
@@ -1964,7 +1964,8 @@ router.put('/returns/:id', authenticateToken, async (req: AuthRequest, res) => {
     await reverseAndRecalculate(client, companyId || '', returnId);
 
     const returnDataFinal = returnData;
-    const returnId = req.params.id;
+    const rData = returnDataFinal;
+    const cogsLines: { account_id: string; account_name: string; debit: number; credit: number; description: string }[] = [];
 for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('return_items', item);
       const itemId = uuidv4();
@@ -2131,7 +2132,7 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
     await reverseAndRecalculate(client, companyId || '', invoiceId);
 
     const invData = invoiceData;
-    const invoiceId = req.params.id;
+    const cogsLines: { account_id: string; account_name: string; debit: number; credit: number; description: string }[] = [];
 for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('purchase_invoice_items', item);
       const itemId = uuidv4();
@@ -2289,7 +2290,8 @@ router.put('/purchase_returns/:id', authenticateToken, async (req: AuthRequest, 
     await reverseAndRecalculate(client, companyId || '', returnId);
 
     const returnDataFinal = returnData;
-    const returnId = req.params.id;
+    const rData = returnDataFinal;
+    const cogsLines: { account_id: string; account_name: string; debit: number; credit: number; description: string }[] = [];
 for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('purchase_return_items', item);
       const itemId = uuidv4();
@@ -2777,9 +2779,9 @@ router.post('/inventory/recalculate_all', authenticateToken, async (req: AuthReq
           } else if (refType === 'purchase_invoice') {
              await recordPurchase(client, companyId, parentDoc.warehouse_id || null, item.product_id, qty, parseFloat(item.unit_price || item.cost_price || '0'), refId, parentDoc.invoice_number, parentDoc.date);
           } else if (refType === 'returns') {
-             await recordSalesReturn(client, companyId, parentDoc.warehouse_id || null, item.product_id, qty, refId, parentDoc.return_number, parentDoc.date);
+             await recordSalesReturn(client, companyId, parentDoc.warehouse_id || null, item.product_id, qty, parseFloat(item.unit_price || item.unit_cost || item.cost_price || '0'), refId, parentDoc.return_number, parentDoc.date);
           } else if (refType === 'purchase_returns') {
-             await recordPurchaseReturn(client, companyId, parentDoc.warehouse_id || null, item.product_id, qty, refId, parentDoc.return_number, parentDoc.date);
+             await recordPurchaseReturn(client, companyId, parentDoc.warehouse_id || null, item.product_id, qty, parseFloat(item.unit_price || item.unit_cost || item.cost_price || '0'), refId, parentDoc.return_number, parentDoc.date);
           }
       }
     }
