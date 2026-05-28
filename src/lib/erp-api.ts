@@ -2780,6 +2780,10 @@ router.post('/inventory/recalculate_all', async (req: any, res) => {
     console.log(`[ERP] Recalculate: Found ${badReferenceIds.size} bad references. Fixing...`);
 
     const productsToRecalc = new Set<string>();
+    
+    // Fetch all products that need recalculation
+    const allProdsRes = await client.query('SELECT id FROM products WHERE COALESCE(is_service, false) = false AND type != \'service\'');
+    allProdsRes.rows.forEach(r => productsToRecalc.add(r.id));
 
     // For each bad reference, delete its movements and re-insert by calling the appropriate record function
     for (const refId of badReferenceIds) {
@@ -2833,9 +2837,53 @@ router.post('/inventory/recalculate_all', async (req: any, res) => {
     for (const pid of productsToRecalc) {
         await recalculateProductStock(client, companyId, pid);
     }
+    
+    // Sync COGS journal entries with latest inventory movement costs
+    console.log('[ERP] Recalculate: Syncing COGS into Journal Entries...');
+    await client.query(`
+      WITH UpdateMovements AS (
+         SELECT reference_id, ABS(total_cost) as true_cost, product_id 
+         FROM inventory_movements 
+         WHERE movement_type IN ('sale', 'sales_return') AND company_id = $1
+      ),
+      TargetLines AS (
+         SELECT jel.id as jel_id, um.true_cost as true_cost, jel.journal_entry_id, jel.debit, jel.credit 
+         FROM journal_entry_lines jel
+         JOIN journal_entries je ON jel.journal_entry_id = je.id
+         JOIN UpdateMovements um ON je.reference_id = um.reference_id
+         JOIN products p ON um.product_id = p.id
+         WHERE (jel.description LIKE '%' || p.name || '%' AND jel.description LIKE '%تكلفة%')
+            OR (jel.description LIKE '%' || p.name || '%' AND jel.description LIKE '%تخفيض%')
+      )
+      UPDATE journal_entry_lines
+      SET debit = CASE WHEN TargetLines.debit > 0 THEN TargetLines.true_cost ELSE 0 END,
+          credit = CASE WHEN TargetLines.credit > 0 THEN TargetLines.true_cost ELSE 0 END
+      FROM TargetLines
+      WHERE journal_entry_lines.id = TargetLines.jel_id
+    `, [companyId]);
+
+    // We also need to fix JE total_debit and total_credit
+    await client.query(`
+      WITH AffectedJEs AS (
+         SELECT DISTINCT je.id
+         FROM journal_entries je
+         JOIN inventory_movements m ON je.reference_id = m.reference_id
+         WHERE m.movement_type IN ('sale', 'sales_return') AND m.company_id = $1
+      ),
+      NewTotals AS (
+         SELECT jel.journal_entry_id, SUM(jel.debit) as new_debit, SUM(jel.credit) as new_credit
+         FROM journal_entry_lines jel
+         JOIN AffectedJEs a ON jel.journal_entry_id = a.id
+         GROUP BY jel.journal_entry_id
+      )
+      UPDATE journal_entries je
+      SET total_debit = nt.new_debit, total_credit = nt.new_credit
+      FROM NewTotals nt
+      WHERE je.id = nt.journal_entry_id AND (je.total_debit != nt.new_debit OR je.total_credit != nt.new_credit)
+    `, [companyId]);
 
     await client.query('COMMIT');
-    res.json({ success: true, message: 'All products recalculated successfully' });
+    res.json({ success: true, message: 'All products recalculated and journal entries synchronized successfully' });
   } catch (error: any) {
     if (client) await client.query('ROLLBACK');
     console.error('Recalculate error:', error);
