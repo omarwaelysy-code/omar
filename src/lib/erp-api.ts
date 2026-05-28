@@ -199,6 +199,43 @@ router.get('/system/check', authenticateToken, authorizeRoles('super_admin'), as
   }
 });
 
+router.get('/system/test-recalc', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const {rows} = await client.query(`SELECT product_id, company_id FROM inventory_movements WHERE reference_number LIKE '%0027%'`);
+    if (rows.length === 0) return res.json({ error: 'not found' });
+    const pid = rows[0].product_id;
+    const cid = rows[0].company_id;
+    const curr = await client.query('SELECT stock, weighted_average_cost FROM products WHERE id = $1', [pid]);
+    
+    // Add recalculate
+    await client.query('BEGIN');
+    await recalculateProductStock(client, cid, pid);
+    await client.query('COMMIT');
+    
+    // Check results inside inventory_movements for this product
+    const moves = await client.query(`
+        SELECT reference_number, date::text as date, unit_cost, total_cost, quantity
+        FROM inventory_movements 
+        WHERE product_id = $1 
+        ORDER BY date ASC, created_at ASC
+    `, [pid]);
+    
+    const after = await client.query('SELECT stock, weighted_average_cost FROM products WHERE id = $1', [pid]);
+    
+    res.json({
+      before: curr.rows[0],
+      after: after.rows[0],
+      moves: moves.rows
+    });
+  } catch(e: any) {
+    if(client) await client.query('ROLLBACK');
+    res.status(500).json({error: e.message});
+  } finally {
+    client.release();
+  }
+});
+
 router.post('/system/fix', authenticateToken, authorizeRoles('super_admin'), async (req, res) => {
   try {
     const result = await runMigrations();

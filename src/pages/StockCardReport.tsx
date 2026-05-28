@@ -261,6 +261,23 @@ export const StockCardReport: React.FC = () => {
     }
   };
 
+  const handleRecalculate = async () => {
+    try {
+      setLoading(true);
+      await fetch('/api/erp/inventory/recalculate_all', {
+         method: 'POST',
+         headers: {
+           'Authorization': `Bearer ${localStorage.getItem('token')}`
+         }
+      });
+      await loadMovementData();
+    } catch(err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePrintStockCard = () => {
     const style = document.createElement('style');
     style.innerHTML = `
@@ -436,6 +453,13 @@ export const StockCardReport: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-2">
+              <button 
+                onClick={handleRecalculate}
+                className="p-2.5 bg-white border border-slate-200 text-slate-600 hover:text-blue-600 rounded-xl hover:bg-slate-50 transition-all flex items-center gap-2 text-xs font-bold shadow-sm"
+              >
+                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                <span>{language === 'ar' ? 'إعادة حساب التكلفة' : 'Recalculate'}</span>
+              </button>
               <button 
                 onClick={handlePrintStockCard}
                 className="p-2.5 bg-white border border-slate-200 text-slate-600 hover:text-emerald-600 rounded-xl hover:bg-slate-50 transition-all flex items-center gap-2 text-xs font-bold shadow-sm"
