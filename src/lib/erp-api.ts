@@ -2165,7 +2165,7 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
       return sendError(res, 404, 'Purchase Invoice not found or permission denied');
     }
 
-    await client.query('DELETE FROM purchase_invoice_items WHERE purchase_invoice_id = $1', [invoiceId]);
+    await client.query('DELETE FROM purchase_invoice_items WHERE invoice_id = $1', [invoiceId]);
     await reverseAndRecalculate(client, companyId || '', invoiceId);
 
     const invData = invoiceData;
@@ -2323,7 +2323,7 @@ router.put('/purchase_returns/:id', authenticateToken, async (req: AuthRequest, 
       return sendError(res, 404, 'Purchase Return not found or permission denied');
     }
 
-    await client.query('DELETE FROM purchase_return_items WHERE purchase_return_id = $1', [returnId]);
+    await client.query('DELETE FROM purchase_return_items WHERE return_id = $1', [returnId]);
     await reverseAndRecalculate(client, companyId || '', returnId);
 
     const returnDataFinal = returnData;
