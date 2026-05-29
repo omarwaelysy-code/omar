@@ -2877,15 +2877,15 @@ router.post('/inventory/recalculate_all', async (req: any, res) => {
              costAccId = line.account_id;
              costAccName = line.account_name;
          }
-         if (line.description.includes('تخفيض') && !invAccId) {
+         if ((line.description.includes('تخفيض') || line.description.includes('إرجاع') || line.description.includes('مخزون')) && !invAccId && !line.description.includes('تكلفة')) {
              invAccId = line.account_id;
              invAccName = line.account_name;
          }
       }
 
       if (costAccId && invAccId) {
-         // Delete all old تكلفة and تخفيض lines
-         await client.query(`DELETE FROM journal_entry_lines WHERE journal_entry_id = $1 AND (description LIKE '%تكلفة%' OR description LIKE '%تخفيض%')`, [je.id]);
+         // Delete all old تكلفة and تخفيض/إرجاع lines
+         await client.query(`DELETE FROM journal_entry_lines WHERE journal_entry_id = $1 AND (description LIKE '%تكلفة%' OR description LIKE '%تخفيض%' OR description LIKE '%إرجاع%')`, [je.id]);
 
          // Insert new combined lines
          const cogsLineId = uuidv4();
@@ -2927,6 +2927,22 @@ router.post('/inventory/recalculate_all', async (req: any, res) => {
     if (client) await client.query('ROLLBACK');
     console.error('Recalculate error:', error);
     sendError(res, 500, 'Recalculation failed', error.message);
+  } finally {
+    client.release();
+  }
+});
+
+router.get('/inventory/debug_moves', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { rows } = await client.query(`
+      SELECT reference_number, date::text as date, created_at, movement_type, quantity, unit_cost, total_cost 
+      FROM inventory_movements 
+      WHERE movement_type IN ('sale', 'purchase', 'sales_return', 'purchase_return', 'adjustment')
+      ORDER BY date ASC, created_at ASC
+      LIMIT 100
+    `);
+    res.json(rows);
   } finally {
     client.release();
   }
