@@ -2839,48 +2839,87 @@ router.post('/inventory/recalculate_all', async (req: any, res) => {
     }
     
     // Sync COGS journal entries with latest inventory movement costs
-    console.log('[ERP] Recalculate: Syncing COGS into Journal Entries...');
-    await client.query(`
-      WITH UpdateMovements AS (
-         SELECT reference_id, ABS(total_cost) as true_cost, product_id 
-         FROM inventory_movements 
-         WHERE movement_type IN ('sale', 'sales_return') AND company_id = $1
-      ),
-      TargetLines AS (
-         SELECT jel.id as jel_id, um.true_cost as true_cost, jel.journal_entry_id, jel.debit, jel.credit 
-         FROM journal_entry_lines jel
-         JOIN journal_entries je ON jel.journal_entry_id = je.id
-         JOIN UpdateMovements um ON je.reference_id = um.reference_id
-         JOIN products p ON um.product_id = p.id
-         WHERE (jel.description LIKE '%' || p.name || '%' AND jel.description LIKE '%تكلفة%')
-            OR (jel.description LIKE '%' || p.name || '%' AND jel.description LIKE '%تخفيض%')
-      )
-      UPDATE journal_entry_lines
-      SET debit = CASE WHEN TargetLines.debit > 0 THEN TargetLines.true_cost ELSE 0 END,
-          credit = CASE WHEN TargetLines.credit > 0 THEN TargetLines.true_cost ELSE 0 END
-      FROM TargetLines
-      WHERE journal_entry_lines.id = TargetLines.jel_id
+    console.log('[ERP] Recalculate: Syncing COGS into Journal Entries (JS fallback logic)...');
+    
+    // 1. Get all movements grouped by reference_id
+    const movesRes = await client.query(`
+      SELECT reference_id, SUM(ABS(total_cost)) as true_cost
+      FROM inventory_movements
+      WHERE movement_type IN ('sale', 'sales_return') AND company_id = $1
+      GROUP BY reference_id
     `, [companyId]);
 
-    // We also need to fix JE total_debit and total_credit
-    await client.query(`
-      WITH AffectedJEs AS (
-         SELECT DISTINCT je.id
-         FROM journal_entries je
-         JOIN inventory_movements m ON je.reference_id = m.reference_id
-         WHERE m.movement_type IN ('sale', 'sales_return') AND m.company_id = $1
-      ),
-      NewTotals AS (
-         SELECT jel.journal_entry_id, SUM(jel.debit) as new_debit, SUM(jel.credit) as new_credit
-         FROM journal_entry_lines jel
-         JOIN AffectedJEs a ON jel.journal_entry_id = a.id
-         GROUP BY jel.journal_entry_id
-      )
-      UPDATE journal_entries je
-      SET total_debit = nt.new_debit, total_credit = nt.new_credit
-      FROM NewTotals nt
-      WHERE je.id = nt.journal_entry_id AND (je.total_debit != nt.new_debit OR je.total_credit != nt.new_credit)
+    const movesByRef = new Map<string, number>();
+    for (const m of movesRes.rows) {
+      movesByRef.set(m.reference_id, parseFloat(m.true_cost || '0'));
+    }
+
+    // 2. Fetch all related Journal Entries
+    const jeRes = await client.query(`
+      SELECT id, reference_id, reference_type 
+      FROM journal_entries 
+      WHERE reference_type IN ('invoice', 'returns') AND company_id = $1
     `, [companyId]);
+
+    for (const je of jeRes.rows) {
+      const totalCogs = movesByRef.get(je.reference_id);
+      if (totalCogs === undefined) continue;
+
+      const linesRes = await client.query(`SELECT * FROM journal_entry_lines WHERE journal_entry_id = $1`, [je.id]);
+      
+      let costAccId = null;
+      let costAccName = null;
+      let invAccId = null;
+      let invAccName = null;
+
+      for (const line of linesRes.rows) {
+         if (line.description.includes('تكلفة') && !costAccId) {
+             costAccId = line.account_id;
+             costAccName = line.account_name;
+         }
+         if (line.description.includes('تخفيض') && !invAccId) {
+             invAccId = line.account_id;
+             invAccName = line.account_name;
+         }
+      }
+
+      if (costAccId && invAccId) {
+         // Delete all old تكلفة and تخفيض lines
+         await client.query(`DELETE FROM journal_entry_lines WHERE journal_entry_id = $1 AND (description LIKE '%تكلفة%' OR description LIKE '%تخفيض%')`, [je.id]);
+
+         // Insert new combined lines
+         const cogsLineId = uuidv4();
+         const invLineId = uuidv4();
+         const isInvoice = je.reference_type === 'invoice';
+
+         await client.query(`
+            INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+         `, [
+            cogsLineId, je.id, costAccId, costAccName, 
+            isInvoice ? 'تكلفة البضاعة المباعة (محدث)' : 'إلغاء تكلفة البضاعة المباعة (محدث)',
+            isInvoice ? totalCogs : 0,
+            isInvoice ? 0 : totalCogs
+         ]);
+
+         await client.query(`
+            INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+         `, [
+            invLineId, je.id, invAccId, invAccName, 
+            isInvoice ? 'تخفيض المخزون (محدث)' : 'إرجاع المخزون (محدث)',
+            isInvoice ? 0 : totalCogs,
+            isInvoice ? totalCogs : 0
+         ]);
+      }
+
+      // Update JE totals
+      const updatedLines = await client.query(`SELECT SUM(debit) as d, SUM(credit) as c FROM journal_entry_lines WHERE journal_entry_id = $1`, [je.id]);
+      if (updatedLines.rows.length > 0) {
+         await client.query('UPDATE journal_entries SET total_debit = $1, total_credit = $2 WHERE id = $3', 
+           [updatedLines.rows[0].d, updatedLines.rows[0].c, je.id]);
+      }
+    }
 
     await client.query('COMMIT');
     res.json({ success: true, message: 'All products recalculated and journal entries synchronized successfully' });
