@@ -137,7 +137,8 @@ export class AccountingEngine {
               credit: credit,
               balance: 0,
               entity_name: entityName,
-              reference_type: entry.reference_type
+              reference_type: entry.reference_type,
+              entry_number: entry.entry_number
             });
           }
         }

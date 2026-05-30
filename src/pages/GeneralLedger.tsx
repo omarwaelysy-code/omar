@@ -318,6 +318,7 @@ export const GeneralLedger: React.FC = () => {
                     <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('ledger.column_entity')}</th>
                     <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_description')}</th>
                     <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_reference')}</th>
+                    <th className="px-6 py-4 text-sm font-bold text-zinc-700">{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</th>
                     <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center">{t('journal.column_debit')}</th>
                     <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center">{t('journal.column_credit')}</th>
                     <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center">{t('ledger.column_balance')}</th>
@@ -329,6 +330,7 @@ export const GeneralLedger: React.FC = () => {
                     <td className="px-6 py-4 text-sm font-bold text-zinc-900">{dateRange.start}</td>
                     <td className="px-6 py-4 text-sm text-zinc-400">-</td>
                     <td className="px-6 py-4 text-sm font-medium text-zinc-600">{t('ledger.opening_balance_row')}</td>
+                    <td className="px-6 py-4 text-sm text-zinc-400 text-center">-</td>
                     <td className="px-6 py-4 text-sm text-zinc-400 text-center">-</td>
                     <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{startBalance > 0 ? formatNumber(startBalance) : '-'}</td>
                     <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{startBalance < 0 ? formatNumber(Math.abs(startBalance)) : '-'}</td>
@@ -357,6 +359,23 @@ export const GeneralLedger: React.FC = () => {
                           </span>
                         )}
                       </td>
+                      <td className="px-6 py-4">
+                        {tx.entry_number ? (
+                          <span 
+                            onClick={() => {
+                              setPendingViewDoc({ type: 'journal', idOrNumber: tx.entry_number! });
+                              setCurrentPage('journal_entries');
+                            }}
+                            className="px-3 py-1 bg-zinc-100 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95"
+                          >
+                            {tx.entry_number}
+                          </span>
+                        ) : (
+                          <span className="px-3 py-1 bg-zinc-100 text-zinc-400 rounded-lg text-xs font-bold">
+                            -
+                          </span>
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{tx.debit > 0 ? formatNumber(tx.debit) : '-'}</td>
                       <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{tx.credit > 0 ? formatNumber(tx.credit) : '-'}</td>
                       <td className="px-6 py-4 text-sm font-black text-zinc-900 text-center">{formatNumber(tx.balance)}</td>
@@ -364,7 +383,7 @@ export const GeneralLedger: React.FC = () => {
                   ))}
                   {ledgerData.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center text-zinc-500 font-medium">
+                      <td colSpan={8} className="px-6 py-12 text-center text-zinc-500 font-medium">
                         {t('ledger.no_transactions')}
                       </td>
                     </tr>

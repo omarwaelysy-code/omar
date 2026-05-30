@@ -535,6 +535,7 @@ export interface JournalEntry {
   reference_id: string;
   reference_type: string;
   reference_number?: string;
+  entry_number?: string;
   total_debit: number;
   total_credit: number;
   company_id: string;
@@ -586,6 +587,7 @@ export interface LedgerLine {
   balance: number;
   entity_name?: string;
   reference_type?: string;
+  entry_number?: string;
 }
 
 export interface Department {

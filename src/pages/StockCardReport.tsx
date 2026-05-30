@@ -12,12 +12,13 @@ import { exportToPDF } from '../utils/pdfUtils';
 interface DocMapInfo {
   partner: string;
   description: string;
+  entry_number?: string;
 }
 
 export const StockCardReport: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
-  const { pendingViewDoc, setPendingViewDoc } = useNavigation();
+  const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -81,37 +82,49 @@ export const StockCardReport: React.FC = () => {
         product_id: selectedProductId 
       });
 
-      const [invs, pinvs, rets, prets] = await Promise.all([
+      const [invs, pinvs, rets, prets, jes] = await Promise.all([
         dbService.list<any>('invoices', { company_id: user.company_id }),
         dbService.list<any>('purchase_invoices', { company_id: user.company_id }),
         dbService.list<any>('returns', { company_id: user.company_id }),
-        dbService.list<any>('purchase_returns', { company_id: user.company_id })
+        dbService.list<any>('purchase_returns', { company_id: user.company_id }),
+        dbService.list<any>('journal_entries', { company_id: user.company_id })
       ]);
+
+      const jeMap: Record<string, string> = {};
+      (jes || []).forEach(j => {
+        if (j.reference_id && j.entry_number) {
+          jeMap[j.reference_id] = j.entry_number;
+        }
+      });
 
       const map: Record<string, DocMapInfo> = {};
       
       (invs || []).forEach(x => {
         map[x.id] = { 
           partner: x.customer_name || t('common.customer') || 'عميل', 
-          description: x.description || '' 
+          description: x.description || '',
+          entry_number: jeMap[x.id]
         };
       });
       (pinvs || []).forEach(x => {
         map[x.id] = { 
           partner: x.supplier_name || t('common.supplier') || 'مورد', 
-          description: x.description || '' 
+          description: x.description || '',
+          entry_number: jeMap[x.id]
         };
       });
       (rets || []).forEach(x => {
         map[x.id] = { 
           partner: x.customer_name || t('common.customer') || 'عميل', 
-          description: x.description || '' 
+          description: x.description || '',
+          entry_number: jeMap[x.id]
         };
       });
       (prets || []).forEach(x => {
         map[x.id] = { 
           partner: x.supplier_name || t('common.supplier') || 'مورد', 
-          description: x.description || '' 
+          description: x.description || '',
+          entry_number: jeMap[x.id]
         };
       });
 
@@ -200,7 +213,8 @@ export const StockCardReport: React.FC = () => {
       runningValue,
       partner: docInfo.partner,
       description: m.description || docInfo.description || '',
-      warehouseName: whName
+      warehouseName: whName,
+      entry_number: docInfo.entry_number
     };
   });
 
@@ -216,12 +230,12 @@ export const StockCardReport: React.FC = () => {
   const handleExportStockCardExcel = () => {
     if (!selectedProduct) return;
     const headers = language === 'ar' ? [
-      'التاريخ', 'رقم الحركة', 'نوع الحركة', 'المخزن', 'العميل / المورد', 'الوصف', 
+      'التاريخ', 'رقم الحركة', 'رقم القيد', 'نوع الحركة', 'المخزن', 'العميل / المورد', 'الوصف', 
       'الوارد (+)', 'المصرف (-)', 'رصيد الكمية', 
       'سياسة التكلفة', 'تكلفة الوحدة', 
       'قيمة مدين (+)', 'قيمة دائن (-)', 'رصيد القيمة'
     ] : [
-      'Date', 'Ref Number', 'Movement Type', 'Warehouse', 'Customer/Supplier', 'Description', 
+      'Date', 'Ref Number', 'Entry No.', 'Movement Type', 'Warehouse', 'Customer/Supplier', 'Description', 
       'In Quantity (+)', 'Out Quantity (-)', 'Running Qty', 
       'Cost Policy', 'Unit Cost', 
       'Debit Value (+)', 'Credit Value (-)', 'Running Balance Value'
@@ -230,6 +244,7 @@ export const StockCardReport: React.FC = () => {
     const data = filteredMovements.map(m => [
       m.date.slice(0, 10),
       m.reference_number || '',
+      m.entry_number || '',
       getMovementTypeLabel(m.movement_type),
       m.warehouseName || '',
       m.partner || '',
@@ -517,6 +532,7 @@ export const StockCardReport: React.FC = () => {
                     <tr>
                       <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
                       <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'رقم الحركة' : 'Movement No.'}</th>
+                      <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</th>
                       <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'نوع الحركة' : 'Type'}</th>
                       <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'المخزن' : 'Warehouse'}</th>
                       <th rowSpan={2} className="px-5 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'العميل / المورد' : 'Customer/Supplier'}</th>
@@ -541,6 +557,19 @@ export const StockCardReport: React.FC = () => {
                       <tr key={m.id || index} className="hover:bg-slate-50/50 transition-colors">
                         <td className="px-4 py-4 border-r border-slate-200 font-mono whitespace-nowrap">{m.date.slice(0, 10)}</td>
                         <td className="px-4 py-4 border-r border-slate-200 font-mono text-slate-500 whitespace-nowrap">{m.reference_number}</td>
+                        <td className="px-4 py-4 border-r border-slate-200 whitespace-nowrap">
+                          {m.entry_number ? (
+                            <span 
+                              onClick={() => {
+                                setPendingViewDoc({ type: 'journal', idOrNumber: m.entry_number });
+                                setCurrentPage('journal_entries');
+                              }}
+                              className="px-3 py-1 bg-zinc-100 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 whitespace-nowrap"
+                            >
+                              {m.entry_number}
+                            </span>
+                          ) : '-'}
+                        </td>
                         <td className="px-4 py-4 border-r border-slate-200 whitespace-nowrap">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                             m.movement_type === 'purchase' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :

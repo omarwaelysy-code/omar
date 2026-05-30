@@ -91,6 +91,7 @@ export const JournalEntries: React.FC = () => {
         try {
           const existing = entries.find(e => 
             e.reference_number === pendingViewDoc.idOrNumber || 
+            e.entry_number === pendingViewDoc.idOrNumber ||
             e.id === pendingViewDoc.idOrNumber
           );
           if (existing) {
@@ -101,8 +102,13 @@ export const JournalEntries: React.FC = () => {
           const docs = await dbService.getDocsByFilter<any>('journal_entries', user.company_id, [
             { field: 'reference_number', operator: '==', value: pendingViewDoc.idOrNumber }
           ]);
+          const docsByEntryNumber = await dbService.getDocsByFilter<any>('journal_entries', user.company_id, [
+            { field: 'entry_number', operator: '==', value: pendingViewDoc.idOrNumber }
+          ]);
           if (docs && docs.length > 0) {
             setSelectedEntry(docs[0]);
+          } else if (docsByEntryNumber && docsByEntryNumber.length > 0) {
+            setSelectedEntry(docsByEntryNumber[0]);
           } else {
             const docById = await dbService.get<any>('journal_entries', pendingViewDoc.idOrNumber);
             if (docById) {
