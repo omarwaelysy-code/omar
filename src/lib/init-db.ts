@@ -346,6 +346,7 @@ export async function initDatabase() {
       CREATE TABLE IF NOT EXISTS "journal_entries" (
         "id" VARCHAR(36) PRIMARY KEY,
         "company_id" VARCHAR(36) REFERENCES "companies"("id"),
+        "entry_number" VARCHAR(50),
         "date" DATE NOT NULL,
         "description" TEXT,
         "reference_id" VARCHAR(36),

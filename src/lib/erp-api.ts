@@ -12,6 +12,109 @@ import * as XLSX from 'xlsx';
 import multer from 'multer';
 import { recordPurchase, recordSale, recordSalesReturn, recordPurchaseReturn, recalculateProductStock, reverseAndRecalculate } from './cost-engine';
 
+export async function syncProductsCostAndJEs(client: any, companyId: string, productIds: string[]) {
+  if (!productIds || productIds.length === 0) return;
+  const uniqueProducts = Array.from(new Set(productIds));
+  console.log(`[ERP] Auto-Syncing COGS and JEs for ${uniqueProducts.length} products...`);
+  
+  for (const pid of uniqueProducts) {
+    await recalculateProductStock(client, companyId, pid);
+  }
+  
+  // 1. Get all movements grouped by reference_id for these products specifically
+  const movesRes = await client.query(`
+    SELECT reference_id, SUM(ABS(total_cost)) as true_cost
+    FROM inventory_movements
+    WHERE movement_type IN ('sale', 'sales_return') AND company_id = $1 AND product_id = ANY($2)
+    GROUP BY reference_id
+  `, [companyId, uniqueProducts]);
+
+  const movesByRef = new Map<string, number>();
+  for (const m of movesRes.rows) {
+    movesByRef.set(m.reference_id, parseFloat(m.true_cost || '0'));
+  }
+
+  if (movesByRef.size === 0) return;
+
+  const refIds = Array.from(movesByRef.keys());
+
+  // 2. Fetch all related Journal Entries (only those related to these movements)
+  const jeRes = await client.query(`
+    SELECT id, reference_id, reference_type 
+    FROM journal_entries 
+    WHERE reference_id = ANY($1) AND company_id = $2
+  `, [refIds, companyId]);
+
+  for (const je of jeRes.rows) {
+    const totalCogs = movesByRef.get(je.reference_id);
+    if (totalCogs === undefined) continue;
+
+    // Wait, the totalCogs fetched from movesByRef only includes the sum of costs FOR THE SPECIFIED PRODUCTS!
+    // But the Journal Entry needs the full COGS for ALL products in that invoice!
+    // So we must fetch the real total COGS for the entire reference_id, not just the filtered products.
+    const allMovesCogsRes = await client.query(`
+      SELECT SUM(ABS(total_cost)) as full_cogs
+      FROM inventory_movements
+      WHERE movement_type IN ('sale', 'sales_return') AND reference_id = $1
+    `, [je.reference_id]);
+    
+    const trueTotalCogs = parseFloat(allMovesCogsRes.rows[0]?.full_cogs || '0');
+
+    const linesRes = await client.query(`SELECT * FROM journal_entry_lines WHERE journal_entry_id = $1`, [je.id]);
+    
+    let costAccId = null;
+    let costAccName = null;
+    let invAccId = null;
+    let invAccName = null;
+
+    for (const line of linesRes.rows) {
+       if (line.description.includes('تكلفة') && !costAccId) {
+           costAccId = line.account_id;
+           costAccName = line.account_name;
+       }
+       if ((line.description.includes('تخفيض') || line.description.includes('إرجاع') || line.description.includes('مخزون')) && !invAccId && !line.description.includes('تكلفة')) {
+           invAccId = line.account_id;
+           invAccName = line.account_name;
+       }
+    }
+
+    if (costAccId && invAccId) {
+       // Delete all old تكلفة and تخفيض/إرجاع lines
+       await client.query(`DELETE FROM journal_entry_lines WHERE journal_entry_id = $1 AND (description LIKE '%تكلفة%' OR description LIKE '%تخفيض%' OR description LIKE '%إرجاع%')`, [je.id]);
+
+       // Insert new combined lines
+       const isInvoice = je.reference_type === 'invoice';
+
+       await client.query(`
+          INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+       `, [
+          uuidv4(), je.id, costAccId, costAccName, 
+          isInvoice ? 'تكلفة البضاعة المباعة (محدث التكلفة التلقائي)' : 'إلغاء تكلفة البضاعة المباعة (محدث التكلفة التلقائي)',
+          isInvoice ? trueTotalCogs : 0,
+          isInvoice ? 0 : trueTotalCogs
+       ]);
+
+       await client.query(`
+          INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+       `, [
+          uuidv4(), je.id, invAccId, invAccName, 
+          isInvoice ? 'تخفيض المخزون (محدث التكلفة التلقائي)' : 'إرجاع المخزون (محدث التكلفة التلقائي)',
+          isInvoice ? 0 : trueTotalCogs,
+          isInvoice ? trueTotalCogs : 0
+       ]);
+    }
+
+    // Update JE totals
+    const updatedLines = await client.query(`SELECT SUM(debit) as d, SUM(credit) as c FROM journal_entry_lines WHERE journal_entry_id = $1`, [je.id]);
+    if (updatedLines.rows.length > 0) {
+       await client.query('UPDATE journal_entries SET total_debit = $1, total_credit = $2 WHERE id = $3', 
+         [updatedLines.rows[0].d, updatedLines.rows[0].c, je.id]);
+    }
+  }
+}
+
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
@@ -796,6 +899,64 @@ function sanitizeData(table: string, data: any) {
   return sanitized;
 }
 
+export async function generateNextSequence(client: any, companyId: string, moduleName: string, dateStr: string): Promise<string> {
+  let numField = 'invoice_number';
+  let prefix = 'INV';
+  
+  switch (moduleName) {
+    case 'invoices': numField = 'invoice_number'; prefix = 'INV'; break;
+    case 'purchase_invoices': numField = 'invoice_number'; prefix = 'PINV'; break;
+    case 'returns': numField = 'return_number'; prefix = 'RET'; break;
+    case 'purchase_returns': numField = 'return_number'; prefix = 'PRET'; break;
+    case 'payment_vouchers': numField = 'voucher_number'; prefix = 'PV'; break;
+    case 'receipt_vouchers': numField = 'voucher_number'; prefix = 'RV'; break;
+    case 'journal_entries': numField = 'entry_number'; prefix = 'JE'; break;
+  }
+
+  if (moduleName === 'journal_entries') {
+    // Requested format: JE-YYYY-MM-DD-00001
+    const parts = dateStr.slice(0, 10).split('-');
+    const year = parts[0];
+    const month = parts[1].padStart(2, '0');
+    const day = parts[2].padStart(2, '0');
+    const datePrefix = `JE-${year}-${month}-${day}`;
+    
+    // Using LIKE to match anything starting with this prefix
+    const sql = `SELECT ${numField} FROM "${moduleName}" WHERE company_id = $1 AND ${numField} LIKE $2 ORDER BY id DESC LIMIT 500`;
+    const rows = await client.query(sql, [companyId, `${datePrefix}-%`]);
+    let maxSeq = 0;
+    rows.rows.forEach((row: any) => {
+       const val = row[numField] || '';
+       const valParts = val.split('-');
+       if (valParts.length >= 5) {
+         const seq = parseInt(valParts[valParts.length - 1], 10);
+         if (!isNaN(seq) && seq > maxSeq) {
+           maxSeq = seq;
+         }
+       }
+    });
+    const nextSeq = String(maxSeq + 1).padStart(5, '0');
+    return `${datePrefix}-${nextSeq}`;
+  } else {
+    // Default format: PREFIX-MM-0001
+    const monthPrefix = dateStr.slice(0, 7);
+    const sql = `SELECT ${numField} FROM "${moduleName}" WHERE company_id = $1 AND date::text LIKE $2 ORDER BY id DESC LIMIT 500`;
+    const rows = await client.query(sql, [companyId, `${monthPrefix}%`]);
+    let maxSeq = 0;
+    const monthStr = monthPrefix.split('-')[1];
+    rows.rows.forEach((row: any) => {
+      const val = row[numField] || '';
+      const parts = val.split('-');
+      if (parts.length === 3 && parts[1] === monthStr) {
+        const seq = parseInt(parts[2], 10);
+        if (!isNaN(seq) && seq > maxSeq) { maxSeq = seq; }
+      }
+    });
+    const nextSeq = String(maxSeq + 1).padStart(4, '0');
+    return `${prefix}-${monthStr}-${nextSeq}`;
+  }
+}
+
 router.get('/utils/next-sequence/:moduleName', authenticateToken, async (req: any, res) => {
   try {
     const { moduleName } = req.params;
@@ -804,38 +965,7 @@ router.get('/utils/next-sequence/:moduleName', authenticateToken, async (req: an
     
     if (!companyId) return res.status(401).json({ error: 'Unauthorized' });
 
-    let numField = 'invoice_number';
-    let prefix = 'INV';
-    
-    switch (moduleName) {
-      case 'invoices': numField = 'invoice_number'; prefix = 'INV'; break;
-      case 'purchase_invoices': numField = 'invoice_number'; prefix = 'PINV'; break;
-      case 'returns': numField = 'return_number'; prefix = 'RET'; break;
-      case 'purchase_returns': numField = 'return_number'; prefix = 'PRET'; break;
-      case 'payment_vouchers': numField = 'voucher_number'; prefix = 'PV'; break;
-      case 'receipt_vouchers': numField = 'voucher_number'; prefix = 'RV'; break;
-      case 'journal_entries': numField = 'entry_number'; prefix = 'JE'; break;
-    }
-
-    const monthPrefix = dateStr.slice(0, 7);
-    const sql = `SELECT ${numField} FROM "${moduleName}" WHERE company_id = $1 AND date::text LIKE $2 ORDER BY id DESC LIMIT 500`;
-    const rows = await pool.query(sql, [companyId, `${monthPrefix}%`]);
-    
-    let maxSeq = 0;
-    const monthStr = monthPrefix.split('-')[1];
-    rows.rows.forEach((row: any) => {
-      const val = row[numField] || '';
-      const parts = val.split('-');
-      if (parts.length === 3 && parts[1] === monthStr) {
-        const seq = parseInt(parts[2]);
-        if (!isNaN(seq) && seq > maxSeq) {
-          maxSeq = seq;
-        }
-      }
-    });
-
-    const nextSeq = String(maxSeq + 1).padStart(4, '0');
-    const nextNumber = `${prefix}-${monthStr}-${nextSeq}`;
+    const nextNumber = await generateNextSequence(pool, companyId, moduleName, dateStr);
     
     res.json({ nextNumber });
   } catch (error: any) {
@@ -1596,9 +1726,9 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
       const finalTotalSum = journalItems.reduce((sum, line) => sum + parseFloat(line.debit || 0), 0);
       
       await client.query(
-        `INSERT INTO journal_entries (id, company_id, date, description, reference_id, reference_type, reference_number, total_debit, total_credit, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-        [journalEntryId, companyId, invoiceData.date, `قيد فاتورة مبيعات رقم: ${invoiceData.invoice_number}`, invoiceId, 'invoice', invoiceData.invoice_number, finalTotalSum, finalTotalSum, 'posted']
+        `INSERT INTO journal_entries (id, company_id, date, description, reference_id, reference_type, reference_number, total_debit, total_credit, status, entry_number)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [journalEntryId, companyId, invoiceData.date, `قيد فاتورة مبيعات رقم: ${invoiceData.invoice_number}`, invoiceId, 'invoice', invoiceData.invoice_number, finalTotalSum, finalTotalSum, 'posted', await generateNextSequence(client, companyId, 'journal_entries', invoiceData.date)]
       );
 
       for (const line of journalItems) {
@@ -1608,6 +1738,11 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
           [uuidv4(), journalEntryId, line.account_id, line.account_name, line.description, line.debit, line.credit, companyId, line.customer_id, line.sub_account_id || null, line.sub_account_type || null, line.customer_name || null, line.supplier_name || null]
         );
       }
+    }
+
+    const productIdsToSync = (items || []).filter((i: any) => i.product_id).map((i: any) => i.product_id);
+    if (productIdsToSync.length > 0) {
+      await syncProductsCostAndJEs(client, companyId, productIdsToSync);
     }
 
     await client.query('COMMIT');
@@ -1860,9 +1995,9 @@ for (const item of (items || [])) {
       const finalTotalSum = journalItems.reduce((sum, line) => sum + parseFloat(line.debit || 0), 0);
       
       await client.query(
-        `INSERT INTO journal_entries (id, company_id, date, description, reference_id, reference_type, reference_number, total_debit, total_credit, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-        [journalEntryId, companyId, invoiceData.date, `قيد فاتورة مبيعات رقم: ${invoiceData.invoice_number}`, invoiceId, 'invoice', invoiceData.invoice_number, finalTotalSum, finalTotalSum, 'posted']
+        `INSERT INTO journal_entries (id, company_id, date, description, reference_id, reference_type, reference_number, total_debit, total_credit, status, entry_number)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [journalEntryId, companyId, invoiceData.date, `قيد فاتورة مبيعات رقم: ${invoiceData.invoice_number}`, invoiceId, 'invoice', invoiceData.invoice_number, finalTotalSum, finalTotalSum, 'posted', await generateNextSequence(client, companyId, 'journal_entries', invoiceData.date)]
       );
 
       for (const line of journalItems) {
@@ -1875,6 +2010,11 @@ for (const item of (items || [])) {
     }
 
     
+    const productIdsToSync = (items || []).filter((i: any) => i.product_id).map((i: any) => i.product_id);
+    if (productIdsToSync.length > 0) {
+      await syncProductsCostAndJEs(client, companyId, productIdsToSync);
+    }
+
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
@@ -1956,6 +2096,11 @@ router.post('/returns', authenticateToken, async (req: AuthRequest, res) => {
         `INSERT INTO "return_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
         Object.values(itemData)
       );
+    }
+
+        const productIdsToSync = (items || []).filter((i: any) => i.product_id).map((i: any) => i.product_id);
+    if (productIdsToSync.length > 0) {
+      await syncProductsCostAndJEs(client, companyId, productIdsToSync);
     }
 
     await client.query('COMMIT');
@@ -2050,6 +2195,11 @@ for (const item of (items || [])) {
     }
 
     
+    const productIdsToSync = (items || []).filter((i: any) => i.product_id).map((i: any) => i.product_id);
+    if (productIdsToSync.length > 0) {
+      await syncProductsCostAndJEs(client, companyId, productIdsToSync);
+    }
+
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
@@ -2124,6 +2274,11 @@ router.post('/purchase_invoices', authenticateToken, async (req: AuthRequest, re
         `INSERT INTO "purchase_invoice_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
         Object.values(itemData)
       );
+    }
+
+    const productIdsToSync = (items || []).filter((i: any) => i.product_id).map((i: any) => i.product_id);
+    if (productIdsToSync.length > 0) {
+      await syncProductsCostAndJEs(client, companyId, productIdsToSync);
     }
 
     await client.query('COMMIT');
@@ -2209,6 +2364,11 @@ for (const item of (items || [])) {
     }
 
     
+    const productIdsToSync = (items || []).filter((i: any) => i.product_id).map((i: any) => i.product_id);
+    if (productIdsToSync.length > 0) {
+      await syncProductsCostAndJEs(client, companyId, productIdsToSync);
+    }
+
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
@@ -2368,6 +2528,11 @@ for (const item of (items || [])) {
     }
 
     
+    const productIdsToSync = (items || []).filter((i: any) => i.product_id).map((i: any) => i.product_id);
+    if (productIdsToSync.length > 0) {
+      await syncProductsCostAndJEs(client, companyId, productIdsToSync);
+    }
+
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
@@ -2407,6 +2572,9 @@ router.post('/journal_entries', authenticateToken, async (req: AuthRequest, res)
     const entryId = entryData.id || uuidv4();
     if (!isUUID(entryId)) return sendError(res, 400, 'Invalid Entry ID format');
 
+    if (!entryData.entry_number && entryData.date) {
+      entryData.entry_number = await generateNextSequence(client, companyId, 'journal_entries', entryData.date as string);
+    }
     const finalEntryData = { ...entryData, id: entryId };
     const keys = Object.keys(finalEntryData);
     const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
