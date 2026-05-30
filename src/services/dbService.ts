@@ -292,15 +292,24 @@ export const dbService = {
   },
 
   async deleteJournalEntryByReference(referenceId: string, companyId: string) {
-    const entries = await dbService.query<any>('journal_entries', [
-      { field: 'company_id', operator: '==', value: companyId },
-      { field: 'reference_id', operator: '==', value: referenceId }
-    ]);
-    
-    for (const entry of entries) {
-      await dbService.delete('journal_entries', entry.id);
-    }
-  },
+        const entries = await dbService.query<any>('journal_entries', [
+          { field: 'company_id', operator: '==', value: companyId },
+          { field: 'reference_id', operator: '==', value: referenceId }
+        ]);
+        
+        let preserved = null;
+        for (const entry of entries) {
+          if (!preserved) {
+             preserved = { entry_number: entry.entry_number, date: entry.date, reference_type: entry.reference_type };
+             (dbService as any)._recentDeletedJEs = (dbService as any)._recentDeletedJEs || {};
+             (dbService as any)._recentDeletedJEs[referenceId] = preserved;
+          }
+          if (!['invoice', 'sales_return', 'purchase_invoice', 'purchase_return', 'return'].includes(entry.reference_type)) {
+              await dbService.delete('journal_entries', entry.id);
+          }
+        }
+        return preserved;
+      },
 
   async getJournalEntryByReference(referenceId: string, companyId: string): Promise<any | null> {
     const entries = await dbService.query<any>('journal_entries', [

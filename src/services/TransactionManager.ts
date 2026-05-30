@@ -132,6 +132,11 @@ export class TransactionManager {
       };
       journalSchema.parse(testJournalWithRef);
 
+      let preserved = (dbService as any)._recentDeletedJEs?.[mainId];
+      if (preserved && preserved.entry_number && preserved.date.slice(0, 10) === journalData.date.slice(0, 10)) {
+         testJournalWithRef.entry_number = preserved.entry_number;
+      }
+
       // 3. Perform main update
       await dbService.update(mainCollection, mainId, mainData);
 

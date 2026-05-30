@@ -1782,6 +1782,16 @@ router.put('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
     if (!isUUID(invoiceId)) return sendError(res, 400, 'Invalid Invoice ID format');
 
     await client.query('BEGIN');
+    // Preserve old JE number if date hasn't changed
+    const oldJERes = await client.query('SELECT entry_number, date::text as date_str FROM journal_entries WHERE reference_id = $1', [req.params.id]);
+    let preservedEntryNumber = null;
+    let newDateStr = req.body.date ? req.body.date.slice(0,10) : null;
+    if (oldJERes.rows.length > 0 && newDateStr) {
+      if (oldJERes.rows[0].date_str.startsWith(newDateStr)) {
+        preservedEntryNumber = oldJERes.rows[0].entry_number;
+      }
+    }
+
     const { items, id: bodyId, ...rawInvoiceData } = req.body;
     const invoiceData = sanitizeData('invoices', rawInvoiceData);
     
@@ -1997,7 +2007,7 @@ for (const item of (items || [])) {
       await client.query(
         `INSERT INTO journal_entries (id, company_id, date, description, reference_id, reference_type, reference_number, total_debit, total_credit, status, entry_number)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [journalEntryId, companyId, invoiceData.date, `قيد فاتورة مبيعات رقم: ${invoiceData.invoice_number}`, invoiceId, 'invoice', invoiceData.invoice_number, finalTotalSum, finalTotalSum, 'posted', await generateNextSequence(client, companyId, 'journal_entries', invoiceData.date)]
+        [journalEntryId, companyId, invoiceData.date, `قيد فاتورة مبيعات رقم: ${invoiceData.invoice_number}`, invoiceId, 'invoice', invoiceData.invoice_number, finalTotalSum, finalTotalSum, 'posted', (preservedEntryNumber || await generateNextSequence(client, companyId, 'journal_entries', invoiceData.date))]
       );
 
       for (const line of journalItems) {
@@ -2122,6 +2132,16 @@ router.put('/returns/:id', authenticateToken, async (req: AuthRequest, res) => {
     if (!isUUID(returnId)) return sendError(res, 400, 'Invalid Return ID format');
 
     await client.query('BEGIN');
+    // Preserve old JE number if date hasn't changed
+    const oldJERes = await client.query('SELECT entry_number, date::text as date_str FROM journal_entries WHERE reference_id = $1', [req.params.id]);
+    let preservedEntryNumber = null;
+    let newDateStr = req.body.date ? req.body.date.slice(0,10) : null;
+    if (oldJERes.rows.length > 0 && newDateStr) {
+      if (oldJERes.rows[0].date_str.startsWith(newDateStr)) {
+        preservedEntryNumber = oldJERes.rows[0].entry_number;
+      }
+    }
+
     const { items, id: bodyId, ...rawReturnData } = req.body;
     const returnData = sanitizeData('returns', rawReturnData);
     
@@ -2300,6 +2320,16 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
     if (!isUUID(invoiceId)) return sendError(res, 400, 'Invalid Invoice ID format');
 
     await client.query('BEGIN');
+    // Preserve old JE number if date hasn't changed
+    const oldJERes = await client.query('SELECT entry_number, date::text as date_str FROM journal_entries WHERE reference_id = $1', [req.params.id]);
+    let preservedEntryNumber = null;
+    let newDateStr = req.body.date ? req.body.date.slice(0,10) : null;
+    if (oldJERes.rows.length > 0 && newDateStr) {
+      if (oldJERes.rows[0].date_str.startsWith(newDateStr)) {
+        preservedEntryNumber = oldJERes.rows[0].entry_number;
+      }
+    }
+
     const { items, id: bodyId, ...rawInvoiceData } = req.body;
     const invoiceData = sanitizeData('purchase_invoices', rawInvoiceData);
     
@@ -2463,6 +2493,16 @@ router.put('/purchase_returns/:id', authenticateToken, async (req: AuthRequest, 
     if (!isUUID(returnId)) return sendError(res, 400, 'Invalid Return ID format');
 
     await client.query('BEGIN');
+    // Preserve old JE number if date hasn't changed
+    const oldJERes = await client.query('SELECT entry_number, date::text as date_str FROM journal_entries WHERE reference_id = $1', [req.params.id]);
+    let preservedEntryNumber = null;
+    let newDateStr = req.body.date ? req.body.date.slice(0,10) : null;
+    if (oldJERes.rows.length > 0 && newDateStr) {
+      if (oldJERes.rows[0].date_str.startsWith(newDateStr)) {
+        preservedEntryNumber = oldJERes.rows[0].entry_number;
+      }
+    }
+
     const { items, id: bodyId, ...rawReturnData } = req.body;
     const returnData = sanitizeData('purchase_returns', rawReturnData);
     
