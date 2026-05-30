@@ -36,11 +36,6 @@ export async function recalculateProductStock(client: PoolClient, companyId: str
       WHERE product_id = $1 AND company_id = $2 
       ORDER BY 
         date ASC, 
-        CASE 
-          WHEN movement_type IN ('purchase', 'sales_return') THEN 1 
-          WHEN movement_type = 'adjustment' AND quantity > 0 THEN 1 
-          ELSE 2 
-        END ASC,
         created_at ASC
     `, [productId, companyId]);
 
