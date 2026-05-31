@@ -204,7 +204,8 @@ async function startServer() {
       await pool.query('ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS entry_number VARCHAR(50);');
       console.log('Successfully altered journal_entries');
     } catch (e) { console.error('Failed to alter', e); }
-    app.listen(PORT, "0.0.0.0", () => {
+    
+  app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 Server ready at http://0.0.0.0:${PORT}`);
     
     // Removed auto trigger

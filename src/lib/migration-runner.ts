@@ -38,6 +38,7 @@ export async function runMigrations() {
     // 0. Programmatic Column Migrations (Requested by User)
     console.log('🛠️ Checking for required columns...');
     const columnsToSync = [
+      { table: 'journal_entries', column: 'entry_number', type: 'VARCHAR(50)' },
       { table: 'receipt_vouchers', column: 'account_id', type: 'VARCHAR(36) REFERENCES accounts(id)' },
       { table: 'payment_vouchers', column: 'account_id', type: 'VARCHAR(36) REFERENCES accounts(id)' },
       { table: 'activity_logs', column: 'account_id', type: 'VARCHAR(36) REFERENCES accounts(id)' },

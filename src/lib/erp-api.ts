@@ -2407,7 +2407,7 @@ router.post('/journal_entries', authenticateToken, async (req: AuthRequest, res)
   } catch (error: any) {
     if (client) await client.query('ROLLBACK');
     console.error('[CRASH PREVENTED] Journal entry creation error:', error);
-    sendError(res, 500, 'Failed to create journal entry', error.message);
+    sendError(res, 500, 'Failed to create journal entry: ' + error.message, error.stack);
   } finally {
     client.release();
   }

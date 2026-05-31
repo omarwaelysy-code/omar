@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 export async function syncCOGSForJournalEntry(client: any, companyId: string, journalEntryId: string, referenceId: string, referenceType: string) {
     if (!['invoice', 'sales_return'].includes(referenceType)) return;
     
@@ -15,7 +16,7 @@ export async function syncCOGSForJournalEntry(client: any, companyId: string, jo
     await client.query("DELETE FROM journal_entry_lines WHERE journal_entry_id = $1 AND (description LIKE '%تكلفة البضاعة%' OR description LIKE '%تخفيض المخزون%' OR description LIKE '%إرجاع المخزون%')", [journalEntryId]);
 
     const isInvoice = referenceType === 'invoice';
-    const uuidv4 = require('uuid').v4;
+    
     let addedCOGS = false;
 
     // 3. Loop through items and generate specific lines based strictly on PRODUCT ACCOUNTS
