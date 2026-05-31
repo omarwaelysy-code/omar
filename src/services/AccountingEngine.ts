@@ -145,8 +145,18 @@ export class AccountingEngine {
       });
     });
 
-    // Sort by date
-    relevantEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Sort by date, with entry_number and ID as tie-breakers
+    relevantEntries.sort((a, b) => {
+      const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+      if (dateDiff !== 0) return dateDiff;
+      
+      const aNo = a.entry_number || '';
+      const bNo = b.entry_number || '';
+      const noDiff = aNo.localeCompare(bNo, undefined, { numeric: true });
+      if (noDiff !== 0) return noDiff;
+
+      return (a.id || '').localeCompare(b.id || '');
+    });
 
     let runningBalance = openingDebit - openingCredit;
     const openingBalanceTotal = runningBalance;

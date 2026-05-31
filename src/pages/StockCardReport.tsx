@@ -190,7 +190,18 @@ export const StockCardReport: React.FC = () => {
     if (aIsInflow && !bIsInflow) return -1;
     if (!aIsInflow && bIsInflow) return 1;
     
-    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    // Tie-breaker 1: Reference number (e.g. Doc number)
+    const aRef = a.reference_number || '';
+    const bRef = b.reference_number || '';
+    const refDiff = aRef.localeCompare(bRef, undefined, { numeric: true });
+    if (refDiff !== 0) return refDiff;
+
+    // Tie-breaker 2: Created at timestamp
+    const timeDiff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    if (timeDiff !== 0) return timeDiff;
+
+    // Tie-breaker 3: ID
+    return (a.id || '').localeCompare(b.id || '');
   });
 
   let runningQty = 0;
