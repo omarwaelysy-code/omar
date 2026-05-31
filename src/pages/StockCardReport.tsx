@@ -180,6 +180,16 @@ export const StockCardReport: React.FC = () => {
   const sortedMovements = [...movements].sort((a, b) => {
     const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
     if (dateDiff !== 0) return dateDiff;
+    
+    // Sort inflows (quantity > 0) before outflows (quantity <= 0)
+    const aQty = parseFloat(a.quantity || '0');
+    const bQty = parseFloat(b.quantity || '0');
+    const aIsInflow = aQty > 0;
+    const bIsInflow = bQty > 0;
+    
+    if (aIsInflow && !bIsInflow) return -1;
+    if (!aIsInflow && bIsInflow) return 1;
+    
     return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
   });
 

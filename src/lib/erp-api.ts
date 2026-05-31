@@ -2896,7 +2896,7 @@ router.get('/inventory/debug_moves', async (req, res) => {
       SELECT reference_number, date::text as date, created_at, movement_type, quantity, unit_cost, total_cost 
       FROM inventory_movements 
       WHERE movement_type IN ('sale', 'purchase', 'sales_return', 'purchase_return', 'adjustment')
-      ORDER BY date ASC, created_at ASC
+      ORDER BY date ASC, CASE WHEN quantity > 0 THEN 0 ELSE 1 END ASC, created_at ASC
       LIMIT 100
     `);
     res.json(rows);

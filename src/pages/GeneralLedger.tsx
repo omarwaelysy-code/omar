@@ -134,6 +134,7 @@ export const GeneralLedger: React.FC = () => {
       [t('ledger.column_entity')]: tx.entity_name || '-',
       [t('journal.column_description')]: tx.description,
       [t('journal.column_reference')]: tx.reference || '-',
+      [language === 'ar' ? 'رقم القيد' : 'Entry No.']: tx.entry_number || '-',
       [t('journal.column_debit')]: tx.debit,
       [t('journal.column_credit')]: tx.credit,
       [t('ledger.column_balance')]: tx.balance
