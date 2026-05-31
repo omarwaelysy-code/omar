@@ -37,7 +37,9 @@ export async function recalculateProductStock(client: PoolClient, companyId: str
       ORDER BY 
         date ASC, 
         CASE WHEN quantity > 0 THEN 0 ELSE 1 END ASC,
-        created_at ASC
+        COALESCE(reference_number, '') ASC,
+        created_at ASC,
+        id ASC
     `, [productId, companyId]);
 
     for (const move of movesRes.rows) {
@@ -108,7 +110,9 @@ export async function recalculateProductStock(client: PoolClient, companyId: str
       ORDER BY 
         date ASC, 
         CASE WHEN quantity > 0 THEN 0 ELSE 1 END ASC,
-        created_at ASC
+        COALESCE(reference_number, '') ASC,
+        created_at ASC,
+        id ASC
     `, [productId, companyId]);
 
     for (const move of movesRes.rows) {
