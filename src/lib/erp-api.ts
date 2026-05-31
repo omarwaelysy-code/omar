@@ -10,6 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import * as XLSX from 'xlsx';
 import multer from 'multer';
+import { syncCOGSForJournalEntry } from './sync-cogs';
 import { recordPurchase, recordSale, recordSalesReturn, recordPurchaseReturn, recalculateProductStock, reverseAndRecalculate } from './cost-engine';
 
 export async function syncProductsCostAndJEs(client: any, companyId: string, productIds: string[]) {
@@ -1633,113 +1634,6 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
       );
     }
 
-    // --- Generate Journal Entry ---
-    console.log('[ERP] Generating Journal Entry...');
-    
-    // Fetch dependencies
-    const { rows: customers } = await client.query('SELECT * FROM customers WHERE company_id = $1', [companyId]);
-    const { rows: productsList } = await client.query('SELECT * FROM products WHERE company_id = $1', [companyId]);
-    const { rows: accounts } = await client.query('SELECT * FROM accounts WHERE company_id = $1', [companyId]);
-    const { rows: paymentMethods } = await client.query('SELECT * FROM payment_methods WHERE company_id = $1', [companyId]);
-    
-    const customer = customers.find((c: any) => c.id === invoiceData.customer_id);
-    const totalAmount = parseFloat(invoiceData.total_amount);
-    const subtotal = parseFloat(invoiceData.subtotal || invoiceData.total_amount);
-    const discount = parseFloat(invoiceData.discount_amount || 0);
-
-    const journalItems: any[] = [];
-    
-    // Debit: Customer or Cash
-    let debitAccountId = '';
-    let debitAccountName = '';
-    
-    if (invoiceData.payment_type === 'cash') {
-      const pm = paymentMethods.find((p: any) => p.id === invoiceData.payment_method_id);
-      debitAccountId = pm?.account_id || accounts.find((a: any) => a.name.includes('خزينة') || a.name.includes('نقدية'))?.id;
-      debitAccountName = pm?.account_name || 'حساب النقدية';
-    } else {
-      debitAccountId = customer?.account_id || accounts.find((a: any) => a.name.includes('عملاء'))?.id;
-      debitAccountName = customer?.account_name || 'حساب العملاء';
-    }
-
-    if (debitAccountId) {
-      journalItems.push({
-        account_id: debitAccountId,
-        account_name: debitAccountName,
-        debit: totalAmount,
-        credit: 0,
-        description: `فاتورة مبيعات رقم ${invoiceData.invoice_number}`,
-        customer_id: invoiceData.customer_id,
-        customer_name: customer?.name || null,
-        sub_account_id: invoiceData.payment_type === 'cash' ? invoiceData.payment_method_id : invoiceData.customer_id,
-        sub_account_type: invoiceData.payment_type === 'cash' ? 'payment_method' : 'customer'
-      });
-    }
-
-    // Discount
-    if (discount > 0) {
-      const discountAcc = accounts.find((a: any) => a.name.includes('خصم مسموح به'));
-      if (discountAcc) {
-        journalItems.push({
-          account_id: discountAcc.id,
-          account_name: discountAcc.name,
-          debit: discount,
-          credit: 0,
-          description: `خصم مسموح به - فاتورة ${invoiceData.invoice_number}`,
-          sub_account_id: null,
-          sub_account_type: null
-        });
-      }
-    }
-
-    // Credit: Revenue
-    const revenueAcc = accounts.find((a: any) => a.name.includes('مبيعات') || a.name.includes('إيراد'));
-    if (revenueAcc) {
-      journalItems.push({
-        account_id: revenueAcc.id,
-        account_name: revenueAcc.name,
-        debit: 0,
-        credit: subtotal,
-        description: `مبيعات - فاتورة ${invoiceData.invoice_number}`,
-        sub_account_id: null,
-        sub_account_type: null
-      });
-    }
-
-    // Append standard perpetual inventory lines (COGS and reduced inventory asset)
-    for (const line of cogsLines) {
-      journalItems.push({
-        account_id: line.account_id,
-        account_name: line.account_name,
-        debit: line.debit,
-        credit: line.credit,
-        description: line.description,
-        customer_id: null,
-        sub_account_id: null,
-        sub_account_type: null
-      });
-    }
-
-    if (journalItems.length > 0) {
-      console.log(`[ERP] Creating Journal Entry with ${journalItems.length} lines`);
-      const journalEntryId = uuidv4();
-      const finalTotalSum = journalItems.reduce((sum, line) => sum + parseFloat(line.debit || 0), 0);
-      
-      await client.query(
-        `INSERT INTO journal_entries (id, company_id, date, description, reference_id, reference_type, reference_number, total_debit, total_credit, status, entry_number)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [journalEntryId, companyId, invoiceData.date, `قيد فاتورة مبيعات رقم: ${invoiceData.invoice_number}`, invoiceId, 'invoice', invoiceData.invoice_number, finalTotalSum, finalTotalSum, 'posted', await generateNextSequence(client, companyId, 'journal_entries', invoiceData.date)]
-      );
-
-      for (const line of journalItems) {
-        await client.query(
-          `INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, company_id, customer_id, sub_account_id, sub_account_type, customer_name, supplier_name)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-          [uuidv4(), journalEntryId, line.account_id, line.account_name, line.description, line.debit, line.credit, companyId, line.customer_id, line.sub_account_id || null, line.sub_account_type || null, line.customer_name || null, line.supplier_name || null]
-        );
-      }
-    }
-
     const productIdsToSync = (items || []).filter((i: any) => i.product_id).map((i: any) => i.product_id);
     if (productIdsToSync.length > 0) {
       await syncProductsCostAndJEs(client, companyId, productIdsToSync);
@@ -1782,15 +1676,7 @@ router.put('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
     if (!isUUID(invoiceId)) return sendError(res, 400, 'Invalid Invoice ID format');
 
     await client.query('BEGIN');
-    // Preserve old JE number if date hasn't changed
-    const oldJERes = await client.query('SELECT entry_number, date::text as date_str FROM journal_entries WHERE reference_id = $1', [req.params.id]);
-    let preservedEntryNumber = null;
-    let newDateStr = req.body.date ? req.body.date.slice(0,10) : null;
-    if (oldJERes.rows.length > 0 && newDateStr) {
-      if (oldJERes.rows[0].date_str.startsWith(newDateStr)) {
-        preservedEntryNumber = oldJERes.rows[0].entry_number;
-      }
-    }
+    // Removed legacy preservedEntryNumber code
 
     const { items, id: bodyId, ...rawInvoiceData } = req.body;
     const invoiceData = sanitizeData('invoices', rawInvoiceData);
@@ -1912,114 +1798,6 @@ for (const item of (items || [])) {
       );
     }
 
-    // --- Generate Journal Entry ---
-    console.log('[ERP] Generating Journal Entry...');
-    
-    // Fetch dependencies
-    const { rows: customers } = await client.query('SELECT * FROM customers WHERE company_id = $1', [companyId]);
-    const { rows: productsList } = await client.query('SELECT * FROM products WHERE company_id = $1', [companyId]);
-    const { rows: accounts } = await client.query('SELECT * FROM accounts WHERE company_id = $1', [companyId]);
-    const { rows: paymentMethods } = await client.query('SELECT * FROM payment_methods WHERE company_id = $1', [companyId]);
-    
-    const customer = customers.find((c: any) => c.id === invoiceData.customer_id);
-    const totalAmount = parseFloat(invoiceData.total_amount);
-    const subtotal = parseFloat(invoiceData.subtotal || invoiceData.total_amount);
-    const discount = parseFloat(invoiceData.discount_amount || 0);
-
-    const journalItems: any[] = [];
-    
-    // Debit: Customer or Cash
-    let debitAccountId = '';
-    let debitAccountName = '';
-    
-    if (invoiceData.payment_type === 'cash') {
-      const pm = paymentMethods.find((p: any) => p.id === invoiceData.payment_method_id);
-      debitAccountId = pm?.account_id || accounts.find((a: any) => a.name.includes('خزينة') || a.name.includes('نقدية'))?.id;
-      debitAccountName = pm?.account_name || 'حساب النقدية';
-    } else {
-      debitAccountId = customer?.account_id || accounts.find((a: any) => a.name.includes('عملاء'))?.id;
-      debitAccountName = customer?.account_name || 'حساب العملاء';
-    }
-
-    if (debitAccountId) {
-      journalItems.push({
-        account_id: debitAccountId,
-        account_name: debitAccountName,
-        debit: totalAmount,
-        credit: 0,
-        description: `فاتورة مبيعات رقم ${invoiceData.invoice_number}`,
-        customer_id: invoiceData.customer_id,
-        customer_name: customer?.name || null,
-        sub_account_id: invoiceData.payment_type === 'cash' ? invoiceData.payment_method_id : invoiceData.customer_id,
-        sub_account_type: invoiceData.payment_type === 'cash' ? 'payment_method' : 'customer'
-      });
-    }
-
-    // Discount
-    if (discount > 0) {
-      const discountAcc = accounts.find((a: any) => a.name.includes('خصم مسموح به'));
-      if (discountAcc) {
-        journalItems.push({
-          account_id: discountAcc.id,
-          account_name: discountAcc.name,
-          debit: discount,
-          credit: 0,
-          description: `خصم مسموح به - فاتورة ${invoiceData.invoice_number}`,
-          sub_account_id: null,
-          sub_account_type: null
-        });
-      }
-    }
-
-    // Credit: Revenue
-    const revenueAcc = accounts.find((a: any) => a.name.includes('مبيعات') || a.name.includes('إيراد'));
-    if (revenueAcc) {
-      journalItems.push({
-        account_id: revenueAcc.id,
-        account_name: revenueAcc.name,
-        debit: 0,
-        credit: subtotal,
-        description: `مبيعات - فاتورة ${invoiceData.invoice_number}`,
-        sub_account_id: null,
-        sub_account_type: null
-      });
-    }
-
-    // Append standard perpetual inventory lines (COGS and reduced inventory asset)
-    for (const line of cogsLines) {
-      journalItems.push({
-        account_id: line.account_id,
-        account_name: line.account_name,
-        debit: line.debit,
-        credit: line.credit,
-        description: line.description,
-        customer_id: null,
-        sub_account_id: null,
-        sub_account_type: null
-      });
-    }
-
-    if (journalItems.length > 0) {
-      console.log(`[ERP] Creating Journal Entry with ${journalItems.length} lines`);
-      const journalEntryId = uuidv4();
-      const finalTotalSum = journalItems.reduce((sum, line) => sum + parseFloat(line.debit || 0), 0);
-      
-      await client.query(
-        `INSERT INTO journal_entries (id, company_id, date, description, reference_id, reference_type, reference_number, total_debit, total_credit, status, entry_number)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [journalEntryId, companyId, invoiceData.date, `قيد فاتورة مبيعات رقم: ${invoiceData.invoice_number}`, invoiceId, 'invoice', invoiceData.invoice_number, finalTotalSum, finalTotalSum, 'posted', (preservedEntryNumber || await generateNextSequence(client, companyId, 'journal_entries', invoiceData.date))]
-      );
-
-      for (const line of journalItems) {
-        await client.query(
-          `INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, company_id, customer_id, sub_account_id, sub_account_type, customer_name, supplier_name)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-          [uuidv4(), journalEntryId, line.account_id, line.account_name, line.description, line.debit, line.credit, companyId, line.customer_id, line.sub_account_id || null, line.sub_account_type || null, line.customer_name || null, line.supplier_name || null]
-        );
-      }
-    }
-
-    
     const productIdsToSync = (items || []).filter((i: any) => i.product_id).map((i: any) => i.product_id);
     if (productIdsToSync.length > 0) {
       await syncProductsCostAndJEs(client, companyId, productIdsToSync);
@@ -2132,15 +1910,7 @@ router.put('/returns/:id', authenticateToken, async (req: AuthRequest, res) => {
     if (!isUUID(returnId)) return sendError(res, 400, 'Invalid Return ID format');
 
     await client.query('BEGIN');
-    // Preserve old JE number if date hasn't changed
-    const oldJERes = await client.query('SELECT entry_number, date::text as date_str FROM journal_entries WHERE reference_id = $1', [req.params.id]);
-    let preservedEntryNumber = null;
-    let newDateStr = req.body.date ? req.body.date.slice(0,10) : null;
-    if (oldJERes.rows.length > 0 && newDateStr) {
-      if (oldJERes.rows[0].date_str.startsWith(newDateStr)) {
-        preservedEntryNumber = oldJERes.rows[0].entry_number;
-      }
-    }
+    // Removed legacy preservedEntryNumber code
 
     const { items, id: bodyId, ...rawReturnData } = req.body;
     const returnData = sanitizeData('returns', rawReturnData);
@@ -2320,15 +2090,7 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
     if (!isUUID(invoiceId)) return sendError(res, 400, 'Invalid Invoice ID format');
 
     await client.query('BEGIN');
-    // Preserve old JE number if date hasn't changed
-    const oldJERes = await client.query('SELECT entry_number, date::text as date_str FROM journal_entries WHERE reference_id = $1', [req.params.id]);
-    let preservedEntryNumber = null;
-    let newDateStr = req.body.date ? req.body.date.slice(0,10) : null;
-    if (oldJERes.rows.length > 0 && newDateStr) {
-      if (oldJERes.rows[0].date_str.startsWith(newDateStr)) {
-        preservedEntryNumber = oldJERes.rows[0].entry_number;
-      }
-    }
+    // Removed legacy preservedEntryNumber code
 
     const { items, id: bodyId, ...rawInvoiceData } = req.body;
     const invoiceData = sanitizeData('purchase_invoices', rawInvoiceData);
@@ -2493,15 +2255,7 @@ router.put('/purchase_returns/:id', authenticateToken, async (req: AuthRequest, 
     if (!isUUID(returnId)) return sendError(res, 400, 'Invalid Return ID format');
 
     await client.query('BEGIN');
-    // Preserve old JE number if date hasn't changed
-    const oldJERes = await client.query('SELECT entry_number, date::text as date_str FROM journal_entries WHERE reference_id = $1', [req.params.id]);
-    let preservedEntryNumber = null;
-    let newDateStr = req.body.date ? req.body.date.slice(0,10) : null;
-    if (oldJERes.rows.length > 0 && newDateStr) {
-      if (oldJERes.rows[0].date_str.startsWith(newDateStr)) {
-        preservedEntryNumber = oldJERes.rows[0].entry_number;
-      }
-    }
+    // Removed legacy preservedEntryNumber code
 
     const { items, id: bodyId, ...rawReturnData } = req.body;
     const returnData = sanitizeData('purchase_returns', rawReturnData);
@@ -2596,18 +2350,7 @@ router.post('/journal_entries', authenticateToken, async (req: AuthRequest, res)
     const entryData = sanitizeData('journal_entries', rawEntryData);
     if (!entryData.company_id) entryData.company_id = companyId;
 
-    // Check for duplicate reference to avoid conflicts with auto-generated entries
-    if (entryData.reference_id && entryData.reference_type) {
-      const { rows: existing } = await client.query(
-        'SELECT id FROM journal_entries WHERE reference_id = $1 AND reference_type = $2 AND company_id = $3',
-        [entryData.reference_id, entryData.reference_type, companyId]
-      );
-      if (existing.length > 0) {
-        console.log(`[ERP] Journal entry for reference ${entryData.reference_id} already exists. Skipping.`);
-        await client.query('ROLLBACK');
-        return res.status(200).json({ id: existing[0].id, message: 'Already exists' });
-      }
-    }
+    // Duplicate skip removed
 
     const entryId = entryData.id || uuidv4();
     if (!isUUID(entryId)) return sendError(res, 400, 'Invalid Entry ID format');
@@ -2635,6 +2378,12 @@ router.post('/journal_entries', authenticateToken, async (req: AuthRequest, res)
         `INSERT INTO journal_entry_lines (${itemKeys.join(', ')}) VALUES (${itemPlaceholders})`,
         Object.values(itemData)
       );
+    }
+
+    
+    if (['invoice', 'sales_return'].includes(finalEntryData.reference_type)) {
+       console.log('[ERP] Auto-Syncing COGS for Journal Entry', entryId);
+       await syncCOGSForJournalEntry(client, companyId, entryId, finalEntryData.reference_id, finalEntryData.reference_type);
     }
 
     await client.query('COMMIT');

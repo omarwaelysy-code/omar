@@ -304,9 +304,7 @@ export const dbService = {
              (dbService as any)._recentDeletedJEs = (dbService as any)._recentDeletedJEs || {};
              (dbService as any)._recentDeletedJEs[referenceId] = preserved;
           }
-          if (!['invoice', 'sales_return', 'purchase_invoice', 'purchase_return', 'return'].includes(entry.reference_type)) {
-              await dbService.delete('journal_entries', entry.id);
-          }
+          await dbService.delete('journal_entries', entry.id);
         }
         return preserved;
       },
