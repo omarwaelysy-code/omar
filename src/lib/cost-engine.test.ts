@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { recordPurchase, recordSale, recordSalesReturn, recordPurchaseReturn } from './cost-engine';
+import { recordPurchase, recordSale, recordSalesReturn, recordPurchaseReturn, recalculateProductStock } from './cost-engine';
 import { PoolClient } from 'pg';
 
 describe('Inventory Costing Engine', () => {
@@ -209,6 +209,161 @@ describe('Inventory Costing Engine', () => {
     expect(client.query).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE inventory_layers SET qty_remaining = qty_remaining - $1 WHERE id = $2'),
       [2, 'layer-p']
+    );
+  });
+
+  it('recalculates stock and FIFO layers / costs correctly on recalculateProductStock', async () => {
+    const settings = { inventory_cost_method: 'fifo' };
+    const product = { id: mockProductId, cost_price: 15, stock: 10, weighted_average_cost: 15 };
+    
+    const dbLayers: any[] = [];
+    const movements = [
+      { id: 'move-1', date: '2026-05-01', quantity: '5.00', unit_cost: '10.00', total_cost: '50.00', movement_type: 'purchase', reference_type: 'purchase_invoice', reference_id: 'ref-1', created_at: new Date('2026-05-01T00:00:00Z') },
+      { id: 'move-2', date: '2026-05-02', quantity: '5.00', unit_cost: '20.00', total_cost: '100.00', movement_type: 'purchase', reference_type: 'purchase_invoice', reference_id: 'ref-2', created_at: new Date('2026-05-02T00:00:00Z') },
+      { id: 'move-3', date: '2026-05-03', quantity: '-7.00', unit_cost: '0.00', total_cost: '0.00', movement_type: 'sale', reference_type: 'invoice', reference_id: 'ref-3', created_at: new Date('2026-05-03T00:00:00Z') }
+    ];
+
+    const client = {
+      query: vi.fn().mockImplementation(async (queryText: string, params: any[]) => {
+        const queryClean = queryText.toLowerCase().trim();
+        if (queryClean.includes('select settings from companies')) {
+          return { rows: [{ settings }] };
+        }
+        if (queryClean.includes('select cost_price, weighted_average_cost from products')) {
+          return { rows: [product] };
+        }
+        if (queryClean.includes('select * from inventory_movements')) {
+          return { rows: movements };
+        }
+        if (queryClean.includes('delete from inventory_layers')) {
+          dbLayers.length = 0;
+          return { rows: [], rowCount: 1 };
+        }
+        if (queryClean.includes('insert into inventory_layers')) {
+          dbLayers.push({
+            id: params[0],
+            purchase_date: params[3],
+            qty_remaining: params[5],
+            unit_cost: params[6],
+            created_at: params[9]
+          });
+          return { rows: [], rowCount: 1 };
+        }
+        if (queryClean.includes('select * from inventory_layers')) {
+          const isDesc = queryClean.includes('desc');
+          const sorted = [...dbLayers].filter(l => l.qty_remaining > 0).sort((a, b) => {
+            const dateDiff = new Date(a.purchase_date).getTime() - new Date(b.purchase_date).getTime();
+            if (dateDiff !== 0) return isDesc ? -dateDiff : dateDiff;
+            return isDesc ? b.created_at - a.created_at : a.created_at - b.created_at;
+          });
+          return { rows: sorted };
+        }
+        if (queryClean.includes('update inventory_layers')) {
+          const decr = params[0];
+          const id = params[1];
+          const l = dbLayers.find(x => x.id === id);
+          if (l) l.qty_remaining -= decr;
+          return { rows: [], rowCount: 1 };
+        }
+        return { rows: [], rowCount: 1 };
+      })
+    } as unknown as PoolClient;
+
+    await recalculateProductStock(client, mockCompanyId, mockProductId);
+
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM inventory_layers'),
+      [mockProductId, mockCompanyId]
+    );
+
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE inventory_movements'),
+      [12.857142857142858, -90, 'move-3']
+    );
+
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE invoice_items'),
+      [12.857142857142858, 90, 'ref-3', mockProductId]
+    );
+
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE products'),
+      [3, 20, mockProductId]
+    );
+  });
+
+  it('recalculates stock and LIFO layers / costs correctly on recalculateProductStock', async () => {
+    const settings = { inventory_cost_method: 'lifo' };
+    const product = { id: mockProductId, cost_price: 15, stock: 10, weighted_average_cost: 15 };
+    
+    const dbLayers: any[] = [];
+    const movements = [
+      { id: 'move-1', date: '2026-05-01', quantity: '5.00', unit_cost: '10.00', total_cost: '50.00', movement_type: 'purchase', reference_type: 'purchase_invoice', reference_id: 'ref-1', created_at: new Date('2026-05-01T00:00:00Z') },
+      { id: 'move-2', date: '2026-05-02', quantity: '5.00', unit_cost: '20.00', total_cost: '100.00', movement_type: 'purchase', reference_type: 'purchase_invoice', reference_id: 'ref-2', created_at: new Date('2026-05-02T00:00:00Z') },
+      { id: 'move-3', date: '2026-05-03', quantity: '-7.00', unit_cost: '0.00', total_cost: '0.00', movement_type: 'sale', reference_type: 'invoice', reference_id: 'ref-3', created_at: new Date('2026-05-03T00:00:00Z') }
+    ];
+
+    const client = {
+      query: vi.fn().mockImplementation(async (queryText: string, params: any[]) => {
+        const queryClean = queryText.toLowerCase().trim();
+        if (queryClean.includes('select settings from companies')) {
+          return { rows: [{ settings }] };
+        }
+        if (queryClean.includes('select cost_price, weighted_average_cost from products')) {
+          return { rows: [product] };
+        }
+        if (queryClean.includes('select * from inventory_movements')) {
+          return { rows: movements };
+        }
+        if (queryClean.includes('delete from inventory_layers')) {
+          dbLayers.length = 0;
+          return { rows: [], rowCount: 1 };
+        }
+        if (queryClean.includes('insert into inventory_layers')) {
+          dbLayers.push({
+            id: params[0],
+            purchase_date: params[3],
+            qty_remaining: params[5],
+            unit_cost: params[6],
+            created_at: params[9]
+          });
+          return { rows: [], rowCount: 1 };
+        }
+        if (queryClean.includes('select * from inventory_layers')) {
+          const isDesc = queryClean.includes('desc');
+          const sorted = [...dbLayers].filter(l => l.qty_remaining > 0).sort((a, b) => {
+            const dateDiff = new Date(a.purchase_date).getTime() - new Date(b.purchase_date).getTime();
+            if (dateDiff !== 0) return isDesc ? -dateDiff : dateDiff;
+            return isDesc ? b.created_at - a.created_at : a.created_at - b.created_at;
+          });
+          return { rows: sorted };
+        }
+        if (queryClean.includes('update inventory_layers')) {
+          const decr = params[0];
+          const id = params[1];
+          const l = dbLayers.find(x => x.id === id);
+          if (l) l.qty_remaining -= decr;
+          return { rows: [], rowCount: 1 };
+        }
+        return { rows: [], rowCount: 1 };
+      })
+    } as unknown as PoolClient;
+
+    await recalculateProductStock(client, mockCompanyId, mockProductId);
+
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE inventory_movements'),
+      [17.142857142857142, -120, 'move-3']
+    );
+
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE invoice_items'),
+      [17.142857142857142, 120, 'ref-3', mockProductId]
+    );
+
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE products'),
+      [3, 20, mockProductId]
     );
   });
 });

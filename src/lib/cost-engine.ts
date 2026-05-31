@@ -62,6 +62,14 @@ export async function recalculateProductStock(client: PoolClient, companyId: str
           SET unit_cost = $1, total_cost = $2 
           WHERE id = $3
         `, [wac, newMoveTotal * sign, move.id]);
+
+        if (move.reference_type === 'invoice' || move.reference_type === 'sale') {
+          await client.query(`
+            UPDATE invoice_items 
+            SET unit_cost = $1, total_cost = $2 
+            WHERE invoice_id = $3 AND product_id = $4
+          `, [wac, newMoveTotal, move.reference_id, productId]);
+        }
         
         stock = stock - qty;
         totalValue = stock * wac;
@@ -76,6 +84,125 @@ export async function recalculateProductStock(client: PoolClient, companyId: str
       SET stock = $1, current_stock = $1, weighted_average_cost = $2, cost_price = $2
       WHERE id = $3
     `, [stock, wac, productId]);
+  } else if (method === 'fifo' || method === 'lifo') {
+    // Delete all existing layers for this product
+    await client.query(
+      'DELETE FROM inventory_layers WHERE product_id = $1 AND company_id = $2',
+      [productId, companyId]
+    );
+
+    let stock = 0;
+    let lastInflowCost = 0;
+
+    // Fetch initial product cost price to use as fallback
+    const productRes = await client.query('SELECT cost_price, weighted_average_cost FROM products WHERE id = $1', [productId]);
+    let fallbackCost = 0;
+    if (productRes.rows.length > 0) {
+      fallbackCost = parseFloat(productRes.rows[0].weighted_average_cost || '0') || parseFloat(productRes.rows[0].cost_price || '0');
+    }
+    lastInflowCost = fallbackCost;
+
+    const movesRes = await client.query(`
+      SELECT * FROM inventory_movements 
+      WHERE product_id = $1 AND company_id = $2 
+      ORDER BY 
+        date ASC, 
+        CASE WHEN quantity > 0 THEN 0 ELSE 1 END ASC,
+        created_at ASC
+    `, [productId, companyId]);
+
+    for (const move of movesRes.rows) {
+      const origQty = parseFloat(move.quantity || '0');
+      const qty = Math.abs(origQty);
+      const isOutflow = ['sale', 'purchase_return'].includes(move.movement_type) || (move.movement_type === 'adjustment' && origQty < 0);
+
+      if (!isOutflow) {
+        // Inflow: create a new layer
+        const layerId = uuidv4();
+        const moveUnitCost = parseFloat(move.unit_cost || '0');
+        await client.query(`
+          INSERT INTO inventory_layers (
+            id, company_id, product_id, purchase_date, original_qty, qty_remaining, 
+            unit_cost, reference_type, reference_id, created_at, warehouse_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        `, [
+          layerId,
+          companyId,
+          productId,
+          move.date,
+          qty,
+          qty,
+          moveUnitCost,
+          move.reference_type || 'adjustment',
+          move.reference_id,
+          move.created_at || new Date(),
+          move.warehouse_id || null
+        ]);
+
+        stock += qty;
+        if (moveUnitCost > 0) {
+          lastInflowCost = moveUnitCost;
+        }
+      } else {
+        // Outflow: consume layers
+        const orderDirection = method === 'fifo' ? 'ASC' : 'DESC';
+        const layersRes = await client.query(`
+          SELECT * FROM inventory_layers 
+          WHERE product_id = $1 AND qty_remaining > 0 
+          ORDER BY purchase_date ${orderDirection}, created_at ${orderDirection}
+        `, [productId]);
+
+        let rem = qty;
+        let totalCost = 0;
+        for (const layer of layersRes.rows) {
+          if (rem <= 0) break;
+          const layerQty = parseFloat(layer.qty_remaining || '0');
+          const layerCost = parseFloat(layer.unit_cost || '0');
+          const take = Math.min(rem, layerQty);
+
+          await client.query(
+            `UPDATE inventory_layers SET qty_remaining = qty_remaining - $1 WHERE id = $2`,
+            [take, layer.id]
+          );
+
+          totalCost += take * layerCost;
+          rem -= take;
+        }
+
+        if (rem > 0) {
+          // Out of stock fallback
+          totalCost += rem * lastInflowCost;
+        }
+
+        const finalUnitCost = qty > 0 ? totalCost / qty : lastInflowCost;
+        const sign = origQty < 0 ? -1 : 1;
+
+        // Update the outflow's movement itself
+        await client.query(`
+          UPDATE inventory_movements 
+          SET unit_cost = $1, total_cost = $2 
+          WHERE id = $3
+        `, [finalUnitCost, totalCost * sign, move.id]);
+
+        // Sync the cost details in the invoice_items table if it's a sale invoice
+        if (move.reference_type === 'invoice' || move.reference_type === 'sale') {
+          await client.query(`
+            UPDATE invoice_items 
+            SET unit_cost = $1, total_cost = $2 
+            WHERE invoice_id = $3 AND product_id = $4
+          `, [finalUnitCost, totalCost, move.reference_id, productId]);
+        }
+
+        stock -= qty;
+      }
+    }
+
+    // Update products table
+    await client.query(`
+      UPDATE products 
+      SET stock = $1, current_stock = $1, weighted_average_cost = $2, cost_price = $2
+      WHERE id = $3
+    `, [stock, lastInflowCost, productId]);
   }
 }
 
