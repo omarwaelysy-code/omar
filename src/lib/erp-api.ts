@@ -22,24 +22,17 @@ export async function syncProductsCostAndJEs(client: any, companyId: string, pro
     await recalculateProductStock(client, companyId, pid);
   }
   
-  // 1. Get all movements grouped by reference_id for these products specifically
+  // 1. Get all movements reference_id for these products specifically
   const movesRes = await client.query(`
-    SELECT reference_id, SUM(ABS(total_cost)) as true_cost
+    SELECT DISTINCT reference_id
     FROM inventory_movements
     WHERE movement_type IN ('sale', 'sales_return') AND company_id = $1 AND product_id = ANY($2)
-    GROUP BY reference_id
   `, [companyId, uniqueProducts]);
 
-  const movesByRef = new Map<string, number>();
-  for (const m of movesRes.rows) {
-    movesByRef.set(m.reference_id, parseFloat(m.true_cost || '0'));
-  }
+  const refIds = movesRes.rows.map((r: any) => r.reference_id).filter(Boolean);
+  if (refIds.length === 0) return;
 
-  if (movesByRef.size === 0) return;
-
-  const refIds = Array.from(movesByRef.keys());
-
-  // 2. Fetch all related Journal Entries (only those related to these movements)
+  // 2. Fetch all related Journal Entries
   const jeRes = await client.query(`
     SELECT id, reference_id, reference_type 
     FROM journal_entries 
@@ -47,72 +40,7 @@ export async function syncProductsCostAndJEs(client: any, companyId: string, pro
   `, [refIds, companyId]);
 
   for (const je of jeRes.rows) {
-    const totalCogs = movesByRef.get(je.reference_id);
-    if (totalCogs === undefined) continue;
-
-    // Wait, the totalCogs fetched from movesByRef only includes the sum of costs FOR THE SPECIFIED PRODUCTS!
-    // But the Journal Entry needs the full COGS for ALL products in that invoice!
-    // So we must fetch the real total COGS for the entire reference_id, not just the filtered products.
-    const allMovesCogsRes = await client.query(`
-      SELECT SUM(ABS(total_cost)) as full_cogs
-      FROM inventory_movements
-      WHERE movement_type IN ('sale', 'sales_return') AND reference_id = $1
-    `, [je.reference_id]);
-    
-    const trueTotalCogs = parseFloat(allMovesCogsRes.rows[0]?.full_cogs || '0');
-
-    const linesRes = await client.query(`SELECT * FROM journal_entry_lines WHERE journal_entry_id = $1`, [je.id]);
-    
-    let costAccId = null;
-    let costAccName = null;
-    let invAccId = null;
-    let invAccName = null;
-
-    for (const line of linesRes.rows) {
-       if (line.description.includes('تكلفة') && !costAccId) {
-           costAccId = line.account_id;
-           costAccName = line.account_name;
-       }
-       if ((line.description.includes('تخفيض') || line.description.includes('إرجاع') || line.description.includes('مخزون')) && !invAccId && !line.description.includes('تكلفة')) {
-           invAccId = line.account_id;
-           invAccName = line.account_name;
-       }
-    }
-
-    if (costAccId && invAccId) {
-       // Delete all old تكلفة and تخفيض/إرجاع lines
-       await client.query(`DELETE FROM journal_entry_lines WHERE journal_entry_id = $1 AND (description LIKE '%تكلفة%' OR description LIKE '%تخفيض%' OR description LIKE '%إرجاع%')`, [je.id]);
-
-       // Insert new combined lines
-       const isInvoice = je.reference_type === 'invoice';
-
-       await client.query(`
-          INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
-       `, [
-          uuidv4(), je.id, costAccId, costAccName, 
-          isInvoice ? 'تكلفة البضاعة المباعة (محدث التكلفة التلقائي)' : 'إلغاء تكلفة البضاعة المباعة (محدث التكلفة التلقائي)',
-          isInvoice ? trueTotalCogs : 0,
-          isInvoice ? 0 : trueTotalCogs
-       ]);
-
-       await client.query(`
-          INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
-       `, [
-          uuidv4(), je.id, invAccId, invAccName, 
-          isInvoice ? 'تخفيض المخزون (محدث التكلفة التلقائي)' : 'إرجاع المخزون (محدث التكلفة التلقائي)',
-          isInvoice ? 0 : trueTotalCogs,
-          isInvoice ? trueTotalCogs : 0
-       ]);
-    }
-
-    // Update JE totals
-    const updatedLines = await client.query(`SELECT SUM(debit) as d, SUM(credit) as c FROM journal_entry_lines WHERE journal_entry_id = $1`, [je.id]);
-    if (updatedLines.rows.length > 0) {
-       await client.query('UPDATE journal_entries SET total_debit = $1, total_credit = $2 WHERE id = $3', 
-         [updatedLines.rows[0].d, updatedLines.rows[0].c, je.id]);
-    }
+     await syncCOGSForJournalEntry(client, companyId, je.id, je.reference_id, je.reference_type);
   }
 }
 
@@ -2381,7 +2309,7 @@ router.post('/journal_entries', authenticateToken, async (req: AuthRequest, res)
     }
 
     
-    if (['invoice', 'sales_return'].includes(finalEntryData.reference_type)) {
+    if (['invoice', 'return', 'sales_return'].includes(finalEntryData.reference_type)) {
        console.log('[ERP] Auto-Syncing COGS for Journal Entry', entryId);
        await syncCOGSForJournalEntry(client, companyId, entryId, finalEntryData.reference_id, finalEntryData.reference_type);
     }
@@ -2798,84 +2726,15 @@ router.post('/inventory/recalculate_all', async (req: any, res) => {
     // Sync COGS journal entries with latest inventory movement costs
     console.log('[ERP] Recalculate: Syncing COGS into Journal Entries (JS fallback logic)...');
     
-    // 1. Get all movements grouped by reference_id
-    const movesRes = await client.query(`
-      SELECT reference_id, SUM(ABS(total_cost)) as true_cost
-      FROM inventory_movements
-      WHERE movement_type IN ('sale', 'sales_return') AND company_id = $1
-      GROUP BY reference_id
-    `, [companyId]);
-
-    const movesByRef = new Map<string, number>();
-    for (const m of movesRes.rows) {
-      movesByRef.set(m.reference_id, parseFloat(m.true_cost || '0'));
-    }
-
-    // 2. Fetch all related Journal Entries
+    // 1. Fetch all related Journal Entries
     const jeRes = await client.query(`
       SELECT id, reference_id, reference_type 
       FROM journal_entries 
-      WHERE reference_type IN ('invoice', 'returns') AND company_id = $1
+      WHERE reference_type IN ('invoice', 'return', 'sales_return') AND company_id = $1
     `, [companyId]);
 
     for (const je of jeRes.rows) {
-      const totalCogs = movesByRef.get(je.reference_id);
-      if (totalCogs === undefined) continue;
-
-      const linesRes = await client.query(`SELECT * FROM journal_entry_lines WHERE journal_entry_id = $1`, [je.id]);
-      
-      let costAccId = null;
-      let costAccName = null;
-      let invAccId = null;
-      let invAccName = null;
-
-      for (const line of linesRes.rows) {
-         if (line.description.includes('تكلفة') && !costAccId) {
-             costAccId = line.account_id;
-             costAccName = line.account_name;
-         }
-         if ((line.description.includes('تخفيض') || line.description.includes('إرجاع') || line.description.includes('مخزون')) && !invAccId && !line.description.includes('تكلفة')) {
-             invAccId = line.account_id;
-             invAccName = line.account_name;
-         }
-      }
-
-      if (costAccId && invAccId) {
-         // Delete all old تكلفة and تخفيض/إرجاع lines
-         await client.query(`DELETE FROM journal_entry_lines WHERE journal_entry_id = $1 AND (description LIKE '%تكلفة%' OR description LIKE '%تخفيض%' OR description LIKE '%إرجاع%')`, [je.id]);
-
-         // Insert new combined lines
-         const cogsLineId = uuidv4();
-         const invLineId = uuidv4();
-         const isInvoice = je.reference_type === 'invoice';
-
-         await client.query(`
-            INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-         `, [
-            cogsLineId, je.id, costAccId, costAccName, 
-            isInvoice ? 'تكلفة البضاعة المباعة (محدث)' : 'إلغاء تكلفة البضاعة المباعة (محدث)',
-            isInvoice ? totalCogs : 0,
-            isInvoice ? 0 : totalCogs
-         ]);
-
-         await client.query(`
-            INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-         `, [
-            invLineId, je.id, invAccId, invAccName, 
-            isInvoice ? 'تخفيض المخزون (محدث)' : 'إرجاع المخزون (محدث)',
-            isInvoice ? 0 : totalCogs,
-            isInvoice ? totalCogs : 0
-         ]);
-      }
-
-      // Update JE totals
-      const updatedLines = await client.query(`SELECT SUM(debit) as d, SUM(credit) as c FROM journal_entry_lines WHERE journal_entry_id = $1`, [je.id]);
-      if (updatedLines.rows.length > 0) {
-         await client.query('UPDATE journal_entries SET total_debit = $1, total_credit = $2 WHERE id = $3', 
-           [updatedLines.rows[0].d, updatedLines.rows[0].c, je.id]);
-      }
+       await syncCOGSForJournalEntry(client, companyId, je.id, je.reference_id, je.reference_type);
     }
 
     await client.query('COMMIT');

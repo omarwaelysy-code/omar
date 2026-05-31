@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 export async function syncCOGSForJournalEntry(client: any, companyId: string, journalEntryId: string, referenceId: string, referenceType: string) {
-    if (!['invoice', 'sales_return'].includes(referenceType)) return;
+    if (!['invoice', 'return', 'sales_return'].includes(referenceType)) return;
     
     // 1. Fetch all items for this reference
     let itemsRes;
@@ -13,7 +13,7 @@ export async function syncCOGSForJournalEntry(client: any, companyId: string, jo
     if (itemsRes.rows.length === 0) return;
 
     // 2. Clear out any old COGS lines from the journal entry (to keep it idempotent)
-    await client.query("DELETE FROM journal_entry_lines WHERE journal_entry_id = $1 AND (description LIKE '%تكلفة البضاعة%' OR description LIKE '%تخفيض المخزون%' OR description LIKE '%إرجاع المخزون%')", [journalEntryId]);
+    await client.query("DELETE FROM journal_entry_lines WHERE journal_entry_id = $1 AND (description LIKE '%تكلفة%' OR description LIKE '%تخفيض%' OR description LIKE '%إرجاع%' OR description LIKE '%محدث%')", [journalEntryId]);
 
     const isInvoice = referenceType === 'invoice';
     
