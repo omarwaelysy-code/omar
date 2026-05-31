@@ -99,7 +99,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   journal_entries: [
     'id', 'company_id', 'date', 'description', 'reference_id', 'reference_type', 
-    'reference_number', 'total_debit', 'total_credit', 'status', 'created_at'
+    'reference_number', 'total_debit', 'total_credit', 'status', 'entry_number', 'created_at'
   ],
   journal_entry_lines: [
     'id', 'journal_entry_id', 'account_id', 'account_name', 'description', 'debit', 'credit',

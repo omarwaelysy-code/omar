@@ -133,7 +133,7 @@ export class TransactionManager {
       journalSchema.parse(testJournalWithRef);
 
       let preserved = (dbService as any)._recentDeletedJEs?.[mainId];
-      if (preserved && preserved.entry_number && preserved.date.slice(0, 10) === journalData.date.slice(0, 10)) {
+      if (preserved && preserved.entry_number && preserved.date && String(preserved.date).slice(0, 10) === String(journalData.date).slice(0, 10)) {
          testJournalWithRef.entry_number = preserved.entry_number;
       }
 
