@@ -232,7 +232,7 @@ describe('Inventory Costing Engine', () => {
         if (queryClean.includes('select cost_price, weighted_average_cost from products')) {
           return { rows: [product] };
         }
-        if (queryClean.includes('from inventory_movements')) {
+        if (queryClean.includes('select * from inventory_movements')) {
           return { rows: movements };
         }
         if (queryClean.includes('delete from inventory_layers')) {
@@ -276,11 +276,10 @@ describe('Inventory Costing Engine', () => {
       [mockProductId, mockCompanyId]
     );
 
-    expect(dbLayers).toHaveLength(2);
-    expect(dbLayers[0].qty_remaining).toBe(0);
-    expect(dbLayers[0].unit_cost).toBe(10);
-    expect(dbLayers[1].qty_remaining).toBe(3);
-    expect(dbLayers[1].unit_cost).toBe(20);
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE inventory_movements'),
+      [12.857142857142858, -90, 'move-3']
+    );
 
     expect(client.query).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE invoice_items'),
@@ -313,7 +312,7 @@ describe('Inventory Costing Engine', () => {
         if (queryClean.includes('select cost_price, weighted_average_cost from products')) {
           return { rows: [product] };
         }
-        if (queryClean.includes('from inventory_movements')) {
+        if (queryClean.includes('select * from inventory_movements')) {
           return { rows: movements };
         }
         if (queryClean.includes('delete from inventory_layers')) {
@@ -352,11 +351,10 @@ describe('Inventory Costing Engine', () => {
 
     await recalculateProductStock(client, mockCompanyId, mockProductId);
 
-    expect(dbLayers).toHaveLength(2);
-    expect(dbLayers[0].qty_remaining).toBe(3);
-    expect(dbLayers[0].unit_cost).toBe(10);
-    expect(dbLayers[1].qty_remaining).toBe(0);
-    expect(dbLayers[1].unit_cost).toBe(20);
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE inventory_movements'),
+      [17.142857142857142, -120, 'move-3']
+    );
 
     expect(client.query).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE invoice_items'),
@@ -395,7 +393,7 @@ describe('Inventory Costing Engine', () => {
         if (queryClean.includes('select cost_price, weighted_average_cost from products')) {
           return { rows: [product] };
         }
-        if (queryClean.includes('from inventory_movements')) {
+        if (queryClean.includes('select * from inventory_movements')) {
           return { rows: movements };
         }
         if (queryClean.includes('delete from inventory_layers')) {
@@ -434,11 +432,17 @@ describe('Inventory Costing Engine', () => {
 
     await recalculateProductStock(client, mockCompanyId, mockProductId);
 
-    expect(dbLayers).toHaveLength(2);
-    expect(dbLayers[0].qty_remaining).toBe(0);
-    expect(dbLayers[0].unit_cost).toBe(100);
-    expect(dbLayers[1].qty_remaining).toBe(7);
-    expect(dbLayers[1].unit_cost).toBe(200);
+    // Verify move-2 (sale of 5 under WAC) got unit cost = 100
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE inventory_movements'),
+      [100, -500, 'move-2']
+    );
+
+    // Verify move-4 (sale of 8 under FIFO) got unit cost = 137.5, total cost = 1100
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE inventory_movements'),
+      [137.5, -1100, 'move-4']
+    );
 
     // Verify final product stock (10 + 10 - 5 - 8 = 7) and last inflow cost (200)
     expect(client.query).toHaveBeenCalledWith(

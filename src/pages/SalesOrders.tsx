@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
-import { SalesOrder, Customer, Product, SalesOrderItem, Warehouse } from '../types';
+import { SalesOrder, Customer, Product, SalesOrderItem, Warehouse, Company } from '../types';
 import { 
   Search, Plus, Trash2, X, Eye, Sparkles, FileText, Pencil, Printer, 
   ChevronLeft, ChevronRight, Hash, Calendar, Package, Tag, ArrowUpRight, 
@@ -91,6 +91,7 @@ export const SalesOrders: React.FC = () => {
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
   const [viewOrder, setViewOrder] = useState<SalesOrder | null>(null);
   const [view, setView] = useViewPreference('sales_orders', 'table');
+  const [companyData, setCompanyData] = useState<Company | null>(null);
 
   // Form State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
@@ -125,6 +126,18 @@ export const SalesOrders: React.FC = () => {
       const unsubCustomers = dbService.subscribe<Customer>('customers', user.company_id, setCustomers);
       const unsubProducts = dbService.subscribe<Product>('products', user.company_id, setProducts);
       const unsubWarehouses = dbService.subscribe<any>('warehouses', user.company_id, setWarehouses);
+
+      const loadCompanyData = async () => {
+        try {
+          const company = await dbService.get<Company>('companies', user.company_id);
+          if (company) {
+            setCompanyData(company);
+          }
+        } catch (error) {
+          console.error('Failed to load company data:', error);
+        }
+      };
+      loadCompanyData();
 
       return () => {
         unsubOrders();
@@ -576,9 +589,9 @@ export const SalesOrders: React.FC = () => {
             <PaginationControls
               page={page}
               limit={limit}
-              totalRecords={totalRecords}
-              setPage={setPage}
-              setLimit={setLimit}
+              total={totalRecords}
+              onPageChange={setPage}
+              onLimitChange={setLimit}
             />
           </div>
         </>
@@ -912,7 +925,12 @@ export const SalesOrders: React.FC = () => {
               <div ref={orderRef} className="flex-1 overflow-y-auto p-8 bg-white" id="order-print-area">
                 <div className="max-w-3xl mx-auto space-y-8">
                   {/* Company Invoice Header Component */}
-                  <CompanyInvoiceHeader documentTitle={ot('order')} />
+                  <CompanyInvoiceHeader 
+                    company={companyData} 
+                    documentNumber={viewOrder.order_number}
+                    documentDate={formatDate(viewOrder.date)}
+                    title={ot('order')}
+                  />
 
                   <div className="grid grid-cols-2 gap-8 text-sm">
                     <div className="space-y-2">

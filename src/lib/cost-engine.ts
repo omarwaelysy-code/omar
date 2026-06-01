@@ -49,13 +49,13 @@ export async function recalculateProductStock(client: PoolClient, companyId: str
 
   // Query all movements sorted chronologically by date and entry number
   const movesRes = await client.query(`
-    SELECT m.* FROM inventory_movements m
-    WHERE m.product_id = $1 AND m.company_id = $2 
+    SELECT * FROM inventory_movements 
+    WHERE product_id = $1 AND company_id = $2 
     ORDER BY 
-      m.date ASC, 
-      (SELECT je.entry_number FROM journal_entries je WHERE je.reference_id = m.reference_id LIMIT 1) ASC,
-      m.created_at ASC,
-      m.id ASC
+      date ASC, 
+      (SELECT je.entry_number FROM journal_entries je WHERE je.reference_id = inventory_movements.reference_id LIMIT 1) ASC,
+      created_at ASC,
+      id ASC
   `, [productId, companyId]);
 
   for (const move of movesRes.rows) {

@@ -363,7 +363,7 @@ router.get('/system/export-excel', authenticateToken, authorizeRoles('super_admi
 });
 
 // Import JSON
-router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 'admin'), upload.single('file'), async (req: AuthRequest, res) => {
+router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 'admin'), upload.single('file') as any, async (req: AuthRequest, res) => {
   const client = await pool.connect();
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -434,7 +434,7 @@ router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 
 });
 
 // Import Excel
-router.post('/system/import-excel', authenticateToken, authorizeRoles('super_admin', 'admin'), upload.single('file'), async (req: AuthRequest, res) => {
+router.post('/system/import-excel', authenticateToken, authorizeRoles('super_admin', 'admin'), upload.single('file') as any, async (req: AuthRequest, res) => {
   const client = await pool.connect();
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });

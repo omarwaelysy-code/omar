@@ -285,6 +285,7 @@ export interface Invoice {
   currency_code?: string;
   exchange_rate?: number;
   total_base_amount?: number;
+  source_orders?: string;
 }
 
 export interface PurchaseInvoice {
@@ -308,6 +309,7 @@ export interface PurchaseInvoice {
   currency_code?: string;
   exchange_rate?: number;
   total_base_amount?: number;
+  source_orders?: string;
 }
 
 export interface InvoiceItem {
