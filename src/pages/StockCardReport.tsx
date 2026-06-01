@@ -187,26 +187,21 @@ export const StockCardReport: React.FC = () => {
     const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
     if (dateDiff !== 0) return dateDiff;
     
-    // Sort inflows (quantity > 0) before outflows (quantity <= 0)
-    const aQty = parseFloat(a.quantity || '0');
-    const bQty = parseFloat(b.quantity || '0');
-    const aIsInflow = aQty > 0;
-    const bIsInflow = bQty > 0;
-    
-    if (aIsInflow && !bIsInflow) return -1;
-    if (!aIsInflow && bIsInflow) return 1;
-    
-    // Tie-breaker 1: Reference number (e.g. Doc number)
-    const aRef = a.reference_number || '';
-    const bRef = b.reference_number || '';
-    const refDiff = aRef.localeCompare(bRef, undefined, { numeric: true });
-    if (refDiff !== 0) return refDiff;
+    // Sort by entry number if available
+    const aEntry = docMap[a.reference_id]?.entry_number || '';
+    const bEntry = docMap[b.reference_id]?.entry_number || '';
+    if (aEntry && bEntry) {
+      const refDiff = aEntry.localeCompare(bEntry, undefined, { numeric: true });
+      if (refDiff !== 0) return refDiff;
+    }
+    if (aEntry && !bEntry) return -1;
+    if (!aEntry && bEntry) return 1;
 
-    // Tie-breaker 2: Created at timestamp
+    // Fallback to Created at timestamp
     const timeDiff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
     if (timeDiff !== 0) return timeDiff;
 
-    // Tie-breaker 3: ID
+    // Fallback to ID
     return (a.id || '').localeCompare(b.id || '');
   });
 

@@ -130,6 +130,13 @@ async function startServer() {
       WHERE cost_policy IS NULL
     `).catch(e => console.warn('⚠️ Failed to set fallback cost_policy:', e.message));
 
+    // Restore historical movements before the policy change (before or on 2026-05-31) to WAC costing policy
+    await pool.query(`
+      UPDATE inventory_movements 
+      SET cost_policy = 'wac' 
+      WHERE date <= '2026-05-31'
+    `).catch(e => console.warn('⚠️ Failed to restore historical WAC movements:', e.message));
+
     await runMigrations();
     
     // Auto-fix orphaned movements on startup

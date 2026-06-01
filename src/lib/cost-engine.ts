@@ -47,22 +47,15 @@ export async function recalculateProductStock(client: PoolClient, companyId: str
   lastInflowCost = fallbackCost;
   wac = fallbackCost;
 
-  // Update all movements of this product to use the current product's costing method
-  await client.query(
-    'UPDATE inventory_movements SET cost_policy = $1 WHERE product_id = $2 AND company_id = $3',
-    [productCostMethod, productId, companyId]
-  );
-
-  // Query all movements sorted chronologically
+  // Query all movements sorted chronologically by date and entry number
   const movesRes = await client.query(`
-    SELECT * FROM inventory_movements 
-    WHERE product_id = $1 AND company_id = $2 
+    SELECT m.* FROM inventory_movements m
+    WHERE m.product_id = $1 AND m.company_id = $2 
     ORDER BY 
-      date ASC, 
-      CASE WHEN quantity > 0 THEN 0 ELSE 1 END ASC,
-      COALESCE(reference_number, '') ASC,
-      created_at ASC,
-      id ASC
+      m.date ASC, 
+      (SELECT je.entry_number FROM journal_entries je WHERE je.reference_id = m.reference_id LIMIT 1) ASC,
+      m.created_at ASC,
+      m.id ASC
   `, [productId, companyId]);
 
   for (const move of movesRes.rows) {
