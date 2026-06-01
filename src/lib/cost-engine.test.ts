@@ -216,11 +216,10 @@ describe('Inventory Costing Engine', () => {
     const settings = { inventory_cost_method: 'fifo' };
     const product = { id: mockProductId, cost_price: 15, stock: 10, weighted_average_cost: 15 };
     
-    const dbLayers: any[] = [];
     const movements = [
-      { id: 'move-1', date: '2026-05-01', quantity: '5.00', unit_cost: '10.00', total_cost: '50.00', movement_type: 'purchase', reference_type: 'purchase_invoice', reference_id: 'ref-1', created_at: new Date('2026-05-01T00:00:00Z') },
-      { id: 'move-2', date: '2026-05-02', quantity: '5.00', unit_cost: '20.00', total_cost: '100.00', movement_type: 'purchase', reference_type: 'purchase_invoice', reference_id: 'ref-2', created_at: new Date('2026-05-02T00:00:00Z') },
-      { id: 'move-3', date: '2026-05-03', quantity: '-7.00', unit_cost: '0.00', total_cost: '0.00', movement_type: 'sale', reference_type: 'invoice', reference_id: 'ref-3', created_at: new Date('2026-05-03T00:00:00Z') }
+      { id: 'move-1', date: '2026-05-01', quantity: '5.00', unit_cost: '10.00', total_cost: '50.00', movement_type: 'purchase', reference_type: 'purchase_invoice', reference_id: 'ref-1', created_at: new Date('2026-05-01T00:00:00Z'), cost_policy: 'fifo' },
+      { id: 'move-2', date: '2026-05-02', quantity: '5.00', unit_cost: '20.00', total_cost: '100.00', movement_type: 'purchase', reference_type: 'purchase_invoice', reference_id: 'ref-2', created_at: new Date('2026-05-02T00:00:00Z'), cost_policy: 'fifo' },
+      { id: 'move-3', date: '2026-05-03', quantity: '-7.00', unit_cost: '0.00', total_cost: '0.00', movement_type: 'sale', reference_type: 'invoice', reference_id: 'ref-3', created_at: new Date('2026-05-03T00:00:00Z'), cost_policy: 'fifo' }
     ];
 
     const client = {
@@ -298,9 +297,9 @@ describe('Inventory Costing Engine', () => {
     
     const dbLayers: any[] = [];
     const movements = [
-      { id: 'move-1', date: '2026-05-01', quantity: '5.00', unit_cost: '10.00', total_cost: '50.00', movement_type: 'purchase', reference_type: 'purchase_invoice', reference_id: 'ref-1', created_at: new Date('2026-05-01T00:00:00Z') },
-      { id: 'move-2', date: '2026-05-02', quantity: '5.00', unit_cost: '20.00', total_cost: '100.00', movement_type: 'purchase', reference_type: 'purchase_invoice', reference_id: 'ref-2', created_at: new Date('2026-05-02T00:00:00Z') },
-      { id: 'move-3', date: '2026-05-03', quantity: '-7.00', unit_cost: '0.00', total_cost: '0.00', movement_type: 'sale', reference_type: 'invoice', reference_id: 'ref-3', created_at: new Date('2026-05-03T00:00:00Z') }
+      { id: 'move-1', date: '2026-05-01', quantity: '5.00', unit_cost: '10.00', total_cost: '50.00', movement_type: 'purchase', reference_type: 'purchase_invoice', reference_id: 'ref-1', created_at: new Date('2026-05-01T00:00:00Z'), cost_policy: 'lifo' },
+      { id: 'move-2', date: '2026-05-02', quantity: '5.00', unit_cost: '20.00', total_cost: '100.00', movement_type: 'purchase', reference_type: 'purchase_invoice', reference_id: 'ref-2', created_at: new Date('2026-05-02T00:00:00Z'), cost_policy: 'lifo' },
+      { id: 'move-3', date: '2026-05-03', quantity: '-7.00', unit_cost: '0.00', total_cost: '0.00', movement_type: 'sale', reference_type: 'invoice', reference_id: 'ref-3', created_at: new Date('2026-05-03T00:00:00Z'), cost_policy: 'lifo' }
     ];
 
     const client = {
@@ -363,7 +362,7 @@ describe('Inventory Costing Engine', () => {
 
     expect(client.query).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE products'),
-      [3, 20, mockProductId]
+      [3, 10, mockProductId]
     );
   });
 
