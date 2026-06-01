@@ -147,6 +147,8 @@ export const PurchaseInvoices: React.FC = () => {
     cost_price: number;
     total: number;
   }[]>([]);
+  const [pendingOrders, setPendingOrders] = useState<any[]>([]);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -261,6 +263,114 @@ export const PurchaseInvoices: React.FC = () => {
       updateNum();
     }
   }, [invoiceData.date, purchaseInvoices, isModalOpen, editingInvoice, user]);
+
+  // Load pending purchase orders for selected supplier
+  useEffect(() => {
+    if (invoiceData.supplier_id && isModalOpen && user) {
+      if (editingInvoice) {
+        Promise.all([
+          dbService.list<any>('purchase_orders', { 
+            company_id: user.company_id,
+            invoice_id: editingInvoice.id
+          }),
+          dbService.list<any>('purchase_orders', {
+            company_id: user.company_id,
+            supplier_id: invoiceData.supplier_id,
+            status: 'pending'
+          })
+        ]).then(([linked, pending]) => {
+          const linkedIds = linked.map(o => o.id);
+          setSelectedOrderIds(linkedIds);
+          const combined = [...linked, ...pending];
+          const unique = combined.filter((o, index, self) => self.findIndex(t => t.id === o.id) === index);
+          setPendingOrders(unique);
+        }).catch(err => {
+          console.error('Error fetching purchase orders for edit:', err);
+        });
+      } else {
+        dbService.list<any>('purchase_orders', { 
+          company_id: user.company_id,
+          supplier_id: invoiceData.supplier_id,
+          status: 'pending'
+        }).then(orders => {
+          setPendingOrders(orders);
+          setSelectedOrderIds([]);
+        }).catch(err => {
+          console.error('Error fetching pending purchase orders:', err);
+        });
+      }
+    } else {
+      setPendingOrders([]);
+      setSelectedOrderIds([]);
+    }
+  }, [invoiceData.supplier_id, isModalOpen, editingInvoice, user]);
+
+  const handleOrderCheckboxChange = (orderId: string, checked: boolean) => {
+    setSelectedOrderIds(prev => {
+      const next = checked ? [...prev, orderId] : prev.filter(id => id !== orderId);
+      const mergedItems: any[] = [];
+      next.forEach(id => {
+        const order = pendingOrders.find(o => o.id === id);
+        if (order) {
+          (order.items || []).forEach((item: any) => {
+            mergedItems.push({
+              product_id: item.product_id,
+              product_name: item.product_name,
+              product_code: item.product_code || '',
+              product_image_url: item.product_image_url || '',
+              quantity: Number(item.quantity) || 0,
+              cost_price: Number(item.unit_price) || 0,
+              total: Number(item.total) || 0,
+              barcode: item.barcode || '',
+              image_url: item.product_image_url || ''
+            });
+          });
+        }
+      });
+      setItems(mergedItems);
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (pendingViewDoc && pendingViewDoc.type === 'convert_purchase_order' && user) {
+      const orderId = pendingViewDoc.idOrNumber;
+      setPendingViewDoc(null);
+      
+      const loadOrderForConversion = async () => {
+        try {
+          const order = await dbService.get<any>('purchase_orders', orderId);
+          if (order) {
+            openModal();
+            setInvoiceData(prev => ({
+              ...prev,
+              supplier_id: order.supplier_id,
+              warehouse_id: order.warehouse_id || '',
+              notes: order.notes || ''
+            }));
+            setSelectedOrderIds([orderId]);
+
+            const mappedItems = (order.items || []).map((item: any) => ({
+              product_id: item.product_id,
+              product_name: item.product_name,
+              product_code: item.product_code || '',
+              product_image_url: item.product_image_url || '',
+              quantity: Number(item.quantity) || 0,
+              cost_price: Number(item.unit_price) || 0,
+              total: Number(item.total) || 0,
+              barcode: item.barcode || '',
+              image_url: item.product_image_url || ''
+            }));
+            setItems(mappedItems);
+          }
+        } catch (err) {
+          console.error("Error converting purchase order", err);
+        }
+      };
+      loadOrderForConversion();
+    }
+  }, [pendingViewDoc, user, setPendingViewDoc]);
+
 
   useEffect(() => {
     const generatePreview = () => {
@@ -783,6 +893,7 @@ export const PurchaseInvoices: React.FC = () => {
         supplier_id: invoiceData.supplier_id,
         supplier_name: supplier?.name || '',
         warehouse_id: invoiceData.warehouse_id || null,
+        order_ids: selectedOrderIds,
         date: invoiceData.date, 
         subtotal,
         discount_amount,
@@ -1115,6 +1226,8 @@ export const PurchaseInvoices: React.FC = () => {
       purchase_type: 'items'
     });
     setItems([]);
+    setSelectedOrderIds([]);
+    setPendingOrders([]);
   };
 
   const filteredInvoices = purchaseInvoices.filter(i => 
@@ -1623,6 +1736,46 @@ export const PurchaseInvoices: React.FC = () => {
                           onChange={(e) => setInvoiceData({...invoiceData, notes: e.target.value})}
                         />
                       </div>
+
+                      {pendingOrders.length > 0 && (
+                        <div className="pt-4 border-t border-slate-100 space-y-3">
+                          <label className="block text-xs font-bold text-emerald-600 tracking-tighter px-2 uppercase flex items-center gap-2">
+                            <FileText className="w-4 h-4" />
+                            {language === 'ar' ? 'ربط بأوامر الشراء المعلقة' : 'Link Pending Purchase Orders'}
+                          </label>
+                          <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-4 overflow-hidden">
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-xs text-right">
+                                <thead>
+                                  <tr className="text-zinc-400 font-bold border-b border-zinc-200 pb-2">
+                                    <th className="py-2 text-center w-10"></th>
+                                    <th className="py-2 text-right">{language === 'ar' ? 'رقم الأمر' : 'Order No'}</th>
+                                    <th className="py-2 text-right">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                                    <th className="py-2 text-right">{language === 'ar' ? 'الإجمالي' : 'Total'}</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-zinc-100">
+                                  {pendingOrders.map(order => (
+                                    <tr key={order.id} className="hover:bg-zinc-100/50">
+                                      <td className="py-3 text-center">
+                                        <input 
+                                          type="checkbox"
+                                          checked={selectedOrderIds.includes(order.id)}
+                                          onChange={(e) => handleOrderCheckboxChange(order.id, e.target.checked)}
+                                          className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                                        />
+                                      </td>
+                                      <td className="py-3 font-mono text-emerald-700 font-bold">{order.order_number}</td>
+                                      <td className="py-3 text-zinc-500">{formatDate(order.date)}</td>
+                                      <td className="py-3 text-zinc-900 font-bold">{formatMoney(order.total_amount)} {t('pi.currency')}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </section>
 
                     {/* Card 2: إعدادات الدفع */}

@@ -11,6 +11,8 @@ import { Expenses } from './pages/Expenses';
 import { PaymentMethods } from './pages/PaymentMethods';
 import { Invoices } from './pages/Invoices';
 import { PurchaseInvoices } from './pages/PurchaseInvoices';
+import { SalesOrders } from './pages/SalesOrders';
+import { PurchaseOrders } from './pages/PurchaseOrders';
 import { Receipts } from './pages/Receipts';
 import { PaymentVouchers } from './pages/PaymentVouchers';
 import { Returns } from './pages/Returns';
@@ -162,8 +164,10 @@ export default function App() {
       case 'suppliers': return <Suppliers />;
       case 'expenses': return <Expenses />;
       case 'payment_methods': return <PaymentMethods />;
-      case 'invoices': return <Invoices />;
+      case 'invoices': return <Invoices />;// Invoices page
+      case 'sales_orders': return <SalesOrders />;
       case 'purchase_invoices': return <PurchaseInvoices />;
+      case 'purchase_orders': return <PurchaseOrders />;
       case 'receipts': return <Receipts />;
       case 'payment_vouchers': return <PaymentVouchers />;
       case 'returns': return <Returns />;

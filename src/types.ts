@@ -630,3 +630,78 @@ export interface Operation {
   cost_center_id?: string;
   created_at?: string;
 }
+
+export interface SalesOrder {
+  id: string;
+  order_number: string;
+  customer_id: string;
+  customer_name?: string;
+  warehouse_id?: string;
+  date: string;
+  delivery_date?: string;
+  description?: string;
+  notes?: string;
+  subtotal?: number;
+  tax_amount?: number;
+  discount_amount?: number;
+  total_amount: number;
+  status: 'pending' | 'converted';
+  invoice_id?: string;
+  invoice_number?: string;
+  items?: SalesOrderItem[];
+  company_id: string;
+  created_by?: string;
+  created_at?: string;
+}
+
+export interface SalesOrderItem {
+  id?: string;
+  order_id?: string;
+  product_id: string;
+  product_name?: string;
+  product_code?: string;
+  product_image_url?: string;
+  quantity: number;
+  unit_price: number;
+  total: number;
+  barcode?: string;
+  image_url?: string;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  order_number: string;
+  supplier_id: string;
+  supplier_name?: string;
+  warehouse_id?: string;
+  date: string;
+  delivery_date?: string;
+  description?: string;
+  notes?: string;
+  subtotal?: number;
+  tax_amount?: number;
+  discount_amount?: number;
+  total_amount: number;
+  status: 'pending' | 'converted';
+  invoice_id?: string;
+  invoice_number?: string;
+  items?: PurchaseOrderItem[];
+  company_id: string;
+  created_by?: string;
+  created_at?: string;
+}
+
+export interface PurchaseOrderItem {
+  id?: string;
+  order_id?: string;
+  product_id: string;
+  product_name?: string;
+  product_code?: string;
+  product_image_url?: string;
+  quantity: number;
+  unit_price: number;
+  total: number;
+  barcode?: string;
+  image_url?: string;
+}
+

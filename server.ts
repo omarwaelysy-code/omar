@@ -109,7 +109,17 @@ async function startServer() {
       'ALTER TABLE "currencies" ADD COLUMN IF NOT EXISTS "flag" VARCHAR(20)',
       
       // Cost policy preservation column
-      'ALTER TABLE "inventory_movements" ADD COLUMN IF NOT EXISTS "cost_policy" VARCHAR(20)'
+      'ALTER TABLE "inventory_movements" ADD COLUMN IF NOT EXISTS "cost_policy" VARCHAR(20)',
+
+      // Sales & Purchase Orders
+      'CREATE TABLE IF NOT EXISTS "sales_orders" ("id" VARCHAR(36) PRIMARY KEY, "company_id" VARCHAR(36), "customer_id" VARCHAR(36), "customer_name" VARCHAR(255), "warehouse_id" VARCHAR(36), "order_number" VARCHAR(50) NOT NULL, "date" DATE NOT NULL, "delivery_date" DATE, "subtotal" DECIMAL(18, 4) NOT NULL, "tax_amount" DECIMAL(18, 4) DEFAULT 0, "discount_amount" DECIMAL(18, 4) DEFAULT 0, "total_amount" DECIMAL(18, 4) NOT NULL, "status" VARCHAR(20) DEFAULT \'pending\', "invoice_id" VARCHAR(36), "invoice_number" VARCHAR(50), "description" TEXT, "notes" TEXT, "created_by" VARCHAR(36), "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)',
+      'CREATE TABLE IF NOT EXISTS "sales_order_items" ("id" VARCHAR(36) PRIMARY KEY, "order_id" VARCHAR(36) REFERENCES "sales_orders"("id") ON DELETE CASCADE, "product_id" VARCHAR(36), "company_id" VARCHAR(36), "description" TEXT, "quantity" DECIMAL(18, 4) NOT NULL, "unit_price" DECIMAL(18, 4) NOT NULL, "total" DECIMAL(18, 4) NOT NULL, "product_name" VARCHAR(255), "product_code" VARCHAR(100), "product_image_url" TEXT, "barcode" VARCHAR(255), "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)',
+      'CREATE TABLE IF NOT EXISTS "purchase_orders" ("id" VARCHAR(36) PRIMARY KEY, "company_id" VARCHAR(36), "supplier_id" VARCHAR(36), "supplier_name" VARCHAR(255), "warehouse_id" VARCHAR(36), "order_number" VARCHAR(50) NOT NULL, "date" DATE NOT NULL, "delivery_date" DATE, "subtotal" DECIMAL(18, 4) NOT NULL, "tax_amount" DECIMAL(18, 4) DEFAULT 0, "discount_amount" DECIMAL(18, 4) DEFAULT 0, "total_amount" DECIMAL(18, 4) NOT NULL, "status" VARCHAR(20) DEFAULT \'pending\', "invoice_id" VARCHAR(36), "invoice_number" VARCHAR(50), "description" TEXT, "notes" TEXT, "created_by" VARCHAR(36), "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)',
+      'CREATE TABLE IF NOT EXISTS "purchase_order_items" ("id" VARCHAR(36) PRIMARY KEY, "order_id" VARCHAR(36) REFERENCES "purchase_orders"("id") ON DELETE CASCADE, "product_id" VARCHAR(36), "company_id" VARCHAR(36), "description" TEXT, "quantity" DECIMAL(18, 4) NOT NULL, "unit_price" DECIMAL(18, 4) NOT NULL, "total" DECIMAL(18, 4) NOT NULL, "product_name" VARCHAR(255), "product_code" VARCHAR(100), "product_image_url" TEXT, "barcode" VARCHAR(255), "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)',
+      
+      // Link columns on invoices
+      'ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "source_orders" TEXT',
+      'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "source_orders" TEXT'
     ];
     
     for (const q of syncQueries) {

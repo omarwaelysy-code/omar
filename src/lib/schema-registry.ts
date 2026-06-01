@@ -42,12 +42,28 @@ export const EXPECTED_SCHEMA: TableSchema = {
   invoices: [
     'id', 'company_id', 'customer_id', 'customer_name', 'warehouse_id', 'invoice_number', 'date', 'due_date', 'subtotal',
     'tax_amount', 'discount_amount', 'total_amount', 'status', 'payment_type', 
-    'payment_method_id', 'payment_method_name', 'description', 'notes', 'created_by', 'created_at'
+    'payment_method_id', 'payment_method_name', 'description', 'notes', 'source_orders', 'created_by', 'created_at'
   ],
   invoice_items: [
     'id', 'invoice_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
     'product_name', 'product_code', 'product_image_url', 'image_url', 'barcode',
     'unit_cost', 'total_cost', 'costing_method_used', 'company_id'
+  ],
+  sales_orders: [
+    'id', 'company_id', 'customer_id', 'customer_name', 'warehouse_id', 'order_number', 'date', 'delivery_date', 'subtotal',
+    'tax_amount', 'discount_amount', 'total_amount', 'status', 'invoice_id', 'invoice_number', 'description', 'notes', 'created_by', 'created_at'
+  ],
+  sales_order_items: [
+    'id', 'order_id', 'product_id', 'company_id', 'description', 'quantity', 'unit_price', 'total',
+    'product_name', 'product_code', 'product_image_url', 'barcode', 'created_at'
+  ],
+  purchase_orders: [
+    'id', 'company_id', 'supplier_id', 'supplier_name', 'warehouse_id', 'order_number', 'date', 'delivery_date', 'subtotal',
+    'tax_amount', 'discount_amount', 'total_amount', 'status', 'invoice_id', 'invoice_number', 'description', 'notes', 'created_by', 'created_at'
+  ],
+  purchase_order_items: [
+    'id', 'order_id', 'product_id', 'company_id', 'description', 'quantity', 'unit_price', 'total',
+    'product_name', 'product_code', 'product_image_url', 'barcode', 'created_at'
   ],
   returns: [
     'id', 'company_id', 'customer_id', 'customer_name', 'warehouse_id', 'return_number', 'date', 'total_amount', 
@@ -60,7 +76,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   purchase_invoices: [
     'id', 'company_id', 'supplier_id', 'supplier_name', 'warehouse_id', 'invoice_number', 'date', 'due_date', 'subtotal',
     'tax_amount', 'discount_amount', 'total_amount', 'status', 'payment_type', 
-    'payment_method_id', 'payment_method_name', 'description', 'notes', 'created_at'
+    'payment_method_id', 'payment_method_name', 'description', 'notes', 'source_orders', 'created_at'
   ],
   purchase_invoice_items: [
     'id', 'invoice_id', 'product_id', 'expense_category_id', 'description', 'quantity', 'unit_price', 'total',

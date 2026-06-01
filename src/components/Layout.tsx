@@ -221,6 +221,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         icon: ArrowUpFromLine,
         subItems: [
           { id: 'invoices', label: t('nav.invoices'), icon: ArrowUpFromLine },
+          { id: 'sales_orders', label: t('nav.sales_orders'), icon: FileText },
           { id: 'returns', label: t('nav.returns'), icon: RotateCcw },
           { id: 'customer_discounts', label: t('nav.customer_discounts'), icon: Tags },
           { id: 'customer_statement', label: t('nav.customer_statement'), icon: FileText },
@@ -234,6 +235,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         icon: ArrowDownToLine,
         subItems: [
           { id: 'purchase_invoices', label: t('nav.purchase_invoices'), icon: ArrowDownToLine },
+          { id: 'purchase_orders', label: t('nav.purchase_orders'), icon: FileText },
           { id: 'purchase_returns', label: t('nav.purchase_returns'), icon: RotateCcw },
           { id: 'supplier_discounts', label: t('nav.supplier_discounts'), icon: Tags },
           { id: 'supplier_statement', label: t('nav.supplier_statement'), icon: FileText },

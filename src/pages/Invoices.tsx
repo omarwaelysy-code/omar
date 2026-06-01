@@ -118,6 +118,8 @@ export const Invoices: React.FC = () => {
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [items, setItems] = useState<InvoiceItem[]>([]);
+  const [pendingOrders, setPendingOrders] = useState<any[]>([]);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [discount, setDiscount] = useState<number>(0);
   const [description, setDescription] = useState<string>('');
   const [paymentType, setPaymentType] = useState<'cash' | 'credit'>('credit');
@@ -291,6 +293,111 @@ export const Invoices: React.FC = () => {
       updateNum();
     }
   }, [date, invoices, isModalOpen, editingInvoice, user]);
+
+  // Load pending sales orders for selected customer
+  useEffect(() => {
+    if (selectedCustomerId && isModalOpen && user) {
+      if (editingInvoice) {
+        Promise.all([
+          dbService.list<any>('sales_orders', { 
+            company_id: user.company_id,
+            invoice_id: editingInvoice.id
+          }),
+          dbService.list<any>('sales_orders', {
+            company_id: user.company_id,
+            customer_id: selectedCustomerId,
+            status: 'pending'
+          })
+        ]).then(([linked, pending]) => {
+          const linkedIds = linked.map(o => o.id);
+          setSelectedOrderIds(linkedIds);
+          const combined = [...linked, ...pending];
+          const unique = combined.filter((o, index, self) => self.findIndex(t => t.id === o.id) === index);
+          setPendingOrders(unique);
+        }).catch(err => {
+          console.error('Error fetching sales orders for edit:', err);
+        });
+      } else {
+        dbService.list<any>('sales_orders', { 
+          company_id: user.company_id,
+          customer_id: selectedCustomerId,
+          status: 'pending'
+        }).then(orders => {
+          setPendingOrders(orders);
+          setSelectedOrderIds([]);
+        }).catch(err => {
+          console.error('Error fetching pending sales orders:', err);
+        });
+      }
+    } else {
+      setPendingOrders([]);
+      setSelectedOrderIds([]);
+    }
+  }, [selectedCustomerId, isModalOpen, editingInvoice, user]);
+
+  const handleOrderCheckboxChange = (orderId: string, checked: boolean) => {
+    setSelectedOrderIds(prev => {
+      const next = checked ? [...prev, orderId] : prev.filter(id => id !== orderId);
+      const mergedItems: InvoiceItem[] = [];
+      next.forEach(id => {
+        const order = pendingOrders.find(o => o.id === id);
+        if (order) {
+          (order.items || []).forEach((item: any) => {
+            mergedItems.push({
+              product_id: item.product_id,
+              product_name: item.product_name,
+              product_code: item.product_code || '',
+              product_image_url: item.product_image_url || '',
+              quantity: Number(item.quantity) || 0,
+              unit_price: Number(item.unit_price) || 0,
+              total: Number(item.total) || 0,
+              barcode: item.barcode || '',
+              image_url: item.product_image_url || ''
+            });
+          });
+        }
+      });
+      setItems(mergedItems);
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (pendingViewDoc && pendingViewDoc.type === 'convert_sales_order' && user) {
+      const orderId = pendingViewDoc.idOrNumber;
+      setPendingViewDoc(null);
+      
+      const loadOrderForConversion = async () => {
+        try {
+          const order = await dbService.get<any>('sales_orders', orderId);
+          if (order) {
+            openModal();
+            setSelectedCustomerId(order.customer_id);
+            setSelectedOrderIds([orderId]);
+            if (order.notes) setDescription(order.notes);
+            if (order.warehouse_id) setSelectedWarehouseId(order.warehouse_id);
+
+            const mappedItems = (order.items || []).map((item: any) => ({
+              product_id: item.product_id,
+              product_name: item.product_name,
+              product_code: item.product_code || '',
+              product_image_url: item.product_image_url || '',
+              quantity: Number(item.quantity) || 0,
+              unit_price: Number(item.unit_price) || 0,
+              total: Number(item.total) || 0,
+              barcode: item.barcode || '',
+              image_url: item.product_image_url || ''
+            }));
+            setItems(mappedItems);
+          }
+        } catch (err) {
+          console.error("Error converting sales order", err);
+        }
+      };
+      loadOrderForConversion();
+    }
+  }, [pendingViewDoc, user, setPendingViewDoc]);
+
 
   useEffect(() => {
     if (!isModalOpen || !user) {
@@ -535,6 +642,7 @@ export const Invoices: React.FC = () => {
         customer_id: selectedCustomerId, 
         customer_name: customer?.name || '',
         warehouse_id: selectedWarehouseId || null,
+        order_ids: selectedOrderIds,
         date, 
         description,
         items: sanitizedItems,
@@ -1117,6 +1225,8 @@ export const Invoices: React.FC = () => {
     setPaymentType('credit');
     setPaymentMethodId('');
     setIsFullScreen(false);
+    setSelectedOrderIds([]);
+    setPendingOrders([]);
   };
 
   const filteredInvoices = invoices.filter(i => 
@@ -1266,7 +1376,14 @@ export const Invoices: React.FC = () => {
                         <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                           <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100">{inv.invoice_number}</span>
                         </td>
-                        <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{inv.customer_name}</td>
+                        <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                          <div>{inv.customer_name}</div>
+                          {inv.source_orders && (
+                            <div className="text-[10px] text-emerald-600 font-bold mt-0.5 font-mono">
+                              {language === 'ar' ? 'أوامر بيع: ' : 'Orders: '}{inv.source_orders}
+                            </div>
+                          )}
+                        </td>
                         <td className={`px-6 py-4 text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(inv.date)}</td>
                         <td className={`px-6 py-4 text-slate-500 max-w-[200px] truncate ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={inv.description}>
                           {inv.description || '-'}
@@ -1678,6 +1795,46 @@ export const Invoices: React.FC = () => {
                           onChange={(e) => setDescription(e.target.value)}
                         />
                       </div>
+
+                      {pendingOrders.length > 0 && (
+                        <div className="pt-4 border-t border-zinc-100 space-y-3">
+                          <label className="block text-xs font-bold text-emerald-600 tracking-tighter px-2 uppercase flex items-center gap-2">
+                            <FileText className="w-4 h-4" />
+                            {language === 'ar' ? 'ربط بأوامر البيع المعلقة' : 'Link Pending Sales Orders'}
+                          </label>
+                          <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-4 overflow-hidden">
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-xs text-right">
+                                <thead>
+                                  <tr className="text-zinc-400 font-bold border-b border-zinc-200 pb-2">
+                                    <th className="py-2 text-center w-10"></th>
+                                    <th className="py-2 text-right">{language === 'ar' ? 'رقم الأمر' : 'Order No'}</th>
+                                    <th className="py-2 text-right">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                                    <th className="py-2 text-right">{language === 'ar' ? 'الإجمالي' : 'Total'}</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-zinc-100">
+                                  {pendingOrders.map(order => (
+                                    <tr key={order.id} className="hover:bg-zinc-100/50">
+                                      <td className="py-3 text-center">
+                                        <input 
+                                          type="checkbox"
+                                          checked={selectedOrderIds.includes(order.id)}
+                                          onChange={(e) => handleOrderCheckboxChange(order.id, e.target.checked)}
+                                          className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                                        />
+                                      </td>
+                                      <td className="py-3 font-mono text-emerald-700 font-bold">{order.order_number}</td>
+                                      <td className="py-3 text-zinc-500">{formatDate(order.date)}</td>
+                                      <td className="py-3 text-zinc-900 font-bold">{formatMoney(order.total_amount)} {t('invoices.currency')}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </section>
 
                     {/* Card 2: إعدادات الدفع */}
@@ -2020,6 +2177,11 @@ export const Invoices: React.FC = () => {
                     <p className="text-2xl font-black text-slate-900 tracking-tight">{viewInvoice.customer_name}</p>
                     {viewInvoice.customer_id && (
                       <p className="text-xs text-slate-500 font-medium">كود العميل: {viewInvoice.customer_id.slice(-6).toUpperCase()}</p>
+                    )}
+                    {viewInvoice.source_orders && (
+                      <p className="text-xs text-emerald-600 font-bold font-mono">
+                        {language === 'ar' ? 'أوامر بيع مرتبطة: ' : 'Linked Orders: '}{viewInvoice.source_orders}
+                      </p>
                     )}
                     {viewInvoice.warehouse_id && (
                       <p className="text-xs text-slate-500 font-medium">

@@ -675,7 +675,8 @@ const modules = [
   'customer_discounts', 'supplier_discounts', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers',
   'system_config', 'audit_logs', 'operation_categories', 'operations', 'operation_fields',
   'departments', 'cost_centers', 'operation_field_values', 'field_operation_categories',
-  'currencies', 'exchange_rates', 'inventory_movements', 'inventory_layers'
+  'currencies', 'exchange_rates', 'inventory_movements', 'inventory_layers',
+  'sales_orders', 'sales_order_items', 'purchase_orders', 'purchase_order_items'
 ];
 
 // --- Flexible Operations Logic ---
@@ -748,7 +749,7 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
   }
 });
 
-const transactionalModules = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns', 'journal_entries'];
+const transactionalModules = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns', 'journal_entries', 'sales_orders', 'purchase_orders'];
 
 // Helper to validate ID format (simplified to check string)
 function isUUID(id: any): boolean {
@@ -840,6 +841,31 @@ export async function generateNextSequence(client: any, companyId: string, modul
     case 'payment_vouchers': numField = 'voucher_number'; prefix = 'PV'; break;
     case 'receipt_vouchers': numField = 'voucher_number'; prefix = 'RV'; break;
     case 'journal_entries': numField = 'entry_number'; prefix = 'JE'; break;
+    case 'sales_orders': numField = 'order_number'; prefix = 'SO'; break;
+    case 'purchase_orders': numField = 'order_number'; prefix = 'PO'; break;
+  }
+
+  if (moduleName === 'sales_orders' || moduleName === 'purchase_orders') {
+    const parts = dateStr.slice(0, 10).split('-');
+    const year = parts[0];
+    const month = parts[1].padStart(2, '0');
+    const datePrefix = `${prefix}-${year}-${month}`;
+    
+    const sql = `SELECT ${numField} FROM "${moduleName}" WHERE company_id = $1 AND ${numField} LIKE $2 ORDER BY id DESC LIMIT 500`;
+    const rows = await client.query(sql, [companyId, `${datePrefix}-%`]);
+    let maxSeq = 0;
+    rows.rows.forEach((row: any) => {
+       const val = row[numField] || '';
+       const valParts = val.split('-');
+       if (valParts.length >= 4) {
+         const seq = parseInt(valParts[valParts.length - 1], 10);
+         if (!isNaN(seq) && seq > maxSeq) {
+           maxSeq = seq;
+         }
+       }
+    });
+    const nextSeq = String(maxSeq + 1).padStart(6, '0');
+    return `${datePrefix}-${nextSeq}`;
   }
 
   if (moduleName === 'journal_entries') {
@@ -1129,6 +1155,12 @@ modules.forEach(moduleName => {
     } else if (module === 'purchase_returns') {
       itemsTable = 'purchase_return_items';
       foreignKey = 'return_id';
+    } else if (module === 'sales_orders') {
+      itemsTable = 'sales_order_items';
+      foreignKey = 'order_id';
+    } else if (module === 'purchase_orders') {
+      itemsTable = 'purchase_order_items';
+      foreignKey = 'order_id';
     }
 
     if (itemsTable) {
@@ -1303,6 +1335,33 @@ modules.forEach(moduleName => {
 
         await client.query('BEGIN');
 
+        if (moduleName === 'sales_orders' || moduleName === 'purchase_orders') {
+          const statusRes = await client.query(`SELECT status, invoice_number FROM "${moduleName}" WHERE id = $1`, [id]);
+          if (statusRes.rows.length > 0 && statusRes.rows[0].status === 'converted') {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, `لا يمكن حذف هذا الأمر لأنه تم تحويله بالفعل إلى فاتورة رقم ${statusRes.rows[0].invoice_number || ''}`);
+          }
+        }
+
+        if (moduleName === 'invoices') {
+          await client.query(
+            `UPDATE sales_orders 
+             SET status = 'pending', invoice_id = NULL, invoice_number = NULL 
+             WHERE invoice_id = $1 AND company_id = $2`,
+            [id, companyId]
+          );
+        }
+
+        if (moduleName === 'purchase_invoices') {
+          await client.query(
+            `UPDATE purchase_orders 
+             SET status = 'pending', invoice_id = NULL, invoice_number = NULL 
+             WHERE invoice_id = $1 AND company_id = $2`,
+            [id, companyId]
+          );
+        }
+
         if (transactionalModules.includes(moduleName)) {
           await reverseAndRecalculate(client, companyId || '', id);
         }
@@ -1451,6 +1510,26 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
     invoiceData.status = invoiceData.status || 'paid';
     invoiceData.payment_type = invoiceData.payment_type || 'cash';
     invoiceData.invoice_number = invoiceData.invoice_number || `INV-${Date.now()}`;
+
+    let sourceOrdersStr = '';
+    if (req.body.order_ids && req.body.order_ids.length > 0) {
+      const ordersRes = await client.query(
+        'SELECT order_number FROM sales_orders WHERE id = ANY($1) AND company_id = $2',
+        [req.body.order_ids, companyId]
+      );
+      const orderNums = ordersRes.rows.map((r: any) => r.order_number);
+      sourceOrdersStr = orderNums.join(', ');
+      
+      // Update sales_orders status and link invoice
+      await client.query(
+        `UPDATE sales_orders 
+         SET status = 'converted', invoice_id = $1, invoice_number = $2 
+         WHERE id = ANY($3) AND company_id = $4`,
+         [invoiceId, invoiceData.invoice_number || `INV-${invoiceId}`, req.body.order_ids, companyId]
+      );
+    }
+    
+    invoiceData.source_orders = sourceOrdersStr || null;
 
     console.log('[ERP] Saving Invoice Header...');
     // Insert Invoice
@@ -1604,9 +1683,36 @@ router.put('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
     if (!isUUID(invoiceId)) return sendError(res, 400, 'Invalid Invoice ID format');
 
     await client.query('BEGIN');
-    // Removed legacy preservedEntryNumber code
+
+    // Reset currently linked sales orders
+    await client.query(
+      `UPDATE sales_orders 
+       SET status = 'pending', invoice_id = NULL, invoice_number = NULL 
+       WHERE invoice_id = $1 AND company_id = $2`,
+      [invoiceId, companyId]
+    );
 
     const { items, id: bodyId, ...rawInvoiceData } = req.body;
+
+    // Fetch and link new sales orders
+    let sourceOrdersStr = '';
+    if (req.body.order_ids && req.body.order_ids.length > 0) {
+      const ordersRes = await client.query(
+        'SELECT order_number FROM sales_orders WHERE id = ANY($1) AND company_id = $2',
+        [req.body.order_ids, companyId]
+      );
+      const orderNums = ordersRes.rows.map((r: any) => r.order_number);
+      sourceOrdersStr = orderNums.join(', ');
+      
+      await client.query(
+        `UPDATE sales_orders 
+         SET status = 'converted', invoice_id = $1, invoice_number = $2 
+         WHERE id = ANY($3) AND company_id = $4`,
+         [invoiceId, rawInvoiceData.invoice_number || `INV-${invoiceId}`, req.body.order_ids, companyId]
+      );
+    }
+    rawInvoiceData.source_orders = sourceOrdersStr || null;
+
     const invoiceData = sanitizeData('invoices', rawInvoiceData);
     
     const invKeys = Object.keys(invoiceData);
@@ -1944,6 +2050,25 @@ router.post('/purchase_invoices', authenticateToken, async (req: AuthRequest, re
     const invoiceId = invoiceData.id || uuidv4();
     if (!isUUID(invoiceId)) return sendError(res, 400, 'Invalid Invoice ID format');
     
+    let sourceOrdersStr = '';
+    if (req.body.order_ids && req.body.order_ids.length > 0) {
+      const ordersRes = await client.query(
+        'SELECT order_number FROM purchase_orders WHERE id = ANY($1) AND company_id = $2',
+        [req.body.order_ids, companyId]
+      );
+      const orderNums = ordersRes.rows.map((r: any) => r.order_number);
+      sourceOrdersStr = orderNums.join(', ');
+      
+      // Update purchase_orders status and link invoice
+      await client.query(
+        `UPDATE purchase_orders 
+         SET status = 'converted', invoice_id = $1, invoice_number = $2 
+         WHERE id = ANY($3) AND company_id = $4`,
+         [invoiceId, invoiceData.invoice_number || `PINV-${invoiceId}`, req.body.order_ids, companyId]
+      );
+    }
+    invoiceData.source_orders = sourceOrdersStr || null;
+
     // Insert Purchase Invoice
     const invData = { ...invoiceData, id: invoiceId };
     const invKeys = Object.keys(invData);
@@ -2018,9 +2143,36 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
     if (!isUUID(invoiceId)) return sendError(res, 400, 'Invalid Invoice ID format');
 
     await client.query('BEGIN');
-    // Removed legacy preservedEntryNumber code
+
+    // Reset currently linked purchase orders
+    await client.query(
+      `UPDATE purchase_orders 
+       SET status = 'pending', invoice_id = NULL, invoice_number = NULL 
+       WHERE invoice_id = $1 AND company_id = $2`,
+      [invoiceId, companyId]
+    );
 
     const { items, id: bodyId, ...rawInvoiceData } = req.body;
+
+    // Fetch and link new purchase orders
+    let sourceOrdersStr = '';
+    if (req.body.order_ids && req.body.order_ids.length > 0) {
+      const ordersRes = await client.query(
+        'SELECT order_number FROM purchase_orders WHERE id = ANY($1) AND company_id = $2',
+        [req.body.order_ids, companyId]
+      );
+      const orderNums = ordersRes.rows.map((r: any) => r.order_number);
+      sourceOrdersStr = orderNums.join(', ');
+      
+      await client.query(
+        `UPDATE purchase_orders 
+         SET status = 'converted', invoice_id = $1, invoice_number = $2 
+         WHERE id = ANY($3) AND company_id = $4`,
+         [invoiceId, rawInvoiceData.invoice_number || `PINV-${invoiceId}`, req.body.order_ids, companyId]
+      );
+    }
+    rawInvoiceData.source_orders = sourceOrdersStr || null;
+
     const invoiceData = sanitizeData('purchase_invoices', rawInvoiceData);
     
     const invKeys = Object.keys(invoiceData);
@@ -2743,6 +2895,301 @@ router.post('/inventory/recalculate_all', async (req: any, res) => {
     if (client) await client.query('ROLLBACK');
     console.error('Recalculate error:', error);
     sendError(res, 500, 'Recalculation failed', error.message);
+  } finally {
+    client.release();
+  }
+});
+
+// --- Sales Orders & Purchase Orders Routes ---
+router.post('/sales_orders', authenticateToken, async (req: AuthRequest, res) => {
+  const client = await pool.connect();
+  try {
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
+    const { items, ...rawOrderData } = req.body;
+    if (!rawOrderData.customer_id) return sendError(res, 400, 'customer_id is required');
+    if (!rawOrderData.date) return sendError(res, 400, 'date is required');
+
+    await client.query('BEGIN');
+
+    const orderData = sanitizeData('sales_orders', rawOrderData);
+    if (!orderData.company_id) orderData.company_id = companyId;
+    const orderId = orderData.id || uuidv4();
+    orderData.status = 'pending';
+
+    orderData.order_number = await generateNextSequence(client, companyId, 'sales_orders', orderData.date as string);
+
+    const ordData = { ...orderData, id: orderId };
+    const ordKeys = Object.keys(ordData);
+    const ordValues = Object.values(ordData);
+    const ordPlaceholders = ordKeys.map((_, i) => `$${i + 1}`).join(', ');
+
+    await client.query(
+      `INSERT INTO "sales_orders" ("${ordKeys.join('", "')}") VALUES (${ordPlaceholders})`,
+      ordValues
+    );
+
+    for (const item of (items || [])) {
+      const sanitizedItem = sanitizeData('sales_order_items', item);
+      const itemId = uuidv4();
+      const itemData = { ...sanitizedItem, id: itemId, order_id: orderId };
+      if (ordData.company_id) itemData.company_id = ordData.company_id;
+
+      const itemKeys = Object.keys(itemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+
+      await client.query(
+        `INSERT INTO "sales_order_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
+        Object.values(itemData)
+      );
+    }
+
+    await client.query('COMMIT');
+
+    logAudit({
+      company_id: companyId,
+      user_id: req.user?.id,
+      username: (req.user as any)?.username || req.user?.email,
+      user_email: req.user?.email,
+      action: 'CREATE',
+      module: 'SALES_ORDERS',
+      details: `Created sales order: ${orderData.order_number}`,
+      entity_type: 'sales_orders',
+      entity_id: orderId,
+      ip_address: getIp(req),
+      metadata: { orderData, itemCount: (items || []).length }
+    });
+
+    res.status(201).json({ id: orderId, order_number: orderData.order_number });
+  } catch (error: any) {
+    if (client) await client.query('ROLLBACK');
+    console.error('Sales Order creation failed:', error);
+    sendError(res, 500, `Failed to create sales order: ${error.message}`, error.message);
+  } finally {
+    client.release();
+  }
+});
+
+router.put('/sales_orders/:id', authenticateToken, async (req: AuthRequest, res) => {
+  const client = await pool.connect();
+  try {
+    const orderId = req.params.id;
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
+    await client.query('BEGIN');
+
+    const statusRes = await client.query('SELECT status, invoice_number FROM sales_orders WHERE id = $1 AND company_id = $2', [orderId, companyId]);
+    if (statusRes.rows.length > 0 && statusRes.rows[0].status === 'converted') {
+      await client.query('ROLLBACK');
+      return sendError(res, 400, `لا يمكن تعديل هذا الأمر لأنه تم تحويله بالفعل إلى فاتورة رقم ${statusRes.rows[0].invoice_number || ''}`);
+    }
+
+    const { items, id: bodyId, ...rawOrderData } = req.body;
+    const orderData = sanitizeData('sales_orders', rawOrderData);
+    delete (orderData as any).id;
+    delete (orderData as any).company_id;
+    delete (orderData as any).order_number;
+    delete (orderData as any).status;
+
+    const ordKeys = Object.keys(orderData);
+    const ordValues = Object.values(orderData);
+    const ordSetClause = ordKeys.map((key, i) => `"${key}" = $${i + 1}`).join(', ');
+
+    let query = `UPDATE "sales_orders" SET ${ordSetClause} WHERE id = $${ordKeys.length + 1} AND company_id = $${ordKeys.length + 2}`;
+    let params = [...ordValues, orderId, companyId];
+
+    const result = await client.query(query, params);
+    if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return sendError(res, 404, 'Sales Order not found or permission denied');
+    }
+
+    await client.query('DELETE FROM sales_order_items WHERE order_id = $1', [orderId]);
+
+    for (const item of (items || [])) {
+      const sanitizedItem = sanitizeData('sales_order_items', item);
+      const itemId = uuidv4();
+      const itemData = { ...sanitizedItem, id: itemId, order_id: orderId, company_id: companyId };
+
+      const itemKeys = Object.keys(itemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+
+      await client.query(
+        `INSERT INTO "sales_order_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
+        Object.values(itemData)
+      );
+    }
+
+    await client.query('COMMIT');
+
+    logAudit({
+      company_id: companyId,
+      user_id: req.user?.id,
+      username: (req.user as any)?.username || req.user?.email,
+      user_email: req.user?.email,
+      action: 'UPDATE',
+      module: 'SALES_ORDERS',
+      details: `Updated sales order: ${orderId}`,
+      entity_type: 'sales_orders',
+      entity_id: orderId,
+      ip_address: getIp(req),
+      metadata: { orderData, itemCount: (items || []).length }
+    });
+
+    res.json({ success: true });
+  } catch (error: any) {
+    if (client) await client.query('ROLLBACK');
+    console.error('Sales Order update failed:', error);
+    sendError(res, 500, `Failed to update sales order: ${error.message}`, error.message);
+  } finally {
+    client.release();
+  }
+});
+
+router.post('/purchase_orders', authenticateToken, async (req: AuthRequest, res) => {
+  const client = await pool.connect();
+  try {
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
+    const { items, ...rawOrderData } = req.body;
+    if (!rawOrderData.supplier_id) return sendError(res, 400, 'supplier_id is required');
+    if (!rawOrderData.date) return sendError(res, 400, 'date is required');
+
+    await client.query('BEGIN');
+
+    const orderData = sanitizeData('purchase_orders', rawOrderData);
+    if (!orderData.company_id) orderData.company_id = companyId;
+    const orderId = orderData.id || uuidv4();
+    orderData.status = 'pending';
+
+    orderData.order_number = await generateNextSequence(client, companyId, 'purchase_orders', orderData.date as string);
+
+    const ordData = { ...orderData, id: orderId };
+    const ordKeys = Object.keys(ordData);
+    const ordValues = Object.values(ordData);
+    const ordPlaceholders = ordKeys.map((_, i) => `$${i + 1}`).join(', ');
+
+    await client.query(
+      `INSERT INTO "purchase_orders" ("${ordKeys.join('", "')}") VALUES (${ordPlaceholders})`,
+      ordValues
+    );
+
+    for (const item of (items || [])) {
+      const sanitizedItem = sanitizeData('purchase_order_items', item);
+      const itemId = uuidv4();
+      const itemData = { ...sanitizedItem, id: itemId, order_id: orderId };
+      if (ordData.company_id) itemData.company_id = ordData.company_id;
+
+      const itemKeys = Object.keys(itemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+
+      await client.query(
+        `INSERT INTO "purchase_order_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
+        Object.values(itemData)
+      );
+    }
+
+    await client.query('COMMIT');
+
+    logAudit({
+      company_id: companyId,
+      user_id: req.user?.id,
+      username: (req.user as any)?.username || req.user?.email,
+      user_email: req.user?.email,
+      action: 'CREATE',
+      module: 'PURCHASE_ORDERS',
+      details: `Created purchase order: ${orderData.order_number}`,
+      entity_type: 'purchase_orders',
+      entity_id: orderId,
+      ip_address: getIp(req),
+      metadata: { orderData, itemCount: (items || []).length }
+    });
+
+    res.status(201).json({ id: orderId, order_number: orderData.order_number });
+  } catch (error: any) {
+    if (client) await client.query('ROLLBACK');
+    console.error('Purchase Order creation failed:', error);
+    sendError(res, 500, `Failed to create purchase order: ${error.message}`, error.message);
+  } finally {
+    client.release();
+  }
+});
+
+router.put('/purchase_orders/:id', authenticateToken, async (req: AuthRequest, res) => {
+  const client = await pool.connect();
+  try {
+    const orderId = req.params.id;
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
+    await client.query('BEGIN');
+
+    const statusRes = await client.query('SELECT status, invoice_number FROM purchase_orders WHERE id = $1 AND company_id = $2', [orderId, companyId]);
+    if (statusRes.rows.length > 0 && statusRes.rows[0].status === 'converted') {
+      await client.query('ROLLBACK');
+      return sendError(res, 400, `لا يمكن تعديل هذا الأمر لأنه تم تحويله بالفعل إلى فاتورة رقم ${statusRes.rows[0].invoice_number || ''}`);
+    }
+
+    const { items, id: bodyId, ...rawOrderData } = req.body;
+    const orderData = sanitizeData('purchase_orders', rawOrderData);
+    delete (orderData as any).id;
+    delete (orderData as any).company_id;
+    delete (orderData as any).order_number;
+    delete (orderData as any).status;
+
+    const ordKeys = Object.keys(orderData);
+    const ordValues = Object.values(orderData);
+    const ordSetClause = ordKeys.map((key, i) => `"${key}" = $${i + 1}`).join(', ');
+
+    let query = `UPDATE "purchase_orders" SET ${ordSetClause} WHERE id = $${ordKeys.length + 1} AND company_id = $${ordKeys.length + 2}`;
+    let params = [...ordValues, orderId, companyId];
+
+    const result = await client.query(query, params);
+    if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return sendError(res, 404, 'Purchase Order not found or permission denied');
+    }
+
+    await client.query('DELETE FROM purchase_order_items WHERE order_id = $1', [orderId]);
+
+    for (const item of (items || [])) {
+      const sanitizedItem = sanitizeData('purchase_order_items', item);
+      const itemId = uuidv4();
+      const itemData = { ...sanitizedItem, id: itemId, order_id: orderId, company_id: companyId };
+
+      const itemKeys = Object.keys(itemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+
+      await client.query(
+        `INSERT INTO "purchase_order_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
+        Object.values(itemData)
+      );
+    }
+
+    await client.query('COMMIT');
+
+    logAudit({
+      company_id: companyId,
+      user_id: req.user?.id,
+      username: (req.user as any)?.username || req.user?.email,
+      user_email: req.user?.email,
+      action: 'UPDATE',
+      module: 'PURCHASE_ORDERS',
+      details: `Updated purchase order: ${orderId}`,
+      entity_type: 'purchase_orders',
+      entity_id: orderId,
+      ip_address: getIp(req),
+      metadata: { orderData, itemCount: (items || []).length }
+    });
+
+    res.json({ success: true });
+  } catch (error: any) {
+    if (client) await client.query('ROLLBACK');
+    console.error('Purchase Order update failed:', error);
+    sendError(res, 500, `Failed to update purchase order: ${error.message}`, error.message);
   } finally {
     client.release();
   }
