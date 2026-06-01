@@ -658,4 +658,3 @@ export async function recordAdjustment(
     methodUsed: method
   };
 }
-}
