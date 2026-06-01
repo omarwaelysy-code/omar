@@ -216,6 +216,7 @@ describe('Inventory Costing Engine', () => {
     const settings = { inventory_cost_method: 'fifo' };
     const product = { id: mockProductId, cost_price: 15, stock: 10, weighted_average_cost: 15 };
     
+    const dbLayers: any[] = [];
     const movements = [
       { id: 'move-1', date: '2026-05-01', quantity: '5.00', unit_cost: '10.00', total_cost: '50.00', movement_type: 'purchase', reference_type: 'purchase_invoice', reference_id: 'ref-1', created_at: new Date('2026-05-01T00:00:00Z'), cost_policy: 'fifo' },
       { id: 'move-2', date: '2026-05-02', quantity: '5.00', unit_cost: '20.00', total_cost: '100.00', movement_type: 'purchase', reference_type: 'purchase_invoice', reference_id: 'ref-2', created_at: new Date('2026-05-02T00:00:00Z'), cost_policy: 'fifo' },
