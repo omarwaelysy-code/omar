@@ -106,12 +106,29 @@ async function startServer() {
       'ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "wht_enabled" BOOLEAN DEFAULT FALSE',
       
       // Currencies
-      'ALTER TABLE "currencies" ADD COLUMN IF NOT EXISTS "flag" VARCHAR(20)'
+      'ALTER TABLE "currencies" ADD COLUMN IF NOT EXISTS "flag" VARCHAR(20)',
+      
+      // Cost policy preservation column
+      'ALTER TABLE "inventory_movements" ADD COLUMN IF NOT EXISTS "cost_policy" VARCHAR(20)'
     ];
     
     for (const q of syncQueries) {
       await pool.query(q).catch(e => console.warn(`⚠️ Forced sync warning on [${q.substring(0, 30)}...]:`, e.message));
     }
+
+    // Initialize existing movements cost_policy to match their product's costing method
+    await pool.query(`
+      UPDATE inventory_movements m 
+      SET cost_policy = COALESCE(p.inventory_cost_method, 'wac') 
+      FROM products p 
+      WHERE m.product_id = p.id AND m.cost_policy IS NULL
+    `).catch(e => console.warn('⚠️ Failed to migrate cost_policy:', e.message));
+
+    await pool.query(`
+      UPDATE inventory_movements 
+      SET cost_policy = 'wac' 
+      WHERE cost_policy IS NULL
+    `).catch(e => console.warn('⚠️ Failed to set fallback cost_policy:', e.message));
 
     await runMigrations();
     

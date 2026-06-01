@@ -366,4 +366,88 @@ describe('Inventory Costing Engine', () => {
       [3, 20, mockProductId]
     );
   });
+
+  it('preserves historical cost policies and calculates correctly during recalculation', async () => {
+    const settings = { inventory_cost_method: 'fifo' };
+    const product = { id: mockProductId, cost_price: 15, stock: 10, weighted_average_cost: 15 };
+    
+    const dbLayers: any[] = [];
+    // movements with different cost policies
+    const movements = [
+      // 1. Purchase 10 @ 100 under wac
+      { id: 'move-1', date: '2026-05-01', quantity: '10.00', unit_cost: '100.00', total_cost: '1000.00', movement_type: 'purchase', reference_type: 'purchase_invoice', reference_id: 'ref-1', created_at: new Date('2026-05-01T00:00:00Z'), cost_policy: 'wac' },
+      // 2. Sale 5 under wac -> should calculate unit cost = 100
+      { id: 'move-2', date: '2026-05-02', quantity: '-5.00', unit_cost: '0.00', total_cost: '0.00', movement_type: 'sale', reference_type: 'invoice', reference_id: 'ref-2', created_at: new Date('2026-05-02T00:00:00Z'), cost_policy: 'wac' },
+      // 3. Purchase 10 @ 200 under fifo
+      { id: 'move-3', date: '2026-05-03', quantity: '10.00', unit_cost: '200.00', total_cost: '2000.00', movement_type: 'purchase', reference_type: 'purchase_invoice', reference_id: 'ref-3', created_at: new Date('2026-05-03T00:00:00Z'), cost_policy: 'fifo' },
+      // 4. Sale 8 under fifo -> should consume remaining 5 @ 100 (value=500) and 3 @ 200 (value=600) -> total_cost = 1100, unit_cost = 137.5
+      { id: 'move-4', date: '2026-05-04', quantity: '-8.00', unit_cost: '0.00', total_cost: '0.00', movement_type: 'sale', reference_type: 'invoice', reference_id: 'ref-4', created_at: new Date('2026-05-04T00:00:00Z'), cost_policy: 'fifo' }
+    ];
+
+    const client = {
+      query: vi.fn().mockImplementation(async (queryText: string, params: any[]) => {
+        const queryClean = queryText.toLowerCase().trim();
+        if (queryClean.includes('select settings from companies')) {
+          return { rows: [{ settings }] };
+        }
+        if (queryClean.includes('select cost_price, weighted_average_cost from products')) {
+          return { rows: [product] };
+        }
+        if (queryClean.includes('select * from inventory_movements')) {
+          return { rows: movements };
+        }
+        if (queryClean.includes('delete from inventory_layers')) {
+          dbLayers.length = 0;
+          return { rows: [], rowCount: 1 };
+        }
+        if (queryClean.includes('insert into inventory_layers')) {
+          dbLayers.push({
+            id: params[0],
+            purchase_date: params[3],
+            qty_remaining: params[5],
+            unit_cost: params[6],
+            created_at: params[9]
+          });
+          return { rows: [], rowCount: 1 };
+        }
+        if (queryClean.includes('select * from inventory_layers')) {
+          const isDesc = queryClean.includes('desc');
+          const sorted = [...dbLayers].filter(l => l.qty_remaining > 0).sort((a, b) => {
+            const dateDiff = new Date(a.purchase_date).getTime() - new Date(b.purchase_date).getTime();
+            if (dateDiff !== 0) return isDesc ? -dateDiff : dateDiff;
+            return isDesc ? b.created_at - a.created_at : a.created_at - b.created_at;
+          });
+          return { rows: sorted };
+        }
+        if (queryClean.includes('update inventory_layers')) {
+          const decr = params[0];
+          const id = params[1];
+          const l = dbLayers.find(x => x.id === id);
+          if (l) l.qty_remaining -= decr;
+          return { rows: [], rowCount: 1 };
+        }
+        return { rows: [], rowCount: 1 };
+      })
+    } as unknown as PoolClient;
+
+    await recalculateProductStock(client, mockCompanyId, mockProductId);
+
+    // Verify move-2 (sale of 5 under WAC) got unit cost = 100
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE inventory_movements'),
+      [100, -500, 'move-2']
+    );
+
+    // Verify move-4 (sale of 8 under FIFO) got unit cost = 137.5, total cost = 1100
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE inventory_movements'),
+      [137.5, -1100, 'move-4']
+    );
+
+    // Verify final product stock (10 + 10 - 5 - 8 = 7) and last inflow cost (200)
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE products'),
+      [7, 200, mockProductId]
+    );
+  });
 });
