@@ -36,14 +36,22 @@ export async function recalculateProductStock(client: PoolClient, companyId: str
   let totalValue = 0;
   let lastInflowCost = 0;
 
-  // Retrieve fallback costs
-  const productRes = await client.query('SELECT cost_price, weighted_average_cost FROM products WHERE id = $1', [productId]);
+  // Retrieve fallback costs and current costing method
+  const productRes = await client.query('SELECT cost_price, weighted_average_cost, inventory_cost_method FROM products WHERE id = $1', [productId]);
   let fallbackCost = 0;
+  let productCostMethod = 'wac';
   if (productRes.rows.length > 0) {
     fallbackCost = parseFloat(productRes.rows[0].weighted_average_cost || '0') || parseFloat(productRes.rows[0].cost_price || '0');
+    productCostMethod = productRes.rows[0].inventory_cost_method || 'wac';
   }
   lastInflowCost = fallbackCost;
   wac = fallbackCost;
+
+  // Update all movements of this product to use the current product's costing method
+  await client.query(
+    'UPDATE inventory_movements SET cost_policy = $1 WHERE product_id = $2 AND company_id = $3',
+    [productCostMethod, productId, companyId]
+  );
 
   // Query all movements sorted chronologically
   const movesRes = await client.query(`
