@@ -45,6 +45,7 @@ export const en = {
   'nav.customer_balances': 'Customer Balances',
   'nav.supplier_balances': 'Supplier Balances',
   'nav.stock_card_report': 'Product Stock Card Report',
+  'nav.stock_balances_report': 'Stock Balances & Movements Report',
   'nav.sales_report': 'Sales Report',
   'nav.expenses_report': 'Expenses Report',
   'nav.cash_report': 'Cash Report',

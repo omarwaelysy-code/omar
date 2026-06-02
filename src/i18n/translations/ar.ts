@@ -45,6 +45,7 @@ export const ar = {
   'nav.customer_balances': 'أرصدة العملاء',
   'nav.supplier_balances': 'أرصدة الموردين',
   'nav.stock_card_report': 'كارت حركة وتكلفة الصنف',
+  'nav.stock_balances_report': 'أرصدة وحركة المخزون خلال فترة',
   'nav.sales_report': 'تقرير المبيعات',
   'nav.expenses_report': 'تقرير المصروفات',
   'nav.cash_report': 'تقرير الخزينة',
