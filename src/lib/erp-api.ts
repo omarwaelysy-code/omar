@@ -677,7 +677,8 @@ const modules = [
   'departments', 'cost_centers', 'operation_field_values', 'field_operation_categories',
   'currencies', 'exchange_rates', 'inventory_movements', 'inventory_layers',
   'sales_orders', 'sales_order_items', 'purchase_orders', 'purchase_order_items', 'employees',
-  'warehouse_transfers', 'warehouse_transfer_items'
+  'warehouse_transfers', 'warehouse_transfer_items', 'opening_stock_balances', 'opening_stock_items',
+  'stock_adjustments', 'stock_adjustment_items'
 ];
 
 // --- Flexible Operations Logic ---
@@ -3559,8 +3560,8 @@ router.post('/opening_stock_balances', authenticateToken, async (req: AuthReques
     const entryId = uuidv4();
     const entryNumber = await generateNextSequence(client, companyId, 'journal_entries', docData.date);
     await client.query(
-      `INSERT INTO "journal_entries" (id, company_id, entry_number, date, description, reference_id, reference_type, created_at, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)`,
+      `INSERT INTO "journal_entries" (id, company_id, entry_number, date, description, reference_id, reference_type, total_debit, total_credit, created_at, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)`,
       [
         entryId,
         companyId,
@@ -3569,6 +3570,8 @@ router.post('/opening_stock_balances', authenticateToken, async (req: AuthReques
         docData.description || `قيد افتتاح مخزون - سند رقم ${docData.document_number}`,
         docId,
         'opening_stock_balance',
+        totalValue,
+        totalValue,
         req.user?.id || null
       ]
     );
@@ -3714,8 +3717,8 @@ router.put('/opening_stock_balances/:id', authenticateToken, async (req: AuthReq
     const entryId = uuidv4();
     const entryNumber = await generateNextSequence(client, companyId, 'journal_entries', docData.date);
     await client.query(
-      `INSERT INTO "journal_entries" (id, company_id, entry_number, date, description, reference_id, reference_type, created_at, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)`,
+      `INSERT INTO "journal_entries" (id, company_id, entry_number, date, description, reference_id, reference_type, total_debit, total_credit, created_at, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)`,
       [
         entryId,
         companyId,
@@ -3724,6 +3727,8 @@ router.put('/opening_stock_balances/:id', authenticateToken, async (req: AuthReq
         docData.description || `قيد افتتاح مخزون - سند رقم ${rawDocData.document_number}`,
         id,
         'opening_stock_balance',
+        totalValue,
+        totalValue,
         req.user?.id || null
       ]
     );
@@ -3914,9 +3919,12 @@ router.post('/stock_adjustments', authenticateToken, async (req: AuthRequest, re
       const entryId = uuidv4();
       const entryNumber = await generateNextSequence(client, companyId, 'journal_entries', docData.date);
 
+      const totalDebit = journalLines.reduce((sum: number, line: any) => sum + (line.debit || 0), 0);
+      const totalCredit = journalLines.reduce((sum: number, line: any) => sum + (line.credit || 0), 0);
+
       await client.query(
-        `INSERT INTO "journal_entries" (id, company_id, entry_number, date, description, reference_id, reference_type, created_at, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)`,
+        `INSERT INTO "journal_entries" (id, company_id, entry_number, date, description, reference_id, reference_type, total_debit, total_credit, created_at, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)`,
         [
           entryId,
           companyId,
@@ -3925,6 +3933,8 @@ router.post('/stock_adjustments', authenticateToken, async (req: AuthRequest, re
           docData.description || `قيد تسوية مخزنية - سند رقم ${docData.adjustment_number}`,
           docId,
           'stock_adjustment',
+          totalDebit,
+          totalCredit,
           req.user?.id || null
         ]
       );
@@ -4094,9 +4104,12 @@ router.put('/stock_adjustments/:id', authenticateToken, async (req: AuthRequest,
       const entryId = uuidv4();
       const entryNumber = await generateNextSequence(client, companyId, 'journal_entries', docData.date);
       
+      const totalDebit = journalLines.reduce((sum: number, line: any) => sum + (line.debit || 0), 0);
+      const totalCredit = journalLines.reduce((sum: number, line: any) => sum + (line.credit || 0), 0);
+
       await client.query(
-        `INSERT INTO "journal_entries" (id, company_id, entry_number, date, description, reference_id, reference_type, created_at, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)`,
+        `INSERT INTO "journal_entries" (id, company_id, entry_number, date, description, reference_id, reference_type, total_debit, total_credit, created_at, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)`,
         [
           entryId,
           companyId,
@@ -4105,6 +4118,8 @@ router.put('/stock_adjustments/:id', authenticateToken, async (req: AuthRequest,
           docData.description || `قيد تسوية مخزنية - سند رقم ${rawDocData.adjustment_number}`,
           id,
           'stock_adjustment',
+          totalDebit,
+          totalCredit,
           req.user?.id || null
         ]
       );
