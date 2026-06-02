@@ -916,22 +916,27 @@ export async function generateNextSequence(client: any, companyId: string, modul
     const nextSeq = String(maxSeq + 1).padStart(5, '0');
     return `${datePrefix}-${nextSeq}`;
   } else {
-    // Default format: PREFIX-MM-0001
-    const monthPrefix = dateStr.slice(0, 7);
-    const sql = `SELECT ${numField} FROM "${moduleName}" WHERE company_id = $1 AND date::text LIKE $2 ORDER BY id DESC LIMIT 500`;
-    const rows = await client.query(sql, [companyId, `${monthPrefix}%`]);
+    // New format: PREFIX-YYYY-MM-NNNNNN
+    const parts = dateStr.slice(0, 10).split('-');
+    const year = parts[0];
+    const month = parts[1].padStart(2, '0');
+    const datePrefix = `${prefix}-${year}-${month}`;
+    
+    const sql = `SELECT ${numField} FROM "${moduleName}" WHERE company_id = $1 AND ${numField} LIKE $2 ORDER BY id DESC LIMIT 500`;
+    const rows = await client.query(sql, [companyId, `${datePrefix}-%`]);
     let maxSeq = 0;
-    const monthStr = monthPrefix.split('-')[1];
     rows.rows.forEach((row: any) => {
       const val = row[numField] || '';
-      const parts = val.split('-');
-      if (parts.length === 3 && parts[1] === monthStr) {
-        const seq = parseInt(parts[2], 10);
-        if (!isNaN(seq) && seq > maxSeq) { maxSeq = seq; }
+      const valParts = val.split('-');
+      if (valParts.length >= 4) {
+        const seq = parseInt(valParts[valParts.length - 1], 10);
+        if (!isNaN(seq) && seq > maxSeq) {
+          maxSeq = seq;
+        }
       }
     });
-    const nextSeq = String(maxSeq + 1).padStart(4, '0');
-    return `${prefix}-${monthStr}-${nextSeq}`;
+    const nextSeq = String(maxSeq + 1).padStart(6, '0');
+    return `${datePrefix}-${nextSeq}`;
   }
 }
 

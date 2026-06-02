@@ -1778,9 +1778,9 @@ export const Invoices: React.FC = () => {
                             <input
                               required
                               type="text"
-                              className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-sm`}
+                              readOnly
+                              className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 rounded-2xl bg-zinc-100 border border-zinc-200 cursor-not-allowed outline-none font-bold text-zinc-500 text-sm`}
                               value={invoiceNumber}
-                              onChange={(e) => setInvoiceNumber(e.target.value)}
                             />
                             <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           </div>

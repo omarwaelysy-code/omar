@@ -91,10 +91,12 @@ export const TransactionSidePanel: React.FC<TransactionSidePanelProps> = ({
                 </div>
                 <div className="text-right">
                   <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs">
-                    قيد اليومية
+                    قيد اليومية {displayJournal.entry_number && `(${displayJournal.entry_number})`}
                     {!documentId && <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[10px] animate-pulse">معاينة</span>}
                   </div>
-                  <p className="text-[10px] text-zinc-400">القيد المحاسبي المولد</p>
+                  <p className="text-[10px] text-zinc-400">
+                    {displayJournal.entry_number ? `رقم القيد: ${displayJournal.entry_number}` : 'القيد المحاسبي المولد'}
+                  </p>
                 </div>
               </div>
               {isJournalOpen ? <ChevronUp size={16} className="text-zinc-400" /> : <ChevronDown size={16} className="text-zinc-400" />}

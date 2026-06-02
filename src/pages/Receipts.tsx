@@ -1036,10 +1036,10 @@ export const Receipts: React.FC = () => {
                         <div className="relative">
                           <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <input 
+                            readOnly
                             type="text" 
-                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl font-bold text-zinc-800 text-sm outline-none font-mono focus:ring-2 focus:ring-emerald-500 transition-all`}
+                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-100 border border-zinc-200 cursor-not-allowed rounded-2xl font-bold text-zinc-500 text-sm outline-none font-mono`}
                             value={editingReceipt ? internalRef : (internalRef || `RCPT-${Date.now().toString().slice(-6)}`)}
-                            onChange={(e) => setInternalRef(e.target.value)}
                           />
                         </div>
                       </div>

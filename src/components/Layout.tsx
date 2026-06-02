@@ -224,8 +224,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'warehouses', label: t('nav.warehouses'), icon: Home },
           { id: 'warehouse_transfers', label: t('nav.warehouse_transfers') || 'تحويل بين المخازن', icon: ArrowLeftRight },
           { id: 'opening_stock_balances', label: t('nav.opening_stock_balances') || 'أرصدة أول المدة للمخزون', icon: ListPlus },
-          { id: 'stock_adjustments', label: t('nav.stock_adjustments') || 'تسوية الأصناف', icon: Sliders },
-          { id: 'stock_card_report', label: t('nav.stock_card_report'), icon: History }
+          { id: 'stock_adjustments', label: t('nav.stock_adjustments') || 'تسوية الأصناف', icon: Sliders }
         ]
       },
       {
@@ -236,10 +235,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'invoices', label: t('nav.invoices'), icon: ArrowUpFromLine },
           { id: 'sales_orders', label: t('nav.sales_orders'), icon: FileText },
           { id: 'returns', label: t('nav.returns'), icon: RotateCcw },
-          { id: 'customer_discounts', label: t('nav.customer_discounts'), icon: Tags },
-          { id: 'customer_statement', label: t('nav.customer_statement'), icon: FileText },
-          { id: 'customer_balances', label: t('nav.customer_balances'), icon: BarChart3 },
-          { id: 'sales_report', label: t('nav.sales_report'), icon: BarChart3 }
+          { id: 'customer_discounts', label: t('nav.customer_discounts'), icon: Tags }
         ]
       },
       {
@@ -250,9 +246,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'purchase_invoices', label: t('nav.purchase_invoices'), icon: ArrowDownToLine },
           { id: 'purchase_orders', label: t('nav.purchase_orders'), icon: FileText },
           { id: 'purchase_returns', label: t('nav.purchase_returns'), icon: RotateCcw },
-          { id: 'supplier_discounts', label: t('nav.supplier_discounts'), icon: Tags },
-          { id: 'supplier_statement', label: t('nav.supplier_statement'), icon: FileText },
-          { id: 'supplier_balances', label: t('nav.supplier_balances'), icon: BarChart3 }
+          { id: 'supplier_discounts', label: t('nav.supplier_discounts'), icon: Tags }
         ]
       },
       {
@@ -262,10 +256,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         subItems: [
           { id: 'receipts', label: t('nav.receipts'), icon: Receipt },
           { id: 'payment_vouchers', label: t('nav.payment_vouchers'), icon: CreditCard },
-          { id: 'cash_transfers', label: t('nav.cash_transfers'), icon: ArrowLeftRight },
-          { id: 'cash_report', label: t('nav.cash_report'), icon: BarChart3 },
-          { id: 'cash_balances', label: t('nav.cash_balances'), icon: BarChart3 },
-          { id: 'expenses_report', label: t('nav.expenses_report'), icon: BarChart3 }
+          { id: 'cash_transfers', label: t('nav.cash_transfers'), icon: ArrowLeftRight }
         ]
       },
       {
@@ -290,11 +281,27 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           ...(company?.settings?.enable_multi_currency || isSuperAdmin ? [{ id: 'currencies', label: t('nav.currencies'), icon: Coins }] : []),
           { id: 'chart_of_accounts', label: t('nav.chart_of_accounts'), icon: PieChart },
           { id: 'create_journal_entry', label: t('nav.create_journal_entry'), icon: Plus },
-          { id: 'journal_entries', label: t('nav.journal_entries'), icon: FileText },
+          { id: 'journal_entries', label: t('nav.journal_entries'), icon: FileText }
+        ]
+      },
+      {
+        id: 'reports_menu',
+        label: t('nav.reports') || 'التقارير',
+        icon: BarChart3,
+        subItems: [
+          { id: 'stock_card_report', label: t('nav.stock_card_report'), icon: History },
+          { id: 'customer_statement', label: t('nav.customer_statement'), icon: FileText },
+          { id: 'customer_balances', label: t('nav.customer_balances'), icon: BarChart3 },
+          { id: 'sales_report', label: t('nav.sales_report'), icon: BarChart3 },
+          { id: 'supplier_statement', label: t('nav.supplier_statement'), icon: FileText },
+          { id: 'supplier_balances', label: t('nav.supplier_balances'), icon: BarChart3 },
+          { id: 'cash_report', label: t('nav.cash_report'), icon: BarChart3 },
+          { id: 'cash_balances', label: t('nav.cash_balances'), icon: BarChart3 },
+          { id: 'expenses_report', label: t('nav.expenses_report'), icon: BarChart3 },
           { id: 'general_ledger_report', label: t('nav.general_ledger_report'), icon: BookOpen },
           { id: 'trial_balance', label: t('nav.trial_balance'), icon: BarChart3 },
           { id: 'income_statement', label: t('nav.income_statement'), icon: BarChart3 },
-          { id: 'balance_sheet', label: t('nav.balance_sheet'), icon: Shield },
+          { id: 'balance_sheet', label: t('nav.balance_sheet'), icon: Shield }
         ]
       },
       {
