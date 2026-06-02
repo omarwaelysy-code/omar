@@ -119,7 +119,10 @@ async function startServer() {
       
       // Link columns on invoices
       'ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "source_orders" TEXT',
-      'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "source_orders" TEXT'
+      'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "source_orders" TEXT',
+
+      // Employees
+      'CREATE TABLE IF NOT EXISTS "employees" ("id" VARCHAR(36) PRIMARY KEY, "company_id" VARCHAR(36), "employee_code" VARCHAR(50) UNIQUE NOT NULL, "name" VARCHAR(255) NOT NULL, "nationality" VARCHAR(100), "national_id" VARCHAR(50), "gender" VARCHAR(20), "marital_status" VARCHAR(20), "birth_date" DATE, "hire_date" DATE, "contract_type" VARCHAR(20), "contract_expiry_date" DATE, "photo_url" TEXT, "documents" TEXT, "created_by" VARCHAR(36), "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)'
     ];
     
     for (const q of syncQueries) {

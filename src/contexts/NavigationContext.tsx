@@ -27,6 +27,7 @@ const pageLabels: { [key: string]: string } = {
   'customers': 'العملاء',
   'suppliers': 'الموردين',
   'products': 'الأصناف',
+  'employees': 'الموظفين',
   'expenses': 'بنود المصروفات',
   'payment_methods': 'طرق السداد',
   'invoices': 'فواتير مبيعات',

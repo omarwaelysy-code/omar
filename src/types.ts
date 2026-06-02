@@ -707,3 +707,28 @@ export interface PurchaseOrderItem {
   image_url?: string;
 }
 
+export interface EmployeeDocument {
+  name: string;
+  type: string;
+  data: string;
+}
+
+export interface Employee {
+  id: string;
+  company_id: string;
+  employee_code: string;
+  name: string;
+  nationality?: string;
+  national_id?: string;
+  gender?: 'male' | 'female';
+  marital_status?: 'married' | 'single';
+  birth_date?: string;
+  hire_date?: string;
+  contract_type?: 'permanent' | 'temporary';
+  contract_expiry_date?: string;
+  photo_url?: string;
+  documents?: string | EmployeeDocument[];
+  created_by?: string;
+  created_at?: string;
+}
+

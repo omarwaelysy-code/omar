@@ -676,7 +676,7 @@ const modules = [
   'system_config', 'audit_logs', 'operation_categories', 'operations', 'operation_fields',
   'departments', 'cost_centers', 'operation_field_values', 'field_operation_categories',
   'currencies', 'exchange_rates', 'inventory_movements', 'inventory_layers',
-  'sales_orders', 'sales_order_items', 'purchase_orders', 'purchase_order_items'
+  'sales_orders', 'sales_order_items', 'purchase_orders', 'purchase_order_items', 'employees'
 ];
 
 // --- Flexible Operations Logic ---
@@ -843,6 +843,25 @@ export async function generateNextSequence(client: any, companyId: string, modul
     case 'journal_entries': numField = 'entry_number'; prefix = 'JE'; break;
     case 'sales_orders': numField = 'order_number'; prefix = 'SO'; break;
     case 'purchase_orders': numField = 'order_number'; prefix = 'PO'; break;
+    case 'employees': numField = 'employee_code'; prefix = 'EMP'; break;
+  }
+
+  if (moduleName === 'employees') {
+    const sql = `SELECT employee_code FROM "employees" WHERE company_id = $1 ORDER BY id DESC LIMIT 500`;
+    const rows = await client.query(sql, [companyId]);
+    let maxSeq = 0;
+    rows.rows.forEach((row: any) => {
+      const val = row.employee_code || '';
+      const parts = val.split('-');
+      if (parts.length === 2 && parts[0] === 'EMP') {
+        const seq = parseInt(parts[1], 10);
+        if (!isNaN(seq) && seq > maxSeq) {
+          maxSeq = seq;
+        }
+      }
+    });
+    const nextSeq = String(maxSeq + 1).padStart(6, '0');
+    return `EMP-${nextSeq}`;
   }
 
   if (moduleName === 'sales_orders' || moduleName === 'purchase_orders') {
@@ -1186,6 +1205,13 @@ modules.forEach(moduleName => {
             }
             if (req.body.temp_password) {
               req.body.password_hash = await bcrypt.hash(req.body.temp_password, 10);
+            }
+          }
+
+          // Special case for employees: handle automatic code generation
+          if (moduleName === 'employees') {
+            if (!req.body.employee_code) {
+              req.body.employee_code = await generateNextSequence(pool, companyId, 'employees', '');
             }
           }
 

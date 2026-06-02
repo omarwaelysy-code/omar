@@ -172,5 +172,10 @@ export const EXPECTED_SCHEMA: TableSchema = {
   inventory_layers: [
     'id', 'company_id', 'product_id', 'purchase_date', 'original_qty', 'qty_remaining',
     'unit_cost', 'reference_type', 'reference_id', 'created_at'
+  ],
+  employees: [
+    'id', 'company_id', 'employee_code', 'name', 'nationality', 'national_id', 'gender',
+    'marital_status', 'birth_date', 'hire_date', 'contract_type', 'contract_expiry_date',
+    'photo_url', 'documents', 'created_by', 'created_at'
   ]
 };

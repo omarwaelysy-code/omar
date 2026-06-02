@@ -205,6 +205,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         icon: Database,
         subItems: [
           { id: 'customers', label: t('nav.customers'), icon: UsersIcon },
+          { id: 'employees', label: t('nav.employees') || 'الموظفين', icon: UsersIcon },
           { id: 'suppliers', label: t('nav.suppliers'), icon: Truck },
           { id: 'products', label: t('nav.products'), icon: Package },
           { id: 'stock_card_report', label: t('nav.stock_card_report'), icon: History },

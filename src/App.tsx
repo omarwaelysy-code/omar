@@ -3,6 +3,7 @@ import { useAuth } from './contexts/AuthContext';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Customers } from './pages/Customers';
+import { Employees } from './pages/Employees';
 import { Products } from './pages/Products';
 import { Warehouses } from './pages/Warehouses';
 import { ItemGroups } from './pages/ItemGroups';
@@ -158,6 +159,7 @@ export default function App() {
     switch (id) {
       case 'dashboard': return <Dashboard />;
       case 'customers': return <Customers />;
+      case 'employees': return <Employees />;
       case 'products': return <Products />;
       case 'warehouses': return <Warehouses />;
       case 'item_groups': return <ItemGroups />;
