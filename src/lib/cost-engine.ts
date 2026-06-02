@@ -194,21 +194,19 @@ export interface CostingResult {
  * Gets the configured company inventory cost method or product specific method.
  */
 async function getCompanyCostMethod(client: PoolClient, companyId: string, productId?: string): Promise<'wac' | 'fifo' | 'lifo'> {
+  if (productId) {
+    const productRes = await client.query('SELECT inventory_cost_method FROM products WHERE id = $1', [productId]);
+    if (productRes.rows.length > 0 && productRes.rows[0].inventory_cost_method) {
+      const productMethod = String(productRes.rows[0].inventory_cost_method).toLowerCase();
+      if (productMethod === 'fifo' || productMethod === 'lifo' || productMethod === 'wac') {
+        return productMethod as 'fifo' | 'lifo' | 'wac';
+      }
+    }
+  }
+
   const companyRes = await client.query('SELECT settings FROM companies WHERE id = $1', [companyId]);
   if (companyRes.rows[0]) {
     const settings = companyRes.rows[0].settings || {};
-    
-    // Check if item level is configured and product ID is provided
-    if (settings.inventory_cost_method_level === 'item' && productId) {
-      const productRes = await client.query('SELECT inventory_cost_method FROM products WHERE id = $1', [productId]);
-      if (productRes.rows.length > 0 && productRes.rows[0].inventory_cost_method) {
-        const productMethod = String(productRes.rows[0].inventory_cost_method).toLowerCase();
-        if (productMethod === 'fifo' || productMethod === 'lifo' || productMethod === 'wac') {
-          return productMethod as 'fifo' | 'lifo' | 'wac';
-        }
-      }
-    }
-
     const method = (settings.inventory_cost_method || '').toLowerCase();
     if (method === 'fifo' || method === 'lifo' || method === 'wac') {
       return method;

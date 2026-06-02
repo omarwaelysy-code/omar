@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Plus, Trash2, X, Package, History, ChevronRight, ChevronLeft, 
   Wallet, Layers, Hash, User, Calendar, Paperclip, LayoutGrid, List,
-  Lock, Camera, Printer, Download, FileText, RefreshCw
+  Lock, Camera, Printer, Download, FileText, RefreshCw, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Barcode from 'react-barcode';
@@ -1109,7 +1109,7 @@ export const Products: React.FC = () => {
                            </div>
                            <h2 className="text-2xl font-black text-slate-900 leading-none tracking-tight uppercase">
                               {language === 'ar' ? 'الإعدادات المحاسبية' : 'Accounting Setup'}
-                           </h2>
+</h2>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-right">
                            <div className="space-y-4">
@@ -1130,7 +1130,7 @@ export const Products: React.FC = () => {
                            {/* Inventory Account (Mandatory for finished goods, raw materials, commodity) */}
                            {['finished_good', 'raw_material', 'commodity', 'consumable'].includes(formData.type) && (
                              <>
-                               <div className={`space-y-4 ${company?.settings?.inventory_cost_method_level === 'item' ? 'md:col-span-1' : 'md:col-span-2'}`}>
+                               <div className="space-y-4 md:col-span-1">
                                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
                                    {t('products.form_inventory_account')} <span className="text-rose-500 font-bold">*</span>
                                  </label>
@@ -1144,23 +1144,41 @@ export const Products: React.FC = () => {
                                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                                  </select>
                                </div>
+                                <div className="space-y-4 md:col-span-1">
+                                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                                    {t('company_settings.inventory_cost_method')}
+                                  </label>
+                                  <select 
+                                    className={`w-full px-8 py-5 border border-slate-100 rounded-[2rem] text-xl font-black appearance-none outline-none focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner ${
+                                      editingProduct 
+                                        ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' 
+                                        : 'bg-slate-50 text-slate-900 focus:bg-white'
+                                    }`} 
+                                    value={formData.inventory_cost_method || 'wac'} 
+                                    onChange={(e) => setFormData({ ...formData, inventory_cost_method: e.target.value as any })}
+                                    disabled={!!editingProduct}
+                                  >
+                                    <option value="wac">{t('company_settings.inventory_cost_method.wac')}</option>
+                                    <option value="fifo">{t('company_settings.inventory_cost_method.fifo')}</option>
+                                    <option value="lifo">{t('company_settings.inventory_cost_method.lifo')}</option>
+                                  </select>
+                                  
+                                  {/* Warning notice about costing policy lock */}
+                                  
+                                                                    <div className="mt-2 text-[10px] font-semibold text-amber-600 flex items-center gap-1.5 bg-amber-50/50 p-2.5 rounded-xl border border-amber-100/50">
+                                    <AlertCircle size={14} className="text-amber-500 flex-shrink-0" />
+                                    <span>
+                                      {language === 'ar' 
+                                        ? (editingProduct 
+                                            ? 'تنبيه: لا يمكن تغيير سياسة التكلفة بعد إنشاء الصنف.' 
+                                            : 'تنبيه: سياسة التكلفة المحددة لا يمكن تعديلها بعد حفظ الصنف.')
+                                        : (editingProduct 
+                                            ? 'Warning: Costing policy cannot be changed after the item has been created.' 
+                                            : 'Warning: The selected costing policy cannot be modified once the item is saved.')}
+                                    </span>
+                                  </div>
 
-                               {company?.settings?.inventory_cost_method_level === 'item' && (
-                                 <div className="space-y-4 md:col-span-1">
-                                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                                     {t('company_settings.inventory_cost_method')}
-                                   </label>
-                                   <select 
-                                     className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner" 
-                                     value={formData.inventory_cost_method || 'wac'} 
-                                     onChange={(e) => setFormData({ ...formData, inventory_cost_method: e.target.value as any })}
-                                   >
-                                     <option value="wac">{t('company_settings.inventory_cost_method.wac')}</option>
-                                     <option value="fifo">{t('company_settings.inventory_cost_method.fifo')}</option>
-                                     <option value="lifo">{t('company_settings.inventory_cost_method.lifo')}</option>
-                                   </select>
-                                 </div>
-                               )}
+                                </div>
                              </>
                            )}
 

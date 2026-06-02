@@ -13,9 +13,7 @@ import {
   Image as ImageIcon,
   Search,
   ChevronDown,
-  Check,
-  Boxes,
-  Info
+  Check
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -163,7 +161,7 @@ export function CompanySettings() {
     fiscal_year_month: 12,
     enable_multi_currency: false,
     inventory_cost_method: 'wac',
-    inventory_cost_method_level: 'company',
+    inventory_cost_method_level: 'item',
     vat_enabled: false,
     wht_enabled: false
   });
@@ -210,7 +208,7 @@ export function CompanySettings() {
             fiscal_year_month: fmonth,
             enable_multi_currency: company.settings?.enable_multi_currency || false,
             inventory_cost_method: company.settings?.inventory_cost_method || 'wac',
-            inventory_cost_method_level: company.settings?.inventory_cost_method_level || 'company',
+            inventory_cost_method_level: 'item',
             vat_enabled: company.settings?.vat_enabled || company.vat_enabled || false,
             wht_enabled: company.settings?.wht_enabled || company.wht_enabled || false
           });
@@ -251,7 +249,7 @@ export function CompanySettings() {
           ...originalSettings,
           currency: data.currency,
           enable_multi_currency: data.enable_multi_currency,
-          inventory_cost_method_level: data.inventory_cost_method_level || 'company',
+          inventory_cost_method_level: 'item',
           inventory_cost_method: data.inventory_cost_method || 'wac',
           vat_enabled: data.vat_enabled,
           wht_enabled: data.wht_enabled
@@ -263,7 +261,7 @@ export function CompanySettings() {
         ...originalSettings,
         currency: data.currency,
         enable_multi_currency: data.enable_multi_currency,
-        inventory_cost_method_level: data.inventory_cost_method_level || 'company',
+        inventory_cost_method_level: 'item',
         inventory_cost_method: data.inventory_cost_method || 'wac',
         vat_enabled: data.vat_enabled,
         wht_enabled: data.wht_enabled
@@ -597,155 +595,6 @@ export function CompanySettings() {
               </div>
             </div>
 
-            {/* Inventory Costing Policy Level Selection */}
-            <div className={`md:col-span-2 pt-6 border-t border-slate-100 flex flex-col gap-4 select-none`}>
-              <div className="flex flex-col gap-0.5 w-full">
-                <span className="font-bold text-slate-800 text-base">
-                  {language === 'ar' ? 'مستوى تطبيق سياسة تكلفة المخزون' : 'Inventory Costing Policy Level'}
-                </span>
-                <span className="text-xs font-semibold text-slate-400">
-                  {language === 'ar' 
-                    ? 'اختر هل يتم تطبيق سياسة تكلفة المخزون على مستوى الشركة بالكامل أم يتم اختيارها لكل صنف على حدة.' 
-                    : 'Choose whether the inventory costing policy is applied company-wide or per item.'}
-                </span>
-              </div>
-              
-              <div className="flex bg-slate-100 p-1.5 rounded-2xl w-full max-w-sm">
-                <button
-                  type="button"
-                  onClick={() => setData(prev => ({ ...prev, inventory_cost_method_level: 'company' }))}
-                  className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-bold transition-all ${
-                    data.inventory_cost_method_level !== 'item' 
-                      ? 'bg-white text-indigo-600 shadow-sm' 
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  {language === 'ar' ? 'على مستوى الشركة' : 'Company Wide'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setData(prev => ({ ...prev, inventory_cost_method_level: 'item' }))}
-                  className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-bold transition-all ${
-                    data.inventory_cost_method_level === 'item' 
-                      ? 'bg-white text-indigo-600 shadow-sm' 
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  {language === 'ar' ? 'على مستوى الصنف' : 'Per Item'}
-                </button>
-              </div>
-            </div>
-
-            {/* Inventory Costing Policy Selection inside Card 3 */}
-            {data.inventory_cost_method_level !== 'item' && (
-              <div className="md:col-span-2 pt-6 border-t border-slate-100 space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
-                <div className="flex items-center gap-2">
-                  <Boxes className="w-5 h-5 text-indigo-500" />
-                  <div className="flex flex-col">
-                    <span className="font-bold text-slate-800 text-base">
-                      {t('company_settings.inventory_cost_method')}
-                    </span>
-                    <span className="text-xs text-slate-400 font-semibold">
-                      {language === 'ar' ? 'حدد الأسلوب المحاسبي لتقييم وطلب بضاعة المخازن.' : 'Select the accounting method used to evaluate stock.'}
-                    </span>
-                  </div>
-                </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* WAC Option */}
-                <button
-                  type="button"
-                  onClick={() => setData(prev => ({ ...prev, inventory_cost_method: 'wac' }))}
-                  className={`p-5 rounded-2xl border transition-all duration-300 flex flex-col gap-2 ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
-                    data.inventory_cost_method === 'wac'
-                      ? 'bg-indigo-50/40 border-indigo-500 text-indigo-900 shadow-sm shadow-indigo-500/5'
-                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <span className="font-bold text-base text-slate-900">
-                      {t('company_settings.inventory_cost_method.wac')}
-                    </span>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                      data.inventory_cost_method === 'wac' ? 'border-indigo-500' : 'border-slate-300'
-                    }`}>
-                      {data.inventory_cost_method === 'wac' && <div className="w-2.5 h-2.5 rounded-full bg-indigo-600" />}
-                    </div>
-                  </div>
-                  <span className="text-xs text-slate-400 leading-relaxed font-semibold">
-                    {language === 'ar' ? 'أكثر شيوعاً واستقراراً للأسعار المستمرة.' : 'More common and stable for fluctuating prices.'}
-                  </span>
-                </button>
-
-                {/* FIFO Option */}
-                <button
-                  type="button"
-                  onClick={() => setData(prev => ({ ...prev, inventory_cost_method: 'fifo' }))}
-                  className={`p-5 rounded-2xl border transition-all duration-300 flex flex-col gap-2 ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
-                    data.inventory_cost_method === 'fifo'
-                      ? 'bg-indigo-50/40 border-indigo-500 text-indigo-900 shadow-sm shadow-indigo-500/5'
-                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <span className="font-bold text-base text-slate-900">
-                      {t('company_settings.inventory_cost_method.fifo')}
-                    </span>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                      data.inventory_cost_method === 'fifo' ? 'border-indigo-500' : 'border-slate-300'
-                    }`}>
-                      {data.inventory_cost_method === 'fifo' && <div className="w-2.5 h-2.5 rounded-full bg-indigo-600" />}
-                    </div>
-                  </div>
-                  <span className="text-xs text-slate-400 leading-relaxed font-semibold">
-                    {language === 'ar' ? 'الوارد أولاً، يصرف أولاً (FIFO) مثالي في حالات توريد بضاعة ذات صلاحية محددة.' : 'Ideal for perishable goods.'}
-                  </span>
-                </button>
-
-                {/* LIFO Option */}
-                <button
-                  type="button"
-                  onClick={() => setData(prev => ({ ...prev, inventory_cost_method: 'lifo' }))}
-                  className={`p-5 rounded-2xl border transition-all duration-300 flex flex-col gap-2 ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
-                    data.inventory_cost_method === 'lifo'
-                      ? 'bg-indigo-50/40 border-indigo-500 text-indigo-900 shadow-sm shadow-indigo-500/5'
-                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <span className="font-bold text-base text-slate-900">
-                      {t('company_settings.inventory_cost_method.lifo')}
-                    </span>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                      data.inventory_cost_method === 'lifo' ? 'border-indigo-500' : 'border-slate-300'
-                    }`}>
-                      {data.inventory_cost_method === 'lifo' && <div className="w-2.5 h-2.5 rounded-full bg-indigo-600" />}
-                    </div>
-                  </div>
-                  <span className="text-xs text-slate-400 leading-relaxed font-semibold">
-                    {language === 'ar' ? 'الوارد أخيراً، يصرف أولاً (LIFO) مثالي لمواجهة تضخم الأسعار.' : 'Ideal in inflationary environments.'}
-                  </span>
-                </button>
-              </div>
-
-              {/* Policy Definition Display */}
-              <div className="p-4 bg-slate-50 border border-slate-150 rounded-2xl flex gap-3.5 transition-all duration-300">
-                <Info size={16} className="text-indigo-500 mt-0.5 flex-shrink-0" />
-                <div className="flex-1 space-y-1">
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider font-semibold">
-                    {language === 'ar' ? 'تفاصيل السياسة المحاسبية:' : 'Policy details:'}
-                  </h4>
-                  <p className="text-xs font-semibold text-slate-500 leading-relaxed">
-                    {data.inventory_cost_method === 'fifo'
-                      ? t('company_settings.inventory_cost_method.fifo.desc')
-                      : data.inventory_cost_method === 'lifo'
-                      ? t('company_settings.inventory_cost_method.lifo.desc')
-                      : t('company_settings.inventory_cost_method.wac.desc')}
-                  </p>
-                </div>
-              </div>
-             </div>
-            )}
           </div>
         </div>
 
