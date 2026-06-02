@@ -43,7 +43,9 @@ import {
   Moon,
   Search,
   Coins,
-  Home
+  Home,
+  ListPlus,
+  Sliders
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
@@ -221,6 +223,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'item_groups', label: t('nav.item_groups'), icon: Folder },
           { id: 'warehouses', label: t('nav.warehouses'), icon: Home },
           { id: 'warehouse_transfers', label: t('nav.warehouse_transfers') || 'تحويل بين المخازن', icon: ArrowLeftRight },
+          { id: 'opening_stock_balances', label: t('nav.opening_stock_balances') || 'أرصدة أول المدة للمخزون', icon: ListPlus },
+          { id: 'stock_adjustments', label: t('nav.stock_adjustments') || 'تسوية الأصناف', icon: Sliders },
           { id: 'stock_card_report', label: t('nav.stock_card_report'), icon: History }
         ]
       },

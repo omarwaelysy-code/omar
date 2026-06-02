@@ -184,5 +184,20 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   warehouse_transfer_items: [
     'id', 'transfer_id', 'product_id', 'product_name', 'product_code', 'quantity', 'unit_cost', 'total_cost', 'company_id', 'created_at'
+  ],
+  opening_stock_balances: [
+    'id', 'company_id', 'document_number', 'date', 'debit_account_id', 'debit_account_name', 
+    'credit_account_id', 'credit_account_name', 'description', 'created_by', 'created_at'
+  ],
+  opening_stock_items: [
+    'id', 'opening_stock_id', 'product_id', 'product_name', 'product_code', 'warehouse_id', 
+    'warehouse_name', 'quantity', 'unit_cost', 'total_cost', 'company_id', 'created_at'
+  ],
+  stock_adjustments: [
+    'id', 'company_id', 'adjustment_number', 'date', 'account_id', 'account_name', 'description', 'created_by', 'created_at'
+  ],
+  stock_adjustment_items: [
+    'id', 'adjustment_id', 'product_id', 'product_name', 'product_code', 'warehouse_id', 
+    'warehouse_name', 'quantity', 'unit_cost', 'total_cost', 'company_id', 'created_at'
   ]
 };

@@ -27,6 +27,8 @@ export const en = {
   'nav.cash_transfers': 'Cash Transfers',
   'nav.warehouses_menu': 'Warehouses',
   'nav.warehouse_transfers': 'Warehouse Transfers',
+  'nav.opening_stock_balances': 'Opening Stock Balances',
+  'nav.stock_adjustments': 'Stock Adjustments',
   'nav.general_ledger': 'General Ledger',
   'nav.account_types': 'Account Types',
   'nav.accounts': 'Chart of Accounts',

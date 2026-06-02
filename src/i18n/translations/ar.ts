@@ -27,6 +27,8 @@ export const ar = {
   'nav.cash_transfers': 'التحويل بين الخزائن',
   'nav.warehouses_menu': 'المخازن',
   'nav.warehouse_transfers': 'تحويل بين المخازن',
+  'nav.opening_stock_balances': 'أرصدة أول المدة للمخزون',
+  'nav.stock_adjustments': 'تسوية الأصناف',
   'nav.general_ledger': 'الحسابات العامة',
   'nav.account_types': 'أنواع الحسابات',
   'nav.accounts': 'دليل الحسابات',

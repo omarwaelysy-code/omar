@@ -761,3 +761,61 @@ export interface WarehouseTransfer {
   items?: WarehouseTransferItem[];
 }
 
+export interface OpeningStockItem {
+  id?: string;
+  opening_stock_id?: string;
+  product_id: string;
+  product_name?: string;
+  product_code?: string;
+  warehouse_id: string;
+  warehouse_name?: string;
+  quantity: number;
+  unit_cost: number;
+  total_cost?: number;
+  company_id?: string;
+  created_at?: string;
+}
+
+export interface OpeningStockBalance {
+  id: string;
+  company_id: string;
+  document_number: string;
+  date: string;
+  debit_account_id: string;
+  debit_account_name?: string;
+  credit_account_id: string;
+  credit_account_name?: string;
+  description?: string;
+  created_by?: string;
+  created_at?: string;
+  items?: OpeningStockItem[];
+}
+
+export interface StockAdjustmentItem {
+  id?: string;
+  adjustment_id?: string;
+  product_id: string;
+  product_name?: string;
+  product_code?: string;
+  warehouse_id: string;
+  warehouse_name?: string;
+  quantity: number;
+  unit_cost: number;
+  total_cost?: number;
+  company_id?: string;
+  created_at?: string;
+}
+
+export interface StockAdjustment {
+  id: string;
+  company_id: string;
+  adjustment_number: string;
+  date: string;
+  account_id: string;
+  account_name?: string;
+  description?: string;
+  created_by?: string;
+  created_at?: string;
+  items?: StockAdjustmentItem[];
+}
+

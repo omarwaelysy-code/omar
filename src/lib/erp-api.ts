@@ -11,7 +11,7 @@ import path from 'path';
 import * as XLSX from 'xlsx';
 import multer from 'multer';
 import { syncCOGSForJournalEntry } from './sync-cogs';
-import { recordPurchase, recordSale, recordSalesReturn, recordPurchaseReturn, recalculateProductStock, reverseAndRecalculate, recordTransfer } from './cost-engine';
+import { recordPurchase, recordSale, recordSalesReturn, recordPurchaseReturn, recalculateProductStock, reverseAndRecalculate, recordTransfer, recordAdjustment } from './cost-engine';
 
 export async function syncProductsCostAndJEs(client: any, companyId: string, productIds: string[]) {
   if (!productIds || productIds.length === 0) return;
@@ -750,7 +750,7 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
   }
 });
 
-const transactionalModules = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns', 'journal_entries', 'sales_orders', 'purchase_orders', 'warehouse_transfers'];
+const transactionalModules = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns', 'journal_entries', 'sales_orders', 'purchase_orders', 'warehouse_transfers', 'opening_stock_balances', 'stock_adjustments'];
 
 // Helper to validate ID format (simplified to check string)
 function isUUID(id: any): boolean {
@@ -846,6 +846,8 @@ export async function generateNextSequence(client: any, companyId: string, modul
     case 'purchase_orders': numField = 'order_number'; prefix = 'PO'; break;
     case 'employees': numField = 'employee_code'; prefix = 'EMP'; break;
     case 'warehouse_transfers': numField = 'transfer_number'; prefix = 'TR'; break;
+    case 'opening_stock_balances': numField = 'document_number'; prefix = 'OPB'; break;
+    case 'stock_adjustments': numField = 'adjustment_number'; prefix = 'ADJ'; break;
   }
 
   if (moduleName === 'employees') {
@@ -1185,6 +1187,12 @@ modules.forEach(moduleName => {
     } else if (module === 'warehouse_transfers') {
       itemsTable = 'warehouse_transfer_items';
       foreignKey = 'transfer_id';
+    } else if (module === 'opening_stock_balances') {
+      itemsTable = 'opening_stock_items';
+      foreignKey = 'opening_stock_id';
+    } else if (module === 'stock_adjustments') {
+      itemsTable = 'stock_adjustment_items';
+      foreignKey = 'adjustment_id';
     }
 
     if (itemsTable) {
@@ -3448,6 +3456,689 @@ router.get('/inventory/debug_moves', async (req, res) => {
       LIMIT 100
     `);
     res.json(rows);
+});
+
+// ==========================================
+// OPENING STOCK BALANCES
+// ==========================================
+router.post('/opening_stock_balances', authenticateToken, async (req: AuthRequest, res) => {
+  const client = await pool.connect();
+  try {
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
+    const { items, ...rawDocData } = req.body;
+    
+    if (!rawDocData.debit_account_id) return sendError(res, 400, 'debit_account_id is required');
+    if (!rawDocData.credit_account_id) return sendError(res, 400, 'credit_account_id is required');
+    if (!rawDocData.date) return sendError(res, 400, 'date is required');
+
+    await client.query('BEGIN');
+
+    const docData = sanitizeData('opening_stock_balances', rawDocData);
+    if (!docData.company_id) docData.company_id = companyId;
+    const docId = docData.id || uuidv4();
+    docData.id = docId;
+    
+    if (!docData.document_number) {
+      docData.document_number = await generateNextSequence(client, companyId, 'opening_stock_balances', docData.date);
+    }
+
+    const keys = Object.keys(docData);
+    const values = Object.values(docData);
+    const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+    await client.query(
+      `INSERT INTO "opening_stock_balances" ("${keys.join('", "')}") VALUES (${placeholders})`,
+      values
+    );
+
+    let totalValue = 0;
+    const productsToSync: string[] = [];
+
+    for (const item of (items || [])) {
+      const sanitizedItem = sanitizeData('opening_stock_items', item);
+      const itemId = uuidv4();
+      const itemData = {
+        ...sanitizedItem,
+        id: itemId,
+        opening_stock_id: docId,
+        company_id: companyId
+      };
+
+      const prodRes = await client.query('SELECT name, code FROM products WHERE id = $1', [item.product_id]);
+      if (prodRes.rows.length === 0) {
+        throw new Error(`Product not found: ${item.product_id}`);
+      }
+      const prod = prodRes.rows[0];
+      itemData.product_name = prod.name;
+      itemData.product_code = prod.code;
+
+      const qty = parseFloat(item.quantity || '0');
+      const cost = parseFloat(item.unit_cost || '0') || 0;
+      const itemTotal = qty * cost;
+      itemData.unit_cost = cost;
+      itemData.total_cost = itemTotal;
+      totalValue += itemTotal;
+
+      const itemKeys = Object.keys(itemData);
+      const itemValues = Object.values(itemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+      await client.query(
+        `INSERT INTO "opening_stock_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
+        itemValues
+      );
+
+      if (qty > 0) {
+        await recordAdjustment(
+          client,
+          companyId,
+          item.warehouse_id || null,
+          item.product_id,
+          qty,
+          cost,
+          docId,
+          docData.document_number,
+          docData.date
+        );
+        productsToSync.push(item.product_id);
+      }
+    }
+
+    // Insert journal entry
+    const entryId = uuidv4();
+    const entryNumber = await generateNextSequence(client, companyId, 'journal_entries', docData.date);
+    await client.query(
+      `INSERT INTO "journal_entries" (id, company_id, entry_number, date, description, reference_id, reference_type, created_at, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)`,
+      [
+        entryId,
+        companyId,
+        entryNumber,
+        docData.date,
+        docData.description || `قيد افتتاح مخزون - سند رقم ${docData.document_number}`,
+        docId,
+        'opening_stock_balance',
+        req.user?.id || null
+      ]
+    );
+
+    // Debit line (Inventory)
+    await client.query(
+      `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, debit, credit, description, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+      [
+        uuidv4(),
+        companyId,
+        entryId,
+        docData.debit_account_id,
+        totalValue,
+        0,
+        `افتتاح مخزون - سند رقم ${docData.document_number}`,
+      ]
+    );
+
+    // Credit line (Capital / Counter Account)
+    await client.query(
+      `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, debit, credit, description, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+      [
+        uuidv4(),
+        companyId,
+        entryId,
+        docData.credit_account_id,
+        0,
+        totalValue,
+        `افتتاح مخزون - مقابل - سند رقم ${docData.document_number}`,
+      ]
+    );
+
+    if (productsToSync.length > 0) {
+      await syncProductsCostAndJEs(client, companyId, productsToSync);
+    }
+
+    logAudit({
+      company_id: companyId,
+      user_id: req.user?.id,
+      username: (req.user as any)?.username || req.user?.email,
+      user_email: req.user?.email,
+      action: 'CREATE',
+      module: 'OPENING_STOCK_BALANCES',
+      details: `Created opening stock balance: ${docData.document_number} with value ${totalValue}`,
+      entity_type: 'opening_stock_balances',
+      entity_id: docId,
+      ip_address: getIp(req),
+      metadata: docData
+    });
+
+    await client.query('COMMIT');
+    res.status(201).json({ id: docId, document_number: docData.document_number });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Error creating opening stock balance:', error);
+    sendError(res, 500, `Failed to create opening stock balance. ${error.message}`, error.message);
+  } finally {
+    client.release();
+  }
+});
+
+router.put('/opening_stock_balances/:id', authenticateToken, async (req: AuthRequest, res) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
+    const { items, ...rawDocData } = req.body;
+
+    await client.query('BEGIN');
+
+    await reverseAndRecalculate(client, companyId, id);
+    await client.query('DELETE FROM opening_stock_items WHERE opening_stock_id = $1', [id]);
+
+    const docData = sanitizeData('opening_stock_balances', rawDocData);
+    delete (docData as any).id;
+    delete (docData as any).company_id;
+
+    const keys = Object.keys(docData);
+    const values = Object.values(docData);
+    const setClause = keys.map((key, i) => `"${key}" = $${i + 1}`).join(', ');
+    await client.query(
+      `UPDATE "opening_stock_balances" SET ${setClause} WHERE id = $${keys.length + 1} AND company_id = $${keys.length + 2}`,
+      [...values, id, companyId]
+    );
+
+    let totalValue = 0;
+    const productsToSync: string[] = [];
+
+    for (const item of (items || [])) {
+      const sanitizedItem = sanitizeData('opening_stock_items', item);
+      const itemId = uuidv4();
+      const itemData = {
+        ...sanitizedItem,
+        id: itemId,
+        opening_stock_id: id,
+        company_id: companyId
+      };
+
+      const prodRes = await client.query('SELECT name, code FROM products WHERE id = $1', [item.product_id]);
+      if (prodRes.rows.length === 0) {
+        throw new Error(`Product not found: ${item.product_id}`);
+      }
+      const prod = prodRes.rows[0];
+      itemData.product_name = prod.name;
+      itemData.product_code = prod.code;
+
+      const qty = parseFloat(item.quantity || '0');
+      const cost = parseFloat(item.unit_cost || '0') || 0;
+      const itemTotal = qty * cost;
+      itemData.unit_cost = cost;
+      itemData.total_cost = itemTotal;
+      totalValue += itemTotal;
+
+      const itemKeys = Object.keys(itemData);
+      const itemValues = Object.values(itemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+      await client.query(
+        `INSERT INTO "opening_stock_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
+        itemValues
+      );
+
+      if (qty > 0) {
+        await recordAdjustment(
+          client,
+          companyId,
+          item.warehouse_id || null,
+          item.product_id,
+          qty,
+          cost,
+          id,
+          rawDocData.document_number,
+          docData.date
+        );
+        productsToSync.push(item.product_id);
+      }
+    }
+
+    // Insert journal entry
+    const entryId = uuidv4();
+    const entryNumber = await generateNextSequence(client, companyId, 'journal_entries', docData.date);
+    await client.query(
+      `INSERT INTO "journal_entries" (id, company_id, entry_number, date, description, reference_id, reference_type, created_at, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)`,
+      [
+        entryId,
+        companyId,
+        entryNumber,
+        docData.date,
+        docData.description || `قيد افتتاح مخزون - سند رقم ${rawDocData.document_number}`,
+        id,
+        'opening_stock_balance',
+        req.user?.id || null
+      ]
+    );
+
+    // Debit line
+    await client.query(
+      `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, debit, credit, description, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+      [
+        uuidv4(),
+        companyId,
+        entryId,
+        docData.debit_account_id,
+        totalValue,
+        0,
+        `افتتاح مخزون - سند رقم ${rawDocData.document_number}`,
+      ]
+    );
+
+    // Credit line
+    await client.query(
+      `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, debit, credit, description, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+      [
+        uuidv4(),
+        companyId,
+        entryId,
+        docData.credit_account_id,
+        0,
+        totalValue,
+        `افتتاح مخزون - مقابل - سند رقم ${rawDocData.document_number}`,
+      ]
+    );
+
+    if (productsToSync.length > 0) {
+      await syncProductsCostAndJEs(client, companyId, productsToSync);
+    }
+
+    logAudit({
+      company_id: companyId,
+      user_id: req.user?.id,
+      username: (req.user as any)?.username || req.user?.email,
+      user_email: req.user?.email,
+      action: 'UPDATE',
+      module: 'OPENING_STOCK_BALANCES',
+      details: `Updated opening stock balance: ${rawDocData.document_number} with value ${totalValue}`,
+      entity_type: 'opening_stock_balances',
+      entity_id: id,
+      ip_address: getIp(req),
+      metadata: docData
+    });
+
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Error updating opening stock balance:', error);
+    sendError(res, 500, `Failed to update opening stock balance. ${error.message}`, error.message);
+  } finally {
+    client.release();
+  }
+});
+
+// ==========================================
+// STOCK ADJUSTMENTS
+// ==========================================
+router.post('/stock_adjustments', authenticateToken, async (req: AuthRequest, res) => {
+  const client = await pool.connect();
+  try {
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
+    const { items, ...rawDocData } = req.body;
+    
+    if (!rawDocData.account_id) return sendError(res, 400, 'account_id (adjustment counter account) is required');
+    if (!rawDocData.date) return sendError(res, 400, 'date is required');
+
+    await client.query('BEGIN');
+
+    const docData = sanitizeData('stock_adjustments', rawDocData);
+    if (!docData.company_id) docData.company_id = companyId;
+    const docId = docData.id || uuidv4();
+    docData.id = docId;
+    
+    if (!docData.adjustment_number) {
+      docData.adjustment_number = await generateNextSequence(client, companyId, 'stock_adjustments', docData.date);
+    }
+
+    const keys = Object.keys(docData);
+    const values = Object.values(docData);
+    const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+    await client.query(
+      `INSERT INTO "stock_adjustments" ("${keys.join('", "')}") VALUES (${placeholders})`,
+      values
+    );
+
+    const productsToSync: string[] = [];
+    const journalLines: { account_id: string; debit: number; credit: number; description: string }[] = [];
+
+    for (const item of (items || [])) {
+      const sanitizedItem = sanitizeData('stock_adjustment_items', item);
+      const itemId = uuidv4();
+      const itemData = {
+        ...sanitizedItem,
+        id: itemId,
+        adjustment_id: docId,
+        company_id: companyId
+      };
+
+      const prodRes = await client.query('SELECT name, code, inventory_account_id FROM products WHERE id = $1', [item.product_id]);
+      if (prodRes.rows.length === 0) {
+        throw new Error(`Product not found: ${item.product_id}`);
+      }
+      const prod = prodRes.rows[0];
+      itemData.product_name = prod.name;
+      itemData.product_code = prod.code;
+
+      const qty = parseFloat(item.quantity || '0');
+      const cost = parseFloat(item.unit_cost || '0') || 0;
+      
+      itemData.unit_cost = cost;
+
+      const costInfo = await recordAdjustment(
+        client,
+        companyId,
+        item.warehouse_id || null,
+        item.product_id,
+        qty,
+        cost,
+        docId,
+        docData.adjustment_number,
+        docData.date
+      );
+
+      // Use the costing engine's computed cost
+      const totalCostValue = Math.abs(costInfo.totalCost || (qty * cost));
+      itemData.total_cost = qty < 0 ? -totalCostValue : totalCostValue;
+
+      const itemKeys = Object.keys(itemData);
+      const itemValues = Object.values(itemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+      await client.query(
+        `INSERT INTO "stock_adjustment_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
+        itemValues
+      );
+
+      productsToSync.push(item.product_id);
+
+      // Find product inventory account
+      let invAccountId = prod.inventory_account_id;
+      if (!invAccountId) {
+        const fallbackRes = await client.query("SELECT id FROM accounts WHERE company_id = $1 AND (name LIKE '%مخزون%' OR name LIKE '%مخازن%') LIMIT 1", [companyId]);
+        invAccountId = fallbackRes.rows[0]?.id || null;
+      }
+
+      if (invAccountId && totalCostValue > 0) {
+        if (qty > 0) {
+          journalLines.push({
+            account_id: invAccountId,
+            debit: totalCostValue,
+            credit: 0,
+            description: `تسوية إضافة مخزون صنف: ${prod.name}`
+          });
+          journalLines.push({
+            account_id: docData.account_id,
+            debit: 0,
+            credit: totalCostValue,
+            description: `تسوية إضافة مخزون صنف: ${prod.name}`
+          });
+        } else if (qty < 0) {
+          journalLines.push({
+            account_id: docData.account_id,
+            debit: totalCostValue,
+            credit: 0,
+            description: `تسوية صرف مخزون صنف: ${prod.name}`
+          });
+          journalLines.push({
+            account_id: invAccountId,
+            debit: 0,
+            credit: totalCostValue,
+            description: `تسوية صرف مخزون صنف: ${prod.name}`
+          });
+        }
+      }
+    }
+
+    if (journalLines.length > 0) {
+      const entryId = uuidv4();
+      const entryNumber = await generateNextSequence(client, companyId, 'journal_entries', docData.date);
+
+      await client.query(
+        `INSERT INTO "journal_entries" (id, company_id, entry_number, date, description, reference_id, reference_type, created_at, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)`,
+        [
+          entryId,
+          companyId,
+          entryNumber,
+          docData.date,
+          docData.description || `قيد تسوية مخزنية - سند رقم ${docData.adjustment_number}`,
+          docId,
+          'stock_adjustment',
+          req.user?.id || null
+        ]
+      );
+
+      for (const line of journalLines) {
+        await client.query(
+          `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, debit, credit, description, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+          [
+            uuidv4(),
+            companyId,
+            entryId,
+            line.account_id,
+            line.debit,
+            line.credit,
+            line.description,
+          ]
+        );
+      }
+    }
+
+    if (productsToSync.length > 0) {
+      await syncProductsCostAndJEs(client, companyId, productsToSync);
+    }
+
+    logAudit({
+      company_id: companyId,
+      user_id: req.user?.id,
+      username: (req.user as any)?.username || req.user?.email,
+      user_email: req.user?.email,
+      action: 'CREATE',
+      module: 'STOCK_ADJUSTMENTS',
+      details: `Created stock adjustment: ${docData.adjustment_number}`,
+      entity_type: 'stock_adjustments',
+      entity_id: docId,
+      ip_address: getIp(req),
+      metadata: docData
+    });
+
+    await client.query('COMMIT');
+    res.status(201).json({ id: docId, adjustment_number: docData.adjustment_number });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Error creating stock adjustment:', error);
+    sendError(res, 500, `Failed to create stock adjustment. ${error.message}`, error.message);
+  } finally {
+    client.release();
+  }
+});
+
+router.put('/stock_adjustments/:id', authenticateToken, async (req: AuthRequest, res) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
+    const { items, ...rawDocData } = req.body;
+
+    await client.query('BEGIN');
+
+    await reverseAndRecalculate(client, companyId, id);
+    await client.query('DELETE FROM stock_adjustment_items WHERE adjustment_id = $1', [id]);
+
+    const docData = sanitizeData('stock_adjustments', rawDocData);
+    delete (docData as any).id;
+    delete (docData as any).company_id;
+
+    const keys = Object.keys(docData);
+    const values = Object.values(docData);
+    const setClause = keys.map((key, i) => `"${key}" = $${i + 1}`).join(', ');
+    await client.query(
+      `UPDATE "stock_adjustments" SET ${setClause} WHERE id = $${keys.length + 1} AND company_id = $${keys.length + 2}`,
+      [...values, id, companyId]
+    );
+
+    const productsToSync: string[] = [];
+    const journalLines: { account_id: string; debit: number; credit: number; description: string }[] = [];
+
+    for (const item of (items || [])) {
+      const sanitizedItem = sanitizeData('stock_adjustment_items', item);
+      const itemId = uuidv4();
+      const itemData = {
+        ...sanitizedItem,
+        id: itemId,
+        adjustment_id: id,
+        company_id: companyId
+      };
+
+      const prodRes = await client.query('SELECT name, code, inventory_account_id FROM products WHERE id = $1', [item.product_id]);
+      if (prodRes.rows.length === 0) {
+        throw new Error(`Product not found: ${item.product_id}`);
+      }
+      const prod = prodRes.rows[0];
+      itemData.product_name = prod.name;
+      itemData.product_code = prod.code;
+
+      const qty = parseFloat(item.quantity || '0');
+      const cost = parseFloat(item.unit_cost || '0') || 0;
+      
+      itemData.unit_cost = cost;
+
+      const costInfo = await recordAdjustment(
+        client,
+        companyId,
+        item.warehouse_id || null,
+        item.product_id,
+        qty,
+        cost,
+        id,
+        rawDocData.adjustment_number,
+        docData.date
+      );
+
+      const totalCostValue = Math.abs(costInfo.totalCost || (qty * cost));
+      itemData.total_cost = qty < 0 ? -totalCostValue : totalCostValue;
+
+      const itemKeys = Object.keys(itemData);
+      const itemValues = Object.values(itemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+      await client.query(
+        `INSERT INTO "stock_adjustment_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
+        itemValues
+      );
+
+      productsToSync.push(item.product_id);
+
+      // Find product inventory account
+      let invAccountId = prod.inventory_account_id;
+      if (!invAccountId) {
+        const fallbackRes = await client.query("SELECT id FROM accounts WHERE company_id = $1 AND (name LIKE '%مخزون%' OR name LIKE '%مخازن%') LIMIT 1", [companyId]);
+        invAccountId = fallbackRes.rows[0]?.id || null;
+      }
+
+      if (invAccountId && totalCostValue > 0) {
+        if (qty > 0) {
+          journalLines.push({
+            account_id: invAccountId,
+            debit: totalCostValue,
+            credit: 0,
+            description: `تسوية إضافة مخزون صنف: ${prod.name}`
+          });
+          journalLines.push({
+            account_id: docData.account_id,
+            debit: 0,
+            credit: totalCostValue,
+            description: `تسوية إضافة مخزون صنف: ${prod.name}`
+          });
+        } else if (qty < 0) {
+          journalLines.push({
+            account_id: docData.account_id,
+            debit: totalCostValue,
+            credit: 0,
+            description: `تسوية صرف مخزون صنف: ${prod.name}`
+          });
+          journalLines.push({
+            account_id: invAccountId,
+            debit: 0,
+            credit: totalCostValue,
+            description: `تسوية صرف مخزون صنف: ${prod.name}`
+          });
+        }
+      }
+    }
+
+    if (journalLines.length > 0) {
+      const entryId = uuidv4();
+      const entryNumber = await generateNextSequence(client, companyId, 'journal_entries', docData.date);
+      
+      await client.query(
+        `INSERT INTO "journal_entries" (id, company_id, entry_number, date, description, reference_id, reference_type, created_at, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)`,
+        [
+          entryId,
+          companyId,
+          entryNumber,
+          docData.date,
+          docData.description || `قيد تسوية مخزنية - سند رقم ${rawDocData.adjustment_number}`,
+          id,
+          'stock_adjustment',
+          req.user?.id || null
+        ]
+      );
+
+      for (const line of journalLines) {
+        await client.query(
+          `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, debit, credit, description, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+          [
+            uuidv4(),
+            companyId,
+            entryId,
+            line.account_id,
+            line.debit,
+            line.credit,
+            line.description,
+          ]
+        );
+      }
+    }
+
+    if (productsToSync.length > 0) {
+      await syncProductsCostAndJEs(client, companyId, productsToSync);
+    }
+
+    logAudit({
+      company_id: companyId,
+      user_id: req.user?.id,
+      username: (req.user as any)?.username || req.user?.email,
+      user_email: req.user?.email,
+      action: 'UPDATE',
+      module: 'STOCK_ADJUSTMENTS',
+      details: `Updated stock adjustment: ${rawDocData.adjustment_number}`,
+      entity_type: 'stock_adjustments',
+      entity_id: id,
+      ip_address: getIp(req),
+      metadata: docData
+    });
+
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Error updating stock adjustment:', error);
+    sendError(res, 500, `Failed to update stock adjustment. ${error.message}`, error.message);
   } finally {
     client.release();
   }

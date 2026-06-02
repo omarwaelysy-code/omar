@@ -568,6 +568,70 @@ export async function initDatabase() {
     `, 'warehouse_transfer_items table');
 
     await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "opening_stock_balances" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id") ON DELETE CASCADE,
+        "document_number" VARCHAR(50) NOT NULL,
+        "date" DATE NOT NULL,
+        "debit_account_id" VARCHAR(36) REFERENCES "accounts"("id"),
+        "debit_account_name" VARCHAR(255),
+        "credit_account_id" VARCHAR(36) REFERENCES "accounts"("id"),
+        "credit_account_name" VARCHAR(255),
+        "description" TEXT,
+        "created_by" VARCHAR(36),
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'opening_stock_balances table');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "opening_stock_items" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "opening_stock_id" VARCHAR(36) REFERENCES "opening_stock_balances"("id") ON DELETE CASCADE,
+        "product_id" VARCHAR(36) REFERENCES "products"("id"),
+        "product_name" VARCHAR(255),
+        "product_code" VARCHAR(100),
+        "warehouse_id" VARCHAR(36) REFERENCES "warehouses"("id"),
+        "warehouse_name" VARCHAR(255),
+        "quantity" DECIMAL(18, 4) NOT NULL,
+        "unit_cost" DECIMAL(18, 4) DEFAULT 0,
+        "total_cost" DECIMAL(18, 4) DEFAULT 0,
+        "company_id" VARCHAR(36),
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'opening_stock_items table');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "stock_adjustments" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id") ON DELETE CASCADE,
+        "adjustment_number" VARCHAR(50) NOT NULL,
+        "date" DATE NOT NULL,
+        "account_id" VARCHAR(36) REFERENCES "accounts"("id"),
+        "account_name" VARCHAR(255),
+        "description" TEXT,
+        "created_by" VARCHAR(36),
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'stock_adjustments table');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "stock_adjustment_items" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "adjustment_id" VARCHAR(36) REFERENCES "stock_adjustments"("id") ON DELETE CASCADE,
+        "product_id" VARCHAR(36) REFERENCES "products"("id"),
+        "product_name" VARCHAR(255),
+        "product_code" VARCHAR(100),
+        "warehouse_id" VARCHAR(36) REFERENCES "warehouses"("id"),
+        "warehouse_name" VARCHAR(255),
+        "quantity" DECIMAL(18, 4) NOT NULL,
+        "unit_cost" DECIMAL(18, 4) DEFAULT 0,
+        "total_cost" DECIMAL(18, 4) DEFAULT 0,
+        "company_id" VARCHAR(36),
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'stock_adjustment_items table');
+
+    await safeQuery(`
       CREATE TABLE IF NOT EXISTS "inventory_movements" (
         "id" VARCHAR(36) PRIMARY KEY,
         "company_id" VARCHAR(36) REFERENCES "companies"("id"),
