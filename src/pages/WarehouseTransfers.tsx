@@ -732,14 +732,17 @@ export const WarehouseTransfers: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {((viewTransfer as any).items || []).map((item: WarehouseTransferItem) => (
-                          <tr key={item.id} className="hover:bg-slate-50/20">
-                            <td className="px-4 py-3.5 font-mono font-bold text-slate-600">{item.product_code || '-'}</td>
-                            <td className="px-4 py-3.5 font-black text-slate-800">{item.product_name}</td>
-                            <td className="px-4 py-3.5 font-black text-slate-700 text-center">{formatNumber(item.quantity)}</td>
-                            <td className="px-4 py-3.5 font-bold text-slate-500">{item.unit || '-'}</td>
-                          </tr>
-                        ))}
+                        {((viewTransfer as any).items || []).map((item: WarehouseTransferItem) => {
+                          const prod = products.find(p => p.id === item.product_id);
+                          return (
+                            <tr key={item.id} className="hover:bg-slate-50/20">
+                              <td className="px-4 py-3.5 font-mono font-bold text-slate-600">{item.product_code || '-'}</td>
+                              <td className="px-4 py-3.5 font-black text-slate-800">{item.product_name}</td>
+                              <td className="px-4 py-3.5 font-black text-slate-700 text-center">{formatNumber(item.quantity)}</td>
+                              <td className="px-4 py-3.5 font-bold text-slate-500">{prod?.unit || '-'}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
