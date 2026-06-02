@@ -248,9 +248,7 @@ export const OpeningStockBalances: React.FC = () => {
 
         const headers = rawData[0] as string[];
         const codeIdx = headers.findIndex(h => String(h).includes('رمز الصنف') || String(h).toLowerCase().includes('product code'));
-        const nameIdx = headers.findIndex(h => String(h).includes('اسم الصنف') || String(h).toLowerCase().includes('product name'));
         const whIdx = headers.findIndex(h => String(h).includes('رمز المستودع') || String(h).toLowerCase().includes('warehouse code'));
-        const whNameIdx = headers.findIndex(h => String(h).includes('اسم المستودع') || String(h).toLowerCase().includes('warehouse name'));
         const qtyIdx = headers.findIndex(h => String(h).includes('الكمية') || String(h).toLowerCase().includes('quantity'));
         const costIdx = headers.findIndex(h => String(h).includes('تكلفة الوحدة') || String(h).toLowerCase().includes('unit cost'));
 
@@ -272,31 +270,22 @@ export const OpeningStockBalances: React.FC = () => {
           if (!row || row.length === 0) continue;
 
           const pCode = String(row[codeIdx] || '').trim();
-          const pName = nameIdx !== -1 ? String(row[nameIdx] || '').trim() : '';
           const wCode = String(row[whIdx] || '').trim();
-          const wName = whNameIdx !== -1 ? String(row[whNameIdx] || '').trim() : '';
           const qtyVal = parseFloat(row[qtyIdx] || '0');
           const costVal = parseFloat(row[costIdx] || '0');
 
-          if (!pCode && !pName) continue; // Skip blank lines
+          if (!pCode) continue; // Skip blank lines
 
-          let prod = products.find(p => p.code === pCode);
-          if (!prod && pName) {
-            prod = products.find(p => p.name.trim().toLowerCase() === pName.toLowerCase());
-          }
-
-          let wh = wName ? warehouses.find(w => w.name.trim().toLowerCase() === wName.toLowerCase()) : undefined;
-          if (!wh && wCode) {
-            wh = warehouses.find(w => w.code === wCode);
-          }
+          const prod = products.find(p => p.code === pCode);
+          const wh = warehouses.find(w => w.code === wCode);
 
           if (!prod) {
-            warnings.push(language === 'ar' ? `الصنف "${pCode || pName}" غير موجود` : `Product "${pCode || pName}" not found`);
+            warnings.push(language === 'ar' ? `رمز الصنف "${pCode}" غير موجود` : `Product code "${pCode}" not found`);
             continue;
           }
 
           if (!wh) {
-            warnings.push(language === 'ar' ? `المستودع "${wCode || wName}" غير موجود` : `Warehouse "${wCode || wName}" not found`);
+            warnings.push(language === 'ar' ? `رمز المستودع "${wCode}" غير موجود` : `Warehouse code "${wCode}" not found`);
             continue;
           }
 
