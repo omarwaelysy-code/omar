@@ -177,5 +177,12 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'id', 'company_id', 'employee_code', 'name', 'nationality', 'national_id', 'gender',
     'marital_status', 'birth_date', 'hire_date', 'contract_type', 'contract_expiry_date',
     'photo_url', 'documents', 'created_by', 'created_at', 'job_title', 'manager_id', 'department_id'
+  ],
+  warehouse_transfers: [
+    'id', 'company_id', 'transfer_number', 'from_warehouse_id', 'to_warehouse_id',
+    'from_warehouse_name', 'to_warehouse_name', 'date', 'description', 'created_by', 'created_at'
+  ],
+  warehouse_transfer_items: [
+    'id', 'transfer_id', 'product_id', 'product_name', 'product_code', 'quantity', 'unit_cost', 'total_cost', 'company_id', 'created_at'
   ]
 };

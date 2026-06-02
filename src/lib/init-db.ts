@@ -537,6 +537,37 @@ export async function initDatabase() {
     `, 'invoice_items table');
 
     await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "warehouse_transfers" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id") ON DELETE CASCADE,
+        "transfer_number" VARCHAR(50) NOT NULL,
+        "from_warehouse_id" VARCHAR(36) REFERENCES "warehouses"("id"),
+        "to_warehouse_id" VARCHAR(36) REFERENCES "warehouses"("id"),
+        "from_warehouse_name" VARCHAR(255),
+        "to_warehouse_name" VARCHAR(255),
+        "date" DATE NOT NULL,
+        "description" TEXT,
+        "created_by" VARCHAR(36),
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'warehouse_transfers table');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "warehouse_transfer_items" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "transfer_id" VARCHAR(36) REFERENCES "warehouse_transfers"("id") ON DELETE CASCADE,
+        "product_id" VARCHAR(36) REFERENCES "products"("id"),
+        "product_name" VARCHAR(255),
+        "product_code" VARCHAR(100),
+        "quantity" DECIMAL(18, 4) NOT NULL,
+        "unit_cost" DECIMAL(18, 4) DEFAULT 0,
+        "total_cost" DECIMAL(18, 4) DEFAULT 0,
+        "company_id" VARCHAR(36),
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'warehouse_transfer_items table');
+
+    await safeQuery(`
       CREATE TABLE IF NOT EXISTS "inventory_movements" (
         "id" VARCHAR(36) PRIMARY KEY,
         "company_id" VARCHAR(36) REFERENCES "companies"("id"),

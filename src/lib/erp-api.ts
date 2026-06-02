@@ -11,7 +11,7 @@ import path from 'path';
 import * as XLSX from 'xlsx';
 import multer from 'multer';
 import { syncCOGSForJournalEntry } from './sync-cogs';
-import { recordPurchase, recordSale, recordSalesReturn, recordPurchaseReturn, recalculateProductStock, reverseAndRecalculate } from './cost-engine';
+import { recordPurchase, recordSale, recordSalesReturn, recordPurchaseReturn, recalculateProductStock, reverseAndRecalculate, recordTransfer } from './cost-engine';
 
 export async function syncProductsCostAndJEs(client: any, companyId: string, productIds: string[]) {
   if (!productIds || productIds.length === 0) return;
@@ -676,7 +676,8 @@ const modules = [
   'system_config', 'audit_logs', 'operation_categories', 'operations', 'operation_fields',
   'departments', 'cost_centers', 'operation_field_values', 'field_operation_categories',
   'currencies', 'exchange_rates', 'inventory_movements', 'inventory_layers',
-  'sales_orders', 'sales_order_items', 'purchase_orders', 'purchase_order_items', 'employees'
+  'sales_orders', 'sales_order_items', 'purchase_orders', 'purchase_order_items', 'employees',
+  'warehouse_transfers', 'warehouse_transfer_items'
 ];
 
 // --- Flexible Operations Logic ---
@@ -749,7 +750,7 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
   }
 });
 
-const transactionalModules = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns', 'journal_entries', 'sales_orders', 'purchase_orders'];
+const transactionalModules = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns', 'journal_entries', 'sales_orders', 'purchase_orders', 'warehouse_transfers'];
 
 // Helper to validate ID format (simplified to check string)
 function isUUID(id: any): boolean {
@@ -844,6 +845,7 @@ export async function generateNextSequence(client: any, companyId: string, modul
     case 'sales_orders': numField = 'order_number'; prefix = 'SO'; break;
     case 'purchase_orders': numField = 'order_number'; prefix = 'PO'; break;
     case 'employees': numField = 'employee_code'; prefix = 'EMP'; break;
+    case 'warehouse_transfers': numField = 'transfer_number'; prefix = 'TR'; break;
   }
 
   if (moduleName === 'employees') {
@@ -1180,6 +1182,9 @@ modules.forEach(moduleName => {
     } else if (module === 'purchase_orders') {
       itemsTable = 'purchase_order_items';
       foreignKey = 'order_id';
+    } else if (module === 'warehouse_transfers') {
+      itemsTable = 'warehouse_transfer_items';
+      foreignKey = 'transfer_id';
     }
 
     if (itemsTable) {
@@ -3221,13 +3226,224 @@ router.put('/purchase_orders/:id', authenticateToken, async (req: AuthRequest, r
   }
 });
 
+router.post('/warehouse_transfers', authenticateToken, async (req: AuthRequest, res) => {
+  const client = await pool.connect();
+  try {
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
+    const { items, ...rawTransferData } = req.body;
+    
+    if (!rawTransferData.from_warehouse_id) return sendError(res, 400, 'from_warehouse_id is required');
+    if (!rawTransferData.to_warehouse_id) return sendError(res, 400, 'to_warehouse_id is required');
+    if (!rawTransferData.date) return sendError(res, 400, 'date is required');
+
+    await client.query('BEGIN');
+
+    const transferData = sanitizeData('warehouse_transfers', rawTransferData);
+    if (!transferData.company_id) transferData.company_id = companyId;
+    const transferId = transferData.id || uuidv4();
+    transferData.id = transferId;
+    
+    if (!transferData.transfer_number) {
+      transferData.transfer_number = await generateNextSequence(client, companyId, 'warehouse_transfers', transferData.date);
+    }
+
+    const whRes = await client.query('SELECT id, name FROM warehouses WHERE id IN ($1, $2)', [transferData.from_warehouse_id, transferData.to_warehouse_id]);
+    const warehouses = whRes.rows;
+    const fromWh = warehouses.find(w => w.id === transferData.from_warehouse_id);
+    const toWh = warehouses.find(w => w.id === transferData.to_warehouse_id);
+    transferData.from_warehouse_name = fromWh?.name || '';
+    transferData.to_warehouse_name = toWh?.name || '';
+
+    const keys = Object.keys(transferData);
+    const values = Object.values(transferData);
+    const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+    await client.query(
+      `INSERT INTO "warehouse_transfers" ("${keys.join('", "')}") VALUES (${placeholders})`,
+      values
+    );
+
+    for (const item of (items || [])) {
+      const sanitizedItem = sanitizeData('warehouse_transfer_items', item);
+      const itemId = uuidv4();
+      const itemData = {
+        ...sanitizedItem,
+        id: itemId,
+        transfer_id: transferId,
+        company_id: companyId
+      };
+
+      const prodRes = await client.query('SELECT name, code, cost_price, weighted_average_cost FROM products WHERE id = $1', [item.product_id]);
+      if (prodRes.rows.length === 0) {
+        throw new Error(`Product not found: ${item.product_id}`);
+      }
+      const prod = prodRes.rows[0];
+      itemData.product_name = prod.name;
+      itemData.product_code = prod.code;
+
+      const currentCost = parseFloat(prod.weighted_average_cost || '0') || parseFloat(prod.cost_price || '0') || 0;
+      itemData.unit_cost = currentCost;
+      itemData.total_cost = parseFloat(item.quantity || '0') * currentCost;
+
+      const itemKeys = Object.keys(itemData);
+      const itemValues = Object.values(itemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+      await client.query(
+        `INSERT INTO "warehouse_transfer_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
+        itemValues
+      );
+
+      const quantity = parseFloat(item.quantity || '0');
+      if (quantity > 0) {
+        await recordTransfer(
+          client,
+          companyId,
+          transferData.from_warehouse_id,
+          transferData.to_warehouse_id,
+          item.product_id,
+          quantity,
+          transferId,
+          transferData.transfer_number,
+          transferData.date
+        );
+      }
+    }
+
+    logAudit({
+      company_id: companyId,
+      user_id: req.user?.id,
+      username: (req.user as any)?.username || req.user?.email,
+      user_email: req.user?.email,
+      action: 'CREATE',
+      module: 'WAREHOUSE_TRANSFERS',
+      details: `Created warehouse transfer: ${transferData.transfer_number} from ${transferData.from_warehouse_name} to ${transferData.to_warehouse_name}`,
+      entity_type: 'warehouse_transfers',
+      entity_id: transferId,
+      ip_address: getIp(req),
+      metadata: transferData
+    });
+
+    await client.query('COMMIT');
+    res.status(201).json({ id: transferId, transfer_number: transferData.transfer_number });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Error creating warehouse transfer:', error);
+    sendError(res, 500, `Failed to create warehouse transfer. ${error.message}`, error.message);
+  } finally {
+    client.release();
+  }
+});
+
+router.put('/warehouse_transfers/:id', authenticateToken, async (req: AuthRequest, res) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
+    const { items, ...rawTransferData } = req.body;
+
+    await client.query('BEGIN');
+
+    await reverseAndRecalculate(client, companyId, id);
+    await client.query('DELETE FROM warehouse_transfer_items WHERE transfer_id = $1', [id]);
+
+    const transferData = sanitizeData('warehouse_transfers', rawTransferData);
+    delete (transferData as any).id;
+    delete (transferData as any).company_id;
+
+    const whRes = await client.query('SELECT id, name FROM warehouses WHERE id IN ($1, $2)', [transferData.from_warehouse_id, transferData.to_warehouse_id]);
+    const warehouses = whRes.rows;
+    const fromWh = warehouses.find(w => w.id === transferData.from_warehouse_id);
+    const toWh = warehouses.find(w => w.id === transferData.to_warehouse_id);
+    transferData.from_warehouse_name = fromWh?.name || '';
+    transferData.to_warehouse_name = toWh?.name || '';
+
+    const keys = Object.keys(transferData);
+    const values = Object.values(transferData);
+    const setClause = keys.map((key, i) => `"${key}" = $${i + 1}`).join(', ');
+    await client.query(
+      `UPDATE "warehouse_transfers" SET ${setClause} WHERE id = $${keys.length + 1} AND company_id = $${keys.length + 2}`,
+      [...values, id, companyId]
+    );
+
+    for (const item of (items || [])) {
+      const sanitizedItem = sanitizeData('warehouse_transfer_items', item);
+      const itemId = uuidv4();
+      const itemData = {
+        ...sanitizedItem,
+        id: itemId,
+        transfer_id: id,
+        company_id: companyId
+      };
+
+      const prodRes = await client.query('SELECT name, code, cost_price, weighted_average_cost FROM products WHERE id = $1', [item.product_id]);
+      if (prodRes.rows.length === 0) throw new Error(`Product not found: ${item.product_id}`);
+      const prod = prodRes.rows[0];
+      itemData.product_name = prod.name;
+      itemData.product_code = prod.code;
+
+      const currentCost = parseFloat(prod.weighted_average_cost || '0') || parseFloat(prod.cost_price || '0') || 0;
+      itemData.unit_cost = currentCost;
+      itemData.total_cost = parseFloat(item.quantity || '0') * currentCost;
+
+      const itemKeys = Object.keys(itemData);
+      const itemValues = Object.values(itemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+      await client.query(
+        `INSERT INTO "warehouse_transfer_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
+        itemValues
+      );
+
+      const quantity = parseFloat(item.quantity || '0');
+      if (quantity > 0) {
+        await recordTransfer(
+          client,
+          companyId,
+          transferData.from_warehouse_id,
+          transferData.to_warehouse_id,
+          item.product_id,
+          quantity,
+          id,
+          rawTransferData.transfer_number,
+          transferData.date
+        );
+      }
+    }
+
+    logAudit({
+      company_id: companyId,
+      user_id: req.user?.id,
+      username: (req.user as any)?.username || req.user?.email,
+      user_email: req.user?.email,
+      action: 'UPDATE',
+      module: 'WAREHOUSE_TRANSFERS',
+      details: `Updated warehouse transfer: ${rawTransferData.transfer_number}`,
+      entity_type: 'warehouse_transfers',
+      entity_id: id,
+      ip_address: getIp(req),
+      metadata: transferData
+    });
+
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Error updating warehouse transfer:', error);
+    sendError(res, 500, `Failed to update warehouse transfer. ${error.message}`, error.message);
+  } finally {
+    client.release();
+  }
+});
+
 router.get('/inventory/debug_moves', async (req, res) => {
   const client = await pool.connect();
   try {
     const { rows } = await client.query(`
       SELECT reference_number, date::text as date, created_at, movement_type, quantity, unit_cost, total_cost 
       FROM inventory_movements 
-      WHERE movement_type IN ('sale', 'purchase', 'sales_return', 'purchase_return', 'adjustment')
+      WHERE movement_type IN ('sale', 'purchase', 'sales_return', 'purchase_return', 'adjustment', 'transfer_out', 'transfer_in')
       ORDER BY date ASC, CASE WHEN quantity > 0 THEN 0 ELSE 1 END ASC, created_at ASC
       LIMIT 100
     `);

@@ -233,7 +233,7 @@ export interface Product {
   id: string;
   code: string;
   name: string;
-  type: 'service' | 'finished_good' | 'raw_material' | 'commodity';
+  type: 'service' | 'finished_good' | 'raw_material' | 'commodity' | 'consumable';
   sale_price: number;
   cost_price: number;
   description?: string;
@@ -733,5 +733,31 @@ export interface Employee {
   job_title?: string;
   manager_id?: string;
   department_id?: string;
+}
+
+export interface WarehouseTransferItem {
+  id?: string;
+  transfer_id?: string;
+  product_id: string;
+  product_name?: string;
+  product_code?: string;
+  quantity: number;
+  unit_cost?: number;
+  total_cost?: number;
+}
+
+export interface WarehouseTransfer {
+  id: string;
+  company_id: string;
+  transfer_number: string;
+  from_warehouse_id: string;
+  to_warehouse_id: string;
+  from_warehouse_name?: string;
+  to_warehouse_name?: string;
+  date: string;
+  description?: string;
+  created_by?: string;
+  created_at?: string;
+  items?: WarehouseTransferItem[];
 }
 

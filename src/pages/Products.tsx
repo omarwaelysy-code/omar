@@ -68,7 +68,7 @@ export const Products: React.FC = () => {
   const [formData, setFormData] = useState({ 
     code: '', 
     name: '', 
-    type: 'finished_good' as 'service' | 'finished_good' | 'raw_material' | 'commodity',
+    type: 'finished_good' as 'service' | 'finished_good' | 'raw_material' | 'commodity' | 'consumable',
     category: '',
     unit: 'قطعة',
     sale_price: 0, 
@@ -122,7 +122,8 @@ export const Products: React.FC = () => {
         'service': 'SRV',
         'finished_good': 'FG',
         'raw_material': 'RM',
-        'commodity': 'CMD'
+        'commodity': 'CMD',
+        'consumable': 'CON'
       };
       
       const prefix = prefixMap[formData.type] || 'PRD';
@@ -262,7 +263,7 @@ export const Products: React.FC = () => {
         return;
       }
 
-      const isPhysicalProduct = ['finished_good', 'raw_material', 'commodity'].includes(formData.type);
+      const isPhysicalProduct = ['finished_good', 'raw_material', 'commodity', 'consumable'].includes(formData.type);
       if (isPhysicalProduct && !formData.inventory_account_id) {
         toast.error(language === 'ar' ? 'الرجاء اختيار حساب المخزون للصنف' : 'Please select the inventory account for the product');
         return;
@@ -807,6 +808,7 @@ export const Products: React.FC = () => {
                                   <option value="service">{t('products.type_service')}</option>
                                   <option value="raw_material">{t('products.type_raw_material')}</option>
                                   <option value="commodity">{t('products.type_commodity')}</option>
+                                  <option value="consumable">{t('products.type_consumable')}</option>
                                 </select>
                               </div>
                            </div>
@@ -1126,7 +1128,7 @@ export const Products: React.FC = () => {
                            </div>
 
                            {/* Inventory Account (Mandatory for finished goods, raw materials, commodity) */}
-                           {['finished_good', 'raw_material', 'commodity'].includes(formData.type) && (
+                           {['finished_good', 'raw_material', 'commodity', 'consumable'].includes(formData.type) && (
                              <>
                                <div className={`space-y-4 ${company?.settings?.inventory_cost_method_level === 'item' ? 'md:col-span-1' : 'md:col-span-2'}`}>
                                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">

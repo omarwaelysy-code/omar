@@ -21,6 +21,7 @@ import { PurchaseReturns } from './pages/PurchaseReturns';
 import { CustomerDiscounts } from './pages/CustomerDiscounts';
 import { SupplierDiscounts } from './pages/SupplierDiscounts';
 import { CashTransfers } from './pages/CashTransfers';
+import { WarehouseTransfers } from './pages/WarehouseTransfers';
 import { Users } from './pages/Users';
 import { CustomerStatement } from './pages/CustomerStatement';
 import { SupplierStatement } from './pages/SupplierStatement';
@@ -177,6 +178,7 @@ export default function App() {
       case 'customer_discounts': return <CustomerDiscounts />;
       case 'supplier_discounts': return <SupplierDiscounts />;
       case 'cash_transfers': return <CashTransfers />;
+      case 'warehouse_transfers': return <WarehouseTransfers />;
       case 'users': return <Users />;
       case 'customer_statement': return <CustomerStatement />;
       case 'supplier_statement': return <SupplierStatement />;

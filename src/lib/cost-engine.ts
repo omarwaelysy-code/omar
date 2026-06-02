@@ -61,7 +61,7 @@ export async function recalculateProductStock(client: PoolClient, companyId: str
   for (const move of movesRes.rows) {
     const origQty = parseFloat(move.quantity || '0');
     const qty = Math.abs(origQty);
-    const isOutflow = ['sale', 'purchase_return'].includes(move.movement_type) || (move.movement_type === 'adjustment' && origQty < 0);
+    const isOutflow = ['sale', 'purchase_return', 'transfer_out'].includes(move.movement_type) || (move.movement_type === 'adjustment' && origQty < 0);
     const movePolicy = move.cost_policy || 'wac';
 
     if (!isOutflow) {
@@ -658,4 +658,91 @@ export async function recordAdjustment(
     totalCost,
     methodUsed: method
   };
+}
+
+export async function recordTransfer(
+  client: PoolClient,
+  companyId: string,
+  fromWarehouseId: string | null,
+  toWarehouseId: string | null,
+  productId: string,
+  quantity: number,
+  referenceId: string,
+  referenceNumber: string,
+  date: string
+) {
+  // 1. Get product's current cost
+  const productRes = await client.query('SELECT cost_price, weighted_average_cost FROM products WHERE id = $1', [productId]);
+  if (productRes.rows.length === 0) throw new Error(`Product not found: ${productId}`);
+  const product = productRes.rows[0];
+  const currentCost = parseFloat(product.weighted_average_cost || '0') || parseFloat(product.cost_price || '0') || 0;
+
+  const method = await getCompanyCostMethod(client, companyId, productId);
+  
+  // 2. Outflow from source warehouse
+  const orderDirection = method === 'lifo' ? 'DESC' : 'ASC';
+  const layersRes = await client.query(
+    `SELECT * FROM inventory_layers 
+     WHERE product_id = $1 AND qty_remaining > 0 
+     ORDER BY purchase_date ${orderDirection}, created_at ${orderDirection}`,
+    [productId]
+  );
+
+  let rem = quantity;
+  let layersCost = 0;
+  for (const layer of layersRes.rows) {
+    if (rem <= 0) break;
+    const layerQty = parseFloat(layer.qty_remaining || '0');
+    const layerCostVal = parseFloat(layer.unit_cost || '0');
+    const take = Math.min(rem, layerQty);
+
+    await client.query(
+      `UPDATE inventory_layers SET qty_remaining = qty_remaining - $1 WHERE id = $2`,
+      [take, layer.id]
+    );
+
+    layersCost += take * layerCostVal;
+    rem -= take;
+  }
+
+  if (rem > 0) {
+    layersCost += rem * currentCost;
+  }
+
+  let unitCost = currentCost;
+  let totalCost = 0;
+  if (method === 'wac') {
+    unitCost = currentCost;
+    totalCost = quantity * currentCost;
+  } else {
+    totalCost = layersCost;
+    unitCost = quantity > 0 ? totalCost / quantity : currentCost;
+  }
+
+  // Insert Outflow Movement
+  const outMovementId = uuidv4();
+  await client.query(
+    `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at, warehouse_id, cost_policy)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12, $13)`,
+    [outMovementId, companyId, productId, 'transfer_out', referenceId, 'warehouse_transfer', referenceNumber, date, -quantity, unitCost, -totalCost, fromWarehouseId, method]
+  );
+
+  // 3. Inflow to destination warehouse
+  const layerId = uuidv4();
+  await client.query(
+    `INSERT INTO inventory_layers (id, company_id, product_id, purchase_date, original_qty, qty_remaining, unit_cost, reference_type, reference_id, created_at, warehouse_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)`,
+    [layerId, companyId, productId, date, quantity, quantity, unitCost, 'warehouse_transfer', referenceId, toWarehouseId]
+  );
+
+  const inMovementId = uuidv4();
+  await client.query(
+    `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at, warehouse_id, cost_policy)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12, $13)`,
+    [inMovementId, companyId, productId, 'transfer_in', referenceId, 'warehouse_transfer', referenceNumber, date, quantity, unitCost, totalCost, toWarehouseId, method]
+  );
+
+  await recalculateProductStock(client, companyId, productId);
+
+  return { unitCost, totalCost };
 }
