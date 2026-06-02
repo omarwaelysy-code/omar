@@ -207,7 +207,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'customers', label: t('nav.customers'), icon: UsersIcon },
           { id: 'employees', label: t('nav.employees') || 'الموظفين', icon: UsersIcon },
           { id: 'suppliers', label: t('nav.suppliers'), icon: Truck },
-          { id: 'item_groups', label: t('nav.item_groups'), icon: Folder },
           { id: 'expenses', label: t('nav.expenses'), icon: Wallet },
           { id: 'payment_methods', label: t('nav.payment_methods'), icon: CreditCard },
           { id: 'discount_settings', label: t('nav.discount_settings'), icon: Settings },
@@ -219,6 +218,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         icon: Home,
         subItems: [
           { id: 'products', label: t('nav.products'), icon: Package },
+          { id: 'item_groups', label: t('nav.item_groups'), icon: Folder },
           { id: 'warehouses', label: t('nav.warehouses'), icon: Home },
           { id: 'warehouse_transfers', label: t('nav.warehouse_transfers') || 'تحويل بين المخازن', icon: ArrowLeftRight },
           { id: 'stock_card_report', label: t('nav.stock_card_report'), icon: History }
