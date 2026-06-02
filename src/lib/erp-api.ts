@@ -3456,6 +3456,12 @@ router.get('/inventory/debug_moves', async (req, res) => {
       LIMIT 100
     `);
     res.json(rows);
+  } catch (error: any) {
+    console.error('Error fetching debug moves:', error);
+    sendError(res, 500, error.message);
+  } finally {
+    client.release();
+  }
 });
 
 // ==========================================
