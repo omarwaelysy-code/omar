@@ -312,6 +312,7 @@ export const OpeningStockBalances: React.FC = () => {
 
         if (importedItems.length > 0) {
           setItems(importedItems);
+          setIsModalOpen(true);
           showNotification(
             language === 'ar'
               ? `تم استيراد عدد ${importedItems.length} أصناف من إكسيل بنجاح`
