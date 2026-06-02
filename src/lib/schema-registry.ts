@@ -176,6 +176,6 @@ export const EXPECTED_SCHEMA: TableSchema = {
   employees: [
     'id', 'company_id', 'employee_code', 'name', 'nationality', 'national_id', 'gender',
     'marital_status', 'birth_date', 'hire_date', 'contract_type', 'contract_expiry_date',
-    'photo_url', 'documents', 'created_by', 'created_at'
+    'photo_url', 'documents', 'created_by', 'created_at', 'job_title', 'manager_id', 'department_id'
   ]
 };

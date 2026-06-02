@@ -730,5 +730,8 @@ export interface Employee {
   documents?: string | EmployeeDocument[];
   created_by?: string;
   created_at?: string;
+  job_title?: string;
+  manager_id?: string;
+  department_id?: string;
 }
 

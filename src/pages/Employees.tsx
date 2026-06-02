@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Employee, EmployeeDocument } from '../types';
+import { Employee, EmployeeDocument, Department } from '../types';
 import { 
   Search, Plus, Edit2, Trash2, X, History, FileText, User, 
   Hash, Calendar, Lock, LayoutGrid, List, ChevronRight, ChevronLeft, 
@@ -50,6 +50,7 @@ export const Employees: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [view, setView] = useViewPreference('employees', 'table');
+  const [departments, setDepartments] = useState<Department[]>([]);
 
   // Filters State
   const [filterGender, setFilterGender] = useState<string>('');
@@ -87,6 +88,9 @@ export const Employees: React.FC = () => {
     hire_date: new Date().toISOString().slice(0, 10),
     contract_type: 'permanent' as 'permanent' | 'temporary',
     contract_expiry_date: '',
+    job_title: '',
+    manager_id: '',
+    department_id: '',
   });
 
   // Subscribe to updates
@@ -97,6 +101,15 @@ export const Employees: React.FC = () => {
         setLoading(false);
       });
       return () => unsubscribe();
+    }
+  }, [user]);
+
+  // Fetch departments list
+  useEffect(() => {
+    if (user) {
+      dbService.list<Department>('departments', user.company_id)
+        .then(setDepartments)
+        .catch(err => console.error('Failed to fetch departments:', err));
     }
   }, [user]);
 
@@ -153,6 +166,9 @@ export const Employees: React.FC = () => {
           hire_date: fullData.hire_date ? fullData.hire_date.slice(0, 10) : new Date().toISOString().slice(0, 10),
           contract_type: (fullData.contract_type as any) || 'permanent',
           contract_expiry_date: fullData.contract_expiry_date ? fullData.contract_expiry_date.slice(0, 10) : '',
+          job_title: fullData.job_title || '',
+          manager_id: fullData.manager_id || '',
+          department_id: fullData.department_id || '',
         });
         setPhotoBase64(fullData.photo_url || '');
         
@@ -169,6 +185,10 @@ export const Employees: React.FC = () => {
         return;
       }
     } else {
+      // Find the latest created employee
+      const sortedEmps = [...employees].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+      const lastEmpId = sortedEmps.length > 0 ? sortedEmps[0].id : '';
+
       setEditingEmployee(null);
       setFormData({
         name: '',
@@ -180,6 +200,9 @@ export const Employees: React.FC = () => {
         hire_date: new Date().toISOString().slice(0, 10),
         contract_type: 'permanent',
         contract_expiry_date: '',
+        job_title: '',
+        manager_id: lastEmpId,
+        department_id: '',
       });
       setPhotoBase64('');
       setAttachedDocs([]);
@@ -295,7 +318,10 @@ export const Employees: React.FC = () => {
       contract_expiry_date: formData.contract_expiry_date || null,
       photo_url: photoBase64,
       documents: JSON.stringify(attachedDocs),
-      company_id: user.company_id
+      company_id: user.company_id,
+      job_title: formData.job_title || null,
+      manager_id: formData.manager_id || null,
+      department_id: formData.department_id || null,
     };
 
     try {
@@ -306,7 +332,10 @@ export const Employees: React.FC = () => {
           { field: 'national_id', label: t('employees.form_national_id') },
           { field: 'gender', label: t('employees.form_gender') },
           { field: 'marital_status', label: t('employees.form_marital_status') },
-          { field: 'contract_type', label: t('employees.form_contract_type') }
+          { field: 'contract_type', label: t('employees.form_contract_type') },
+          { field: 'job_title', label: language === 'ar' ? 'الوظيفة' : 'Job Title' },
+          { field: 'manager_id', label: language === 'ar' ? 'المدير' : 'Manager' },
+          { field: 'department_id', label: language === 'ar' ? 'الإدارة' : 'Department' }
         ];
 
         await dbService.updateWithLog(
@@ -373,6 +402,9 @@ export const Employees: React.FC = () => {
     const nat = COUNTRIES.find(c => c.code === viewingEmployee.nationality);
     const natText = language === 'ar' ? nat?.name_ar : nat?.name_en;
     
+    const printManager = employees.find(e => e.id === viewingEmployee.manager_id);
+    const printDept = departments.find(d => d.id === viewingEmployee.department_id);
+
     const docHtml = `
       <html>
         <head>
@@ -414,6 +446,9 @@ export const Employees: React.FC = () => {
             <div class="info-box"><label>${t('employees.form_hire_date')}</label><span>${viewingEmployee.hire_date ? new Date(viewingEmployee.hire_date).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US') : '-'}</span></div>
             <div class="info-box"><label>${t('employees.form_contract_type')}</label><span>${viewingEmployee.contract_type === 'permanent' ? t('employees.contract_permanent') : t('employees.contract_temporary')}</span></div>
             ${viewingEmployee.contract_type === 'temporary' ? `<div class="info-box"><label>${t('employees.form_contract_expiry_date')}</label><span>${viewingEmployee.contract_expiry_date ? new Date(viewingEmployee.contract_expiry_date).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US') : '-'}</span></div>` : ''}
+            <div class="info-box"><label>${language === 'ar' ? 'الوظيفة' : 'Job Title'}</label><span>${viewingEmployee.job_title || '-'}</span></div>
+            <div class="info-box"><label>${language === 'ar' ? 'المدير' : 'Manager'}</label><span>${printManager ? printManager.name : '-'}</span></div>
+            <div class="info-box"><label>${language === 'ar' ? 'الإدارة' : 'Department'}</label><span>${printDept ? printDept.name : '-'}</span></div>
           </div>
         </body>
       </html>
@@ -574,6 +609,8 @@ export const Employees: React.FC = () => {
                           <tr className="text-slate-500 text-[10px] uppercase font-black tracking-[0.2em]">
                             <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_code')}</th>
                             <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_name')}</th>
+                            <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الوظيفة' : 'Job Title'}</th>
+                            <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الإدارة' : 'Department'}</th>
                             <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_nationality')}</th>
                             <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_national_id')}</th>
                             <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_contract_type')}</th>
@@ -605,6 +642,14 @@ export const Employees: React.FC = () => {
                                     )}
                                     <span className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors">{emp.name}</span>
                                   </div>
+                                </td>
+                                <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  <span className="text-sm font-bold text-slate-700">{emp.job_title || '-'}</span>
+                                </td>
+                                <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  <span className="text-sm font-bold text-slate-700">
+                                    {departments.find(d => d.id === emp.department_id)?.name || '-'}
+                                  </span>
                                 </td>
                                 <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                                   <span className="text-sm font-bold">
@@ -674,6 +719,10 @@ export const Employees: React.FC = () => {
                                 )}
                                 <div>
                                   <h4 className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors text-lg leading-tight">{emp.name}</h4>
+                                  <p className="text-xs text-slate-500 font-bold mt-1">
+                                    {emp.job_title ? `${emp.job_title} | ` : ''}
+                                    {departments.find(d => d.id === emp.department_id)?.name || ''}
+                                  </p>
                                   <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded text-slate-400 font-black border border-slate-200 inline-block mt-1">
                                     {emp.employee_code}
                                   </span>
@@ -940,6 +989,56 @@ export const Employees: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Job Title */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'الوظيفة' : 'Job Title'}</label>
+                    <input
+                      type="text"
+                      placeholder={language === 'ar' ? 'أدخل الوظيفة' : 'Enter Job Title'}
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-sm rounded-2xl"
+                      value={formData.job_title}
+                      onChange={(e) => setFormData({ ...formData, job_title: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Manager */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'المدير' : 'Manager'}</label>
+                    <div className="relative">
+                      <select
+                        className="w-full py-3 px-4 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm"
+                        value={formData.manager_id}
+                        onChange={(e) => setFormData({ ...formData, manager_id: e.target.value })}
+                      >
+                        <option value="">{language === 'ar' ? 'اختر المدير' : 'Select Manager'}</option>
+                        {employees
+                          .filter(emp => !editingEmployee || emp.id !== editingEmployee.id)
+                          .map(emp => (
+                            <option key={emp.id} value={emp.id}>{emp.name} ({emp.employee_code})</option>
+                          ))}
+                      </select>
+                      <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                    </div>
+                  </div>
+
+                  {/* Department */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'الإدارة' : 'Department'}</label>
+                    <div className="relative">
+                      <select
+                        className="w-full py-3 px-4 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm"
+                        value={formData.department_id}
+                        onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
+                      >
+                        <option value="">{language === 'ar' ? 'اختر الإدارة' : 'Select Department'}</option>
+                        {departments.map(dept => (
+                          <option key={dept.id} value={dept.id}>{dept.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                    </div>
+                  </div>
+
                   {/* Contract Expiry Date (Only if temporary) */}
                   {formData.contract_type === 'temporary' && (
                     <div className="sm:col-span-2 lg:col-span-3 animate-in slide-in-from-top duration-300">
@@ -1136,6 +1235,22 @@ export const Employees: React.FC = () => {
                         {viewingEmployee.contract_type === 'permanent' ? t('employees.contract_permanent') : t('employees.contract_temporary')}
                       </span>
                     </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">{language === 'ar' ? 'الوظيفة' : 'Job Title'}</span>
+                      <span className="font-bold text-slate-900">{viewingEmployee.job_title || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">{language === 'ar' ? 'المدير' : 'Manager'}</span>
+                      <span className="font-bold text-slate-900">
+                        {employees.find(e => e.id === viewingEmployee.manager_id)?.name || '-'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">{language === 'ar' ? 'الإدارة' : 'Department'}</span>
+                      <span className="font-bold text-slate-900">
+                        {departments.find(d => d.id === viewingEmployee.department_id)?.name || '-'}
+                      </span>
+                    </div>
                     {viewingEmployee.contract_type === 'temporary' && (
                       <div>
                         <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">{t('employees.form_contract_expiry_date')}</span>
@@ -1187,269 +1302,7 @@ export const Employees: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Delete Confirmation Modal */}
-      <AnimatePresence>
-        {isDeleteModalOpen && (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-            <motion.div 
-              initial={{ x: dir === 'rtl' ? -600 : 600 }}
-              animate={{ x: 0 }}
-              exit={{ x: dir === 'rtl' ? -600 : 600 }}
-              transition={{ type: 'spring', damping: 30 }}
-              className="w-full max-w-2xl bg-white h-full shadow-2xl relative z-10 flex flex-col"
-            >
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-20">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                     <User size={24} />
-                  </div>
-                  <div>
-                     <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-none mb-1">
-                       {editingEmployee ? t('employees.edit') : t('employees.add_new')}
-                     </h3>
-                     <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">{t('employees.subtitle')}</p>
-                  </div>
-                </div>
-                <button onClick={closeModal} className="text-slate-300 hover:text-slate-900 p-2.5 hover:bg-slate-50 rounded-full transition-all">
-                  <X size={20} />
-                </button>
-              </div>
 
-              {/* Form Content */}
-              <div className="flex-grow overflow-y-auto custom-scrollbar p-8">
-                <form onSubmit={handleSubmit} className="space-y-8">
-                  {/* Photo upload section */}
-                  <div className="flex flex-col items-center">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block self-start px-1">{t('employees.form_photo')}</span>
-                    <div 
-                      onClick={() => fileInputRef.current?.click()}
-                      className="relative w-32 h-32 rounded-3xl border-2 border-dashed border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/10 cursor-pointer transition-all flex flex-col items-center justify-center overflow-hidden group shadow-sm"
-                    >
-                      {photoBase64 ? (
-                        <>
-                          <img src={photoBase64} alt="" className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold transition-opacity">
-                            {language === 'ar' ? 'تغيير الصورة' : 'Change Photo'}
-                          </div>
-                        </>
-                      ) : (
-                        <div className="flex flex-col items-center text-slate-400 gap-1.5 p-4 text-center">
-                          {uploadingPhoto ? (
-                            <RefreshCw size={24} className="animate-spin text-emerald-600" />
-                          ) : (
-                            <>
-                              <Upload size={24} />
-                              <span className="text-[10px] font-bold leading-tight">{t('employees.drop_photo_here')}</span>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <input 
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handlePhotoUpload}
-                      accept="image/*"
-                      className="hidden"
-                    />
-                  </div>
-
-                  {/* Form fields Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Name */}
-                    <div className="md:col-span-2">
-                      <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1">{t('employees.form_name')}</label>
-                      <input
-                        required
-                        type="text"
-                        placeholder="John Doe"
-                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold text-slate-800 outline-none focus:border-emerald-500 transition-all shadow-sm"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      />
-                    </div>
-
-                    {/* Employee Code (Read-only if editing) */}
-                    {editingEmployee && (
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1">{t('employees.column_code')}</label>
-                        <input
-                          readOnly
-                          type="text"
-                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-mono font-bold text-slate-400 cursor-not-allowed outline-none"
-                          value={editingEmployee.employee_code}
-                        />
-                      </div>
-                    )}
-
-                    {/* Nationality */}
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1">{t('employees.form_nationality')}</label>
-                      <select
-                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold text-slate-800 outline-none focus:border-emerald-500 transition-all shadow-sm"
-                        value={formData.nationality}
-                        onChange={(e) => setFormData({ ...formData, nationality: e.target.value })}
-                      >
-                        {COUNTRIES.map(c => (
-                          <option key={c.code} value={c.code}>{c.flag} {language === 'ar' ? c.name_ar : c.name_en}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* National ID */}
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1">{t('employees.form_national_id')}</label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold text-slate-800 outline-none focus:border-emerald-500 transition-all shadow-sm font-mono"
-                        value={formData.national_id}
-                        onChange={(e) => setFormData({ ...formData, national_id: e.target.value })}
-                      />
-                    </div>
-
-                    {/* Gender */}
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1">{t('employees.form_gender')}</label>
-                      <select
-                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold text-slate-800 outline-none focus:border-emerald-500 transition-all shadow-sm"
-                        value={formData.gender}
-                        onChange={(e) => setFormData({ ...formData, gender: e.target.value as any })}
-                      >
-                        <option value="male">{t('employees.gender_male')}</option>
-                        <option value="female">{t('employees.gender_female')}</option>
-                      </select>
-                    </div>
-
-                    {/* Marital Status */}
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1">{t('employees.form_marital_status')}</label>
-                      <select
-                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold text-slate-800 outline-none focus:border-emerald-500 transition-all shadow-sm"
-                        value={formData.marital_status}
-                        onChange={(e) => setFormData({ ...formData, marital_status: e.target.value as any })}
-                      >
-                        <option value="single">{t('employees.marital_single')}</option>
-                        <option value="married">{t('employees.marital_married')}</option>
-                      </select>
-                    </div>
-
-                    {/* Date of Birth */}
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1">{t('employees.form_birth_date')}</label>
-                      <input
-                        type="date"
-                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold text-slate-800 outline-none focus:border-emerald-500 transition-all shadow-sm"
-                        value={formData.birth_date}
-                        onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
-                      />
-                    </div>
-
-                    {/* Hire Date */}
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1">{t('employees.form_hire_date')}</label>
-                      <input
-                        type="date"
-                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold text-slate-800 outline-none focus:border-emerald-500 transition-all shadow-sm"
-                        value={formData.hire_date}
-                        onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
-                      />
-                    </div>
-
-                    {/* Contract Type */}
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1">{t('employees.form_contract_type')}</label>
-                      <select
-                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold text-slate-800 outline-none focus:border-emerald-500 transition-all shadow-sm"
-                        value={formData.contract_type}
-                        onChange={(e) => setFormData({ ...formData, contract_type: e.target.value as any })}
-                      >
-                        <option value="permanent">{t('employees.contract_permanent')}</option>
-                        <option value="temporary">{t('employees.contract_temporary')}</option>
-                      </select>
-                    </div>
-
-                    {/* Contract Expiry Date (Only if temporary) */}
-                    {formData.contract_type === 'temporary' && (
-                      <div className="animate-in slide-in-from-top duration-300">
-                        <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest px-1 text-rose-600">{t('employees.form_contract_expiry_date')}</label>
-                        <input
-                          required
-                          type="date"
-                          className="w-full px-4 py-3 bg-white border border-rose-200 focus:border-rose-500 rounded-2xl font-bold text-slate-800 outline-none transition-all shadow-sm"
-                          value={formData.contract_expiry_date}
-                          onChange={(e) => setFormData({ ...formData, contract_expiry_date: e.target.value })}
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Documents Attachment area */}
-                  <div className="space-y-4 pt-4 border-t border-slate-100">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">{t('employees.form_documents')}</span>
-                    
-                    <div 
-                      onClick={() => docInputRef.current?.click()}
-                      className="border-2 border-dashed border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/10 cursor-pointer rounded-2xl p-6 text-center transition-all flex flex-col items-center justify-center gap-2 group"
-                    >
-                      {uploadingDoc ? (
-                        <RefreshCw size={24} className="animate-spin text-emerald-600" />
-                      ) : (
-                        <>
-                          <Upload size={24} className="text-slate-400 group-hover:text-emerald-600" />
-                          <span className="text-xs font-bold text-slate-500">{t('employees.drop_docs_here')}</span>
-                        </>
-                      )}
-                    </div>
-                    <input 
-                      type="file"
-                      ref={docInputRef}
-                      onChange={handleDocUpload}
-                      multiple
-                      className="hidden"
-                    />
-
-                    {/* List of uploaded documents in Form */}
-                    <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
-                      {attachedDocs.map((doc, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-100 rounded-xl">
-                          <div className="flex items-center gap-2 truncate">
-                            <File size={16} className="text-slate-400 flex-shrink-0" />
-                            <span className="text-xs font-bold text-slate-700 truncate" title={doc.name}>{doc.name}</span>
-                          </div>
-                          <button 
-                            type="button"
-                            onClick={() => handleRemoveDoc(idx)}
-                            className="p-1 text-slate-400 hover:text-rose-500 rounded-lg"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Submit buttons */}
-                  <div className="pt-6 border-t border-slate-100 flex gap-3 justify-end sticky bottom-0 bg-white pb-4">
-                    <button
-                      type="button"
-                      onClick={closeModal}
-                      className="px-6 py-3 border border-slate-200 text-slate-600 rounded-2xl font-bold hover:bg-slate-50"
-                    >
-                      {t('common.cancel')}
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold shadow-lg shadow-emerald-500/20 active:scale-95"
-                    >
-                      {t('common.save')}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
