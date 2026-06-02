@@ -657,10 +657,9 @@ export const OpeningStockBalances: React.FC = () => {
           <PaginationControls
             page={page}
             limit={limit}
-            totalRecords={totalRecords}
+            total={totalRecords}
             onPageChange={setPage}
             onLimitChange={(l) => { setLimit(l); setPage(1); }}
-            language={language}
           />
         </div>
       )}
