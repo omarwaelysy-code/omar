@@ -6,7 +6,8 @@ import { Employee, EmployeeDocument } from '../types';
 import { 
   Search, Plus, Edit2, Trash2, X, History, FileText, User, 
   Hash, Calendar, Lock, LayoutGrid, List, ChevronRight, ChevronLeft, 
-  Upload, Download, File, Printer, AlertCircle, RefreshCw
+  Upload, Download, File, Printer, AlertCircle, RefreshCw,
+  ChevronDown, Paperclip, RotateCcw, Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
@@ -289,6 +290,9 @@ export const Employees: React.FC = () => {
 
     const dataToSave = {
       ...formData,
+      birth_date: formData.birth_date || null,
+      hire_date: formData.hire_date || null,
+      contract_expiry_date: formData.contract_expiry_date || null,
       photo_url: photoBase64,
       documents: JSON.stringify(attachedDocs),
       company_id: user.company_id
@@ -446,276 +450,588 @@ export const Employees: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col space-y-6 animate-in fade-in duration-500 overflow-hidden" dir={dir}>
-      {/* Header Panel */}
-      {!isModalOpen && (
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-emerald-600 text-white rounded-3xl flex items-center justify-center shadow-xl shadow-emerald-500/20">
-              <User size={28} />
+      {!isModalOpen ? (
+        <>
+          {/* Header Panel */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-emerald-600 text-white rounded-3xl flex items-center justify-center shadow-xl shadow-emerald-500/20">
+                <User size={28} />
+              </div>
+              <div>
+                <h2 className="text-3xl font-black tracking-tight text-slate-900 italic serif">{t('employees.title')}</h2>
+                <p className="text-slate-500 font-medium">{t('employees.subtitle')}</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-3xl font-black tracking-tight text-slate-900 italic serif">{t('employees.title')}</h2>
-              <p className="text-slate-500 font-medium">{t('employees.subtitle')}</p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <button 
-              onClick={() => {
-                setActivityLogDocumentId(undefined);
-                setIsActivityLogOpen(true);
-              }}
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
-            >
-              <History size={20} />
-              <span className="hidden md:inline">{language === 'ar' ? 'سجل النشاط' : 'Activity Log'}</span>
-            </button>
-            <ExportButtons 
-              onExportExcel={handleExportExcel} 
-              onExportPDF={handleExportPDF} 
-            />
-            {canCreate && (
+            <div className="flex flex-wrap items-center gap-3">
               <button 
-                onClick={() => openModal()}
-                className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95 border border-emerald-500/50"
+                onClick={() => {
+                  setActivityLogDocumentId(undefined);
+                  setIsActivityLogOpen(true);
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
               >
-                <Plus size={20} />
-                {t('employees.add_new')}
+                <History size={20} />
+                <span className="hidden md:inline">{language === 'ar' ? 'سجل النشاط' : 'Activity Log'}</span>
               </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Main List Area */}
-      <div className={`flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden pb-4 ${isModalOpen ? 'hidden' : ''}`}>
-        <div className="flex-1 flex flex-col w-full">
-          {/* Filters and Search Bar */}
-          <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full">
-            <div className="p-6 border-b border-slate-100 flex flex-col gap-4 bg-slate-50/30">
-              <div className="flex flex-col md:flex-row gap-4 items-center">
-                {/* Search */}
-                <div className="relative flex-1 w-full group">
-                  <Search className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors pointer-events-none`} size={20} />
-                  <input
-                    type="text"
-                    placeholder={t('employees.search_placeholder')}
-                    className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none transition-all font-bold text-slate-900 placeholder:text-slate-400 shadow-sm`}
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-
-                {/* View Switch */}
-                <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
-                  <button
-                    onClick={() => setView('table')}
-                    className={`p-2 rounded-xl transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}
-                  >
-                    <List size={22} />
-                  </button>
-                  <button
-                    onClick={() => setView('card')}
-                    className={`p-2 rounded-xl transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}
-                  >
-                    <LayoutGrid size={22} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Advanced Filter Pills */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                <div>
-                  <select
-                    className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none font-bold text-xs bg-white"
-                    value={filterGender}
-                    onChange={(e) => setFilterGender(e.target.value)}
-                  >
-                    <option value="">{language === 'ar' ? 'كل الأنواع' : 'All Genders'}</option>
-                    <option value="male">{t('employees.gender_male')}</option>
-                    <option value="female">{t('employees.gender_female')}</option>
-                  </select>
-                </div>
-                <div>
-                  <select
-                    className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none font-bold text-xs bg-white"
-                    value={filterContractType}
-                    onChange={(e) => setFilterContractType(e.target.value)}
-                  >
-                    <option value="">{language === 'ar' ? 'كل العقود' : 'All Contracts'}</option>
-                    <option value="permanent">{t('employees.contract_permanent')}</option>
-                    <option value="temporary">{t('employees.contract_temporary')}</option>
-                  </select>
-                </div>
-                <div>
-                  <select
-                    className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none font-bold text-xs bg-white"
-                    value={filterNationality}
-                    onChange={(e) => setFilterNationality(e.target.value)}
-                  >
-                    <option value="">{language === 'ar' ? 'كل الجنسيات' : 'All Nationalities'}</option>
-                    {COUNTRIES.map(c => (
-                      <option key={c.code} value={c.code}>{c.flag} {language === 'ar' ? c.name_ar : c.name_en}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* List / Table Render */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar">
-              {view === 'table' ? (
-                <div className="hidden md:block overflow-x-auto h-full">
-                  <table ref={tableRef} className="w-full">
-                    <thead className="sticky top-0 bg-white/80 backdrop-blur-md z-10 border-b border-slate-100">
-                      <tr className="text-slate-500 text-[10px] uppercase font-black tracking-[0.2em]">
-                        <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_code')}</th>
-                        <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_name')}</th>
-                        <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_nationality')}</th>
-                        <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_national_id')}</th>
-                        <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_contract_type')}</th>
-                        <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.actions')}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {filteredEmployees.map((emp) => {
-                        const nat = COUNTRIES.find(c => c.code === emp.nationality);
-                        return (
-                          <tr 
-                            key={emp.id} 
-                            onClick={() => setViewingEmployee(emp)}
-                            className="hover:bg-emerald-50/40 transition-all group cursor-pointer"
-                          >
-                            <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              <span className="font-mono text-[10px] bg-slate-100 px-3 py-1 rounded-lg text-slate-500 font-black border border-slate-200 group-hover:border-emerald-200 group-hover:text-emerald-600 transition-all">
-                                {emp.employee_code}
-                              </span>
-                            </td>
-                            <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              <div className="flex items-center gap-3">
-                                {emp.photo_url ? (
-                                  <img src={emp.photo_url} alt="" className="w-10 h-10 rounded-xl object-cover border border-slate-200" />
-                                ) : (
-                                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-500">
-                                    {emp.name[0]}
-                                  </div>
-                                )}
-                                <span className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors">{emp.name}</span>
-                              </div>
-                            </td>
-                            <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              <span className="text-sm font-bold">
-                                {nat?.flag} {language === 'ar' ? nat?.name_ar : nat?.name_en}
-                              </span>
-                            </td>
-                            <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              <span className="text-sm font-bold font-mono text-slate-500">{emp.national_id || '-'}</span>
-                            </td>
-                            <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              <span className={`px-3 py-1 rounded-full text-xs font-bold ${emp.contract_type === 'permanent' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                                {emp.contract_type === 'permanent' ? t('employees.contract_permanent') : t('employees.contract_temporary')}
-                              </span>
-                            </td>
-                            <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                              <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-all`}>
-                                {canEdit && (
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); openModal(emp); }}
-                                    className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
-                                  >
-                                    <Edit2 size={18} />
-                                  </button>
-                                )}
-                                {canDelete && (
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); handleDelete(emp.id); }}
-                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
-                                  >
-                                    <Trash2 size={18} />
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  {filteredEmployees.length === 0 && !loading && (
-                    <div className="p-20 text-center flex flex-col items-center gap-4">
-                      <div className="w-20 h-20 bg-slate-50 text-slate-200 rounded-full flex items-center justify-center">
-                        <Search size={40} />
-                      </div>
-                      <p className="text-slate-400 font-black text-lg italic tracking-tighter">{t('common.no_data')}</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="p-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-                  {filteredEmployees.map((emp) => {
-                    const nat = COUNTRIES.find(c => c.code === emp.nationality);
-                    return (
-                      <div 
-                        key={emp.id} 
-                        onClick={() => setViewingEmployee(emp)}
-                        className="p-6 space-y-4 rounded-3xl border border-slate-100 bg-slate-50/30 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 hover:bg-white transition-all cursor-pointer group relative overflow-hidden"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-center gap-3">
-                            {emp.photo_url ? (
-                              <img src={emp.photo_url} alt="" className="w-14 h-14 rounded-2xl object-cover border border-slate-200" />
-                            ) : (
-                              <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center font-bold text-slate-500 text-xl">
-                                {emp.name[0]}
-                              </div>
-                            )}
-                            <div>
-                              <h4 className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors text-lg leading-tight">{emp.name}</h4>
-                              <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded text-slate-400 font-black border border-slate-200 inline-block mt-1">
-                                {emp.employee_code}
-                              </span>
-                            </div>
-                          </div>
-                          <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${emp.contract_type === 'permanent' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                            {emp.contract_type === 'permanent' ? t('employees.contract_permanent') : t('employees.contract_temporary')}
-                          </span>
-                        </div>
-
-                        <div className="pt-4 border-t border-slate-200/50 flex justify-between items-center text-xs text-slate-500 font-bold">
-                          <span>{nat?.flag} {language === 'ar' ? nat?.name_ar : nat?.name_en}</span>
-                          <span className="font-mono">{emp.national_id || '-'}</span>
-                        </div>
-
-                        {/* Card Hover Action Buttons Overlay */}
-                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all bg-white/90 backdrop-blur rounded-xl p-1 shadow-sm">
-                          {canEdit && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); openModal(emp); }}
-                              className="p-1.5 text-slate-500 hover:text-emerald-600 rounded-lg"
-                            >
-                              <Edit2 size={14} />
-                            </button>
-                          )}
-                          {canDelete && (
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); handleDelete(emp.id); }}
-                              className="p-1.5 text-slate-500 hover:text-rose-600 rounded-lg"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {filteredEmployees.length === 0 && !loading && (
-                    <div className="col-span-full py-20 text-center text-slate-400 font-black italic tracking-tighter">{t('common.no_data')}</div>
-                  )}
-                </div>
+              <ExportButtons 
+                onExportExcel={handleExportExcel} 
+                onExportPDF={handleExportPDF} 
+              />
+              {canCreate && (
+                <button 
+                  onClick={() => openModal()}
+                  className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95 border border-emerald-500/50"
+                >
+                  <Plus size={20} />
+                  {t('employees.add_new')}
+                </button>
               )}
             </div>
           </div>
+
+          {/* Main List Area */}
+          <div className="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden pb-4">
+            <div className="flex-1 flex flex-col w-full">
+              {/* Filters and Search Bar */}
+              <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full">
+                <div className="p-6 border-b border-slate-100 flex flex-col gap-4 bg-slate-50/30">
+                  <div className="flex flex-col md:flex-row gap-4 items-center">
+                    {/* Search */}
+                    <div className="relative flex-1 w-full group">
+                      <Search className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors pointer-events-none`} size={20} />
+                      <input
+                        type="text"
+                        placeholder={t('employees.search_placeholder')}
+                        className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none transition-all font-bold text-slate-900 placeholder:text-slate-400 shadow-sm`}
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+
+                    {/* View Switch */}
+                    <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
+                      <button
+                        onClick={() => setView('table')}
+                        className={`p-2 rounded-xl transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                        <List size={22} />
+                      </button>
+                      <button
+                        onClick={() => setView('card')}
+                        className={`p-2 rounded-xl transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                        <LayoutGrid size={22} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Advanced Filter Pills */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                    <div>
+                      <select
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none font-bold text-xs bg-white"
+                        value={filterGender}
+                        onChange={(e) => setFilterGender(e.target.value)}
+                      >
+                        <option value="">{language === 'ar' ? 'كل الأنواع' : 'All Genders'}</option>
+                        <option value="male">{t('employees.gender_male')}</option>
+                        <option value="female">{t('employees.gender_female')}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <select
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none font-bold text-xs bg-white"
+                        value={filterContractType}
+                        onChange={(e) => setFilterContractType(e.target.value)}
+                      >
+                        <option value="">{language === 'ar' ? 'كل العقود' : 'All Contracts'}</option>
+                        <option value="permanent">{t('employees.contract_permanent')}</option>
+                        <option value="temporary">{t('employees.contract_temporary')}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <select
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none font-bold text-xs bg-white"
+                        value={filterNationality}
+                        onChange={(e) => setFilterNationality(e.target.value)}
+                      >
+                        <option value="">{language === 'ar' ? 'كل الجنسيات' : 'All Nationalities'}</option>
+                        {COUNTRIES.map(c => (
+                          <option key={c.code} value={c.code}>{c.flag} {language === 'ar' ? c.name_ar : c.name_en}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* List / Table Render */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                  {view === 'table' ? (
+                    <div className="hidden md:block overflow-x-auto h-full">
+                      <table ref={tableRef} className="w-full">
+                        <thead className="sticky top-0 bg-white/80 backdrop-blur-md z-10 border-b border-slate-100">
+                          <tr className="text-slate-500 text-[10px] uppercase font-black tracking-[0.2em]">
+                            <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_code')}</th>
+                            <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_name')}</th>
+                            <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_nationality')}</th>
+                            <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_national_id')}</th>
+                            <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_contract_type')}</th>
+                            <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.actions')}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {filteredEmployees.map((emp) => {
+                            const nat = COUNTRIES.find(c => c.code === emp.nationality);
+                            return (
+                              <tr 
+                                key={emp.id} 
+                                onClick={() => setViewingEmployee(emp)}
+                                className="hover:bg-emerald-50/40 transition-all group cursor-pointer"
+                              >
+                                <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  <span className="font-mono text-[10px] bg-slate-100 px-3 py-1 rounded-lg text-slate-500 font-black border border-slate-200 group-hover:border-emerald-200 group-hover:text-emerald-600 transition-all">
+                                    {emp.employee_code}
+                                  </span>
+                                </td>
+                                <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  <div className="flex items-center gap-3">
+                                    {emp.photo_url ? (
+                                      <img src={emp.photo_url} alt="" className="w-10 h-10 rounded-xl object-cover border border-slate-200" />
+                                    ) : (
+                                      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-500">
+                                        {emp.name[0]}
+                                      </div>
+                                    )}
+                                    <span className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors">{emp.name}</span>
+                                  </div>
+                                </td>
+                                <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  <span className="text-sm font-bold">
+                                    {nat?.flag} {language === 'ar' ? nat?.name_ar : nat?.name_en}
+                                  </span>
+                                </td>
+                                <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  <span className="text-sm font-bold font-mono text-slate-500">{emp.national_id || '-'}</span>
+                                </td>
+                                <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${emp.contract_type === 'permanent' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                    {emp.contract_type === 'permanent' ? t('employees.contract_permanent') : t('employees.contract_temporary')}
+                                  </span>
+                                </td>
+                                <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                                  <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-all`}>
+                                    {canEdit && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); openModal(emp); }}
+                                        className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                                      >
+                                        <Edit2 size={18} />
+                                      </button>
+                                    )}
+                                    {canDelete && (
+                                      <button 
+                                        onClick={(e) => { e.stopPropagation(); handleDelete(emp.id); }}
+                                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                                      >
+                                        <Trash2 size={18} />
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                      {filteredEmployees.length === 0 && !loading && (
+                        <div className="p-20 text-center flex flex-col items-center gap-4">
+                          <div className="w-20 h-20 bg-slate-50 text-slate-200 rounded-full flex items-center justify-center">
+                            <Search size={40} />
+                          </div>
+                          <p className="text-slate-400 font-black text-lg italic tracking-tighter">{t('common.no_data')}</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                      {filteredEmployees.map((emp) => {
+                        const nat = COUNTRIES.find(c => c.code === emp.nationality);
+                        return (
+                          <div 
+                            key={emp.id} 
+                            onClick={() => setViewingEmployee(emp)}
+                            className="p-6 space-y-4 rounded-3xl border border-slate-100 bg-slate-50/30 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 hover:bg-white transition-all cursor-pointer group relative overflow-hidden"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div className="flex items-center gap-3">
+                                {emp.photo_url ? (
+                                  <img src={emp.photo_url} alt="" className="w-14 h-14 rounded-2xl object-cover border border-slate-200" />
+                                ) : (
+                                  <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center font-bold text-slate-500 text-xl">
+                                    {emp.name[0]}
+                                  </div>
+                                )}
+                                <div>
+                                  <h4 className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors text-lg leading-tight">{emp.name}</h4>
+                                  <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded text-slate-400 font-black border border-slate-200 inline-block mt-1">
+                                    {emp.employee_code}
+                                  </span>
+                                </div>
+                              </div>
+                              <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${emp.contract_type === 'permanent' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                {emp.contract_type === 'permanent' ? t('employees.contract_permanent') : t('employees.contract_temporary')}
+                              </span>
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-200/50 flex justify-between items-center text-xs text-slate-500 font-bold">
+                              <span>{nat?.flag} {language === 'ar' ? nat?.name_ar : nat?.name_en}</span>
+                              <span className="font-mono">{emp.national_id || '-'}</span>
+                            </div>
+
+                            {/* Card Hover Action Buttons Overlay */}
+                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all bg-white/90 backdrop-blur rounded-xl p-1 shadow-sm">
+                              {canEdit && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openModal(emp); }}
+                                  className="p-1.5 text-slate-500 hover:text-emerald-600 rounded-lg"
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                              )}
+                              {canDelete && (
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); handleDelete(emp.id); }}
+                                  className="p-1.5 text-slate-500 hover:text-rose-600 rounded-lg"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {filteredEmployees.length === 0 && !loading && (
+                        <div className="col-span-full py-20 text-center text-slate-400 font-black italic tracking-tighter">{t('common.no_data')}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
+          {/* Form Header */}
+          <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70]">
+            <div className="flex items-center gap-3">
+              <button 
+                type="button"
+                onClick={closeModal} 
+                className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all font-black text-sm"
+              >
+                {dir === 'rtl' ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+                <span>{language === 'ar' ? 'العودة للقائمة' : 'Back to List'}</span>
+              </button>
+            </div>
+            
+            <div className="flex-1 flex justify-center">
+              <button 
+                type="button"
+                onClick={() => {
+                  setActivityLogDocumentId(editingEmployee?.id || undefined);
+                  setIsActivityLogOpen(true);
+                }}
+                className="flex items-center gap-3 px-6 py-2.5 rounded-2xl text-sm font-black transition-all border shadow-sm bg-white text-slate-700 border-slate-200 hover:bg-zinc-50"
+              >
+                <History size={18} />
+                <span>{language === 'ar' ? 'سجل النشاط والتعديلات' : 'Activity Log'}</span>
+              </button>
+            </div>
+
+            <div>
+              <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
+                {editingEmployee ? t('employees.edit') : t('employees.add_new')}
+              </h3>
+            </div>
+          </div>
+
+          {/* Form Content */}
+          <div className="flex-grow overflow-y-auto custom-scrollbar p-6">
+            <form id="employee-form" onSubmit={handleSubmit} className="space-y-8 max-w-4xl mx-auto">
+              
+              {/* Section 1: الصورة والبيانات الشخصية */}
+              <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
+                <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50/50 px-3 py-1 rounded-full border border-emerald-100">
+                  <User className="w-4 h-4" />
+                  <span className="text-xs font-bold">{language === 'ar' ? 'البيانات الشخصية والصورة' : 'Personal Details & Photo'}</span>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Photo Uploader */}
+                  <div className="flex flex-col items-center justify-center border-b md:border-b-0 md:border-l border-slate-100 pb-6 md:pb-0 md:pl-6">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block self-start px-1">{t('employees.form_photo')}</span>
+                    <div 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="relative w-32 h-32 rounded-3xl border-2 border-dashed border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/10 cursor-pointer transition-all flex flex-col items-center justify-center overflow-hidden group shadow-sm"
+                    >
+                      {photoBase64 ? (
+                        <>
+                          <img src={photoBase64} alt="" className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold transition-opacity">
+                            {language === 'ar' ? 'تغيير الصورة' : 'Change Photo'}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center text-slate-400 gap-1.5 p-4 text-center">
+                          {uploadingPhoto ? (
+                            <RefreshCw size={24} className="animate-spin text-emerald-600" />
+                          ) : (
+                            <>
+                              <Upload size={24} />
+                              <span className="text-[10px] font-bold leading-tight">{t('employees.drop_photo_here')}</span>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <input 
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handlePhotoUpload}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                  </div>
+
+                  {/* Rest of Personal Details */}
+                  <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('employees.form_name')}</label>
+                      <input
+                        required
+                        type="text"
+                        placeholder="John Doe"
+                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-sm rounded-2xl"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('employees.form_nationality')}</label>
+                      <div className="relative">
+                        <select
+                          className="w-full py-3 px-4 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm"
+                          value={formData.nationality}
+                          onChange={(e) => setFormData({ ...formData, nationality: e.target.value })}
+                        >
+                          {COUNTRIES.map(c => (
+                            <option key={c.code} value={c.code}>{c.flag} {language === 'ar' ? c.name_ar : c.name_en}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('employees.form_national_id')}</label>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-sm rounded-2xl font-mono"
+                        value={formData.national_id}
+                        onChange={(e) => setFormData({ ...formData, national_id: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('employees.form_gender')}</label>
+                      <div className="relative">
+                        <select
+                          className="w-full py-3 px-4 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm"
+                          value={formData.gender}
+                          onChange={(e) => setFormData({ ...formData, gender: e.target.value as any })}
+                        >
+                          <option value="male">{t('employees.gender_male')}</option>
+                          <option value="female">{t('employees.gender_female')}</option>
+                        </select>
+                        <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('employees.form_marital_status')}</label>
+                      <div className="relative">
+                        <select
+                          className="w-full py-3 px-4 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm"
+                          value={formData.marital_status}
+                          onChange={(e) => setFormData({ ...formData, marital_status: e.target.value as any })}
+                        >
+                          <option value="single">{t('employees.marital_single')}</option>
+                          <option value="married">{t('employees.marital_married')}</option>
+                        </select>
+                        <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                      </div>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('employees.form_birth_date')}</label>
+                      <div className="relative">
+                        <input
+                          type="date"
+                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-sm rounded-2xl"
+                          value={formData.birth_date}
+                          onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
+                        />
+                        <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Section 2: بيانات الوظيفة والعقد */}
+              <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
+                <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50/50 px-3 py-1 rounded-full border border-emerald-100">
+                  <FileText className="w-4 h-4" />
+                  <span className="text-xs font-bold">{language === 'ar' ? 'التعيين والتعاقد' : 'Job & Contract Details'}</span>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {/* Code */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('employees.column_code')}</label>
+                    <input
+                      readOnly
+                      type="text"
+                      className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-2xl font-mono font-bold text-slate-400 cursor-not-allowed outline-none text-sm"
+                      value={editingEmployee ? editingEmployee.employee_code : (language === 'ar' ? 'تلقائي' : 'Auto')}
+                    />
+                  </div>
+
+                  {/* Hire Date */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('employees.form_hire_date')}</label>
+                    <div className="relative">
+                      <input
+                        type="date"
+                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-sm rounded-2xl"
+                        value={formData.hire_date}
+                        onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
+                      />
+                      <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                    </div>
+                  </div>
+
+                  {/* Contract Type */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('employees.form_contract_type')}</label>
+                    <div className="relative">
+                      <select
+                        className="w-full py-3 px-4 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm"
+                        value={formData.contract_type}
+                        onChange={(e) => setFormData({ ...formData, contract_type: e.target.value as any })}
+                      >
+                        <option value="permanent">{t('employees.contract_permanent')}</option>
+                        <option value="temporary">{t('employees.contract_temporary')}</option>
+                      </select>
+                      <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                    </div>
+                  </div>
+
+                  {/* Contract Expiry Date (Only if temporary) */}
+                  {formData.contract_type === 'temporary' && (
+                    <div className="sm:col-span-2 lg:col-span-3 animate-in slide-in-from-top duration-300">
+                      <label className="block text-xs font-bold text-rose-600 tracking-tighter mb-2 px-2 uppercase">{t('employees.form_contract_expiry_date')}</label>
+                      <div className="relative">
+                        <input
+                          required
+                          type="date"
+                          className="w-full px-4 py-3 bg-white border border-rose-200 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 rounded-2xl font-bold text-zinc-800 outline-none transition-all shadow-sm text-sm"
+                          value={formData.contract_expiry_date}
+                          onChange={(e) => setFormData({ ...formData, contract_expiry_date: e.target.value })}
+                        />
+                        <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-rose-400 pointer-events-none`} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* Section 3: المستندات والمرفقات */}
+              <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
+                <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50/50 px-3 py-1 rounded-full border border-emerald-100">
+                  <Paperclip className="w-4 h-4" />
+                  <span className="text-xs font-bold">{t('employees.form_documents')}</span>
+                </div>
+                
+                <div className="space-y-4">
+                  <div 
+                    onClick={() => docInputRef.current?.click()}
+                    className="border-2 border-dashed border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/10 cursor-pointer rounded-2xl p-6 text-center transition-all flex flex-col items-center justify-center gap-2 group"
+                  >
+                    {uploadingDoc ? (
+                      <RefreshCw size={24} className="animate-spin text-emerald-600" />
+                    ) : (
+                      <>
+                        <Upload size={24} className="text-slate-400 group-hover:text-emerald-600" />
+                        <span className="text-xs font-bold text-slate-500">{t('employees.drop_docs_here')}</span>
+                      </>
+                    )}
+                  </div>
+                  <input 
+                    type="file"
+                    ref={docInputRef}
+                    onChange={handleDocUpload}
+                    multiple
+                    className="hidden"
+                  />
+
+                  {/* List of uploaded documents in Form */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto custom-scrollbar">
+                    {attachedDocs.map((doc, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-2xl shadow-sm">
+                        <div className="flex items-center gap-2 truncate">
+                          <File size={16} className="text-slate-400 flex-shrink-0" />
+                          <span className="text-xs font-bold text-slate-700 truncate" title={doc.name}>{doc.name}</span>
+                        </div>
+                        <button 
+                          type="button"
+                          onClick={() => handleRemoveDoc(idx)}
+                          className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 transition-colors"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            </form>
+          </div>
+
+          {/* Form Footer */}
+          <div className="p-4 md:p-6 border-t border-slate-100 bg-white/80 backdrop-blur-md sticky bottom-0 z-[70] flex items-center justify-between gap-4">
+            <button 
+              type="button"
+              onClick={closeModal}
+              className="flex-1 max-w-[200px] py-4 rounded-2xl bg-zinc-100 text-zinc-600 font-black hover:bg-zinc-200 transition-all flex items-center justify-center gap-3 active:scale-95 text-sm"
+            >
+              <RotateCcw size={20} />
+              {t('common.cancel')}
+            </button>
+            <button 
+              type="submit"
+              form="employee-form"
+              className="flex-1 py-4 rounded-2xl bg-emerald-600 text-white font-black hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 shadow-xl shadow-emerald-600/20 active:scale-95 text-sm"
+            >
+              <Save size={20} />
+              {t('common.save')}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Profile Detail Drawer (View Details) */}
       <AnimatePresence>
@@ -871,11 +1187,10 @@ export const Employees: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Add / Edit Side Drawer Modal */}
+      {/* Delete Confirmation Modal */}
       <AnimatePresence>
-        {isModalOpen && (
-          <div className="fixed inset-0 z-[250] flex justify-end">
-            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={closeModal} />
+        {isDeleteModalOpen && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <motion.div 
               initial={{ x: dir === 'rtl' ? -600 : 600 }}
               animate={{ x: 0 }}

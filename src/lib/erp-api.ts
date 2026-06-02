@@ -801,8 +801,8 @@ function sanitizeData(table: string, data: any) {
     if (key in data) {
       let value = data[key];
       
-      // Convert empty strings to null for IDs and decimals
-      if (value === '' && (key.endsWith('_id') || key === 'amount' || key === 'price' || key === 'unit_price' || key === 'total' || key === 'subtotal')) {
+      // Convert empty strings to null for IDs, decimals and dates
+      if (value === '' && (key.endsWith('_id') || key.endsWith('_date') || key === 'date' || key === 'amount' || key === 'price' || key === 'unit_price' || key === 'total' || key === 'subtotal')) {
         value = null;
       } 
       
