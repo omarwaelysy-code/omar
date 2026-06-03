@@ -56,8 +56,8 @@ BEGIN
     -- 4. Create missing field_operation_categories table
     IF NOT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'field_operation_categories') THEN
         CREATE TABLE field_operation_categories (
-            field_id UUID REFERENCES operation_fields(id) ON DELETE CASCADE,
-            category_id UUID REFERENCES operation_categories(id) ON DELETE CASCADE,
+            field_id VARCHAR(36) REFERENCES operation_fields(id) ON DELETE CASCADE,
+            category_id VARCHAR(36) REFERENCES operation_categories(id) ON DELETE CASCADE,
             company_id VARCHAR(36),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (field_id, category_id)
