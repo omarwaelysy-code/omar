@@ -62,9 +62,22 @@ export const StockCardReport: React.FC = () => {
     loadSelectData();
   }, [user]);
 
-  // Check for pending selected product ID from navigation
+  // Check for pending selected product ID from navigation or session storage (transition from Stock Balances Report)
   useEffect(() => {
-    if (pendingViewDoc && pendingViewDoc.type === 'stock_card' && pendingViewDoc.idOrNumber) {
+    const sessionProdId = sessionStorage.getItem('stock_card_filter_product_id');
+    const sessionDateFrom = sessionStorage.getItem('stock_card_filter_date_from');
+    const sessionDateTo = sessionStorage.getItem('stock_card_filter_date_to');
+
+    if (sessionProdId) {
+      setSelectedProductId(sessionProdId);
+      if (sessionDateFrom) setDateFrom(sessionDateFrom);
+      if (sessionDateTo) setDateTo(sessionDateTo);
+
+      // Clean up sessionStorage
+      sessionStorage.removeItem('stock_card_filter_product_id');
+      sessionStorage.removeItem('stock_card_filter_date_from');
+      sessionStorage.removeItem('stock_card_filter_date_to');
+    } else if (pendingViewDoc && pendingViewDoc.type === 'stock_card' && pendingViewDoc.idOrNumber) {
       setSelectedProductId(pendingViewDoc.idOrNumber);
       // Clear pendingViewDoc so we don't trigger it continuously
       setPendingViewDoc(null);

@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Product, Warehouse } from '../types';
 import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useNavigation } from '../contexts/NavigationContext';
 import { formatNumber } from '../utils/formatUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { exportToPDF } from '../utils/pdfUtils';
@@ -23,6 +24,7 @@ interface ItemGroup {
 export const StockBalancesReport: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
+  const { setCurrentPage } = useNavigation();
 
   // Data states
   const [products, setProducts] = useState<Product[]>([]);
@@ -851,7 +853,18 @@ export const StockBalancesReport: React.FC = () => {
                     {/* Group Items */}
                     {group.items.map((item: any, idx) => (
                       <tr key={item.product.id || idx} className="hover:bg-slate-50/30 transition-colors">
-                        <td className="px-4 py-3.5 border-r border-slate-200 font-mono text-[10px] whitespace-nowrap">{item.product.code}</td>
+                        <td 
+                          className="px-4 py-3.5 border-r border-slate-200 font-mono text-[10px] whitespace-nowrap text-indigo-600 hover:text-indigo-900 cursor-pointer hover:underline"
+                          onClick={() => {
+                            sessionStorage.setItem('stock_card_filter_product_id', item.product.id);
+                            sessionStorage.setItem('stock_card_filter_date_from', dateFrom);
+                            sessionStorage.setItem('stock_card_filter_date_to', dateTo);
+                            setCurrentPage('stock_card_report');
+                          }}
+                          title={language === 'ar' ? 'عرض كارت الصنف لهذا الصنف' : 'View stock card for this product'}
+                        >
+                          {item.product.code}
+                        </td>
                         <td className="px-5 py-3.5 border-r border-slate-200 text-slate-900 font-bold text-right whitespace-nowrap">{item.product.name}</td>
                         <td className="px-4 py-3.5 border-r border-slate-200 text-[10px] text-slate-500 whitespace-nowrap">{getCostMethodLabel(item.product.inventory_cost_method)}</td>
                         
