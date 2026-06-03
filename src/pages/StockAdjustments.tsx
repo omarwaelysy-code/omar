@@ -551,7 +551,7 @@ export const StockAdjustments: React.FC = () => {
               </div>
 
               <form onSubmit={handleSave} className="p-6 md:p-8 space-y-6 max-h-[70vh] overflow-y-auto">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className={`grid grid-cols-1 md:grid-cols-2 ${editingAdj?.entry_number ? 'lg:grid-cols-3' : ''} gap-6`}>
                   <div>
                     <label className="block text-sm font-black text-slate-700 mb-2">
                       {language === 'ar' ? 'تاريخ التسوية *' : 'Adjustment Date *'}
@@ -567,6 +567,23 @@ export const StockAdjustments: React.FC = () => {
                       />
                     </div>
                   </div>
+
+                  {editingAdj?.entry_number && (
+                    <div>
+                      <label className="block text-sm font-black text-slate-700 mb-2">
+                        {language === 'ar' ? 'رقم القيد المرتبط' : 'Linked Journal Entry'}
+                      </label>
+                      <div className="relative">
+                        <Layers className="absolute right-4 top-3.5 text-emerald-500" size={18} />
+                        <input
+                          readOnly
+                          type="text"
+                          className="w-full pr-11 pl-4 py-3 bg-emerald-50 border border-emerald-200 rounded-2xl outline-none font-bold text-emerald-800 text-sm"
+                          value={editingAdj.entry_number}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-black text-slate-700 mb-2">

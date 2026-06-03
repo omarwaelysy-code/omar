@@ -1826,6 +1826,21 @@ export const Invoices: React.FC = () => {
                             <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           </div>
                         </div>
+
+                        {editingInvoice?.entry_number && (
+                          <div className="order-1 md:order-5">
+                            <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'رقم القيد المرتبط' : 'Linked Journal Entry'}</label>
+                            <div className="relative">
+                              <input
+                                readOnly
+                                type="text"
+                                className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 rounded-2xl bg-emerald-50 border border-emerald-200 outline-none font-bold text-emerald-800 text-sm`}
+                                value={editingInvoice.entry_number}
+                              />
+                              <Layers className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-emerald-500 pointer-events-none`} />
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       <div className="pt-4 border-t border-zinc-100">

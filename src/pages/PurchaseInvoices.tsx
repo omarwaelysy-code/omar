@@ -1764,6 +1764,21 @@ export const PurchaseInvoices: React.FC = () => {
                             />
                           </div>
                         </div>
+
+                        {editingInvoice?.entry_number && (
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">{language === 'ar' ? 'رقم القيد المرتبط' : 'Linked Journal Entry'}</label>
+                            <div className="relative">
+                              <Layers className="absolute start-3 top-2.5 text-emerald-500" size={16} />
+                              <input 
+                                readOnly
+                                type="text" 
+                                className="w-full ps-10 pe-4 py-2.5 bg-emerald-50 border border-emerald-200 rounded-lg outline-none transition-all font-bold text-emerald-800"
+                                value={editingInvoice.entry_number}
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Currency - REMOVED */}

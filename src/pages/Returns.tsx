@@ -1310,6 +1310,21 @@ export const Returns: React.FC = () => {
                           />
                         </div>
                       </div>
+
+                      {editingReturn?.entry_number && (
+                        <div>
+                          <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'رقم القيد المرتبط' : 'Linked Journal Entry'}</label>
+                          <div className="relative">
+                            <Layers className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-emerald-500 pointer-events-none`} />
+                            <input 
+                              readOnly
+                              type="text"
+                              className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-emerald-50 border border-emerald-200 rounded-2xl outline-none transition-all font-bold text-emerald-800 text-sm`}
+                              value={editingReturn.entry_number}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </section>
 

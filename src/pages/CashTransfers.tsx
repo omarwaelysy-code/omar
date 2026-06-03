@@ -913,6 +913,21 @@ export const CashTransfers: React.FC = () => {
                           </div>
                         </div>
 
+                        {editingTransfer?.entry_number && (
+                          <div className="space-y-2">
+                            <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2">{language === 'ar' ? 'رقم القيد المرتبط' : 'Linked Journal Entry'}</label>
+                            <div className="relative group">
+                              <Layers className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-emerald-500 pointer-events-none transition-colors`} />
+                              <input 
+                                readOnly
+                                type="text"
+                                className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-emerald-50 border border-transparent rounded-2xl outline-none transition-all font-bold text-emerald-800 text-sm`}
+                                value={editingTransfer.entry_number}
+                              />
+                            </div>
+                          </div>
+                        )}
+
                         <div className="space-y-2">
                           <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2">المبلغ</label>
                           <div className="relative group">
