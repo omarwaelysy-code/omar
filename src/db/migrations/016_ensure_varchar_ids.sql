@@ -311,6 +311,150 @@ BEGIN
     END IF;
 
     -- =========================================================
+    -- STEP 2.5: Purge orphaned references BEFORE re-adding FKs
+    --           Any row that points to a non-existent parent would
+    --           cause the ADD CONSTRAINT to fail.  We NULL them out
+    --           (mirrors the ON DELETE SET NULL behaviour of the FK).
+    -- =========================================================
+
+    -- operations.category_id → operation_categories
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'operations')
+    AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'operation_categories')
+    AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'operations' AND column_name = 'category_id')
+    THEN
+        UPDATE operations
+        SET category_id = NULL
+        WHERE category_id IS NOT NULL
+          AND category_id::text NOT IN (
+              SELECT id::text FROM operation_categories
+          );
+    END IF;
+
+    -- operations.operation_category_id → operation_categories
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'operations')
+    AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'operation_categories')
+    AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'operations' AND column_name = 'operation_category_id')
+    THEN
+        UPDATE operations
+        SET operation_category_id = NULL
+        WHERE operation_category_id IS NOT NULL
+          AND operation_category_id::text NOT IN (
+              SELECT id::text FROM operation_categories
+          );
+    END IF;
+
+    -- operation_fields.category_id → operation_categories
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'operation_fields')
+    AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'operation_categories')
+    AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'operation_fields' AND column_name = 'category_id')
+    THEN
+        UPDATE operation_fields
+        SET category_id = NULL
+        WHERE category_id IS NOT NULL
+          AND category_id::text NOT IN (
+              SELECT id::text FROM operation_categories
+          );
+    END IF;
+
+    -- operation_fields.operation_category_id → operation_categories
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'operation_fields')
+    AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'operation_categories')
+    AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'operation_fields' AND column_name = 'operation_category_id')
+    THEN
+        UPDATE operation_fields
+        SET operation_category_id = NULL
+        WHERE operation_category_id IS NOT NULL
+          AND operation_category_id::text NOT IN (
+              SELECT id::text FROM operation_categories
+          );
+    END IF;
+
+    -- field_operation_categories.category_id → operation_categories
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'field_operation_categories')
+    AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'operation_categories')
+    AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'field_operation_categories' AND column_name = 'category_id')
+    THEN
+        DELETE FROM field_operation_categories
+        WHERE category_id IS NOT NULL
+          AND category_id::text NOT IN (
+              SELECT id::text FROM operation_categories
+          );
+    END IF;
+
+    -- field_operation_categories.field_id → operation_fields
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'field_operation_categories')
+    AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'operation_fields')
+    AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'field_operation_categories' AND column_name = 'field_id')
+    THEN
+        DELETE FROM field_operation_categories
+        WHERE field_id IS NOT NULL
+          AND field_id::text NOT IN (
+              SELECT id::text FROM operation_fields
+          );
+    END IF;
+
+    -- operation_field_values.operation_id → operations
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'operation_field_values')
+    AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'operations')
+    THEN
+        DELETE FROM operation_field_values
+        WHERE operation_id IS NOT NULL
+          AND operation_id::text NOT IN (
+              SELECT id::text FROM operations
+          );
+    END IF;
+
+    -- operation_field_values.field_id → operation_fields
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'operation_field_values')
+    AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'operation_fields')
+    THEN
+        DELETE FROM operation_field_values
+        WHERE field_id IS NOT NULL
+          AND field_id::text NOT IN (
+              SELECT id::text FROM operation_fields
+          );
+    END IF;
+
+    -- cost_centers.department_id → departments
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'cost_centers')
+    AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'departments')
+    AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cost_centers' AND column_name = 'department_id')
+    THEN
+        UPDATE cost_centers
+        SET department_id = NULL
+        WHERE department_id IS NOT NULL
+          AND department_id::text NOT IN (
+              SELECT id::text FROM departments
+          );
+    END IF;
+
+    -- operations.department_id → departments
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'operations')
+    AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'departments')
+    AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'operations' AND column_name = 'department_id')
+    THEN
+        UPDATE operations
+        SET department_id = NULL
+        WHERE department_id IS NOT NULL
+          AND department_id::text NOT IN (
+              SELECT id::text FROM departments
+          );
+    END IF;
+
+    -- operations.cost_center_id → cost_centers
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'operations')
+    AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'cost_centers')
+    AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'operations' AND column_name = 'cost_center_id')
+    THEN
+        UPDATE operations
+        SET cost_center_id = NULL
+        WHERE cost_center_id IS NOT NULL
+          AND cost_center_id::text NOT IN (
+              SELECT id::text FROM cost_centers
+          );
+    END IF;
+
+    -- =========================================================
     -- STEP 3: Re-add FK constraints now that all sides are VARCHAR(36)
     --         Each constraint is conditional on both sides existing and
     --         both being varchar (so this is safe on any database state).
