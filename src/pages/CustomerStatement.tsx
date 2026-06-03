@@ -99,10 +99,10 @@ export const CustomerStatement: React.FC = () => {
                   let description = item.description || je.description || 'قيد مالي';
                   if (je.reference_type === 'invoice' && je.reference_number) {
                     const inv = invoicesMap[je.reference_number];
-                    description = inv?.description || inv?.notes || (language === 'ar' ? 'فاتورة مبيعات' : 'Sales Invoice');
+                    description = inv?.description || (language === 'ar' ? 'فاتورة مبيعات' : 'Sales Invoice');
                   } else if ((je.reference_type === 'receipt' || je.reference_type === 'receipt_voucher') && je.reference_number) {
                     const rect = receiptsMap[je.reference_number];
-                    description = rect?.description || rect?.notes || (language === 'ar' ? 'سند قبض' : 'Receipt Voucher');
+                    description = rect?.description || (language === 'ar' ? 'سند قبض' : 'Receipt Voucher');
                   } else if (je.reference_type === 'return' && je.reference_number) {
                     const ret = returnsMap[je.reference_number];
                     description = ret?.description || ret?.notes || (language === 'ar' ? 'مرتجع مبيعات' : 'Sales Return');
@@ -230,10 +230,10 @@ export const CustomerStatement: React.FC = () => {
 
             if (je.reference_type === 'invoice' && je.reference_number) {
               const inv = invoicesMap[je.reference_number];
-              description = inv?.description || inv?.notes || (language === 'ar' ? 'فاتورة مبيعات' : 'Sales Invoice');
+              description = inv?.description || (language === 'ar' ? 'فاتورة مبيعات' : 'Sales Invoice');
             } else if ((je.reference_type === 'receipt' || je.reference_type === 'receipt_voucher') && je.reference_number) {
               const rect = receiptsMap[je.reference_number];
-              description = rect?.description || rect?.notes || (language === 'ar' ? 'سند قبض' : 'Receipt Voucher');
+              description = rect?.description || (language === 'ar' ? 'سند قبض' : 'Receipt Voucher');
             } else if (je.reference_type === 'return' && je.reference_number) {
               const ret = returnsMap[je.reference_number];
               description = ret?.description || ret?.notes || (language === 'ar' ? 'مرتجع مبيعات' : 'Sales Return');

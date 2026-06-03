@@ -107,10 +107,10 @@ export const SupplierStatement: React.FC = () => {
 
                   if (je.reference_type === 'purchase_invoice' && je.reference_number) {
                     const inv = invoicesMap[je.reference_number];
-                    notes = inv?.description || inv?.notes || (language === 'ar' ? 'فاتورة مشتريات' : 'Purchase Invoice');
+                    notes = inv?.description || (language === 'ar' ? 'فاتورة مشتريات' : 'Purchase Invoice');
                   } else if (je.reference_type === 'payment_voucher' && je.reference_number) {
                     const voucher = vouchersMap[je.reference_number];
-                    notes = voucher?.description || voucher?.notes || (language === 'ar' ? 'سند صرف' : 'Payment Voucher');
+                    notes = voucher?.description || (language === 'ar' ? 'سند صرف' : 'Payment Voucher');
                   } else if (je.reference_type === 'purchase_return' && je.reference_number) {
                     const ret = returnsMap[je.reference_number];
                     notes = ret?.description || ret?.notes || (language === 'ar' ? 'مرتجع مشتريات' : 'Purchase Return');
@@ -226,10 +226,10 @@ export const SupplierStatement: React.FC = () => {
 
             if (je.reference_type === 'purchase_invoice' && je.reference_number) {
               const inv = invoicesMap[je.reference_number];
-              notes = inv?.description || inv?.notes || (language === 'ar' ? 'فاتورة مشتريات' : 'Purchase Invoice');
+              notes = inv?.description || (language === 'ar' ? 'فاتورة مشتريات' : 'Purchase Invoice');
             } else if (je.reference_type === 'payment_voucher' && je.reference_number) {
               const voucher = vouchersMap[je.reference_number];
-              notes = voucher?.description || voucher?.notes || (language === 'ar' ? 'سند صرف' : 'Payment Voucher');
+              notes = voucher?.description || (language === 'ar' ? 'سند صرف' : 'Payment Voucher');
             } else if (je.reference_type === 'purchase_return' && je.reference_number) {
               const ret = returnsMap[je.reference_number];
               notes = ret?.description || ret?.notes || (language === 'ar' ? 'مرتجع مشتريات' : 'Purchase Return');
