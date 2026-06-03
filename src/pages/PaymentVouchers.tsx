@@ -946,7 +946,9 @@ export const PaymentVouchers: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {!isModalOpen ? (
+        <>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('payments.title')}</h2>
           <p className="text-zinc-500">{t('payments.subtitle')}</p>
@@ -1288,30 +1290,26 @@ export const PaymentVouchers: React.FC = () => {
           </div>
         )}
       </div>
-
-      {isModalOpen && (
-        <div className={`fixed inset-0 bg-zinc-100 dark:bg-zinc-900 z-[100] flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300 ${isFullScreen ? 'm-0 rounded-none' : 'md:m-4 md:rounded-[2.5rem] shadow-2xl border border-white/20'}`}>
-          {/* Header Block */}
-          <div className="p-4 md:p-6 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[90]">
+    </>
+  ) : (
+    <div className="bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
+          {/* Form Header */}
+          <div className="p-4 md:p-6 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70]">
             <div className="flex items-center gap-3">
               <button 
-                onClick={closeModal}
-                className="p-3 hover:bg-zinc-100 rounded-2xl transition-all text-zinc-400 hover:text-zinc-900 group"
+                onClick={closeModal} 
+                className="flex items-center gap-2 px-4 py-2 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all font-black text-sm"
               >
-                <div className="flex items-center gap-2">
-                  <RotateCcw className={`w-5 h-5 transition-transform group-hover:-rotate-45`} />
-                  <span className="text-sm font-bold">{t('common.back')}</span>
-                </div>
+                {dir === 'rtl' ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+                <span>{language === 'ar' ? 'العودة للقائمة' : 'Back to list'}</span>
               </button>
-              <div className="w-px h-6 bg-zinc-200 mx-2" />
-              <button
+            </div>
+
+            <div className="flex-1 flex justify-center">
+              <button 
                 type="button"
                 onClick={() => setShowSidePanel(!showSidePanel)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
-                  showSidePanel 
-                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-sm' 
-                    : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200 border-transparent'
-                } border`}
+                className={`flex items-center gap-3 px-6 py-2.5 rounded-2xl text-sm font-black transition-all border shadow-sm ${showSidePanel ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'}`}
               >
                 <History size={18} />
                 <span>{language === 'ar' ? 'قيد اليومية \\ سجل التعديلات' : 'Journal Entry / Activity Log'}</span>
@@ -1341,14 +1339,6 @@ export const PaymentVouchers: React.FC = () => {
                   </button>
                 </div>
               )}
-              <button
-                type="button"
-                onClick={() => setIsFullScreen(!isFullScreen)}
-                className="p-2 text-zinc-400 hover:bg-zinc-100 rounded-xl transition-all hidden md:block"
-                title={isFullScreen ? t('common.minimize') : t('common.maximize')}
-              >
-                {isFullScreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
-              </button>
               <h3 className="text-xl md:text-2xl font-black text-zinc-900 tracking-tight">
                 {editingVoucher ? 'تعديل سند صرف' : 'إضافة سند صرف'}
               </h3>
