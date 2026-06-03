@@ -99,13 +99,13 @@ export const CustomerStatement: React.FC = () => {
                   let description = item.description || je.description || 'قيد مالي';
                   if (je.reference_type === 'invoice' && je.reference_number) {
                     const inv = invoicesMap[je.reference_number];
-                    if (inv && inv.description) description += ` - ${inv.description}`;
+                    description = inv?.description || inv?.notes || (language === 'ar' ? 'فاتورة مبيعات' : 'Sales Invoice');
                   } else if ((je.reference_type === 'receipt' || je.reference_type === 'receipt_voucher') && je.reference_number) {
                     const rect = receiptsMap[je.reference_number];
-                    if (rect && rect.description) description += ` - ${rect.description}`;
+                    description = rect?.description || rect?.notes || (language === 'ar' ? 'سند قبض' : 'Receipt Voucher');
                   } else if (je.reference_type === 'return' && je.reference_number) {
                     const ret = returnsMap[je.reference_number];
-                    if (ret && ret.description) description += ` - ${ret.description}`;
+                    description = ret?.description || ret?.notes || (language === 'ar' ? 'مرتجع مبيعات' : 'Sales Return');
                   }
 
                   allEntries.push({
@@ -228,29 +228,15 @@ export const CustomerStatement: React.FC = () => {
           if (item.customer_id === selectedCustomerId && item.account_id === customer?.account_id) {
             let description = item.description || je.description || 'قيد مالي';
 
-            // Enrich description from source document if available
             if (je.reference_type === 'invoice' && je.reference_number) {
               const inv = invoicesMap[je.reference_number];
-              if (inv) {
-                const parts = [];
-                if (inv.description) parts.push(inv.description);
-                if (parts.length > 0) description += ` - ${parts.join(' | ')}`;
-              }
+              description = inv?.description || inv?.notes || (language === 'ar' ? 'فاتورة مبيعات' : 'Sales Invoice');
             } else if ((je.reference_type === 'receipt' || je.reference_type === 'receipt_voucher') && je.reference_number) {
               const rect = receiptsMap[je.reference_number];
-              if (rect) {
-                const parts = [];
-                if (rect.description) parts.push(rect.description);
-                if (parts.length > 0) description += ` - ${parts.join(' | ')}`;
-              }
+              description = rect?.description || rect?.notes || (language === 'ar' ? 'سند قبض' : 'Receipt Voucher');
             } else if (je.reference_type === 'return' && je.reference_number) {
               const ret = returnsMap[je.reference_number];
-              if (ret) {
-                const parts = [];
-                if (ret.description) parts.push(ret.description);
-                if (ret.notes) parts.push(ret.notes);
-                if (parts.length > 0) description += ` - ${parts.join(' | ')}`;
-              }
+              description = ret?.description || ret?.notes || (language === 'ar' ? 'مرتجع مبيعات' : 'Sales Return');
             }
 
             allEntries.push({

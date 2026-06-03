@@ -107,13 +107,13 @@ export const SupplierStatement: React.FC = () => {
 
                   if (je.reference_type === 'purchase_invoice' && je.reference_number) {
                     const inv = invoicesMap[je.reference_number];
-                    if (inv && inv.description) notes += ` - ${inv.description}`;
+                    notes = inv?.description || inv?.notes || (language === 'ar' ? 'فاتورة مشتريات' : 'Purchase Invoice');
                   } else if (je.reference_type === 'payment_voucher' && je.reference_number) {
                     const voucher = vouchersMap[je.reference_number];
-                    if (voucher && voucher.description) notes += ` - ${voucher.description}`;
+                    notes = voucher?.description || voucher?.notes || (language === 'ar' ? 'سند صرف' : 'Payment Voucher');
                   } else if (je.reference_type === 'purchase_return' && je.reference_number) {
                     const ret = returnsMap[je.reference_number];
-                    if (ret && ret.description) notes += ` - ${ret.description}`;
+                    notes = ret?.description || ret?.notes || (language === 'ar' ? 'مرتجع مشتريات' : 'Purchase Return');
                   }
 
                   allItems.push({
@@ -224,29 +224,15 @@ export const SupplierStatement: React.FC = () => {
           if (item.supplier_id === selectedSupplierId && item.account_id === supplier?.account_id) {
             let notes = item.description || je.description || 'قيد مالي';
 
-            // Enrich notes from source document if available
             if (je.reference_type === 'purchase_invoice' && je.reference_number) {
               const inv = invoicesMap[je.reference_number];
-              if (inv) {
-                const parts = [];
-                if (inv.description) parts.push(inv.description);
-                if (parts.length > 0) notes += ` - ${parts.join(' | ')}`;
-              }
+              notes = inv?.description || inv?.notes || (language === 'ar' ? 'فاتورة مشتريات' : 'Purchase Invoice');
             } else if (je.reference_type === 'payment_voucher' && je.reference_number) {
               const voucher = vouchersMap[je.reference_number];
-              if (voucher) {
-                const parts = [];
-                if (voucher.description) parts.push(voucher.description);
-                if (parts.length > 0) notes += ` - ${parts.join(' | ')}`;
-              }
+              notes = voucher?.description || voucher?.notes || (language === 'ar' ? 'سند صرف' : 'Payment Voucher');
             } else if (je.reference_type === 'purchase_return' && je.reference_number) {
               const ret = returnsMap[je.reference_number];
-              if (ret) {
-                const parts = [];
-                if (ret.description) parts.push(ret.description);
-                if (ret.notes) parts.push(ret.notes);
-                if (parts.length > 0) notes += ` - ${parts.join(' | ')}`;
-              }
+              notes = ret?.description || ret?.notes || (language === 'ar' ? 'مرتجع مشتريات' : 'Purchase Return');
             }
 
             allItems.push({
