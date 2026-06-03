@@ -23,6 +23,7 @@ import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { ExportButtons } from '../components/ExportButtons';
 import { PaginationControls } from '../components/PaginationControls';
 import { useNavigation } from '../contexts/NavigationContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export const CashTransfers: React.FC = () => {
   const { user } = useAuth();
@@ -61,7 +62,7 @@ export const CashTransfers: React.FC = () => {
   const [previewJournalEntry, setPreviewJournalEntry] = useState<JournalEntry | null>(null);
   const [previewActivityLog, setPreviewActivityLog] = useState<Partial<ActivityLog> | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const dir = 'rtl';
+  const { language, dir } = useLanguage();
 
   const closeModal = () => {
     setIsModalOpen(false);

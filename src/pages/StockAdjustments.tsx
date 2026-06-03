@@ -4,7 +4,7 @@ import { useNotification } from '../contexts/NotificationContext';
 import { Warehouse, Product, StockAdjustment, StockAdjustmentItem, Account } from '../types';
 import { 
   Search, Plus, Trash2, X, Sliders, Pencil, 
-  Eye, FileText, History, Printer, Calendar, Hash, Save,
+  Eye, FileText, History, Printer, Calendar, Hash, Layers, Save,
   ChevronRight, ChevronLeft, LayoutGrid, List
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';

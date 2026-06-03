@@ -5,7 +5,7 @@ import { Warehouse, Product, OpeningStockBalance, OpeningStockItem, Account } fr
 import { 
   Search, Plus, Trash2, X, ListPlus, Pencil, 
   Download, Upload, Eye, FileText, History, Printer, 
-  Calendar, Hash, Save, ChevronRight, ChevronLeft, LayoutGrid, List
+  Calendar, Hash, Layers, Save, ChevronRight, ChevronLeft, LayoutGrid, List
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
