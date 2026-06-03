@@ -47,6 +47,7 @@ export const StockBalancesReport: React.FC = () => {
   const [groupBy, setGroupBy] = useState<'all' | 'group' | 'type'>('all');
   const [sortBy, setSortBy] = useState<'code' | 'name' | 'ending_qty' | 'ending_val'>('code');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [viewMode, setViewMode] = useState<'qty_only' | 'qty_and_val' | 'qty_and_end_val'>('qty_and_val');
 
   const reportTableRef = useRef<HTMLTableElement>(null);
 
@@ -379,106 +380,91 @@ export const StockBalancesReport: React.FC = () => {
 
   // Export to Excel handler
   const handleExportExcel = () => {
-    const headers1 = language === 'ar' ? [
-      'الكود', 'الاسم', 'السياسة', 'رصيد أول المدة', '', 'رصيد أول سند', '', 'مشتريات', '', 'مردودات مشتريات', '', 'مبيعات', '', 'مردودات مبيعات', '', 'تحويلات', '', 'تسويات', '', 'رصيد آخر المدة', '', 'قيمة المخزون'
-    ] : [
-      'Code', 'Name', 'Cost Policy', 'Period Start Balance', '', 'Opening Stock Entry', '', 'Purchases', '', 'Purchase Returns', '', 'Sales', '', 'Sales Returns', '', 'Transfers', '', 'Adjustments', '', 'Period End Balance', '', 'Inventory Value'
+    interface ColDef {
+      h1: string;
+      h2: string;
+      val: (item: any) => any;
+    }
+
+    const cols: ColDef[] = [
+      { h1: language === 'ar' ? 'الكود' : 'Code', h2: '', val: (item) => item.product?.code || '' },
+      { h1: language === 'ar' ? 'الاسم' : 'Name', h2: '', val: (item) => item.product?.name || '' },
+      { h1: language === 'ar' ? 'السياسة' : 'Cost Policy', h2: '', val: (item) => item.product ? getCostMethodLabel(item.product.inventory_cost_method) : '' },
+      
+      // Period Start
+      { h1: language === 'ar' ? 'رصيد أول المدة' : 'Period Start Balance', h2: language === 'ar' ? 'كمية' : 'Qty', val: (item) => item.opening_qty },
+      ...(viewMode === 'qty_and_val' ? [{ h1: '', h2: language === 'ar' ? 'قيمة' : 'Val', val: (item: any) => item.opening_val }] : []),
+      
+      // Opening Stock Entry
+      { h1: language === 'ar' ? 'رصيد أول سند' : 'Opening Stock Entry', h2: language === 'ar' ? 'كمية' : 'Qty', val: (item) => item.opb_qty },
+      ...(viewMode === 'qty_and_val' ? [{ h1: '', h2: language === 'ar' ? 'قيمة' : 'Val', val: (item: any) => item.opb_val }] : []),
+      
+      // Purchases
+      { h1: language === 'ar' ? 'مشتريات' : 'Purchases', h2: language === 'ar' ? 'كمية' : 'Qty', val: (item) => item.purchases_qty },
+      ...(viewMode === 'qty_and_val' ? [{ h1: '', h2: language === 'ar' ? 'قيمة' : 'Val', val: (item: any) => item.purchases_val }] : []),
+      
+      // Purchase Returns
+      { h1: language === 'ar' ? 'مردودات مشتريات' : 'Purchase Returns', h2: language === 'ar' ? 'كمية' : 'Qty', val: (item) => Math.abs(item.purchase_returns_qty) },
+      ...(viewMode === 'qty_and_val' ? [{ h1: '', h2: language === 'ar' ? 'قيمة' : 'Val', val: (item: any) => Math.abs(item.purchase_returns_val) }] : []),
+      
+      // Sales
+      { h1: language === 'ar' ? 'مبيعات' : 'Sales', h2: language === 'ar' ? 'كمية' : 'Qty', val: (item) => Math.abs(item.sales_qty) },
+      ...(viewMode === 'qty_and_val' ? [{ h1: '', h2: language === 'ar' ? 'قيمة' : 'Val', val: (item: any) => Math.abs(item.sales_val) }] : []),
+      
+      // Sales Returns
+      { h1: language === 'ar' ? 'مردودات مبيعات' : 'Sales Returns', h2: language === 'ar' ? 'كمية' : 'Qty', val: (item) => item.sales_returns_qty },
+      ...(viewMode === 'qty_and_val' ? [{ h1: '', h2: language === 'ar' ? 'قيمة' : 'Val', val: (item: any) => item.sales_returns_val }] : []),
+      
+      // Transfers
+      { h1: language === 'ar' ? 'تحويلات' : 'Transfers', h2: language === 'ar' ? 'كمية' : 'Qty', val: (item) => item.transfers_qty },
+      ...(viewMode === 'qty_and_val' ? [{ h1: '', h2: language === 'ar' ? 'قيمة' : 'Val', val: (item: any) => item.transfers_val }] : []),
+      
+      // Adjustments
+      { h1: language === 'ar' ? 'تسويات' : 'Adjustments', h2: language === 'ar' ? 'كمية' : 'Qty', val: (item) => item.adjustments_qty },
+      ...(viewMode === 'qty_and_val' ? [{ h1: '', h2: language === 'ar' ? 'قيمة' : 'Val', val: (item: any) => item.adjustments_val }] : []),
+      
+      // Period End
+      { h1: language === 'ar' ? 'رصيد آخر المدة' : 'Period End Balance', h2: language === 'ar' ? 'كمية' : 'Qty', val: (item) => item.ending_qty },
+      ...(viewMode !== 'qty_only' ? [
+        { h1: '', h2: language === 'ar' ? 'قيمة' : 'Val', val: (item: any) => item.ending_val },
+        { h1: language === 'ar' ? 'قيمة المخزون' : 'Inventory Value', h2: language === 'ar' ? 'قيمة' : 'Val', val: (item: any) => item.ending_val }
+      ] : [])
     ];
 
-    const headers2 = language === 'ar' ? [
-      '', '', '', 'كمية', 'قيمة', 'كمية', 'قيمة', 'كمية', 'قيمة', 'كمية', 'قيمة', 'كمية', 'قيمة', 'كمية', 'قيمة', 'كمية', 'قيمة', 'كمية', 'قيمة', 'كمية', 'قيمة', 'قيمة'
-    ] : [
-      '', '', '', 'Qty', 'Val', 'Qty', 'Val', 'Qty', 'Val', 'Qty', 'Val', 'Qty', 'Val', 'Qty', 'Val', 'Qty', 'Val', 'Qty', 'Val', 'Qty', 'Val', 'Val'
-    ];
-
+    const headers1 = cols.map(c => c.h1);
+    const headers2 = cols.map(c => c.h2);
     const rows: any[] = [headers1, headers2];
 
     groupedData.forEach(group => {
       if (groupBy !== 'all') {
-        rows.push([group.name, '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+        const groupTitleRow = new Array(cols.length).fill('');
+        groupTitleRow[0] = group.name;
+        rows.push(groupTitleRow);
       }
 
       group.items.forEach((item: any) => {
-        rows.push([
-          item.product.code || '',
-          item.product.name || '',
-          getCostMethodLabel(item.product.inventory_cost_method),
-          item.opening_qty,
-          item.opening_val,
-          item.opb_qty,
-          item.opb_val,
-          item.purchases_qty,
-          item.purchases_val,
-          Math.abs(item.purchase_returns_qty),
-          Math.abs(item.purchase_returns_val),
-          Math.abs(item.sales_qty),
-          Math.abs(item.sales_val),
-          item.sales_returns_qty,
-          item.sales_returns_val,
-          item.transfers_qty,
-          item.transfers_val,
-          item.adjustments_qty,
-          item.adjustments_val,
-          item.ending_qty,
-          item.ending_val,
-          item.ending_val
-        ]);
+        const itemRow = cols.map(c => c.val(item));
+        rows.push(itemRow);
       });
 
       if (groupBy !== 'all' && group.items.length > 0) {
         const subTotals = getTotals(group.items);
-        rows.push([
-          language === 'ar' ? `إجمالي: ${group.name}` : `Total: ${group.name}`,
-          '',
-          '',
-          subTotals.opening_qty,
-          subTotals.opening_val,
-          subTotals.opb_qty,
-          subTotals.opb_val,
-          subTotals.purchases_qty,
-          subTotals.purchases_val,
-          Math.abs(subTotals.purchase_returns_qty),
-          Math.abs(subTotals.purchase_returns_val),
-          Math.abs(subTotals.sales_qty),
-          Math.abs(subTotals.sales_val),
-          subTotals.sales_returns_qty,
-          subTotals.sales_returns_val,
-          subTotals.transfers_qty,
-          subTotals.transfers_val,
-          subTotals.adjustments_qty,
-          subTotals.adjustments_val,
-          subTotals.ending_qty,
-          subTotals.ending_val,
-          subTotals.ending_val
-        ]);
+        const subtotalRow = cols.map((c, index) => {
+          if (index === 0) return language === 'ar' ? `إجمالي: ${group.name}` : `Total: ${group.name}`;
+          if (index === 1 || index === 2) return '';
+          return c.val(subTotals);
+        });
+        rows.push(subtotalRow);
       }
     });
 
     // Grand Totals row
-    rows.push([
-      language === 'ar' ? 'الإجمالي العام' : 'Grand Total',
-      '',
-      '',
-      grandTotals.opening_qty,
-      grandTotals.opening_val,
-      grandTotals.opb_qty,
-      grandTotals.opb_val,
-      grandTotals.purchases_qty,
-      grandTotals.purchases_val,
-      Math.abs(grandTotals.purchase_returns_qty),
-      Math.abs(grandTotals.purchase_returns_val),
-      Math.abs(grandTotals.sales_qty),
-      Math.abs(grandTotals.sales_val),
-      grandTotals.sales_returns_qty,
-      grandTotals.sales_returns_val,
-      grandTotals.transfers_qty,
-      grandTotals.transfers_val,
-      grandTotals.adjustments_qty,
-      grandTotals.adjustments_val,
-      grandTotals.ending_qty,
-      grandTotals.ending_val,
-      grandTotals.ending_val
-    ]);
+    const grandTotalRow = cols.map((c, index) => {
+      if (index === 0) return language === 'ar' ? 'الإجمالي العام' : 'Grand Total';
+      if (index === 1 || index === 2) return '';
+      return c.val(grandTotals);
+    });
+    rows.push(grandTotalRow);
 
     exportToExcel(rows, {
       filename: `Stock_Balances_Report_${dateFrom}_to_${dateTo}`,
@@ -529,6 +515,9 @@ export const StockBalancesReport: React.FC = () => {
       setSortOrder('asc');
     }
   };
+
+  const totalColumns = viewMode === 'qty_and_val' ? 22 : (viewMode === 'qty_only' ? 12 : 14);
+  const tableMinWidthClass = viewMode === 'qty_only' ? 'min-w-[1200px]' : (viewMode === 'qty_and_end_val' ? 'min-w-[1400px]' : 'min-w-[2000px]');
 
   return (
     <div className="space-y-8" dir={dir}>
@@ -696,6 +685,20 @@ export const StockBalancesReport: React.FC = () => {
               </select>
             </div>
 
+            {/* View Mode select */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-400">{language === 'ar' ? 'طريقة العرض: ' : 'View Mode: '}</span>
+              <select
+                className="bg-white border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-black text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                value={viewMode}
+                onChange={(e) => setViewMode(e.target.value as any)}
+              >
+                <option value="qty_and_val">{language === 'ar' ? 'الكميات والقيمة' : 'Qty and Value'}</option>
+                <option value="qty_only">{language === 'ar' ? 'الكميات فقط' : 'Qty Only'}</option>
+                <option value="qty_and_end_val">{language === 'ar' ? 'الكميات وقيمة رصيد آخر المدة' : 'Qty and Ending Value'}</option>
+              </select>
+            </div>
+
             {/* Zero balance toggle */}
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input 
@@ -761,20 +764,20 @@ export const StockBalancesReport: React.FC = () => {
           </div>
         ) : (
           <div className="overflow-x-auto custom-scrollbar">
-            <table ref={reportTableRef} className="w-full min-w-[2000px] border-collapse bg-white text-center text-[11px] font-bold">
+            <table ref={reportTableRef} className={`w-full ${tableMinWidthClass} border-collapse bg-white text-center text-[11px] font-bold`}>
               <thead className="bg-slate-50 text-[10px] uppercase font-black tracking-wider text-slate-400 border-b border-slate-200">
                 {/* Double-header - Row 1 */}
                 <tr>
                   <th colSpan={3} className="px-4 py-3 border-r border-slate-200 text-slate-500 font-black">{language === 'ar' ? 'تفاصيل الصنف' : 'Product Details'}</th>
-                  <th colSpan={2} className="px-4 py-3 border-r border-slate-200 bg-slate-100/50 text-slate-600 font-bold">{language === 'ar' ? 'أول الفترة' : 'Period Start'}</th>
-                  <th colSpan={2} className="px-4 py-3 border-r border-slate-200 bg-teal-50/20 text-teal-800 font-bold">{language === 'ar' ? 'رصيد أول سند' : 'Opening Doc'}</th>
-                  <th colSpan={2} className="px-4 py-3 border-r border-slate-200 bg-emerald-50/30 text-emerald-800 font-bold">{language === 'ar' ? 'مشتريات' : 'Purchases'}</th>
-                  <th colSpan={2} className="px-4 py-3 border-r border-slate-200 bg-rose-50/20 text-rose-800 font-bold">{language === 'ar' ? 'مردودات مشتريات' : 'Purchase Returns'}</th>
-                  <th colSpan={2} className="px-4 py-3 border-r border-slate-200 bg-sky-50/30 text-sky-800 font-bold">{language === 'ar' ? 'مبيعات' : 'Sales'}</th>
-                  <th colSpan={2} className="px-4 py-3 border-r border-slate-200 bg-orange-50/20 text-orange-800 font-bold">{language === 'ar' ? 'مردودات مبيعات' : 'Sales Returns'}</th>
-                  <th colSpan={2} className="px-4 py-3 border-r border-slate-200 bg-purple-50/20 text-purple-800 font-bold">{language === 'ar' ? 'صافي تحويلات' : 'Transfers'}</th>
-                  <th colSpan={2} className="px-4 py-3 border-r border-slate-200 bg-amber-50/20 text-amber-800 font-bold">{language === 'ar' ? 'تسويات' : 'Adjustments'}</th>
-                  <th colSpan={3} className="px-4 py-3 bg-zinc-100 text-zinc-900 font-black">{language === 'ar' ? 'رصيد آخر الفترة والقيمة' : 'Period End Balance'}</th>
+                  <th colSpan={viewMode === 'qty_and_val' ? 2 : 1} className="px-4 py-3 border-r border-slate-200 bg-slate-100/50 text-slate-600 font-bold">{language === 'ar' ? 'أول الفترة' : 'Period Start'}</th>
+                  <th colSpan={viewMode === 'qty_and_val' ? 2 : 1} className="px-4 py-3 border-r border-slate-200 bg-teal-50/20 text-teal-800 font-bold">{language === 'ar' ? 'رصيد أول سند' : 'Opening Doc'}</th>
+                  <th colSpan={viewMode === 'qty_and_val' ? 2 : 1} className="px-4 py-3 border-r border-slate-200 bg-emerald-50/30 text-emerald-800 font-bold">{language === 'ar' ? 'مشتريات' : 'Purchases'}</th>
+                  <th colSpan={viewMode === 'qty_and_val' ? 2 : 1} className="px-4 py-3 border-r border-slate-200 bg-rose-50/20 text-rose-800 font-bold">{language === 'ar' ? 'مردودات مشتريات' : 'Purchase Returns'}</th>
+                  <th colSpan={viewMode === 'qty_and_val' ? 2 : 1} className="px-4 py-3 border-r border-slate-200 bg-sky-50/30 text-sky-800 font-bold">{language === 'ar' ? 'مبيعات' : 'Sales'}</th>
+                  <th colSpan={viewMode === 'qty_and_val' ? 2 : 1} className="px-4 py-3 border-r border-slate-200 bg-orange-50/20 text-orange-800 font-bold">{language === 'ar' ? 'مردودات مبيعات' : 'Sales Returns'}</th>
+                  <th colSpan={viewMode === 'qty_and_val' ? 2 : 1} className="px-4 py-3 border-r border-slate-200 bg-purple-50/20 text-purple-800 font-bold">{language === 'ar' ? 'صافي تحويلات' : 'Transfers'}</th>
+                  <th colSpan={viewMode === 'qty_and_val' ? 2 : 1} className="px-4 py-3 border-r border-slate-200 bg-amber-50/20 text-amber-800 font-bold">{language === 'ar' ? 'تسويات' : 'Adjustments'}</th>
+                  <th colSpan={viewMode === 'qty_only' ? 1 : 3} className="px-4 py-3 bg-zinc-100 text-zinc-900 font-black">{language === 'ar' ? 'رصيد آخر الفترة والقيمة' : 'Period End Balance'}</th>
                 </tr>
                 {/* Double-header - Row 2 */}
                 <tr className="border-b border-slate-200 bg-slate-50/30">
@@ -788,44 +791,48 @@ export const StockBalancesReport: React.FC = () => {
                   
                   {/* Start */}
                   <th className="px-3 py-2 border-r border-slate-200 bg-slate-100/20 text-slate-500">{language === 'ar' ? 'كمية' : 'Qty'}</th>
-                  <th className="px-3 py-2 border-r border-slate-200 bg-slate-100/20 text-slate-500">{language === 'ar' ? 'قيمة' : 'Val'}</th>
+                  {viewMode === 'qty_and_val' && <th className="px-3 py-2 border-r border-slate-200 bg-slate-100/20 text-slate-500">{language === 'ar' ? 'قيمة' : 'Val'}</th>}
                   
                   {/* Opening balance doc */}
                   <th className="px-3 py-2 border-r border-slate-200 bg-teal-50/10 text-teal-600">{language === 'ar' ? 'كمية' : 'Qty'}</th>
-                  <th className="px-3 py-2 border-r border-slate-200 bg-teal-50/10 text-teal-600">{language === 'ar' ? 'قيمة' : 'Val'}</th>
+                  {viewMode === 'qty_and_val' && <th className="px-3 py-2 border-r border-slate-200 bg-teal-50/10 text-teal-600">{language === 'ar' ? 'قيمة' : 'Val'}</th>}
 
                   {/* Purchases */}
                   <th className="px-3 py-2 border-r border-slate-200 bg-emerald-50/10 text-emerald-600">{language === 'ar' ? 'كمية' : 'Qty'}</th>
-                  <th className="px-3 py-2 border-r border-slate-200 bg-emerald-50/10 text-emerald-600">{language === 'ar' ? 'قيمة' : 'Val'}</th>
+                  {viewMode === 'qty_and_val' && <th className="px-3 py-2 border-r border-slate-200 bg-emerald-50/10 text-emerald-600">{language === 'ar' ? 'قيمة' : 'Val'}</th>}
 
                   {/* Purchase Returns */}
                   <th className="px-3 py-2 border-r border-slate-200 bg-rose-50/10 text-rose-600">{language === 'ar' ? 'كمية' : 'Qty'}</th>
-                  <th className="px-3 py-2 border-r border-slate-200 bg-rose-50/10 text-rose-600">{language === 'ar' ? 'قيمة' : 'Val'}</th>
+                  {viewMode === 'qty_and_val' && <th className="px-3 py-2 border-r border-slate-200 bg-rose-50/10 text-rose-600">{language === 'ar' ? 'قيمة' : 'Val'}</th>}
 
                   {/* Sales */}
                   <th className="px-3 py-2 border-r border-slate-200 bg-sky-50/10 text-sky-600">{language === 'ar' ? 'كمية' : 'Qty'}</th>
-                  <th className="px-3 py-2 border-r border-slate-200 bg-sky-50/10 text-sky-600">{language === 'ar' ? 'قيمة' : 'Val'}</th>
+                  {viewMode === 'qty_and_val' && <th className="px-3 py-2 border-r border-slate-200 bg-sky-50/10 text-sky-600">{language === 'ar' ? 'قيمة' : 'Val'}</th>}
 
                   {/* Sales Returns */}
                   <th className="px-3 py-2 border-r border-slate-200 bg-orange-50/10 text-orange-600">{language === 'ar' ? 'كمية' : 'Qty'}</th>
-                  <th className="px-3 py-2 border-r border-slate-200 bg-orange-50/10 text-orange-600">{language === 'ar' ? 'قيمة' : 'Val'}</th>
+                  {viewMode === 'qty_and_val' && <th className="px-3 py-2 border-r border-slate-200 bg-orange-50/10 text-orange-600">{language === 'ar' ? 'قيمة' : 'Val'}</th>}
 
                   {/* Transfers */}
                   <th className="px-3 py-2 border-r border-slate-200 bg-purple-50/10 text-purple-600">{language === 'ar' ? 'كمية' : 'Qty'}</th>
-                  <th className="px-3 py-2 border-r border-slate-200 bg-purple-50/10 text-purple-600">{language === 'ar' ? 'قيمة' : 'Val'}</th>
+                  {viewMode === 'qty_and_val' && <th className="px-3 py-2 border-r border-slate-200 bg-purple-50/10 text-purple-600">{language === 'ar' ? 'قيمة' : 'Val'}</th>}
 
                   {/* Adjustments */}
                   <th className="px-3 py-2 border-r border-slate-200 bg-amber-50/10 text-amber-600">{language === 'ar' ? 'كمية' : 'Qty'}</th>
-                  <th className="px-3 py-2 border-r border-slate-200 bg-amber-50/10 text-amber-600">{language === 'ar' ? 'قيمة' : 'Val'}</th>
+                  {viewMode === 'qty_and_val' && <th className="px-3 py-2 border-r border-slate-200 bg-amber-50/10 text-amber-600">{language === 'ar' ? 'قيمة' : 'Val'}</th>}
 
                   {/* End */}
                   <th className="px-3 py-2 border-r border-slate-250 bg-zinc-200/50 text-zinc-900 cursor-pointer" onClick={() => toggleSort('ending_qty')}>
                     {language === 'ar' ? 'كمية آخر' : 'Qty End'} {sortBy === 'ending_qty' && (sortOrder === 'asc' ? '▲' : '▼')}
                   </th>
-                  <th className="px-3 py-2 border-r border-slate-250 bg-zinc-200/50 text-zinc-900 cursor-pointer" onClick={() => toggleSort('ending_val')}>
-                    {language === 'ar' ? 'القيمة' : 'Inventory Val'} {sortBy === 'ending_val' && (sortOrder === 'asc' ? '▲' : '▼')}
-                  </th>
-                  <th className="px-3 py-2 bg-emerald-100 text-emerald-800">{language === 'ar' ? 'قيمة المخزون' : 'Stock Value'}</th>
+                  {viewMode !== 'qty_only' && (
+                    <>
+                      <th className="px-3 py-2 border-r border-slate-250 bg-zinc-200/50 text-zinc-900 cursor-pointer" onClick={() => toggleSort('ending_val')}>
+                        {language === 'ar' ? 'القيمة' : 'Inventory Val'} {sortBy === 'ending_val' && (sortOrder === 'asc' ? '▲' : '▼')}
+                      </th>
+                      <th className="px-3 py-2 bg-emerald-100 text-emerald-800">{language === 'ar' ? 'قيمة المخزون' : 'Stock Value'}</th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -834,7 +841,7 @@ export const StockBalancesReport: React.FC = () => {
                     {/* Render Group Title Header */}
                     {groupBy !== 'all' && (
                       <tr className="bg-slate-50/80 font-black text-slate-900 text-right">
-                        <td colSpan={22} className="px-6 py-3 font-extrabold text-sm border-y border-slate-200 text-indigo-900">
+                        <td colSpan={totalColumns} className="px-6 py-3 font-extrabold text-sm border-y border-slate-200 text-indigo-900">
                           {groupBy === 'group' ? (language === 'ar' ? 'مجموعة: ' : 'Group: ') : (language === 'ar' ? 'نوع: ' : 'Type: ')}
                           {group.name}
                         </td>
@@ -850,40 +857,44 @@ export const StockBalancesReport: React.FC = () => {
                         
                         {/* Opening stats */}
                         <td className="px-3 py-3.5 border-r border-slate-200 bg-slate-50/20 font-mono text-slate-600">{item.opening_qty !== 0 ? formatNumber(item.opening_qty) : '-'}</td>
-                        <td className="px-3 py-3.5 border-r border-slate-200 bg-slate-50/20 font-mono text-slate-600">{item.opening_val !== 0 ? formatNumber(item.opening_val) : '-'}</td>
+                        {viewMode === 'qty_and_val' && <td className="px-3 py-3.5 border-r border-slate-200 bg-slate-50/20 font-mono text-slate-600">{item.opening_val !== 0 ? formatNumber(item.opening_val) : '-'}</td>}
 
                         {/* Opening Doc stats */}
                         <td className="px-3 py-3.5 border-r border-slate-200 bg-teal-50/5 font-mono text-slate-800">{item.opb_qty !== 0 ? formatNumber(item.opb_qty) : '-'}</td>
-                        <td className="px-3 py-3.5 border-r border-slate-200 bg-teal-50/5 font-mono text-slate-800">{item.opb_val !== 0 ? formatNumber(item.opb_val) : '-'}</td>
+                        {viewMode === 'qty_and_val' && <td className="px-3 py-3.5 border-r border-slate-200 bg-teal-50/5 font-mono text-slate-800">{item.opb_val !== 0 ? formatNumber(item.opb_val) : '-'}</td>}
 
                         {/* Purchases stats */}
                         <td className="px-3 py-3.5 border-r border-slate-200 bg-emerald-50/5 font-mono text-slate-800">{item.purchases_qty !== 0 ? formatNumber(item.purchases_qty) : '-'}</td>
-                        <td className="px-3 py-3.5 border-r border-slate-200 bg-emerald-50/5 font-mono text-slate-800">{item.purchases_val !== 0 ? formatNumber(item.purchases_val) : '-'}</td>
+                        {viewMode === 'qty_and_val' && <td className="px-3 py-3.5 border-r border-slate-200 bg-emerald-50/5 font-mono text-slate-800">{item.purchases_val !== 0 ? formatNumber(item.purchases_val) : '-'}</td>}
 
                         {/* Purchase returns stats */}
                         <td className="px-3 py-3.5 border-r border-slate-200 bg-rose-50/5 font-mono text-rose-600">{item.purchase_returns_qty !== 0 ? formatNumber(Math.abs(item.purchase_returns_qty)) : '-'}</td>
-                        <td className="px-3 py-3.5 border-r border-slate-200 bg-rose-50/5 font-mono text-rose-600">{item.purchase_returns_val !== 0 ? formatNumber(Math.abs(item.purchase_returns_val)) : '-'}</td>
+                        {viewMode === 'qty_and_val' && <td className="px-3 py-3.5 border-r border-slate-200 bg-rose-50/5 font-mono text-rose-600">{item.purchase_returns_val !== 0 ? formatNumber(Math.abs(item.purchase_returns_val)) : '-'}</td>}
 
                         {/* Sales stats */}
                         <td className="px-3 py-3.5 border-r border-slate-200 bg-sky-50/5 font-mono text-slate-800">{item.sales_qty !== 0 ? formatNumber(Math.abs(item.sales_qty)) : '-'}</td>
-                        <td className="px-3 py-3.5 border-r border-slate-200 bg-sky-50/5 font-mono text-slate-800">{item.sales_val !== 0 ? formatNumber(Math.abs(item.sales_val)) : '-'}</td>
+                        {viewMode === 'qty_and_val' && <td className="px-3 py-3.5 border-r border-slate-200 bg-sky-50/5 font-mono text-slate-800">{item.sales_val !== 0 ? formatNumber(Math.abs(item.sales_val)) : '-'}</td>}
 
                         {/* Sales returns stats */}
                         <td className="px-3 py-3.5 border-r border-slate-200 bg-orange-50/5 font-mono text-slate-800">{item.sales_returns_qty !== 0 ? formatNumber(item.sales_returns_qty) : '-'}</td>
-                        <td className="px-3 py-3.5 border-r border-slate-200 bg-orange-50/5 font-mono text-slate-800">{item.sales_returns_val !== 0 ? formatNumber(item.sales_returns_val) : '-'}</td>
+                        {viewMode === 'qty_and_val' && <td className="px-3 py-3.5 border-r border-slate-200 bg-orange-50/5 font-mono text-slate-800">{item.sales_returns_val !== 0 ? formatNumber(item.sales_returns_val) : '-'}</td>}
 
                         {/* Transfers stats */}
                         <td className="px-3 py-3.5 border-r border-slate-200 bg-purple-50/5 font-mono text-slate-800">{item.transfers_qty !== 0 ? formatNumber(item.transfers_qty) : '-'}</td>
-                        <td className="px-3 py-3.5 border-r border-slate-200 bg-purple-50/5 font-mono text-slate-800">{item.transfers_val !== 0 ? formatNumber(item.transfers_val) : '-'}</td>
+                        {viewMode === 'qty_and_val' && <td className="px-3 py-3.5 border-r border-slate-200 bg-purple-50/5 font-mono text-slate-800">{item.transfers_val !== 0 ? formatNumber(item.transfers_val) : '-'}</td>}
 
                         {/* Adjustments stats */}
                         <td className="px-3 py-3.5 border-r border-slate-200 bg-amber-50/5 font-mono text-slate-800">{item.adjustments_qty !== 0 ? formatNumber(item.adjustments_qty) : '-'}</td>
-                        <td className="px-3 py-3.5 border-r border-slate-200 bg-amber-50/5 font-mono text-slate-800">{item.adjustments_val !== 0 ? formatNumber(item.adjustments_val) : '-'}</td>
+                        {viewMode === 'qty_and_val' && <td className="px-3 py-3.5 border-r border-slate-200 bg-amber-50/5 font-mono text-slate-800">{item.adjustments_val !== 0 ? formatNumber(item.adjustments_val) : '-'}</td>}
 
                         {/* Ending stats */}
                         <td className="px-3 py-3.5 border-r border-slate-250 bg-slate-100/50 font-mono text-slate-900 font-black">{formatNumber(item.ending_qty)}</td>
-                        <td className="px-3 py-3.5 border-r border-slate-250 bg-slate-100/50 font-mono text-slate-900 font-black">{formatNumber(item.ending_val)}</td>
-                        <td className="px-3 py-3.5 bg-emerald-50 font-mono text-emerald-800 font-black">{formatNumber(item.ending_val)}</td>
+                        {viewMode !== 'qty_only' && (
+                          <>
+                            <td className="px-3 py-3.5 border-r border-slate-250 bg-slate-100/50 font-mono text-slate-900 font-black">{formatNumber(item.ending_val)}</td>
+                            <td className="px-3 py-3.5 bg-emerald-50 font-mono text-emerald-800 font-black">{formatNumber(item.ending_val)}</td>
+                          </>
+                        )}
                       </tr>
                     ))}
 
@@ -897,25 +908,29 @@ export const StockBalancesReport: React.FC = () => {
                           </td>
                           {/* Totals values */}
                           <td className="px-3 py-3 font-mono">{subTotals.opening_qty !== 0 ? formatNumber(subTotals.opening_qty) : '-'}</td>
-                          <td className="px-3 py-3 font-mono">{subTotals.opening_val !== 0 ? formatNumber(subTotals.opening_val) : '-'}</td>
+                          {viewMode === 'qty_and_val' && <td className="px-3 py-3 font-mono">{subTotals.opening_val !== 0 ? formatNumber(subTotals.opening_val) : '-'}</td>}
                           <td className="px-3 py-3 font-mono">{subTotals.opb_qty !== 0 ? formatNumber(subTotals.opb_qty) : '-'}</td>
-                          <td className="px-3 py-3 font-mono">{subTotals.opb_val !== 0 ? formatNumber(subTotals.opb_val) : '-'}</td>
+                          {viewMode === 'qty_and_val' && <td className="px-3 py-3 font-mono">{subTotals.opb_val !== 0 ? formatNumber(subTotals.opb_val) : '-'}</td>}
                           <td className="px-3 py-3 font-mono">{subTotals.purchases_qty !== 0 ? formatNumber(subTotals.purchases_qty) : '-'}</td>
-                          <td className="px-3 py-3 font-mono">{subTotals.purchases_val !== 0 ? formatNumber(subTotals.purchases_val) : '-'}</td>
+                          {viewMode === 'qty_and_val' && <td className="px-3 py-3 font-mono">{subTotals.purchases_val !== 0 ? formatNumber(subTotals.purchases_val) : '-'}</td>}
                           <td className="px-3 py-3 font-mono text-rose-600">{subTotals.purchase_returns_qty !== 0 ? formatNumber(Math.abs(subTotals.purchase_returns_qty)) : '-'}</td>
-                          <td className="px-3 py-3 font-mono text-rose-600">{subTotals.purchase_returns_val !== 0 ? formatNumber(Math.abs(subTotals.purchase_returns_val)) : '-'}</td>
+                          {viewMode === 'qty_and_val' && <td className="px-3 py-3 font-mono text-rose-600">{subTotals.purchase_returns_val !== 0 ? formatNumber(Math.abs(subTotals.purchase_returns_val)) : '-'}</td>}
                           <td className="px-3 py-3 font-mono">{subTotals.sales_qty !== 0 ? formatNumber(Math.abs(subTotals.sales_qty)) : '-'}</td>
-                          <td className="px-3 py-3 font-mono">{subTotals.sales_val !== 0 ? formatNumber(Math.abs(subTotals.sales_val)) : '-'}</td>
+                          {viewMode === 'qty_and_val' && <td className="px-3 py-3 font-mono">{subTotals.sales_val !== 0 ? formatNumber(Math.abs(subTotals.sales_val)) : '-'}</td>}
                           <td className="px-3 py-3 font-mono">{subTotals.sales_returns_qty !== 0 ? formatNumber(subTotals.sales_returns_qty) : '-'}</td>
-                          <td className="px-3 py-3 font-mono">{subTotals.sales_returns_val !== 0 ? formatNumber(subTotals.sales_returns_val) : '-'}</td>
+                          {viewMode === 'qty_and_val' && <td className="px-3 py-3 font-mono">{subTotals.sales_returns_val !== 0 ? formatNumber(subTotals.sales_returns_val) : '-'}</td>}
                           <td className="px-3 py-3 font-mono">{subTotals.transfers_qty !== 0 ? formatNumber(subTotals.transfers_qty) : '-'}</td>
-                          <td className="px-3 py-3 font-mono">{subTotals.transfers_val !== 0 ? formatNumber(subTotals.transfers_val) : '-'}</td>
+                          {viewMode === 'qty_and_val' && <td className="px-3 py-3 font-mono">{subTotals.transfers_val !== 0 ? formatNumber(subTotals.transfers_val) : '-'}</td>}
                           <td className="px-3 py-3 font-mono">{subTotals.adjustments_qty !== 0 ? formatNumber(subTotals.adjustments_qty) : '-'}</td>
-                          <td className="px-3 py-3 font-mono">{subTotals.adjustments_val !== 0 ? formatNumber(subTotals.adjustments_val) : '-'}</td>
+                          {viewMode === 'qty_and_val' && <td className="px-3 py-3 font-mono">{subTotals.adjustments_val !== 0 ? formatNumber(subTotals.adjustments_val) : '-'}</td>}
                           
                           <td className="px-3 py-3 font-mono text-slate-900 bg-slate-200/50 font-black">{formatNumber(subTotals.ending_qty)}</td>
-                          <td className="px-3 py-3 font-mono text-slate-900 bg-slate-200/50 font-black">{formatNumber(subTotals.ending_val)}</td>
-                          <td className="px-3 py-3 font-mono text-emerald-800 bg-emerald-100/50 font-black">{formatNumber(subTotals.ending_val)}</td>
+                          {viewMode !== 'qty_only' && (
+                            <>
+                              <td className="px-3 py-3 font-mono text-slate-900 bg-slate-200/50 font-black">{formatNumber(subTotals.ending_val)}</td>
+                              <td className="px-3 py-3 font-mono text-emerald-800 bg-emerald-100/50 font-black">{formatNumber(subTotals.ending_val)}</td>
+                            </>
+                          )}
                         </tr>
                       );
                     })()}
@@ -928,25 +943,29 @@ export const StockBalancesReport: React.FC = () => {
                     {language === 'ar' ? 'الإجمالي العام للمخزون' : 'Inventory Grand Total'}
                   </td>
                   <td className="px-3 py-4 font-mono">{grandTotals.opening_qty !== 0 ? formatNumber(grandTotals.opening_qty) : '-'}</td>
-                  <td className="px-3 py-4 font-mono">{grandTotals.opening_val !== 0 ? formatNumber(grandTotals.opening_val) : '-'}</td>
+                  {viewMode === 'qty_and_val' && <td className="px-3 py-4 font-mono">{grandTotals.opening_val !== 0 ? formatNumber(grandTotals.opening_val) : '-'}</td>}
                   <td className="px-3 py-4 font-mono">{grandTotals.opb_qty !== 0 ? formatNumber(grandTotals.opb_qty) : '-'}</td>
-                  <td className="px-3 py-4 font-mono">{grandTotals.opb_val !== 0 ? formatNumber(grandTotals.opb_val) : '-'}</td>
+                  {viewMode === 'qty_and_val' && <td className="px-3 py-4 font-mono">{grandTotals.opb_val !== 0 ? formatNumber(grandTotals.opb_val) : '-'}</td>}
                   <td className="px-3 py-4 font-mono">{grandTotals.purchases_qty !== 0 ? formatNumber(grandTotals.purchases_qty) : '-'}</td>
-                  <td className="px-3 py-4 font-mono">{grandTotals.purchases_val !== 0 ? formatNumber(grandTotals.purchases_val) : '-'}</td>
+                  {viewMode === 'qty_and_val' && <td className="px-3 py-4 font-mono">{grandTotals.purchases_val !== 0 ? formatNumber(grandTotals.purchases_val) : '-'}</td>}
                   <td className="px-3 py-4 font-mono text-rose-300">{grandTotals.purchase_returns_qty !== 0 ? formatNumber(Math.abs(grandTotals.purchase_returns_qty)) : '-'}</td>
-                  <td className="px-3 py-4 font-mono text-rose-300">{grandTotals.purchase_returns_val !== 0 ? formatNumber(Math.abs(grandTotals.purchase_returns_val)) : '-'}</td>
+                  {viewMode === 'qty_and_val' && <td className="px-3 py-4 font-mono text-rose-300">{grandTotals.purchase_returns_val !== 0 ? formatNumber(Math.abs(grandTotals.purchase_returns_val)) : '-'}</td>}
                   <td className="px-3 py-4 font-mono">{grandTotals.sales_qty !== 0 ? formatNumber(Math.abs(grandTotals.sales_qty)) : '-'}</td>
-                  <td className="px-3 py-4 font-mono">{grandTotals.sales_val !== 0 ? formatNumber(Math.abs(grandTotals.sales_val)) : '-'}</td>
+                  {viewMode === 'qty_and_val' && <td className="px-3 py-4 font-mono">{grandTotals.sales_val !== 0 ? formatNumber(Math.abs(grandTotals.sales_val)) : '-'}</td>}
                   <td className="px-3 py-4 font-mono">{grandTotals.sales_returns_qty !== 0 ? formatNumber(grandTotals.sales_returns_qty) : '-'}</td>
-                  <td className="px-3 py-4 font-mono">{grandTotals.sales_returns_val !== 0 ? formatNumber(grandTotals.sales_returns_val) : '-'}</td>
+                  {viewMode === 'qty_and_val' && <td className="px-3 py-4 font-mono">{grandTotals.sales_returns_val !== 0 ? formatNumber(grandTotals.sales_returns_val) : '-'}</td>}
                   <td className="px-3 py-4 font-mono">{grandTotals.transfers_qty !== 0 ? formatNumber(grandTotals.transfers_qty) : '-'}</td>
-                  <td className="px-3 py-4 font-mono">{grandTotals.transfers_val !== 0 ? formatNumber(grandTotals.transfers_val) : '-'}</td>
+                  {viewMode === 'qty_and_val' && <td className="px-3 py-4 font-mono">{grandTotals.transfers_val !== 0 ? formatNumber(grandTotals.transfers_val) : '-'}</td>}
                   <td className="px-3 py-4 font-mono">{grandTotals.adjustments_qty !== 0 ? formatNumber(grandTotals.adjustments_qty) : '-'}</td>
-                  <td className="px-3 py-4 font-mono">{grandTotals.adjustments_val !== 0 ? formatNumber(grandTotals.adjustments_val) : '-'}</td>
+                  {viewMode === 'qty_and_val' && <td className="px-3 py-4 font-mono">{grandTotals.adjustments_val !== 0 ? formatNumber(grandTotals.adjustments_val) : '-'}</td>}
                   
                   <td className="px-3 py-4 font-mono bg-zinc-800 text-zinc-100 font-extrabold">{formatNumber(grandTotals.ending_qty)}</td>
-                  <td className="px-3 py-4 font-mono bg-zinc-800 text-zinc-100 font-extrabold">{formatNumber(grandTotals.ending_val)}</td>
-                  <td className="px-3 py-4 font-mono bg-emerald-800 text-emerald-100 font-extrabold">{formatNumber(grandTotals.ending_val)}</td>
+                  {viewMode !== 'qty_only' && (
+                    <>
+                      <td className="px-3 py-4 font-mono bg-zinc-800 text-zinc-100 font-extrabold">{formatNumber(grandTotals.ending_val)}</td>
+                      <td className="px-3 py-4 font-mono bg-emerald-800 text-emerald-100 font-extrabold">{formatNumber(grandTotals.ending_val)}</td>
+                    </>
+                  )}
                 </tr>
               </tbody>
             </table>
