@@ -134,13 +134,15 @@ export async function initDatabase() {
         "id" VARCHAR(36) PRIMARY KEY,
         "company_id" VARCHAR(36),
         "user_id" VARCHAR(36),
-        "user_email" VARCHAR(100),
+        "username" VARCHAR(255),
+        "user_email" VARCHAR(255),
         "action" VARCHAR(100) NOT NULL,
-        "resource" VARCHAR(100) NOT NULL,
-        "resource_id" VARCHAR(36),
-        "changes" JSONB,
-        "severity" VARCHAR(20) DEFAULT 'info',
+        "module" VARCHAR(100),
+        "details" TEXT,
+        "entity_type" VARCHAR(100),
+        "entity_id" VARCHAR(100),
         "ip_address" VARCHAR(45),
+        "metadata" JSONB DEFAULT '{}',
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `, 'audit_logs table');
