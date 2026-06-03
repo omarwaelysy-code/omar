@@ -59,6 +59,128 @@ export const SupplierStatement: React.FC = () => {
     }
   }, [user]);
 
+  // Auto-run statement generation if redirected from balances report
+  useEffect(() => {
+    if (user && suppliers.length > 0) {
+      const savedSupId = sessionStorage.getItem('supplier_statement_filter_supplier_id');
+      const savedStart = sessionStorage.getItem('supplier_statement_filter_start_date');
+      const savedEnd = sessionStorage.getItem('supplier_statement_filter_end_date');
+      
+      if (savedSupId) {
+        setSelectedSupplierId(savedSupId);
+        setStartDate(savedStart || '');
+        setEndDate(savedEnd || new Date().toISOString().slice(0, 10));
+        
+        sessionStorage.removeItem('supplier_statement_filter_supplier_id');
+        sessionStorage.removeItem('supplier_statement_filter_start_date');
+        sessionStorage.removeItem('supplier_statement_filter_end_date');
+        
+        const runAutoGenerate = async () => {
+          setLoading(true);
+          try {
+            const supplier = suppliers.find(s => s.id === savedSupId);
+            const opBal = supplier?.opening_balance || 0;
+            setOpeningBalance(opBal);
+
+            const [invoices, returns, vouchers, discounts, journalEntries] = await Promise.all([
+              dbService.list<PurchaseInvoice>('purchase_invoices', user.company_id),
+              dbService.list<PurchaseReturn>('purchase_returns', user.company_id),
+              dbService.list<PaymentVoucher>('payment_vouchers', user.company_id),
+              dbService.list<any>('supplier_discounts', user.company_id),
+              dbService.list<any>('journal_entries', user.company_id)
+            ]);
+
+            const invoicesMap = invoices.reduce((acc, inv) => { acc[inv.invoice_number] = inv; return acc; }, {} as Record<string, PurchaseInvoice>);
+            const vouchersMap = vouchers.reduce((acc, v) => {
+              const ref = v.voucher_number || v.manual_reference || v.internal_reference;
+              if (ref) acc[ref] = v;
+              return acc;
+            }, {} as Record<string, PaymentVoucher>);
+            const returnsMap = returns.reduce((acc, ret) => { acc[ret.return_number] = ret; return acc; }, {} as Record<string, PurchaseReturn>);
+
+            const allItems: StatementItem[] = [];
+
+            journalEntries.forEach((je: any) => {
+              je.items?.forEach((item: any) => {
+                if (item.supplier_id === savedSupId && item.account_id === supplier?.account_id) {
+                  let notes = item.description || je.description || 'قيد مالي';
+
+                  if (je.reference_type === 'purchase_invoice' && je.reference_number) {
+                    const inv = invoicesMap[je.reference_number];
+                    if (inv && inv.description) notes += ` - ${inv.description}`;
+                  } else if (je.reference_type === 'payment_voucher' && je.reference_number) {
+                    const voucher = vouchersMap[je.reference_number];
+                    if (voucher && voucher.description) notes += ` - ${voucher.description}`;
+                  } else if (je.reference_type === 'purchase_return' && je.reference_number) {
+                    const ret = returnsMap[je.reference_number];
+                    if (ret && ret.description) notes += ` - ${ret.description}`;
+                  }
+
+                  allItems.push({
+                    id: `je-${je.id}-${Math.random()}`,
+                    date: je.date,
+                    type: je.reference_type || 'manual',
+                    reference: je.reference_number || '-',
+                    debit: item.debit || 0,
+                    credit: item.credit || 0,
+                    notes: notes
+                  });
+                }
+              });
+            });
+
+            allItems.sort((a, b) => {
+              const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+              if (dateDiff !== 0) return dateDiff;
+              return a.id.localeCompare(b.id);
+            });
+
+            const startVal = savedStart || '';
+            const endVal = savedEnd || new Date().toISOString().slice(0, 10);
+
+            const filteredItems = allItems.filter(item => {
+              const itemDate = new Date(item.date);
+              const start = startVal ? new Date(startVal) : new Date(0);
+              const end = endVal ? new Date(endVal) : new Date();
+              end.setHours(23, 59, 59, 999);
+              return itemDate >= start && itemDate <= end;
+            });
+
+            const supplierOpBal = Number(supplier?.opening_balance || 0);
+            const hasOpeningBalanceInItems = allItems.some(item => item.type === 'opening_balance' || item.notes.includes('رصيد افتتاحي'));
+            const manualOpBal = hasOpeningBalanceInItems ? 0 : supplierOpBal;
+            let balanceBefore = 0;
+            
+            if (startVal) {
+              const itemsBefore = allItems.filter(item => new Date(item.date) < new Date(startVal));
+              balanceBefore = manualOpBal + itemsBefore.reduce((sum, item) => sum + (Number(item.credit || 0) - Number(item.debit || 0)), 0);
+            } else {
+              if (manualOpBal !== 0) {
+                balanceBefore = manualOpBal;
+              }
+            }
+            
+            const initialBalance = balanceBefore;
+            setStartBalance(initialBalance);
+            
+            let currentBalance = initialBalance;
+            const finalItems = filteredItems.map(item => {
+              currentBalance += (item.credit - item.debit);
+              return { ...item, balance: currentBalance };
+            });
+
+            setStatement(finalItems);
+          } catch (e) {
+            console.error(e);
+          } finally {
+            setLoading(false);
+          }
+        };
+        runAutoGenerate();
+      }
+    }
+  }, [user, suppliers]);
+
   const fetchStatement = async () => {
     if (!selectedSupplierId || !user) return;
     setLoading(true);

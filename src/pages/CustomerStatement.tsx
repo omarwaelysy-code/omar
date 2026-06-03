@@ -58,6 +58,135 @@ export const CustomerStatement: React.FC = () => {
     }
   }, [user]);
 
+  // Auto-run statement generation if redirected from balances report
+  useEffect(() => {
+    if (user && customers.length > 0) {
+      const savedCustId = sessionStorage.getItem('customer_statement_filter_customer_id');
+      const savedStart = sessionStorage.getItem('customer_statement_filter_start_date');
+      const savedEnd = sessionStorage.getItem('customer_statement_filter_end_date');
+      
+      if (savedCustId) {
+        setSelectedCustomerId(savedCustId);
+        setStartDate(savedStart || '');
+        setEndDate(savedEnd || new Date().toISOString().slice(0, 10));
+        
+        sessionStorage.removeItem('customer_statement_filter_customer_id');
+        sessionStorage.removeItem('customer_statement_filter_start_date');
+        sessionStorage.removeItem('customer_statement_filter_end_date');
+        
+        const runAutoGenerate = async () => {
+          setLoading(true);
+          const customer = customers.find(c => c.id === savedCustId) || null;
+          setCustomerInfo(customer);
+          
+          try {
+            const [invoices, receipts, returns, discounts, journalEntries] = await Promise.all([
+              dbService.list<Invoice>('invoices', user.company_id),
+              dbService.list<ReceiptVoucher>('receipt_vouchers', user.company_id),
+              dbService.list<Return>('returns', user.company_id),
+              dbService.list<any>('customer_discounts', user.company_id),
+              dbService.list<any>('journal_entries', user.company_id)
+            ]);
+
+            const invoicesMap = invoices.reduce((acc, inv) => { acc[inv.invoice_number] = inv; return acc; }, {} as Record<string, Invoice>);
+            const receiptsMap = receipts.reduce((acc, r) => { if (r.voucher_number) acc[r.voucher_number] = r; return acc; }, {} as Record<string, ReceiptVoucher>);
+            const returnsMap = returns.reduce((acc, ret) => { acc[ret.return_number] = ret; return acc; }, {} as Record<string, Return>);
+
+            let allEntries: any[] = [];
+            journalEntries.forEach((je: any) => {
+              je.items?.forEach((item: any) => {
+                if (item.customer_id === savedCustId && item.account_id === customer?.account_id) {
+                  let description = item.description || je.description || 'قيد مالي';
+                  if (je.reference_type === 'invoice' && je.reference_number) {
+                    const inv = invoicesMap[je.reference_number];
+                    if (inv && inv.description) description += ` - ${inv.description}`;
+                  } else if ((je.reference_type === 'receipt' || je.reference_type === 'receipt_voucher') && je.reference_number) {
+                    const rect = receiptsMap[je.reference_number];
+                    if (rect && rect.description) description += ` - ${rect.description}`;
+                  } else if (je.reference_type === 'return' && je.reference_number) {
+                    const ret = returnsMap[je.reference_number];
+                    if (ret && ret.description) description += ` - ${ret.description}`;
+                  }
+
+                  allEntries.push({
+                    id: `je-${je.id}-${Math.random()}`,
+                    date: je.date,
+                    type: je.reference_type || 'journal',
+                    reference: je.reference_number || '-',
+                    description: description,
+                    debit: item.debit || 0,
+                    credit: item.credit || 0,
+                    balance: 0
+                  });
+                }
+              });
+            });
+
+            allEntries.sort((a, b) => {
+              const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+              if (dateDiff !== 0) return dateDiff;
+              return a.id.localeCompare(b.id);
+            });
+
+            const customerOpBal = Number(customer?.opening_balance || 0);
+            const hasOpeningBalanceInEntries = allEntries.some(e => e.type === 'opening_balance' || e.description.includes('رصيد افتتاحي'));
+            const manualOpBal = hasOpeningBalanceInEntries ? 0 : customerOpBal;
+            let balanceForward = 0;
+            let filteredEntries = allEntries;
+            const finalAllEntries = [];
+
+            const startVal = savedStart || '';
+            const endVal = savedEnd || new Date().toISOString().slice(0, 10);
+
+            if (startVal) {
+              const entriesBefore = allEntries.filter(e => e.date < startVal);
+              balanceForward = manualOpBal + entriesBefore.reduce((sum, e) => sum + (Number(e.debit || 0) - Number(e.credit || 0)), 0);
+              filteredEntries = allEntries.filter(e => e.date >= startVal);
+              
+              finalAllEntries.push({
+                id: 'balance-forward',
+                date: startVal,
+                type: 'opening_balance',
+                reference: '-',
+                description: language === 'ar' ? 'رصيد منقول' : 'Balance Forward',
+                debit: balanceForward > 0 ? balanceForward : 0,
+                credit: balanceForward < 0 ? Math.abs(balanceForward) : 0,
+                balance: balanceForward
+              });
+            } else {
+              if (manualOpBal !== 0) {
+                finalAllEntries.push({
+                  id: 'opening-balance',
+                  date: allEntries[0]?.date || new Date().toISOString().slice(0, 10),
+                  type: 'opening_balance',
+                  reference: '-',
+                  description: language === 'ar' ? 'رصيد افتتاحي' : 'Opening Balance',
+                  debit: manualOpBal > 0 ? manualOpBal : 0,
+                  credit: manualOpBal < 0 ? Math.abs(manualOpBal) : 0,
+                  balance: manualOpBal
+                });
+                balanceForward = manualOpBal;
+              }
+            }
+
+            let currentBalance = balanceForward;
+            const finalEntries = filteredEntries.filter(e => !endVal || e.date <= endVal).map(entry => {
+              currentBalance += (entry.debit - entry.credit);
+              return { ...entry, balance: currentBalance };
+            });
+
+            setEntries([...finalAllEntries, ...finalEntries]);
+          } catch (e) {
+            console.error(e);
+          } finally {
+            setLoading(false);
+          }
+        };
+        runAutoGenerate();
+      }
+    }
+  }, [user, customers]);
+
   const generateStatement = async () => {
     if (!selectedCustomerId || !user) return;
     setLoading(true);

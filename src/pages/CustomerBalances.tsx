@@ -2,12 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Customer } from '../types';
-import { FileSpreadsheet, Download, Search, User, Wallet, ArrowUpRight, RefreshCcw } from 'lucide-react';
+import { FileSpreadsheet, Download, Search, User, Wallet, ArrowUpRight, RefreshCcw, Calendar } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
 import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useNavigation } from '../contexts/NavigationContext';
 
 export const CustomerBalances: React.FC = () => {
   const { user } = useAuth();
@@ -16,6 +17,66 @@ export const CustomerBalances: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const reportRef = useRef<HTMLDivElement>(null);
+  
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const { setCurrentPage } = useNavigation();
+
+  const applyPreset = (preset: 'last_month' | 'last_year' | 'current_year' | 'last_quarter' | 'all') => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth(); // 0-indexed (0 = Jan, 11 = Dec)
+    
+    if (preset === 'all') {
+      setStartDate('');
+      setEndDate('');
+      return;
+    }
+    
+    let start = '';
+    let end = '';
+    
+    switch (preset) {
+      case 'last_month':
+        const lmStart = new Date(year, month - 1, 1);
+        const lmEnd = new Date(year, month, 0);
+        start = lmStart.toISOString().slice(0, 10);
+        end = lmEnd.toISOString().slice(0, 10);
+        break;
+      case 'last_year':
+        start = `${year - 1}-01-01`;
+        end = `${year - 1}-12-31`;
+        break;
+      case 'current_year':
+        start = `${year}-01-01`;
+        end = now.toISOString().slice(0, 10);
+        break;
+      case 'last_quarter':
+        const currentQuarter = Math.floor(month / 3);
+        if (currentQuarter === 0) {
+          start = `${year - 1}-10-01`;
+          end = `${year - 1}-12-31`;
+        } else {
+          const qStartMonth = (currentQuarter - 1) * 3;
+          const lqStart = new Date(year, qStartMonth, 1);
+          const lqEnd = new Date(year, qStartMonth + 3, 0);
+          start = lqStart.toISOString().slice(0, 10);
+          end = lqEnd.toISOString().slice(0, 10);
+        }
+        break;
+      default:
+        break;
+    }
+    setStartDate(start);
+    setEndDate(end);
+  };
+
+  const handleNavigateToStatement = (customerId: string) => {
+    sessionStorage.setItem('customer_statement_filter_customer_id', customerId);
+    sessionStorage.setItem('customer_statement_filter_start_date', startDate);
+    sessionStorage.setItem('customer_statement_filter_end_date', endDate);
+    setCurrentPage('customer_statement');
+  };
 
   const [error, setError] = useState<string | null>(null);
 
@@ -45,23 +106,62 @@ export const CustomerBalances: React.FC = () => {
           return false;
         });
         const custDiscounts = discounts.filter((d: any) => d.customer_id === customer.id);
-        
-        const openingBalance = Number(customer.opening_balance) || 0;
-        let journalDebit = 0;
-        let journalCredit = 0;
-        let manualJournalDebit = 0;
-        let manualJournalCredit = 0;
+
+        const getReceiptAmount = (r: any) => {
+          const isMulti = r.voucher_type === 'multi' || r.type === 'multi';
+          if (isMulti && r.items && Array.isArray(r.items)) {
+             return r.items
+               .filter((item: any) => item.type === 'customer' && item.entity_id === customer.id)
+               .reduce((itemSum: number, item: any) => itemSum + (Number(item.amount) || 0), 0);
+          }
+          if (r.customer_id === customer.id) {
+             return Number(r.amount) || 0;
+          }
+          return 0;
+        };
+
+        // Split standard transactions into "before" and "within" period
+        const invoicesBefore = custInvoices.filter((i: any) => startDate && i.date < startDate);
+        const invoicesPeriod = custInvoices.filter((i: any) => (!startDate || i.date >= startDate) && (!endDate || i.date <= endDate));
+
+        const returnsBefore = custReturns.filter((r: any) => startDate && r.date < startDate);
+        const returnsPeriod = custReturns.filter((r: any) => (!startDate || r.date >= startDate) && (!endDate || r.date <= endDate));
+
+        const discountsBefore = custDiscounts.filter((d: any) => startDate && d.date < startDate);
+        const discountsPeriod = custDiscounts.filter((d: any) => (!startDate || d.date >= startDate) && (!endDate || d.date <= endDate));
+
+        const receiptsBefore = custReceipts.filter((r: any) => startDate && r.date < startDate);
+        const receiptsPeriod = custReceipts.filter((r: any) => (!startDate || r.date >= startDate) && (!endDate || r.date <= endDate));
+
+        // Cash Invoices amount behaves like a receipt
+        const cashInvoicesBefore = invoicesBefore.filter((i: any) => i.payment_type === 'cash')
+          .reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
+        const cashInvoicesPeriod = invoicesPeriod.filter((i: any) => i.payment_type === 'cash')
+          .reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
+
+        const totalInvoicesBefore = invoicesBefore.reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
+        const totalInvoicesPeriod = invoicesPeriod.reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
+
+        const totalReturnsBefore = returnsBefore.reduce((sum: number, r: any) => sum + (Number(r.total_amount) || 0), 0);
+        const totalReturnsPeriod = returnsPeriod.reduce((sum: number, r: any) => sum + (Number(r.total_amount) || 0), 0);
+
+        const totalDiscountsBefore = discountsBefore.reduce((sum: number, d: any) => sum + (Number(d.amount) || 0), 0);
+        const totalDiscountsPeriod = discountsPeriod.reduce((sum: number, d: any) => sum + (Number(d.amount) || 0), 0);
+
+        const totalReceiptsBefore = receiptsBefore.reduce((sum: number, r: any) => sum + getReceiptAmount(r), 0) + cashInvoicesBefore;
+        const totalReceiptsPeriod = receiptsPeriod.reduce((sum: number, r: any) => sum + getReceiptAmount(r), 0) + cashInvoicesPeriod;
+
+        let manualJournalDebitBefore = 0;
+        let manualJournalCreditBefore = 0;
+        let manualJournalDebitPeriod = 0;
+        let manualJournalCreditPeriod = 0;
 
         journalEntries.forEach((je: any) => {
           je.items?.forEach((item: any) => {
             if (item.customer_id === customer.id && item.account_id === customer.account_id) {
               const debit = Number(item.debit) || 0;
               const credit = Number(item.credit) || 0;
-              journalDebit += debit;
-              journalCredit += credit;
               
-              // Only include as "manual impact" if it's not from a standard document we're already counting
-              // Expanded exclusion list to cover potential legacy or variations in naming
               const standardTypes = [
                 'invoice', 'sales_invoice', 'cash_invoice', 
                 'return', 'sales_return', 
@@ -72,37 +172,33 @@ export const CustomerBalances: React.FC = () => {
               
               if (je.reference_type === 'manual' || je.reference_type === 'journal' || 
                   !standardTypes.includes(je.reference_type)) {
-                manualJournalDebit += debit;
-                manualJournalCredit += credit;
+                if (startDate && je.date < startDate) {
+                  manualJournalDebitBefore += debit;
+                  manualJournalCreditBefore += credit;
+                } else if ((!startDate || je.date >= startDate) && (!endDate || je.date <= endDate)) {
+                  manualJournalDebitPeriod += debit;
+                  manualJournalCreditPeriod += credit;
+                }
               }
             }
           });
         });
 
-        const totalInvoices = custInvoices.reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
-        const totalReturns = custReturns.reduce((sum: number, r: any) => sum + (Number(r.total_amount) || 0), 0);
-        const cashInvoicesAmount = custInvoices.filter((i: any) => i.payment_type === 'cash')
-          .reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
-        
-        const totalReceipts = custReceipts.reduce((sum: number, r: any) => {
-          const isMulti = r.voucher_type === 'multi' || r.type === 'multi';
-          if (isMulti && r.items && Array.isArray(r.items)) {
-             const itemsSum = r.items
-               .filter((item: any) => item.type === 'customer' && item.entity_id === customer.id)
-               .reduce((itemSum: number, item: any) => itemSum + (Number(item.amount) || 0), 0);
-             return sum + itemsSum;
-          }
-          if (r.customer_id === customer.id) {
-             return sum + (Number(r.amount) || 0);
-          }
-          return sum;
-        }, 0) + cashInvoicesAmount;
+        const openingBalance = (Number(customer.opening_balance) || 0) + 
+                               totalInvoicesBefore - 
+                               totalReturnsBefore - 
+                               totalReceiptsBefore - 
+                               totalDiscountsBefore + 
+                               (manualJournalDebitBefore - manualJournalCreditBefore);
 
-        const totalDiscounts = custDiscounts.reduce((sum: number, d: any) => sum + (Number(d.amount) || 0), 0);
+        const totalInvoices = totalInvoicesPeriod;
+        const totalReturns = totalReturnsPeriod;
+        const totalReceipts = totalReceiptsPeriod;
+        const totalDiscounts = totalDiscountsPeriod;
+        const manualJournalImpact = manualJournalDebitPeriod - manualJournalCreditPeriod;
 
-        // Precise calculation formula
-        const currentBalance = (openingBalance + totalInvoices) - totalReturns - totalReceipts - totalDiscounts + (manualJournalDebit - manualJournalCredit);
-        
+        const currentBalance = openingBalance + totalInvoices - totalReturns - totalReceipts - totalDiscounts + manualJournalImpact;
+
         return {
           ...customer,
           openingBalance,
@@ -110,9 +206,7 @@ export const CustomerBalances: React.FC = () => {
           totalReturns,
           totalReceipts,
           totalDiscounts,
-          journalDebit,
-          journalCredit,
-          manualJournalImpact: manualJournalDebit - manualJournalCredit,
+          manualJournalImpact,
           currentBalance
         };
       });
@@ -127,7 +221,7 @@ export const CustomerBalances: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, [user]);
+  }, [user, startDate, endDate]);
 
   const { language } = useLanguage();
 
@@ -247,8 +341,8 @@ export const CustomerBalances: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-3xl border border-zinc-100 shadow-sm flex items-center gap-4">
-        <div className="relative flex-1">
+      <div className="bg-white p-6 rounded-3xl border border-zinc-100 shadow-sm space-y-6">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={20} />
           <input 
             type="text" 
@@ -257,6 +351,86 @@ export const CustomerBalances: React.FC = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-zinc-100">
+          <div>
+            <label className="block text-sm font-bold text-zinc-700 mb-1">من تاريخ</label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-3 text-zinc-400" size={18} />
+              <input 
+                type="date" 
+                className="w-full pl-10 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-sm"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-zinc-700 mb-1">إلى تاريخ</label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-3 text-zinc-400" size={18} />
+              <input 
+                type="date" 
+                className="w-full pl-10 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-sm"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 pt-2">
+          <span className="text-xs font-bold text-zinc-400 ml-2">الفترات السريعة:</span>
+          <button 
+            type="button"
+            onClick={() => applyPreset('last_month')}
+            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105 ${
+              startDate && endDate && startDate === new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toISOString().slice(0, 10) && endDate === new Date(new Date().getFullYear(), new Date().getMonth(), 0).toISOString().slice(0, 10)
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' 
+                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+            }`}
+          >
+            آخر الشهر الماضي
+          </button>
+          <button 
+            type="button"
+            onClick={() => applyPreset('last_year')}
+            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105 ${
+              startDate && endDate && startDate === `${new Date().getFullYear() - 1}-01-01` && endDate === `${new Date().getFullYear() - 1}-12-31`
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' 
+                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+            }`}
+          >
+            آخر العام الماضي
+          </button>
+          <button 
+            type="button"
+            onClick={() => applyPreset('current_year')}
+            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105 ${
+              startDate && endDate && startDate === `${new Date().getFullYear()}-01-01` && endDate === new Date().toISOString().slice(0, 10)
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' 
+                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+            }`}
+          >
+            العام الحالي
+          </button>
+          <button 
+            type="button"
+            onClick={() => applyPreset('last_quarter')}
+            className="px-4 py-1.5 rounded-xl text-xs font-bold bg-zinc-100 text-zinc-600 hover:bg-zinc-200 transition-all hover:scale-105"
+          >
+            آخر ربع سنة
+          </button>
+          <button 
+            type="button"
+            onClick={() => applyPreset('all')}
+            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105 ${
+              !startDate && !endDate ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+            }`}
+          >
+            كل الفترات
+          </button>
         </div>
       </div>
 
@@ -296,7 +470,13 @@ export const CustomerBalances: React.FC = () => {
               ) : filteredCustomers.map(customer => (
                 <tr key={customer.id} className="hover:bg-zinc-50/50 transition-colors group">
                   <td className="px-4 py-4">
-                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg uppercase tracking-wider">{customer.code}</span>
+                    <span 
+                      onClick={() => handleNavigateToStatement(customer.id)}
+                      className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg uppercase tracking-wider cursor-pointer hover:bg-emerald-100 hover:text-emerald-700 active:scale-95 transition-all inline-block"
+                      title={language === 'ar' ? 'عرض كشف الحساب لهذه الفترة' : 'View statement for this period'}
+                    >
+                      {customer.code}
+                    </span>
                   </td>
                   <td className="px-4 py-4">
                     <span className="font-bold text-zinc-900 text-sm">{customer.name}</span>
@@ -347,7 +527,13 @@ export const CustomerBalances: React.FC = () => {
           ) : filteredCustomers.map(customer => (
             <div key={customer.id} className="p-4 space-y-3 active:bg-zinc-50 transition-colors">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg uppercase tracking-wider">{customer.code}</span>
+                <span 
+                  onClick={() => handleNavigateToStatement(customer.id)}
+                  className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg uppercase tracking-wider cursor-pointer hover:bg-emerald-100 hover:text-emerald-700 active:scale-95 transition-all inline-block"
+                  title={language === 'ar' ? 'عرض كشف الحساب لهذه الفترة' : 'View statement for this period'}
+                >
+                  {customer.code}
+                </span>
                 <span className="font-bold text-zinc-900">{customer.name}</span>
               </div>
               <div className="grid grid-cols-2 gap-2 text-[10px]">
@@ -369,7 +555,7 @@ export const CustomerBalances: React.FC = () => {
                 </div>
                 <div className="flex justify-between border-b border-zinc-50 pb-1">
                   <span className="text-zinc-400">قيود (+/-):</span>
-                  <span className="text-zinc-600 font-medium">{formatNumber(customer.journalDebit - customer.journalCredit)}</span>
+                  <span className="text-zinc-600 font-medium">{formatNumber(customer.manualJournalImpact)}</span>
                 </div>
               </div>
               <div className="flex items-center justify-between pt-2 border-t border-zinc-100">
