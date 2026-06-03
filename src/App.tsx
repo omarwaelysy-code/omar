@@ -29,6 +29,7 @@ import { CustomerStatement } from './pages/CustomerStatement';
 import { SupplierStatement } from './pages/SupplierStatement';
 import { StockCardReport } from './pages/StockCardReport';
 import { StockBalancesReport } from './pages/StockBalancesReport';
+import { GeneralStockMovementsReport } from './pages/GeneralStockMovementsReport';
 import { CustomerBalances } from './pages/CustomerBalances';
 import { SupplierBalances } from './pages/SupplierBalances';
 import { SalesReport } from './pages/SalesReport';
@@ -189,6 +190,7 @@ export default function App() {
       case 'supplier_statement': return <SupplierStatement />;
       case 'stock_card_report': return <StockCardReport />;
       case 'stock_balances_report': return <StockBalancesReport />;
+      case 'general_stock_movements_report': return <GeneralStockMovementsReport />;
       case 'customer_balances': return <CustomerBalances />;
       case 'supplier_balances': return <SupplierBalances />;
       case 'sales_report': return <SalesReport />;

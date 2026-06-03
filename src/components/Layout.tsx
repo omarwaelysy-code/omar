@@ -291,6 +291,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         subItems: [
           { id: 'stock_card_report', label: t('nav.stock_card_report'), icon: History },
           { id: 'stock_balances_report', label: t('nav.stock_balances_report') || 'أرصدة المخزون خلال فترة', icon: BarChart3 },
+          { id: 'general_stock_movements_report', label: t('nav.general_stock_movements_report') || 'حركة المخزن العامة لجميع الأصناف', icon: History },
           { id: 'customer_statement', label: t('nav.customer_statement'), icon: FileText },
           { id: 'customer_balances', label: t('nav.customer_balances'), icon: BarChart3 },
           { id: 'sales_report', label: t('nav.sales_report'), icon: BarChart3 },
