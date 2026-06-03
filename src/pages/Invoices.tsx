@@ -38,7 +38,7 @@ export const Invoices: React.FC = () => {
   const { user } = useAuth();
   const { canView, canCreate, canEdit, canDelete } = usePermissions('invoices');
   const { showNotification } = useNotification();
-  const { pendingViewDoc, setPendingViewDoc } = useNavigation();
+  const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -1364,6 +1364,7 @@ export const Invoices: React.FC = () => {
                           </span>
                         </div>
                       </th>
+                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</th>
                       <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
                     </tr>
                   </thead>
@@ -1400,6 +1401,22 @@ export const Invoices: React.FC = () => {
                         </td>
                         <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                           {formatMoney(inv.total_amount)} {t('invoices.currency')}
+                        </td>
+                        <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                          {inv.entry_number ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPendingViewDoc({ type: 'journal', idOrNumber: inv.entry_number! });
+                                setCurrentPage('journal_entries');
+                              }}
+                              className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-100/50 transition-all active:scale-95"
+                            >
+                              {inv.entry_number}
+                            </button>
+                          ) : (
+                            <span className="text-slate-400 font-mono text-xs">-</span>
+                          )}
                         </td>
                         <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                           <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
@@ -1507,6 +1524,18 @@ export const Invoices: React.FC = () => {
                         <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
                         <h4 className="font-bold text-slate-900 group-hover:text-emerald-700 transition-colors text-xl mt-1 tracking-tight">{inv.customer_name}</h4>
                       </div>
+                      {inv.entry_number && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingViewDoc({ type: 'journal', idOrNumber: inv.entry_number! });
+                            setCurrentPage('journal_entries');
+                          }}
+                          className="font-mono text-[9px] bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100/50 transition-all active:scale-95 z-10"
+                        >
+                          {inv.entry_number}
+                        </button>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200/50 mt-4">
                       <div className="space-y-1">
@@ -1563,6 +1592,18 @@ export const Invoices: React.FC = () => {
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-[10px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
+                        {inv.entry_number && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPendingViewDoc({ type: 'journal', idOrNumber: inv.entry_number! });
+                              setCurrentPage('journal_entries');
+                            }}
+                            className="font-mono text-[9px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100/50"
+                          >
+                            {inv.entry_number}
+                          </button>
+                        )}
                         <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider ${
                           inv.payment_type === 'cash' 
                             ? 'bg-emerald-100 text-emerald-700' 
@@ -2187,6 +2228,21 @@ export const Invoices: React.FC = () => {
                     {viewInvoice.warehouse_id && (
                       <p className="text-xs text-slate-500 font-medium">
                         {language === 'ar' ? 'المخزن:' : 'Warehouse:'} <span className="text-emerald-600 font-bold">{warehouses.find(w => w.id?.toString() === viewInvoice.warehouse_id?.toString())?.name || viewInvoice.warehouse_id}</span>
+                      </p>
+                    )}
+                    {viewInvoice.entry_number && (
+                      <p className="text-xs text-slate-500 font-medium mt-1">
+                        {language === 'ar' ? 'رقم القيد:' : 'Journal Entry:'} <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewInvoice(null);
+                            setPendingViewDoc({ type: 'journal', idOrNumber: viewInvoice.entry_number! });
+                            setCurrentPage('journal_entries');
+                          }}
+                          className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50"
+                        >
+                          {viewInvoice.entry_number}
+                        </button>
                       </p>
                     )}
                   </div>

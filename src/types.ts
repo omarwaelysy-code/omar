@@ -227,6 +227,7 @@ export interface CashTransfer {
   company_id: string;
   created_at: string;
   created_by: string;
+  entry_number?: string;
 }
 
 export interface Product {
@@ -286,6 +287,7 @@ export interface Invoice {
   exchange_rate?: number;
   total_base_amount?: number;
   source_orders?: string;
+  entry_number?: string;
 }
 
 export interface PurchaseInvoice {
@@ -310,6 +312,7 @@ export interface PurchaseInvoice {
   exchange_rate?: number;
   total_base_amount?: number;
   source_orders?: string;
+  entry_number?: string;
 }
 
 export interface InvoiceItem {
@@ -338,6 +341,7 @@ export interface ReceiptVoucher {
   payment_method_name?: string;
   account_id?: string;
   company_id: string;
+  entry_number?: string;
 }
 
 export interface PaymentVoucherItem {
@@ -365,6 +369,7 @@ export interface PaymentVoucher {
   account_id?: string;
   company_id: string;
   items?: PaymentVoucherItem[];
+  entry_number?: string;
 }
 
 export interface Return {
@@ -386,6 +391,7 @@ export interface Return {
   payment_method_name?: string;
   items?: ReturnItem[];
   company_id: string;
+  entry_number?: string;
 }
 
 export interface PurchaseReturn {
@@ -407,6 +413,7 @@ export interface PurchaseReturn {
   payment_method_name?: string;
   items?: ReturnItem[];
   company_id: string;
+  entry_number?: string;
 }
 
 export interface ReturnItem {
@@ -759,6 +766,7 @@ export interface WarehouseTransfer {
   created_by?: string;
   created_at?: string;
   items?: WarehouseTransferItem[];
+  entry_number?: string;
 }
 
 export interface OpeningStockItem {
@@ -789,6 +797,7 @@ export interface OpeningStockBalance {
   created_by?: string;
   created_at?: string;
   items?: OpeningStockItem[];
+  entry_number?: string;
 }
 
 export interface StockAdjustmentItem {
@@ -817,5 +826,6 @@ export interface StockAdjustment {
   created_by?: string;
   created_at?: string;
   items?: StockAdjustmentItem[];
+  entry_number?: string;
 }
 

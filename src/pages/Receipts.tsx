@@ -31,7 +31,7 @@ export const Receipts: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
-  const { pendingViewDoc, setPendingViewDoc } = useNavigation();
+  const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
   const [receipts, setReceipts] = useState<ReceiptVoucher[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -744,6 +744,7 @@ export const Receipts: React.FC = () => {
                       </span>
                     </div>
                   </th>
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</th>
                   <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>الإجراءات</th>
                 </tr>
               </thead>
@@ -769,6 +770,22 @@ export const Receipts: React.FC = () => {
                       )}
                     </td>
                     <td className="px-6 py-4 font-bold text-emerald-600">{formatNumber(receipt.amount)} {t('common.currency')}</td>
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      {receipt.entry_number ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingViewDoc({ type: 'journal', idOrNumber: receipt.entry_number! });
+                            setCurrentPage('journal_entries');
+                          }}
+                          className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-100/50 transition-all active:scale-95"
+                        >
+                          {receipt.entry_number}
+                        </button>
+                      ) : (
+                        <span className="text-slate-400 font-mono text-xs">-</span>
+                      )}
+                    </td>
                     <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                       <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity no-pdf`}>
                         <button 
@@ -865,6 +882,18 @@ export const Receipts: React.FC = () => {
                     <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{receipt.voucher_number}</span>
                     <h4 className="font-bold text-zinc-900 group-hover:text-emerald-700 transition-colors text-xl mt-1 tracking-tight">{receipt.customer_name}</h4>
                   </div>
+                  {receipt.entry_number && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPendingViewDoc({ type: 'journal', idOrNumber: receipt.entry_number! });
+                        setCurrentPage('journal_entries');
+                      }}
+                      className="font-mono text-[9px] bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100/50 transition-all active:scale-95 z-10"
+                    >
+                      {receipt.entry_number}
+                    </button>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-200/50 mt-4">
                   <div className="space-y-1">
@@ -1243,6 +1272,22 @@ export const Receipts: React.FC = () => {
                       <span className="text-zinc-500">طريقة السداد:</span>
                       <span className="font-bold text-zinc-900">{viewReceipt.payment_method_name || '---'}</span>
                     </div>
+                    {viewReceipt.entry_number && (
+                      <div className="flex justify-between py-3 border-b border-zinc-100">
+                        <span className="text-zinc-500">{language === 'ar' ? 'رقم القيد:' : 'Journal Entry:'}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewReceipt(null);
+                            setPendingViewDoc({ type: 'journal', idOrNumber: viewReceipt.entry_number! });
+                            setCurrentPage('journal_entries');
+                          }}
+                          className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50"
+                        >
+                          {viewReceipt.entry_number}
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-12 flex justify-between items-end">

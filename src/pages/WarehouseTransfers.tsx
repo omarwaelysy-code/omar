@@ -375,6 +375,9 @@ export const WarehouseTransfers: React.FC = () => {
                     {t('warehouse_transfers.column_items_count')}
                   </th>
                   <th className="px-6 py-5 text-sm font-black text-slate-600 uppercase">
+                    {language === 'ar' ? 'رقم القيد' : 'Journal Entry'}
+                  </th>
+                  <th className="px-6 py-5 text-sm font-black text-slate-600 uppercase">
                     {language === 'ar' ? 'البيان' : 'Description'}
                   </th>
                   <th className="px-6 py-5 text-sm font-black text-slate-600 uppercase text-center w-36">
@@ -399,6 +402,9 @@ export const WarehouseTransfers: React.FC = () => {
                     </td>
                     <td className="px-6 py-5 text-sm font-black text-slate-700">
                       {(tItem as any).items_count || 1}
+                    </td>
+                    <td className="px-6 py-5 text-sm font-black text-slate-400 font-mono text-xs">
+                      -
                     </td>
                     <td className="px-6 py-5 text-sm font-bold text-slate-500 max-w-[200px] truncate">
                       {tItem.description || '-'}
@@ -692,7 +698,7 @@ export const WarehouseTransfers: React.FC = () => {
 
               {/* Document Details */}
               <div className="p-6 space-y-6">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-5 bg-slate-50 rounded-2xl">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-5 bg-slate-50 rounded-2xl">
                   <div>
                     <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('warehouse_transfers.column_date')}</span>
                     <span className="text-slate-700 font-bold text-sm block mt-1">{formatDate(viewTransfer.date)}</span>
@@ -704,6 +710,10 @@ export const WarehouseTransfers: React.FC = () => {
                   <div>
                     <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('warehouse_transfers.column_to_warehouse')}</span>
                     <span className="text-emerald-600 font-black text-base block mt-1">{viewTransfer.to_warehouse_name}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{language === 'ar' ? 'رقم القيد' : 'Journal Entry'}</span>
+                    <span className="text-slate-400 font-mono text-xs block mt-1">-</span>
                   </div>
                   <div>
                     <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{language === 'ar' ? 'بواسطة' : 'Created By'}</span>

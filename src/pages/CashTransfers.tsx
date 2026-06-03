@@ -22,10 +22,12 @@ import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { ExportButtons } from '../components/ExportButtons';
 import { PaginationControls } from '../components/PaginationControls';
+import { useNavigation } from '../contexts/NavigationContext';
 
 export const CashTransfers: React.FC = () => {
   const { user } = useAuth();
   const { showNotification } = useNotification();
+  const { setPendingViewDoc, setCurrentPage } = useNavigation();
   const [transfers, setTransfers] = useState<CashTransfer[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -556,6 +558,7 @@ export const CashTransfers: React.FC = () => {
                       </span>
                     </div>
                   </th>
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100">رقم القيد</th>
                   <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100">الوصف</th>
                   <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100">الإجراءات</th>
                 </tr>
@@ -596,6 +599,22 @@ export const CashTransfers: React.FC = () => {
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-emerald-600 font-black">{formatNumber(transfer.amount)} ج.م</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {transfer.entry_number ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingViewDoc({ type: 'journal', idOrNumber: transfer.entry_number! });
+                            setCurrentPage('journal_entries');
+                          }}
+                          className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-100/50 transition-all active:scale-95 animate-in fade-in"
+                        >
+                          {transfer.entry_number}
+                        </button>
+                      ) : (
+                        <span className="text-zinc-400 font-mono text-xs">-</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-zinc-500 font-medium max-w-xs truncate">{transfer.description}</td>
                     <td className="px-6 py-4">
@@ -709,6 +728,18 @@ export const CashTransfers: React.FC = () => {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between border-b border-zinc-100/60 pb-2">
                       <span className="text-xs text-zinc-400 font-semibold">{formatDate(transfer.date)}</span>
+                      {transfer.entry_number && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingViewDoc({ type: 'journal', idOrNumber: transfer.entry_number! });
+                            setCurrentPage('journal_entries');
+                          }}
+                          className="font-mono text-[9px] bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100/50 transition-all active:scale-95 z-10"
+                        >
+                          {transfer.entry_number}
+                        </button>
+                      )}
                     </div>
                     
                     <div className="space-y-2">
@@ -1247,8 +1278,24 @@ export const CashTransfers: React.FC = () => {
                     <p className="font-bold text-zinc-900">{viewTransfer.to_payment_method_name}</p>
                   </div>
                 </div>
-
                 <div className="space-y-4">
+                  {viewTransfer.entry_number && (
+                    <div className="flex items-center gap-3 text-zinc-600">
+                      <Layers size={18} className="text-zinc-400" />
+                      <span className="font-bold">رقم القيد:</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowSidePanel(false);
+                          setPendingViewDoc({ type: 'journal', idOrNumber: viewTransfer.entry_number! });
+                          setCurrentPage('journal_entries');
+                        }}
+                        className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50"
+                      >
+                        {viewTransfer.entry_number}
+                      </button>
+                    </div>
+                  )}
                   <div className="flex items-center gap-3 text-zinc-600">
                     <Calendar size={18} className="text-zinc-400" />
                     <span className="font-bold">التاريخ: {formatDate(viewTransfer.date)}</span>

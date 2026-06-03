@@ -12,6 +12,7 @@ import { dbService } from '../services/dbService';
 import { formatNumber, formatDate } from '../utils/formatUtils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { PaginationControls } from '../components/PaginationControls';
+import { useNavigation } from '../contexts/NavigationContext';
 
 interface AdjItemInput {
   product_id: string;
@@ -24,6 +25,7 @@ export const StockAdjustments: React.FC = () => {
   const { user } = useAuth();
   const { showNotification } = useNotification();
   const { t, dir, language } = useLanguage();
+  const { setPendingViewDoc, setCurrentPage } = useNavigation();
 
   // Data states
   const [adjustments, setAdjustments] = useState<StockAdjustment[]>([]);
@@ -434,6 +436,9 @@ export const StockAdjustments: React.FC = () => {
                     {language === 'ar' ? 'الأصناف المتأثرة' : 'Items Affected'}
                   </th>
                   <th className="px-6 py-5 text-sm font-black text-slate-600 uppercase">
+                    {language === 'ar' ? 'رقم القيد' : 'Journal Entry'}
+                  </th>
+                  <th className="px-6 py-5 text-sm font-black text-slate-600 uppercase">
                     {language === 'ar' ? 'البيان / الملاحظات' : 'Description'}
                   </th>
                   <th className="px-6 py-5 text-sm font-black text-slate-600 uppercase text-center w-36">
@@ -455,6 +460,22 @@ export const StockAdjustments: React.FC = () => {
                     </td>
                     <td className="px-6 py-5 text-sm font-black text-slate-700">
                       {(adj as any).items_count || (adj.items ? adj.items.length : 1)}
+                    </td>
+                    <td className="px-6 py-5 text-sm font-black text-slate-700">
+                      {adj.entry_number ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingViewDoc({ type: 'journal', idOrNumber: adj.entry_number! });
+                            setCurrentPage('journal_entries');
+                          }}
+                          className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-100/50 transition-all active:scale-95"
+                        >
+                          {adj.entry_number}
+                        </button>
+                      ) : (
+                        <span className="text-slate-400 font-mono text-xs">-</span>
+                      )}
                     </td>
                     <td className="px-6 py-5 text-sm font-bold text-slate-500 max-w-[240px] truncate">
                       {adj.description || '-'}
@@ -751,6 +772,22 @@ export const StockAdjustments: React.FC = () => {
                       <span className="text-slate-400 font-bold">{language === 'ar' ? 'حساب التسوية المقابل:' : 'Offset Account:'}</span>
                       <span className="text-slate-800 font-black">{viewAdj.account_name || '-'}</span>
                     </div>
+                    {viewAdj.entry_number && (
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-slate-400 font-bold">{language === 'ar' ? 'رقم القيد:' : 'Journal Entry:'}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewAdj(null);
+                            setPendingViewDoc({ type: 'journal', idOrNumber: viewAdj.entry_number! });
+                            setCurrentPage('journal_entries');
+                          }}
+                          className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50"
+                        >
+                          {viewAdj.entry_number}
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-3">
                     <div className="flex flex-col text-sm">

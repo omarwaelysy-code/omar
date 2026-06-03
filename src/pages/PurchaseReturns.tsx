@@ -24,7 +24,7 @@ export const PurchaseReturns: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
-  const { pendingViewDoc, setPendingViewDoc } = useNavigation();
+  const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -920,6 +920,9 @@ export const PurchaseReturns: React.FC = () => {
                       </span>
                     </div>
                   </th>
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                    {language === 'ar' ? 'رقم القيد' : 'Journal Entry'}
+                  </th>
                   <th className="px-6 py-4 font-bold text-left">الإجراءات</th>
                 </tr>
               </thead>
@@ -945,6 +948,22 @@ export const PurchaseReturns: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(ret.total_amount)} ج.م</td>
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      {ret.entry_number ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingViewDoc({ type: 'journal', idOrNumber: ret.entry_number! });
+                            setCurrentPage('journal_entries');
+                          }}
+                          className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-100/50 transition-all active:scale-95 animate-in fade-in"
+                        >
+                          {ret.entry_number}
+                        </button>
+                      ) : (
+                        <span className="text-zinc-400 font-mono text-xs">-</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-left">
                       <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button 
@@ -1044,7 +1063,21 @@ export const PurchaseReturns: React.FC = () => {
                 <div className="flex flex-col h-full justify-between">
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs bg-red-50 px-2 py-1 rounded text-red-700 font-bold">{ret.return_number}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs bg-red-50 px-2 py-1 rounded text-red-700 font-bold">{ret.return_number}</span>
+                        {ret.entry_number && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPendingViewDoc({ type: 'journal', idOrNumber: ret.entry_number! });
+                              setCurrentPage('journal_entries');
+                            }}
+                            className="font-mono text-[9px] bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100/50 transition-all active:scale-95 z-10"
+                          >
+                            {ret.entry_number}
+                          </button>
+                        )}
+                      </div>
                       <span className="text-xs text-zinc-400 font-medium">{formatDate(ret.date)}</span>
                     </div>
                     <div>
@@ -1085,7 +1118,21 @@ export const PurchaseReturns: React.FC = () => {
                 className="p-4 space-y-3 hover:bg-zinc-50 transition-colors cursor-pointer"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs bg-red-50 px-2 py-1 rounded text-red-700 font-bold">{ret.return_number}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs bg-red-50 px-2 py-1 rounded text-red-700 font-bold">{ret.return_number}</span>
+                    {ret.entry_number && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPendingViewDoc({ type: 'journal', idOrNumber: ret.entry_number! });
+                          setCurrentPage('journal_entries');
+                        }}
+                        className="font-mono text-[9px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100/50"
+                      >
+                        {ret.entry_number}
+                      </button>
+                    )}
+                  </div>
                   <span className="text-xs text-zinc-500 flex items-center gap-1">
                     <Calendar size={12} />
                     {formatDate(ret.date)}
@@ -1593,6 +1640,21 @@ export const PurchaseReturns: React.FC = () => {
                     {viewReturn.warehouse_id && (
                       <p className="text-xs text-slate-500 font-medium mt-1">
                         {language === 'ar' ? 'المخزن:' : 'Warehouse:'} <span className="text-emerald-600 font-bold">{warehouses.find((w: any) => w.id?.toString() === viewReturn.warehouse_id?.toString())?.name || viewReturn.warehouse_id}</span>
+                      </p>
+                    )}
+                    {viewReturn.entry_number && (
+                      <p className="text-xs text-slate-500 font-medium mt-1">
+                        {language === 'ar' ? 'رقم القيد:' : 'Journal Entry:'} <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewReturn(null);
+                            setPendingViewDoc({ type: 'journal', idOrNumber: viewReturn.entry_number! });
+                            setCurrentPage('journal_entries');
+                          }}
+                          className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50"
+                        >
+                          {viewReturn.entry_number}
+                        </button>
                       </p>
                     )}
                   </div>

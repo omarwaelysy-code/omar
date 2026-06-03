@@ -30,7 +30,7 @@ export const PaymentVouchers: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
-  const { pendingViewDoc, setPendingViewDoc } = useNavigation();
+  const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -1050,6 +1050,7 @@ export const PaymentVouchers: React.FC = () => {
                       </span>
                     </div>
                   </th>
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</th>
                   <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>الإجراءات</th>
                 </tr>
               </thead>
@@ -1100,6 +1101,22 @@ export const PaymentVouchers: React.FC = () => {
                     <td className="px-6 py-4 text-zinc-500">{formatDate(voucher.date)}</td>
                     <td className="px-6 py-4 text-zinc-600 max-w-xs">{voucher.description || '---'}</td>
                     <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(voucher.amount)} {t('common.currency')}</td>
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      {voucher.entry_number ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingViewDoc({ type: 'journal', idOrNumber: voucher.entry_number! });
+                            setCurrentPage('journal_entries');
+                          }}
+                          className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-100/50 transition-all active:scale-95"
+                        >
+                          {voucher.entry_number}
+                        </button>
+                      ) : (
+                        <span className="text-slate-400 font-mono text-xs">-</span>
+                      )}
+                    </td>
                     <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                       <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity no-pdf`}>
                         <button 
@@ -1192,6 +1209,18 @@ export const PaymentVouchers: React.FC = () => {
                       <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100 italic">
                         {voucher.internal_reference || voucher.voucher_number || voucher.number}
                       </span>
+                      {voucher.entry_number && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingViewDoc({ type: 'journal', idOrNumber: voucher.entry_number! });
+                            setCurrentPage('journal_entries');
+                          }}
+                          className="font-mono text-[9px] bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100/50 transition-all active:scale-95 z-10"
+                        >
+                          {voucher.entry_number}
+                        </button>
+                      )}
                       {voucher.manual_reference && (
                         <span className="font-mono text-[9px] text-zinc-400">
                           {voucher.manual_reference}
@@ -1757,6 +1786,22 @@ export const PaymentVouchers: React.FC = () => {
                       <span className="text-zinc-500">طريقة الصرف:</span>
                       <span className="font-bold text-zinc-900">{viewVoucher.payment_method_name || '---'}</span>
                     </div>
+                    {viewVoucher.entry_number && (
+                      <div className="flex justify-between py-3 border-b border-zinc-100">
+                        <span className="text-zinc-500">{language === 'ar' ? 'رقم القيد:' : 'Journal Entry:'}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewVoucher(null);
+                            setPendingViewDoc({ type: 'journal', idOrNumber: viewVoucher.entry_number! });
+                            setCurrentPage('journal_entries');
+                          }}
+                          className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50"
+                        >
+                          {viewVoucher.entry_number}
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-12 flex justify-between items-end">

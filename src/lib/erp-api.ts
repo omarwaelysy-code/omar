@@ -514,7 +514,18 @@ router.get('/db-health', async (req, res) => {
 
 // Helper for generic list
 const getList = async (table: string, filters: any) => {
-  let sql = `SELECT * FROM "${table}"`;
+  let sql;
+  const journaledTables = [
+    'invoices', 'purchase_invoices', 'receipt_vouchers', 'payment_vouchers',
+    'returns', 'purchase_returns', 'cash_transfers', 'customer_discounts',
+    'supplier_discounts', 'opening_stock_balances', 'stock_adjustments',
+    'warehouse_transfers'
+  ];
+  if (journaledTables.includes(table)) {
+    sql = `SELECT t.*, (SELECT entry_number FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS entry_number FROM "${table}" t`;
+  } else {
+    sql = `SELECT * FROM "${table}"`;
+  }
   const values: any[] = [];
   const conditions: string[] = [];
   
@@ -1038,7 +1049,18 @@ modules.forEach(moduleName => {
           const sortOrder = queryFilters._sortOrder || 'DESC';
           const search = queryFilters._search || '';
           
-          let sql = `SELECT * FROM "${moduleName}"`;
+          let sql;
+          const journaledTables = [
+            'invoices', 'purchase_invoices', 'receipt_vouchers', 'payment_vouchers',
+            'returns', 'purchase_returns', 'cash_transfers', 'customer_discounts',
+            'supplier_discounts', 'opening_stock_balances', 'stock_adjustments',
+            'warehouse_transfers'
+          ];
+          if (journaledTables.includes(moduleName)) {
+            sql = `SELECT t.*, (SELECT entry_number FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS entry_number FROM "${moduleName}" t`;
+          } else {
+            sql = `SELECT * FROM "${moduleName}"`;
+          }
           const values: any[] = [];
           const conditions: string[] = [];
           let paramIndex = 1;
@@ -1146,7 +1168,19 @@ modules.forEach(moduleName => {
           return sendError(res, 400, `Invalid ID format for ${moduleName}`);
         }
 
-        const { rows }: any = await pool.query(`SELECT * FROM ${moduleName} WHERE id = $1`, [id]);
+        let queryStr;
+        const journaledTables = [
+          'invoices', 'purchase_invoices', 'receipt_vouchers', 'payment_vouchers',
+          'returns', 'purchase_returns', 'cash_transfers', 'customer_discounts',
+          'supplier_discounts', 'opening_stock_balances', 'stock_adjustments',
+          'warehouse_transfers'
+        ];
+        if (journaledTables.includes(moduleName)) {
+          queryStr = `SELECT t.*, (SELECT entry_number FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS entry_number FROM "${moduleName}" t WHERE t.id = $1`;
+        } else {
+          queryStr = `SELECT * FROM "${moduleName}" WHERE id = $1`;
+        }
+        const { rows }: any = await pool.query(queryStr, [id]);
         const row = rows[0] || null;
         
         if (!row) {

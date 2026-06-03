@@ -13,6 +13,7 @@ import { formatNumber, formatDate } from '../utils/formatUtils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { PaginationControls } from '../components/PaginationControls';
 import * as XLSX from 'xlsx';
+import { useNavigation } from '../contexts/NavigationContext';
 
 interface ItemInput {
   product_id: string;
@@ -25,6 +26,7 @@ export const OpeningStockBalances: React.FC = () => {
   const { user } = useAuth();
   const { showNotification } = useNotification();
   const { t, dir, language } = useLanguage();
+  const { setPendingViewDoc, setCurrentPage } = useNavigation();
 
   // Data states
   const [documents, setDocuments] = useState<OpeningStockBalance[]>([]);
@@ -599,6 +601,9 @@ export const OpeningStockBalances: React.FC = () => {
                     {language === 'ar' ? 'الحساب الدائن' : 'Credit Account'}
                   </th>
                   <th className="px-6 py-5 text-sm font-black text-slate-600 uppercase">
+                    {language === 'ar' ? 'رقم القيد' : 'Journal Entry'}
+                  </th>
+                  <th className="px-6 py-5 text-sm font-black text-slate-600 uppercase">
                     {language === 'ar' ? 'البيان / الملاحظات' : 'Description'}
                   </th>
                   <th className="px-6 py-5 text-sm font-black text-slate-600 uppercase text-center w-36">
@@ -620,6 +625,22 @@ export const OpeningStockBalances: React.FC = () => {
                     </td>
                     <td className="px-6 py-5 text-sm font-black text-slate-700">
                       {doc.credit_account_name || '-'}
+                    </td>
+                    <td className="px-6 py-5 text-sm font-black text-slate-700">
+                      {doc.entry_number ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingViewDoc({ type: 'journal', idOrNumber: doc.entry_number! });
+                            setCurrentPage('journal_entries');
+                          }}
+                          className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-100/50 transition-all active:scale-95"
+                        >
+                          {doc.entry_number}
+                        </button>
+                      ) : (
+                        <span className="text-slate-400 font-mono text-xs">-</span>
+                      )}
                     </td>
                     <td className="px-6 py-5 text-sm font-bold text-slate-500 max-w-[240px] truncate">
                       {doc.description || '-'}
@@ -939,6 +960,22 @@ export const OpeningStockBalances: React.FC = () => {
                       <span className="text-slate-400 font-bold">{language === 'ar' ? 'الحساب الدائن:' : 'Credit Account:'}</span>
                       <span className="text-slate-800 font-black">{viewDoc.credit_account_name || '-'}</span>
                     </div>
+                    {viewDoc.entry_number && (
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-slate-400 font-bold">{language === 'ar' ? 'رقم القيد:' : 'Journal Entry:'}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewDoc(null);
+                            setPendingViewDoc({ type: 'journal', idOrNumber: viewDoc.entry_number! });
+                            setCurrentPage('journal_entries');
+                          }}
+                          className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50"
+                        >
+                          {viewDoc.entry_number}
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-3">
                     <div className="flex flex-col text-sm">
