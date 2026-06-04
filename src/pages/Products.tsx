@@ -48,6 +48,9 @@ const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
   required = false,
   placeholder = ''
 }) => {
+  const [isFocused, setIsFocused] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+
   const formatValue = (num: number) => {
     if (num === undefined || num === null || isNaN(num)) return '';
     return new Intl.NumberFormat('en-US', {
@@ -56,31 +59,39 @@ const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
     }).format(num);
   };
 
-  const [displayValue, setDisplayValue] = useState(formatValue(value));
-
   useEffect(() => {
-    setDisplayValue(formatValue(value));
-  }, [value]);
+    if (!isFocused) {
+      setInputValue(value === 0 ? '' : String(value));
+    }
+  }, [value, isFocused]);
 
-  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let inputVal = e.target.value;
-    let clean = inputVal.replace(/[^0-9.,-]/g, '');
-    const parts = clean.replace(/,/g, '').split('.');
-    if (parts[0]) {
-      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    }
-    let formatted = parts[0];
-    if (clean.includes('.')) {
-      formatted += '.' + (parts[1] || '');
-    }
-    setDisplayValue(formatted);
-    const parsed = parseFloat(clean.replace(/,/g, ''));
-    onChange(isNaN(parsed) ? 0 : parsed);
+  const handleFocus = () => {
+    setIsFocused(true);
+    setInputValue(value === 0 ? '' : String(value));
   };
 
   const handleBlur = () => {
-    setDisplayValue(formatValue(value));
+    setIsFocused(false);
+    const parsed = parseFloat(inputValue.replace(/,/g, '')) || 0;
+    onChange(parsed);
   };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    // Allow digits, dot, and minus
+    let clean = val.replace(/[^0-9.-]/g, '');
+    const parts = clean.split('.');
+    if (parts.length > 2) {
+      clean = parts[0] + '.' + parts.slice(1).join('');
+    }
+    setInputValue(clean);
+    
+    // Notify parent on change so state is reactive
+    const parsed = parseFloat(clean) || 0;
+    onChange(parsed);
+  };
+
+  const displayValue = isFocused ? inputValue : formatValue(value);
 
   return (
     <input
@@ -90,8 +101,9 @@ const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
       placeholder={placeholder}
       className={className}
       value={displayValue}
-      onChange={handleTextChange}
+      onFocus={handleFocus}
       onBlur={handleBlur}
+      onChange={handleChange}
     />
   );
 };
