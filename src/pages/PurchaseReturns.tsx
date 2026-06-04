@@ -1389,62 +1389,66 @@ export const PurchaseReturns: React.FC = () => {
 
                   {/* Card 2: Payment settings */}
                   <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                    <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50/50 px-3 py-1 rounded-full border border-emerald-100">
                       <Wallet className="w-4 h-4" />
-                      <span className="text-xs font-bold">إعدادات الدفع</span>
+                      <span className="text-xs font-bold">{language === 'ar' ? 'إعدادات الدفع' : 'Payment Settings'}</span>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">نوع المرتجع</label>
-                        <div className="grid grid-cols-2 gap-3 p-1 bg-zinc-100 rounded-2xl">
-                          <button
-                            type="button"
-                            onClick={() => setReturnData({ ...returnData, payment_type: 'cash' })}
-                            className={`py-2 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm ${returnData.payment_type === 'cash' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
-                          >
-                            <Wallet size={16} />
-                            نقدي
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setReturnData({ ...returnData, payment_type: 'credit' })}
-                            className={`py-2 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm ${returnData.payment_type === 'credit' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
-                          >
-                            <Layers size={16} />
-                            آجل
-                          </button>
-                        </div>
-                      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6">
+                      <button 
+                        type="button"
+                        onClick={() => setReturnData({ ...returnData, payment_type: 'cash' })}
+                        className={`flex-1 py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-3 border ${returnData.payment_type === 'cash' ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg scale-[1.02]' : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'}`}
+                      >
+                        <Wallet size={18} />
+                        {language === 'ar' ? 'نقدي' : 'Cash'}
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setReturnData({ ...returnData, payment_type: 'credit' })}
+                        className={`flex-1 py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-3 border ${returnData.payment_type === 'credit' ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg scale-[1.02]' : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'}`}
+                      >
+                        <CreditCard size={18} />
+                        {language === 'ar' ? 'آجل' : 'Credit'}
+                      </button>
+                    </div>
 
-                      {returnData.payment_type === 'cash' && (
-                        <div className="animate-in slide-in-from-top-2 duration-200">
-                          <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">طريقة استرداد المبلغ</label>
-                          <div className="relative group">
-                            <CreditCard className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
-                            <select 
-                              required
-                              className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
-                              value={returnData.payment_method_id}
-                              onChange={(e) => {
-                                if (e.target.value === 'new') {
-                                  setIsPaymentMethodModalOpen(true);
-                                } else {
-                                  setReturnData({...returnData, payment_method_id: e.target.value});
-                                }
-                              }}
-                            >
-                              <option value="">اختر الطريقة...</option>
-                              {paymentMethods.map(m => (
-                                <option key={m.id} value={m.id}>{m.name}</option>
-                              ))}
-                              <option value="new" className="font-bold text-emerald-600">+ إضافة طريقة دفع...</option>
-                            </select>
-                            <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                    {returnData.payment_type === 'cash' && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }} 
+                        animate={{ opacity: 1, y: 0 }} 
+                        className="space-y-6 pt-6 border-t border-zinc-100"
+                      >
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <label className="block text-sm font-medium text-zinc-700 mb-2">{language === 'ar' ? 'طريقة استرداد المبلغ' : 'Refund Method'}</label>
+                            <div className="relative group">
+                              <CreditCard className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 w-4 h-4 text-zinc-400 transition-colors`} />
+                              <select 
+                                required
+                                className={`w-full ${dir === 'rtl' ? 'pr-10' : 'pl-10'} py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm`}
+                                value={returnData.payment_method_id}
+                                onChange={(e) => {
+                                  if (e.target.value === 'new') {
+                                    setIsPaymentMethodModalOpen(true);
+                                  } else {
+                                    setReturnData({...returnData, payment_method_id: e.target.value});
+                                  }
+                                }}
+                              >
+                                <option value="">{language === 'ar' ? 'اختر الطريقة...' : 'Select Method...'}</option>
+                                {paymentMethods.map(m => (
+                                  <option key={m.id} value={m.id}>{m.name}</option>
+                                ))}
+                                <option value="new" className="font-bold text-emerald-600">+ {language === 'ar' ? 'إضافة طريقة دفع...' : 'Add Payment Method...'}</option>
+                              </select>
+                              <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                            </div>
                           </div>
                         </div>
-                      )}
-                    </div>
+                      </motion.div>
+                    )}
+
                     <div>
                       <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">ملاحظات</label>
                       <textarea 
@@ -1589,21 +1593,22 @@ export const PurchaseReturns: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action Footer */}
-              <div className="flex gap-4 p-6 bg-zinc-50 border-t border-zinc-100 sticky bottom-0 z-[60] mt-auto">
+              {/* Form Footer */}
+              <div className="p-4 md:p-6 border-t border-slate-100 bg-white/80 backdrop-blur-md sticky bottom-0 z-[70] flex items-center justify-between gap-4 mt-auto">
                 <button 
                   type="button"
                   onClick={closeModal}
-                  className="flex-1 py-4 bg-white text-zinc-600 rounded-2xl font-bold border border-zinc-200 hover:bg-zinc-100 transition-all active:scale-95 shadow-sm"
+                  className="flex-1 max-w-[200px] py-4 rounded-2xl bg-zinc-100 text-zinc-600 font-black hover:bg-zinc-200 transition-all flex items-center justify-center gap-3 active:scale-95"
                 >
+                  <RotateCcw size={20} />
                   {t('common.cancel')}
                 </button>
                 <button 
                   type="submit"
                   disabled={items.length === 0 || returnData.supplier_id === ''}
-                  className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-3"
+                  className="flex-1 py-4 rounded-2xl bg-emerald-600 text-white font-black hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 shadow-xl shadow-emerald-600/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Save className="w-6 h-6" />
+                  <Save size={20} />
                   {editingReturn ? 'حفظ التعديلات' : 'حفظ المرتجع'}
                 </button>
               </div>
