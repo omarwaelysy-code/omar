@@ -8,7 +8,7 @@ import {
   Calendar, Hash, Package, Save, FileText, Pencil, Download, 
   Eye, History, Printer, ArrowRight, ArrowLeft, Minimize2, 
   Maximize2, Phone, Mail, MapPin, Wallet, Layers, Paperclip, 
-  Tag, Box, LayoutGrid, List, Receipt, ChevronDown
+  Tag, Box, LayoutGrid, List, Receipt, ChevronDown, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartAIInput } from '../components/SmartAIInput';
@@ -59,7 +59,6 @@ export const PurchaseInvoices: React.FC = () => {
   const [previewJournalEntry, setPreviewJournalEntry] = useState<any | null>(null);
   const [previewActivityLog, setPreviewActivityLog] = useState<any | null>(null);
   const [invoiceNumber, setInvoiceNumber] = useState('');
-  const [isFullScreen, setIsFullScreen] = useState(false);
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [view, setView] = useViewPreference('purchase_invoices', 'table');
@@ -1350,7 +1349,9 @@ export const PurchaseInvoices: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {!isModalOpen ? (
+        <>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('pi.title')}</h2>
           <p className="text-zinc-500">{t('pi.subtitle')}</p>
@@ -1699,57 +1700,61 @@ export const PurchaseInvoices: React.FC = () => {
           )}
         </div>
       </div>
-
-      {isModalOpen && (
-        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm`}>
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className={`bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col transition-all duration-300 ${isFullScreen ? 'w-full h-full rounded-none' : 'w-full max-w-6xl max-h-[90vh]'}`}
+    </>
+  ) : (
+    <div className="bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
+      {/* Form Header */}
+      <div className="p-4 md:p-6 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70]">
+        <div className="flex items-center gap-3">
+          <button 
+            type="button"
+            onClick={closeModal} 
+            className="flex items-center gap-2 px-4 py-2 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all font-black text-sm"
           >
-            <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/50">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-emerald-100 text-emerald-600 rounded-2xl">
-                  <ShoppingCart size={24} />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-zinc-900">{editingInvoice ? t('pi.edit_invoice') : t('pi.add_invoice')}</h3>
-                  <p className="text-sm text-zinc-500">{t('pi.modal_subtitle')}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {editingInvoice && (
-                  <div className="flex items-center gap-1 mr-4">
-                    <button
-                      onClick={handleBackInvoice}
-                      disabled={purchaseInvoices.findIndex(inv => inv.id === editingInvoice.id) === purchaseInvoices.length - 1}
-                      className="p-2 hover:bg-zinc-200 rounded-xl transition-all disabled:opacity-30"
-                      title={t('common.previous')}
-                    >
-                      {t('dir') === 'rtl' ? <ArrowRight size={20} /> : <ArrowLeft size={20} />}
-                    </button>
-                    <button
-                      onClick={handleNextInvoice}
-                      disabled={purchaseInvoices.findIndex(inv => inv.id === editingInvoice.id) === 0}
-                      className="p-2 hover:bg-zinc-200 rounded-xl transition-all disabled:opacity-30"
-                      title={t('common.next')}
-                    >
-                      {t('dir') === 'rtl' ? <ArrowLeft size={20} /> : <ArrowRight size={20} />}
-                    </button>
-                  </div>
-                )}
-                <button 
-                  onClick={() => setIsFullScreen(!isFullScreen)}
-                  className="p-2 hover:bg-zinc-200 rounded-xl transition-all text-zinc-500"
-                  title={isFullScreen ? t('common.minimize') : t('common.maximize')}
-                >
-                  {isFullScreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
-                </button>
-                <button onClick={closeModal} className="p-2 hover:bg-zinc-200 rounded-xl transition-all text-zinc-500">
-                  <X size={24} />
-                </button>
-              </div>
+            {t('dir') === 'rtl' ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+            <span>{t('dir') === 'rtl' ? 'العودة للقائمة' : 'Back to List'}</span>
+          </button>
+        </div>
+
+        <div className="flex-1 flex justify-center">
+          <button 
+            type="button"
+            onClick={() => setShowSidePanel(!showSidePanel)}
+            className={`flex items-center gap-3 px-6 py-2.5 rounded-2xl text-sm font-black transition-all border shadow-sm ${showSidePanel ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'}`}
+          >
+            <History size={18} />
+            <span>{t('dir') === 'rtl' ? 'قيد اليومية \\ سجل التعديلات' : 'Journal Entry / Edit Log'}</span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-4">
+          {editingInvoice && (
+            <div className="hidden lg:flex items-center gap-2 bg-zinc-100 p-1.5 rounded-2xl">
+              <button 
+                type="button"
+                onClick={handleBackInvoice}
+                className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
+                disabled={purchaseInvoices.findIndex(inv => inv.id === editingInvoice.id) === purchaseInvoices.length - 1}
+              >
+                {t('dir') === 'rtl' ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                {t('common.previous')}
+              </button>
+              <button 
+                type="button"
+                onClick={handleNextInvoice}
+                className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
+                disabled={purchaseInvoices.findIndex(inv => inv.id === editingInvoice.id) === 0}
+              >
+                {t('common.next')}
+                {t('dir') === 'rtl' ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+              </button>
             </div>
+          )}
+          <h3 className="text-xl md:text-2xl font-black text-zinc-900 tracking-tight">
+            {editingInvoice ? t('pi.edit_invoice') : t('pi.add_invoice')}
+          </h3>
+        </div>
+      </div>
             
             <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full relative">
               {/* Side Panel for Activity Log and Journal Entry */}
@@ -2322,9 +2327,8 @@ export const PurchaseInvoices: React.FC = () => {
               </div>
             </div>
           </div>
-        </motion.div>
-      </div>
-    )}
+    </div>
+  )}
 
       {/* View Modal */}
       {viewInvoice && (
