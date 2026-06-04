@@ -160,10 +160,16 @@ ALTER TABLE purchase_returns ADD COLUMN IF NOT EXISTS payment_type VARCHAR(20) D
 ALTER TABLE purchase_returns ADD COLUMN IF NOT EXISTS payment_method_id VARCHAR(36);
 ALTER TABLE purchase_returns ADD COLUMN IF NOT EXISTS payment_method_name VARCHAR(255);
 
-ALTER TABLE customer_discounts ADD COLUMN IF NOT EXISTS company_id VARCHAR(36);
-ALTER TABLE customer_discounts ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255);
-ALTER TABLE supplier_discounts ADD COLUMN IF NOT EXISTS company_id VARCHAR(36);
-ALTER TABLE supplier_discounts ADD COLUMN IF NOT EXISTS supplier_name VARCHAR(255);
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'customer_discounts') THEN
+        ALTER TABLE customer_discounts ADD COLUMN IF NOT EXISTS company_id VARCHAR(36);
+        ALTER TABLE customer_discounts ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255);
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'supplier_discounts') THEN
+        ALTER TABLE supplier_discounts ADD COLUMN IF NOT EXISTS company_id VARCHAR(36);
+        ALTER TABLE supplier_discounts ADD COLUMN IF NOT EXISTS supplier_name VARCHAR(255);
+    END IF;
+END $$;
 
 -- 14. Payment Methods
 ALTER TABLE payment_methods ADD COLUMN IF NOT EXISTS account_id VARCHAR(36);
@@ -212,9 +218,22 @@ CREATE TABLE IF NOT EXISTS settings (
 -- Indices 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_company_id ON users(company_id);
-CREATE INDEX IF NOT EXISTS idx_activity_logs_company_timestamp ON activity_logs(company_id, timestamp DESC);
+-- activity_logs: use created_at (the actual column name); timestamp column may not exist
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='activity_logs' AND column_name='created_at') THEN
+        IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='idx_activity_logs_company_at') THEN
+            CREATE INDEX idx_activity_logs_company_at ON activity_logs(company_id, created_at DESC);
+        END IF;
+    END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON activity_logs(user_id);
-CREATE INDEX IF NOT EXISTS idx_activity_logs_category ON activity_logs USING GIN (category);
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='activity_logs' AND column_name='entity') THEN
+        IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='idx_activity_logs_entity') THEN
+            CREATE INDEX idx_activity_logs_entity ON activity_logs USING GIN (entity);
+        END IF;
+    END IF;
+END $$;
 
 -- Report Optimization Indices
 CREATE INDEX IF NOT EXISTS idx_journal_entries_company_date ON journal_entries(company_id, date DESC);
@@ -238,4 +257,4 @@ CREATE TABLE IF NOT EXISTS _system_settings (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-INSERT INTO _system_settings (key, value) VALUES ('schema_version', '{"version": "1.0.1"}') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP;
+INSERT INTO _system_settings (key, value) VALUES ('schema_version', '{"version": "2.0.0", "master_migration_safe": true}') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP;
