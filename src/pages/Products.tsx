@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Plus, Trash2, X, Package, History, ChevronRight, ChevronLeft, 
   Wallet, Layers, Hash, User, Calendar, Paperclip, LayoutGrid, List,
@@ -1075,17 +1075,38 @@ export const Products: React.FC = () => {
                               <label className="block text-[10px] font-black text-slate-400 mb-6 uppercase tracking-widest px-1">{t('products.form_attachment')}</label>
                               <div className="relative group mb-8">
                                 <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" id="product-attachment" />
-                                <label htmlFor="product-attachment" className="flex flex-col items-center justify-center gap-6 w-full p-16 bg-slate-50 border-[3px] border-dashed border-slate-100 rounded-[3.5rem] cursor-pointer hover:bg-slate-100 hover:border-emerald-200 transition-all shadow-inner">
-                                  <div className="w-20 h-20 bg-white rounded-3xl shadow-sm flex items-center justify-center text-slate-300 group-hover:text-emerald-500 transition-all">
-                                    <Camera size={32} />
-                                  </div>
-                                  <div className="text-center">
-                                    <span className="text-sm font-black text-slate-500 block mb-1 uppercase tracking-widest">{formData.image_url ? t('common.edit') : 'اضغط لإضافة صورة'}</span>
-                                    <span className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">JPG, PNG, WEBP (Max 2MB)</span>
-                                  </div>
+                                <label 
+                                  htmlFor="product-attachment" 
+                                  className="relative flex flex-col items-center justify-center gap-6 w-full min-h-[280px] bg-slate-50 border-[3px] border-dashed border-slate-100 rounded-[3.5rem] cursor-pointer hover:bg-slate-100 hover:border-emerald-200 transition-all shadow-inner overflow-hidden"
+                                >
+                                  {formData.image_url ? (
+                                    <>
+                                      <img 
+                                        src={formData.image_url} 
+                                        alt="Product preview" 
+                                        className="absolute inset-0 w-full h-full object-cover rounded-[3.3rem]" 
+                                        referrerPolicy="no-referrer"
+                                      />
+                                      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-4 text-white rounded-[3.3rem]">
+                                        <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center">
+                                          <Camera size={28} className="text-white" />
+                                        </div>
+                                        <span className="text-sm font-black uppercase tracking-widest">{t('common.edit')}</span>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div className="w-20 h-20 bg-white rounded-3xl shadow-sm flex items-center justify-center text-slate-300 group-hover:text-emerald-500 transition-all">
+                                        <Camera size={32} />
+                                      </div>
+                                      <div className="text-center">
+                                        <span className="text-sm font-black text-slate-500 block mb-1 uppercase tracking-widest">اضغط لإضافة صورة</span>
+                                        <span className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">JPG, PNG, WEBP (Max 2MB)</span>
+                                      </div>
+                                    </>
+                                  )}
                                 </label>
                               </div>
-                              {formData.image_url && <img src={formData.image_url} alt="" className="max-h-48 mx-auto rounded-[2rem] shadow-2xl border-4 border-white" />}
                            </div>
                            <div className="space-y-8">
                               <div className="space-y-4">
