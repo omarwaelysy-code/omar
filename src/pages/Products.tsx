@@ -31,6 +31,71 @@ interface ItemGroup {
   type: string;
 }
 
+interface FormattedNumberInputProps {
+  value: number;
+  onChange: (val: number) => void;
+  className?: string;
+  disabled?: boolean;
+  required?: boolean;
+  placeholder?: string;
+}
+
+const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
+  value,
+  onChange,
+  className = '',
+  disabled = false,
+  required = false,
+  placeholder = ''
+}) => {
+  const formatValue = (num: number) => {
+    if (num === undefined || num === null || isNaN(num)) return '';
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(num);
+  };
+
+  const [displayValue, setDisplayValue] = useState(formatValue(value));
+
+  useEffect(() => {
+    setDisplayValue(formatValue(value));
+  }, [value]);
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let inputVal = e.target.value;
+    let clean = inputVal.replace(/[^0-9.,-]/g, '');
+    const parts = clean.replace(/,/g, '').split('.');
+    if (parts[0]) {
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+    let formatted = parts[0];
+    if (clean.includes('.')) {
+      formatted += '.' + (parts[1] || '');
+    }
+    setDisplayValue(formatted);
+    const parsed = parseFloat(clean.replace(/,/g, ''));
+    onChange(isNaN(parsed) ? 0 : parsed);
+  };
+
+  const handleBlur = () => {
+    setDisplayValue(formatValue(value));
+  };
+
+  return (
+    <input
+      type="text"
+      required={required}
+      disabled={disabled}
+      placeholder={placeholder}
+      className={className}
+      value={displayValue}
+      onChange={handleTextChange}
+      onBlur={handleBlur}
+    />
+  );
+};
+
 export const Products: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
@@ -844,14 +909,14 @@ export const Products: React.FC = () => {
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('products.form_sale_price')}</label>
                                 <div className="relative group">
                                   <Wallet className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-emerald-400`} size={24} />
-                                  <input required type="number" step="0.01" className="w-full pr-16 pl-6 py-5 bg-white border border-emerald-100 rounded-[2.5rem] text-4xl font-black text-emerald-600 outline-none focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-sm" value={formData.sale_price || ''} onChange={(e) => setFormData({ ...formData, sale_price: parseFloat(e.target.value) || 0 })} />
+                                  <FormattedNumberInput required className="w-full pr-16 pl-6 py-5 bg-white border border-emerald-100 rounded-[2.5rem] text-2xl font-black text-emerald-600 outline-none focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-sm" value={formData.sale_price || 0} onChange={(val) => setFormData({ ...formData, sale_price: val })} />
                                 </div>
                               </div>
                               <div className="space-y-4">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('products.form_cost_price')}</label>
                                 <div className="relative group">
                                   <Wallet className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300`} size={24} />
-                                  <input required type="number" step="0.01" className="w-full pr-16 pl-6 py-5 bg-white border border-slate-200 rounded-[2.5rem] text-4xl font-black text-slate-900 outline-none focus:ring-8 focus:ring-slate-500/5 transition-all shadow-sm" value={formData.cost_price || ''} onChange={(e) => setFormData({ ...formData, cost_price: parseFloat(e.target.value) || 0 })} />
+                                  <FormattedNumberInput required className="w-full pr-16 pl-6 py-5 bg-white border border-slate-200 rounded-[2.5rem] text-2xl font-black text-slate-900 outline-none focus:ring-8 focus:ring-slate-500/5 transition-all shadow-sm" value={formData.cost_price || 0} onChange={(val) => setFormData({ ...formData, cost_price: val })} />
                                 </div>
                               </div>
                            </div>
@@ -859,11 +924,11 @@ export const Products: React.FC = () => {
                              <>
                                <div className="space-y-4">
                                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('products.form_stock_quantity')}</label>
-                                  <input disabled type="number" className="w-full px-8 py-5 bg-slate-100 border border-slate-100 rounded-[2rem] text-xl font-black outline-none transition-all shadow-inner opacity-60 cursor-not-allowed" value={formData.stock || ''} onChange={(e) => setFormData({ ...formData, stock: parseFloat(e.target.value) || 0 })} />
+                                  <FormattedNumberInput disabled className="w-full px-8 py-5 bg-slate-100 border border-slate-100 rounded-[2rem] text-lg font-black outline-none transition-all shadow-inner opacity-60 cursor-not-allowed" value={formData.stock || 0} onChange={(val) => setFormData({ ...formData, stock: val })} />
                                </div>
                                <div className="space-y-4">
                                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('products.form_min_stock')}</label>
-                                  <input type="number" className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black outline-none focus:bg-white focus:ring-8 focus:ring-rose-500/5 transition-all shadow-inner" value={formData.min_stock || ''} onChange={(e) => setFormData({ ...formData, min_stock: parseFloat(e.target.value) || 0 })} />
+                                  <FormattedNumberInput className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-lg font-black outline-none focus:bg-white focus:ring-8 focus:ring-rose-500/5 transition-all shadow-inner" value={formData.min_stock || 0} onChange={(val) => setFormData({ ...formData, min_stock: val })} />
                                </div>
                              </>
                            )}
