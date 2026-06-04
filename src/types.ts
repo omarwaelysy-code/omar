@@ -125,6 +125,11 @@ export interface Customer {
   account_name?: string;
   counter_account_id?: string;
   company_id: string;
+  payment_method?: string;
+  credit_limit?: number;
+  payment_terms?: string;
+  payment_terms_days?: number;
+  advance_percentage?: number;
 }
 
 export interface Supplier {
@@ -140,6 +145,11 @@ export interface Supplier {
   account_name?: string;
   counter_account_id?: string;
   company_id: string;
+  payment_method?: string;
+  credit_limit?: number;
+  payment_terms?: string;
+  payment_terms_days?: number;
+  advance_percentage?: number;
 }
 
 export interface Warehouse {
@@ -288,6 +298,9 @@ export interface Invoice {
   total_base_amount?: number;
   source_orders?: string;
   entry_number?: string;
+  payment_terms?: string;
+  payment_terms_days?: number;
+  advance_percentage?: number;
 }
 
 export interface PurchaseInvoice {
@@ -297,6 +310,7 @@ export interface PurchaseInvoice {
   supplier_name?: string;
   warehouse_id?: string;
   date: string;
+  due_date?: string;
   description?: string;
   subtotal?: number;
   discount?: number;
@@ -313,6 +327,9 @@ export interface PurchaseInvoice {
   total_base_amount?: number;
   source_orders?: string;
   entry_number?: string;
+  payment_terms?: string;
+  payment_terms_days?: number;
+  advance_percentage?: number;
 }
 
 export interface InvoiceItem {

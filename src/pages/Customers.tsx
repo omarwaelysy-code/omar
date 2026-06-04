@@ -6,7 +6,7 @@ import { Customer, Account, JournalEntry } from '../types';
 import { 
   Search, Plus, Edit2, Trash2, X, History, FileText, User, 
   Hash, Box, Wallet, Calendar, Phone, Mail, MapPin, Lock,
-  LayoutGrid, List, ChevronRight, ChevronLeft, AlertCircle
+  LayoutGrid, List, ChevronRight, ChevronLeft, AlertCircle, CreditCard
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
@@ -70,7 +70,12 @@ export const Customers: React.FC = () => {
     opening_balance_date: new Date().toISOString().slice(0, 10),
     account_id: '',
     account_name: '',
-    counter_account_id: ''
+    counter_account_id: '',
+    payment_method: 'credit',
+    credit_limit: 0,
+    payment_terms: 'due_on_receipt',
+    payment_terms_days: 0,
+    advance_percentage: 0
   });
 
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -157,7 +162,12 @@ export const Customers: React.FC = () => {
           { field: 'opening_balance', label: 'رصيد أول' },
           { field: 'opening_balance_date', label: 'تاريخ الرصيد' },
           { field: 'account_name', label: 'الحساب المحاسبي' },
-          { field: 'counter_account_id', label: 'حساب الطرف الآخر' }
+          { field: 'counter_account_id', label: 'حساب الطرف الآخر' },
+          { field: 'payment_method', label: 'طريقة السداد' },
+          { field: 'credit_limit', label: 'حد الائتمان' },
+          { field: 'payment_terms', label: 'شروط السداد' },
+          { field: 'payment_terms_days', label: 'أيام شروط السداد' },
+          { field: 'advance_percentage', label: 'نسبة الدفعة المقدمة' }
         ];
         await dbService.updateWithLog(
           'customers', 
@@ -309,7 +319,12 @@ export const Customers: React.FC = () => {
           opening_balance_date: (fullData.opening_balance_date || new Date().toISOString()).slice(0, 10),
           account_id: fullData.account_id || '',
           account_name: fullData.account_name || '',
-          counter_account_id: fullData.counter_account_id || ''
+          counter_account_id: fullData.counter_account_id || '',
+          payment_method: fullData.payment_method || 'credit',
+          credit_limit: fullData.credit_limit || 0,
+          payment_terms: fullData.payment_terms || 'due_on_receipt',
+          payment_terms_days: fullData.payment_terms_days || 0,
+          advance_percentage: fullData.advance_percentage || 0
         });
         console.log('[EDIT] Form updated with customer:', fullData.id);
       } catch (error: any) {
@@ -330,7 +345,12 @@ export const Customers: React.FC = () => {
         opening_balance_date: new Date().toISOString().slice(0, 10),
         account_id: defaultAccount?.id || '',
         account_name: defaultAccount?.name || '',
-        counter_account_id: defaultCounterAccount?.id || ''
+        counter_account_id: defaultCounterAccount?.id || '',
+        payment_method: 'credit',
+        credit_limit: 0,
+        payment_terms: 'due_on_receipt',
+        payment_terms_days: 0,
+        advance_percentage: 0
       });
     }
     setIsModalOpen(true);
@@ -475,7 +495,22 @@ export const Customers: React.FC = () => {
                           <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                              <div className="flex flex-col">
                                 <span className={`font-black text-slate-900 group-hover:text-emerald-700 transition-colors ${editingCustomer?.id === customer.id ? 'text-emerald-700' : ''}`}>{customer.name}</span>
-                                <span className="text-[10px] text-slate-400 font-bold tracking-tight">{customer.mobile}</span>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-[10px] text-slate-400 font-bold tracking-tight">{customer.mobile}</span>
+                                    {customer.payment_method && (
+                                      <span className="text-[9px] font-black px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded">
+                                        {customer.payment_method === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') :
+                                         customer.payment_method === 'credit' ? (language === 'ar' ? 'آجل' : 'Credit') :
+                                         customer.payment_method === 'installments' ? (language === 'ar' ? 'دفعات' : 'Installments') : 
+                                         (language === 'ar' ? 'أخرى' : 'Other')}
+                                      </span>
+                                    )}
+                                    {customer.credit_limit > 0 && (
+                                      <span className="text-[9px] font-black px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded border border-amber-200/20">
+                                        {language === 'ar' ? 'حد: ' : 'Limit: '}{formatNumber(customer.credit_limit)}
+                                      </span>
+                                    )}
+                                 </div>
                              </div>
                           </td>
                           <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
@@ -525,6 +560,21 @@ export const Customers: React.FC = () => {
                           <span className="font-mono text-[10px] bg-white px-3 py-1 rounded-lg text-slate-500 font-black w-fit border border-slate-200 group-hover:border-emerald-200 transition-all">{customer.code}</span>
                           <h4 className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors text-2xl tracking-tighter leading-none">{customer.name}</h4>
                           <span className="text-xs text-slate-400 font-bold tracking-[0.1em]">{customer.mobile}</span>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {customer.payment_method && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-600 rounded">
+                                {customer.payment_method === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') :
+                                 customer.payment_method === 'credit' ? (language === 'ar' ? 'آجل' : 'Credit') :
+                                 customer.payment_method === 'installments' ? (language === 'ar' ? 'دفعات' : 'Installments') : 
+                                 (language === 'ar' ? 'أخرى' : 'Other')}
+                              </span>
+                            )}
+                            {customer.credit_limit > 0 && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-700 rounded border border-amber-200/20">
+                                {language === 'ar' ? 'حد الائتمان: ' : 'Limit: '}{formatNumber(customer.credit_limit)}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-transform group-hover:scale-110 ${getCustomerBalance(customer.id) >= 0 ? 'bg-emerald-600 shadow-emerald-500/20 text-white' : 'bg-rose-600 shadow-rose-500/20 text-white'}`}>
                            <Wallet size={24} />
@@ -711,6 +761,147 @@ export const Customers: React.FC = () => {
                               <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
                             ))}
                           </select>
+                        </div>
+                      </div>
+
+                      {/* Payment & Credit Settings Section */}
+                      <div className="md:col-span-2 p-10 bg-slate-50/50 rounded-[3rem] border border-slate-100 space-y-8">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-emerald-600/10 text-emerald-600 rounded-[1.25rem] flex items-center justify-center">
+                            <CreditCard size={24} />
+                          </div>
+                          <div>
+                            <h4 className="text-lg font-black text-slate-900 leading-none mb-1">
+                              {language === 'ar' ? 'إعدادات السداد والائتمان' : 'Payment & Credit Settings'}
+                            </h4>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                              {language === 'ar' ? 'طرق السداد، حدود الائتمان، وشروط الاستحقاق' : 'Payment terms, credit limits, and due dates'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          {/* Payment Method / طريقة السداد */}
+                          <div>
+                            <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {language === 'ar' ? 'طريقة السداد الافتراضية' : 'Default Payment Method'}
+                            </label>
+                            <div className="relative group">
+                              <Wallet className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 pointer-events-none`} size={20} />
+                              <select
+                                className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14 appearance-none"
+                                value={formData.payment_method || 'credit'}
+                                onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
+                              >
+                                <option value="cash">{language === 'ar' ? 'نقدي' : 'Cash'}</option>
+                                <option value="credit">{language === 'ar' ? 'آجل' : 'Credit / Postpaid'}</option>
+                                <option value="installments">{language === 'ar' ? 'دفعات' : 'Installments'}</option>
+                                <option value="other">{language === 'ar' ? 'أخرى' : 'Other'}</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Credit Limit / حد الائتمان */}
+                          <div>
+                            <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {language === 'ar' ? 'حد الائتمان' : 'Credit Limit'}
+                            </label>
+                            <div className="relative group">
+                              <span className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 font-black text-lg`}>$</span>
+                              <input
+                                type="number"
+                                min={0}
+                                className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14"
+                                value={formData.credit_limit || 0}
+                                onChange={(e) => setFormData({ ...formData, credit_limit: Number(e.target.value) })}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Payment Terms / شروط السداد */}
+                          <div className="md:col-span-2">
+                            <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {language === 'ar' ? 'شروط السداد (Payment Terms)' : 'Payment Terms'}
+                            </label>
+                            <div className="relative group">
+                              <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 pointer-events-none`} size={20} />
+                              <select
+                                className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14 appearance-none"
+                                value={formData.payment_terms || 'due_on_receipt'}
+                                onChange={(e) => {
+                                  const term = e.target.value;
+                                  let days = 0;
+                                  let pct = 0;
+                                  if (term === 'net_7') days = 7;
+                                  else if (term === 'net_15') days = 15;
+                                  else if (term === 'net_30') days = 30;
+                                  else if (term === 'net_45') days = 45;
+                                  else if (term === 'net_60') days = 60;
+                                  else if (term === 'net_90') days = 90;
+                                  else if (term === 'net_180') days = 180;
+                                  else if (term === 'advance_50_50') pct = 50;
+                                  else if (term === 'advance') pct = 100;
+                                  
+                                  setFormData({ 
+                                    ...formData, 
+                                    payment_terms: term,
+                                    payment_terms_days: days,
+                                    advance_percentage: pct
+                                  });
+                                }}
+                              >
+                                <option value="cash">{language === 'ar' ? 'نقدي عند التسليم (Cash)' : 'Cash on Delivery'}</option>
+                                <option value="due_on_receipt">{language === 'ar' ? 'مستحق فور استلام الفاتورة (Due on Receipt)' : 'Due on Receipt'}</option>
+                                <option value="net_7">{language === 'ar' ? 'خلال 7 أيام (Net 7)' : 'Net 7 Days'}</option>
+                                <option value="net_15">{language === 'ar' ? 'خلال 15 يوماً (Net 15)' : 'Net 15 Days'}</option>
+                                <option value="net_30">{language === 'ar' ? 'خلال 30 يوماً (Net 30)' : 'Net 30 Days'}</option>
+                                <option value="net_45">{language === 'ar' ? 'خلال 45 يوماً (Net 45)' : 'Net 45 Days'}</option>
+                                <option value="net_60">{language === 'ar' ? 'خلال 60 يوماً (Net 60)' : 'Net 60 Days'}</option>
+                                <option value="net_90">{language === 'ar' ? 'خلال 90 يوماً (Net 90)' : 'Net 90 Days'}</option>
+                                <option value="net_180">{language === 'ar' ? 'خلال 180 يوماً (Net 180)' : 'Net 180 Days'}</option>
+                                <option value="eom">{language === 'ar' ? 'نهاية الشهر (EOM)' : 'End of Month (EOM)'}</option>
+                                <option value="eom_30">{language === 'ar' ? 'السداد بعد 30 يوم من نهاية شهر الفاتورة (30 Days EOM)' : '30 Days EOM'}</option>
+                                <option value="advance">{language === 'ar' ? 'دفعة مقدمة قبل التوريد (Advance Payment)' : 'Advance Payment (100%)'}</option>
+                                <option value="advance_50_50">{language === 'ar' ? '50% مقدم والباقي عند التسليم' : '50% Advance / 50% on Delivery'}</option>
+                                <option value="custom">{language === 'ar' ? 'مخصص (أيام / نسب مقدمة مخصصة)' : 'Custom Days & Percentage'}</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Conditional Custom days and advance percentage */}
+                          {formData.payment_terms === 'custom' && (
+                            <>
+                              <div>
+                                <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  {language === 'ar' ? 'فترة السداد بالأيام' : 'Payment Terms (Days)'}
+                                </label>
+                                <div className="relative group">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none"
+                                    value={formData.payment_terms_days || 0}
+                                    onChange={(e) => setFormData({ ...formData, payment_terms_days: Number(e.target.value) })}
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  {language === 'ar' ? 'نسبة الدفعة المقدمة %' : 'Advance Percentage %'}
+                                </label>
+                                <div className="relative group">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none"
+                                    value={formData.advance_percentage || 0}
+                                    onChange={(e) => setFormData({ ...formData, advance_percentage: Number(e.target.value) })}
+                                  />
+                                </div>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
 

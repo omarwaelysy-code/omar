@@ -125,7 +125,27 @@ async function startServer() {
       'CREATE TABLE IF NOT EXISTS "employees" ("id" VARCHAR(36) PRIMARY KEY, "company_id" VARCHAR(36), "employee_code" VARCHAR(50) UNIQUE NOT NULL, "name" VARCHAR(255) NOT NULL, "nationality" VARCHAR(100), "national_id" VARCHAR(50), "gender" VARCHAR(20), "marital_status" VARCHAR(20), "birth_date" DATE, "hire_date" DATE, "contract_type" VARCHAR(20), "contract_expiry_date" DATE, "photo_url" TEXT, "documents" TEXT, "created_by" VARCHAR(36), "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)',
       'ALTER TABLE "employees" ADD COLUMN IF NOT EXISTS "job_title" VARCHAR(255)',
       'ALTER TABLE "employees" ADD COLUMN IF NOT EXISTS "manager_id" VARCHAR(36)',
-      'ALTER TABLE "employees" ADD COLUMN IF NOT EXISTS "department_id" VARCHAR(36)'
+      'ALTER TABLE "employees" ADD COLUMN IF NOT EXISTS "department_id" VARCHAR(36)',
+
+      // Payment Configurations, Credit Limits, and Payment Terms (Customers & Suppliers)
+      'ALTER TABLE "customers" ADD COLUMN IF NOT EXISTS "payment_method" VARCHAR(50)',
+      'ALTER TABLE "customers" ADD COLUMN IF NOT EXISTS "credit_limit" DECIMAL(18, 4) DEFAULT 0',
+      'ALTER TABLE "customers" ADD COLUMN IF NOT EXISTS "payment_terms" VARCHAR(100)',
+      'ALTER TABLE "customers" ADD COLUMN IF NOT EXISTS "payment_terms_days" INTEGER DEFAULT 0',
+      'ALTER TABLE "customers" ADD COLUMN IF NOT EXISTS "advance_percentage" DECIMAL(5, 2) DEFAULT 0',
+      'ALTER TABLE "suppliers" ADD COLUMN IF NOT EXISTS "payment_method" VARCHAR(50)',
+      'ALTER TABLE "suppliers" ADD COLUMN IF NOT EXISTS "credit_limit" DECIMAL(18, 4) DEFAULT 0',
+      'ALTER TABLE "suppliers" ADD COLUMN IF NOT EXISTS "payment_terms" VARCHAR(100)',
+      'ALTER TABLE "suppliers" ADD COLUMN IF NOT EXISTS "payment_terms_days" INTEGER DEFAULT 0',
+      'ALTER TABLE "suppliers" ADD COLUMN IF NOT EXISTS "advance_percentage" DECIMAL(5, 2) DEFAULT 0',
+
+      // Payment Terms on Invoices & Purchase Invoices
+      'ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "payment_terms" VARCHAR(100)',
+      'ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "payment_terms_days" INTEGER DEFAULT 0',
+      'ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "advance_percentage" DECIMAL(5, 2) DEFAULT 0',
+      'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "payment_terms" VARCHAR(100)',
+      'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "payment_terms_days" INTEGER DEFAULT 0',
+      'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "advance_percentage" DECIMAL(5, 2) DEFAULT 0'
     ];
     
     for (const q of syncQueries) {

@@ -73,6 +73,7 @@ export const Invoices: React.FC = () => {
   const [previewActivityLog, setPreviewActivityLog] = useState<Partial<ActivityLog> | null>(null);
   const invoiceRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
+  const isInitialLoad = useRef(true);
   const [isAiParsing, setIsAiParsing] = useState(false);
   const [showSidePanel, setShowSidePanel] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState('');
@@ -115,6 +116,11 @@ export const Invoices: React.FC = () => {
 
   // Form State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [entries, setEntries] = useState<JournalEntry[]>([]);
+  const [paymentTerms, setPaymentTerms] = useState<string>('due_on_receipt');
+  const [paymentTermsDays, setPaymentTermsDays] = useState<number>(0);
+  const [advancePercentage, setAdvancePercentage] = useState<number>(0);
+  const [dueDate, setDueDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [items, setItems] = useState<InvoiceItem[]>([]);
@@ -151,6 +157,7 @@ export const Invoices: React.FC = () => {
       const unsubPM = dbService.subscribe<any>('payment_methods', user.company_id, setPaymentMethods);
       const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
       const unsubWarehouses = dbService.subscribe<any>('warehouses', user.company_id, setWarehouses);
+      const unsubEntries = dbService.subscribe<JournalEntry>('journal_entries', user.company_id, setEntries);
       
       const fetchSettings = async () => {
         const docs = await dbService.getDocsByFilter<any>('settings', user.company_id, [
@@ -182,6 +189,7 @@ export const Invoices: React.FC = () => {
         unsubPM();
         unsubAccounts();
         unsubWarehouses();
+        unsubEntries();
       };
     }
   }, [user, page, limit, sortBy, sortOrder, searchTerm]);
@@ -190,6 +198,88 @@ export const Invoices: React.FC = () => {
     const next = await dbService.getNextSequence('invoices', dateStr);
     return next;
   };
+
+  const getCustomerBalance = (customerId: string) => {
+    let balance = 0;
+    entries.forEach((je: any) => {
+      je.items?.forEach((item: any) => {
+        if (item.customer_id === customerId) {
+          balance += (item.debit || 0) - (item.credit || 0);
+        }
+      });
+    });
+    return balance;
+  };
+
+  const calculateDueDate = (invoiceDateStr: string, terms: string, customDays: number) => {
+    if (!invoiceDateStr) return invoiceDateStr;
+    const invDate = new Date(invoiceDateStr);
+    if (isNaN(invDate.getTime())) return invoiceDateStr;
+
+    if (terms === 'due_on_receipt' || terms === 'cash') {
+      return invoiceDateStr;
+    } else if (terms === 'eom') {
+      const y = invDate.getFullYear();
+      const m = invDate.getMonth();
+      const lastDay = new Date(y, m + 1, 0);
+      return lastDay.toISOString().slice(0, 10);
+    } else if (terms === 'eom_30') {
+      const y = invDate.getFullYear();
+      const m = invDate.getMonth();
+      const lastDay = new Date(y, m + 1, 30);
+      return lastDay.toISOString().slice(0, 10);
+    } else {
+      let days = 0;
+      if (terms === 'net_7') days = 7;
+      else if (terms === 'net_15') days = 15;
+      else if (terms === 'net_30') days = 30;
+      else if (terms === 'net_45') days = 45;
+      else if (terms === 'net_60') days = 60;
+      else if (terms === 'net_90') days = 90;
+      else if (terms === 'net_180') days = 180;
+      else if (terms === 'custom') days = customDays || 0;
+      
+      invDate.setDate(invDate.getDate() + days);
+      return invDate.toISOString().slice(0, 10);
+    }
+  };
+
+  // Auto populate customer preferences
+  useEffect(() => {
+    if (selectedCustomerId && isModalOpen && user) {
+      const customer = customers.find(c => c.id === selectedCustomerId);
+      if (customer && !editingInvoice) {
+        if (customer.payment_method) {
+          setPaymentType(customer.payment_method === 'cash' ? 'cash' : 'credit');
+        }
+        if (customer.payment_terms) {
+          setPaymentTerms(customer.payment_terms);
+          setPaymentTermsDays(customer.payment_terms_days || 0);
+          setAdvancePercentage(customer.advance_percentage || 0);
+          
+          const computedDue = calculateDueDate(date, customer.payment_terms, customer.payment_terms_days || 0);
+          setDueDate(computedDue);
+        } else {
+          setPaymentTerms('due_on_receipt');
+          setPaymentTermsDays(0);
+          setAdvancePercentage(0);
+          setDueDate(date);
+        }
+      }
+    }
+  }, [selectedCustomerId, isModalOpen, editingInvoice, user, customers]);
+
+  // Recalculate due date when date or terms change
+  useEffect(() => {
+    if (isModalOpen) {
+      if (isInitialLoad.current) {
+        isInitialLoad.current = false;
+        return;
+      }
+      const computedDue = calculateDueDate(date, paymentTerms, paymentTermsDays);
+      setDueDate(computedDue);
+    }
+  }, [date, paymentTerms, paymentTermsDays, isModalOpen]);
 
   useEffect(() => {
     if (isProductModalOpen) {
@@ -655,7 +745,11 @@ export const Invoices: React.FC = () => {
         payment_method_name: paymentType === 'cash' ? (paymentMethod?.name || '') : null,
         company_id: user.company_id,
         created_at: new Date().toISOString(),
-        created_by: user.id
+        created_by: user.id,
+        payment_terms: paymentTerms,
+        payment_terms_days: paymentTermsDays,
+        advance_percentage: advancePercentage,
+        due_date: dueDate
       };
 
       // Journal items generation
@@ -1102,6 +1196,7 @@ export const Invoices: React.FC = () => {
   };
 
   const openModal = async () => {
+    isInitialLoad.current = true;
     setEditingInvoice(null);
     setSelectedCustomerId('');
     setSelectedWarehouseId('');
@@ -1113,6 +1208,10 @@ export const Invoices: React.FC = () => {
     setDescription('');
     setPaymentType('credit');
     setPaymentMethodId('');
+    setPaymentTerms('due_on_receipt');
+    setPaymentTermsDays(0);
+    setAdvancePercentage(0);
+    setDueDate(newDate);
     setIsModalOpen(true);
     setIsFullScreen(false);
   };
@@ -1152,6 +1251,11 @@ export const Invoices: React.FC = () => {
       setDescription(fullData.description || '');
       setPaymentType(fullData.payment_type || 'credit');
       setPaymentMethodId(fullData.payment_method_id || '');
+      setPaymentTerms(fullData.payment_terms || 'due_on_receipt');
+      setPaymentTermsDays(fullData.payment_terms_days || 0);
+      setAdvancePercentage(fullData.advance_percentage || 0);
+      setDueDate(fullData.due_date ? fullData.due_date.slice(0, 10) : fullData.date.slice(0, 10));
+      isInitialLoad.current = true;
       setIsModalOpen(true);
       setIsFullScreen(false);
       
@@ -1225,6 +1329,10 @@ export const Invoices: React.FC = () => {
     setDescription('');
     setPaymentType('credit');
     setPaymentMethodId('');
+    setPaymentTerms('due_on_receipt');
+    setPaymentTermsDays(0);
+    setAdvancePercentage(0);
+    setDueDate(new Date().toISOString().slice(0, 10));
     setIsFullScreen(false);
     setSelectedOrderIds([]);
     setPendingOrders([]);
@@ -1950,6 +2058,130 @@ export const Invoices: React.FC = () => {
                         </motion.div>
                       )}
 
+                      {paymentType === 'credit' && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 pt-6 border-t border-zinc-100">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                              <label className="block text-sm font-bold text-zinc-700 mb-2">
+                                {language === 'ar' ? 'شروط السداد' : 'Payment Terms'}
+                              </label>
+                              <div className="relative group">
+                                <Calendar className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                                <select 
+                                  className={`w-full ${dir === 'rtl' ? 'pr-10' : 'pl-10'} py-2.5 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer`}
+                                  value={paymentTerms}
+                                  onChange={(e) => {
+                                    const term = e.target.value;
+                                    let days = 0;
+                                    let pct = 0;
+                                    if (term === 'net_7') days = 7;
+                                    else if (term === 'net_15') days = 15;
+                                    else if (term === 'net_30') days = 30;
+                                    else if (term === 'net_45') days = 45;
+                                    else if (term === 'net_60') days = 60;
+                                    else if (term === 'net_90') days = 90;
+                                    else if (term === 'net_180') days = 180;
+                                    else if (term === 'advance_50_50') pct = 50;
+                                    else if (term === 'advance') pct = 100;
+                                    
+                                    setPaymentTerms(term);
+                                    setPaymentTermsDays(days);
+                                    setAdvancePercentage(pct);
+                                  }}
+                                >
+                                  <option value="cash">{language === 'ar' ? 'نقدي عند التسليم' : 'Cash on Delivery'}</option>
+                                  <option value="due_on_receipt">{language === 'ar' ? 'مستحق فور استلام الفاتورة' : 'Due on Receipt'}</option>
+                                  <option value="net_7">{language === 'ar' ? 'خلال 7 أيام' : 'Net 7 Days'}</option>
+                                  <option value="net_15">{language === 'ar' ? 'خلال 15 يوماً' : 'Net 15 Days'}</option>
+                                  <option value="net_30">{language === 'ar' ? 'خلال 30 يوماً' : 'Net 30 Days'}</option>
+                                  <option value="net_45">{language === 'ar' ? 'خلال 45 يوماً' : 'Net 45 Days'}</option>
+                                  <option value="net_60">{language === 'ar' ? 'خلال 60 يوماً' : 'Net 60 Days'}</option>
+                                  <option value="net_90">{language === 'ar' ? 'خلال 90 يوماً' : 'Net 90 Days'}</option>
+                                  <option value="net_180">{language === 'ar' ? 'خلال 180 يوماً' : 'Net 180 Days'}</option>
+                                  <option value="eom">{language === 'ar' ? 'نهاية الشهر (EOM)' : 'End of Month (EOM)'}</option>
+                                  <option value="eom_30">{language === 'ar' ? 'السداد بعد 30 يوم من نهاية الشهر' : '30 Days EOM'}</option>
+                                  <option value="advance">{language === 'ar' ? 'دفعة مقدمة قبل التوريد' : 'Advance Payment (100%)'}</option>
+                                  <option value="advance_50_50">{language === 'ar' ? '50% مقدم والباقي عند التسليم' : '50% Advance / 50% on Delivery'}</option>
+                                  <option value="custom">{language === 'ar' ? 'مخصص (أيام / نسب مقدمة مخصصة)' : 'Custom Days & Percentage'}</option>
+                                </select>
+                                <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-bold text-zinc-700 mb-2">
+                                {language === 'ar' ? 'تاريخ الاستحقاق' : 'Due Date'}
+                              </label>
+                              <div className="relative">
+                                <input
+                                  type="date"
+                                  className="w-full px-4 py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800"
+                                  value={dueDate}
+                                  onChange={(e) => setDueDate(e.target.value)}
+                                />
+                              </div>
+                            </div>
+
+                            {paymentTerms === 'custom' && (
+                              <>
+                                <div>
+                                  <label className="block text-sm font-bold text-zinc-700 mb-2">
+                                    {language === 'ar' ? 'فترة السداد بالأيام' : 'Payment Terms (Days)'}
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    className="w-full px-4 py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800"
+                                    value={paymentTermsDays}
+                                    onChange={(e) => setPaymentTermsDays(Number(e.target.value) || 0)}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-bold text-zinc-700 mb-2">
+                                    {language === 'ar' ? 'نسبة الدفعة المقدمة %' : 'Advance Percentage %'}
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    className="w-full px-4 py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800"
+                                    value={advancePercentage}
+                                    onChange={(e) => setAdvancePercentage(Number(e.target.value) || 0)}
+                                  />
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {/* Credit Limit Warning Banner */}
+                      {paymentType === 'credit' && selectedCustomerId && (() => {
+                        const currentCustomer = customers.find(c => c.id === selectedCustomerId);
+                        const totalInvoiceAmount = items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) - discount;
+                        const customerBalance = getCustomerBalance(selectedCustomerId);
+                        const totalTentativeBalance = customerBalance + totalInvoiceAmount;
+                        
+                        if (currentCustomer && currentCustomer.credit_limit > 0 && totalTentativeBalance > currentCustomer.credit_limit) {
+                          return (
+                            <div className="mt-4 p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-3 text-rose-800 animate-in fade-in slide-in-from-top-2 duration-300">
+                              <span className="text-xl">⚠️</span>
+                              <div className="flex-1 text-sm font-medium">
+                                <p className="font-bold text-rose-950 mb-1">
+                                  {language === 'ar' ? 'تنبيه: تجاوز حد الائتمان!' : 'Warning: Credit Limit Exceeded!'}
+                                </p>
+                                <p>
+                                  {language === 'ar' 
+                                    ? `سيؤدي حفظ هذه الفاتورة إلى تجاوز حد الائتمان المسموح به للعميل (${formatMoney(currentCustomer.credit_limit)}). الرصيد الحالي للعميل: ${formatMoney(customerBalance)} + إجمالي الفاتورة: ${formatMoney(totalInvoiceAmount)} = الإجمالي المتوقع: ${formatMoney(totalTentativeBalance)}.`
+                                    : `Saving this invoice will exceed the customer's credit limit (${formatMoney(currentCustomer.credit_limit)}). Current balance: ${formatMoney(customerBalance)} + Invoice total: ${formatMoney(totalInvoiceAmount)} = Tentative total: ${formatMoney(totalTentativeBalance)}.`}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+
                       {/* Currency Selection - REMOVED */}
                     </section>
 
@@ -2258,6 +2490,33 @@ export const Invoices: React.FC = () => {
                         >
                           {viewInvoice.entry_number}
                         </button>
+                      </p>
+                    )}
+                    {viewInvoice.payment_type === 'credit' && viewInvoice.payment_terms && (
+                      <p className="text-xs text-slate-500 font-medium mt-1">
+                        {language === 'ar' ? 'شروط السداد:' : 'Payment Terms:'} <span className="text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-100/50">
+                          {viewInvoice.payment_terms === 'cash' ? (language === 'ar' ? 'نقدي عند التسليم' : 'Cash on Delivery') :
+                           viewInvoice.payment_terms === 'due_on_receipt' ? (language === 'ar' ? 'مستحق فور الاستلام' : 'Due on Receipt') :
+                           viewInvoice.payment_terms === 'net_7' ? (language === 'ar' ? 'خلال 7 أيام' : 'Net 7 Days') :
+                           viewInvoice.payment_terms === 'net_15' ? (language === 'ar' ? 'خلال 15 يوماً' : 'Net 15 Days') :
+                           viewInvoice.payment_terms === 'net_30' ? (language === 'ar' ? 'خلال 30 يوماً' : 'Net 30 Days') :
+                           viewInvoice.payment_terms === 'net_45' ? (language === 'ar' ? 'خلال 45 يوماً' : 'Net 45 Days') :
+                           viewInvoice.payment_terms === 'net_60' ? (language === 'ar' ? 'خلال 60 يوماً' : 'Net 60 Days') :
+                           viewInvoice.payment_terms === 'net_90' ? (language === 'ar' ? 'خلال 90 يوماً' : 'Net 90 Days') :
+                           viewInvoice.payment_terms === 'net_180' ? (language === 'ar' ? 'خلال 180 يوماً' : 'Net 180 Days') :
+                           viewInvoice.payment_terms === 'eom' ? (language === 'ar' ? 'نهاية الشهر' : 'End of Month (EOM)') :
+                           viewInvoice.payment_terms === 'eom_30' ? (language === 'ar' ? 'السداد بعد 30 يوم من نهاية الشهر' : '30 Days EOM') :
+                           viewInvoice.payment_terms === 'advance' ? (language === 'ar' ? 'دفعة مقدمة قبل التوريد' : 'Advance Payment') :
+                           viewInvoice.payment_terms === 'advance_50_50' ? (language === 'ar' ? '50% مقدم والباقي عند التسليم' : '50% Advance / 50% Delivery') :
+                           (language === 'ar' ? `مخصص (${viewInvoice.payment_terms_days} يوم)` : `Custom (${viewInvoice.payment_terms_days} Days)`)}
+                        </span>
+                      </p>
+                    )}
+                    {viewInvoice.payment_type === 'credit' && viewInvoice.due_date && (
+                      <p className="text-xs text-slate-500 font-medium mt-1">
+                        {language === 'ar' ? 'تاريخ الاستحقاق:' : 'Due Date:'} <span className="text-zinc-700 font-bold bg-zinc-50 px-2 py-0.5 rounded border border-zinc-200">
+                          {formatDate(viewInvoice.due_date)}
+                        </span>
                       </p>
                     )}
                   </div>
