@@ -846,21 +846,22 @@ export const CustomerDiscounts: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action Footer */}
-              <div className="flex gap-4 p-6 bg-zinc-50 border-t border-zinc-100 sticky bottom-0 z-[60] mt-auto">
+              {/* Form Footer */}
+              <div className="p-4 md:p-6 border-t border-slate-100 bg-white/80 backdrop-blur-md sticky bottom-0 z-[70] flex items-center justify-between gap-4 mt-auto">
                 <button 
                   type="button"
                   onClick={closeModal}
-                  className="flex-1 py-4 bg-white text-zinc-600 rounded-2xl font-bold border border-zinc-200 hover:bg-zinc-100 transition-all active:scale-95 shadow-sm"
+                  className="flex-1 max-w-[200px] py-4 rounded-2xl bg-zinc-100 text-zinc-600 font-black hover:bg-zinc-200 transition-all flex items-center justify-center gap-3 active:scale-95"
                 >
-                  إلغاء
+                  <RotateCcw size={20} />
+                  {t('common.cancel')}
                 </button>
                 <button 
                   type="submit"
                   disabled={discountData.amount <= 0 || !discountData.customer_id}
-                  className="flex-[2] py-4 bg-emerald-500 text-white rounded-2xl font-black uppercase tracking-wider hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-3"
+                  className="flex-1 py-4 rounded-2xl bg-emerald-600 text-white font-black hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 shadow-xl shadow-emerald-600/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Save className="w-6 h-6" />
+                  <Save size={20} />
                   {editingDiscount ? 'حفظ التعديلات' : 'حفظ الخصم'}
                 </button>
               </div>
