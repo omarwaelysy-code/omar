@@ -45,7 +45,6 @@ export const CustomerDiscounts: React.FC = () => {
   const [serverSummary, setServerSummary] = useState<any>({});
   const [discountNumber, setDiscountNumber] = useState('');
   const [editingDiscount, setEditingDiscount] = useState<any | null>(null);
-  const [isFullScreen, setIsFullScreen] = useState(false);
 
   const generateDiscountNumber = async (selectedDate: string) => {
     return await dbService.getNextSequence('customer_discounts', selectedDate);
@@ -424,7 +423,9 @@ export const CustomerDiscounts: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {!isModalOpen ? (
+        <>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">خصم العملاء</h2>
           <p className="text-zinc-500">إدارة الخصومات الممنوحة للعملاء.</p>
@@ -636,9 +637,9 @@ export const CustomerDiscounts: React.FC = () => {
           </div>
         )}
       </div>
-
-      {isModalOpen && (
-        <div className={`fixed inset-0 bg-zinc-100 dark:bg-zinc-900 z-[100] flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300 ${isFullScreen ? 'm-0 rounded-none' : 'md:m-4 md:rounded-[2.5rem] shadow-2xl border border-white/20'}`}>
+    </>
+  ) : (
+    <div className="bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
           {/* Header Block */}
           <div className="p-4 md:p-6 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[90]">
             <div className="flex items-center gap-3">
@@ -689,14 +690,6 @@ export const CustomerDiscounts: React.FC = () => {
                   </button>
                 </div>
               )}
-              <button
-                type="button"
-                onClick={() => setIsFullScreen(!isFullScreen)}
-                className="p-2 text-zinc-400 hover:bg-zinc-100 rounded-xl transition-all hidden md:block"
-                title={isFullScreen ? 'تصغير' : 'تكبير'}
-              >
-                {isFullScreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
-              </button>
               <h3 className="text-xl md:text-2xl font-black text-zinc-900 tracking-tight">
                 {editingDiscount ? 'تعديل خصم عميل' : 'إضافة خصم لعميل'}
               </h3>
