@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Customer, Account, JournalEntry, JournalEntryItem } from '../types';
-import { Search, Plus, Trash2, X, Tag, User, Calendar, Save, Wallet, CreditCard, History, BookOpen, Phone, Mail, MapPin, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, ChevronDown, LayoutGrid, List } from 'lucide-react';
+import { Search, Plus, Trash2, X, Tag, User, Calendar, Save, Wallet, CreditCard, History, BookOpen, Phone, Mail, MapPin, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, ChevronDown, LayoutGrid, List, Hash } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
@@ -759,7 +759,20 @@ export const CustomerDiscounts: React.FC = () => {
                       <span className="text-xs font-bold">بيانات الخصم</span>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">رقم الخصم</label>
+                        <div className="relative">
+                          <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <input 
+                            readOnly
+                            type="text"
+                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-100 border border-zinc-200 rounded-2xl font-bold text-zinc-500 text-sm outline-none cursor-not-allowed`}
+                            value={editingDiscount ? editingDiscount.number : discountNumber}
+                          />
+                        </div>
+                      </div>
+
                       <div>
                         <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase">العميل</label>
                         <div className="relative group">
