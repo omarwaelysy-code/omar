@@ -289,17 +289,26 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         label: t('nav.reports') || 'التقارير',
         icon: BarChart3,
         subItems: [
+          { id: 'h_inv', label: language === 'ar' ? 'المستودع والمخازن' : 'Warehouse & Inventory', isHeader: true },
           { id: 'stock_card_report', label: t('nav.stock_card_report'), icon: History },
           { id: 'stock_balances_report', label: t('nav.stock_balances_report') || 'أرصدة المخزون خلال فترة', icon: BarChart3 },
           { id: 'general_stock_movements_report', label: t('nav.general_stock_movements_report') || 'حركة المخزن العامة لجميع الأصناف', icon: History },
+          { id: 'div_inv', isDivider: true },
+          { id: 'h_sales', label: language === 'ar' ? 'العملاء والمبيعات' : 'Customers & Sales', isHeader: true },
           { id: 'customer_statement', label: t('nav.customer_statement'), icon: FileText },
           { id: 'customer_balances', label: t('nav.customer_balances'), icon: BarChart3 },
           { id: 'sales_report', label: t('nav.sales_report'), icon: BarChart3 },
+          { id: 'div_sales', isDivider: true },
+          { id: 'h_purchases', label: language === 'ar' ? 'الموردين والمشتريات' : 'Suppliers & Purchases', isHeader: true },
           { id: 'supplier_statement', label: t('nav.supplier_statement'), icon: FileText },
           { id: 'supplier_balances', label: t('nav.supplier_balances'), icon: BarChart3 },
+          { id: 'div_purchases', isDivider: true },
+          { id: 'h_cash', label: language === 'ar' ? 'النقدية والمصروفات' : 'Cash & Expenses', isHeader: true },
           { id: 'cash_report', label: t('nav.cash_report'), icon: BarChart3 },
           { id: 'cash_balances', label: t('nav.cash_balances'), icon: BarChart3 },
           { id: 'expenses_report', label: t('nav.expenses_report'), icon: BarChart3 },
+          { id: 'div_cash', isDivider: true },
+          { id: 'h_acct', label: language === 'ar' ? 'التقارير المالية والمحاسبية' : 'Financial Accounting', isHeader: true },
           { id: 'general_ledger_report', label: t('nav.general_ledger_report'), icon: BookOpen },
           { id: 'trial_balance', label: t('nav.trial_balance'), icon: BarChart3 },
           { id: 'income_statement', label: t('nav.income_statement'), icon: BarChart3 },
@@ -342,18 +351,35 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       
       if (item.subItems) {
         const visibleSubItems = item.subItems.filter(sub => {
-          if (sub.id === 'currencies') return true; // Always allow currencies if it reached here
+          if (sub.isDivider || sub.isHeader) return true;
+          if (sub.id === 'currencies') return true;
           return hasPermission(sub.id, 'view');
         });
-        if (visibleSubItems.length > 0) {
-          return { ...item, subItems: visibleSubItems };
+        
+        // Clean up empty headers and trailing dividers
+        const cleanedSubItems = visibleSubItems.filter((sub, idx) => {
+          if (sub.isHeader) {
+            const slice = visibleSubItems.slice(idx + 1);
+            const nextDividerIdx = slice.findIndex(s => s.isDivider);
+            const sectionItems = nextDividerIdx === -1 ? slice : slice.slice(0, nextDividerIdx);
+            return sectionItems.some(s => !s.isDivider && !s.isHeader);
+          }
+          if (sub.isDivider) {
+            const slice = visibleSubItems.slice(idx + 1);
+            return slice.some(s => !s.isDivider && !s.isHeader);
+          }
+          return true;
+        });
+
+        if (cleanedSubItems.length > 0) {
+          return { ...item, subItems: cleanedSubItems };
         }
         return null;
       }
       
       return canView ? item : null;
     }).filter(Boolean) as typeof navItems;
-  }, [user, isSuperAdmin, isCompanyAdmin, hasPermission, company, t]);
+  }, [user, isSuperAdmin, isCompanyAdmin, hasPermission, company, t, language]);
 
 
   // Update nav item click to use openTab
@@ -485,22 +511,36 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                   
                   {/* Dropdown */}
                   <div className={`absolute top-full ${dir === 'rtl' ? 'right-0' : 'left-0'} pt-2 opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-200 z-[160]`}>
-                    <div className="bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 min-w-[200px]">
-                      {item.subItems.map((sub: any) => (
-                        <button
-                          key={sub.id}
-                          onClick={() => handleNavClick(sub.id, sub.label, sub.path)}
-                          className={`
-                            w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}
-                            ${currentPage === sub.id 
-                              ? 'bg-brand-primary text-white shadow-sm' 
-                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
-                          `}
-                        >
-                          <sub.icon size={16} />
-                          <span className="text-sm font-semibold">{sub.label}</span>
-                        </button>
-                      ))}
+                    <div className="bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 min-w-[260px]">
+                      {item.subItems.map((sub: any) => {
+                        if (sub.isDivider) {
+                          return (
+                            <div key={sub.id} className="h-px bg-slate-100 my-1.5 mx-2" />
+                          );
+                        }
+                        if (sub.isHeader) {
+                          return (
+                            <div key={sub.id} className={`px-3 py-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {sub.label}
+                            </div>
+                          );
+                        }
+                        return (
+                          <button
+                            key={sub.id}
+                            onClick={() => handleNavClick(sub.id, sub.label, sub.path)}
+                            className={`
+                              w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}
+                              ${currentPage === sub.id 
+                                ? 'bg-brand-primary text-white shadow-sm' 
+                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
+                            `}
+                          >
+                            <sub.icon size={16} />
+                            <span className="text-sm font-semibold">{sub.label}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -905,19 +945,33 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                                   exit={{ height: 0, opacity: 0 }}
                                   className="overflow-hidden mr-4 border-r-2 border-slate-100 pr-4 space-y-1"
                                 >
-                                  {item.subItems.map((sub: any) => (
-                                    <button
-                                      key={sub.id}
-                                      onClick={() => handleNavClick(sub.id, sub.label, sub.path)}
-                                      className={`
-                                        w-full flex items-center gap-3 p-3 rounded-xl transition-all text-right font-bold text-sm
-                                        ${currentPage === sub.id ? 'text-emerald-600 bg-emerald-50' : 'text-slate-500 hover:bg-slate-50'}
-                                      `}
-                                    >
-                                      <sub.icon size={16} />
-                                      <span>{sub.label}</span>
-                                    </button>
-                                  ))}
+                                  {item.subItems.map((sub: any) => {
+                                    if (sub.isDivider) {
+                                      return (
+                                        <div key={sub.id} className="h-px bg-slate-100 my-2 mx-4" />
+                                      );
+                                    }
+                                    if (sub.isHeader) {
+                                      return (
+                                        <div key={sub.id} className="px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">
+                                          {sub.label}
+                                        </div>
+                                      );
+                                    }
+                                    return (
+                                      <button
+                                        key={sub.id}
+                                        onClick={() => handleNavClick(sub.id, sub.label, sub.path)}
+                                        className={`
+                                          w-full flex items-center gap-3 p-3 rounded-xl transition-all text-right font-bold text-sm
+                                          ${currentPage === sub.id ? 'text-emerald-600 bg-emerald-50' : 'text-slate-500 hover:bg-slate-50'}
+                                        `}
+                                      >
+                                        <sub.icon size={16} />
+                                        <span>{sub.label}</span>
+                                      </button>
+                                    );
+                                  })}
                                 </motion.div>
                               )}
                             </AnimatePresence>
