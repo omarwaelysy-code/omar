@@ -18,7 +18,7 @@ import { PaginationControls } from '../components/PaginationControls';
 export const CustomerDiscounts: React.FC = () => {
   const { user } = useAuth();
   const { showNotification } = useNotification();
-  const { dir } = useLanguage();
+  const { t, dir, language } = useLanguage();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
