@@ -64,6 +64,224 @@ export const Receipts: React.FC = () => {
     return await dbService.getNextSequence('receipt_vouchers', selectedDate);
   };
   
+  const generateSettlementSerial = (dateStr: string, allReceiptsList: any[], allPaymentsList: any[]) => {
+    const dateParts = dateStr.slice(0, 10).split('-');
+    const year = dateParts[0];
+    const month = dateParts[1].padStart(2, '0');
+    const prefix = `SET-${year}-${month}`;
+
+    let maxSeq = 0;
+    const checkVoucherItems = (vouchers: any[]) => {
+      vouchers.forEach(v => {
+        if (v.items && Array.isArray(v.items)) {
+          v.items.forEach(item => {
+            if (item.settlements && Array.isArray(item.settlements)) {
+              item.settlements.forEach((s: any) => {
+                if (s.settlement_number && s.settlement_number.startsWith(prefix)) {
+                  const parts = s.settlement_number.split('-');
+                  if (parts.length >= 4) {
+                    const seq = parseInt(parts[parts.length - 1], 10);
+                    if (!isNaN(seq) && seq > maxSeq) {
+                      maxSeq = seq;
+                    }
+                  }
+                }
+              });
+            }
+          });
+        }
+      });
+    };
+
+    checkVoucherItems(allReceiptsList);
+    checkVoucherItems(allPaymentsList);
+
+    const nextSeq = String(maxSeq + 1).padStart(6, '0');
+    return `${prefix}-${nextSeq}`;
+  };
+
+  const calculateOpenAmounts = (
+    entity: any,
+    entityType: 'customer' | 'supplier'
+  ) => {
+    const entityId = entity.id;
+    const accountId = entity.account_id;
+    const transactions: any[] = [];
+    
+    // Invoices / Purchase Invoices
+    const relevantInvoices = allInvoices.filter(inv => {
+      if (entityType === 'customer') {
+        return inv.customer_id === entityId && inv.payment_type === 'credit';
+      } else {
+        return inv.supplier_id === entityId && inv.payment_type === 'credit';
+      }
+    });
+    
+    relevantInvoices.forEach(inv => {
+      transactions.push({
+        id: inv.id,
+        date: inv.date,
+        type: entityType === 'customer' ? 'invoice' : 'purchase_invoice',
+        type_label: entityType === 'customer' ? 'فاتورة مبيعات' : 'فاتورة مشتريات',
+        reference_number: inv.invoice_number,
+        entry_number: inv.entry_number || inv.invoice_number || '',
+        original_amount: Number(inv.total_amount) || 0,
+        open_amount: Number(inv.total_amount) || 0
+      });
+    });
+    
+    // Opening Balance
+    const opBal = Number(entity.opening_balance) || 0;
+    if (opBal !== 0) {
+      const isDebitOpBal = entityType === 'customer' ? opBal > 0 : opBal < 0;
+      if (isDebitOpBal) {
+        transactions.push({
+          id: `OPEN-${entityId}`,
+          date: entity.opening_balance_date || '2026-01-01',
+          type: 'opening_balance',
+          type_label: 'رصيد افتتاحي',
+          reference_number: `OPEN-${entity.code || entity.id.slice(0, 8)}`,
+          entry_number: '-',
+          original_amount: Math.abs(opBal),
+          open_amount: Math.abs(opBal)
+        });
+      }
+    }
+    
+    // Manual JEs
+    allJournalEntries.forEach(je => {
+      const standardTypes = ['invoice', 'purchase_invoice', 'receipt', 'receipt_voucher', 'payment', 'payment_voucher', 'return', 'purchase_return', 'opening_balance'];
+      if (je.reference_type && standardTypes.includes(je.reference_type)) {
+        return;
+      }
+      
+      je.items?.forEach((item: any) => {
+        const matchesEntity = entityType === 'customer'
+          ? item.customer_id === entityId
+          : item.supplier_id === entityId;
+          
+        if (matchesEntity && item.account_id === accountId) {
+          const isTargetLine = entityType === 'customer'
+            ? (Number(item.debit) > 0)
+            : (Number(item.credit) > 0);
+            
+          if (isTargetLine) {
+            transactions.push({
+              id: `${je.id}-${item.account_id}`,
+              date: je.date,
+              type: 'journal',
+              type_label: 'قيد يدوي',
+              reference_number: je.reference_number || je.entry_number || je.id.slice(0, 8),
+              entry_number: je.entry_number || '',
+              original_amount: entityType === 'customer' ? Number(item.debit) : Number(item.credit),
+              open_amount: entityType === 'customer' ? Number(item.debit) : Number(item.credit)
+            });
+          }
+        }
+      });
+    });
+    
+    // Subtract settlements from other vouchers
+    const getSettlementsForTarget = (targetId: string) => {
+      let settledSum = 0;
+      
+      const sumVoucherSettlements = (vouchersList: any[]) => {
+        vouchersList.forEach(v => {
+          if (editingReceipt && v.id === editingReceipt.id) return;
+          
+          if (v.items && Array.isArray(v.items)) {
+            v.items.forEach(item => {
+              if (item.settlements && Array.isArray(item.settlements)) {
+                item.settlements.forEach((s: any) => {
+                  if (s.target_id === targetId) {
+                    settledSum += Number(s.settled_amount) || 0;
+                  }
+                });
+              }
+            });
+          }
+        });
+      };
+      
+      sumVoucherSettlements(receipts);
+      sumVoucherSettlements(allPayments);
+      
+      return settledSum;
+    };
+    
+    transactions.forEach(t => {
+      const settledAmount = getSettlementsForTarget(t.id);
+      t.open_amount = Math.max(0, t.original_amount - settledAmount);
+    });
+    
+    return transactions.filter(t => t.open_amount > 0.01);
+  };
+
+  const handleSettlementChange = (
+    itemIdx: number, 
+    targetTx: any, 
+    amount: number
+  ) => {
+    const newItems = [...voucherData.items];
+    const item = newItems[itemIdx];
+    const settlements = [...(item.settlements || [])];
+    
+    const existingIdx = settlements.findIndex(s => s.target_id === targetTx.id);
+    
+    if (amount <= 0) {
+      if (existingIdx > -1) {
+        settlements.splice(existingIdx, 1);
+      }
+    } else {
+      const settlementObj = {
+        target_id: targetTx.id,
+        settled_amount: amount,
+        reference_number: targetTx.reference_number,
+        entry_number: targetTx.entry_number,
+        type: targetTx.type,
+        type_label: targetTx.type_label,
+        date: targetTx.date,
+        original_amount: targetTx.original_amount
+      };
+      if (existingIdx > -1) {
+        settlements[existingIdx] = settlementObj;
+      } else {
+        settlements.push(settlementObj);
+      }
+    }
+    
+    item.settlements = settlements;
+    item.amount = settlements.reduce((sum: number, s: any) => sum + Number(s.settled_amount), 0);
+    
+    setVoucherData({
+      ...voucherData,
+      items: newItems
+    });
+  };
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+    let changed = false;
+    const updatedItems = voucherData.items.map((item: any) => {
+      const isEntity = item.type === 'customer' || item.type === 'supplier';
+      if (isEntity && item.entity_id && !item.settlement_number) {
+        changed = true;
+        const serial = generateSettlementSerial(item.settlement_date || voucherData.date, receipts, allPayments);
+        return {
+          ...item,
+          settlement_date: item.settlement_date || voucherData.date,
+          settlement_number: serial,
+          settlements: item.settlements || []
+        };
+      }
+      return item;
+    });
+    
+    if (changed) {
+      setVoucherData(prev => ({ ...prev, items: updatedItems }));
+    }
+  }, [voucherData.items, voucherData.date, receipts, allPayments, isModalOpen]);
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingReceipt, setEditingReceipt] = useState<ReceiptVoucher | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -113,6 +331,10 @@ export const Receipts: React.FC = () => {
     notes: ''
   });
 
+  const [allInvoices, setAllInvoices] = useState<any[]>([]);
+  const [allPayments, setAllPayments] = useState<any[]>([]);
+  const [allJournalEntries, setAllJournalEntries] = useState<any[]>([]);
+
   const subAccounts = [
     ...customers.map(c => ({ id: c.id, name: c.name, type: 'customer' as const, label: `عميل: ${c.name}` })),
     ...suppliers.map(s => ({ id: s.id, name: s.name, type: 'supplier' as const, label: `مورد: ${s.name}` })),
@@ -138,6 +360,9 @@ export const Receipts: React.FC = () => {
       const unsubCategories = dbService.subscribe<ExpenseCategory>('expense_categories', user.company_id, setCategories);
       const unsubPM = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setPaymentMethods);
       const unsubAccounts = dbService.subscribe<any>('accounts', user.company_id, setAccounts);
+      const unsubInvoices = dbService.subscribe<any>('invoices', user.company_id, setAllInvoices);
+      const unsubPayments = dbService.subscribe<any>('payment_vouchers', user.company_id, setAllPayments);
+      const unsubJournalEntries = dbService.subscribe<any>('journal_entries', user.company_id, setAllJournalEntries);
       
       const fetchCompany = async () => {
         try {
@@ -157,6 +382,9 @@ export const Receipts: React.FC = () => {
         unsubCategories();
         unsubPM();
         unsubAccounts();
+        unsubInvoices();
+        unsubPayments();
+        unsubJournalEntries();
       };
     }
   }, [user, page, limit, sortBy, sortOrder, searchTerm]);
@@ -1326,100 +1554,255 @@ export const Receipts: React.FC = () => {
                           </thead>
                           <tbody className="divide-y divide-zinc-50">
                             {voucherData.items.map((item, idx) => (
-                              <tr key={idx} className="group hover:bg-zinc-50 transition-colors">
-                                <td className="px-1 py-1 relative">
-                                  <select 
-                                    className="w-full px-2 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] font-bold outline-none appearance-none"
-                                    value={item.type}
-                                    onChange={(e) => {
-                                      const newItems = [...voucherData.items];
-                                      newItems[idx].type = e.target.value;
-                                      newItems[idx].entity_id = '';
-                                      setVoucherData({...voucherData, items: newItems});
-                                    }}
-                                  >
-                                    <option value="customer">عميل</option>
-                                    <option value="supplier">مورد</option>
-                                    <option value="expense">مصروف</option>
-                                    <option value="account">حساب عام</option>
-                                  </select>
-                                  <ChevronDown size={12} className="absolute right-3 top-4 text-zinc-400 pointer-events-none" />
-                                </td>
-                                <td className="px-1 py-1 relative">
-                                  <select 
-                                    className="w-full px-2 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] font-black outline-none appearance-none"
-                                    value={item.entity_id}
-                                    onChange={(e) => {
-                                      const newItems = [...voucherData.items];
-                                      newItems[idx].entity_id = e.target.value;
-                                      newItems[idx].sub_account_id = '';
-                                      setVoucherData({...voucherData, items: newItems});
-                                    }}
-                                  >
-                                    <option value="">اختر...</option>
-                                    {item.type === 'customer' && customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                    {item.type === 'supplier' && suppliers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
-                                    {item.type === 'expense' && categories.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
-                                    {item.type === 'account' && accounts.map(a => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)}
-                                  </select>
-                                  <ChevronDown size={12} className="absolute right-4 top-4 text-zinc-400 pointer-events-none" />
-                                  {item.type === 'account' && accounts.find(a => a.id === item.entity_id)?.required_sub_account && (
-                                    <select
-                                      className="w-full px-2 py-2 mt-1 bg-emerald-50 border border-emerald-200 rounded-xl text-[10px] font-bold outline-none"
-                                      value={item.sub_account_id || ''}
+                              <React.Fragment key={idx}>
+                                <tr className="group hover:bg-zinc-50 transition-colors">
+                                  <td className="px-1 py-1 relative">
+                                    <select 
+                                      className="w-full px-2 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] font-bold outline-none appearance-none"
+                                      value={item.type}
                                       onChange={(e) => {
                                         const newItems = [...voucherData.items];
-                                        newItems[idx].sub_account_id = e.target.value;
+                                        newItems[idx].type = e.target.value;
+                                        newItems[idx].entity_id = '';
+                                        newItems[idx].settlements = [];
+                                        newItems[idx].amount = 0;
                                         setVoucherData({...voucherData, items: newItems});
                                       }}
-                                      required
                                     >
-                                      <option value="">اختر الحساب الفرعي...</option>
-                                      {subAccounts.map(sa => (
-                                        <option key={sa.id} value={sa.id}>{sa.label}</option>
-                                      ))}
+                                      <option value="customer">عميل</option>
+                                      <option value="supplier">مورد</option>
+                                      <option value="expense">مصروف</option>
+                                      <option value="account">حساب عام</option>
                                     </select>
-                                  )}
-                                </td>
-                                <td className="px-1 py-1">
-                                  <input 
-                                    type="number" 
-                                    className="w-full px-2 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-black text-emerald-600 outline-none text-center"
-                                    placeholder="0"
-                                    value={item.amount || ''}
-                                    onChange={(e) => {
-                                      const newItems = [...voucherData.items];
-                                      newItems[idx].amount = Number(e.target.value);
-                                      setVoucherData({...voucherData, items: newItems});
-                                    }}
-                                  />
-                                </td>
-                                <td className="px-1 py-1">
-                                  <input 
-                                    type="text" 
-                                    placeholder="بيان تفصيلي..."
-                                    className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] font-bold outline-none"
-                                    value={item.description}
-                                    onChange={(e) => {
-                                      const newItems = [...voucherData.items];
-                                      newItems[idx].description = e.target.value;
-                                      setVoucherData({...voucherData, items: newItems});
-                                    }}
-                                  />
-                                </td>
-                                <td className="px-1 py-1 text-center">
-                                  <button 
-                                    type="button"
-                                    onClick={() => {
-                                      const newItems = voucherData.items.filter((_, i) => i !== idx);
-                                      setVoucherData({...voucherData, items: newItems});
-                                    }}
-                                    className="p-2 text-zinc-400 hover:text-red-500 rounded-lg hover:bg-zinc-100 transition-colors"
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                </td>
-                              </tr>
+                                    <ChevronDown size={12} className="absolute right-3 top-4 text-zinc-400 pointer-events-none" />
+                                  </td>
+                                  <td className="px-1 py-1 relative">
+                                    <select 
+                                      className="w-full px-2 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] font-black outline-none appearance-none"
+                                      value={item.entity_id}
+                                      onChange={(e) => {
+                                        const newItems = [...voucherData.items];
+                                        newItems[idx].entity_id = e.target.value;
+                                        newItems[idx].sub_account_id = '';
+                                        newItems[idx].settlements = [];
+                                        newItems[idx].amount = 0;
+                                        setVoucherData({...voucherData, items: newItems});
+                                      }}
+                                    >
+                                      <option value="">اختر...</option>
+                                      {item.type === 'customer' && customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                      {item.type === 'supplier' && suppliers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
+                                      {item.type === 'expense' && categories.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
+                                      {item.type === 'account' && accounts.map(a => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)}
+                                    </select>
+                                    <ChevronDown size={12} className="absolute right-4 top-4 text-zinc-400 pointer-events-none" />
+                                    {item.type === 'account' && accounts.find(a => a.id === item.entity_id)?.required_sub_account && (
+                                      <select
+                                        className="w-full px-2 py-2 mt-1 bg-emerald-50 border border-emerald-200 rounded-xl text-[10px] font-bold outline-none"
+                                        value={item.sub_account_id || ''}
+                                        onChange={(e) => {
+                                          const newItems = [...voucherData.items];
+                                          newItems[idx].sub_account_id = e.target.value;
+                                          setVoucherData({...voucherData, items: newItems});
+                                        }}
+                                        required
+                                      >
+                                        <option value="">اختر الحساب الفرعي...</option>
+                                        {subAccounts.map(sa => (
+                                          <option key={sa.id} value={sa.id}>{sa.label}</option>
+                                        ))}
+                                      </select>
+                                    )}
+                                  </td>
+                                  <td className="px-1 py-1">
+                                    <input 
+                                      type="number" 
+                                      className="w-full px-2 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-black text-emerald-600 outline-none text-center"
+                                      placeholder="0"
+                                      value={item.amount || ''}
+                                      onChange={(e) => {
+                                        const newItems = [...voucherData.items];
+                                        newItems[idx].amount = Number(e.target.value);
+                                        setVoucherData({...voucherData, items: newItems});
+                                      }}
+                                    />
+                                  </td>
+                                  <td className="px-1 py-1">
+                                    <input 
+                                      type="text" 
+                                      placeholder="بيان تفصيلي..."
+                                      className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] font-bold outline-none"
+                                      value={item.description}
+                                      onChange={(e) => {
+                                        const newItems = [...voucherData.items];
+                                        newItems[idx].description = e.target.value;
+                                        setVoucherData({...voucherData, items: newItems});
+                                      }}
+                                    />
+                                  </td>
+                                  <td className="px-1 py-1 text-center">
+                                    <button 
+                                      type="button"
+                                      onClick={() => {
+                                        const newItems = voucherData.items.filter((_, i) => i !== idx);
+                                        setVoucherData({...voucherData, items: newItems});
+                                      }}
+                                      className="p-2 text-zinc-400 hover:text-red-500 rounded-lg hover:bg-zinc-100 transition-colors"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </td>
+                                </tr>
+
+                                {/* Settlement Sub-row */}
+                                {((item.type === 'customer' || item.type === 'supplier') && item.entity_id) && (() => {
+                                  const entity = item.type === 'customer' 
+                                    ? customers.find(c => c.id === item.entity_id)
+                                    : suppliers.find(s => s.id === item.entity_id);
+                                  if (!entity) return null;
+                                  
+                                  const openTransactions = calculateOpenAmounts(entity, item.type);
+                                  
+                                  return (
+                                    <tr className="bg-zinc-50/30">
+                                      <td colSpan={5} className="px-4 py-3 border-t border-b border-zinc-200/50">
+                                        <div className="bg-white p-4 rounded-2xl border border-zinc-150 shadow-sm space-y-4">
+                                          {/* Header info */}
+                                          <div className="flex flex-wrap items-center gap-6 text-xs border-b border-zinc-100 pb-3">
+                                            <div className="flex items-center gap-2">
+                                              <span className="font-bold text-zinc-400">رقم التسوية:</span>
+                                              <span className="font-mono bg-zinc-100 px-2.5 py-1 rounded-lg text-zinc-600 font-bold border border-zinc-200">
+                                                {item.settlement_number || '-'}
+                                              </span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                              <span className="font-bold text-zinc-400">تاريخ التسوية:</span>
+                                              <input
+                                                type="date"
+                                                className="px-2.5 py-1 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500"
+                                                value={item.settlement_date ? item.settlement_date.slice(0, 10) : voucherData.date.slice(0, 10)}
+                                                onChange={(e) => {
+                                                  const newItems = [...voucherData.items];
+                                                  newItems[idx].settlement_date = e.target.value;
+                                                  const serial = generateSettlementSerial(e.target.value, receipts, allPayments);
+                                                  newItems[idx].settlement_number = serial;
+                                                  setVoucherData({ ...voucherData, items: newItems });
+                                                }}
+                                              />
+                                            </div>
+                                          </div>
+
+                                          {/* Transactions Table */}
+                                          {openTransactions.length === 0 ? (
+                                            <div className="text-center py-4 text-xs font-bold text-zinc-400">
+                                              لا توجد حركات غير مسواة لهذا {item.type === 'customer' ? 'العميل' : 'المورد'}
+                                            </div>
+                                          ) : (
+                                            <div className="overflow-x-auto">
+                                              <table className="w-full text-right text-xs">
+                                                <thead>
+                                                  <tr className="text-zinc-400 font-bold border-b border-zinc-100 pb-2">
+                                                    <th className="pb-2 text-right">رقم القيد</th>
+                                                    <th className="pb-2 text-right">نوع الحركة</th>
+                                                    <th className="pb-2 text-right">رقم الحركة</th>
+                                                    <th className="pb-2 text-right">التاريخ</th>
+                                                    <th className="pb-2 text-right">المبلغ الأصلي</th>
+                                                    <th className="pb-2 text-right">المبلغ المفتوح</th>
+                                                    <th className="pb-2 text-center w-24">تسوية كاملة</th>
+                                                    <th className="pb-2 text-center w-32">تسوية جزئية</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-zinc-50 text-zinc-700 font-bold">
+                                                  {openTransactions.map((t) => {
+                                                    const settlement = (item.settlements || []).find((s: any) => s.target_id === t.id);
+                                                    const settledAmount = settlement ? Number(settlement.settled_amount) : 0;
+                                                    const isFullySettled = Math.abs(settledAmount - t.open_amount) < 0.01;
+
+                                                    return (
+                                                      <tr key={t.id} className="hover:bg-zinc-50/50 transition-colors">
+                                                        <td className="py-2.5">
+                                                          {t.entry_number && t.entry_number !== '-' ? (
+                                                            <button
+                                                              type="button"
+                                                              onClick={() => {
+                                                                setPendingViewDoc({ type: 'journal', idOrNumber: t.entry_number });
+                                                                setCurrentPage('journal_entries');
+                                                              }}
+                                                              className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-black"
+                                                            >
+                                                              {t.entry_number}
+                                                            </button>
+                                                          ) : (
+                                                            <span className="text-zinc-400 font-mono font-normal">-</span>
+                                                          )}
+                                                        </td>
+                                                        <td className="py-2.5 text-zinc-500 font-semibold">{t.type_label}</td>
+                                                        <td className="py-2.5">
+                                                          {t.reference_number && t.reference_number !== '-' ? (
+                                                            <button
+                                                              type="button"
+                                                              onClick={() => {
+                                                                if (t.type === 'invoice') {
+                                                                  setPendingViewDoc({ type: 'invoice', idOrNumber: t.reference_number });
+                                                                  setCurrentPage('invoices');
+                                                                } else if (t.type === 'purchase_invoice') {
+                                                                  setPendingViewDoc({ type: 'purchase_invoice', idOrNumber: t.reference_number });
+                                                                  setCurrentPage('purchase_invoices');
+                                                                } else {
+                                                                  setPendingViewDoc({ type: 'journal', idOrNumber: t.reference_number });
+                                                                  setCurrentPage('journal_entries');
+                                                                }
+                                                              }}
+                                                              className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-black"
+                                                            >
+                                                              {t.reference_number}
+                                                            </button>
+                                                          ) : (
+                                                            <span className="text-zinc-400 font-mono font-normal">-</span>
+                                                          )}
+                                                        </td>
+                                                        <td className="py-2.5 text-zinc-400 font-normal font-mono">{t.date}</td>
+                                                        <td className="py-2.5 text-zinc-500 font-semibold">{formatNumber(t.original_amount)}</td>
+                                                        <td className="py-2.5 text-zinc-900 font-black">{formatNumber(t.open_amount)}</td>
+                                                        <td className="py-2.5 text-center">
+                                                          <input
+                                                            type="checkbox"
+                                                            className="w-4 h-4 rounded border-zinc-350 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                                            checked={isFullySettled}
+                                                            onChange={(e) => {
+                                                              const checked = e.target.checked;
+                                                              handleSettlementChange(idx, t, checked ? t.open_amount : 0);
+                                                            }}
+                                                          />
+                                                        </td>
+                                                        <td className="py-2.5 text-center">
+                                                          <input
+                                                            type="number"
+                                                            step="any"
+                                                            className="w-full px-2 py-1 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-black text-center text-emerald-600 outline-none focus:ring-2 focus:ring-emerald-500"
+                                                            placeholder="0"
+                                                            value={settledAmount || ''}
+                                                            max={t.open_amount}
+                                                            onChange={(e) => {
+                                                              const val = Number(e.target.value);
+                                                              const cappedVal = Math.min(Math.max(0, val), t.open_amount);
+                                                              handleSettlementChange(idx, t, cappedVal);
+                                                            }}
+                                                          />
+                                                        </td>
+                                                      </tr>
+                                                    );
+                                                  })}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })()}
+                              </React.Fragment>
                             ))}
                           </tbody>
                         </table>
@@ -1539,23 +1922,100 @@ export const Receipts: React.FC = () => {
                           </thead>
                           <tbody className="divide-y divide-zinc-50 text-zinc-700 font-bold">
                             {viewReceipt.items.map((item, idx) => (
-                              <tr key={idx}>
-                                <td className="px-4 py-3 font-normal text-zinc-500">
-                                  {item.type === 'customer' ? 'عميل' :
-                                   item.type === 'supplier' ? 'مورد' :
-                                   item.type === 'expense' ? 'مصروف' : 'حساب عام'}
-                                </td>
-                                <td className="px-4 py-3">
-                                  {item.entity_name || item.entity_id || '---'}
-                                  {item.sub_account_id && ` (فرعي: ${item.sub_account_id})`}
-                                </td>
-                                <td className="px-4 py-3 text-left text-emerald-600 font-black">
-                                  {formatNumber(item.amount)} ج.م
-                                </td>
-                                <td className="px-4 py-3 text-zinc-500 font-normal">
-                                  {item.description || '---'}
-                                </td>
-                              </tr>
+                              <React.Fragment key={idx}>
+                                <tr>
+                                  <td className="px-4 py-3 font-normal text-zinc-500">
+                                    {item.type === 'customer' ? 'عميل' :
+                                     item.type === 'supplier' ? 'مورد' :
+                                     item.type === 'expense' ? 'مصروف' : 'حساب عام'}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    {item.entity_name || item.entity_id || '---'}
+                                    {item.sub_account_id && ` (فرعي: ${item.sub_account_id})`}
+                                  </td>
+                                  <td className="px-4 py-3 text-left text-emerald-600 font-black">
+                                    {formatNumber(item.amount)} ج.م
+                                  </td>
+                                  <td className="px-4 py-3 text-zinc-500 font-normal">
+                                    {item.description || '---'}
+                                  </td>
+                                </tr>
+                                {item.settlements && item.settlements.length > 0 && (
+                                  <tr className="bg-zinc-50/50">
+                                    <td colSpan={4} className="px-4 py-3 border-t border-b border-zinc-100">
+                                      <div className="bg-white p-3 rounded-xl border border-zinc-100 shadow-sm space-y-2 text-xs">
+                                        <div className="flex justify-between items-center border-b border-zinc-100 pb-2 mb-2 font-bold text-zinc-500">
+                                          <span>تسويات البند (رقم التسوية: {item.settlement_number || '-'} - تاريخ التسوية: {item.settlement_date ? formatDate(item.settlement_date) : ''})</span>
+                                        </div>
+                                        <table className="w-full text-right text-[11px]">
+                                          <thead>
+                                            <tr className="text-zinc-400 font-bold border-b border-zinc-50">
+                                              <th className="pb-1 text-right">رقم القيد</th>
+                                              <th className="pb-1 text-right">نوع الحركة</th>
+                                              <th className="pb-1 text-right">رقم الحركة</th>
+                                              <th className="pb-1 text-right">التاريخ</th>
+                                              <th className="pb-1 text-right">المبلغ الأصلي</th>
+                                              <th className="pb-1 text-left">المبلغ المسوى</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody className="divide-y divide-zinc-50 text-zinc-600">
+                                            {item.settlements.map((s: any, sIdx: number) => (
+                                              <tr key={sIdx}>
+                                                <td className="py-1">
+                                                  {s.entry_number && s.entry_number !== '-' ? (
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setViewReceipt(null);
+                                                        setPendingViewDoc({ type: 'journal', idOrNumber: s.entry_number });
+                                                        setCurrentPage('journal_entries');
+                                                      }}
+                                                      className="text-emerald-600 hover:underline font-mono"
+                                                    >
+                                                      {s.entry_number}
+                                                    </button>
+                                                  ) : (
+                                                    <span className="text-zinc-400 font-mono">-</span>
+                                                  )}
+                                                </td>
+                                                <td className="py-1">{s.type_label}</td>
+                                                <td className="py-1">
+                                                  {s.reference_number && s.reference_number !== '-' ? (
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setViewReceipt(null);
+                                                        if (s.type === 'invoice') {
+                                                          setPendingViewDoc({ type: 'invoice', idOrNumber: s.reference_number });
+                                                          setCurrentPage('invoices');
+                                                        } else if (s.type === 'purchase_invoice') {
+                                                          setPendingViewDoc({ type: 'purchase_invoice', idOrNumber: s.reference_number });
+                                                          setCurrentPage('purchase_invoices');
+                                                        } else {
+                                                          setPendingViewDoc({ type: 'journal', idOrNumber: s.reference_number });
+                                                          setCurrentPage('journal_entries');
+                                                        }
+                                                      }}
+                                                      className="text-emerald-600 hover:underline font-mono"
+                                                    >
+                                                      {s.reference_number}
+                                                    </button>
+                                                  ) : (
+                                                    <span className="text-zinc-400 font-mono">-</span>
+                                                  )}
+                                                </td>
+                                                <td className="py-1 font-mono">{s.date ? formatDate(s.date) : ''}</td>
+                                                <td className="py-1">{formatNumber(s.original_amount)}</td>
+                                                <td className="py-1 text-left text-emerald-600 font-bold">{formatNumber(s.settled_amount)} ج.م</td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
                             ))}
                           </tbody>
                         </table>
