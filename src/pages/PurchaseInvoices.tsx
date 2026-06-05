@@ -503,7 +503,7 @@ export const PurchaseInvoices: React.FC = () => {
     allPayments.forEach(v => {
       if (v.items && Array.isArray(v.items)) {
         v.items.forEach((item: any, idx: number) => {
-          if (item.supplier_id === supplierId) {
+          if (item.supplier_id === supplierId || (item.type === 'supplier' && item.entity_id === supplierId)) {
             const voucherSettled = (item.settlements || []).reduce((sum: number, s: any) => sum + Number(s.settled_amount || s.amount || 0), 0);
             
             let invoiceSettled = 0;
@@ -522,9 +522,6 @@ export const PurchaseInvoices: React.FC = () => {
             const openAmount = originalAmount - totalSettled;
 
             if (openAmount > 0.01 || formSettlements.some(fs => fs.target_id === `${v.id}-${idx}`)) {
-              const currentSettle = formSettlements.find(fs => fs.target_id === `${v.id}-${idx}`);
-              const currentSettleAmt = currentSettle ? Number(currentSettle.settled_amount) : 0;
-              
               movements.push({
                 id: `${v.id}-${idx}`,
                 original_id: v.id,
@@ -533,7 +530,7 @@ export const PurchaseInvoices: React.FC = () => {
                 number: v.voucher_number || v.number || v.id,
                 page_name: 'payment_vouchers',
                 original_amount: originalAmount,
-                open_amount: openAmount + currentSettleAmt,
+                open_amount: openAmount,
                 notes: v.description || v.notes || '',
                 je_number: v.entry_number || ''
               });
@@ -561,9 +558,6 @@ export const PurchaseInvoices: React.FC = () => {
         const openAmount = originalAmount - invoiceSettled;
 
         if (openAmount > 0.01 || formSettlements.some(fs => fs.target_id === r.id)) {
-          const currentSettle = formSettlements.find(fs => fs.target_id === r.id);
-          const currentSettleAmt = currentSettle ? Number(currentSettle.settled_amount) : 0;
-
           movements.push({
             id: r.id,
             original_id: r.id,
@@ -572,7 +566,7 @@ export const PurchaseInvoices: React.FC = () => {
             number: r.return_number || r.id,
             page_name: 'purchase_returns',
             original_amount: originalAmount,
-            open_amount: openAmount + currentSettleAmt,
+            open_amount: openAmount,
             notes: r.description || r.notes || '',
             je_number: r.entry_number || ''
           });
@@ -605,9 +599,6 @@ export const PurchaseInvoices: React.FC = () => {
           const openAmount = originalAmount - invoiceSettled;
 
           if (openAmount > 0.01 || formSettlements.some(fs => fs.target_id === `${je.id}-${idx}`)) {
-            const currentSettle = formSettlements.find(fs => fs.target_id === `${je.id}-${idx}`);
-            const currentSettleAmt = currentSettle ? Number(currentSettle.settled_amount) : 0;
-
             movements.push({
               id: `${je.id}-${idx}`,
               original_id: je.id,
@@ -616,7 +607,7 @@ export const PurchaseInvoices: React.FC = () => {
               number: je.entry_number || je.id.slice(0, 8),
               page_name: 'journal_entries',
               original_amount: originalAmount,
-              open_amount: openAmount + currentSettleAmt,
+              open_amount: openAmount,
               notes: item.description || je.description || '',
               je_number: je.entry_number || je.id.slice(0, 8)
             });

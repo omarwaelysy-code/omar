@@ -782,7 +782,7 @@ function sendError(res: any, status: number, message: string, details?: any) {
 // Helper to parse JSONB fields if they are returned as strings
 function parseRow(table: string, row: any) {
   if (!row) return row;
-  const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features', 'options'];
+  const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features', 'options', 'settlements'];
   
   const parsed = { ...row };
   jsonbFields.forEach(field => {
@@ -808,7 +808,7 @@ function sanitizeData(table: string, data: any) {
   if (!allowedKeys) return data;
   
   const sanitized: any = {};
-  const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features', 'value', 'options'];
+  const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features', 'value', 'options', 'settlements'];
 
   allowedKeys.forEach(key => {
     if (key in data) {

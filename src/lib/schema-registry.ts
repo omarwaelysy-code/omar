@@ -45,7 +45,8 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'id', 'company_id', 'customer_id', 'customer_name', 'warehouse_id', 'invoice_number', 'date', 'due_date', 'subtotal',
     'tax_amount', 'discount_amount', 'total_amount', 'status', 'payment_type', 
     'payment_method_id', 'payment_method_name', 'description', 'notes', 'source_orders', 'created_by', 'created_at',
-    'payment_terms', 'payment_terms_days', 'advance_percentage'
+    'payment_terms', 'payment_terms_days', 'advance_percentage',
+    'settlements', 'settlement_number', 'settlement_date'
   ],
   invoice_items: [
     'id', 'invoice_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
@@ -80,7 +81,8 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'id', 'company_id', 'supplier_id', 'supplier_name', 'warehouse_id', 'invoice_number', 'date', 'due_date', 'subtotal',
     'tax_amount', 'discount_amount', 'total_amount', 'status', 'payment_type', 
     'payment_method_id', 'payment_method_name', 'description', 'notes', 'source_orders', 'created_at',
-    'payment_terms', 'payment_terms_days', 'advance_percentage'
+    'payment_terms', 'payment_terms_days', 'advance_percentage',
+    'settlements', 'settlement_number', 'settlement_date'
   ],
   purchase_invoice_items: [
     'id', 'invoice_id', 'product_id', 'expense_category_id', 'description', 'quantity', 'unit_price', 'total',
