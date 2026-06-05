@@ -66,6 +66,9 @@ export const InvoiceSchema = BaseSchema.extend({
   status: z.string().optional(),
   description: z.string().optional(),
   notes: z.string().optional(),
+  settlements: z.array(z.any()).optional().nullable(),
+  settlement_number: z.string().optional().nullable(),
+  settlement_date: z.string().optional().nullable(),
 });
 
 // Voucher (Receipt/Payment)
@@ -76,6 +79,8 @@ export const VoucherItemSchema = z.object({
   amount: z.coerce.number().default(0),
   description: z.string().optional(),
   settlements: z.array(z.any()).optional(),
+  settlement_number: z.string().optional().nullable(),
+  settlement_date: z.string().optional().nullable(),
 });
 
 export const VoucherSchema = BaseSchema.extend({

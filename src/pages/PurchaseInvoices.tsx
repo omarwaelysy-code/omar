@@ -414,11 +414,11 @@ export const PurchaseInvoices: React.FC = () => {
       inv.settlements.forEach((s: any) => {
         invoiceSideSettlements.push({
           id: `${inv.id}-${s.target_id}`,
-          date: s.date || inv.date,
+          date: s.settlement_date || s.date || inv.date,
           type_label: s.type_label || 'تسوية',
-          number: s.reference_number || s.target_id,
+          number: s.settlement_number || s.reference_number || s.target_id,
           page_name: s.type || 'receipts',
-          amount: Number(s.settled_amount) || 0,
+          amount: Number(s.settled_amount || s.amount) || 0,
           notes: s.notes || ''
         });
       });

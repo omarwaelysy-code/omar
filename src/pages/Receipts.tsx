@@ -121,6 +121,8 @@ export const Receipts: React.FC = () => {
   const [allPurchaseInvoices, setAllPurchaseInvoices] = useState<any[]>([]);
   const [allReturns, setAllReturns] = useState<any[]>([]);
   const [allPurchaseReturns, setAllPurchaseReturns] = useState<any[]>([]);
+  const [allReceipts, setAllReceipts] = useState<any[]>([]);
+  const [rowSettlementDates, setRowSettlementDates] = useState<Record<string, string>>({});
 
   const generateSettlementSerial = (dateStr: string, allReceiptsList: any[], allPaymentsList: any[]) => {
     const dateParts = dateStr.slice(0, 10).split('-');
@@ -151,8 +153,28 @@ export const Receipts: React.FC = () => {
       });
     };
 
+    const checkInvoices = (invoicesList: any[]) => {
+      invoicesList.forEach(inv => {
+        if (inv.settlements && Array.isArray(inv.settlements)) {
+          inv.settlements.forEach((s: any) => {
+            if (s.settlement_number && s.settlement_number.startsWith(prefix)) {
+              const parts = s.settlement_number.split('-');
+              if (parts.length >= 4) {
+                const seq = parseInt(parts[parts.length - 1], 10);
+                if (!isNaN(seq) && seq > maxSeq) {
+                  maxSeq = seq;
+                }
+              }
+            }
+          });
+        }
+      });
+    };
+
     checkVoucherItems(allReceiptsList);
     checkVoucherItems(allPaymentsList);
+    checkInvoices(allInvoices);
+    checkInvoices(allPurchaseInvoices);
 
     const nextSeq = String(maxSeq + 1).padStart(6, '0');
     return `${prefix}-${nextSeq}`;
@@ -269,7 +291,7 @@ export const Receipts: React.FC = () => {
         });
       };
       
-      sumVoucherSettlements(receipts);
+      sumVoucherSettlements(allReceipts);
       sumVoucherSettlements(allPayments);
       sumInvoiceSettlements(allInvoices);
       sumInvoiceSettlements(allPurchaseInvoices);
@@ -374,6 +396,39 @@ export const Receipts: React.FC = () => {
     return transactions.filter(t => t.open_amount > 0.01);
   };
 
+  const handleRowDateChange = (
+    itemIdx: number,
+    targetTx: any,
+    newDate: string
+  ) => {
+    const key = `${itemIdx}-${targetTx.id}`;
+    const newDates = {
+      ...rowSettlementDates,
+      [key]: newDate
+    };
+    setRowSettlementDates(newDates);
+
+    const newItems = [...voucherData.items];
+    const item = newItems[itemIdx];
+    const settlements = [...(item.settlements || [])];
+    const existingIdx = settlements.findIndex(s => s.target_id === targetTx.id);
+
+    if (existingIdx > -1) {
+      const currentS = settlements[existingIdx];
+      const serial = generateSettlementSerial(newDate, allReceipts, allPayments);
+      settlements[existingIdx] = {
+        ...currentS,
+        settlement_date: newDate,
+        settlement_number: serial
+      };
+      item.settlements = settlements;
+      setVoucherData({
+        ...voucherData,
+        items: newItems
+      });
+    }
+  };
+
   const handleSettlementChange = (
     itemIdx: number, 
     targetTx: any, 
@@ -384,12 +439,20 @@ export const Receipts: React.FC = () => {
     const settlements = [...(item.settlements || [])];
     
     const existingIdx = settlements.findIndex(s => s.target_id === targetTx.id);
+    const rowDate = rowSettlementDates[`${itemIdx}-${targetTx.id}`] || voucherData.date.slice(0, 10);
     
     if (amount <= 0) {
       if (existingIdx > -1) {
         settlements.splice(existingIdx, 1);
       }
     } else {
+      let settlementNum = '';
+      if (existingIdx > -1) {
+        settlementNum = settlements[existingIdx].settlement_number || generateSettlementSerial(rowDate, allReceipts, allPayments);
+      } else {
+        settlementNum = generateSettlementSerial(rowDate, allReceipts, allPayments);
+      }
+
       const settlementObj = {
         target_id: targetTx.id,
         settled_amount: amount,
@@ -398,7 +461,9 @@ export const Receipts: React.FC = () => {
         type: targetTx.type,
         type_label: targetTx.type_label,
         date: targetTx.date,
-        original_amount: targetTx.original_amount
+        original_amount: targetTx.original_amount,
+        settlement_number: settlementNum,
+        settlement_date: rowDate
       };
       if (existingIdx > -1) {
         settlements[existingIdx] = settlementObj;
@@ -414,29 +479,6 @@ export const Receipts: React.FC = () => {
       items: newItems
     });
   };
-
-  useEffect(() => {
-    if (!isModalOpen) return;
-    let changed = false;
-    const updatedItems = voucherData.items.map((item: any) => {
-      const isEntity = item.type === 'customer' || item.type === 'supplier';
-      if (isEntity && item.entity_id && !item.settlement_number) {
-        changed = true;
-        const serial = generateSettlementSerial(item.settlement_date || voucherData.date, receipts, allPayments);
-        return {
-          ...item,
-          settlement_date: item.settlement_date || voucherData.date,
-          settlement_number: serial,
-          settlements: item.settlements || []
-        };
-      }
-      return item;
-    });
-    
-    if (changed) {
-      setVoucherData(prev => ({ ...prev, items: updatedItems }));
-    }
-  }, [voucherData.items, voucherData.date, receipts, allPayments, isModalOpen]);
 
   const subAccounts = [
     ...customers.map(c => ({ id: c.id, name: c.name, type: 'customer' as const, label: `عميل: ${c.name}` })),
@@ -469,6 +511,7 @@ export const Receipts: React.FC = () => {
       const unsubPurchaseInvoices = dbService.subscribe<any>('purchase_invoices', user.company_id, setAllPurchaseInvoices);
       const unsubReturns = dbService.subscribe<any>('returns', user.company_id, setAllReturns);
       const unsubPR = dbService.subscribe<any>('purchase_returns', user.company_id, setAllPurchaseReturns);
+      const unsubAllReceipts = dbService.subscribe<any>('receipt_vouchers', user.company_id, setAllReceipts);
       
       const fetchCompany = async () => {
         try {
@@ -494,6 +537,7 @@ export const Receipts: React.FC = () => {
         unsubPurchaseInvoices();
         unsubReturns();
         unsubPR();
+        unsubAllReceipts();
       };
     }
   }, [user, page, limit, sortBy, sortOrder, searchTerm]);
@@ -1016,6 +1060,19 @@ export const Receipts: React.FC = () => {
         notes: fullData.description || ''
       });
       setIsModalOpen(true);
+      const datesDict: Record<string, string> = {};
+      if (loadedItems && Array.isArray(loadedItems)) {
+        loadedItems.forEach((item: any, itemIdx: number) => {
+          if (item.settlements && Array.isArray(item.settlements)) {
+            item.settlements.forEach((s: any) => {
+              if (s.target_id) {
+                datesDict[`${itemIdx}-${s.target_id}`] = s.settlement_date || s.date || (fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10));
+              }
+            });
+          }
+        });
+      }
+      setRowSettlementDates(datesDict);
       console.log('[EDIT] Form updated with receipt:', fullData.id);
     } catch (error: any) {
       console.error('[EDIT] Error loading receipt:', error);
@@ -1805,7 +1862,7 @@ export const Receipts: React.FC = () => {
                                                 onChange={(e) => {
                                                   const newItems = [...voucherData.items];
                                                   newItems[idx].settlement_date = e.target.value;
-                                                  const serial = generateSettlementSerial(e.target.value, receipts, allPayments);
+                                                  const serial = generateSettlementSerial(e.target.value, allReceipts, allPayments);
                                                   newItems[idx].settlement_number = serial;
                                                   setVoucherData({ ...voucherData, items: newItems });
                                                 }}
@@ -1845,6 +1902,8 @@ export const Receipts: React.FC = () => {
                                                     <th className="pb-2 text-right">نوع الحركة</th>
                                                     <th className="pb-2 text-right">رقم الحركة</th>
                                                     <th className="pb-2 text-right">التاريخ</th>
+                                                    <th className="pb-2 text-center w-36">رقم التسوية</th>
+                                                    <th className="pb-2 text-center w-36">تاريخ التسوية</th>
                                                     <th className="pb-2 text-right">المبلغ الأصلي</th>
                                                     <th className="pb-2 text-right">المبلغ المفتوح</th>
                                                     <th className="pb-2 text-center w-24">تسوية كاملة</th>
@@ -1902,6 +1961,23 @@ export const Receipts: React.FC = () => {
                                                           )}
                                                         </td>
                                                         <td className="py-2.5 text-zinc-400 font-normal font-mono">{t.date}</td>
+                                                        <td className="py-2.5">
+                                                          <input
+                                                            disabled
+                                                            type="text"
+                                                            className="w-36 bg-zinc-50 border border-zinc-200 rounded-lg px-2 py-1 text-center text-zinc-500 font-mono text-xs font-black"
+                                                            value={settlement?.settlement_number || ''}
+                                                            placeholder="-"
+                                                          />
+                                                        </td>
+                                                        <td className="py-2.5">
+                                                          <input
+                                                            type="date"
+                                                            className="w-36 bg-white border border-zinc-200 rounded-lg px-2 py-1 text-center text-zinc-700 text-xs font-bold focus:ring-1 focus:ring-emerald-500"
+                                                            value={rowSettlementDates[`${idx}-${t.id}`] || voucherData.date.slice(0, 10)}
+                                                            onChange={(e) => handleRowDateChange(idx, t, e.target.value)}
+                                                          />
+                                                        </td>
                                                         <td className="py-2.5 text-zinc-500 font-semibold">{formatNumber(t.original_amount)}</td>
                                                         <td className="py-2.5 text-zinc-900 font-black">{formatNumber(t.open_amount)}</td>
                                                         <td className="py-2.5 text-center">
