@@ -311,7 +311,6 @@ export const PaymentVouchers: React.FC = () => {
     }
     
     item.settlements = settlements;
-    item.amount = settlements.reduce((sum: number, s: any) => sum + Number(s.settled_amount), 0);
     
     setVoucherData({
       ...voucherData,
@@ -739,6 +738,18 @@ export const PaymentVouchers: React.FC = () => {
     if (finalAmount <= 0) {
       showNotification('يرجى إدخال مبلغ صحيح', 'error');
       return;
+    }
+
+    // Validation: check if settlement sum is greater than the item amount
+    for (let i = 0; i < voucherData.items.length; i++) {
+      const item = voucherData.items[i];
+      if ((item.type === 'customer' || item.type === 'supplier') && item.entity_id) {
+        const totalSettled = (item.settlements || []).reduce((sum: number, s: any) => sum + Number(s.settled_amount), 0);
+        if (totalSettled > item.amount) {
+          showNotification('التسوية أكبر من المبلغ الإجمالي', 'error');
+          return;
+        }
+      }
     }
 
     try {
@@ -1892,6 +1903,24 @@ export const PaymentVouchers: React.FC = () => {
                                                 }}
                                               />
                                             </div>
+                                            {(() => {
+                                              const totalSettled = (item.settlements || []).reduce((sum: number, s: any) => sum + Number(s.settled_amount), 0);
+                                              const difference = (item.amount || 0) - totalSettled;
+                                              return (
+                                                <div className="flex flex-wrap items-center gap-4 text-xs font-bold">
+                                                  <div className="flex items-center gap-1.5">
+                                                    <span className="text-zinc-400">إجمالي المسوى:</span>
+                                                    <span className="text-emerald-600 font-mono font-black bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">{formatNumber(totalSettled)} ج.م</span>
+                                                  </div>
+                                                  <div className="flex items-center gap-1.5">
+                                                    <span className="text-zinc-400">الفرق:</span>
+                                                    <span className={`font-mono font-black px-2.5 py-1 rounded-lg border ${difference === 0 ? 'text-zinc-600 bg-zinc-50 border-zinc-200' : difference > 0 ? 'text-blue-600 bg-blue-50 border-blue-100' : 'text-red-600 bg-red-50 border-red-100'}`}>
+                                                      {formatNumber(difference)} ج.م
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              );
+                                            })()}
                                           </div>
 
                                           {/* Transactions Table */}
@@ -1911,6 +1940,7 @@ export const PaymentVouchers: React.FC = () => {
                                                     <th className="pb-2 text-right">المبلغ الأصلي</th>
                                                     <th className="pb-2 text-right">المبلغ المفتوح</th>
                                                     <th className="pb-2 text-center w-24">تسوية كاملة</th>
+                                                    <th className="pb-2 text-center w-32">تسوية بمبلغ الدفعة</th>
                                                     <th className="pb-2 text-center w-32">تسوية جزئية</th>
                                                   </tr>
                                                 </thead>
@@ -1976,6 +2006,26 @@ export const PaymentVouchers: React.FC = () => {
                                                               handleSettlementChange(idx, t, checked ? t.open_amount : 0);
                                                             }}
                                                           />
+                                                        </td>
+                                                        <td className="py-2.5 text-center">
+                                                          {(() => {
+                                                            const otherSettledSum = (item.settlements || []).filter((s: any) => s.target_id !== t.id).reduce((sum: number, s: any) => sum + Number(s.settled_amount), 0);
+                                                            const remainingVoucherAmount = Math.max(0, (item.amount || 0) - otherSettledSum);
+                                                            const maxAllocation = Math.min(remainingVoucherAmount, t.open_amount);
+                                                            const isVoucherAmountSettled = settledAmount > 0 && Math.abs(settledAmount - maxAllocation) < 0.01;
+                                                            return (
+                                                              <input
+                                                                type="checkbox"
+                                                                className="w-4 h-4 rounded border-zinc-350 text-blue-650 focus:ring-blue-500 cursor-pointer"
+                                                                disabled={maxAllocation <= 0 && settledAmount === 0}
+                                                                checked={isVoucherAmountSettled}
+                                                                onChange={(e) => {
+                                                                  const checked = e.target.checked;
+                                                                  handleSettlementChange(idx, t, checked ? maxAllocation : 0);
+                                                                }}
+                                                              />
+                                                            );
+                                                          })()}
                                                         </td>
                                                         <td className="py-2.5 text-center">
                                                           <input
