@@ -64,6 +64,61 @@ export const Receipts: React.FC = () => {
     return await dbService.getNextSequence('receipt_vouchers', selectedDate);
   };
   
+
+  
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingReceipt, setEditingReceipt] = useState<ReceiptVoucher | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [receiptToDelete, setReceiptToDelete] = useState<string | null>(null);
+  const [viewReceipt, setViewReceipt] = useState<ReceiptVoucher | null>(null);
+
+  const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
+  const [showSidePanel, setShowSidePanel] = useState(false);
+  const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
+  const [previewJournalEntry, setPreviewJournalEntry] = useState<JournalEntry | null>(null);
+  const [previewActivityLog, setPreviewActivityLog] = useState<Partial<ActivityLog> | null>(null);
+  const [view, setView] = useViewPreference('receipts', 'table');
+  const [companyData, setCompanyData] = useState<Company | null>(null);
+  const receiptRef = React.useRef<HTMLDivElement>(null);
+  const tableRef = React.useRef<HTMLDivElement>(null);
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  const [isPaymentMethodModalOpen, setIsPaymentMethodModalOpen] = useState(false);
+  const [customerFormData, setCustomerFormData] = useState({
+    name: '',
+    mobile: '',
+    email: '',
+    address: '',
+    opening_balance: 0,
+    opening_balance_date: new Date().toISOString().slice(0, 10),
+    account_id: '',
+    counter_account_id: ''
+  });
+  const [paymentMethodFormData, setPaymentMethodFormData] = useState({
+    code: '',
+    name: '',
+    type: 'cash' as 'cash' | 'bank' | 'wallet',
+    account_id: '',
+    opening_balance: 0,
+    opening_balance_date: new Date().toISOString().slice(0, 10),
+    counter_account_id: '',
+    details: ''
+  });
+  const [voucherData, setVoucherData] = useState({
+    internal_reference: '',
+    manual_reference: '',
+    items: [] as any[],
+    customer_id: '',
+    supplier_id: '',
+    amount: 0,
+    payment_method_id: '',
+    date: new Date().toISOString().slice(0, 10),
+    notes: ''
+  });
+
+  const [allInvoices, setAllInvoices] = useState<any[]>([]);
+  const [allPayments, setAllPayments] = useState<any[]>([]);
+  const [allJournalEntries, setAllJournalEntries] = useState<any[]>([]);
+
   const generateSettlementSerial = (dateStr: string, allReceiptsList: any[], allPaymentsList: any[]) => {
     const dateParts = dateStr.slice(0, 10).split('-');
     const year = dateParts[0];
@@ -281,59 +336,6 @@ export const Receipts: React.FC = () => {
       setVoucherData(prev => ({ ...prev, items: updatedItems }));
     }
   }, [voucherData.items, voucherData.date, receipts, allPayments, isModalOpen]);
-  
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingReceipt, setEditingReceipt] = useState<ReceiptVoucher | null>(null);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [receiptToDelete, setReceiptToDelete] = useState<string | null>(null);
-  const [viewReceipt, setViewReceipt] = useState<ReceiptVoucher | null>(null);
-
-  const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
-  const [showSidePanel, setShowSidePanel] = useState(false);
-  const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
-  const [previewJournalEntry, setPreviewJournalEntry] = useState<JournalEntry | null>(null);
-  const [previewActivityLog, setPreviewActivityLog] = useState<Partial<ActivityLog> | null>(null);
-  const [view, setView] = useViewPreference('receipts', 'table');
-  const [companyData, setCompanyData] = useState<Company | null>(null);
-  const receiptRef = React.useRef<HTMLDivElement>(null);
-  const tableRef = React.useRef<HTMLDivElement>(null);
-  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
-  const [isPaymentMethodModalOpen, setIsPaymentMethodModalOpen] = useState(false);
-  const [customerFormData, setCustomerFormData] = useState({
-    name: '',
-    mobile: '',
-    email: '',
-    address: '',
-    opening_balance: 0,
-    opening_balance_date: new Date().toISOString().slice(0, 10),
-    account_id: '',
-    counter_account_id: ''
-  });
-  const [paymentMethodFormData, setPaymentMethodFormData] = useState({
-    code: '',
-    name: '',
-    type: 'cash' as 'cash' | 'bank' | 'wallet',
-    account_id: '',
-    opening_balance: 0,
-    opening_balance_date: new Date().toISOString().slice(0, 10),
-    counter_account_id: '',
-    details: ''
-  });
-  const [voucherData, setVoucherData] = useState({
-    internal_reference: '',
-    manual_reference: '',
-    items: [] as any[],
-    customer_id: '',
-    supplier_id: '',
-    amount: 0,
-    payment_method_id: '',
-    date: new Date().toISOString().slice(0, 10),
-    notes: ''
-  });
-
-  const [allInvoices, setAllInvoices] = useState<any[]>([]);
-  const [allPayments, setAllPayments] = useState<any[]>([]);
-  const [allJournalEntries, setAllJournalEntries] = useState<any[]>([]);
 
   const subAccounts = [
     ...customers.map(c => ({ id: c.id, name: c.name, type: 'customer' as const, label: `عميل: ${c.name}` })),
