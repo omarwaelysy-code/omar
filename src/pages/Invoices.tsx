@@ -374,7 +374,30 @@ export const Invoices: React.FC = () => {
         const voucherOriginalId = parts.length > 1 ? parts.slice(0, -1).join('-') : s.target_id;
         const alreadyCounted = countedVoucherIds.has(voucherOriginalId) || countedVoucherIds.has(s.target_id);
         
-        if (!alreadyCounted) {
+        // Verify target document exists in our loaded data
+        let targetExists = false;
+        const targetType = s.type || s.page_name;
+        
+        if (targetType === 'receipts' || targetType === 'receipt') {
+          targetExists = allReceipts.some((v: any) => String(v.id) === String(voucherOriginalId));
+        } else if (targetType === 'payment_vouchers' || targetType === 'payment') {
+          targetExists = allPayments.some((v: any) => String(v.id) === String(voucherOriginalId));
+        } else if (targetType === 'returns' || targetType === 'return') {
+          targetExists = allReturns.some((r: any) => String(r.id) === String(voucherOriginalId));
+        } else if (targetType === 'purchase_returns' || targetType === 'purchase_return') {
+          targetExists = allPurchaseReturns.some((r: any) => String(r.id) === String(voucherOriginalId));
+        } else if (targetType === 'journal_entries' || targetType === 'journal') {
+          targetExists = entries.some((je: any) => String(je.id) === String(voucherOriginalId));
+        } else {
+          // Fallback check in all loaded documents
+          targetExists = allReceipts.some((v: any) => String(v.id) === String(voucherOriginalId)) ||
+                         allPayments.some((v: any) => String(v.id) === String(voucherOriginalId)) ||
+                         allReturns.some((r: any) => String(r.id) === String(voucherOriginalId)) ||
+                         allPurchaseReturns.some((r: any) => String(r.id) === String(voucherOriginalId)) ||
+                         entries.some((je: any) => String(je.id) === String(voucherOriginalId));
+        }
+
+        if (targetExists && !alreadyCounted) {
           invoiceSideSettlements.push({
             id: `${inv.id}-${s.target_id}`,
             date: s.settlement_date || s.date || inv.date,

@@ -1017,6 +1017,43 @@ export const Receipts: React.FC = () => {
       // Delete associated journal entry
       await dbService.deleteJournalEntryByReference(receiptToDelete, user.company_id);
       
+      // Clean up invoice settlements referencing this receipt voucher
+      const invoicesToUpdate = allInvoices.filter(inv => 
+        inv.settlements && Array.isArray(inv.settlements) && 
+        inv.settlements.some((s: any) => {
+          const parts = (s.target_id || '').split('-');
+          const voucherOriginalId = parts.length > 1 ? parts.slice(0, -1).join('-') : s.target_id;
+          return String(voucherOriginalId) === String(receiptToDelete);
+        })
+      );
+
+      for (const inv of invoicesToUpdate) {
+        const updatedSettlements = inv.settlements.filter((s: any) => {
+          const parts = (s.target_id || '').split('-');
+          const voucherOriginalId = parts.length > 1 ? parts.slice(0, -1).join('-') : s.target_id;
+          return String(voucherOriginalId) !== String(receiptToDelete);
+        });
+        await dbService.update('invoices', inv.id, { settlements: updatedSettlements });
+      }
+
+      const purchaseInvoicesToUpdate = allPurchaseInvoices.filter(inv => 
+        inv.settlements && Array.isArray(inv.settlements) && 
+        inv.settlements.some((s: any) => {
+          const parts = (s.target_id || '').split('-');
+          const voucherOriginalId = parts.length > 1 ? parts.slice(0, -1).join('-') : s.target_id;
+          return String(voucherOriginalId) === String(receiptToDelete);
+        })
+      );
+
+      for (const inv of purchaseInvoicesToUpdate) {
+        const updatedSettlements = inv.settlements.filter((s: any) => {
+          const parts = (s.target_id || '').split('-');
+          const voucherOriginalId = parts.length > 1 ? parts.slice(0, -1).join('-') : s.target_id;
+          return String(voucherOriginalId) !== String(receiptToDelete);
+        });
+        await dbService.update('purchase_invoices', inv.id, { settlements: updatedSettlements });
+      }
+
       await dbService.delete('receipt_vouchers', receiptToDelete);
       await dbService.logActivity(user.id, user.username, user.company_id, 'حذف سند قبض', `حذف سند قبض للعميل: ${receipt?.customer_name}`, 'receipt_vouchers');
       showNotification(t('common.delete_success'), 'success');
