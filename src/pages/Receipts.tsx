@@ -186,10 +186,12 @@ export const Receipts: React.FC = () => {
     const targetId = `${voucherId}-${itemIdx}`;
     
     const sumFromList = (list: any[]) => {
+      if (!Array.isArray(list)) return;
       list.forEach(inv => {
+        if (!inv) return;
         if (inv.settlements && Array.isArray(inv.settlements)) {
           inv.settlements.forEach((s: any) => {
-            if (String(s.target_id) === String(targetId)) {
+            if (s && String(s.target_id) === String(targetId)) {
               sum += Number(s.settled_amount || s.amount) || 0;
             }
           });
