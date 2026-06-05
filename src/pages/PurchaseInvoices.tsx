@@ -125,6 +125,10 @@ export const PurchaseInvoices: React.FC = () => {
   const invoiceRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const isInitialLoad = useRef(true);
+  const [allReceipts, setAllReceipts] = useState<any[]>([]);
+  const [allPayments, setAllPayments] = useState<any[]>([]);
+  const [allReturns, setAllReturns] = useState<any[]>([]);
+  const [allPurchaseReturns, setAllPurchaseReturns] = useState<any[]>([]);
 
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [paymentTerms, setPaymentTerms] = useState<string>('due_on_receipt');
@@ -177,6 +181,10 @@ export const PurchaseInvoices: React.FC = () => {
       const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
       const unsubWarehouses = dbService.subscribe<any>('warehouses', user.company_id, setWarehouses);
       const unsubEntries = dbService.subscribe<JournalEntry>('journal_entries', user.company_id, setEntries);
+      const unsubReceipts = dbService.subscribe<any>('receipt_vouchers', user.company_id, setAllReceipts);
+      const unsubPayments = dbService.subscribe<any>('payment_vouchers', user.company_id, setAllPayments);
+      const unsubReturns = dbService.subscribe<any>('returns', user.company_id, setAllReturns);
+      const unsubPR = dbService.subscribe<any>('purchase_returns', user.company_id, setAllPurchaseReturns);
       
       const fetchSettings = async () => {
         const docs = await dbService.getDocsByFilter<any>('settings', user.company_id, [
@@ -211,6 +219,10 @@ export const PurchaseInvoices: React.FC = () => {
         unsubAccounts();
         unsubWarehouses();
         unsubEntries();
+        unsubReceipts();
+        unsubPayments();
+        unsubReturns();
+        unsubPR();
       };
     }
   }, [user, page, limit, sortBy, sortOrder, searchTerm]);
@@ -265,6 +277,137 @@ export const PurchaseInvoices: React.FC = () => {
       });
     });
     return balance;
+  };
+
+  const getInvoiceSettlements = (inv: any) => {
+    if (!inv) return [];
+    const voucherSettlements: any[] = [];
+    
+    // Receipt Vouchers
+    allReceipts.forEach(v => {
+      if (v.items && Array.isArray(v.items)) {
+        v.items.forEach((item: any) => {
+          if (item.settlements && Array.isArray(item.settlements)) {
+            item.settlements.forEach((s: any) => {
+              if (s.target_id === inv.id) {
+                voucherSettlements.push({
+                  id: `${v.id}-${s.target_id}`,
+                  date: v.date,
+                  type_label: 'سند قبض',
+                  number: v.voucher_number || v.number || v.id,
+                  page_name: 'receipts',
+                  amount: Number(s.settled_amount) || 0,
+                  notes: v.description || v.notes || ''
+                });
+              }
+            });
+          }
+        });
+      }
+    });
+
+    // Payment Vouchers
+    allPayments.forEach(v => {
+      if (v.items && Array.isArray(v.items)) {
+        v.items.forEach((item: any) => {
+          if (item.settlements && Array.isArray(item.settlements)) {
+            item.settlements.forEach((s: any) => {
+              if (s.target_id === inv.id) {
+                voucherSettlements.push({
+                  id: `${v.id}-${s.target_id}`,
+                  date: v.date,
+                  type_label: 'سند صرف',
+                  number: v.voucher_number || v.number || v.id,
+                  page_name: 'payment_vouchers',
+                  amount: Number(s.settled_amount) || 0,
+                  notes: v.description || v.notes || ''
+                });
+              }
+            });
+          }
+        });
+      }
+    });
+
+    // Returns
+    const returnSettlements: any[] = [];
+    const returnsList = inv.customer_id ? allReturns : allPurchaseReturns;
+    returnsList.forEach(r => {
+      const descMatches = r.description?.toLowerCase().includes(inv.invoice_number.toLowerCase()) ||
+                          r.notes?.toLowerCase().includes(inv.invoice_number.toLowerCase()) ||
+                          r.return_number?.toLowerCase().includes(inv.invoice_number.toLowerCase());
+      
+      const isCorrectEntity = inv.customer_id 
+        ? r.customer_id === inv.customer_id 
+        : r.supplier_id === inv.supplier_id;
+        
+      if (descMatches && isCorrectEntity) {
+        returnSettlements.push({
+          id: r.id,
+          date: r.date,
+          type_label: inv.customer_id ? 'مرتجع مبيعات' : 'مرتجع مشتريات',
+          number: r.return_number || r.id,
+          page_name: inv.customer_id ? 'returns' : 'purchase_returns',
+          amount: Number(r.total_amount) || 0,
+          notes: r.description || r.notes || ''
+        });
+      }
+    });
+
+    // Manual JEs
+    const jeSettlements: any[] = [];
+    entries.forEach(je => {
+      if (je.reference_id === inv.id || je.reference_number === inv.invoice_number) {
+        return;
+      }
+      
+      if (je.reference_type === 'receipt_voucher' || je.reference_type === 'payment_voucher') {
+        return;
+      }
+
+      const jeDescMatches = je.description?.toLowerCase().includes(inv.invoice_number.toLowerCase()) ||
+                            je.reference_number?.toLowerCase().includes(inv.invoice_number.toLowerCase());
+                            
+      je.items?.forEach((item: any) => {
+        const isCorrectAccount = inv.customer_id 
+          ? item.customer_id === inv.customer_id
+          : item.supplier_id === inv.supplier_id;
+          
+        if (isCorrectAccount) {
+          const isSettlingLine = inv.customer_id
+            ? (Number(item.credit) > 0)
+            : (Number(item.debit) > 0);
+            
+          const lineDescMatches = item.description?.toLowerCase().includes(inv.invoice_number.toLowerCase());
+          
+          if (isSettlingLine && (jeDescMatches || lineDescMatches)) {
+            jeSettlements.push({
+              id: `${je.id}-${item.account_id}`,
+              date: je.date,
+              type_label: 'قيد يومية',
+              number: je.entry_number || je.id.slice(0, 8),
+              page_name: 'journal_entries',
+              amount: inv.customer_id ? Number(item.credit) : Number(item.debit),
+              notes: item.description || je.description || ''
+            });
+          }
+        }
+      });
+    });
+
+    return [...voucherSettlements, ...returnSettlements, ...jeSettlements];
+  };
+
+  const getPaymentStatus = (inv: any) => {
+    if (!inv) return 'unpaid';
+    if (inv.payment_type === 'cash') return 'paid';
+    
+    const settlements = getInvoiceSettlements(inv);
+    const totalSettled = settlements.reduce((sum, s) => sum + s.amount, 0);
+    
+    if (totalSettled <= 0) return 'unpaid';
+    if (totalSettled >= inv.total_amount - 0.01) return 'paid';
+    return 'partial';
   };
 
   const calculateDueDate = (invoiceDateStr: string, terms: string, customDays: number) => {
@@ -1456,6 +1599,7 @@ export const PurchaseInvoices: React.FC = () => {
                       </span>
                     </div>
                   </th>
+                  <th className={`px-6 py-4 font-bold ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>حالة الدفع</th>
                   <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('total_amount')}>
                     <div className="flex items-center gap-1">
                       {t('pi.total_amount')}
@@ -1471,7 +1615,7 @@ export const PurchaseInvoices: React.FC = () => {
               <tbody className="divide-y divide-zinc-50">
                 {filteredInvoices.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 italic">{t('pi.no_invoices')}</td>
+                    <td colSpan={6} className="px-6 py-12 text-center text-zinc-400 italic">{t('pi.no_invoices')}</td>
                   </tr>
                 ) : filteredInvoices.map((inv) => (
                   <tr 
@@ -1484,6 +1628,26 @@ export const PurchaseInvoices: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 font-bold text-zinc-900">{inv.supplier_name}</td>
                     <td className="px-6 py-4 text-zinc-500">{formatDate(inv.date)}</td>
+                    <td className="px-6 py-4">
+                      {(() => {
+                        const status = getPaymentStatus(inv);
+                        const statusLabels = {
+                          paid: language === 'ar' ? 'مدفوعة' : 'Paid',
+                          partial: language === 'ar' ? 'مدفوعة جزئياً' : 'Partially Paid',
+                          unpaid: language === 'ar' ? 'غير مدفوعة' : 'Unpaid'
+                        };
+                        const statusClasses = {
+                          paid: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                          partial: 'bg-blue-100 text-blue-800 border-blue-200',
+                          unpaid: 'bg-red-100 text-red-800 border-red-200'
+                        };
+                        return (
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-bold border ${statusClasses[status]}`}>
+                            {statusLabels[status]}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td className="px-6 py-4 font-bold text-zinc-900">
                       {formatNumber(inv.total_amount)} {t('common.currency')}
                     </td>
@@ -1614,12 +1778,33 @@ export const PurchaseInvoices: React.FC = () => {
                     <p className="text-zinc-900 font-bold text-sm tracking-tight">{formatDate(inv.date)}</p>
                   </div>
                   <div className="space-y-1 text-left">
-                    <p className="text-zinc-400 text-[10px] uppercase font-black tracking-widest">{t('pi.total_amount')}</p>
-                    <p className="font-black text-2xl tracking-tighter text-emerald-600">
-                      {formatNumber(inv.total_amount)} <span className="text-sm font-bold">{t('common.currency')}</span>
-                    </p>
+                    <p className="text-zinc-400 text-[10px] uppercase font-black tracking-widest">حالة الدفع</p>
+                    {(() => {
+                      const status = getPaymentStatus(inv);
+                      const statusLabels = {
+                        paid: language === 'ar' ? 'مدفوعة' : 'Paid',
+                        partial: language === 'ar' ? 'مدفوعة جزئياً' : 'Partially Paid',
+                        unpaid: language === 'ar' ? 'غير مدفوعة' : 'Unpaid'
+                      };
+                      const statusClasses = {
+                        paid: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                        partial: 'bg-blue-100 text-blue-800 border-blue-200',
+                        unpaid: 'bg-red-100 text-red-800 border-red-200'
+                      };
+                      return (
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-[8px] font-bold border ${statusClasses[status]}`}>
+                          {statusLabels[status]}
+                        </span>
+                      );
+                    })()}
                   </div>
-                  <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-zinc-200/50 flex justify-end">
+                  <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-zinc-200/50 flex justify-between items-end">
+                    <div>
+                      <p className="text-zinc-400 text-[10px] uppercase font-black tracking-widest">{t('pi.total_amount')}</p>
+                      <p className="font-black text-2xl tracking-tighter text-emerald-600">
+                        {formatNumber(inv.total_amount)} <span className="text-sm font-bold">{t('common.currency')}</span>
+                      </p>
+                    </div>
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
@@ -2406,9 +2591,38 @@ export const PurchaseInvoices: React.FC = () => {
                       </p>
                     )}
                   </div>
-                  <div className={t('dir') === 'rtl' ? 'text-left' : 'text-right'}>
-                    <p className="text-xs font-bold text-[#a1a1aa] uppercase tracking-widest mb-1">{t('common.date')}</p>
-                    <p className="text-lg font-medium text-[#18181b]">{formatDate(viewInvoice.date)}</p>
+                  <div className={`flex flex-col ${dir === 'rtl' ? 'items-start' : 'items-end'} justify-center gap-2`}>
+                    <div className="mb-1 text-center">
+                      <p className="text-xs font-bold text-[#a1a1aa] uppercase tracking-widest mb-1">{t('common.date')}</p>
+                      <p className="text-lg font-medium text-[#18181b]">{formatDate(viewInvoice.date)}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border
+                        ${viewInvoice.payment_type === 'cash' 
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                          : 'bg-amber-50 text-amber-700 border-amber-100'
+                        }`}>
+                        {viewInvoice.payment_type === 'cash' ? (language === 'ar' ? 'سداد نقدي' : 'Cash') : (language === 'ar' ? 'سداد آجل' : 'Credit')}
+                      </div>
+                      {(() => {
+                        const status = getPaymentStatus(viewInvoice);
+                        const statusLabels = {
+                          paid: language === 'ar' ? 'مدفوعة' : 'Paid',
+                          partial: language === 'ar' ? 'مدفوعة جزئياً' : 'Partially Paid',
+                          unpaid: language === 'ar' ? 'غير مدفوعة' : 'Unpaid'
+                        };
+                        const statusClasses = {
+                          paid: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                          partial: 'bg-blue-100 text-blue-800 border-blue-200',
+                          unpaid: 'bg-red-100 text-red-800 border-red-200'
+                        };
+                        return (
+                          <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${statusClasses[status]}`}>
+                            {statusLabels[status]}
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </div>
 
@@ -2465,6 +2679,80 @@ export const PurchaseInvoices: React.FC = () => {
                     </tfoot>
                   </table>
                 </div>
+
+                {/* Settlements Table */}
+                {(() => {
+                  const settlements = getInvoiceSettlements(viewInvoice);
+                  if (settlements.length === 0) return null;
+                  
+                  return (
+                    <div className="space-y-3 mt-8">
+                      <h4 className="font-bold text-slate-800 text-sm border-b border-slate-150 pb-2">
+                        {language === 'ar' ? 'جدول تسويات الفاتورة' : 'Invoice Settlements Table'}
+                      </h4>
+                      <div className="overflow-x-auto rounded-2xl border border-slate-150 shadow-sm">
+                        <table className={`w-full text-sm ${t('dir') === 'rtl' ? 'text-right' : 'text-left'} border-collapse bg-slate-50/20`}>
+                          <thead>
+                            <tr className="bg-slate-50 text-slate-500 text-xs font-bold border-b border-slate-200">
+                              <th className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {language === 'ar' ? 'التاريخ' : 'Date'}
+                              </th>
+                              <th className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {language === 'ar' ? 'نوع الحركة' : 'Transaction Type'}
+                              </th>
+                              <th className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {language === 'ar' ? 'رقم الحركة / المرجع' : 'Transaction No. / Ref'}
+                              </th>
+                              <th className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {language === 'ar' ? 'الملاحظات' : 'Notes'}
+                              </th>
+                              <th className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'}`}>
+                                {language === 'ar' ? 'المبلغ المسوى' : 'Settled Amount'}
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 text-slate-700">
+                            {settlements.map((s: any) => {
+                              // If language is English, map type labels
+                              let displayTypeLabel = s.type_label;
+                              if (language !== 'ar') {
+                                if (s.type_label === 'سند قبض') displayTypeLabel = 'Receipt Voucher';
+                                else if (s.type_label === 'سند صرف') displayTypeLabel = 'Payment Voucher';
+                                else if (s.type_label === 'مرتجع مبيعات') displayTypeLabel = 'Sales Return';
+                                else if (s.type_label === 'مرتجع مشتريات') displayTypeLabel = 'Purchase Return';
+                                else if (s.type_label === 'قيد يومية') displayTypeLabel = 'Journal Entry';
+                              }
+                              
+                              return (
+                                <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
+                                  <td className="px-4 py-3 font-mono text-xs">{formatDate(s.date)}</td>
+                                  <td className="px-4 py-3 text-xs font-bold">{displayTypeLabel}</td>
+                                  <td className="px-4 py-3 font-mono text-xs text-emerald-600 font-bold">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setViewInvoice(null);
+                                        setPendingViewDoc({ type: s.page_name === 'journal_entries' ? 'journal' : s.page_name === 'receipts' ? 'receipt' : s.page_name, idOrNumber: s.number });
+                                        setCurrentPage(s.page_name);
+                                      }}
+                                      className="hover:underline"
+                                    >
+                                      {s.number}
+                                    </button>
+                                  </td>
+                                  <td className="px-4 py-3 text-xs text-slate-500 max-w-xs truncate" title={s.notes}>{s.notes || '-'}</td>
+                                  <td className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} font-black text-emerald-600`}>
+                                    {formatNumber(s.amount)} {companyData?.settings?.currency || ''}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="flex gap-4" data-html2canvas-ignore>
                   <button 
