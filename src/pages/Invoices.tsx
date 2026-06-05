@@ -136,6 +136,11 @@ export const Invoices: React.FC = () => {
   const [paymentMethodId, setPaymentMethodId] = useState<string | ''>('');
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  
+  // Form Settlements State
+  const [formSettlementNumber, setFormSettlementNumber] = useState<string>('');
+  const [formSettlementDate, setFormSettlementDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [formSettlements, setFormSettlements] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>(null);
   const [companyData, setCompanyData] = useState<Company | null>(null);
   const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -205,6 +210,13 @@ export const Invoices: React.FC = () => {
       };
     }
   }, [user, page, limit, sortBy, sortOrder, searchTerm]);
+
+  useEffect(() => {
+    if (isModalOpen && !formSettlementNumber && selectedCustomerId) {
+      const serial = generateSettlementSerial(formSettlementDate || date, allReceipts, allPayments);
+      setFormSettlementNumber(serial);
+    }
+  }, [isModalOpen, selectedCustomerId, formSettlementDate, date]);
 
   const generateInvoiceNumber = async (dateStr: string) => {
     const next = await dbService.getNextSequence('invoices', dateStr);
@@ -339,7 +351,23 @@ export const Invoices: React.FC = () => {
       });
     });
 
-    return [...voucherSettlements, ...returnSettlements, ...jeSettlements];
+    // Invoice-side settlements
+    const invoiceSideSettlements: any[] = [];
+    if (inv.settlements && Array.isArray(inv.settlements)) {
+      inv.settlements.forEach((s: any) => {
+        invoiceSideSettlements.push({
+          id: `${inv.id}-${s.target_id}`,
+          date: s.date || inv.date,
+          type_label: s.type_label || 'تسوية',
+          number: s.reference_number || s.target_id,
+          page_name: s.type || 'receipts',
+          amount: Number(s.settled_amount) || 0,
+          notes: s.notes || ''
+        });
+      });
+    }
+
+    return [...voucherSettlements, ...returnSettlements, ...jeSettlements, ...invoiceSideSettlements];
   };
 
   const getPaymentStatus = (inv: any) => {
@@ -352,6 +380,229 @@ export const Invoices: React.FC = () => {
     if (totalSettled <= 0) return 'unpaid';
     if (totalSettled >= inv.total_amount - 0.01) return 'paid';
     return 'partial';
+  };
+
+  const generateSettlementSerial = (dateStr: string, allReceiptsList: any[], allPaymentsList: any[]) => {
+    const dateParts = dateStr.slice(0, 10).split('-');
+    const year = dateParts[0];
+    const month = dateParts[1].padStart(2, '0');
+    const prefix = `SET-${year}-${month}`;
+
+    let maxSeq = 0;
+    const checkVoucherItems = (vouchers: any[]) => {
+      vouchers.forEach(v => {
+        if (v.items && Array.isArray(v.items)) {
+          v.items.forEach(item => {
+            if (item.settlements && Array.isArray(item.settlements)) {
+              item.settlements.forEach((s: any) => {
+                if (s.settlement_number && s.settlement_number.startsWith(prefix)) {
+                  const parts = s.settlement_number.split('-');
+                  if (parts.length >= 4) {
+                    const seq = parseInt(parts[parts.length - 1], 10);
+                    if (!isNaN(seq) && seq > maxSeq) {
+                      maxSeq = seq;
+                    }
+                  }
+                }
+              });
+            }
+          });
+        }
+      });
+    };
+
+    const checkInvoices = (invoicesList: any[]) => {
+      invoicesList.forEach(inv => {
+        if (inv.settlements && Array.isArray(inv.settlements)) {
+          inv.settlements.forEach((s: any) => {
+            if (s.settlement_number && s.settlement_number.startsWith(prefix)) {
+              const parts = s.settlement_number.split('-');
+              if (parts.length >= 4) {
+                const seq = parseInt(parts[parts.length - 1], 10);
+                if (!isNaN(seq) && seq > maxSeq) {
+                  maxSeq = seq;
+                }
+              }
+            }
+          });
+        }
+      });
+    };
+
+    checkVoucherItems(allReceiptsList);
+    checkVoucherItems(allPaymentsList);
+    checkInvoices(invoices);
+
+    const nextSeq = (maxSeq + 1).toString().padStart(6, '0');
+    return `${prefix}-${nextSeq}`;
+  };
+
+  const getOppositeMovements = (customerId: string) => {
+    if (!customerId) return [];
+
+    const movements: any[] = [];
+
+    // 1. Receipt Vouchers
+    allReceipts.forEach(v => {
+      if (v.items && Array.isArray(v.items)) {
+        v.items.forEach((item: any, idx: number) => {
+          if (item.customer_id === customerId) {
+            const voucherSettled = (item.settlements || []).reduce((sum: number, s: any) => sum + Number(s.settled_amount || s.amount || 0), 0);
+            
+            let invoiceSettled = 0;
+            invoices.forEach(inv => {
+              if (inv.id !== editingInvoice?.id && inv.settlements && Array.isArray(inv.settlements)) {
+                inv.settlements.forEach((s: any) => {
+                  if (s.target_id === `${v.id}-${idx}`) {
+                    invoiceSettled += Number(s.settled_amount || s.amount || 0);
+                  }
+                });
+              }
+            });
+
+            const totalSettled = voucherSettled + invoiceSettled;
+            const originalAmount = Number(item.amount) || 0;
+            const openAmount = originalAmount - totalSettled;
+
+            if (openAmount > 0.01 || formSettlements.some(fs => fs.target_id === `${v.id}-${idx}`)) {
+              const currentSettle = formSettlements.find(fs => fs.target_id === `${v.id}-${idx}`);
+              const currentSettleAmt = currentSettle ? Number(currentSettle.settled_amount) : 0;
+              
+              movements.push({
+                id: `${v.id}-${idx}`,
+                original_id: v.id,
+                date: v.date,
+                type_label: 'سند قبض',
+                number: v.voucher_number || v.number || v.id,
+                page_name: 'receipts',
+                original_amount: originalAmount,
+                open_amount: openAmount + currentSettleAmt,
+                notes: v.description || v.notes || '',
+                je_number: v.entry_number || ''
+              });
+            }
+          }
+        });
+      }
+    });
+
+    // 2. Sales Returns
+    allReturns.forEach(r => {
+      if (r.customer_id === customerId) {
+        let invoiceSettled = 0;
+        invoices.forEach(inv => {
+          if (inv.id !== editingInvoice?.id && inv.settlements && Array.isArray(inv.settlements)) {
+            inv.settlements.forEach((s: any) => {
+              if (s.target_id === r.id) {
+                invoiceSettled += Number(s.settled_amount || s.amount || 0);
+              }
+            });
+          }
+        });
+
+        const originalAmount = Number(r.total_amount) || 0;
+        const openAmount = originalAmount - invoiceSettled;
+
+        if (openAmount > 0.01 || formSettlements.some(fs => fs.target_id === r.id)) {
+          const currentSettle = formSettlements.find(fs => fs.target_id === r.id);
+          const currentSettleAmt = currentSettle ? Number(currentSettle.settled_amount) : 0;
+
+          movements.push({
+            id: r.id,
+            original_id: r.id,
+            date: r.date,
+            type_label: 'مرتجع مبيعات',
+            number: r.return_number || r.id,
+            page_name: 'returns',
+            original_amount: originalAmount,
+            open_amount: openAmount + currentSettleAmt,
+            notes: r.description || r.notes || '',
+            je_number: r.entry_number || ''
+          });
+        }
+      }
+    });
+
+    // 3. Manual JEs
+    entries.forEach(je => {
+      if (je.reference_type === 'invoice' || je.reference_type === 'receipt_voucher' || je.reference_type === 'payment_voucher') {
+        return;
+      }
+      
+      je.items?.forEach((item: any, idx: number) => {
+        if (item.customer_id === customerId && Number(item.credit) > 0) {
+          const originalAmount = Number(item.credit) || 0;
+          
+          let invoiceSettled = 0;
+          invoices.forEach(inv => {
+            if (inv.id !== editingInvoice?.id && inv.settlements && Array.isArray(inv.settlements)) {
+              inv.settlements.forEach((s: any) => {
+                if (s.target_id === `${je.id}-${idx}`) {
+                  invoiceSettled += Number(s.settled_amount || s.amount || 0);
+                }
+              });
+            }
+          });
+
+          const openAmount = originalAmount - invoiceSettled;
+
+          if (openAmount > 0.01 || formSettlements.some(fs => fs.target_id === `${je.id}-${idx}`)) {
+            const currentSettle = formSettlements.find(fs => fs.target_id === `${je.id}-${idx}`);
+            const currentSettleAmt = currentSettle ? Number(currentSettle.settled_amount) : 0;
+
+            movements.push({
+              id: `${je.id}-${idx}`,
+              original_id: je.id,
+              date: je.date,
+              type_label: 'قيد يومية',
+              number: je.entry_number || je.id.slice(0, 8),
+              page_name: 'journal_entries',
+              original_amount: originalAmount,
+              open_amount: openAmount + currentSettleAmt,
+              notes: item.description || je.description || '',
+              je_number: je.entry_number || je.id.slice(0, 8)
+            });
+          }
+        }
+      });
+    });
+
+    return movements;
+  };
+
+  const handleSettlementChange = (targetTx: any, amount: number) => {
+    const settlements = [...formSettlements];
+    const existingIdx = settlements.findIndex(s => s.target_id === targetTx.id);
+
+    if (amount <= 0) {
+      if (existingIdx > -1) {
+        settlements.splice(existingIdx, 1);
+      }
+    } else {
+      const settlementObj = {
+        target_id: targetTx.id,
+        settled_amount: amount,
+        reference_number: targetTx.number,
+        entry_number: targetTx.je_number,
+        type: targetTx.page_name,
+        type_label: targetTx.type_label,
+        date: targetTx.date,
+        original_amount: targetTx.original_amount,
+        settlement_number: formSettlementNumber || generateSettlementSerial(formSettlementDate || date, allReceipts, allPayments),
+        settlement_date: formSettlementDate || date
+      };
+
+      if (existingIdx > -1) {
+        settlements[existingIdx] = {
+          ...settlements[existingIdx],
+          ...settlementObj
+        };
+      } else {
+        settlements.push(settlementObj);
+      }
+    }
+
+    setFormSettlements(settlements);
   };
 
   const calculateDueDate = (invoiceDateStr: string, terms: string, customDays: number) => {
@@ -855,6 +1106,13 @@ export const Invoices: React.FC = () => {
       const subtotal = Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)), 0)) || 0;
       const discount_amount = Number(discount) || 0;
       const total_amount = Number(subtotal - discount_amount) || 0;
+
+      // Over-settlement validation
+      const totalSettled = formSettlements.reduce((sum, s) => sum + Number(s.settled_amount), 0);
+      if (totalSettled > total_amount) {
+        showNotification('التسوية أكبر من المبلغ الإجمالي', 'error');
+        return;
+      }
       
       const customer = customers.find(c => c.id === selectedCustomerId);
       const paymentMethod = paymentMethods.find(pm => pm.id === paymentMethodId);
@@ -872,6 +1130,9 @@ export const Invoices: React.FC = () => {
       }));
 
       const invoiceData = { 
+        settlement_number: formSettlementNumber || null,
+        settlement_date: formSettlementDate || null,
+        settlements: formSettlements,
         invoice_number: invoiceNumber,
         customer_id: selectedCustomerId, 
         customer_name: customer?.name || '',
@@ -1355,6 +1616,9 @@ export const Invoices: React.FC = () => {
     setPaymentTermsDays(0);
     setAdvancePercentage(0);
     setDueDate(newDate);
+    setFormSettlementNumber('');
+    setFormSettlementDate(newDate);
+    setFormSettlements([]);
     setIsModalOpen(true);
     setIsFullScreen(false);
   };
@@ -1398,6 +1662,9 @@ export const Invoices: React.FC = () => {
       setPaymentTermsDays(fullData.payment_terms_days || 0);
       setAdvancePercentage(fullData.advance_percentage || 0);
       setDueDate(fullData.due_date ? fullData.due_date.slice(0, 10) : fullData.date.slice(0, 10));
+      setFormSettlementNumber(fullData.settlement_number || '');
+      setFormSettlementDate(fullData.settlement_date ? fullData.settlement_date.slice(0, 10) : fullData.date.slice(0, 10));
+      setFormSettlements(fullData.settlements || []);
       isInitialLoad.current = true;
       setIsModalOpen(true);
       setIsFullScreen(false);
@@ -1476,6 +1743,9 @@ export const Invoices: React.FC = () => {
     setPaymentTermsDays(0);
     setAdvancePercentage(0);
     setDueDate(new Date().toISOString().slice(0, 10));
+    setFormSettlementNumber('');
+    setFormSettlementDate(new Date().toISOString().slice(0, 10));
+    setFormSettlements([]);
     setIsFullScreen(false);
     setSelectedOrderIds([]);
     setPendingOrders([]);
@@ -2088,6 +2358,8 @@ export const Invoices: React.FC = () => {
                                   setIsCustomerModalOpen(true);
                                 } else {
                                   setSelectedCustomerId(e.target.value);
+                                  setFormSettlements([]);
+                                  setFormSettlementNumber('');
                                 }
                               }}
                             >
@@ -2612,66 +2884,155 @@ export const Invoices: React.FC = () => {
                       </section>
                     </div>
 
-                    {/* Settlements Table Card in Form (only when editing) */}
-                    {editingInvoice && (
+                    {/* Settlements Table Card in Form */}
+                    {selectedCustomerId && paymentType === 'credit' && (
                       <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-4">
-                        <div className="flex items-center gap-2 mb-2 text-emerald-600">
-                          <Layers className="w-5 h-5" />
-                          <h2 className="font-semibold text-zinc-900">
-                            {language === 'ar' ? 'جدول تسويات الفاتورة' : 'Invoice Settlements Table'}
-                          </h2>
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-100 pb-4">
+                          <div className="flex items-center gap-2 text-emerald-600">
+                            <Layers className="w-5 h-5" />
+                            <h2 className="font-semibold text-zinc-900">
+                              {language === 'ar' ? 'جدول تسويات الفاتورة' : 'Invoice Settlements Table'}
+                            </h2>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-4 text-xs font-bold font-mono">
+                            <div className="flex items-center gap-2">
+                              <span className="text-zinc-400 font-sans">{language === 'ar' ? 'رقم التسوية:' : 'Settlement No:'}</span>
+                              <input 
+                                disabled 
+                                type="text" 
+                                className="w-48 bg-zinc-50 border border-zinc-200 rounded-lg px-2 py-1 text-center text-zinc-500 font-mono text-xs"
+                                value={formSettlementNumber}
+                              />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-zinc-400 font-sans">{language === 'ar' ? 'تاريخ التسوية:' : 'Settlement Date:'}</span>
+                              <input 
+                                type="date" 
+                                className="bg-zinc-50 border border-zinc-200 rounded-lg px-2 py-1 text-center text-zinc-700 text-xs"
+                                value={formSettlementDate}
+                                onChange={(e) => setFormSettlementDate(e.target.value)}
+                              />
+                            </div>
+                            <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 text-xs font-sans">
+                              <span>{language === 'ar' ? 'إجمالي المسوى:' : 'Total Settled:'}</span>
+                              <span>{formatMoney(formSettlements.reduce((sum, s) => sum + Number(s.settled_amount), 0))} {companyData?.settings?.currency || ''}</span>
+                            </div>
+                            <div className="flex items-center gap-2 bg-slate-50 text-slate-700 px-3 py-1 rounded-full border border-slate-200 text-xs font-sans">
+                              <span>{language === 'ar' ? 'الفرق:' : 'Difference:'}</span>
+                              <span>{formatMoney(Math.max(0, invoiceGrandTotal - formSettlements.reduce((sum, s) => sum + Number(s.settled_amount), 0)))} {companyData?.settings?.currency || ''}</span>
+                            </div>
+                          </div>
                         </div>
+
                         {(() => {
-                          const settlements = getInvoiceSettlements(editingInvoice);
-                          if (settlements.length === 0) {
+                          const openTransactions = getOppositeMovements(selectedCustomerId);
+                          if (openTransactions.length === 0) {
                             return (
                               <p className="text-zinc-400 text-sm italic py-4 text-center">
-                                {language === 'ar' ? 'لا توجد تسويات لهذه الفاتورة بعد.' : 'No settlements for this invoice yet.'}
+                                {language === 'ar' ? 'لا توجد حركات مستحقة للتسوية.' : 'No outstanding transactions for settlement.'}
                               </p>
                             );
                           }
                           return (
-                            <div className="overflow-x-auto rounded-2xl border border-slate-150 shadow-sm">
-                              <table className={`w-full text-sm ${dir === 'rtl' ? 'text-right' : 'text-left'} border-collapse bg-slate-50/20`}>
+                            <div className="overflow-x-auto">
+                              <table className={`w-full text-sm ${dir === 'rtl' ? 'text-right' : 'text-left'} border-collapse`}>
                                 <thead>
-                                  <tr className="bg-slate-50 text-slate-500 text-xs font-bold border-b border-slate-200">
-                                    <th className={`px-4 py-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'التاريخ' : 'Date'}</th>
-                                    <th className={`px-4 py-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'نوع الحركة' : 'Transaction Type'}</th>
-                                    <th className={`px-4 py-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'رقم الحركة / المرجع' : 'Transaction No. / Ref'}</th>
-                                    <th className={`px-4 py-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الملاحظات' : 'Notes'}</th>
-                                    <th className={`px-4 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{language === 'ar' ? 'المبلغ المسوى' : 'Settled Amount'}</th>
+                                  <tr className="border-b border-zinc-100 text-zinc-400 text-xs font-bold uppercase tracking-wider">
+                                    <th className="pb-2 text-right">{language === 'ar' ? 'رقم القيد' : 'Entry No'}</th>
+                                    <th className="pb-2 text-right">{language === 'ar' ? 'نوع الحركة' : 'Type'}</th>
+                                    <th className="pb-2 text-right">{language === 'ar' ? 'رقم الحركة / المرجع' : 'Ref No'}</th>
+                                    <th className="pb-2 text-right">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                                    <th className="pb-2 text-right">{language === 'ar' ? 'المبلغ الأصلي' : 'Original Amt'}</th>
+                                    <th className="pb-2 text-right">{language === 'ar' ? 'المبلغ المفتوح' : 'Open Amt'}</th>
+                                    <th className="pb-2 text-center w-24">{language === 'ar' ? 'تسوية كاملة' : 'Full Settle'}</th>
+                                    <th className="pb-2 text-center w-32">{language === 'ar' ? 'تسوية بمبلغ الدفعة' : 'Settle with Payment'}</th>
+                                    <th className="pb-2 text-center w-32">{language === 'ar' ? 'تسوية جزئية' : 'Partial Settle'}</th>
                                   </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100 text-slate-700">
-                                  {settlements.map((s: any) => {
-                                    let displayTypeLabel = s.type_label;
-                                    if (language !== 'ar') {
-                                      if (s.type_label === 'سند قبض') displayTypeLabel = 'Receipt Voucher';
-                                      else if (s.type_label === 'سند صرف') displayTypeLabel = 'Payment Voucher';
-                                      else if (s.type_label === 'مرتجع مبيعات') displayTypeLabel = 'Sales Return';
-                                      else if (s.type_label === 'مرتجع مشتريات') displayTypeLabel = 'Purchase Return';
-                                      else if (s.type_label === 'قيد يومية') displayTypeLabel = 'Journal Entry';
-                                    }
+                                <tbody className="divide-y divide-zinc-50 text-zinc-700 font-bold">
+                                  {openTransactions.map((t: any) => {
+                                    const settlement = formSettlements.find((s: any) => s.target_id === t.id);
+                                    const settledAmount = settlement ? Number(settlement.settled_amount) : 0;
+                                    const isFullySettled = Math.abs(settledAmount - t.open_amount) < 0.01;
+
+                                    const otherSettledSum = formSettlements.filter((s: any) => s.target_id !== t.id).reduce((sum: number, s: any) => sum + Number(s.settled_amount), 0);
+                                    const remainingInvoiceAmount = Math.max(0, invoiceGrandTotal - otherSettledSum);
+                                    const maxAllocation = Math.min(remainingInvoiceAmount, t.open_amount);
+                                    const isInvoiceAmountSettled = settledAmount > 0 && Math.abs(settledAmount - maxAllocation) < 0.01;
+
                                     return (
-                                      <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
-                                        <td className="px-4 py-3 font-mono text-xs">{formatDate(s.date)}</td>
-                                        <td className="px-4 py-3 text-xs font-bold">{displayTypeLabel}</td>
-                                        <td className="px-4 py-3 font-mono text-xs text-emerald-600 font-bold">
+                                      <tr key={t.id} className="hover:bg-zinc-50/50 transition-colors">
+                                        <td className="py-2.5">
+                                          {t.je_number && t.je_number !== '-' ? (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                closeModal();
+                                                setPendingViewDoc({ type: 'journal', idOrNumber: t.je_number });
+                                                setCurrentPage('journal_entries');
+                                              }}
+                                              className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-black"
+                                            >
+                                              {t.je_number}
+                                            </button>
+                                          ) : (
+                                            <span className="text-zinc-400 font-mono font-normal">-</span>
+                                          )}
+                                        </td>
+                                        <td className="py-2.5 text-zinc-500 font-semibold">{t.type_label}</td>
+                                        <td className="py-2.5">
                                           <button
                                             type="button"
                                             onClick={() => {
                                               closeModal();
-                                              setPendingViewDoc({ type: s.page_name === 'journal_entries' ? 'journal' : s.page_name === 'receipts' ? 'receipt' : s.page_name, idOrNumber: s.number });
-                                              setCurrentPage(s.page_name);
+                                              setPendingViewDoc({ type: t.page_name === 'journal_entries' ? 'journal' : t.page_name === 'receipts' ? 'receipt' : t.page_name, idOrNumber: t.number });
+                                              setCurrentPage(t.page_name);
                                             }}
-                                            className="hover:underline"
+                                            className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-black"
                                           >
-                                            {s.number}
+                                            {t.number}
                                           </button>
                                         </td>
-                                        <td className="px-4 py-3 text-xs text-slate-500 max-w-xs truncate" title={s.notes}>{s.notes || '-'}</td>
-                                        <td className={`px-4 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} font-black text-emerald-600`}>
-                                          {formatMoney(s.amount)} {companyData?.settings?.currency || ''}
+                                        <td className="py-2.5 text-zinc-400 font-normal font-mono">{formatDate(t.date)}</td>
+                                        <td className="py-2.5 text-zinc-500 font-semibold">{formatMoney(t.original_amount)}</td>
+                                        <td className="py-2.5 text-zinc-900 font-black">{formatMoney(t.open_amount)}</td>
+                                        <td className="py-2.5 text-center">
+                                          <input
+                                            type="checkbox"
+                                            className="w-4 h-4 rounded border-zinc-350 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                            checked={isFullySettled}
+                                            onChange={(e) => {
+                                              const checked = e.target.checked;
+                                              handleSettlementChange(t, checked ? t.open_amount : 0);
+                                            }}
+                                          />
+                                        </td>
+                                        <td className="py-2.5 text-center">
+                                          <input
+                                            type="checkbox"
+                                            className="w-4 h-4 rounded border-zinc-350 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                            disabled={maxAllocation <= 0 && settledAmount === 0}
+                                            checked={isInvoiceAmountSettled}
+                                            onChange={(e) => {
+                                              const checked = e.target.checked;
+                                              handleSettlementChange(t, checked ? maxAllocation : 0);
+                                            }}
+                                          />
+                                        </td>
+                                        <td className="py-2.5 text-center">
+                                          <input
+                                            type="number"
+                                            step="any"
+                                            className="w-full px-2 py-1 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-black text-center text-emerald-600 outline-none focus:ring-2 focus:ring-emerald-500"
+                                            placeholder="0"
+                                            value={settledAmount || ''}
+                                            max={t.open_amount}
+                                            onChange={(e) => {
+                                              const val = Number(e.target.value);
+                                              const cappedVal = Math.min(Math.max(0, val), t.open_amount);
+                                              handleSettlementChange(t, cappedVal);
+                                            }}
+                                          />
                                         </td>
                                       </tr>
                                     );
