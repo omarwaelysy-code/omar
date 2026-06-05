@@ -301,6 +301,9 @@ export interface Invoice {
   payment_terms?: string;
   payment_terms_days?: number;
   advance_percentage?: number;
+  settlements?: any[];
+  settlement_number?: string | null;
+  settlement_date?: string | null;
 }
 
 export interface PurchaseInvoice {
@@ -330,6 +333,9 @@ export interface PurchaseInvoice {
   payment_terms?: string;
   payment_terms_days?: number;
   advance_percentage?: number;
+  settlements?: any[];
+  settlement_number?: string | null;
+  settlement_date?: string | null;
 }
 
 export interface InvoiceItem {

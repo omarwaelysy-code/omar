@@ -2885,165 +2885,166 @@ export const Invoices: React.FC = () => {
                     </div>
 
                     {/* Settlements Table Card in Form */}
-                    {selectedCustomerId && paymentType === 'credit' && (
-                      <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-4">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-100 pb-4">
-                          <div className="flex items-center gap-2 text-emerald-600">
-                            <Layers className="w-5 h-5" />
-                            <h2 className="font-semibold text-zinc-900">
-                              {language === 'ar' ? 'جدول تسويات الفاتورة' : 'Invoice Settlements Table'}
-                            </h2>
+                    {selectedCustomerId && paymentType === 'credit' && (() => {
+                      const invoiceGrandTotal = Math.max(0, items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) - discount);
+                      const openTransactions = getOppositeMovements(selectedCustomerId);
+                      if (openTransactions.length === 0) {
+                        return (
+                          <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-4">
+                            <p className="text-zinc-400 text-sm italic py-4 text-center">
+                              {language === 'ar' ? 'لا توجد حركات مستحقة للتسوية.' : 'No outstanding transactions for settlement.'}
+                            </p>
+                          </section>
+                        );
+                      }
+                      return (
+                        <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-4">
+                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-100 pb-4">
+                            <div className="flex items-center gap-2 text-emerald-600">
+                              <Layers className="w-5 h-5" />
+                              <h2 className="font-semibold text-zinc-900">
+                                {language === 'ar' ? 'جدول تسويات الفاتورة' : 'Invoice Settlements Table'}
+                              </h2>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-4 text-xs font-bold font-mono">
+                              <div className="flex items-center gap-2">
+                                <span className="text-zinc-400 font-sans">{language === 'ar' ? 'رقم التسوية:' : 'Settlement No:'}</span>
+                                <input 
+                                  disabled 
+                                  type="text" 
+                                  className="w-48 bg-zinc-50 border border-zinc-200 rounded-lg px-2 py-1 text-center text-zinc-500 font-mono text-xs"
+                                  value={formSettlementNumber}
+                                />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-zinc-400 font-sans">{language === 'ar' ? 'تاريخ التسوية:' : 'Settlement Date:'}</span>
+                                <input 
+                                  type="date" 
+                                  className="bg-zinc-50 border border-zinc-200 rounded-lg px-2 py-1 text-center text-zinc-700 text-xs"
+                                  value={formSettlementDate}
+                                  onChange={(e) => setFormSettlementDate(e.target.value)}
+                                />
+                              </div>
+                              <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 text-xs font-sans">
+                                <span>{language === 'ar' ? 'إجمالي المسوى:' : 'Total Settled:'}</span>
+                                <span>{formatMoney(formSettlements.reduce((sum, s) => sum + Number(s.settled_amount), 0))} {companyData?.settings?.currency || ''}</span>
+                              </div>
+                              <div className="flex items-center gap-2 bg-slate-50 text-slate-700 px-3 py-1 rounded-full border border-slate-200 text-xs font-sans">
+                                <span>{language === 'ar' ? 'الفرق:' : 'Difference:'}</span>
+                                <span>{formatMoney(Math.max(0, invoiceGrandTotal - formSettlements.reduce((sum, s) => sum + Number(s.settled_amount), 0)))} {companyData?.settings?.currency || ''}</span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex flex-wrap items-center gap-4 text-xs font-bold font-mono">
-                            <div className="flex items-center gap-2">
-                              <span className="text-zinc-400 font-sans">{language === 'ar' ? 'رقم التسوية:' : 'Settlement No:'}</span>
-                              <input 
-                                disabled 
-                                type="text" 
-                                className="w-48 bg-zinc-50 border border-zinc-200 rounded-lg px-2 py-1 text-center text-zinc-500 font-mono text-xs"
-                                value={formSettlementNumber}
-                              />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-zinc-400 font-sans">{language === 'ar' ? 'تاريخ التسوية:' : 'Settlement Date:'}</span>
-                              <input 
-                                type="date" 
-                                className="bg-zinc-50 border border-zinc-200 rounded-lg px-2 py-1 text-center text-zinc-700 text-xs"
-                                value={formSettlementDate}
-                                onChange={(e) => setFormSettlementDate(e.target.value)}
-                              />
-                            </div>
-                            <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 text-xs font-sans">
-                              <span>{language === 'ar' ? 'إجمالي المسوى:' : 'Total Settled:'}</span>
-                              <span>{formatMoney(formSettlements.reduce((sum, s) => sum + Number(s.settled_amount), 0))} {companyData?.settings?.currency || ''}</span>
-                            </div>
-                            <div className="flex items-center gap-2 bg-slate-50 text-slate-700 px-3 py-1 rounded-full border border-slate-200 text-xs font-sans">
-                              <span>{language === 'ar' ? 'الفرق:' : 'Difference:'}</span>
-                              <span>{formatMoney(Math.max(0, invoiceGrandTotal - formSettlements.reduce((sum, s) => sum + Number(s.settled_amount), 0)))} {companyData?.settings?.currency || ''}</span>
-                            </div>
-                          </div>
-                        </div>
 
-                        {(() => {
-                          const openTransactions = getOppositeMovements(selectedCustomerId);
-                          if (openTransactions.length === 0) {
-                            return (
-                              <p className="text-zinc-400 text-sm italic py-4 text-center">
-                                {language === 'ar' ? 'لا توجد حركات مستحقة للتسوية.' : 'No outstanding transactions for settlement.'}
-                              </p>
-                            );
-                          }
-                          return (
-                            <div className="overflow-x-auto">
-                              <table className={`w-full text-sm ${dir === 'rtl' ? 'text-right' : 'text-left'} border-collapse`}>
-                                <thead>
-                                  <tr className="border-b border-zinc-100 text-zinc-400 text-xs font-bold uppercase tracking-wider">
-                                    <th className="pb-2 text-right">{language === 'ar' ? 'رقم القيد' : 'Entry No'}</th>
-                                    <th className="pb-2 text-right">{language === 'ar' ? 'نوع الحركة' : 'Type'}</th>
-                                    <th className="pb-2 text-right">{language === 'ar' ? 'رقم الحركة / المرجع' : 'Ref No'}</th>
-                                    <th className="pb-2 text-right">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
-                                    <th className="pb-2 text-right">{language === 'ar' ? 'المبلغ الأصلي' : 'Original Amt'}</th>
-                                    <th className="pb-2 text-right">{language === 'ar' ? 'المبلغ المفتوح' : 'Open Amt'}</th>
-                                    <th className="pb-2 text-center w-24">{language === 'ar' ? 'تسوية كاملة' : 'Full Settle'}</th>
-                                    <th className="pb-2 text-center w-32">{language === 'ar' ? 'تسوية بمبلغ الدفعة' : 'Settle with Payment'}</th>
-                                    <th className="pb-2 text-center w-32">{language === 'ar' ? 'تسوية جزئية' : 'Partial Settle'}</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-zinc-50 text-zinc-700 font-bold">
-                                  {openTransactions.map((t: any) => {
-                                    const settlement = formSettlements.find((s: any) => s.target_id === t.id);
-                                    const settledAmount = settlement ? Number(settlement.settled_amount) : 0;
-                                    const isFullySettled = Math.abs(settledAmount - t.open_amount) < 0.01;
+                          <div className="overflow-x-auto">
+                            <table className={`w-full text-sm ${dir === 'rtl' ? 'text-right' : 'text-left'} border-collapse`}>
+                              <thead>
+                                <tr className="border-b border-zinc-100 text-zinc-400 text-xs font-bold uppercase tracking-wider">
+                                  <th className="pb-2 text-right">{language === 'ar' ? 'رقم القيد' : 'Entry No'}</th>
+                                  <th className="pb-2 text-right">{language === 'ar' ? 'نوع الحركة' : 'Type'}</th>
+                                  <th className="pb-2 text-right">{language === 'ar' ? 'رقم الحركة / المرجع' : 'Ref No'}</th>
+                                  <th className="pb-2 text-right">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                                  <th className="pb-2 text-right">{language === 'ar' ? 'المبلغ الأصلي' : 'Original Amt'}</th>
+                                  <th className="pb-2 text-right">{language === 'ar' ? 'المبلغ المفتوح' : 'Open Amt'}</th>
+                                  <th className="pb-2 text-center w-24">{language === 'ar' ? 'تسوية كاملة' : 'Full Settle'}</th>
+                                  <th className="pb-2 text-center w-32">{language === 'ar' ? 'تسوية بمبلغ الدفعة' : 'Settle with Payment'}</th>
+                                  <th className="pb-2 text-center w-32">{language === 'ar' ? 'تسوية جزئية' : 'Partial Settle'}</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-zinc-50 text-zinc-700 font-bold">
+                                {openTransactions.map((t: any) => {
+                                  const settlement = formSettlements.find((s: any) => s.target_id === t.id);
+                                  const settledAmount = settlement ? Number(settlement.settled_amount) : 0;
+                                  const isFullySettled = Math.abs(settledAmount - t.open_amount) < 0.01;
 
-                                    const otherSettledSum = formSettlements.filter((s: any) => s.target_id !== t.id).reduce((sum: number, s: any) => sum + Number(s.settled_amount), 0);
-                                    const remainingInvoiceAmount = Math.max(0, invoiceGrandTotal - otherSettledSum);
-                                    const maxAllocation = Math.min(remainingInvoiceAmount, t.open_amount);
-                                    const isInvoiceAmountSettled = settledAmount > 0 && Math.abs(settledAmount - maxAllocation) < 0.01;
+                                  const otherSettledSum = formSettlements.filter((s: any) => s.target_id !== t.id).reduce((sum: number, s: any) => sum + Number(s.settled_amount), 0);
+                                  const remainingInvoiceAmount = Math.max(0, invoiceGrandTotal - otherSettledSum);
+                                  const maxAllocation = Math.min(remainingInvoiceAmount, t.open_amount);
+                                  const isInvoiceAmountSettled = settledAmount > 0 && Math.abs(settledAmount - maxAllocation) < 0.01;
 
-                                    return (
-                                      <tr key={t.id} className="hover:bg-zinc-50/50 transition-colors">
-                                        <td className="py-2.5">
-                                          {t.je_number && t.je_number !== '-' ? (
-                                            <button
-                                              type="button"
-                                              onClick={() => {
-                                                closeModal();
-                                                setPendingViewDoc({ type: 'journal', idOrNumber: t.je_number });
-                                                setCurrentPage('journal_entries');
-                                              }}
-                                              className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-black"
-                                            >
-                                              {t.je_number}
-                                            </button>
-                                          ) : (
-                                            <span className="text-zinc-400 font-mono font-normal">-</span>
-                                          )}
-                                        </td>
-                                        <td className="py-2.5 text-zinc-500 font-semibold">{t.type_label}</td>
-                                        <td className="py-2.5">
+                                  return (
+                                    <tr key={t.id} className="hover:bg-zinc-50/50 transition-colors">
+                                      <td className="py-2.5">
+                                        {t.je_number && t.je_number !== '-' ? (
                                           <button
                                             type="button"
                                             onClick={() => {
                                               closeModal();
-                                              setPendingViewDoc({ type: t.page_name === 'journal_entries' ? 'journal' : t.page_name === 'receipts' ? 'receipt' : t.page_name, idOrNumber: t.number });
-                                              setCurrentPage(t.page_name);
+                                              setPendingViewDoc({ type: 'journal', idOrNumber: t.je_number });
+                                              setCurrentPage('journal_entries');
                                             }}
                                             className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-black"
                                           >
-                                            {t.number}
+                                            {t.je_number}
                                           </button>
-                                        </td>
-                                        <td className="py-2.5 text-zinc-400 font-normal font-mono">{formatDate(t.date)}</td>
-                                        <td className="py-2.5 text-zinc-500 font-semibold">{formatMoney(t.original_amount)}</td>
-                                        <td className="py-2.5 text-zinc-900 font-black">{formatMoney(t.open_amount)}</td>
-                                        <td className="py-2.5 text-center">
-                                          <input
-                                            type="checkbox"
-                                            className="w-4 h-4 rounded border-zinc-350 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                                            checked={isFullySettled}
-                                            onChange={(e) => {
-                                              const checked = e.target.checked;
-                                              handleSettlementChange(t, checked ? t.open_amount : 0);
-                                            }}
-                                          />
-                                        </td>
-                                        <td className="py-2.5 text-center">
-                                          <input
-                                            type="checkbox"
-                                            className="w-4 h-4 rounded border-zinc-350 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                            disabled={maxAllocation <= 0 && settledAmount === 0}
-                                            checked={isInvoiceAmountSettled}
-                                            onChange={(e) => {
-                                              const checked = e.target.checked;
-                                              handleSettlementChange(t, checked ? maxAllocation : 0);
-                                            }}
-                                          />
-                                        </td>
-                                        <td className="py-2.5 text-center">
-                                          <input
-                                            type="number"
-                                            step="any"
-                                            className="w-full px-2 py-1 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-black text-center text-emerald-600 outline-none focus:ring-2 focus:ring-emerald-500"
-                                            placeholder="0"
-                                            value={settledAmount || ''}
-                                            max={t.open_amount}
-                                            onChange={(e) => {
-                                              const val = Number(e.target.value);
-                                              const cappedVal = Math.min(Math.max(0, val), t.open_amount);
-                                              handleSettlementChange(t, cappedVal);
-                                            }}
-                                          />
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                          );
-                        })()}
-                      </section>
-                    )}
+                                        ) : (
+                                          <span className="text-zinc-400 font-mono font-normal">-</span>
+                                        )}
+                                      </td>
+                                      <td className="py-2.5 text-zinc-500 font-semibold">{t.type_label}</td>
+                                      <td className="py-2.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            closeModal();
+                                            setPendingViewDoc({ type: t.page_name === 'journal_entries' ? 'journal' : t.page_name === 'receipts' ? 'receipt' : t.page_name, idOrNumber: t.number });
+                                            setCurrentPage(t.page_name);
+                                          }}
+                                          className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-black"
+                                        >
+                                          {t.number}
+                                        </button>
+                                      </td>
+                                      <td className="py-2.5 text-zinc-400 font-normal font-mono">{formatDate(t.date)}</td>
+                                      <td className="py-2.5 text-zinc-500 font-semibold">{formatMoney(t.original_amount)}</td>
+                                      <td className="py-2.5 text-zinc-900 font-black">{formatMoney(t.open_amount)}</td>
+                                      <td className="py-2.5 text-center">
+                                        <input
+                                          type="checkbox"
+                                          className="w-4 h-4 rounded border-zinc-350 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                          checked={isFullySettled}
+                                          onChange={(e) => {
+                                            const checked = e.target.checked;
+                                            handleSettlementChange(t, checked ? t.open_amount : 0);
+                                          }}
+                                        />
+                                      </td>
+                                      <td className="py-2.5 text-center">
+                                        <input
+                                          type="checkbox"
+                                          className="w-4 h-4 rounded border-zinc-350 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                          disabled={maxAllocation <= 0 && settledAmount === 0}
+                                          checked={isInvoiceAmountSettled}
+                                          onChange={(e) => {
+                                            const checked = e.target.checked;
+                                            handleSettlementChange(t, checked ? maxAllocation : 0);
+                                          }}
+                                        />
+                                      </td>
+                                      <td className="py-2.5 text-center">
+                                        <input
+                                          type="number"
+                                          step="any"
+                                          className="w-full px-2 py-1 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-black text-center text-emerald-600 outline-none focus:ring-2 focus:ring-emerald-500"
+                                          placeholder="0"
+                                          value={settledAmount || ''}
+                                          max={t.open_amount}
+                                          onChange={(e) => {
+                                            const val = Number(e.target.value);
+                                            const cappedVal = Math.min(Math.max(0, val), t.open_amount);
+                                            handleSettlementChange(t, cappedVal);
+                                          }}
+                                        />
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </section>
+                      );
+                    })()}
 
                     {/* Actions removed from bottom of scrollable area as they are in the fixed footer */}
                   </form>

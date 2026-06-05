@@ -2896,9 +2896,46 @@ export const PurchaseInvoices: React.FC = () => {
                                             {t.number}
                                           </button>
                                         </td>
-                                        <td className="px-4 py-3 text-xs text-slate-500 max-w-xs truncate" title={s.notes}>{s.notes || '-'}</td>
-                                        <td className={`px-4 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} font-black text-emerald-600`}>
-                                          {formatNumber(s.amount)} {companyData?.settings?.currency || ''}
+                                        <td className="py-2.5 text-zinc-400 font-normal font-mono">{formatDate(t.date)}</td>
+                                        <td className="py-2.5 text-zinc-500 font-semibold">{formatNumber(t.original_amount)}</td>
+                                        <td className="py-2.5 text-zinc-900 font-black">{formatNumber(t.open_amount)}</td>
+                                        <td className="py-2.5 text-center">
+                                          <input
+                                            type="checkbox"
+                                            className="w-4 h-4 rounded border-zinc-350 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                            checked={isFullySettled}
+                                            onChange={(e) => {
+                                              const checked = e.target.checked;
+                                              handleSettlementChange(t, checked ? t.open_amount : 0);
+                                            }}
+                                          />
+                                        </td>
+                                        <td className="py-2.5 text-center">
+                                          <input
+                                            type="checkbox"
+                                            className="w-4 h-4 rounded border-zinc-350 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                            disabled={maxAllocation <= 0 && settledAmount === 0}
+                                            checked={isInvoiceAmountSettled}
+                                            onChange={(e) => {
+                                              const checked = e.target.checked;
+                                              handleSettlementChange(t, checked ? maxAllocation : 0);
+                                            }}
+                                          />
+                                        </td>
+                                        <td className="py-2.5 text-center">
+                                          <input
+                                            type="number"
+                                            step="any"
+                                            className="w-full px-2 py-1 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-black text-center text-emerald-600 outline-none focus:ring-2 focus:ring-emerald-500"
+                                            placeholder="0"
+                                            value={settledAmount || ''}
+                                            max={t.open_amount}
+                                            onChange={(e) => {
+                                              const val = Number(e.target.value);
+                                              const cappedVal = Math.min(Math.max(0, val), t.open_amount);
+                                              handleSettlementChange(t, cappedVal);
+                                            }}
+                                          />
                                         </td>
                                       </tr>
                                     );
