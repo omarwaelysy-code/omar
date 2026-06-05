@@ -2033,6 +2033,29 @@ export const Invoices: React.FC = () => {
                   <form id="invoice-form" onSubmit={handleSubmit} className="space-y-8">
                     {/* Card 1: المعلومات الأساسية */}
                     <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
+                      {editingInvoice && (
+                        <div className={`absolute ${dir === 'rtl' ? 'left-12' : 'right-12'} top-4 z-20 pointer-events-none select-none opacity-80 transform -rotate-12`}>
+                          {(() => {
+                            const status = getPaymentStatus(editingInvoice);
+                            const statusLabels = {
+                              paid: language === 'ar' ? 'مدفوعة' : 'Paid',
+                              partial: language === 'ar' ? 'مدفوعة جزئياً' : 'Partially Paid',
+                              unpaid: language === 'ar' ? 'غير مدفوعة' : 'Unpaid'
+                            };
+                            const statusColors = {
+                              paid: 'text-emerald-600 border-emerald-600 bg-emerald-50/70',
+                              partial: 'text-blue-600 border-blue-600 bg-blue-50/70',
+                              unpaid: 'text-red-500 border-red-500 bg-red-50/70'
+                            };
+                            const colorClass = statusColors[status] || statusColors.unpaid;
+                            return (
+                              <div className={`px-6 py-2 border-y-2 border-dashed ${colorClass} font-black text-xl tracking-widest uppercase rounded`}>
+                                {statusLabels[status]}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
                       <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50/50 px-3 py-1 rounded-full border border-emerald-100">
                         <FileText className="w-4 h-4" />
                         <span className="text-xs font-bold">invoices.basic_info</span>
@@ -2588,6 +2611,78 @@ export const Invoices: React.FC = () => {
                         />
                       </section>
                     </div>
+
+                    {/* Settlements Table Card in Form (only when editing) */}
+                    {editingInvoice && (
+                      <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-4">
+                        <div className="flex items-center gap-2 mb-2 text-emerald-600">
+                          <Layers className="w-5 h-5" />
+                          <h2 className="font-semibold text-zinc-900">
+                            {language === 'ar' ? 'جدول تسويات الفاتورة' : 'Invoice Settlements Table'}
+                          </h2>
+                        </div>
+                        {(() => {
+                          const settlements = getInvoiceSettlements(editingInvoice);
+                          if (settlements.length === 0) {
+                            return (
+                              <p className="text-zinc-400 text-sm italic py-4 text-center">
+                                {language === 'ar' ? 'لا توجد تسويات لهذه الفاتورة بعد.' : 'No settlements for this invoice yet.'}
+                              </p>
+                            );
+                          }
+                          return (
+                            <div className="overflow-x-auto rounded-2xl border border-slate-150 shadow-sm">
+                              <table className={`w-full text-sm ${dir === 'rtl' ? 'text-right' : 'text-left'} border-collapse bg-slate-50/20`}>
+                                <thead>
+                                  <tr className="bg-slate-50 text-slate-500 text-xs font-bold border-b border-slate-200">
+                                    <th className={`px-4 py-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                                    <th className={`px-4 py-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'نوع الحركة' : 'Transaction Type'}</th>
+                                    <th className={`px-4 py-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'رقم الحركة / المرجع' : 'Transaction No. / Ref'}</th>
+                                    <th className={`px-4 py-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الملاحظات' : 'Notes'}</th>
+                                    <th className={`px-4 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{language === 'ar' ? 'المبلغ المسوى' : 'Settled Amount'}</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 text-slate-700">
+                                  {settlements.map((s: any) => {
+                                    let displayTypeLabel = s.type_label;
+                                    if (language !== 'ar') {
+                                      if (s.type_label === 'سند قبض') displayTypeLabel = 'Receipt Voucher';
+                                      else if (s.type_label === 'سند صرف') displayTypeLabel = 'Payment Voucher';
+                                      else if (s.type_label === 'مرتجع مبيعات') displayTypeLabel = 'Sales Return';
+                                      else if (s.type_label === 'مرتجع مشتريات') displayTypeLabel = 'Purchase Return';
+                                      else if (s.type_label === 'قيد يومية') displayTypeLabel = 'Journal Entry';
+                                    }
+                                    return (
+                                      <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
+                                        <td className="px-4 py-3 font-mono text-xs">{formatDate(s.date)}</td>
+                                        <td className="px-4 py-3 text-xs font-bold">{displayTypeLabel}</td>
+                                        <td className="px-4 py-3 font-mono text-xs text-emerald-600 font-bold">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              closeModal();
+                                              setPendingViewDoc({ type: s.page_name === 'journal_entries' ? 'journal' : s.page_name === 'receipts' ? 'receipt' : s.page_name, idOrNumber: s.number });
+                                              setCurrentPage(s.page_name);
+                                            }}
+                                            className="hover:underline"
+                                          >
+                                            {s.number}
+                                          </button>
+                                        </td>
+                                        <td className="px-4 py-3 text-xs text-slate-500 max-w-xs truncate" title={s.notes}>{s.notes || '-'}</td>
+                                        <td className={`px-4 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} font-black text-emerald-600`}>
+                                          {formatMoney(s.amount)} {companyData?.settings?.currency || ''}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          );
+                        })()}
+                      </section>
+                    )}
 
                     {/* Actions removed from bottom of scrollable area as they are in the fixed footer */}
                   </form>
