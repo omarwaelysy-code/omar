@@ -374,6 +374,8 @@ export interface ReceiptVoucher {
   entry_number?: string;
   items?: ReceiptVoucherItem[];
   voucher_type?: string;
+  created_at?: string;
+  created_by?: string;
 }
 
 export interface PaymentVoucherItem {

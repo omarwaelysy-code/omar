@@ -443,7 +443,7 @@ export const Receipts: React.FC = () => {
     try {
       const paymentMethod = paymentMethods.find(pm => pm.id === voucherData.payment_method_id);
       const receipt_number = editingReceipt 
-        ? (editingReceipt.voucher_number || editingReceipt.number) 
+        ? (editingReceipt.voucher_number || editingReceipt.id) 
         : (internalRef || `RCPT-${Date.now().toString().slice(-6)}`);
       
       const mappedItems = voucherData.items.map(item => {
