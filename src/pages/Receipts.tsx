@@ -20,7 +20,7 @@ import { ExportButtons } from '../components/ExportButtons';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { TransactionManager } from '../services/TransactionManager';
 import { VoucherSchema, JournalEntrySchema } from '../lib/schemas';
-import { ActivityLog, ReceiptVoucher, Customer, PaymentMethod, JournalEntry, JournalEntryItem, Account, Company } from '../types';
+import { ActivityLog, ReceiptVoucher, Customer, Supplier, ExpenseCategory, PaymentMethod, JournalEntry, JournalEntryItem, Account, Company } from '../types';
 import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { PaginationControls } from '../components/PaginationControls';
 import { useViewPreference } from '../hooks/useViewPreference';
@@ -34,6 +34,8 @@ export const Receipts: React.FC = () => {
   const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
   const [receipts, setReceipts] = useState<ReceiptVoucher[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,13 +101,23 @@ export const Receipts: React.FC = () => {
     counter_account_id: '',
     details: ''
   });
-  const [formData, setFormData] = useState({ 
-    customer_id: '', 
-    date: new Date().toISOString().slice(0, 10), 
-    amount: 0, 
-    description: '',
-    payment_method_id: ''
+  const [voucherData, setVoucherData] = useState({
+    internal_reference: '',
+    manual_reference: '',
+    items: [] as any[],
+    customer_id: '',
+    supplier_id: '',
+    amount: 0,
+    payment_method_id: '',
+    date: new Date().toISOString().slice(0, 10),
+    notes: ''
   });
+
+  const subAccounts = [
+    ...customers.map(c => ({ id: c.id, name: c.name, type: 'customer' as const, label: `عميل: ${c.name}` })),
+    ...suppliers.map(s => ({ id: s.id, name: s.name, type: 'supplier' as const, label: `مورد: ${s.name}` })),
+    ...paymentMethods.map(p => ({ id: p.id, name: p.name, type: 'payment_method' as const, label: `خزينة/بنك: ${p.name}` }))
+  ];
 
   useEffect(() => {
     if (user) {
@@ -122,6 +134,8 @@ export const Receipts: React.FC = () => {
         setServerSummary(result.summary);
       });
       const unsubCustomers = dbService.subscribe<Customer>('customers', user.company_id, setCustomers);
+      const unsubSuppliers = dbService.subscribe<Supplier>('suppliers', user.company_id, setSuppliers);
+      const unsubCategories = dbService.subscribe<ExpenseCategory>('expense_categories', user.company_id, setCategories);
       const unsubPM = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setPaymentMethods);
       const unsubAccounts = dbService.subscribe<any>('accounts', user.company_id, setAccounts);
       
@@ -139,6 +153,8 @@ export const Receipts: React.FC = () => {
       return () => {
         unsubItems();
         unsubCustomers();
+        unsubSuppliers();
+        unsubCategories();
         unsubPM();
         unsubAccounts();
       };
@@ -148,12 +164,12 @@ export const Receipts: React.FC = () => {
   useEffect(() => {
     if (!editingReceipt && !internalRef && !loading && isModalOpen) {
       const updateNum = async () => {
-        const num = await generateInternalRef(formData.date);
+        const num = await generateInternalRef(voucherData.date);
         setInternalRef(num);
       };
       updateNum();
     }
-  }, [editingReceipt, loading, isModalOpen, formData.date]);
+  }, [editingReceipt, loading, isModalOpen, voucherData.date]);
 
   // Real-time Preview Logic
   useEffect(() => {
@@ -164,26 +180,77 @@ export const Receipts: React.FC = () => {
     }
 
     const generatePreview = () => {
-      if (formData.amount <= 0) {
+      const totalPreviewAmount = voucherData.items.reduce((sum, item) => sum + item.amount, 0);
+      if (totalPreviewAmount <= 0) {
         setPreviewJournalEntry(null);
         setPreviewActivityLog(null);
         return;
       }
 
-      const customer = customers.find(c => c.id === formData.customer_id);
-      const paymentMethod = paymentMethods.find(pm => pm.id === formData.payment_method_id);
+      const paymentMethod = paymentMethods.find(pm => pm.id === voucherData.payment_method_id);
       const receipt_number = 'REC-PREVIEW';
 
       // Preview Activity Log
       setPreviewActivityLog({
         action: 'إضافة سند قبض',
-        details: `إضافة سند قبض جديد من العميل ${customer?.name || '...'} بمبلغ ${formatNumber(formData.amount)}`,
+        details: `إضافة سند قبض جديد بمبلغ ${formatNumber(totalPreviewAmount)}`,
         created_at: new Date().toISOString(),
         entity: 'receipts'
       });
 
       // Preview Journal Entry
       const journalItems: JournalEntryItem[] = [];
+
+      voucherData.items.forEach(item => {
+        let creditAccountId = '';
+        let creditAccountName = '';
+        let subAccountId = undefined;
+        let subAccountType = undefined;
+
+        if (item.type === 'customer') {
+          const customer = customers.find(c => c.id === item.entity_id);
+          creditAccountId = customer?.account_id || '';
+          creditAccountName = customer?.account_name || '';
+          subAccountId = customer?.id;
+          subAccountType = 'customer';
+        } else if (item.type === 'supplier') {
+          const supplier = suppliers.find(s => s.id === item.entity_id);
+          creditAccountId = supplier?.account_id || '';
+          creditAccountName = supplier?.account_name || '';
+          subAccountId = supplier?.id;
+          subAccountType = 'supplier';
+        } else if (item.type === 'expense') {
+          const category = categories.find(c => c.id === item.entity_id);
+          creditAccountId = category?.account_id || '';
+          creditAccountName = category?.name || '';
+          subAccountId = category?.id;
+          subAccountType = 'expense';
+        } else {
+          const account = accounts.find(a => a.id === item.entity_id);
+          creditAccountId = account?.id || '';
+          creditAccountName = account?.name || '';
+          
+          if (account?.required_sub_account && item.sub_account_id) {
+            const subAccount = subAccounts.find((sa: any) => sa.id === item.sub_account_id);
+            subAccountId = item.sub_account_id;
+            subAccountType = subAccount?.type;
+          }
+        }
+
+        if (item.amount > 0) {
+          journalItems.push({
+            account_id: creditAccountId || 'credit_account_missing',
+            account_name: creditAccountName || 'حساب دائن مفقود',
+            debit: 0,
+            credit: item.amount,
+            description: item.description || `سند قبض رقم ${receipt_number} - ${voucherData.notes}`,
+            sub_account_id: subAccountId,
+            sub_account_type: subAccountType as 'customer' | 'supplier' | undefined,
+            customer_id: item.type === 'customer' ? item.entity_id : undefined,
+            supplier_id: item.type === 'supplier' ? item.entity_id : undefined,
+          });
+        }
+      });
 
       // Debit: Payment Method (Cash/Bank)
       let debitAccountId = paymentMethod?.account_id || '';
@@ -200,43 +267,23 @@ export const Receipts: React.FC = () => {
       journalItems.push({
         account_id: debitAccountId,
         account_name: debitAccountName,
-        debit: formData.amount,
+        debit: totalPreviewAmount,
         credit: 0,
-        description: `سند قبض رقم ${receipt_number} - ${customer?.name || '...'}`,
+        description: `سند قبض رقم ${receipt_number} - ${totalPreviewAmount}`,
         sub_account_id: paymentMethod?.id,
         sub_account_type: 'payment_method'
       });
 
-      // Credit: Customer
-      let creditAccountId = customer?.account_id || '';
-      let creditAccountName = customer?.account_name || '';
-      
-      if (!creditAccountId) {
-        const fallbackAccount = accounts.find(a => a.name.includes('عملاء'));
-        creditAccountId = fallbackAccount?.id || 'customers_account_default';
-        creditAccountName = fallbackAccount?.name || 'حساب العملاء (افتراضي)';
-      }
-
-      journalItems.push({
-        account_id: creditAccountId,
-        account_name: creditAccountName,
-        debit: 0,
-        credit: formData.amount,
-        description: `سند قبض رقم ${receipt_number} - ${customer?.name || '...'}`,
-        sub_account_id: customer?.id,
-        sub_account_type: 'customer'
-      });
-
       setPreviewJournalEntry({
         id: 'preview',
-        date: formData.date,
+        date: voucherData.date,
         reference_number: receipt_number,
         reference_id: 'preview',
         reference_type: 'receipt',
         description: `قيد سند قبض رقم ${receipt_number}`,
         items: journalItems,
-        total_debit: formData.amount,
-        total_credit: formData.amount,
+        total_debit: totalPreviewAmount,
+        total_credit: totalPreviewAmount,
         company_id: user.company_id,
         created_at: new Date().toISOString(),
         created_by: user.id
@@ -244,7 +291,7 @@ export const Receipts: React.FC = () => {
     };
 
     generatePreview();
-  }, [isModalOpen, formData, user, customers, paymentMethods, accounts]);
+  }, [isModalOpen, voucherData, user, customers, suppliers, categories, paymentMethods, accounts]);
 
   const handleCustomerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -298,7 +345,7 @@ export const Receipts: React.FC = () => {
 
       await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة عميل', `إضافة عميل جديد من سند القبض: ${customerFormData.name}`, ['customers', 'receipt_vouchers']);
       
-      setFormData({ ...formData, customer_id: customerId });
+      setVoucherData({ ...voucherData, customer_id: customerId });
       setIsCustomerModalOpen(false);
       setCustomerFormData({
         name: '',
@@ -364,7 +411,7 @@ export const Receipts: React.FC = () => {
         });
       }
 
-      setFormData({ ...formData, payment_method_id: pmId });
+      setVoucherData({ ...voucherData, payment_method_id: pmId });
       setIsPaymentMethodModalOpen(false);
       setPaymentMethodFormData({
         code: '',
@@ -385,32 +432,119 @@ export const Receipts: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !formData.customer_id) return;
+    if (!user) return;
+
+    const finalAmount = voucherData.items.reduce((sum, item) => sum + item.amount, 0);
+    if (finalAmount <= 0) {
+      showNotification('يرجى إدخال مبلغ صحيح', 'error');
+      return;
+    }
 
     try {
-      const customer = customers.find(c => c.id === formData.customer_id);
-      const paymentMethod = paymentMethods.find(pm => pm.id === formData.payment_method_id);
+      const paymentMethod = paymentMethods.find(pm => pm.id === voucherData.payment_method_id);
       const receipt_number = editingReceipt 
-        ? editingReceipt.voucher_number 
+        ? (editingReceipt.voucher_number || editingReceipt.number) 
         : (internalRef || `RCPT-${Date.now().toString().slice(-6)}`);
       
-      const receiptData = {
+      const mappedItems = voucherData.items.map(item => {
+        let name = '';
+        if (item.type === 'customer') {
+          name = customers.find(c => c.id === item.entity_id)?.name || '';
+        } else if (item.type === 'supplier') {
+          name = suppliers.find(s => s.id === item.entity_id)?.name || '';
+        } else if (item.type === 'expense') {
+          name = categories.find(c => c.id === item.entity_id)?.name || '';
+        } else {
+          name = accounts.find(a => a.id === item.entity_id)?.name || '';
+        }
+        return {
+          ...item,
+          entity_name: name
+        };
+      });
+
+      let mainCustomerId = '';
+      if (voucherData.items.length > 0 && voucherData.items[0].type === 'customer') {
+        mainCustomerId = voucherData.items[0].entity_id;
+      }
+
+      const entityNames = mappedItems.map(item => item.entity_name).filter(Boolean);
+      const combinedCustomerName = entityNames.length > 0 
+        ? entityNames.join(', ') 
+        : 'حساب عام / جهات متعددة';
+
+      const receiptData: any = {
         voucher_number: receipt_number,
-        date: formData.date,
-        amount: formData.amount,
-        description: formData.description,
-        customer_id: formData.customer_id,
-        customer_name: customer?.name || '',
-        payment_method_id: formData.payment_method_id || null,
+        internal_reference: voucherData.internal_reference,
+        manual_reference: voucherData.manual_reference,
+        date: voucherData.date,
+        amount: finalAmount,
+        description: voucherData.notes,
+        customer_id: mainCustomerId || null,
+        customer_name: combinedCustomerName,
+        payment_method_id: voucherData.payment_method_id || null,
         payment_method_name: paymentMethod?.name || '',
         account_id: paymentMethod?.account_id || null,
         type: 'receipt' as const,
         company_id: user.company_id,
-        created_at: new Date().toISOString(),
-        created_by: user.id
+        created_at: editingReceipt?.created_at || new Date().toISOString(),
+        created_by: editingReceipt?.created_by || user.id,
+        voucher_type: 'multi',
+        items: mappedItems
       };
 
       const journalItems: any[] = [];
+
+      voucherData.items.forEach(item => {
+        let creditAccountId = '';
+        let creditAccountName = '';
+        let subAccountId = undefined;
+        let subAccountType = undefined;
+
+        if (item.type === 'customer') {
+          const customer = customers.find(c => c.id === item.entity_id);
+          creditAccountId = customer?.account_id || '';
+          creditAccountName = customer?.account_name || '';
+          subAccountId = customer?.id;
+          subAccountType = 'customer';
+        } else if (item.type === 'supplier') {
+          const supplier = suppliers.find(s => s.id === item.entity_id);
+          creditAccountId = supplier?.account_id || '';
+          creditAccountName = supplier?.account_name || '';
+          subAccountId = supplier?.id;
+          subAccountType = 'supplier';
+        } else if (item.type === 'expense') {
+          const category = categories.find(c => c.id === item.entity_id);
+          creditAccountId = category?.account_id || '';
+          creditAccountName = category?.name || '';
+          subAccountId = category?.id;
+          subAccountType = 'expense';
+        } else {
+          const account = accounts.find(a => a.id === item.entity_id);
+          creditAccountId = account?.id || '';
+          creditAccountName = account?.name || '';
+          
+          if (account?.required_sub_account && item.sub_account_id) {
+            const subAccount = subAccounts.find((sa: any) => sa.id === item.sub_account_id);
+            subAccountId = item.sub_account_id;
+            subAccountType = subAccount?.type;
+          }
+        }
+
+        journalItems.push({
+          account_id: creditAccountId,
+          account_name: creditAccountName,
+          debit: 0,
+          credit: item.amount,
+          description: (item.description || `سند قبض رقم ${receipt_number}`) + (voucherData.notes ? ` - ${voucherData.notes}` : ''),
+          sub_account_id: subAccountId,
+          sub_account_type: subAccountType,
+          customer_id: item.type === 'customer' ? item.entity_id : undefined,
+          supplier_id: item.type === 'supplier' ? item.entity_id : undefined,
+        });
+      });
+
+      // Debit: Payment Method
       let debitAccountId = paymentMethod?.account_id || '';
       let debitAccountName = paymentMethod?.name || '';
       if (!debitAccountId) {
@@ -424,41 +558,21 @@ export const Receipts: React.FC = () => {
       journalItems.push({
         account_id: debitAccountId,
         account_name: debitAccountName,
-        debit: formData.amount,
+        debit: finalAmount,
         credit: 0,
-        description: `سند قبض رقم ${receipt_number}${formData.description ? ` - ${formData.description}` : ''}`,
+        description: `سند قبض رقم ${receipt_number} إلى حساب: ${paymentMethod?.name}` + (voucherData.notes ? ` - ${voucherData.notes}` : ''),
         sub_account_id: paymentMethod?.id,
         sub_account_type: 'payment_method'
       });
 
-      let creditAccountId = customer?.account_id || '';
-      let creditAccountName = customer?.account_name || '';
-      if (!creditAccountId) {
-        const fallback = accounts.find(a => a.name.includes('عملاء'));
-        creditAccountId = fallback?.id || 'customers_account_default';
-        creditAccountName = fallback?.name || 'حساب العملاء (افتراضي)';
-      }
-
-      journalItems.push({
-        account_id: creditAccountId,
-        account_name: creditAccountName,
-        debit: 0,
-        credit: formData.amount,
-        description: `سند قبض رقم ${receipt_number}${formData.description ? ` - ${formData.description}` : ''} من العميل: ${customer?.name}`,
-        customer_id: formData.customer_id,
-        customer_name: customer?.name,
-        sub_account_id: formData.customer_id,
-        sub_account_type: 'customer'
-      });
-
       const journalEntryData = {
-        date: formData.date,
+        date: voucherData.date,
         reference_number: receipt_number,
         reference_type: 'receipt',
         description: `قيد سند قبض رقم ${receipt_number}`,
         items: journalItems,
-        total_debit: formData.amount,
-        total_credit: formData.amount,
+        total_debit: finalAmount,
+        total_credit: finalAmount,
         company_id: user.company_id,
         created_at: new Date().toISOString(),
         created_by: user.id
@@ -488,7 +602,7 @@ export const Receipts: React.FC = () => {
       closeModal();
 
       if (!editingReceipt) {
-        dbService.logActivity(user.id, user.username, user.company_id, 'إضافة سند قبض', `إضافة سند قبض جديد للعميل: ${customer?.name}`, 'receipt_vouchers');
+        dbService.logActivity(user.id, user.username, user.company_id, 'إضافة سند قبض', `إضافة سند قبض جديد بقيمة: ${finalAmount}`, 'receipt_vouchers');
       }
 
     } catch (e: any) {
@@ -531,12 +645,26 @@ export const Receipts: React.FC = () => {
 
       setEditingReceipt(fullData);
       setInternalRef(fullData.voucher_number || '');
-      setFormData({
-        customer_id: fullData.customer_id,
-        date: fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+      
+      const loadedItems = fullData.items && fullData.items.length > 0
+        ? fullData.items
+        : [{
+            type: 'customer' as const,
+            entity_id: fullData.customer_id || '',
+            amount: fullData.amount,
+            description: fullData.description || ''
+          }];
+
+      setVoucherData({
+        internal_reference: fullData.internal_reference || fullData.voucher_number || '',
+        manual_reference: fullData.manual_reference || '',
+        items: loadedItems,
+        customer_id: fullData.customer_id || '',
+        supplier_id: fullData.supplier_id || '',
         amount: fullData.amount,
-        description: fullData.description,
-        payment_method_id: fullData.payment_method_id || ''
+        payment_method_id: fullData.payment_method_id || '',
+        date: fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        notes: fullData.description || ''
       });
       setIsModalOpen(true);
       console.log('[EDIT] Form updated with receipt:', fullData.id);
@@ -616,12 +744,16 @@ export const Receipts: React.FC = () => {
     setIsModalOpen(false);
     setEditingReceipt(null);
     setInternalRef('');
-    setFormData({ 
-      customer_id: '', 
-      date: new Date().toISOString().slice(0, 10), 
-      amount: 0, 
-      description: '',
-      payment_method_id: ''
+    setVoucherData({
+      internal_reference: '',
+      manual_reference: '',
+      items: [],
+      customer_id: '',
+      supplier_id: '',
+      amount: 0,
+      payment_method_id: '',
+      date: new Date().toISOString().slice(0, 10),
+      notes: ''
     });
   };
 
@@ -1025,15 +1157,42 @@ export const Receipts: React.FC = () => {
                   if (data.customerName) {
                     const customer = customers.find(c => c.name.includes(data.customerName!) || data.customerName!.includes(c.name));
                     if (customer) {
-                      setFormData(prev => ({ ...prev, customer_id: customer.id }));
+                      setVoucherData(prev => {
+                        const items = [...prev.items];
+                        if (items.length === 0) {
+                          items.push({ type: 'customer', entity_id: customer.id, amount: data.amount || 0, description: data.description || '' });
+                        } else {
+                          items[0].entity_id = customer.id;
+                          items[0].type = 'customer';
+                        }
+                        return { ...prev, items };
+                      });
                     }
                   }
-                  if (data.amount) setFormData(prev => ({ ...prev, amount: data.amount! }));
-                  if (data.date) setFormData(prev => ({ ...prev, date: data.date! }));
-                  if (data.description) setFormData(prev => ({ ...prev, description: data.description! }));
+                  if (data.amount) {
+                    setVoucherData(prev => {
+                      const items = [...prev.items];
+                      if (items.length === 0) {
+                        items.push({ type: 'customer', entity_id: '', amount: data.amount!, description: data.description || '' });
+                      } else {
+                        items[0].amount = data.amount!;
+                      }
+                      return { ...prev, amount: data.amount!, items };
+                    });
+                  }
+                  if (data.date) setVoucherData(prev => ({ ...prev, date: data.date! }));
+                  if (data.description) {
+                    setVoucherData(prev => {
+                      const items = [...prev.items];
+                      if (items.length > 0) {
+                        items[0].description = data.description!;
+                      }
+                      return { ...prev, notes: data.description!, items };
+                    });
+                  }
                   if (data.paymentMethod) {
                     const pm = paymentMethods.find(p => p.name.includes(data.paymentMethod!) || data.paymentMethod!.includes(p.name));
-                    if (pm) setFormData(prev => ({ ...prev, payment_method_id: pm.id }));
+                    if (pm) setVoucherData(prev => ({ ...prev, payment_method_id: pm.id }));
                   }
                 }}
                 transactionType="receipt_voucher"
@@ -1057,32 +1216,22 @@ export const Receipts: React.FC = () => {
                             readOnly
                             type="text" 
                             className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-100 border border-zinc-200 cursor-not-allowed rounded-2xl font-bold text-zinc-500 text-sm outline-none font-mono`}
-                            value={editingReceipt ? internalRef : (internalRef || `RCPT-${Date.now().toString().slice(-6)}`)}
+                            value={editingReceipt ? voucherData.internal_reference : (internalRef || voucherData.internal_reference)}
                           />
                         </div>
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">العميل</label>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">مرجع يدوي / آخر</label>
                         <div className="relative group">
-                          <User className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
-                          <select 
-                            required
-                            className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
-                            value={formData.customer_id}
-                            onChange={(e) => {
-                              if (e.target.value === 'new_customer') {
-                                setIsCustomerModalOpen(true);
-                              } else {
-                                setFormData({ ...formData, customer_id: e.target.value });
-                              }
-                            }}
-                          >
-                            <option value="">اختر العميل...</option>
-                            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                            <option value="new_customer" className="font-bold text-emerald-600">+ إضافة عميل جديد...</option>
-                          </select>
-                          <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <FileText className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <input 
+                            type="text" 
+                            placeholder="ادخل رقم المرجع اليدوي..."
+                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                            value={voucherData.manual_reference}
+                            onChange={(e) => setVoucherData({...voucherData, manual_reference: e.target.value})}
+                          />
                         </div>
                       </div>
 
@@ -1094,8 +1243,8 @@ export const Receipts: React.FC = () => {
                             required
                             type="date"
                             className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
-                            value={formData.date}
-                            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                            value={voucherData.date}
+                            onChange={(e) => setVoucherData({...voucherData, date: e.target.value})}
                           />
                         </div>
                       </div>
@@ -1115,66 +1264,186 @@ export const Receipts: React.FC = () => {
                         </div>
                       )}
                     </div>
-                  </section>
-
-                  {/* Card 2: Payment details */}
-                  <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                    <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
-                      <Wallet className="w-4 h-4" />
-                      <span className="text-xs font-bold">تفاصيل القبض</span>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">طريقة القبض</label>
-                        <div className="relative group">
-                          <CreditCard className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
-                          <select 
-                            required
-                            className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
-                            value={formData.payment_method_id}
-                            onChange={(e) => {
-                              if (e.target.value === 'new_payment_method') {
-                                setIsPaymentMethodModalOpen(true);
-                              } else {
-                                setFormData({ ...formData, payment_method_id: e.target.value });
-                              }
-                            }}
-                          >
-                            <option value="">اختر طريقة السداد...</option>
-                            {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
-                            <option value="new_payment_method" className="font-bold text-emerald-600">+ إضافة طريقة دفع جديدة...</option>
-                          </select>
-                          <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">المبلغ</label>
-                        <div className="relative">
-                          <span className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 font-bold text-zinc-400 text-sm`}>ج.م</span>
-                          <input 
-                            required
-                            type="number"
-                            step="0.01"
-                            className={`w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-black text-2xl text-emerald-600 tracking-tighter`}
-                            value={isNaN(formData.amount) ? '' : formData.amount}
-                            onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) })}
-                          />
-                        </div>
-                      </div>
-                    </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">الوصف / ملاحظات</label>
-                      <textarea 
-                        rows={3}
-                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none text-sm font-bold text-zinc-800"
-                        placeholder="اكتب تفاصيل القبض هنا..."
-                        value={formData.description}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      />
+                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">طريقة القبض (إلى خزينة/بنك)</label>
+                      <div className="relative group">
+                        <CreditCard className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                        <select 
+                          required
+                          className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
+                          value={voucherData.payment_method_id}
+                          onChange={(e) => {
+                            if (e.target.value === 'new_payment_method') {
+                              setIsPaymentMethodModalOpen(true);
+                            } else {
+                              setVoucherData({...voucherData, payment_method_id: e.target.value});
+                            }
+                          }}
+                        >
+                          <option value="">اختر طريقة القبض...</option>
+                          {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
+                          <option value="new_payment_method" className="font-bold text-emerald-600">+ إضافة طريقة دفع جديدة...</option>
+                        </select>
+                        <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                      </div>
                     </div>
+                  </section>
+
+                  {/* Card 2: Receipt Items */}
+                  <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
+                    <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                      <Layers className="w-4 h-4" />
+                      <span className="text-xs font-bold">بنود القبض</span>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-zinc-100 pb-2">
+                        <h4 className="font-bold text-zinc-900 italic tracking-tight uppercase text-sm">تفاصيل البنود</h4>
+                        <button 
+                          type="button"
+                          onClick={() => setVoucherData({
+                            ...voucherData,
+                            items: [...voucherData.items, { type: 'customer', entity_id: '', amount: 0, description: '' }]
+                          })}
+                          className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-black border border-emerald-100 hover:bg-emerald-100 transition-all shadow-sm"
+                        >
+                          <Plus size={16} />
+                          <span>إضافة بند قبض جديد</span>
+                        </button>
+                      </div>
+                      
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className={`text-zinc-500 text-[10px] uppercase font-black tracking-widest ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              <th className="px-2 py-3 w-32 tracking-tighter">النوع</th>
+                              <th className="px-2 py-3 tracking-tighter">المقبوض منه / الحساب</th>
+                              <th className="px-2 py-3 w-32 tracking-tighter uppercase tracking-widest">المبلغ</th>
+                              <th className="px-2 py-3 tracking-tighter uppercase tracking-widest">الوصف</th>
+                              <th className="px-2 py-3 w-10"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-50">
+                            {voucherData.items.map((item, idx) => (
+                              <tr key={idx} className="group hover:bg-zinc-50 transition-colors">
+                                <td className="px-1 py-1 relative">
+                                  <select 
+                                    className="w-full px-2 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] font-bold outline-none appearance-none"
+                                    value={item.type}
+                                    onChange={(e) => {
+                                      const newItems = [...voucherData.items];
+                                      newItems[idx].type = e.target.value;
+                                      newItems[idx].entity_id = '';
+                                      setVoucherData({...voucherData, items: newItems});
+                                    }}
+                                  >
+                                    <option value="customer">عميل</option>
+                                    <option value="supplier">مورد</option>
+                                    <option value="expense">مصروف</option>
+                                    <option value="account">حساب عام</option>
+                                  </select>
+                                  <ChevronDown size={12} className="absolute right-3 top-4 text-zinc-400 pointer-events-none" />
+                                </td>
+                                <td className="px-1 py-1 relative">
+                                  <select 
+                                    className="w-full px-2 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] font-black outline-none appearance-none"
+                                    value={item.entity_id}
+                                    onChange={(e) => {
+                                      const newItems = [...voucherData.items];
+                                      newItems[idx].entity_id = e.target.value;
+                                      newItems[idx].sub_account_id = '';
+                                      setVoucherData({...voucherData, items: newItems});
+                                    }}
+                                  >
+                                    <option value="">اختر...</option>
+                                    {item.type === 'customer' && customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    {item.type === 'supplier' && suppliers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
+                                    {item.type === 'expense' && categories.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
+                                    {item.type === 'account' && accounts.map(a => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)}
+                                  </select>
+                                  <ChevronDown size={12} className="absolute right-4 top-4 text-zinc-400 pointer-events-none" />
+                                  {item.type === 'account' && accounts.find(a => a.id === item.entity_id)?.required_sub_account && (
+                                    <select
+                                      className="w-full px-2 py-2 mt-1 bg-emerald-50 border border-emerald-200 rounded-xl text-[10px] font-bold outline-none"
+                                      value={item.sub_account_id || ''}
+                                      onChange={(e) => {
+                                        const newItems = [...voucherData.items];
+                                        newItems[idx].sub_account_id = e.target.value;
+                                        setVoucherData({...voucherData, items: newItems});
+                                      }}
+                                      required
+                                    >
+                                      <option value="">اختر الحساب الفرعي...</option>
+                                      {subAccounts.map(sa => (
+                                        <option key={sa.id} value={sa.id}>{sa.label}</option>
+                                      ))}
+                                    </select>
+                                  )}
+                                </td>
+                                <td className="px-1 py-1">
+                                  <input 
+                                    type="number" 
+                                    className="w-full px-2 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-black text-emerald-600 outline-none text-center"
+                                    placeholder="0"
+                                    value={item.amount || ''}
+                                    onChange={(e) => {
+                                      const newItems = [...voucherData.items];
+                                      newItems[idx].amount = Number(e.target.value);
+                                      setVoucherData({...voucherData, items: newItems});
+                                    }}
+                                  />
+                                </td>
+                                <td className="px-1 py-1">
+                                  <input 
+                                    type="text" 
+                                    placeholder="بيان تفصيلي..."
+                                    className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] font-bold outline-none"
+                                    value={item.description}
+                                    onChange={(e) => {
+                                      const newItems = [...voucherData.items];
+                                      newItems[idx].description = e.target.value;
+                                      setVoucherData({...voucherData, items: newItems});
+                                    }}
+                                  />
+                                </td>
+                                <td className="px-1 py-1 text-center">
+                                  <button 
+                                    type="button"
+                                    onClick={() => {
+                                      const newItems = voucherData.items.filter((_, i) => i !== idx);
+                                      setVoucherData({...voucherData, items: newItems});
+                                    }}
+                                    className="p-2 text-zinc-400 hover:text-red-500 rounded-lg hover:bg-zinc-100 transition-colors"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="flex justify-between items-center bg-zinc-50 p-4 rounded-2xl border border-zinc-100 mt-4">
+                        <span className="font-bold text-zinc-700 text-sm">إجمالي المبلغ المستلم:</span>
+                        <span className="font-black text-2xl text-emerald-600 tracking-tighter">
+                          {formatNumber(voucherData.items.reduce((sum, item) => sum + item.amount, 0))} ج.م
+                        </span>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Notes Card */}
+                  <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-4">
+                    <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">البيان العام / ملاحظات إضافية</label>
+                    <textarea 
+                      rows={3}
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none text-sm font-bold text-zinc-800"
+                      placeholder="اكتب ملاحظات السند هنا..."
+                      value={voucherData.notes}
+                      onChange={(e) => setVoucherData({...voucherData, notes: e.target.value})}
+                    />
                   </section>
                 </div>
               </div>
@@ -1190,7 +1459,7 @@ export const Receipts: React.FC = () => {
                 </button>
                 <button 
                   type="submit"
-                  disabled={formData.amount <= 0 || !formData.customer_id}
+                  disabled={voucherData.items.reduce((sum, item) => sum + item.amount, 0) <= 0 || !voucherData.payment_method_id}
                   className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-3"
                 >
                   <Save className="w-6 h-6" />
@@ -1256,22 +1525,75 @@ export const Receipts: React.FC = () => {
                 />
                 
                 <div className="space-y-8">
-                  <div className="grid grid-cols-2 gap-8 p-6 bg-zinc-50 rounded-2xl border border-zinc-100">
-                    <div>
-                      <p className="text-xs text-zinc-400 uppercase tracking-wider mb-1">وصلنا من السيد / السادة</p>
-                      <p className="text-lg font-bold text-zinc-900">{viewReceipt.customer_name}</p>
+                  {viewReceipt.items && viewReceipt.items.length > 0 ? (
+                    <div className="space-y-6">
+                      <div className="overflow-x-auto border border-zinc-100 rounded-2xl">
+                        <table className="w-full text-xs md:text-sm">
+                          <thead className="bg-zinc-50 border-b border-zinc-100 text-zinc-500 font-bold">
+                            <tr>
+                              <th className="px-4 py-3 text-right">النوع</th>
+                              <th className="px-4 py-3 text-right">المقبوض منه / الحساب</th>
+                              <th className="px-4 py-3 text-left">المبلغ</th>
+                              <th className="px-4 py-3 text-right">البيان التفصيلي</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-50 text-zinc-700 font-bold">
+                            {viewReceipt.items.map((item, idx) => (
+                              <tr key={idx}>
+                                <td className="px-4 py-3 font-normal text-zinc-500">
+                                  {item.type === 'customer' ? 'عميل' :
+                                   item.type === 'supplier' ? 'مورد' :
+                                   item.type === 'expense' ? 'مصروف' : 'حساب عام'}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {item.entity_name || item.entity_id || '---'}
+                                  {item.sub_account_id && ` (فرعي: ${item.sub_account_id})`}
+                                </td>
+                                <td className="px-4 py-3 text-left text-emerald-600 font-black">
+                                  {formatNumber(item.amount)} ج.م
+                                </td>
+                                <td className="px-4 py-3 text-zinc-500 font-normal">
+                                  {item.description || '---'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="flex justify-between items-center bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
+                        <span className="font-bold text-zinc-700 text-sm">إجمالي المبلغ المستلم:</span>
+                        <span className="font-black text-2xl text-emerald-600 tracking-tighter">
+                          {formatNumber(viewReceipt.amount)} ج.م
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-left">
-                      <p className="text-xs text-zinc-400 uppercase tracking-wider mb-1">المبلغ</p>
-                      <p className="text-2xl font-black text-emerald-600">{formatNumber(viewReceipt.amount)} ج.م</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-8 p-6 bg-zinc-50 rounded-2xl border border-zinc-100">
+                      <div>
+                        <p className="text-xs text-zinc-400 uppercase tracking-wider mb-1">وصلنا من السيد / السادة</p>
+                        <p className="text-lg font-bold text-zinc-900">{viewReceipt.customer_name}</p>
+                      </div>
+                      <div className="text-left">
+                        <p className="text-xs text-zinc-400 uppercase tracking-wider mb-1">المبلغ</p>
+                        <p className="text-2xl font-black text-emerald-600">{formatNumber(viewReceipt.amount)} ج.م</p>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="space-y-4">
-                    <div className="flex justify-between py-3 border-b border-zinc-100">
-                      <span className="text-zinc-500">وذلك عن:</span>
-                      <span className="font-bold text-zinc-900">{viewReceipt.description || '---'}</span>
-                    </div>
+                    {(!viewReceipt.items || viewReceipt.items.length === 0) && (
+                      <div className="flex justify-between py-3 border-b border-zinc-100">
+                        <span className="text-zinc-500">وذلك عن:</span>
+                        <span className="font-bold text-zinc-900">{viewReceipt.description || '---'}</span>
+                      </div>
+                    )}
+                    {viewReceipt.items && viewReceipt.items.length > 0 && viewReceipt.description && (
+                      <div className="flex justify-between py-3 border-b border-zinc-100">
+                        <span className="text-zinc-500">البيان العام:</span>
+                        <span className="font-bold text-zinc-900">{viewReceipt.description}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between py-3 border-b border-zinc-100">
                       <span className="text-zinc-500">طريقة السداد:</span>
                       <span className="font-bold text-zinc-900">{viewReceipt.payment_method_name || '---'}</span>

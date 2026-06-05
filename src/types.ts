@@ -346,11 +346,24 @@ export interface InvoiceItem {
   image_url?: string;
 }
 
+export interface ReceiptVoucherItem {
+  type: 'customer' | 'supplier' | 'expense' | 'account';
+  entity_id: string;
+  entity_name?: string;
+  amount: number;
+  description?: string;
+  sub_account_id?: string;
+}
+
 export interface ReceiptVoucher {
   id: string;
-  customer_id: string;
+  customer_id?: string;
   customer_name?: string;
+  supplier_id?: string;
+  supplier_name?: string;
   voucher_number?: string;
+  internal_reference?: string;
+  manual_reference?: string;
   date: string;
   amount: number;
   description: string;
@@ -359,6 +372,8 @@ export interface ReceiptVoucher {
   account_id?: string;
   company_id: string;
   entry_number?: string;
+  items?: ReceiptVoucherItem[];
+  voucher_type?: string;
 }
 
 export interface PaymentVoucherItem {
