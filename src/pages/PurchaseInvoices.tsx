@@ -301,7 +301,7 @@ export const PurchaseInvoices: React.FC = () => {
         v.items.forEach((item: any) => {
           if (item.settlements && Array.isArray(item.settlements)) {
             item.settlements.forEach((s: any) => {
-              if (s.target_id === inv.id) {
+              if (String(s.target_id) === String(inv.id)) {
                 voucherSettlements.push({
                   id: `${v.id}-${s.target_id}`,
                   date: v.date,
@@ -324,7 +324,7 @@ export const PurchaseInvoices: React.FC = () => {
         v.items.forEach((item: any) => {
           if (item.settlements && Array.isArray(item.settlements)) {
             item.settlements.forEach((s: any) => {
-              if (s.target_id === inv.id) {
+              if (String(s.target_id) === String(inv.id)) {
                 voucherSettlements.push({
                   id: `${v.id}-${s.target_id}`,
                   date: v.date,
@@ -369,7 +369,7 @@ export const PurchaseInvoices: React.FC = () => {
     // Manual JEs
     const jeSettlements: any[] = [];
     entries.forEach(je => {
-      if (je.reference_id === inv.id || je.reference_number === inv.invoice_number) {
+      if (String(je.reference_id) === String(inv.id) || je.reference_number === inv.invoice_number) {
         return;
       }
       
@@ -417,7 +417,7 @@ export const PurchaseInvoices: React.FC = () => {
       // Extract the voucher id from the composite id
       // The id was built as `${v.id}-${s.target_id}` where s.target_id = inv.id
       // So voucher id = everything before the last "-" + inv.id part
-      const voucherId = vs.id.replace(`-${inv.id}`, '');
+      const voucherId = vs.id.replace(`-${String(inv.id)}`, '');
       countedVoucherIds.add(voucherId);
     });
 
@@ -3007,6 +3007,60 @@ export const PurchaseInvoices: React.FC = () => {
                         })()}
                       </section>
                     )}
+
+                    {/* Existing Settlements for Editing Invoice */}
+                    {editingInvoice && (() => {
+                      const existingSettlements = getInvoiceSettlements(editingInvoice);
+                      if (existingSettlements.length === 0) return null;
+                      
+                      return (
+                        <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-4 mt-8">
+                          <div className="flex items-center gap-2 text-emerald-600 border-b border-zinc-100 pb-4">
+                            <Layers className="w-5 h-5" />
+                            <h2 className="font-semibold text-zinc-900">
+                              {language === 'ar' ? 'التسويات المرتبطة بالفاتورة' : 'Settlements Linked to Invoice'}
+                            </h2>
+                          </div>
+                          
+                          <div className="overflow-x-auto">
+                            <table className={`w-full text-sm ${dir === 'rtl' ? 'text-right' : 'text-left'} border-collapse`}>
+                              <thead>
+                                <tr className="border-b border-zinc-100 text-zinc-400 text-xs font-bold uppercase tracking-wider">
+                                  <th className="pb-2 text-right">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                                  <th className="pb-2 text-right">{language === 'ar' ? 'نوع الحركة' : 'Transaction Type'}</th>
+                                  <th className="pb-2 text-right">{language === 'ar' ? 'رقم الحركة / المرجع' : 'Reference / Doc No'}</th>
+                                  <th className="pb-2 text-right">{language === 'ar' ? 'الملاحظات' : 'Notes'}</th>
+                                  <th className="pb-2 text-left">{language === 'ar' ? 'المبلغ المسوى' : 'Settled Amount'}</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-zinc-50 text-zinc-700 font-bold">
+                                {existingSettlements.map((s: any) => (
+                                  <tr key={s.id} className="hover:bg-zinc-50/50 transition-colors">
+                                    <td className="py-2.5 font-mono text-xs">{formatDate(s.date)}</td>
+                                    <td className="py-2.5 text-zinc-500 font-semibold">{s.type_label}</td>
+                                    <td className="py-2.5 font-mono text-emerald-600 font-black">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          closeModal();
+                                          setPendingViewDoc({ type: s.page_name === 'journal_entries' ? 'journal' : s.page_name === 'receipts' ? 'receipt' : s.page_name, idOrNumber: s.number });
+                                          setCurrentPage(s.page_name);
+                                        }}
+                                        className="hover:underline text-emerald-600 font-mono font-black"
+                                      >
+                                        {s.number}
+                                      </button>
+                                    </td>
+                                    <td className="py-2.5 text-zinc-500 font-medium max-w-xs truncate" title={s.notes}>{s.notes || '-'}</td>
+                                    <td className="py-2.5 text-left text-emerald-600 font-black">{formatNumber(s.amount)} {t('invoices.currency')}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </section>
+                      );
+                    })()}
 
                     <div className="pt-6 flex gap-4 sticky bottom-0 bg-white/80 backdrop-blur-md pb-4 md:pb-0 z-20 border-t border-slate-100">
                       <button 
