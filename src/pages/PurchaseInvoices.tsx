@@ -408,19 +408,39 @@ export const PurchaseInvoices: React.FC = () => {
       });
     });
 
-    // Invoice-side settlements
+    // Invoice-side settlements (only add those not already found from voucher side)
     const invoiceSideSettlements: any[] = [];
+    // Track which voucher original IDs have already been counted from voucherSettlements
+    // voucherSettlements id format: "${voucherId}-${inv.id}"
+    const countedVoucherIds = new Set<string>();
+    voucherSettlements.forEach(vs => {
+      // Extract the voucher id from the composite id
+      // The id was built as `${v.id}-${s.target_id}` where s.target_id = inv.id
+      // So voucher id = everything before the last "-" + inv.id part
+      const voucherId = vs.id.replace(`-${inv.id}`, '');
+      countedVoucherIds.add(voucherId);
+    });
+
     if (inv.settlements && Array.isArray(inv.settlements)) {
       inv.settlements.forEach((s: any) => {
-        invoiceSideSettlements.push({
-          id: `${inv.id}-${s.target_id}`,
-          date: s.settlement_date || s.date || inv.date,
-          type_label: s.type_label || 'تسوية',
-          number: s.settlement_number || s.reference_number || s.target_id,
-          page_name: s.type || 'receipts',
-          amount: Number(s.settled_amount || s.amount) || 0,
-          notes: s.notes || ''
-        });
+        // s.target_id is the voucher reference like "REC_ID-0" or "PAY_ID-0"
+        // Check if the voucher original_id (without -idx) was already counted
+        // target_id format: "${voucherId}-${idx}" 
+        const parts = (s.target_id || '').split('-');
+        const voucherOriginalId = parts.length > 1 ? parts.slice(0, -1).join('-') : s.target_id;
+        const alreadyCounted = countedVoucherIds.has(voucherOriginalId) || countedVoucherIds.has(s.target_id);
+
+        if (!alreadyCounted) {
+          invoiceSideSettlements.push({
+            id: `${inv.id}-${s.target_id}`,
+            date: s.settlement_date || s.date || inv.date,
+            type_label: s.type_label || 'تسوية',
+            number: s.settlement_number || s.reference_number || s.target_id,
+            page_name: s.type || 'receipts',
+            amount: Number(s.settled_amount || s.amount) || 0,
+            notes: s.notes || ''
+          });
+        }
       });
     }
 
@@ -566,7 +586,7 @@ export const PurchaseInvoices: React.FC = () => {
       if (v.items && Array.isArray(v.items)) {
         v.items.forEach((item: any, idx: number) => {
           if (item.supplier_id === supplierId || (item.type === 'supplier' && item.entity_id === supplierId)) {
-            const voucherSettled = (item.settlements || []).reduce((sum: number, s: any) => sum + Number(s.settled_amount || s.amount || 0), 0);
+            const voucherSettled = (item.settlements || []).filter((s: any) => !editingInvoice || s.target_id !== editingInvoice.id).reduce((sum: number, s: any) => sum + Number(s.settled_amount || s.amount || 0), 0);
             const invoiceSettled = getSettlementsForTarget(`${v.id}-${idx}`, editingInvoice?.id);
             const totalSettled = voucherSettled + invoiceSettled;
             const originalAmount = Number(item.amount) || 0;
