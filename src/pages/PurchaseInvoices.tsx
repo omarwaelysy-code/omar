@@ -2584,7 +2584,7 @@ export const PurchaseInvoices: React.FC = () => {
                           );
                         })()}
                       </section>
-                    )
+                    )}
 
                     <div className="pt-6 flex gap-4 sticky bottom-0 bg-white/80 backdrop-blur-md pb-4 md:pb-0 z-20 border-t border-slate-100">
                       <button 
