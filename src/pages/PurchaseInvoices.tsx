@@ -140,6 +140,9 @@ export const PurchaseInvoices: React.FC = () => {
   const [formSettlementNumber, setFormSettlementNumber] = useState<string>('');
   const [formSettlementDate, setFormSettlementDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [formSettlements, setFormSettlements] = useState<any[]>([]);
+  const [rowSettlementDates, setRowSettlementDates] = useState<Record<string, string>>({});
+  const [allInvoices, setAllInvoices] = useState<any[]>([]);
+  const [allPurchaseInvoices, setAllPurchaseInvoices] = useState<any[]>([]);
   
   // Invoice State
   const [invoiceData, setInvoiceData] = useState({
@@ -190,6 +193,8 @@ export const PurchaseInvoices: React.FC = () => {
       const unsubPayments = dbService.subscribe<any>('payment_vouchers', user.company_id, setAllPayments);
       const unsubReturns = dbService.subscribe<any>('returns', user.company_id, setAllReturns);
       const unsubPR = dbService.subscribe<any>('purchase_returns', user.company_id, setAllPurchaseReturns);
+      const unsubAllInvoices = dbService.subscribe<any>('invoices', user.company_id, setAllInvoices);
+      const unsubAllPurchaseInvoices = dbService.subscribe<any>('purchase_invoices', user.company_id, setAllPurchaseInvoices);
       
       const fetchSettings = async () => {
         const docs = await dbService.getDocsByFilter<any>('settings', user.company_id, [
@@ -228,16 +233,11 @@ export const PurchaseInvoices: React.FC = () => {
         unsubPayments();
         unsubReturns();
         unsubPR();
+        unsubAllInvoices();
+        unsubAllPurchaseInvoices();
       };
     }
   }, [user, page, limit, sortBy, sortOrder, searchTerm]);
-
-  useEffect(() => {
-    if (isModalOpen && !formSettlementNumber && invoiceData.supplier_id) {
-      const serial = generateSettlementSerial(formSettlementDate || invoiceData.date, allReceipts, allPayments);
-      setFormSettlementNumber(serial);
-    }
-  }, [isModalOpen, invoiceData.supplier_id, formSettlementDate, invoiceData.date]);
 
   useEffect(() => {
     if (isProductModalOpen) {
@@ -381,7 +381,7 @@ export const PurchaseInvoices: React.FC = () => {
       const jeDescMatches = je.description?.toLowerCase().includes(inv.invoice_number.toLowerCase()) ||
                             je.reference_number?.toLowerCase().includes(inv.invoice_number.toLowerCase());
                             
-      je.items?.forEach((item: any) => {
+      je.items?.forEach((item: any, idx: number) => {
         const isCorrectAccount = inv.customer_id 
           ? item.customer_id === inv.customer_id
           : item.supplier_id === inv.supplier_id;
@@ -395,7 +395,7 @@ export const PurchaseInvoices: React.FC = () => {
           
           if (isSettlingLine && (jeDescMatches || lineDescMatches)) {
             jeSettlements.push({
-              id: `${je.id}-${item.account_id}`,
+              id: `${je.id}-${idx}`,
               date: je.date,
               type_label: 'قيد يومية',
               number: je.entry_number || je.id.slice(0, 8),
@@ -488,10 +488,72 @@ export const PurchaseInvoices: React.FC = () => {
 
     checkVoucherItems(allReceiptsList);
     checkVoucherItems(allPaymentsList);
-    checkInvoices(purchaseInvoices);
+    checkInvoices(allInvoices);
+    checkInvoices(allPurchaseInvoices);
 
     const nextSeq = (maxSeq + 1).toString().padStart(6, '0');
     return `${prefix}-${nextSeq}`;
+  };
+
+  const getSettlementsForTarget = (targetId: string, excludeInvoiceId?: string) => {
+    let settledSum = 0;
+    
+    const sumInvoiceSettlements = (invoicesList: any[]) => {
+      invoicesList.forEach(inv => {
+        if (excludeInvoiceId && inv.id === excludeInvoiceId) return;
+        if (inv.settlements && Array.isArray(inv.settlements)) {
+          inv.settlements.forEach((s: any) => {
+            if (s.target_id === targetId) {
+              settledSum += Number(s.settled_amount) || 0;
+            }
+          });
+        }
+      });
+    };
+    
+    const sumVoucherSettlements = (vouchersList: any[]) => {
+      vouchersList.forEach(v => {
+        if (v.items && Array.isArray(v.items)) {
+          v.items.forEach(item => {
+            if (item.settlements && Array.isArray(item.settlements)) {
+              item.settlements.forEach((s: any) => {
+                if (s.target_id === targetId) {
+                  settledSum += Number(s.settled_amount) || 0;
+                }
+              });
+            }
+          });
+        }
+      });
+    };
+
+    sumInvoiceSettlements(allInvoices);
+    sumInvoiceSettlements(allPurchaseInvoices);
+    sumVoucherSettlements(allReceipts);
+    sumVoucherSettlements(allPayments);
+
+    return settledSum;
+  };
+
+  const handleRowDateChange = (targetTx: any, newDate: string) => {
+    const newDates = {
+      ...rowSettlementDates,
+      [targetTx.id]: newDate
+    };
+    setRowSettlementDates(newDates);
+
+    const settlements = [...formSettlements];
+    const existingIdx = settlements.findIndex(s => s.target_id === targetTx.id);
+    if (existingIdx > -1) {
+      const currentS = settlements[existingIdx];
+      const serial = generateSettlementSerial(newDate, allReceipts, allPayments);
+      settlements[existingIdx] = {
+        ...currentS,
+        settlement_date: newDate,
+        settlement_number: serial
+      };
+      setFormSettlements(settlements);
+    }
   };
 
   const getOppositeMovements = (supplierId: string) => {
@@ -505,18 +567,7 @@ export const PurchaseInvoices: React.FC = () => {
         v.items.forEach((item: any, idx: number) => {
           if (item.supplier_id === supplierId || (item.type === 'supplier' && item.entity_id === supplierId)) {
             const voucherSettled = (item.settlements || []).reduce((sum: number, s: any) => sum + Number(s.settled_amount || s.amount || 0), 0);
-            
-            let invoiceSettled = 0;
-            purchaseInvoices.forEach(inv => {
-              if (inv.id !== editingInvoice?.id && inv.settlements && Array.isArray(inv.settlements)) {
-                inv.settlements.forEach((s: any) => {
-                  if (s.target_id === `${v.id}-${idx}`) {
-                    invoiceSettled += Number(s.settled_amount || s.amount || 0);
-                  }
-                });
-              }
-            });
-
+            const invoiceSettled = getSettlementsForTarget(`${v.id}-${idx}`, editingInvoice?.id);
             const totalSettled = voucherSettled + invoiceSettled;
             const originalAmount = Number(item.amount) || 0;
             const openAmount = originalAmount - totalSettled;
@@ -543,17 +594,7 @@ export const PurchaseInvoices: React.FC = () => {
     // 2. Purchase Returns
     allPurchaseReturns.forEach(r => {
       if (r.supplier_id === supplierId) {
-        let invoiceSettled = 0;
-        purchaseInvoices.forEach(inv => {
-          if (inv.id !== editingInvoice?.id && inv.settlements && Array.isArray(inv.settlements)) {
-            inv.settlements.forEach((s: any) => {
-              if (s.target_id === r.id) {
-                invoiceSettled += Number(s.settled_amount || s.amount || 0);
-              }
-            });
-          }
-        });
-
+        const invoiceSettled = getSettlementsForTarget(r.id, editingInvoice?.id);
         const originalAmount = Number(r.total_amount) || 0;
         const openAmount = originalAmount - invoiceSettled;
 
@@ -584,18 +625,7 @@ export const PurchaseInvoices: React.FC = () => {
       je.items?.forEach((item: any, idx: number) => {
         if (item.supplier_id === supplierId && Number(item.debit) > 0) {
           const originalAmount = Number(item.debit) || 0;
-          
-          let invoiceSettled = 0;
-          purchaseInvoices.forEach(inv => {
-            if (inv.id !== editingInvoice?.id && inv.settlements && Array.isArray(inv.settlements)) {
-              inv.settlements.forEach((s: any) => {
-                if (s.target_id === `${je.id}-${idx}`) {
-                  invoiceSettled += Number(s.settled_amount || s.amount || 0);
-                }
-              });
-            }
-          });
-
+          const invoiceSettled = getSettlementsForTarget(`${je.id}-${idx}`, editingInvoice?.id);
           const openAmount = originalAmount - invoiceSettled;
 
           if (openAmount > 0.01 || formSettlements.some(fs => fs.target_id === `${je.id}-${idx}`)) {
@@ -622,12 +652,20 @@ export const PurchaseInvoices: React.FC = () => {
   const handleSettlementChange = (targetTx: any, amount: number) => {
     const settlements = [...formSettlements];
     const existingIdx = settlements.findIndex(s => s.target_id === targetTx.id);
+    const rowDate = rowSettlementDates[targetTx.id] || invoiceData.date.slice(0, 10);
 
     if (amount <= 0) {
       if (existingIdx > -1) {
         settlements.splice(existingIdx, 1);
       }
     } else {
+      let settlementNum = '';
+      if (existingIdx > -1) {
+        settlementNum = settlements[existingIdx].settlement_number || generateSettlementSerial(rowDate, allReceipts, allPayments);
+      } else {
+        settlementNum = generateSettlementSerial(rowDate, allReceipts, allPayments);
+      }
+
       const settlementObj = {
         target_id: targetTx.id,
         settled_amount: amount,
@@ -637,15 +675,12 @@ export const PurchaseInvoices: React.FC = () => {
         type_label: targetTx.type_label,
         date: targetTx.date,
         original_amount: targetTx.original_amount,
-        settlement_number: formSettlementNumber || generateSettlementSerial(formSettlementDate || invoiceData.date, allReceipts, allPayments),
-        settlement_date: formSettlementDate || invoiceData.date
+        settlement_number: settlementNum,
+        settlement_date: rowDate
       };
 
       if (existingIdx > -1) {
-        settlements[existingIdx] = {
-          ...settlements[existingIdx],
-          ...settlementObj
-        };
+        settlements[existingIdx] = settlementObj;
       } else {
         settlements.push(settlementObj);
       }
@@ -1378,8 +1413,8 @@ export const PurchaseInvoices: React.FC = () => {
       }));
 
       const data = {
-        settlement_number: formSettlementNumber || null,
-        settlement_date: formSettlementDate || null,
+        settlement_number: null,
+        settlement_date: null,
         settlements: formSettlements,
         invoice_number,
         supplier_id: invoiceData.supplier_id,
@@ -1621,6 +1656,15 @@ export const PurchaseInvoices: React.FC = () => {
         setFormSettlementNumber(fullData.settlement_number || '');
         setFormSettlementDate(fullData.settlement_date ? fullData.settlement_date.slice(0, 10) : (fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10)));
         setFormSettlements(fullData.settlements || []);
+        const datesDict: Record<string, string> = {};
+        if (fullData.settlements && Array.isArray(fullData.settlements)) {
+          fullData.settlements.forEach((s: any) => {
+            if (s.target_id) {
+              datesDict[s.target_id] = s.settlement_date || s.date || fullData.date.slice(0, 10);
+            }
+          });
+        }
+        setRowSettlementDates(datesDict);
         isInitialLoad.current = true;
         console.log('[EDIT] Form updated with purchase invoice:', fullData.id);
       } catch (error: any) {
@@ -1634,6 +1678,7 @@ export const PurchaseInvoices: React.FC = () => {
       setFormSettlementNumber('');
       setFormSettlementDate(newDate);
       setFormSettlements([]);
+      setRowSettlementDates({});
       setInvoiceData({
         supplier_id: '',
         warehouse_id: '',
@@ -1745,6 +1790,7 @@ export const PurchaseInvoices: React.FC = () => {
     setFormSettlementNumber('');
     setFormSettlementDate(new Date().toISOString().slice(0, 10));
     setFormSettlements([]);
+    setRowSettlementDates({});
     setSelectedOrderIds([]);
     setPendingOrders([]);
   };
@@ -2791,24 +2837,6 @@ export const PurchaseInvoices: React.FC = () => {
                             </h2>
                           </div>
                           <div className="flex flex-wrap items-center gap-4 text-xs font-bold font-mono">
-                            <div className="flex items-center gap-2">
-                              <span className="text-zinc-400 font-sans">{language === 'ar' ? 'رقم التسوية:' : 'Settlement No:'}</span>
-                              <input 
-                                disabled 
-                                type="text" 
-                                className="w-48 bg-zinc-50 border border-zinc-200 rounded-lg px-2 py-1 text-center text-zinc-500 font-mono text-xs"
-                                value={formSettlementNumber}
-                              />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-zinc-400 font-sans">{language === 'ar' ? 'تاريخ التسوية:' : 'Settlement Date:'}</span>
-                              <input 
-                                type="date" 
-                                className="bg-zinc-50 border border-zinc-200 rounded-lg px-2 py-1 text-center text-zinc-700 text-xs"
-                                value={formSettlementDate}
-                                onChange={(e) => setFormSettlementDate(e.target.value)}
-                              />
-                            </div>
                             <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 text-xs font-sans">
                               <span>{language === 'ar' ? 'إجمالي المسوى:' : 'Total Settled:'}</span>
                               <span>{formatNumber(formSettlements.reduce((sum, s) => sum + Number(s.settled_amount), 0))} {companyData?.settings?.currency || ''}</span>
@@ -2838,6 +2866,8 @@ export const PurchaseInvoices: React.FC = () => {
                                     <th className="pb-2 text-right">{language === 'ar' ? 'نوع الحركة' : 'Type'}</th>
                                     <th className="pb-2 text-right">{language === 'ar' ? 'رقم الحركة / المرجع' : 'Ref No'}</th>
                                     <th className="pb-2 text-right">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                                    <th className="pb-2 text-right">{language === 'ar' ? 'رقم التسوية' : 'Settlement No'}</th>
+                                    <th className="pb-2 text-right">{language === 'ar' ? 'تاريخ التسوية' : 'Settlement Date'}</th>
                                     <th className="pb-2 text-right">{language === 'ar' ? 'المبلغ الأصلي' : 'Original Amt'}</th>
                                     <th className="pb-2 text-right">{language === 'ar' ? 'المبلغ المفتوح' : 'Open Amt'}</th>
                                     <th className="pb-2 text-center w-24">{language === 'ar' ? 'تسوية كاملة' : 'Full Settle'}</th>
@@ -2890,6 +2920,23 @@ export const PurchaseInvoices: React.FC = () => {
                                           </button>
                                         </td>
                                         <td className="py-2.5 text-zinc-400 font-normal font-mono">{formatDate(t.date)}</td>
+                                        <td className="py-2.5">
+                                          <input
+                                            disabled
+                                            type="text"
+                                            className="w-36 bg-zinc-50 border border-zinc-200 rounded-lg px-2 py-1 text-center text-zinc-500 font-mono text-xs font-black"
+                                            value={settlement?.settlement_number || ''}
+                                            placeholder="-"
+                                          />
+                                        </td>
+                                        <td className="py-2.5">
+                                          <input
+                                            type="date"
+                                            className="w-36 bg-white border border-zinc-200 rounded-lg px-2 py-1 text-center text-zinc-700 text-xs font-bold focus:ring-1 focus:ring-emerald-500"
+                                            value={rowSettlementDates[t.id] || invoiceData.date.slice(0, 10)}
+                                            onChange={(e) => handleRowDateChange(t, e.target.value)}
+                                          />
+                                        </td>
                                         <td className="py-2.5 text-zinc-500 font-semibold">{formatNumber(t.original_amount)}</td>
                                         <td className="py-2.5 text-zinc-900 font-black">{formatNumber(t.open_amount)}</td>
                                         <td className="py-2.5 text-center">

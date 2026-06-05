@@ -118,6 +118,9 @@ export const Receipts: React.FC = () => {
   const [allInvoices, setAllInvoices] = useState<any[]>([]);
   const [allPayments, setAllPayments] = useState<any[]>([]);
   const [allJournalEntries, setAllJournalEntries] = useState<any[]>([]);
+  const [allPurchaseInvoices, setAllPurchaseInvoices] = useState<any[]>([]);
+  const [allReturns, setAllReturns] = useState<any[]>([]);
+  const [allPurchaseReturns, setAllPurchaseReturns] = useState<any[]>([]);
 
   const generateSettlementSerial = (dateStr: string, allReceiptsList: any[], allPaymentsList: any[]) => {
     const dateParts = dateStr.slice(0, 10).split('-');
@@ -164,13 +167,9 @@ export const Receipts: React.FC = () => {
     const transactions: any[] = [];
     
     // Invoices / Purchase Invoices
-    const relevantInvoices = allInvoices.filter(inv => {
-      if (entityType === 'customer') {
-        return inv.customer_id === entityId && inv.payment_type === 'credit';
-      } else {
-        return inv.supplier_id === entityId && inv.payment_type === 'credit';
-      }
-    });
+    const relevantInvoices = entityType === 'customer'
+      ? allInvoices.filter(inv => inv.customer_id === entityId && inv.payment_type === 'credit')
+      : allPurchaseInvoices.filter(inv => inv.supplier_id === entityId && inv.payment_type === 'credit');
     
     relevantInvoices.forEach(inv => {
       transactions.push({
@@ -210,7 +209,7 @@ export const Receipts: React.FC = () => {
         return;
       }
       
-      je.items?.forEach((item: any) => {
+      je.items?.forEach((item: any, idx: number) => {
         const matchesEntity = entityType === 'customer'
           ? item.customer_id === entityId
           : item.supplier_id === entityId;
@@ -222,7 +221,7 @@ export const Receipts: React.FC = () => {
             
           if (isTargetLine) {
             transactions.push({
-              id: `${je.id}-${item.account_id}`,
+              id: `${je.id}-${idx}`,
               date: je.date,
               type: 'journal',
               type_label: 'قيد يدوي',
@@ -236,7 +235,7 @@ export const Receipts: React.FC = () => {
       });
     });
     
-    // Subtract settlements from other vouchers
+    // Subtract settlements from other vouchers and invoices
     const getSettlementsForTarget = (targetId: string) => {
       let settledSum = 0;
       
@@ -257,15 +256,118 @@ export const Receipts: React.FC = () => {
           }
         });
       };
+
+      const sumInvoiceSettlements = (invoicesList: any[]) => {
+        invoicesList.forEach(inv => {
+          if (inv.settlements && Array.isArray(inv.settlements)) {
+            inv.settlements.forEach((s: any) => {
+              if (s.target_id === targetId) {
+                settledSum += Number(s.settled_amount) || 0;
+              }
+            });
+          }
+        });
+      };
       
       sumVoucherSettlements(receipts);
       sumVoucherSettlements(allPayments);
+      sumInvoiceSettlements(allInvoices);
+      sumInvoiceSettlements(allPurchaseInvoices);
       
       return settledSum;
     };
+
+    const getInvoiceSettledAmount = (inv: any, entityType: 'customer' | 'supplier') => {
+      let settled = 0;
+      const targetId = inv.id;
+
+      const sumVoucherSettlements = (vouchersList: any[]) => {
+        vouchersList.forEach(v => {
+          if (editingReceipt && v.id === editingReceipt.id) return;
+          if (v.items && Array.isArray(v.items)) {
+            v.items.forEach(item => {
+              if (item.settlements && Array.isArray(item.settlements)) {
+                item.settlements.forEach((s: any) => {
+                  if (s.target_id === targetId) {
+                    settled += Number(s.settled_amount) || 0;
+                  }
+                });
+              }
+            });
+          }
+        });
+      };
+      sumVoucherSettlements(receipts);
+      sumVoucherSettlements(allPayments);
+      
+      const returnsList = entityType === 'customer' ? allReturns : allPurchaseReturns;
+      returnsList.forEach(r => {
+        const descMatches = r.description?.toLowerCase().includes(inv.invoice_number.toLowerCase()) ||
+                            r.notes?.toLowerCase().includes(inv.invoice_number.toLowerCase()) ||
+                            r.return_number?.toLowerCase().includes(inv.invoice_number.toLowerCase());
+        
+        const isCorrectEntity = entityType === 'customer'
+          ? r.customer_id === inv.customer_id 
+          : r.supplier_id === inv.supplier_id;
+          
+        if (descMatches && isCorrectEntity) {
+          settled += Number(r.total_amount) || 0;
+        }
+      });
+
+      allJournalEntries.forEach(je => {
+        if (je.reference_id === inv.id || je.reference_number === inv.invoice_number) {
+          return;
+        }
+        
+        const standardTypes = ['invoice', 'purchase_invoice', 'receipt', 'payment', 'return', 'purchase_return', 'opening_balance', 'receipt_voucher', 'payment_voucher'];
+        if (je.reference_type && standardTypes.includes(je.reference_type)) {
+          return;
+        }
+
+        const jeDescMatches = je.description?.toLowerCase().includes(inv.invoice_number.toLowerCase()) ||
+                              je.reference_number?.toLowerCase().includes(inv.invoice_number.toLowerCase());
+                              
+        je.items?.forEach((item: any) => {
+          const isCorrectAccount = entityType === 'customer'
+            ? item.customer_id === inv.customer_id
+            : item.supplier_id === inv.supplier_id;
+            
+          if (isCorrectAccount) {
+            const isSettlingLine = entityType === 'customer'
+              ? (Number(item.credit) > 0)
+              : (Number(item.debit) > 0);
+              
+            const lineDescMatches = item.description?.toLowerCase().includes(inv.invoice_number.toLowerCase());
+            
+            if (isSettlingLine && (jeDescMatches || lineDescMatches)) {
+              settled += entityType === 'customer' ? Number(item.credit) : Number(item.debit);
+            }
+          }
+        });
+      });
+
+      if (inv.settlements && Array.isArray(inv.settlements)) {
+        inv.settlements.forEach((s: any) => {
+          settled += Number(s.settled_amount) || 0;
+        });
+      }
+
+      return settled;
+    };
     
     transactions.forEach(t => {
-      const settledAmount = getSettlementsForTarget(t.id);
+      let settledAmount = 0;
+      if (t.type === 'invoice' || t.type === 'purchase_invoice') {
+        const invObj = t.type === 'invoice'
+          ? allInvoices.find(i => i.id === t.id)
+          : allPurchaseInvoices.find(i => i.id === t.id);
+        if (invObj) {
+          settledAmount = getInvoiceSettledAmount(invObj, entityType);
+        }
+      } else {
+        settledAmount = getSettlementsForTarget(t.id);
+      }
       t.open_amount = Math.max(0, t.original_amount - settledAmount);
     });
     
@@ -364,6 +466,9 @@ export const Receipts: React.FC = () => {
       const unsubInvoices = dbService.subscribe<any>('invoices', user.company_id, setAllInvoices);
       const unsubPayments = dbService.subscribe<any>('payment_vouchers', user.company_id, setAllPayments);
       const unsubJournalEntries = dbService.subscribe<any>('journal_entries', user.company_id, setAllJournalEntries);
+      const unsubPurchaseInvoices = dbService.subscribe<any>('purchase_invoices', user.company_id, setAllPurchaseInvoices);
+      const unsubReturns = dbService.subscribe<any>('returns', user.company_id, setAllReturns);
+      const unsubPR = dbService.subscribe<any>('purchase_returns', user.company_id, setAllPurchaseReturns);
       
       const fetchCompany = async () => {
         try {
@@ -386,6 +491,9 @@ export const Receipts: React.FC = () => {
         unsubInvoices();
         unsubPayments();
         unsubJournalEntries();
+        unsubPurchaseInvoices();
+        unsubReturns();
+        unsubPR();
       };
     }
   }, [user, page, limit, sortBy, sortOrder, searchTerm]);
