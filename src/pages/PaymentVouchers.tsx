@@ -187,6 +187,28 @@ export const PaymentVouchers: React.FC = () => {
     return `${prefix}-${nextSeq}`;
   };
 
+  const getInvoiceSideSettledAmount = (voucherId: string | undefined, itemIdx: number) => {
+    if (!voucherId) return 0;
+    let sum = 0;
+    const targetId = `${voucherId}-${itemIdx}`;
+    
+    const sumFromList = (list: any[]) => {
+      list.forEach(inv => {
+        if (inv.settlements && Array.isArray(inv.settlements)) {
+          inv.settlements.forEach((s: any) => {
+            if (String(s.target_id) === String(targetId)) {
+              sum += Number(s.settled_amount || s.amount) || 0;
+            }
+          });
+        }
+      });
+    };
+    
+    sumFromList(allInvoices);
+    sumFromList(allPurchaseInvoices);
+    return sum;
+  };
+
   const calculateOpenAmounts = (
     entity: any,
     entityType: 'customer' | 'supplier'
@@ -896,7 +918,7 @@ export const PaymentVouchers: React.FC = () => {
     for (let i = 0; i < voucherData.items.length; i++) {
       const item = voucherData.items[i];
       if ((item.type === 'customer' || item.type === 'supplier') && item.entity_id) {
-        const totalSettled = (item.settlements || []).reduce((sum: number, s: any) => sum + Number(s.settled_amount), 0);
+        const totalSettled = (item.settlements || []).reduce((sum: number, s: any) => sum + Number(s.settled_amount), 0) + getInvoiceSideSettledAmount(editingVoucher?.id, i);
         if (totalSettled > item.amount) {
           showNotification('التسوية أكبر من المبلغ الإجمالي', 'error');
           return;
@@ -2106,7 +2128,8 @@ export const PaymentVouchers: React.FC = () => {
                                               />
                                             </div>
                                             {(() => {
-                                              const totalSettled = (item.settlements || []).reduce((sum: number, s: any) => sum + Number(s.settled_amount), 0);
+                                              const invoiceSideAmount = getInvoiceSideSettledAmount(editingVoucher?.id, idx);
+                                              const totalSettled = (item.settlements || []).reduce((sum: number, s: any) => sum + Number(s.settled_amount), 0) + invoiceSideAmount;
                                               const difference = (item.amount || 0) - totalSettled;
                                               return (
                                                 <div className="flex flex-wrap items-center gap-4 text-xs font-bold">
@@ -2153,6 +2176,13 @@ export const PaymentVouchers: React.FC = () => {
                                                     const settlement = (item.settlements || []).find((s: any) => s.target_id === t.id);
                                                     const settledAmount = settlement ? Number(settlement.settled_amount) : 0;
                                                     const isFullySettled = Math.abs(settledAmount - t.open_amount) < 0.01;
+
+                                                    const invoiceSideAmount = getInvoiceSideSettledAmount(editingVoucher?.id, idx);
+                                                    const otherSettledSum = (item.settlements || []).filter((s: any) => s.target_id !== t.id).reduce((sum: number, s: any) => sum + Number(s.settled_amount), 0);
+                                                    const remainingVoucherAmount = Math.max(0, (item.amount || 0) - invoiceSideAmount - otherSettledSum);
+                                                    const maxAllocation = Math.min(remainingVoucherAmount, t.open_amount);
+                                                    const isVoucherAmountSettled = settledAmount > 0 && Math.abs(settledAmount - maxAllocation) < 0.01;
+                                                    const maxAllowed = Math.max(0, Math.min(t.open_amount, remainingVoucherAmount));
 
                                                     return (
                                                       <tr key={t.id} className="hover:bg-zinc-50/50 transition-colors">
@@ -2221,6 +2251,7 @@ export const PaymentVouchers: React.FC = () => {
                                                           <input
                                                             type="checkbox"
                                                             className="w-4 h-4 rounded border-zinc-350 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                                            disabled={remainingVoucherAmount < t.open_amount && !isFullySettled}
                                                             checked={isFullySettled}
                                                             onChange={(e) => {
                                                               const checked = e.target.checked;
@@ -2229,24 +2260,16 @@ export const PaymentVouchers: React.FC = () => {
                                                           />
                                                         </td>
                                                         <td className="py-2.5 text-center">
-                                                          {(() => {
-                                                            const otherSettledSum = (item.settlements || []).filter((s: any) => s.target_id !== t.id).reduce((sum: number, s: any) => sum + Number(s.settled_amount), 0);
-                                                            const remainingVoucherAmount = Math.max(0, (item.amount || 0) - otherSettledSum);
-                                                            const maxAllocation = Math.min(remainingVoucherAmount, t.open_amount);
-                                                            const isVoucherAmountSettled = settledAmount > 0 && Math.abs(settledAmount - maxAllocation) < 0.01;
-                                                            return (
-                                                              <input
-                                                                type="checkbox"
-                                                                className="w-4 h-4 rounded border-zinc-350 text-blue-650 focus:ring-blue-500 cursor-pointer"
-                                                                disabled={maxAllocation <= 0 && settledAmount === 0}
-                                                                checked={isVoucherAmountSettled}
-                                                                onChange={(e) => {
-                                                                  const checked = e.target.checked;
-                                                                  handleSettlementChange(idx, t, checked ? maxAllocation : 0);
-                                                                }}
-                                                              />
-                                                            );
-                                                          })()}
+                                                          <input
+                                                            type="checkbox"
+                                                            className="w-4 h-4 rounded border-zinc-350 text-blue-650 focus:ring-blue-500 cursor-pointer"
+                                                            disabled={maxAllocation <= 0 && settledAmount === 0}
+                                                            checked={isVoucherAmountSettled}
+                                                            onChange={(e) => {
+                                                              const checked = e.target.checked;
+                                                              handleSettlementChange(idx, t, checked ? maxAllocation : 0);
+                                                            }}
+                                                          />
                                                         </td>
                                                         <td className="py-2.5 text-center">
                                                           <input
@@ -2255,10 +2278,10 @@ export const PaymentVouchers: React.FC = () => {
                                                             className="w-full px-2 py-1 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-black text-center text-emerald-600 outline-none focus:ring-2 focus:ring-emerald-500"
                                                             placeholder="0"
                                                             value={settledAmount || ''}
-                                                            max={t.open_amount}
+                                                            max={maxAllowed}
                                                             onChange={(e) => {
                                                               const val = Number(e.target.value);
-                                                              const cappedVal = Math.min(Math.max(0, val), t.open_amount);
+                                                              const cappedVal = Math.min(Math.max(0, val), maxAllowed);
                                                               handleSettlementChange(idx, t, cappedVal);
                                                             }}
                                                           />
