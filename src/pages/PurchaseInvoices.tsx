@@ -373,7 +373,8 @@ export const PurchaseInvoices: React.FC = () => {
         return;
       }
       
-      if (je.reference_type === 'receipt_voucher' || je.reference_type === 'payment_voucher') {
+      const standardTypes = ['invoice', 'purchase_invoice', 'receipt', 'payment', 'return', 'purchase_return', 'opening_balance', 'receipt_voucher', 'payment_voucher'];
+      if (je.reference_type && standardTypes.includes(je.reference_type)) {
         return;
       }
 
@@ -581,7 +582,8 @@ export const PurchaseInvoices: React.FC = () => {
 
     // 3. Manual JEs
     entries.forEach(je => {
-      if (je.reference_type === 'invoice' || je.reference_type === 'receipt_voucher' || je.reference_type === 'payment_voucher') {
+      const standardTypes = ['invoice', 'purchase_invoice', 'receipt', 'payment', 'return', 'purchase_return', 'opening_balance', 'receipt_voucher', 'payment_voucher'];
+      if (je.reference_type && standardTypes.includes(je.reference_type)) {
         return;
       }
       

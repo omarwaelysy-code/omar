@@ -75,6 +75,7 @@ export const VoucherItemSchema = z.object({
   entity_name: z.string().optional(),
   amount: z.coerce.number().default(0),
   description: z.string().optional(),
+  settlements: z.array(z.any()).optional(),
 });
 
 export const VoucherSchema = BaseSchema.extend({
