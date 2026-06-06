@@ -211,6 +211,55 @@ export const PaymentVouchers: React.FC = () => {
     return sum;
   };
 
+  const getUniqueSettlementsForVoucherItem = (item: any, idx: number) => {
+    const uniqueMap = new Map<string, any>();
+
+    // 1. Add voucher side settlements
+    if (item.settlements && Array.isArray(item.settlements)) {
+      item.settlements.forEach((s: any) => {
+        uniqueMap.set(s.target_id, {
+          target_id: s.target_id,
+          settled_amount: Number(s.settled_amount) || 0,
+          settlement_number: s.settlement_number || '',
+          settlement_date: s.settlement_date || '',
+          type_label: s.type_label || '',
+          reference_number: s.reference_number || ''
+        });
+      });
+    }
+
+    // 2. Add invoice side settlements
+    if (editingVoucher) {
+      const targetId = `${editingVoucher.id}-${idx}`;
+      const sumFromList = (list: any[]) => {
+        if (!Array.isArray(list)) return;
+        list.forEach(inv => {
+          if (!inv) return;
+          if (inv.settlements && Array.isArray(inv.settlements)) {
+            inv.settlements.forEach((s: any) => {
+              if (s && String(s.target_id) === String(targetId)) {
+                if (!uniqueMap.has(inv.id)) {
+                  uniqueMap.set(inv.id, {
+                    target_id: inv.id,
+                    settled_amount: Number(s.settled_amount || s.amount) || 0,
+                    settlement_number: s.settlement_number || '',
+                    settlement_date: s.settlement_date || s.date || '',
+                    type_label: 'فاتورة مشتريات',
+                    reference_number: inv.invoice_number || ''
+                  });
+                }
+              }
+            });
+          }
+        });
+      };
+      sumFromList(allInvoices);
+      sumFromList(allPurchaseInvoices);
+    }
+
+    return Array.from(uniqueMap.values());
+  };
+
   const calculateOpenAmounts = (
     entity: any,
     entityType: 'customer' | 'supplier'
@@ -404,6 +453,11 @@ export const PaymentVouchers: React.FC = () => {
 
       if (inv.settlements && Array.isArray(inv.settlements)) {
         inv.settlements.forEach((s: any) => {
+          const parts = (s.target_id || '').split('-');
+          const voucherOriginalId = parts.length > 1 ? parts.slice(0, -1).join('-') : s.target_id;
+          if (editingVoucher && String(voucherOriginalId) === String(editingVoucher.id)) {
+            return;
+          }
           const alreadyCounted = countedVoucherItemIds.has(s.target_id);
           if (!alreadyCounted) {
             settled += Number(s.settled_amount || s.amount) || 0;
@@ -930,7 +984,8 @@ export const PaymentVouchers: React.FC = () => {
     for (let i = 0; i < voucherData.items.length; i++) {
       const item = voucherData.items[i];
       if ((item.type === 'customer' || item.type === 'supplier') && item.entity_id) {
-        const totalSettled = (item.settlements || []).reduce((sum: number, s: any) => sum + Number(s.settled_amount), 0) + getInvoiceSideSettledAmount(editingVoucher?.id, i);
+        const uniqueSettlements = getUniqueSettlementsForVoucherItem(item, i);
+        const totalSettled = uniqueSettlements.reduce((sum: number, s: any) => sum + s.settled_amount, 0);
         if (totalSettled > item.amount) {
           showNotification('التسوية أكبر من المبلغ الإجمالي', 'error');
           return;
@@ -2271,8 +2326,8 @@ export const PaymentVouchers: React.FC = () => {
                                               />
                                             </div>
                                             {(() => {
-                                              const invoiceSideAmount = getInvoiceSideSettledAmount(editingVoucher?.id, idx);
-                                              const totalSettled = (item.settlements || []).reduce((sum: number, s: any) => sum + Number(s.settled_amount), 0) + invoiceSideAmount;
+                                              const uniqueSettlements = getUniqueSettlementsForVoucherItem(item, idx);
+                                              const totalSettled = uniqueSettlements.reduce((sum: number, s: any) => sum + Number(s.settled_amount), 0);
                                               const difference = (item.amount || 0) - totalSettled;
                                               return (
                                                 <div className="flex flex-wrap items-center gap-4 text-xs font-bold">
@@ -2316,13 +2371,13 @@ export const PaymentVouchers: React.FC = () => {
                                                 </thead>
                                                 <tbody className="divide-y divide-zinc-50 text-zinc-700 font-bold">
                                                   {openTransactions.map((t) => {
-                                                    const settlement = (item.settlements || []).find((s: any) => s.target_id === t.id);
+                                                    const uniqueSettlements = getUniqueSettlementsForVoucherItem(item, idx);
+                                                    const settlement = uniqueSettlements.find((s: any) => s.target_id === t.id);
                                                     const settledAmount = settlement ? Number(settlement.settled_amount) : 0;
                                                     const isFullySettled = Math.abs(settledAmount - t.open_amount) < 0.01;
 
-                                                    const invoiceSideAmount = getInvoiceSideSettledAmount(editingVoucher?.id, idx);
-                                                    const otherSettledSum = (item.settlements || []).filter((s: any) => s.target_id !== t.id).reduce((sum: number, s: any) => sum + Number(s.settled_amount), 0);
-                                                    const remainingVoucherAmount = Math.max(0, (item.amount || 0) - invoiceSideAmount - otherSettledSum);
+                                                    const otherSettledSum = uniqueSettlements.filter((s: any) => s.target_id !== t.id).reduce((sum: number, s: any) => sum + s.settled_amount, 0);
+                                                    const remainingVoucherAmount = Math.max(0, (item.amount || 0) - otherSettledSum);
                                                     const maxAllocation = Math.min(remainingVoucherAmount, t.open_amount);
                                                     const isVoucherAmountSettled = settledAmount > 0 && Math.abs(settledAmount - maxAllocation) < 0.01;
                                                     const maxAllowed = Math.max(0, Math.min(t.open_amount, remainingVoucherAmount));
