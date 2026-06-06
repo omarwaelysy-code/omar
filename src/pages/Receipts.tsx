@@ -326,16 +326,18 @@ export const Receipts: React.FC = () => {
     const getInvoiceSettledAmount = (inv: any, entityType: 'customer' | 'supplier') => {
       let settled = 0;
       const targetId = inv.id;
+      const countedVoucherItemIds = new Set<string>();
 
       const sumVoucherSettlements = (vouchersList: any[]) => {
         vouchersList.forEach(v => {
           if (editingReceipt && v.id === editingReceipt.id) return;
           if (v.items && Array.isArray(v.items)) {
-            v.items.forEach(item => {
+            v.items.forEach((item, idx) => {
               if (item.settlements && Array.isArray(item.settlements)) {
                 item.settlements.forEach((s: any) => {
                   if (s.target_id === targetId) {
                     settled += Number(s.settled_amount) || 0;
+                    countedVoucherItemIds.add(`${v.id}-${idx}`);
                   }
                 });
               }
@@ -395,7 +397,10 @@ export const Receipts: React.FC = () => {
 
       if (inv.settlements && Array.isArray(inv.settlements)) {
         inv.settlements.forEach((s: any) => {
-          settled += Number(s.settled_amount) || 0;
+          const alreadyCounted = countedVoucherItemIds.has(s.target_id);
+          if (!alreadyCounted) {
+            settled += Number(s.settled_amount || s.amount) || 0;
+          }
         });
       }
 
@@ -1000,9 +1005,11 @@ export const Receipts: React.FC = () => {
         created_by: user.id
       };
 
+      let savedVoucherId = editingReceipt ? editingReceipt.id : '';
+
       if (editingReceipt) {
         await dbService.deleteJournalEntryByReference(editingReceipt.id, user.company_id);
-        await TransactionManager.updateWithAccounting(
+        const res = await TransactionManager.updateWithAccounting(
           'receipt_vouchers',
           editingReceipt.id,
           receiptData,
@@ -1010,14 +1017,143 @@ export const Receipts: React.FC = () => {
           journalEntryData,
           JournalEntrySchema
         );
+        savedVoucherId = res.mainId;
       } else {
-        await TransactionManager.saveWithAccounting(
+        const res = await TransactionManager.saveWithAccounting(
           'receipt_vouchers',
           receiptData,
           VoucherSchema,
           journalEntryData,
           JournalEntrySchema
         );
+        savedVoucherId = res.mainId;
+      }
+
+      // === TWO-WAY SYNC: Update invoices with voucher-side settlements ===
+      if (savedVoucherId) {
+        try {
+          // Group settlements by invoice (s.target_id)
+          const invoiceUpdates = new Map<string, { collection: string; settlements: any[] }>();
+          
+          voucherData.items.forEach((item, itemIdx) => {
+            if (item.settlements && Array.isArray(item.settlements)) {
+              item.settlements.forEach((s: any) => {
+                if (s.type === 'invoice' || s.type === 'purchase_invoice') {
+                  const collection = s.type === 'invoice' ? 'invoices' : 'purchase_invoices';
+                  const invoiceId = s.target_id;
+                  const key = `${collection}:${invoiceId}`;
+                  if (!invoiceUpdates.has(key)) {
+                    invoiceUpdates.set(key, { collection, settlements: [] });
+                  }
+                  invoiceUpdates.get(key)!.settlements.push({
+                    ...s,
+                    itemIdx,
+                    originalItemAmount: Number(item.amount) || 0
+                  });
+                }
+              });
+            }
+          });
+
+          // Update each invoice
+          for (const [key, { collection, settlements }] of invoiceUpdates) {
+            const invoiceId = key.split(':')[1];
+            try {
+              const invoice = await dbService.get<any>(collection, invoiceId);
+              if (!invoice) continue;
+
+              const existingSettlements = [...(invoice.settlements || [])];
+              let changed = false;
+
+              for (const s of settlements) {
+                const itemIdx = s.itemIdx;
+                const targetId = `${savedVoucherId}-${itemIdx}`;
+
+                // Find existing settlement for this voucher item
+                const existingIdx = existingSettlements.findIndex(
+                  (es: any) => es.target_id === targetId
+                );
+
+                // Build the settlement object for the invoice side
+                const invoiceSideSettlement = {
+                  target_id: targetId,
+                  settled_amount: Number(s.settled_amount) || 0,
+                  reference_number: receipt_number,
+                  entry_number: journalEntryData.reference_number || '',
+                  type: 'receipts',
+                  type_label: 'سند قبض',
+                  date: voucherData.date,
+                  original_amount: s.originalItemAmount,
+                  settlement_number: s.settlement_number || '',
+                  settlement_date: s.settlement_date || voucherData.date.slice(0, 10)
+                };
+
+                if (existingIdx > -1) {
+                  existingSettlements[existingIdx] = invoiceSideSettlement;
+                } else {
+                  existingSettlements.push(invoiceSideSettlement);
+                }
+                changed = true;
+              }
+
+              if (changed) {
+                await dbService.update(collection, invoiceId, { ...invoice, settlements: existingSettlements });
+              }
+            } catch (syncErr) {
+              console.error(`[SYNC] Failed to update invoice ${invoiceId}:`, syncErr);
+            }
+          }
+        } catch (syncErr) {
+          console.error('[SYNC] Invoice settlement sync failed:', syncErr);
+        }
+      }
+
+      // Handle removed settlements (when editing) - remove from invoices
+      if (editingReceipt && editingReceipt.items) {
+        const oldSettlements: any[] = [];
+        editingReceipt.items.forEach((item, itemIdx) => {
+          if (item.settlements && Array.isArray(item.settlements)) {
+            item.settlements.forEach((s: any) => {
+              oldSettlements.push({ ...s, itemIdx });
+            });
+          }
+        });
+
+        const newTargetIds = new Set();
+        voucherData.items.forEach((item, itemIdx) => {
+          if (item.settlements && Array.isArray(item.settlements)) {
+            item.settlements.forEach((s: any) => {
+              newTargetIds.add(`${s.target_id}-${itemIdx}`);
+            });
+          }
+        });
+
+        const removedSettlements = oldSettlements.filter(
+          (s: any) => !newTargetIds.has(`${s.target_id}-${s.itemIdx}`)
+        );
+
+        for (const removed of removedSettlements) {
+          try {
+            const invoiceId = removed.target_id;
+            const collection = removed.type === 'invoice' ? 'invoices' : 
+                               removed.type === 'purchase_invoice' ? 'purchase_invoices' : null;
+            if (!collection) continue;
+
+            const invoice = await dbService.get<any>(collection, invoiceId);
+            if (!invoice || !invoice.settlements) continue;
+
+            const targetId = `${editingReceipt.id}-${removed.itemIdx}`;
+            const updatedSettlements = invoice.settlements.filter(
+              (es: any) => es.target_id !== targetId
+            );
+
+            if (updatedSettlements.length !== invoice.settlements.length) {
+              await dbService.update(collection, invoiceId, { ...invoice, settlements: updatedSettlements });
+            }
+          } catch (syncErr) {
+            console.error('[SYNC] Failed to remove settlement from invoice:', syncErr);
+          }
+        }
       }
 
       showNotification(editingReceipt ? 'تم تحديث سند القبض بنجاح' : 'تم إضافة سند القبض بنجاح', 'success');

@@ -543,6 +543,30 @@ export const Invoices: React.FC = () => {
     }
   };
 
+  const getInvoiceSideSettlementsForVoucherItem = (targetId: string, excludeInvoiceId?: string) => {
+    const results: { invoiceId: string; amount: number }[] = [];
+    
+    const checkList = (invoicesList: any[]) => {
+      invoicesList.forEach(inv => {
+        if (excludeInvoiceId && inv.id === excludeInvoiceId) return;
+        if (inv.settlements && Array.isArray(inv.settlements)) {
+          inv.settlements.forEach((s: any) => {
+            if (s.target_id === targetId) {
+              results.push({
+                invoiceId: inv.id,
+                amount: Number(s.settled_amount || s.amount) || 0
+              });
+            }
+          });
+        }
+      });
+    };
+
+    checkList(allInvoices);
+    checkList(allPurchaseInvoices);
+    return results;
+  };
+
   const getOppositeMovements = (customerId: string) => {
     if (!customerId) return [];
 
@@ -553,9 +577,25 @@ export const Invoices: React.FC = () => {
       if (v.items && Array.isArray(v.items)) {
         v.items.forEach((item: any, idx: number) => {
           if (item.customer_id === customerId || (item.type === 'customer' && item.entity_id === customerId)) {
-            const voucherSettled = (item.settlements || []).filter((s: any) => !editingInvoice || s.target_id !== editingInvoice.id).reduce((sum: number, s: any) => sum + Number(s.settled_amount || s.amount || 0), 0);
-            const invoiceSettled = getSettlementsForTarget(`${v.id}-${idx}`, editingInvoice?.id);
-            const totalSettled = voucherSettled + invoiceSettled;
+            const countedInvoiceIds = new Set<string>();
+            let totalSettled = 0;
+
+            if (item.settlements && Array.isArray(item.settlements)) {
+              item.settlements.forEach((s: any) => {
+                if (!editingInvoice || s.target_id !== editingInvoice.id) {
+                  totalSettled += Number(s.settled_amount || s.amount || 0);
+                  countedInvoiceIds.add(s.target_id);
+                }
+              });
+            }
+
+            const invoiceSettlements = getInvoiceSideSettlementsForVoucherItem(`${v.id}-${idx}`, editingInvoice?.id);
+            invoiceSettlements.forEach((s: any) => {
+              if (!countedInvoiceIds.has(s.invoiceId)) {
+                totalSettled += s.amount;
+              }
+            });
+
             const originalAmount = Number(item.amount) || 0;
             const openAmount = originalAmount - totalSettled;
 
