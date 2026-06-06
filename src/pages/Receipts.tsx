@@ -343,7 +343,7 @@ export const Receipts: React.FC = () => {
           }
         });
       };
-      sumVoucherSettlements(receipts);
+      sumVoucherSettlements(allReceipts);
       sumVoucherSettlements(allPayments);
       
       const returnsList = entityType === 'customer' ? allReturns : allPurchaseReturns;

@@ -639,7 +639,11 @@ export const Invoices: React.FC = () => {
   const handleSettlementChange = (targetTx: any, amount: number) => {
     const settlements = [...formSettlements];
     const existingIdx = settlements.findIndex(s => s.target_id === targetTx.id);
-    const rowDate = rowSettlementDates[targetTx.id] || date.slice(0, 10);
+    // Default settlement date = the LATER of invoice date and transaction date
+    const invoiceDate = date.slice(0, 10);
+    const txDate = (targetTx.date || '').slice(0, 10);
+    const defaultDate = txDate && txDate > invoiceDate ? txDate : invoiceDate;
+    const rowDate = rowSettlementDates[targetTx.id] || defaultDate;
 
     if (amount <= 0) {
       if (existingIdx > -1) {
@@ -1345,6 +1349,142 @@ export const Invoices: React.FC = () => {
           journalEntryData,
           JournalEntrySchema
         );
+      }
+
+      // === TWO-WAY SYNC: Update receipt/payment vouchers with invoice-side settlements ===
+      const savedInvoiceId = editingInvoice ? editingInvoice.id : (await dbService.list<any>('invoices', { company_id: user.company_id, invoice_number: invoiceNumber }))?.[0]?.id;
+      
+      if (savedInvoiceId && formSettlements.length > 0) {
+        try {
+          // Group settlements by voucher (original_id)
+          const voucherUpdates = new Map<string, { collection: string; settlements: any[] }>();
+          
+          for (const settlement of formSettlements) {
+            // target_id format: "${voucherId}-${idx}" 
+            const targetId = settlement.target_id || '';
+            const parts = targetId.split('-');
+            if (parts.length < 2) continue;
+            
+            const itemIdx = parseInt(parts[parts.length - 1], 10);
+            const originalVoucherId = parts.slice(0, -1).join('-');
+            
+            if (isNaN(itemIdx)) continue;
+            
+            // Determine collection based on settlement type
+            const collection = settlement.type === 'receipts' ? 'receipt_vouchers' : 
+                              settlement.type === 'payment_vouchers' ? 'payment_vouchers' : null;
+            if (!collection) continue;
+            
+            const key = `${collection}:${originalVoucherId}`;
+            if (!voucherUpdates.has(key)) {
+              voucherUpdates.set(key, { collection, settlements: [] });
+            }
+            voucherUpdates.get(key)!.settlements.push({
+              ...settlement,
+              itemIdx,
+              invoiceId: savedInvoiceId
+            });
+          }
+          
+          // Update each voucher
+          for (const [key, { collection, settlements }] of voucherUpdates) {
+            const voucherId = key.split(':')[1];
+            try {
+              const voucher = await dbService.get<any>(collection, voucherId);
+              if (!voucher || !voucher.items) continue;
+              
+              const updatedItems = [...voucher.items];
+              let changed = false;
+              
+              for (const s of settlements) {
+                const itemIdx = s.itemIdx;
+                if (itemIdx >= updatedItems.length) continue;
+                
+                const item = { ...updatedItems[itemIdx] };
+                const existingSettlements = [...(item.settlements || [])];
+                
+                // Find existing settlement for this invoice
+                const existingIdx = existingSettlements.findIndex(
+                  (es: any) => es.target_id === savedInvoiceId
+                );
+                
+                // Build the settlement object for the voucher side
+                const voucherSideSettlement = {
+                  target_id: savedInvoiceId,
+                  settled_amount: Number(s.settled_amount) || 0,
+                  reference_number: invoiceNumber,
+                  type: 'invoice',
+                  type_label: 'فاتورة مبيعات',
+                  date: date,
+                  original_amount: items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) - (Number(discount) || 0),
+                  settlement_number: s.settlement_number || '',
+                  settlement_date: s.settlement_date || date.slice(0, 10)
+                };
+                
+                if (existingIdx > -1) {
+                  existingSettlements[existingIdx] = voucherSideSettlement;
+                } else {
+                  existingSettlements.push(voucherSideSettlement);
+                }
+                
+                item.settlements = existingSettlements;
+                updatedItems[itemIdx] = item;
+                changed = true;
+              }
+              
+              if (changed) {
+                await dbService.update(collection, voucherId, { ...voucher, items: updatedItems });
+              }
+            } catch (syncErr) {
+              console.error(`[SYNC] Failed to update voucher ${voucherId}:`, syncErr);
+            }
+          }
+        } catch (syncErr) {
+          console.error('[SYNC] Settlement sync failed:', syncErr);
+        }
+      }
+      
+      // Handle removed settlements (when editing) - remove from vouchers
+      if (editingInvoice && editingInvoice.settlements) {
+        const oldSettlements = editingInvoice.settlements || [];
+        const newTargetIds = new Set(formSettlements.map((s: any) => s.target_id));
+        const removedSettlements = oldSettlements.filter((s: any) => !newTargetIds.has(s.target_id));
+        
+        for (const removed of removedSettlements) {
+          try {
+            const targetId = removed.target_id || '';
+            const parts = targetId.split('-');
+            if (parts.length < 2) continue;
+            
+            const itemIdx = parseInt(parts[parts.length - 1], 10);
+            const originalVoucherId = parts.slice(0, -1).join('-');
+            if (isNaN(itemIdx)) continue;
+            
+            const collection = removed.type === 'receipts' ? 'receipt_vouchers' : 
+                              removed.type === 'payment_vouchers' ? 'payment_vouchers' : null;
+            if (!collection) continue;
+            
+            const voucher = await dbService.get<any>(collection, originalVoucherId);
+            if (!voucher || !voucher.items || itemIdx >= voucher.items.length) continue;
+            
+            const updatedItems = [...voucher.items];
+            const item = { ...updatedItems[itemIdx] };
+            const existingSettlements = [...(item.settlements || [])];
+            
+            const existingIdx = existingSettlements.findIndex(
+              (es: any) => es.target_id === editingInvoice.id
+            );
+            
+            if (existingIdx > -1) {
+              existingSettlements.splice(existingIdx, 1);
+              item.settlements = existingSettlements;
+              updatedItems[itemIdx] = item;
+              await dbService.update(collection, originalVoucherId, { ...voucher, items: updatedItems });
+            }
+          } catch (syncErr) {
+            console.error('[SYNC] Failed to remove settlement from voucher:', syncErr);
+          }
+        }
       }
 
       closeModal();
