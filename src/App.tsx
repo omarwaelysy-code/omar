@@ -20,6 +20,8 @@ import { Returns } from './pages/Returns';
 import { PurchaseReturns } from './pages/PurchaseReturns';
 import { CustomerDiscounts } from './pages/CustomerDiscounts';
 import { SupplierDiscounts } from './pages/SupplierDiscounts';
+import { CustomerSettlements } from './pages/CustomerSettlements';
+import { SupplierSettlements } from './pages/SupplierSettlements';
 import { CashTransfers } from './pages/CashTransfers';
 import { WarehouseTransfers } from './pages/WarehouseTransfers';
 import { OpeningStockBalances } from './pages/OpeningStockBalances';
@@ -181,6 +183,8 @@ export default function App() {
       case 'purchase_returns': return <PurchaseReturns />;
       case 'customer_discounts': return <CustomerDiscounts />;
       case 'supplier_discounts': return <SupplierDiscounts />;
+      case 'customer_settlements': return <CustomerSettlements />;
+      case 'supplier_settlements': return <SupplierSettlements />;
       case 'cash_transfers': return <CashTransfers />;
       case 'warehouse_transfers': return <WarehouseTransfers />;
       case 'opening_stock_balances': return <OpeningStockBalances />;

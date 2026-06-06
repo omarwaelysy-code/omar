@@ -1052,4 +1052,6 @@ export const ar = {
   'employees.print_profile': 'طباعة ملف الموظف',
   'employees.contract_details': 'تفاصيل التعاقد',
   'employees.personal_details': 'البيانات الشخصية',
+  'nav.customer_settlements': 'تسويات العملاء',
+  'nav.supplier_settlements': 'تسويات الموردين',
 };

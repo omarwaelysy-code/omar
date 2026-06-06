@@ -1052,4 +1052,6 @@ export const en = {
   'employees.print_profile': 'Print Employee Profile',
   'employees.contract_details': 'Contract Details',
   'employees.personal_details': 'Personal Details',
+  'nav.customer_settlements': 'Customer Settlements',
+  'nav.supplier_settlements': 'Supplier Settlements',
 };
