@@ -845,6 +845,11 @@ export const Receipts: React.FC = () => {
       return;
     }
 
+    if (!voucherData.payment_method_id) {
+      showNotification('يرجى اختيار طريقة القبض', 'error');
+      return;
+    }
+
     // Validation: check if settlement sum is greater than the item amount
     for (let i = 0; i < voucherData.items.length; i++) {
       const item = voucherData.items[i];
@@ -2140,7 +2145,7 @@ export const Receipts: React.FC = () => {
                 </button>
                 <button 
                   type="submit"
-                  disabled={voucherData.items.reduce((sum, item) => sum + item.amount, 0) <= 0 || !voucherData.payment_method_id}
+                  disabled={voucherData.items.reduce((sum, item) => sum + item.amount, 0) <= 0}
                   className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-3"
                 >
                   <Save className="w-6 h-6" />
