@@ -180,6 +180,14 @@ async function startServer() {
     `).catch(e => console.warn('⚠️ Failed to restore historical WAC movements:', e.message));
 
     await runMigrations();
+
+    // Auto-backfill any missing journal entries for documents on server start
+    try {
+      const { backfillMissingJournalEntries } = await import("./src/lib/backfill.js");
+      await backfillMissingJournalEntries(pool);
+    } catch (e: any) {
+      console.error("⚠️ Failed to backfill missing journal entries:", e.message);
+    }
     
     // Auto-fix orphaned movements on startup
     console.log("🧹 Cleaning up orphaned inventory movements...");

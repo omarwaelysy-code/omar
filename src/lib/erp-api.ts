@@ -45,6 +45,9 @@ export async function syncProductsCostAndJEs(client: any, companyId: string, pro
 }
 
 const router = Router();
+
+
+
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // Helper to get remote IP safely

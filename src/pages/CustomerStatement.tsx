@@ -97,6 +97,9 @@ export const CustomerStatement: React.FC = () => {
               je.items?.forEach((item: any) => {
                 if (item.customer_id === savedCustId && item.account_id === customer?.account_id) {
                   let description = item.description || je.description || 'قيد مالي';
+                  let mappedType = je.reference_type || 'journal';
+                  if (mappedType === 'receipt') mappedType = 'receipt_voucher';
+
                   if (je.reference_type === 'invoice' && je.reference_number) {
                     const inv = invoicesMap[je.reference_number];
                     description = inv?.description || (language === 'ar' ? 'فاتورة مبيعات' : 'Sales Invoice');
@@ -111,7 +114,7 @@ export const CustomerStatement: React.FC = () => {
                   allEntries.push({
                     id: `je-${je.id}-${Math.random()}`,
                     date: je.date,
-                    type: je.reference_type || 'journal',
+                    type: mappedType,
                     reference: je.reference_number || '-',
                     description: description,
                     debit: item.debit || 0,
@@ -227,6 +230,8 @@ export const CustomerStatement: React.FC = () => {
           // This prevents double entries if customer_id was accidentally set on both sides of a transaction
           if (item.customer_id === selectedCustomerId && item.account_id === customer?.account_id) {
             let description = item.description || je.description || 'قيد مالي';
+            let mappedType = je.reference_type || 'journal';
+            if (mappedType === 'receipt') mappedType = 'receipt_voucher';
 
             if (je.reference_type === 'invoice' && je.reference_number) {
               const inv = invoicesMap[je.reference_number];
@@ -242,7 +247,7 @@ export const CustomerStatement: React.FC = () => {
             allEntries.push({
               id: `je-${je.id}-${Math.random()}`,
               date: je.date,
-              type: je.reference_type || 'journal',
+              type: mappedType,
               reference: je.reference_number || '-',
               description: description,
               debit: item.debit || 0,
@@ -475,7 +480,7 @@ export const CustomerStatement: React.FC = () => {
                           <span 
                             onClick={() => handleTransactionClick(entry.type, entry.reference)}
                             className={`px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer hover:scale-105 transition-transform inline-block ${
-                              entry.type === 'invoice' ? 'bg-emerald-50 text-emerald-600' :
+                              entry.type === 'invoice' ? (entry.credit > 0 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600') :
                               entry.type === 'receipt' ? 'bg-amber-50 text-amber-600' :
                               entry.type === 'receipt_voucher' ? 'bg-amber-50 text-amber-600' :
                               entry.type === 'return' ? 'bg-emerald-50 text-emerald-600' :
@@ -485,7 +490,7 @@ export const CustomerStatement: React.FC = () => {
                               'bg-zinc-100 text-zinc-600'
                             }`}
                           >
-                            {entry.type === 'invoice' ? 'فاتورة مبيعات' :
+                            {entry.type === 'invoice' ? (entry.credit > 0 ? 'سداد نقدي' : 'فاتورة مبيعات') :
                              entry.type === 'receipt' ? 'سند قبض' :
                              entry.type === 'receipt_voucher' ? 'سند قبض' :
                              entry.type === 'return' ? 'مرتجع مبيعات' :

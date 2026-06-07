@@ -104,11 +104,13 @@ export const SupplierStatement: React.FC = () => {
               je.items?.forEach((item: any) => {
                 if (item.supplier_id === savedSupId && item.account_id === supplier?.account_id) {
                   let notes = item.description || je.description || 'قيد مالي';
+                  let mappedType = je.reference_type || 'manual';
+                  if (mappedType === 'payment') mappedType = 'payment_voucher';
 
                   if (je.reference_type === 'purchase_invoice' && je.reference_number) {
                     const inv = invoicesMap[je.reference_number];
                     notes = inv?.description || (language === 'ar' ? 'فاتورة مشتريات' : 'Purchase Invoice');
-                  } else if (je.reference_type === 'payment_voucher' && je.reference_number) {
+                  } else if ((je.reference_type === 'payment_voucher' || je.reference_type === 'payment') && je.reference_number) {
                     const voucher = vouchersMap[je.reference_number];
                     notes = voucher?.description || (language === 'ar' ? 'سند صرف' : 'Payment Voucher');
                   } else if (je.reference_type === 'purchase_return' && je.reference_number) {
@@ -119,7 +121,7 @@ export const SupplierStatement: React.FC = () => {
                   allItems.push({
                     id: `je-${je.id}-${Math.random()}`,
                     date: je.date,
-                    type: je.reference_type || 'manual',
+                    type: mappedType,
                     reference: je.reference_number || '-',
                     debit: item.debit || 0,
                     credit: item.credit || 0,
@@ -223,11 +225,13 @@ export const SupplierStatement: React.FC = () => {
           // This prevents double entries if supplier_id was accidentally set on both sides of a transaction
           if (item.supplier_id === selectedSupplierId && item.account_id === supplier?.account_id) {
             let notes = item.description || je.description || 'قيد مالي';
+            let mappedType = je.reference_type || 'manual';
+            if (mappedType === 'payment') mappedType = 'payment_voucher';
 
             if (je.reference_type === 'purchase_invoice' && je.reference_number) {
               const inv = invoicesMap[je.reference_number];
               notes = inv?.description || (language === 'ar' ? 'فاتورة مشتريات' : 'Purchase Invoice');
-            } else if (je.reference_type === 'payment_voucher' && je.reference_number) {
+            } else if ((je.reference_type === 'payment_voucher' || je.reference_type === 'payment') && je.reference_number) {
               const voucher = vouchersMap[je.reference_number];
               notes = voucher?.description || (language === 'ar' ? 'سند صرف' : 'Payment Voucher');
             } else if (je.reference_type === 'purchase_return' && je.reference_number) {
@@ -238,7 +242,7 @@ export const SupplierStatement: React.FC = () => {
             allItems.push({
               id: `je-${je.id}-${Math.random()}`,
               date: je.date,
-              type: je.reference_type || 'manual',
+              type: mappedType,
               reference: je.reference_number || '-',
               debit: item.debit || 0,
               credit: item.credit || 0,
@@ -467,7 +471,7 @@ export const SupplierStatement: React.FC = () => {
                           <span 
                             onClick={() => handleTransactionClick(item.type, item.reference)}
                             className={`px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer hover:scale-105 transition-transform inline-block ${
-                              item.type === 'purchase_invoice' ? 'bg-emerald-50 text-emerald-600' :
+                              item.type === 'purchase_invoice' ? (item.debit > 0 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600') :
                               item.type === 'payment_voucher' ? 'bg-amber-50 text-amber-600' :
                               item.type === 'purchase_return' ? 'bg-emerald-50 text-emerald-600' :
                               item.type === 'manual' ? 'bg-blue-50 text-blue-600' :
@@ -475,7 +479,7 @@ export const SupplierStatement: React.FC = () => {
                               'bg-zinc-100 text-zinc-600'
                             }`}
                           >
-                            {item.type === 'purchase_invoice' ? 'فاتورة مشتريات' :
+                            {item.type === 'purchase_invoice' ? (item.debit > 0 ? 'سداد نقدي' : 'فاتورة مشتريات') :
                              item.type === 'payment_voucher' ? 'سند صرف' :
                              item.type === 'purchase_return' ? 'مرتجع مشتريات' :
                              item.type === 'manual' ? 'قيد يدوي' :
