@@ -167,7 +167,7 @@ export const exportToExcel = (data: any[], options: ExcelOptions) => {
   }
   
   // Write file
-  XLSX.writeFile(wb, `${filename}.xlsx`, { cellNF: true });
+  XLSX.writeFile(wb, `${filename}.xlsx`);
 };
 
 /**
