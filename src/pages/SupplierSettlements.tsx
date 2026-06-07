@@ -50,8 +50,8 @@ export const SupplierSettlements: React.FC = () => {
   // UI layout and search states
   const [layoutMode, setLayoutMode] = useState<'split' | 'unified'>('split');
   const [showFilters, setShowFilters] = useState(false);
+  const [filterSearchType, setFilterSearchType] = useState<string>('number');
   const [filterDocNumbers, setFilterDocNumbers] = useState('');
-  const [filterDates, setFilterDates] = useState('');
   const [filterFromDate, setFilterFromDate] = useState('');
   const [filterToDate, setFilterToDate] = useState('');
   const [filterTypes, setFilterTypes] = useState<string[]>([]);
@@ -454,43 +454,50 @@ export const SupplierSettlements: React.FC = () => {
   // Apply Advanced Filtering
   const applyFilters = (list: Movement[]) => {
     return list.filter(m => {
-      // 1. Bulk Doc numbers search
+      // 1. Bulk multi-search
       if (filterDocNumbers.trim()) {
-        const docList = filterDocNumbers
+        const queryList = filterDocNumbers
           .split(/[\n,;]+/)
           .map(s => s.trim().toLowerCase())
           .filter(Boolean);
-        if (docList.length > 0) {
-          const matched = docList.some(docNum => 
-            m.number.toLowerCase().includes(docNum) || 
-            (m.je_number && m.je_number.toLowerCase().includes(docNum))
-          );
+        if (queryList.length > 0) {
+          const matched = queryList.some(query => {
+            if (filterSearchType === 'number') {
+              return m.number.toLowerCase().includes(query);
+            }
+            if (filterSearchType === 'je_number') {
+              return !!(m.je_number && m.je_number.toLowerCase().includes(query));
+            }
+            if (filterSearchType === 'date') {
+              return m.date.slice(0, 10).includes(query);
+            }
+            if (filterSearchType === 'original_amount') {
+              const numVal = parseFloat(query);
+              return !isNaN(numVal) && Math.abs(m.original_amount - numVal) < 0.01;
+            }
+            if (filterSearchType === 'open_amount') {
+              const numVal = parseFloat(query);
+              return !isNaN(numVal) && Math.abs(m.open_amount - numVal) < 0.01;
+            }
+            if (filterSearchType === 'notes') {
+              return !!(m.notes && m.notes.toLowerCase().includes(query));
+            }
+            return false;
+          });
           if (!matched) return false;
         }
       }
 
-      // 2. Discrete dates (comma separated)
-      if (filterDates.trim()) {
-        const dateList = filterDates
-          .split(/[\s,;]+/)
-          .map(s => s.trim())
-          .filter(Boolean);
-        if (dateList.length > 0) {
-          const matched = dateList.some(d => m.date.slice(0, 10) === d);
-          if (!matched) return false;
-        }
-      }
-
-      // 3. Date range
+      // 2. Date range
       if (filterFromDate && m.date.slice(0, 10) < filterFromDate) return false;
       if (filterToDate && m.date.slice(0, 10) > filterToDate) return false;
 
-      // 4. Movement Type
+      // 3. Movement Type
       if (filterTypes.length > 0) {
         if (!filterTypes.includes(m.page_name)) return false;
       }
 
-      // 5. Basic search bar (searchTerm)
+      // 4. Basic search bar (searchTerm)
       if (searchTerm.trim()) {
         const query = searchTerm.toLowerCase();
         const matchesQuery = m.number.toLowerCase().includes(query) || 
@@ -505,11 +512,11 @@ export const SupplierSettlements: React.FC = () => {
 
   const processedDebitMovements = useMemo(() => {
     return applyFilters(debitMovements);
-  }, [debitMovements, filterDocNumbers, filterDates, filterFromDate, filterToDate, filterTypes, searchTerm]);
+  }, [debitMovements, filterDocNumbers, filterSearchType, filterFromDate, filterToDate, filterTypes, searchTerm]);
 
   const processedCreditMovements = useMemo(() => {
     return applyFilters(creditMovements);
-  }, [creditMovements, filterDocNumbers, filterDates, filterFromDate, filterToDate, filterTypes, searchTerm]);
+  }, [creditMovements, filterDocNumbers, filterSearchType, filterFromDate, filterToDate, filterTypes, searchTerm]);
 
   // Unified grid table array
   const unifiedMovements = useMemo(() => {
@@ -631,6 +638,10 @@ export const SupplierSettlements: React.FC = () => {
     return `${prefix}-${nextSeq}`;
   };
 
+  const autoSettlementNumber = useMemo(() => {
+    return generateSettlementSerial(settlementDate);
+  }, [settlementDate, allPurchaseInvoices, allPayments]);
+
   // Submit Save Settlement
   const handleSaveSettlement = async () => {
     if (!user) return;
@@ -645,7 +656,7 @@ export const SupplierSettlements: React.FC = () => {
     }
 
     try {
-      const settlementNumber = generateSettlementSerial(settlementDate);
+      const settlementNumber = autoSettlementNumber;
 
       // Perform FIFO matching
       const debitsToSettle = debitMovements
@@ -986,7 +997,7 @@ export const SupplierSettlements: React.FC = () => {
         <div className="space-y-6">
           {/* Supplier Selection Card */}
           <div className="bg-white p-5 rounded-3xl border border-zinc-200 shadow-sm space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
               <div>
                 <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">المورد</label>
                 <div className="relative group">
@@ -1018,6 +1029,18 @@ export const SupplierSettlements: React.FC = () => {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">رقم التسوية التلقائي</label>
+                <div className="relative group">
+                  <input 
+                    readOnly
+                    type="text" 
+                    className="w-full px-4 py-3 bg-zinc-100 border border-zinc-200 rounded-2xl font-black text-emerald-600 text-sm outline-none cursor-default"
+                    value={selectedSupplierId ? autoSettlementNumber : '-'}
+                  />
+                </div>
+              </div>
+
               {selectedSupplierId && (
                 <div>
                   <button
@@ -1043,29 +1066,39 @@ export const SupplierSettlements: React.FC = () => {
                   <div className="pt-4 border-t border-zinc-100 grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* Bulk numbers search */}
                     <div>
-                      <label className="block text-[10px] font-bold text-zinc-400 mb-1 px-1 uppercase">البحث المتعدد بالمستندات (كل سطر مستند)</label>
+                      <div className="flex items-center justify-between mb-2 px-1">
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase">البحث المتعدد</label>
+                        <select
+                          className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border-0 rounded-lg outline-none py-0.5 px-2 cursor-pointer"
+                          value={filterSearchType}
+                          onChange={(e) => setFilterSearchType(e.target.value)}
+                        >
+                          <option value="number">رقم المستند</option>
+                          <option value="je_number">رقم القيد</option>
+                          <option value="date">التاريخ (YYYY-MM-DD)</option>
+                          <option value="original_amount">المبلغ الأصلي</option>
+                          <option value="open_amount">المبلغ المتبقي</option>
+                          <option value="notes">ملاحظات / وصف</option>
+                        </select>
+                      </div>
                       <textarea
                         rows={3}
                         className="w-full p-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-xs font-mono"
-                        placeholder="PINV-2026-06-000005&#10;PAY-2026-06-000003"
+                        placeholder={
+                          filterSearchType === 'number' ? 'PINV-2026-06-000005\nPAY-2026-06-000003' :
+                          filterSearchType === 'je_number' ? 'JV-2026-0001\nJV-2026-0002' :
+                          filterSearchType === 'date' ? '2026-06-01\n2026-06-05' :
+                          filterSearchType === 'original_amount' ? '1500\n3400.50' :
+                          filterSearchType === 'open_amount' ? '500\n1000' : 'وصف أو ملاحظة القيد'
+                        }
                         value={filterDocNumbers}
                         onChange={(e) => setFilterDocNumbers(e.target.value)}
                       />
                     </div>
 
-                    {/* Discrete dates search */}
+                    {/* Date range search */}
                     <div className="space-y-4">
-                      <div>
-                        <label className="block text-[10px] font-bold text-zinc-400 mb-1 px-1 uppercase">تواريخ متفرقة (مفصولة بفاصلة)</label>
-                        <input
-                          type="text"
-                          className="w-full p-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
-                          placeholder="2026-06-01, 2026-06-05"
-                          value={filterDates}
-                          onChange={(e) => setFilterDates(e.target.value)}
-                        />
-                      </div>
-
+                      <label className="block text-[10px] font-bold text-zinc-400 mb-1 px-1 uppercase">البحث بنطاق تاريخى</label>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="block text-[9px] font-bold text-zinc-400 mb-1">من تاريخ</label>
@@ -1114,7 +1147,7 @@ export const SupplierSettlements: React.FC = () => {
                       <button
                         onClick={() => {
                           setFilterDocNumbers('');
-                          setFilterDates('');
+                          setFilterSearchType('number');
                           setFilterFromDate('');
                           setFilterToDate('');
                           setFilterTypes([]);
