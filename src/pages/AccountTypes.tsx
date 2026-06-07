@@ -7,10 +7,12 @@ import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { parseAccountType, parseAccountTypesBulk } from '../services/geminiService';
 import { useViewPreference } from '../hooks/useViewPreference';
+import { useNavigation } from '../contexts/NavigationContext';
 
 export const AccountTypes: React.FC = () => {
   const { user } = useAuth();
   const { showNotification } = useNotification();
+  const { pendingAccountTypeEditId, setPendingAccountTypeEditId } = useNavigation();
   const [view, setView] = useViewPreference('account_types', 'card');
   const [types, setTypes] = useState<AccountType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +40,16 @@ export const AccountTypes: React.FC = () => {
       return () => unsub();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (pendingAccountTypeEditId && types.length > 0) {
+      const type = types.find(t => t.id === pendingAccountTypeEditId);
+      if (type) {
+        openModal(type);
+      }
+      setPendingAccountTypeEditId(null);
+    }
+  }, [pendingAccountTypeEditId, types, setPendingAccountTypeEditId]);
 
   const handleAiParse = async () => {
     if (!aiText.trim()) return;

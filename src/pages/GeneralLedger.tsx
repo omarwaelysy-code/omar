@@ -67,6 +67,19 @@ export const GeneralLedger: React.FC = () => {
   });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+  const { pendingLedgerParams, setPendingLedgerParams } = useNavigation();
+
+  useEffect(() => {
+    if (pendingLedgerParams) {
+      setSelectedAccountId(pendingLedgerParams.accountId);
+      setDateRange({
+        start: pendingLedgerParams.startDate,
+        end: pendingLedgerParams.endDate
+      });
+      setPendingLedgerParams(null);
+    }
+  }, [pendingLedgerParams, setPendingLedgerParams]);
+
   useEffect(() => {
     if (!user) return;
 

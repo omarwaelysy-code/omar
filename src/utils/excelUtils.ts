@@ -8,6 +8,37 @@ interface ExcelOptions {
 const EXCEL_CELL_LIMIT = 32760; // Slightly under 32767 for safety
 
 /**
+ * Tries to parse a string representation of a number to a number type,
+ * while preserving codes with leading zeros, dates, and non-numeric fields.
+ */
+const tryParseNumber = (value: any): any => {
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '') return value;
+    
+    // Check if it's a date-like string (e.g. 2026-06-05 or 05/06/2026)
+    if (/^\d{4}[-/]\d{2}[-/]\d{2}/.test(trimmed) || /^\d{2}[-/]\d{2}[-/]\d{4}/.test(trimmed)) {
+      return trimmed;
+    }
+    // Check if it has time or timezone info
+    if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/.test(trimmed)) {
+      return trimmed;
+    }
+    // Check if it's a code with leading zeros (e.g. '00123' or '05')
+    if (/^0[0-9]+/.test(trimmed) && !/^0\./.test(trimmed)) {
+      return trimmed;
+    }
+    const num = Number(trimmed);
+    if (!isNaN(num) && isFinite(num)) {
+      return num;
+    }
+  }
+  return value;
+};
+
+/**
  * Flattens a nested object into a single-level object with dot-separated keys.
  */
 const flattenObject = (obj: any, prefix = ''): Record<string, any> => {
@@ -15,7 +46,7 @@ const flattenObject = (obj: any, prefix = ''): Record<string, any> => {
   
   if (obj === null || obj === undefined) return { [prefix]: '' };
   if (typeof obj !== 'object') return { [prefix]: obj };
-  if (obj instanceof Date) return { [prefix]: obj.toISOString() };
+  if (obj instanceof Date) return { [prefix]: obj.toISOString().split('T')[0] };
 
   Object.keys(obj).forEach(key => {
     const propName = prefix ? `${prefix}.${key}` : key;
@@ -56,7 +87,7 @@ export const sanitizeForExcel = (data: any[]): any[] => {
     const flattened = flattenObject(item);
     const sanitized: any = {};
     
-    // 2. Handle long strings by splitting into multiple columns if necessary
+    // 2. Handle values, format dates, and parse numbers
     Object.keys(flattened).forEach(key => {
       let value = flattened[key];
       
@@ -65,7 +96,15 @@ export const sanitizeForExcel = (data: any[]): any[] => {
         return;
       }
 
-      // Convert to string if not already
+      // Convert ISO Date-time string to Date-only string YYYY-MM-DD
+      if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/.test(value)) {
+        value = value.substring(0, 10);
+      }
+
+      // Convert to number if it's a numeric string
+      value = tryParseNumber(value);
+
+      // Convert to string to check length limit
       let strValue = typeof value === 'string' ? value : JSON.stringify(value);
       
       if (strValue.length > EXCEL_CELL_LIMIT) {
@@ -128,7 +167,7 @@ export const exportToExcel = (data: any[], options: ExcelOptions) => {
   }
   
   // Write file
-  XLSX.writeFile(wb, `${filename}.xlsx`);
+  XLSX.writeFile(wb, `${filename}.xlsx`, { cellNF: true });
 };
 
 /**

@@ -14,11 +14,13 @@ import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { useRef } from 'react';
 import { useViewPreference } from '../hooks/useViewPreference';
+import { useNavigation } from '../contexts/NavigationContext';
 
 export const Accounts: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
+  const { setCurrentPage, setPendingAccountTypeEditId } = useNavigation();
   const [view, setView] = useViewPreference('accounts', 'card');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [types, setTypes] = useState<AccountType[]>([]);
@@ -299,7 +301,14 @@ export const Accounts: React.FC = () => {
                   <td className="px-6 py-4 font-bold text-slate-900">
                     {account.name}
                   </td>
-                  <td className="px-6 py-4 text-slate-500">
+                  <td 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPendingAccountTypeEditId(account.type_id);
+                      setCurrentPage('account_types');
+                    }}
+                    className="px-6 py-4 text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer font-bold"
+                  >
                     {account.type_name}
                   </td>
                   <td className="px-6 py-4 text-left no-pdf">
@@ -355,7 +364,14 @@ export const Accounts: React.FC = () => {
                     <h3 className="text-lg font-black text-slate-900 tracking-tight leading-tight group-hover:text-emerald-700 transition-colors">{account.name}</h3>
                     <div className={`flex items-center gap-2 mt-1.5 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                       <span className="font-mono text-[10px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md uppercase tracking-wider border border-slate-200">{account.code}</span>
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <span 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPendingAccountTypeEditId(account.type_id);
+                          setCurrentPage('account_types');
+                        }}
+                        className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md uppercase tracking-wider cursor-pointer hover:bg-emerald-100 transition-colors"
+                      >
                         {account.type_name}
                       </span>
                     </div>

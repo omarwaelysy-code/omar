@@ -17,6 +17,10 @@ interface NavigationContextType {
   resetNavigation: () => void;
   pendingViewDoc: { type: string; idOrNumber: string } | null;
   setPendingViewDoc: (doc: { type: string; idOrNumber: string } | null) => void;
+  pendingLedgerParams: { accountId: string; startDate: string; endDate: string } | null;
+  setPendingLedgerParams: (params: { accountId: string; startDate: string; endDate: string } | null) => void;
+  pendingAccountTypeEditId: string | null;
+  setPendingAccountTypeEditId: (id: string | null) => void;
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
@@ -72,6 +76,8 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [openTabs, setOpenTabs] = useState<Tab[]>([{ id: 'dashboard', label: 'لوحة التحكم' }]);
   const [activeTabId, setActiveTabId] = useState('dashboard');
   const [pendingViewDoc, setPendingViewDoc] = useState<{ type: string; idOrNumber: string } | null>(null);
+  const [pendingLedgerParams, setPendingLedgerParams] = useState<{ accountId: string; startDate: string; endDate: string } | null>(null);
+  const [pendingAccountTypeEditId, setPendingAccountTypeEditId] = useState<string | null>(null);
 
   const openTab = (id: string, label: string) => {
     setOpenTabs(prev => {
@@ -138,7 +144,11 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setActiveTab,
       resetNavigation,
       pendingViewDoc,
-      setPendingViewDoc
+      setPendingViewDoc,
+      pendingLedgerParams,
+      setPendingLedgerParams,
+      pendingAccountTypeEditId,
+      setPendingAccountTypeEditId
     }}>
       {children}
     </NavigationContext.Provider>

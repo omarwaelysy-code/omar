@@ -9,10 +9,12 @@ import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { AccountingEngine } from '../services/AccountingEngine';
 import { formatNumber } from '../utils/formatUtils';
+import { useNavigation } from '../contexts/NavigationContext';
 
 export const TrialBalance: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
+  const { setCurrentPage, setPendingLedgerParams } = useNavigation();
   const reportRef = useRef<HTMLDivElement>(null);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -196,8 +198,32 @@ export const TrialBalance: React.FC = () => {
             <tbody className="divide-y divide-zinc-100">
               {trialBalanceData.map((a) => (
                 <tr key={a.id} className="hover:bg-zinc-50/50 transition-colors">
-                  <td className={`px-6 py-4 text-sm font-bold text-zinc-500 ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.code}</td>
-                  <td className={`px-6 py-4 text-sm font-bold text-zinc-900 ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.name}</td>
+                  <td 
+                    onClick={() => {
+                      setPendingLedgerParams({
+                        accountId: a.id,
+                        startDate: dateRange.start,
+                        endDate: dateRange.end
+                      });
+                      setCurrentPage('general_ledger_report');
+                    }}
+                    className={`px-6 py-4 text-sm font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}
+                  >
+                    {a.code}
+                  </td>
+                  <td 
+                    onClick={() => {
+                      setPendingLedgerParams({
+                        accountId: a.id,
+                        startDate: dateRange.start,
+                        endDate: dateRange.end
+                      });
+                      setCurrentPage('general_ledger_report');
+                    }}
+                    className={`px-6 py-4 text-sm font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}
+                  >
+                    {a.name}
+                  </td>
                   <td className={`px-4 py-4 text-sm font-black text-emerald-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.opening.debit > 0 ? formatNumber(a.opening.debit) : '-'}</td>
                   <td className={`px-4 py-4 text-sm font-black text-emerald-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.opening.credit > 0 ? formatNumber(a.opening.credit) : '-'}</td>
                   <td className={`px-4 py-4 text-sm font-black text-emerald-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.movement.debit > 0 ? formatNumber(a.movement.debit) : '-'}</td>

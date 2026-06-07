@@ -9,10 +9,12 @@ import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { AccountingEngine } from '../services/AccountingEngine';
 import { formatNumber } from '../utils/formatUtils';
+import { useNavigation } from '../contexts/NavigationContext';
 
 export const IncomeStatement: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
+  const { setCurrentPage, setPendingLedgerParams } = useNavigation();
   const reportRef = useRef<HTMLDivElement>(null);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -152,7 +154,19 @@ export const IncomeStatement: React.FC = () => {
             <div className="p-2">
               {data.revenues.map(a => (
                 <div key={a.id} className={`flex items-center justify-between p-4 hover:bg-zinc-50 rounded-2xl transition-all ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                  <span className="font-bold text-zinc-600">{a.name}</span>
+                  <span 
+                    onClick={() => {
+                      setPendingLedgerParams({
+                        accountId: a.id,
+                        startDate: dateRange.start,
+                        endDate: dateRange.end
+                      });
+                      setCurrentPage('general_ledger_report');
+                    }}
+                    className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
+                  >
+                    {a.name}
+                  </span>
                   <span className="font-black text-zinc-900">{formatNumber(a.balance)}</span>
                 </div>
               ))}
@@ -171,7 +185,19 @@ export const IncomeStatement: React.FC = () => {
             <div className="p-2">
               {data.costs.map(a => (
                 <div key={a.id} className={`flex items-center justify-between p-4 hover:bg-zinc-50 rounded-2xl transition-all ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                  <span className="font-bold text-zinc-600">{a.name}</span>
+                  <span 
+                    onClick={() => {
+                      setPendingLedgerParams({
+                        accountId: a.id,
+                        startDate: dateRange.start,
+                        endDate: dateRange.end
+                      });
+                      setCurrentPage('general_ledger_report');
+                    }}
+                    className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
+                  >
+                    {a.name}
+                  </span>
                   <span className="font-black text-zinc-900">{formatNumber(Math.abs(a.balance))}</span>
                 </div>
               ))}
@@ -190,7 +216,19 @@ export const IncomeStatement: React.FC = () => {
             <div className="p-2">
               {data.expenses.map(a => (
                 <div key={a.id} className={`flex items-center justify-between p-4 hover:bg-zinc-50 rounded-2xl transition-all ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                  <span className="font-bold text-zinc-600">{a.name}</span>
+                  <span 
+                    onClick={() => {
+                      setPendingLedgerParams({
+                        accountId: a.id,
+                        startDate: dateRange.start,
+                        endDate: dateRange.end
+                      });
+                      setCurrentPage('general_ledger_report');
+                    }}
+                    className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
+                  >
+                    {a.name}
+                  </span>
                   <span className="font-black text-zinc-900">{formatNumber(Math.abs(a.balance))}</span>
                 </div>
               ))}

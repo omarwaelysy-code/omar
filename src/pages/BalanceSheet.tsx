@@ -8,12 +8,13 @@ import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { AccountingEngine } from '../services/AccountingEngine';
 import { formatNumber } from '../utils/formatUtils';
-
 import { useLanguage } from '../contexts/LanguageContext';
+import { useNavigation } from '../contexts/NavigationContext';
 
 export const BalanceSheet: React.FC = () => {
   const { user } = useAuth();
   const { t, dir } = useLanguage();
+  const { setCurrentPage, setPendingLedgerParams } = useNavigation();
   const reportRef = useRef<HTMLDivElement>(null);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -140,7 +141,20 @@ export const BalanceSheet: React.FC = () => {
               <div className="p-4 space-y-2">
                 {data.assets.map(a => (
                   <div key={a.id} className={`flex items-center justify-between p-4 hover:bg-emerald-50/30 rounded-2xl transition-all border border-transparent hover:border-emerald-100 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                    <span className="font-bold text-zinc-600">{a.name}</span>
+                    <span 
+                      onClick={() => {
+                        const year = new Date(asOfDate).getFullYear();
+                        setPendingLedgerParams({
+                          accountId: a.id,
+                          startDate: `${year}-01-01`,
+                          endDate: asOfDate
+                        });
+                        setCurrentPage('general_ledger_report');
+                      }}
+                      className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
+                    >
+                      {a.name}
+                    </span>
                     <span className="font-black text-zinc-900">{formatNumber(a.balance)}</span>
                   </div>
                 ))}
@@ -165,7 +179,20 @@ export const BalanceSheet: React.FC = () => {
               <div className="p-4 space-y-2">
                 {data.liabilities.map(a => (
                   <div key={a.id} className={`flex items-center justify-between p-4 hover:bg-emerald-50/30 rounded-2xl transition-all border border-transparent hover:border-emerald-100 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                    <span className="font-bold text-zinc-600">{a.name}</span>
+                    <span 
+                      onClick={() => {
+                        const year = new Date(asOfDate).getFullYear();
+                        setPendingLedgerParams({
+                          accountId: a.id,
+                          startDate: `${year}-01-01`,
+                          endDate: asOfDate
+                        });
+                        setCurrentPage('general_ledger_report');
+                      }}
+                      className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
+                    >
+                      {a.name}
+                    </span>
                     <span className="font-black text-zinc-900">{formatNumber(Math.abs(a.balance))}</span>
                   </div>
                 ))}
@@ -187,7 +214,20 @@ export const BalanceSheet: React.FC = () => {
               <div className="p-4 space-y-2">
                 {data.equity.map(a => (
                   <div key={a.id} className={`flex items-center justify-between p-4 hover:bg-blue-50/30 rounded-2xl transition-all border border-transparent hover:border-blue-100 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                    <span className="font-bold text-zinc-600">{a.name}</span>
+                    <span 
+                      onClick={() => {
+                        const year = new Date(asOfDate).getFullYear();
+                        setPendingLedgerParams({
+                          accountId: a.id,
+                          startDate: `${year}-01-01`,
+                          endDate: asOfDate
+                        });
+                        setCurrentPage('general_ledger_report');
+                      }}
+                      className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
+                    >
+                      {a.name}
+                    </span>
                     <span className="font-black text-zinc-900">{formatNumber(Math.abs(a.balance))}</span>
                   </div>
                 ))}

@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Account, AccountType } from '../types';
 import { dbService } from '../services/dbService';
-import { ChevronDown, ChevronRight, BookOpen, PieChart, Folder, FileText, BarChart3, AlertTriangle } from 'lucide-react';
+import { ChevronDown, ChevronRight, BookOpen, PieChart, Folder, FileText, BarChart3, AlertTriangle, Edit2 } from 'lucide-react';
+import { useNavigation } from '../contexts/NavigationContext';
 
 interface TreeItemProps {
-  label: string;
+  label: React.ReactNode;
   icon: React.ElementType;
   children?: React.ReactNode;
   level: number;
@@ -44,6 +45,7 @@ const TreeItem: React.FC<TreeItemProps> = ({ label, icon: Icon, children, level,
 
 export const ChartOfAccounts: React.FC = () => {
   const { user } = useAuth();
+  const { setCurrentPage, setPendingAccountTypeEditId } = useNavigation();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [types, setTypes] = useState<AccountType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -159,7 +161,27 @@ export const ChartOfAccounts: React.FC = () => {
             {classifications.filter(c => c.statement === 'balance_sheet').map(cls => (
               <TreeItem key={cls.id} label={cls.label} icon={Folder} level={0} isOpenDefault={true}>
                 {filterTypesByCls(cls.id).map(type => (
-                  <TreeItem key={type.id} label={`${type.code} - ${type.name}`} icon={Folder} level={1}>
+                  <TreeItem 
+                    key={type.id} 
+                    label={
+                      <div className="flex items-center gap-2 group/type">
+                        <span>{type.code} - {type.name}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingAccountTypeEditId(type.id);
+                            setCurrentPage('account_types');
+                          }}
+                          className="p-1 text-zinc-400 hover:text-emerald-600 rounded hover:bg-zinc-200 opacity-0 group-hover/type:opacity-100 transition-opacity"
+                          title="تعديل نوع الحساب"
+                        >
+                          <Edit2 size={12} />
+                        </button>
+                      </div>
+                    } 
+                    icon={Folder} 
+                    level={1}
+                  >
                     {renderAccountTree(null, type.id, 2)}
                   </TreeItem>
                 ))}
@@ -182,7 +204,27 @@ export const ChartOfAccounts: React.FC = () => {
             {classifications.filter(c => c.statement === 'income_statement' || c.statement === 'other').map(cls => (
               <TreeItem key={cls.id} label={cls.label} icon={Folder} level={0} isOpenDefault={true}>
                 {filterTypesByCls(cls.id).map(type => (
-                  <TreeItem key={type.id} label={`${type.code} - ${type.name}`} icon={Folder} level={1}>
+                  <TreeItem 
+                    key={type.id} 
+                    label={
+                      <div className="flex items-center gap-2 group/type">
+                        <span>{type.code} - {type.name}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingAccountTypeEditId(type.id);
+                            setCurrentPage('account_types');
+                          }}
+                          className="p-1 text-zinc-400 hover:text-emerald-600 rounded hover:bg-zinc-200 opacity-0 group-hover/type:opacity-100 transition-opacity"
+                          title="تعديل نوع الحساب"
+                        >
+                          <Edit2 size={12} />
+                        </button>
+                      </div>
+                    } 
+                    icon={Folder} 
+                    level={1}
+                  >
                     {renderAccountTree(null, type.id, 2)}
                   </TreeItem>
                 ))}
