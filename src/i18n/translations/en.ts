@@ -1054,4 +1054,10 @@ export const en = {
   'employees.personal_details': 'Personal Details',
   'nav.customer_settlements': 'Customer Settlements',
   'nav.supplier_settlements': 'Supplier Settlements',
+  'settlements.unified_layout': 'Unified Table View',
+  'settlements.split_layout': 'Split Table View',
+  'settlements.movement_type': 'Movement Type',
+  'settlements.advanced_search': 'Advanced Filters & Search',
+  'settlements.bulk_doc_placeholder': 'Paste list of docs here (one per line or comma separated)...',
+  'settlements.discrete_dates': 'Discrete dates (e.g. 2026-06-01, 2026-06-05)...',
 };

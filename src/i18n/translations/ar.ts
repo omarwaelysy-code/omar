@@ -1054,4 +1054,10 @@ export const ar = {
   'employees.personal_details': 'البيانات الشخصية',
   'nav.customer_settlements': 'تسويات العملاء',
   'nav.supplier_settlements': 'تسويات الموردين',
+  'settlements.unified_layout': 'عرض الجدول الموحد',
+  'settlements.split_layout': 'عرض الجداول المنفصلة',
+  'settlements.movement_type': 'نوع الحركة',
+  'settlements.advanced_search': 'تصفية وبحث متقدم',
+  'settlements.bulk_doc_placeholder': 'الصق قائمة المستندات هنا (مستند في كل سطر أو مفصولة بفاصلة)...',
+  'settlements.discrete_dates': 'تواريخ متفرقة (مثال: 2026-06-01, 2026-06-05)...',
 };

@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
-import { Supplier, Account, JournalEntry } from '../types';
-import { Search, Trash2, X, Layers, Truck, Calendar, RotateCcw, ChevronDown, Check, AlertCircle, Info, ArrowLeftRight } from 'lucide-react';
+import { Supplier, Account } from '../types';
+import { Search, Trash2, X, Layers, Truck, Calendar, ChevronDown, Check, Info, LayoutGrid, SlidersHorizontal, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
+import { useNavigation } from '../contexts/NavigationContext';
 import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 
 interface Movement {
@@ -27,6 +28,7 @@ export const SupplierSettlements: React.FC = () => {
   const { user } = useAuth();
   const { showNotification } = useNotification();
   const { t, dir, language } = useLanguage();
+  const { setCurrentPage, setPendingViewDoc } = useNavigation();
 
   // Database states
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -44,6 +46,15 @@ export const SupplierSettlements: React.FC = () => {
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
   const [settlementDate, setSettlementDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [searchTerm, setSearchTerm] = useState<string>('');
+
+  // UI layout and search states
+  const [layoutMode, setLayoutMode] = useState<'split' | 'unified'>('split');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterDocNumbers, setFilterDocNumbers] = useState('');
+  const [filterDates, setFilterDates] = useState('');
+  const [filterFromDate, setFilterFromDate] = useState('');
+  const [filterToDate, setFilterToDate] = useState('');
+  const [filterTypes, setFilterTypes] = useState<string[]>([]);
 
   // Movements state
   const [debitMovements, setDebitMovements] = useState<Movement[]>([]);
@@ -225,6 +236,37 @@ export const SupplierSettlements: React.FC = () => {
     });
 
     return settledSum;
+  };
+
+  // Clickable badge navigation to document details
+  const navigateToDoc = (pageName: string, docId: string) => {
+    let pageId = pageName;
+    let docType = pageName;
+    if (pageName === 'receipts' || pageName === 'receipt_vouchers') {
+      pageId = 'receipts';
+      docType = 'receipt';
+    } else if (pageName === 'payment_vouchers') {
+      pageId = 'payment_vouchers';
+      docType = 'payment_voucher';
+    } else if (pageName === 'journal_entries' || pageName === 'journal') {
+      pageId = 'journal_entries';
+      docType = 'manual';
+    } else if (pageName === 'returns') {
+      pageId = 'returns';
+      docType = 'return';
+    } else if (pageName === 'purchase_returns') {
+      pageId = 'purchase_returns';
+      docType = 'purchase_return';
+    } else if (pageName === 'invoices') {
+      pageId = 'invoices';
+      docType = 'invoice';
+    } else if (pageName === 'purchase_invoices') {
+      pageId = 'purchase_invoices';
+      docType = 'purchase_invoice';
+    }
+
+    setCurrentPage(pageId);
+    setPendingViewDoc({ type: docType, idOrNumber: docId });
   };
 
   // Build list of movements when supplier selection changes
@@ -409,6 +451,75 @@ export const SupplierSettlements: React.FC = () => {
     setCreditMovements(credits.sort((a, b) => b.date.localeCompare(a.date)));
   }, [selectedSupplierId, allPurchaseInvoices, allPayments, allPurchaseReturns, allJournalEntries]);
 
+  // Apply Advanced Filtering
+  const applyFilters = (list: Movement[]) => {
+    return list.filter(m => {
+      // 1. Bulk Doc numbers search
+      if (filterDocNumbers.trim()) {
+        const docList = filterDocNumbers
+          .split(/[\n,;]+/)
+          .map(s => s.trim().toLowerCase())
+          .filter(Boolean);
+        if (docList.length > 0) {
+          const matched = docList.some(docNum => 
+            m.number.toLowerCase().includes(docNum) || 
+            (m.je_number && m.je_number.toLowerCase().includes(docNum))
+          );
+          if (!matched) return false;
+        }
+      }
+
+      // 2. Discrete dates (comma separated)
+      if (filterDates.trim()) {
+        const dateList = filterDates
+          .split(/[\s,;]+/)
+          .map(s => s.trim())
+          .filter(Boolean);
+        if (dateList.length > 0) {
+          const matched = dateList.some(d => m.date.slice(0, 10) === d);
+          if (!matched) return false;
+        }
+      }
+
+      // 3. Date range
+      if (filterFromDate && m.date.slice(0, 10) < filterFromDate) return false;
+      if (filterToDate && m.date.slice(0, 10) > filterToDate) return false;
+
+      // 4. Movement Type
+      if (filterTypes.length > 0) {
+        if (!filterTypes.includes(m.page_name)) return false;
+      }
+
+      // 5. Basic search bar (searchTerm)
+      if (searchTerm.trim()) {
+        const query = searchTerm.toLowerCase();
+        const matchesQuery = m.number.toLowerCase().includes(query) || 
+                             m.type_label.toLowerCase().includes(query) || 
+                             m.notes.toLowerCase().includes(query);
+        if (!matchesQuery) return false;
+      }
+
+      return true;
+    });
+  };
+
+  const processedDebitMovements = useMemo(() => {
+    return applyFilters(debitMovements);
+  }, [debitMovements, filterDocNumbers, filterDates, filterFromDate, filterToDate, filterTypes, searchTerm]);
+
+  const processedCreditMovements = useMemo(() => {
+    return applyFilters(creditMovements);
+  }, [creditMovements, filterDocNumbers, filterDates, filterFromDate, filterToDate, filterTypes, searchTerm]);
+
+  // Unified grid table array
+  const unifiedMovements = useMemo(() => {
+    const merged: (Movement & { isDebit: boolean })[] = [];
+    processedDebitMovements.forEach(m => merged.push({ ...m, isDebit: true }));
+    processedCreditMovements.forEach(m => merged.push({ ...m, isDebit: false }));
+    // Sort descending by date
+    return merged.sort((a, b) => b.date.localeCompare(a.date));
+  }, [processedDebitMovements, processedCreditMovements]);
+
   // Totals
   const totalSettledDebit = useMemo(() => {
     return debitMovements.reduce((sum, m) => sum + (m.selected ? m.settled_amount : 0), 0);
@@ -461,40 +572,16 @@ export const SupplierSettlements: React.FC = () => {
     }));
   };
 
-  // FIFO Balancing Logic
-  const handleAutoBalance = () => {
-    const selectedDebits = debitMovements.filter(m => m.selected);
-    const selectedCredits = creditMovements.filter(m => m.selected);
+  // Toggle layout mode
+  const handleToggleLayout = () => {
+    setLayoutMode(prev => prev === 'split' ? 'unified' : 'split');
+  };
 
-    if (selectedDebits.length === 0 || selectedCredits.length === 0) {
-      showNotification('يرجى تحديد حركات من كلا الجانبين للموازنة', 'error');
-      return;
-    }
-
-    const totalDebitsOpen = selectedDebits.reduce((sum, m) => sum + m.open_amount, 0);
-    const totalCreditsOpen = selectedCredits.reduce((sum, m) => sum + m.open_amount, 0);
-
-    const targetAmount = Math.min(totalDebitsOpen, totalCreditsOpen);
-
-    // Distribute targetAmount on selected debits
-    let remDebit = targetAmount;
-    setDebitMovements(prev => prev.map(m => {
-      if (!m.selected) return { ...m, settled_amount: 0 };
-      const alloc = Math.min(m.open_amount, remDebit);
-      remDebit -= alloc;
-      return { ...m, settled_amount: Number(alloc.toFixed(2)) };
-    }));
-
-    // Distribute targetAmount on selected credits
-    let remCredit = targetAmount;
-    setCreditMovements(prev => prev.map(m => {
-      if (!m.selected) return { ...m, settled_amount: 0 };
-      const alloc = Math.min(m.open_amount, remCredit);
-      remCredit -= alloc;
-      return { ...m, settled_amount: Number(alloc.toFixed(2)) };
-    }));
-
-    showNotification('تمت موازنة المبالغ بنجاح', 'success');
+  // Toggle type selection filters
+  const handleToggleTypeFilter = (type: string) => {
+    setFilterTypes(prev => 
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+    );
   };
 
   // Sequence generation for settlement
@@ -697,8 +784,8 @@ export const SupplierSettlements: React.FC = () => {
       entity_name: string;
       entity_id: string;
       total_amount: number;
-      debitDocs: { number: string; type_label: string; amount: number }[];
-      creditDocs: { number: string; type_label: string; amount: number }[];
+      debitDocs: { number: string; type_label: string; amount: number; page_name: string; original_id: string }[];
+      creditDocs: { number: string; type_label: string; amount: number; page_name: string; original_id: string }[];
     }>();
 
     // 1. Scan Purchase Invoices
@@ -724,14 +811,19 @@ export const SupplierSettlements: React.FC = () => {
               entry.creditDocs.push({
                 number: inv.invoice_number,
                 type_label: 'فاتورة مشتريات',
-                amount: Number(s.settled_amount) || 0
+                amount: Number(s.settled_amount) || 0,
+                page_name: 'purchase_invoices',
+                original_id: inv.id
               });
             }
             if (!entry.debitDocs.some(d => d.number === s.reference_number)) {
+              const targetOriginalId = (s.target_id || '').split('-')[0];
               entry.debitDocs.push({
                 number: s.reference_number,
                 type_label: s.type_label || 'تسوية',
-                amount: Number(s.settled_amount) || 0
+                amount: Number(s.settled_amount) || 0,
+                page_name: s.type || 'payment_vouchers',
+                original_id: targetOriginalId
               });
             }
           }
@@ -764,14 +856,18 @@ export const SupplierSettlements: React.FC = () => {
                   entry.debitDocs.push({
                     number: v.voucher_number || v.number || v.id,
                     type_label: 'سند صرف',
-                    amount: Number(s.settled_amount) || 0
+                    amount: Number(s.settled_amount) || 0,
+                    page_name: 'payment_vouchers',
+                    original_id: v.id
                   });
                 }
                 if (!entry.creditDocs.some(c => c.number === s.reference_number)) {
                   entry.creditDocs.push({
                     number: s.reference_number,
                     type_label: s.type_label || 'تسوية',
-                    amount: Number(s.settled_amount) || 0
+                    amount: Number(s.settled_amount) || 0,
+                    page_name: s.type || 'purchase_invoices',
+                    original_id: s.target_id
                   });
                 }
               }
@@ -851,33 +947,45 @@ export const SupplierSettlements: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* Title block */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">تسويات الموردين</h2>
-          <p className="text-zinc-500">إجراء تسويات حرّة ومباشرة للمورد لربط الحركات المدينة بالدائنة بالتزامن الكامل.</p>
+          <p className="text-zinc-500 text-sm">إجراء تسويات حرّة ومباشرة للمورد لربط الحركات المدينة بالدائنة بالتزامن الكامل.</p>
         </div>
         
-        {/* Tab Switcher */}
-        <div className="flex bg-zinc-100 p-1 rounded-2xl border border-zinc-200/50 shadow-inner w-fit">
-          <button
-            onClick={() => setActiveTab('new')}
-            className={`p-2 px-6 rounded-xl transition-all font-bold text-sm ${activeTab === 'new' ? 'bg-white text-emerald-600 shadow-sm border border-zinc-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
-          >
-            تسوية جديدة
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`p-2 px-6 rounded-xl transition-all font-bold text-sm ${activeTab === 'history' ? 'bg-white text-emerald-600 shadow-sm border border-zinc-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
-          >
-            سجل التسويات
-          </button>
+        {/* Tab Switcher & Layout Toggle */}
+        <div className="flex flex-wrap items-center gap-3">
+          {selectedSupplierId && activeTab === 'new' && (
+            <button
+              onClick={handleToggleLayout}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 transition-all rounded-xl font-bold text-xs shadow-sm"
+            >
+              <LayoutGrid size={16} className="text-emerald-600" />
+              <span>{layoutMode === 'split' ? 'عرض الجدول الموحد' : 'عرض الجداول المنفصلة'}</span>
+            </button>
+          )}
+
+          <div className="flex bg-zinc-100 p-1 rounded-2xl border border-zinc-200/50 shadow-inner w-fit">
+            <button
+              onClick={() => setActiveTab('new')}
+              className={`p-2 px-6 rounded-xl transition-all font-bold text-sm ${activeTab === 'new' ? 'bg-white text-emerald-600 shadow-sm border border-zinc-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+            >
+              تسوية جديدة
+            </button>
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`p-2 px-6 rounded-xl transition-all font-bold text-sm ${activeTab === 'history' ? 'bg-white text-emerald-600 shadow-sm border border-zinc-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+            >
+              سجل التسويات
+            </button>
+          </div>
         </div>
       </div>
 
       {activeTab === 'new' ? (
         <div className="space-y-6">
           {/* Supplier Selection Card */}
-          <div className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6">
+          <div className="bg-white p-5 rounded-3xl border border-zinc-200 shadow-sm space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
               <div>
                 <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">المورد</label>
@@ -911,153 +1019,381 @@ export const SupplierSettlements: React.FC = () => {
               </div>
 
               {selectedSupplierId && (
-                <div className="flex gap-2">
+                <div>
                   <button
-                    onClick={handleAutoBalance}
-                    className="flex-1 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-md flex items-center justify-center gap-2 text-sm"
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`flex items-center justify-center gap-2 w-full py-3 border rounded-2xl font-bold text-xs transition-all shadow-sm ${showFilters ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'}`}
                   >
-                    <ArrowLeftRight size={18} />
-                    موازنة التسوية تلقائياً (FIFO)
+                    <SlidersHorizontal size={16} />
+                    <span>تصفية وبحث متقدم</span>
                   </button>
                 </div>
               )}
             </div>
+
+            {/* Advanced Filters Panel */}
+            <AnimatePresence>
+              {showFilters && selectedSupplierId && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="pt-4 border-t border-zinc-100 grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Bulk numbers search */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-400 mb-1 px-1 uppercase">البحث المتعدد بالمستندات (كل سطر مستند)</label>
+                      <textarea
+                        rows={3}
+                        className="w-full p-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-xs font-mono"
+                        placeholder="PINV-2026-06-000005&#10;PAY-2026-06-000003"
+                        value={filterDocNumbers}
+                        onChange={(e) => setFilterDocNumbers(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Discrete dates search */}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 mb-1 px-1 uppercase">تواريخ متفرقة (مفصولة بفاصلة)</label>
+                        <input
+                          type="text"
+                          className="w-full p-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
+                          placeholder="2026-06-01, 2026-06-05"
+                          value={filterDates}
+                          onChange={(e) => setFilterDates(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[9px] font-bold text-zinc-400 mb-1">من تاريخ</label>
+                          <input
+                            type="date"
+                            className="w-full p-1.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs"
+                            value={filterFromDate}
+                            onChange={(e) => setFilterFromDate(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-bold text-zinc-400 mb-1">إلى تاريخ</label>
+                          <input
+                            type="date"
+                            className="w-full p-1.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs"
+                            value={filterToDate}
+                            onChange={(e) => setFilterToDate(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Filter by Type */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-400 mb-2 px-1 uppercase">تصفية حسب نوع المستند</label>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {[
+                          { key: 'purchase_invoices', label: 'فواتير مشتريات' },
+                          { key: 'payment_vouchers', label: 'سندات صرف' },
+                          { key: 'purchase_returns', label: 'مرتجعات' },
+                          { key: 'journal_entries', label: 'قيود يومية' }
+                        ].map(type => (
+                          <label key={type.key} className="flex items-center gap-2 p-2 bg-zinc-50 hover:bg-zinc-100 rounded-xl cursor-pointer select-none border border-transparent hover:border-zinc-200/50">
+                            <input
+                              type="checkbox"
+                              className="rounded text-emerald-600 focus:ring-emerald-500 w-4.5 h-4.5"
+                              checked={filterTypes.includes(type.key)}
+                              onChange={() => handleToggleTypeFilter(type.key)}
+                            />
+                            <span className="font-semibold text-zinc-700">{type.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                      
+                      {/* Clear filters button */}
+                      <button
+                        onClick={() => {
+                          setFilterDocNumbers('');
+                          setFilterDates('');
+                          setFilterFromDate('');
+                          setFilterToDate('');
+                          setFilterTypes([]);
+                          setSearchTerm('');
+                        }}
+                        className="mt-4 text-[10px] font-bold text-red-500 hover:text-red-600 underline text-right block ml-auto"
+                      >
+                        إعادة تعيين كافة المرشحات
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {selectedSupplierId ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Debit Side Column */}
-              <div className="bg-white rounded-3xl border border-zinc-200 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
-                <div className="p-4 bg-red-50 border-b border-red-100 flex items-center justify-between">
-                  <span className="font-bold text-red-700 flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                    الجانب المدين (دفعات / مرتجعات / إعفاءات)
-                  </span>
-                  <span className="bg-red-100 text-red-800 text-xs px-3 py-1 rounded-full font-bold">
-                    إجمالي المسوى: {formatMoney(totalSettledDebit)} ج.م
-                  </span>
-                </div>
+            <div className="space-y-6">
+              {layoutMode === 'split' ? (
+                /* 1. CURRENT SPLIT TABLE LAYOUT with Compact Spreadsheet styling */
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Debit Side Column */}
+                  <div className="bg-white rounded-3xl border border-zinc-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
+                    <div className="p-3 bg-red-50/60 border-b border-red-100 flex items-center justify-between">
+                      <span className="font-bold text-red-700 text-xs flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                        الجانب المدين (دفعات / مرتجعات / إعفاءات)
+                      </span>
+                      <span className="bg-red-100 text-red-800 text-[10px] px-2.5 py-0.5 rounded-full font-bold">
+                        إجمالي المسوى: {formatMoney(totalSettledDebit)} ج.م
+                      </span>
+                    </div>
 
-                <div className="flex-1 overflow-x-auto">
-                  <table className="w-full text-right border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b border-zinc-100 text-zinc-400 text-xs font-bold uppercase tracking-wider bg-zinc-50/50">
-                        <th className="p-3 w-12 text-center">تحديد</th>
-                        <th className="p-3">المستند</th>
-                        <th className="p-3">التاريخ</th>
-                        <th className="p-3 text-left">المبلغ</th>
-                        <th className="p-3 text-left">المتبقي</th>
-                        <th className="p-3 w-32 text-left">المبلغ المسوى</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-50">
-                      {debitMovements.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="p-8 text-center text-zinc-400 italic">لا توجد حركات مدينة مستحقة</td>
-                        </tr>
-                      ) : (
-                        debitMovements.map(m => (
-                          <tr key={m.id} className={`hover:bg-zinc-50/50 transition-colors ${m.selected ? 'bg-emerald-50/10' : ''}`}>
-                            <td className="p-3 text-center">
-                              <input 
-                                type="checkbox" 
-                                className="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4 cursor-pointer"
-                                checked={m.selected}
-                                onChange={(e) => handleToggleDebit(m.id, e.target.checked)}
-                              />
-                            </td>
-                            <td className="p-3">
-                              <p className="font-bold text-zinc-800">{m.number}</p>
-                              <span className="text-[10px] text-zinc-400 font-semibold">{m.type_label}</span>
-                            </td>
-                            <td className="p-3 text-zinc-500">{formatDate(m.date)}</td>
-                            <td className="p-3 text-left font-semibold text-zinc-600">{formatNumber(m.original_amount)}</td>
-                            <td className="p-3 text-left font-bold text-zinc-800">{formatNumber(m.open_amount)}</td>
-                            <td className="p-3 text-left">
-                              <input 
-                                type="number"
-                                step="any"
-                                className="w-24 px-2 py-1 bg-zinc-50 border border-zinc-200 rounded-lg text-left font-black text-emerald-600 focus:ring-2 focus:ring-emerald-500 outline-none text-xs"
-                                value={m.settled_amount || ''}
-                                placeholder="0.00"
-                                onChange={(e) => handleDebitAmountChange(m.id, parseFloat(e.target.value) || 0)}
-                              />
-                            </td>
+                    <div className="flex-1 overflow-x-auto">
+                      <table className="w-full text-right border-collapse text-xs border border-zinc-200">
+                        <thead>
+                          <tr className="bg-zinc-100 text-zinc-600 font-bold uppercase tracking-wider text-[10px]">
+                            <th className="p-1.5 border border-zinc-200 w-10 text-center">تحديد</th>
+                            <th className="p-1.5 border border-zinc-200">نوع الحركة</th>
+                            <th className="p-1.5 border border-zinc-200">رقم المستند</th>
+                            <th className="p-1.5 border border-zinc-200">التاريخ</th>
+                            <th className="p-1.5 border border-zinc-200 text-left">المبلغ</th>
+                            <th className="p-1.5 border border-zinc-200 text-left">المتبقي</th>
+                            <th className="p-1.5 border border-zinc-200 w-28 text-left">المبلغ المسوى</th>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-200">
+                          {processedDebitMovements.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="p-6 text-center text-zinc-400 italic">لا توجد حركات مدينة تطابق البحث</td>
+                            </tr>
+                          ) : (
+                            processedDebitMovements.map(m => (
+                              <tr key={m.id} className={`hover:bg-zinc-50 transition-colors ${m.selected ? 'bg-emerald-50/15' : ''}`}>
+                                <td className="p-1 text-center border border-zinc-200">
+                                  <input 
+                                    type="checkbox" 
+                                    className="rounded text-emerald-600 focus:ring-emerald-500 h-4.5 w-4.5 cursor-pointer"
+                                    checked={m.selected}
+                                    onChange={(e) => handleToggleDebit(m.id, e.target.checked)}
+                                  />
+                                </td>
+                                <td className="p-1 px-2 border border-zinc-200 font-semibold text-zinc-500">{m.type_label}</td>
+                                <td className="p-1 px-2 border border-zinc-200 font-bold">
+                                  <button
+                                    onClick={() => navigateToDoc(m.page_name, m.original_id)}
+                                    className="text-emerald-600 hover:text-emerald-700 hover:underline flex items-center gap-1 focus:outline-none"
+                                  >
+                                    <span>{m.number}</span>
+                                    <ExternalLink size={10} className="opacity-40" />
+                                  </button>
+                                </td>
+                                <td className="p-1 px-2 border border-zinc-200 text-zinc-500">{formatDate(m.date)}</td>
+                                <td className="p-1 px-2 border border-zinc-200 text-left font-semibold text-zinc-500">{formatNumber(m.original_amount)}</td>
+                                <td className="p-1 px-2 border border-zinc-200 text-left font-bold text-zinc-800">{formatNumber(m.open_amount)}</td>
+                                <td className="p-0.5 border border-zinc-200 text-left">
+                                  <input 
+                                    type="number"
+                                    step="any"
+                                    className="w-full px-2 py-1 bg-transparent border-0 text-left font-black text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
+                                    value={m.settled_amount || ''}
+                                    placeholder="0.00"
+                                    onChange={(e) => handleDebitAmountChange(m.id, parseFloat(e.target.value) || 0)}
+                                  />
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
 
-              {/* Credit Side Column */}
-              <div className="bg-white rounded-3xl border border-zinc-200 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
-                <div className="p-4 bg-emerald-50 border-b border-emerald-100 flex items-center justify-between">
-                  <span className="font-bold text-emerald-700 flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                    الجانب الدائن (المستندات المطلوبة)
-                  </span>
-                  <span className="bg-emerald-100 text-emerald-800 text-xs px-3 py-1 rounded-full font-bold">
-                    إجمالي المسوى: {formatMoney(totalSettledCredit)} ج.م
-                  </span>
-                </div>
+                  {/* Credit Side Column */}
+                  <div className="bg-white rounded-3xl border border-zinc-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
+                    <div className="p-3 bg-emerald-50/60 border-b border-emerald-100 flex items-center justify-between">
+                      <span className="font-bold text-emerald-700 text-xs flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        الجانب الدائن (المستندات المطلوبة / فواتير المشتريات)
+                      </span>
+                      <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2.5 py-0.5 rounded-full font-bold">
+                        إجمالي المسوى: {formatMoney(totalSettledCredit)} ج.م
+                      </span>
+                    </div>
 
-                <div className="flex-1 overflow-x-auto">
-                  <table className="w-full text-right border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b border-zinc-100 text-zinc-400 text-xs font-bold uppercase tracking-wider bg-zinc-50/50">
-                        <th className="p-3 w-12 text-center">تحديد</th>
-                        <th className="p-3">المستند</th>
-                        <th className="p-3">التاريخ</th>
-                        <th className="p-3 text-left">المبلغ</th>
-                        <th className="p-3 text-left">المتبقي</th>
-                        <th className="p-3 w-32 text-left">المبلغ المسوى</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-50">
-                      {creditMovements.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="p-8 text-center text-zinc-400 italic">لا توجد حركات دائنة مستحقة</td>
-                        </tr>
-                      ) : (
-                        creditMovements.map(m => (
-                          <tr key={m.id} className={`hover:bg-zinc-50/50 transition-colors ${m.selected ? 'bg-emerald-50/10' : ''}`}>
-                            <td className="p-3 text-center">
-                              <input 
-                                type="checkbox" 
-                                className="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4 cursor-pointer"
-                                checked={m.selected}
-                                onChange={(e) => handleToggleCredit(m.id, e.target.checked)}
-                              />
-                            </td>
-                            <td className="p-3">
-                              <p className="font-bold text-zinc-800">{m.number}</p>
-                              <span className="text-[10px] text-zinc-400 font-semibold">{m.type_label}</span>
-                            </td>
-                            <td className="p-3 text-zinc-500">{formatDate(m.date)}</td>
-                            <td className="p-3 text-left font-semibold text-zinc-600">{formatNumber(m.original_amount)}</td>
-                            <td className="p-3 text-left font-bold text-zinc-800">{formatNumber(m.open_amount)}</td>
-                            <td className="p-3 text-left">
-                              <input 
-                                type="number"
-                                step="any"
-                                className="w-24 px-2 py-1 bg-zinc-50 border border-zinc-200 rounded-lg text-left font-black text-emerald-600 focus:ring-2 focus:ring-emerald-500 outline-none text-xs"
-                                value={m.settled_amount || ''}
-                                placeholder="0.00"
-                                onChange={(e) => handleCreditAmountChange(m.id, parseFloat(e.target.value) || 0)}
-                              />
-                            </td>
+                    <div className="flex-1 overflow-x-auto">
+                      <table className="w-full text-right border-collapse text-xs border border-zinc-200">
+                        <thead>
+                          <tr className="bg-zinc-100 text-zinc-600 font-bold uppercase tracking-wider text-[10px]">
+                            <th className="p-1.5 border border-zinc-200 w-10 text-center">تحديد</th>
+                            <th className="p-1.5 border border-zinc-200">نوع الحركة</th>
+                            <th className="p-1.5 border border-zinc-200">رقم المستند</th>
+                            <th className="p-1.5 border border-zinc-200">التاريخ</th>
+                            <th className="p-1.5 border border-zinc-200 text-left">المبلغ</th>
+                            <th className="p-1.5 border border-zinc-200 text-left">المتبقي</th>
+                            <th className="p-1.5 border border-zinc-200 w-28 text-left">المبلغ المسوى</th>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-200">
+                          {processedCreditMovements.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="p-6 text-center text-zinc-400 italic">لا توجد حركات دائنة تطابق البحث</td>
+                            </tr>
+                          ) : (
+                            processedCreditMovements.map(m => (
+                              <tr key={m.id} className={`hover:bg-zinc-50 transition-colors ${m.selected ? 'bg-emerald-50/15' : ''}`}>
+                                <td className="p-1 text-center border border-zinc-200">
+                                  <input 
+                                    type="checkbox" 
+                                    className="rounded text-emerald-600 focus:ring-emerald-500 h-4.5 w-4.5 cursor-pointer"
+                                    checked={m.selected}
+                                    onChange={(e) => handleToggleCredit(m.id, e.target.checked)}
+                                  />
+                                </td>
+                                <td className="p-1 px-2 border border-zinc-200 font-semibold text-zinc-500">{m.type_label}</td>
+                                <td className="p-1 px-2 border border-zinc-200 font-bold">
+                                  <button
+                                    onClick={() => navigateToDoc(m.page_name, m.original_id)}
+                                    className="text-emerald-600 hover:text-emerald-700 hover:underline flex items-center gap-1 focus:outline-none"
+                                  >
+                                    <span>{m.number}</span>
+                                    <ExternalLink size={10} className="opacity-40" />
+                                  </button>
+                                </td>
+                                <td className="p-1 px-2 border border-zinc-200 text-zinc-500">{formatDate(m.date)}</td>
+                                <td className="p-1 px-2 border border-zinc-200 text-left font-semibold text-zinc-500">{formatNumber(m.original_amount)}</td>
+                                <td className="p-1 px-2 border border-zinc-200 text-left font-bold text-zinc-800">{formatNumber(m.open_amount)}</td>
+                                <td className="p-0.5 border border-zinc-200 text-left">
+                                  <input 
+                                    type="number"
+                                    step="any"
+                                    className="w-full px-2 py-1 bg-transparent border-0 text-left font-black text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
+                                    value={m.settled_amount || ''}
+                                    placeholder="0.00"
+                                    onChange={(e) => handleCreditAmountChange(m.id, parseFloat(e.target.value) || 0)}
+                                  />
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                /* 2. NEW UNIFIED SINGLE TABLE LAYOUT with separate debit/credit columns and compact spreadsheet styling */
+                <div className="bg-white rounded-3xl border border-zinc-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
+                  <div className="p-3 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between">
+                    <span className="font-bold text-zinc-700 text-xs flex items-center gap-2">
+                      <SlidersHorizontal size={16} className="text-emerald-600" />
+                      عرض الجدول الموحد المحاسبي (Excel Grid)
+                    </span>
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="bg-red-50 text-red-700 px-2 py-0.5 rounded border border-red-100 font-bold">
+                        مدين: {formatMoney(totalSettledDebit)}
+                      </span>
+                      <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-100 font-bold">
+                        دائن: {formatMoney(totalSettledCredit)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-x-auto">
+                    <table className="w-full text-right border-collapse text-xs border border-zinc-200">
+                      <thead>
+                        <tr className="bg-zinc-100 text-zinc-600 font-black text-[10px] uppercase">
+                          <th className="p-2 border border-zinc-200 w-10 text-center" rowSpan={2}>تحديد</th>
+                          <th className="p-2 border border-zinc-200" rowSpan={2}>التاريخ</th>
+                          <th className="p-2 border border-zinc-200" rowSpan={2}>نوع الحركة</th>
+                          <th className="p-2 border border-zinc-200" rowSpan={2}>رقم المستند</th>
+                          <th className="p-1 border border-zinc-200 text-center bg-red-50/50 text-red-700 font-bold" colSpan={2}>الحركات المدينة (Debit)</th>
+                          <th className="p-1 border border-zinc-200 text-center bg-emerald-50/50 text-emerald-700 font-bold" colSpan={2}>الحركات الدائنة (Credit)</th>
+                        </tr>
+                        <tr className="bg-zinc-100 text-zinc-500 text-[9px] uppercase">
+                          <th className="p-1.5 border border-zinc-200 text-left w-24 bg-red-50/30">المتبقي</th>
+                          <th className="p-1.5 border border-zinc-200 text-left w-32 bg-red-50/30">المسوى</th>
+                          <th className="p-1.5 border border-zinc-200 text-left w-24 bg-emerald-50/30">المتبقي</th>
+                          <th className="p-1.5 border border-zinc-200 text-left w-32 bg-emerald-50/30">المسوى</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-200">
+                        {unifiedMovements.length === 0 ? (
+                          <tr>
+                            <td colSpan={8} className="p-8 text-center text-zinc-400 italic">لا توجد حركات تطابق خيارات التصفية والبحث</td>
+                          </tr>
+                        ) : (
+                          unifiedMovements.map(m => (
+                            <tr key={m.id} className={`hover:bg-zinc-50 transition-colors ${m.selected ? 'bg-emerald-50/15' : ''}`}>
+                              <td className="p-1 text-center border border-zinc-200">
+                                <input 
+                                  type="checkbox" 
+                                  className="rounded text-emerald-600 focus:ring-emerald-500 h-4.5 w-4.5 cursor-pointer"
+                                  checked={m.selected}
+                                  onChange={(e) => {
+                                    if (m.isDebit) {
+                                      handleToggleDebit(m.id, e.target.checked);
+                                    } else {
+                                      handleToggleCredit(m.id, e.target.checked);
+                                    }
+                                  }}
+                                />
+                              </td>
+                              <td className="p-1 px-2 border border-zinc-200 text-zinc-500 font-semibold">{formatDate(m.date)}</td>
+                              <td className="p-1 px-2 border border-zinc-200 text-zinc-500 font-bold">{m.type_label}</td>
+                              <td className="p-1 px-2 border border-zinc-200 font-bold">
+                                <button
+                                  onClick={() => navigateToDoc(m.page_name, m.original_id)}
+                                  className="text-emerald-600 hover:text-emerald-700 hover:underline flex items-center gap-1 focus:outline-none"
+                                >
+                                  <span>{m.number}</span>
+                                  <ExternalLink size={10} className="opacity-40" />
+                                </button>
+                              </td>
+                              
+                              {/* Debit columns */}
+                              <td className="p-1 px-2 border border-zinc-200 text-left bg-red-50/5 text-red-600 font-semibold">
+                                {m.isDebit ? formatNumber(m.open_amount) : '-'}
+                              </td>
+                              <td className="p-0.5 border border-zinc-200 text-left bg-red-50/5">
+                                {m.isDebit ? (
+                                  <input 
+                                    type="number"
+                                    step="any"
+                                    className="w-full px-2 py-1 bg-transparent border-0 text-left font-black text-red-600 focus:ring-1 focus:ring-red-500 outline-none text-xs"
+                                    value={m.settled_amount || ''}
+                                    placeholder="0.00"
+                                    onChange={(e) => handleDebitAmountChange(m.id, parseFloat(e.target.value) || 0)}
+                                  />
+                                ) : '-'}
+                              </td>
+
+                              {/* Credit columns */}
+                              <td className="p-1 px-2 border border-zinc-200 text-left bg-emerald-50/5 text-emerald-600 font-semibold">
+                                {!m.isDebit ? formatNumber(m.open_amount) : '-'}
+                              </td>
+                              <td className="p-0.5 border border-zinc-200 text-left bg-emerald-50/5">
+                                {!m.isDebit ? (
+                                  <input 
+                                    type="number"
+                                    step="any"
+                                    className="w-full px-2 py-1 bg-transparent border-0 text-left font-black text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
+                                    value={m.settled_amount || ''}
+                                    placeholder="0.00"
+                                    onChange={(e) => handleCreditAmountChange(m.id, parseFloat(e.target.value) || 0)}
+                                  />
+                                ) : '-'}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               {/* Summary Bottom Actions Card */}
-              <div className="lg:col-span-2 bg-slate-900 p-6 rounded-3xl text-white flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl">
+              <div className="bg-slate-900 p-6 rounded-3xl text-white flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl">
                 <div className="flex flex-wrap items-center gap-6">
                   <div className="space-y-1">
                     <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">إجمالي المدين المسوى</span>
@@ -1195,7 +1531,16 @@ export const SupplierSettlements: React.FC = () => {
                       {selectedHistory.debitDocs.map((doc: any, i: number) => (
                         <div key={i} className="flex justify-between items-center p-3 bg-zinc-50 rounded-xl text-xs">
                           <div>
-                            <p className="font-bold text-zinc-800">{doc.number}</p>
+                            <button
+                              onClick={() => {
+                                navigateToDoc(doc.page_name, doc.original_id);
+                                setSelectedHistory(null);
+                              }}
+                              className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline flex items-center gap-1 focus:outline-none"
+                            >
+                              <span>{doc.number}</span>
+                              <ExternalLink size={10} className="opacity-40" />
+                            </button>
                             <span className="text-[10px] text-zinc-400 font-semibold">{doc.type_label}</span>
                           </div>
                           <span className="font-black text-red-500">{formatMoney(doc.amount)} ج.م</span>
@@ -1211,7 +1556,16 @@ export const SupplierSettlements: React.FC = () => {
                       {selectedHistory.creditDocs.map((doc: any, i: number) => (
                         <div key={i} className="flex justify-between items-center p-3 bg-zinc-50 rounded-xl text-xs">
                           <div>
-                            <p className="font-bold text-zinc-800">{doc.number}</p>
+                            <button
+                              onClick={() => {
+                                navigateToDoc(doc.page_name, doc.original_id);
+                                setSelectedHistory(null);
+                              }}
+                              className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline flex items-center gap-1 focus:outline-none"
+                            >
+                              <span>{doc.number}</span>
+                              <ExternalLink size={10} className="opacity-40" />
+                            </button>
                             <span className="text-[10px] text-zinc-400 font-semibold">{doc.type_label}</span>
                           </div>
                           <span className="font-black text-emerald-500">{formatMoney(doc.amount)} ج.م</span>
