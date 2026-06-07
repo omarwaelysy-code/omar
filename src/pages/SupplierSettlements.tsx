@@ -248,7 +248,7 @@ export const SupplierSettlements: React.FC = () => {
     } else if (pageName === 'payment_vouchers') {
       pageId = 'payment_vouchers';
       docType = 'payment_voucher';
-    } else if (pageName === 'journal_entries' || pageName === 'journal') {
+    } else if (pageName === 'journal_entries' || pageName === 'journal' || pageName === 'discounts') {
       pageId = 'journal_entries';
       docType = 'manual';
     } else if (pageName === 'returns') {
@@ -368,13 +368,14 @@ export const SupplierSettlements: React.FC = () => {
           const openAmount = originalAmount - settled;
 
           if (openAmount > 0.01) {
+            const isDiscount = je.reference_type === 'supplier_discount';
             debits.push({
               id: `${je.id}-${idx}`,
               original_id: je.id,
               date: je.date,
-              type_label: 'قيد يومية (مدين)',
+              type_label: isDiscount ? 'خصم مكتسب' : 'قيد يومية (مدين)',
               number: je.entry_number || je.id.slice(0, 8),
-              page_name: 'journal_entries',
+              page_name: isDiscount ? 'discounts' : 'journal_entries',
               original_amount: originalAmount,
               open_amount: openAmount,
               settled_amount: 0,
@@ -428,13 +429,14 @@ export const SupplierSettlements: React.FC = () => {
           const openAmount = originalAmount - settled;
 
           if (openAmount > 0.01) {
+            const isDiscount = je.reference_type === 'supplier_discount';
             credits.push({
               id: `${je.id}-${idx}`,
               original_id: je.id,
               date: je.date,
-              type_label: 'قيد يومية (دائن)',
+              type_label: isDiscount ? 'خصم مكتسب' : 'قيد يومية (دائن)',
               number: je.entry_number || je.id.slice(0, 8),
-              page_name: 'journal_entries',
+              page_name: isDiscount ? 'discounts' : 'journal_entries',
               original_amount: originalAmount,
               open_amount: openAmount,
               settled_amount: 0,
@@ -539,6 +541,57 @@ export const SupplierSettlements: React.FC = () => {
   const difference = useMemo(() => {
     return Math.abs(totalSettledDebit - totalSettledCredit);
   }, [totalSettledDebit, totalSettledCredit]);
+
+  const isAllDebitSelected = useMemo(() => {
+    return processedDebitMovements.length > 0 && processedDebitMovements.every(m => m.selected);
+  }, [processedDebitMovements]);
+
+  const handleSelectAllDebits = (checked: boolean) => {
+    const visibleIds = new Set(processedDebitMovements.map(m => m.id));
+    setDebitMovements(prev => prev.map(m => {
+      if (visibleIds.has(m.id)) {
+        return { ...m, selected: checked, settled_amount: checked ? m.open_amount : 0 };
+      }
+      return m;
+    }));
+  };
+
+  const isAllCreditSelected = useMemo(() => {
+    return processedCreditMovements.length > 0 && processedCreditMovements.every(m => m.selected);
+  }, [processedCreditMovements]);
+
+  const handleSelectAllCredits = (checked: boolean) => {
+    const visibleIds = new Set(processedCreditMovements.map(m => m.id));
+    setCreditMovements(prev => prev.map(m => {
+      if (visibleIds.has(m.id)) {
+        return { ...m, selected: checked, settled_amount: checked ? m.open_amount : 0 };
+      }
+      return m;
+    }));
+  };
+
+  const isAllUnifiedSelected = useMemo(() => {
+    return unifiedMovements.length > 0 && unifiedMovements.every(m => m.selected);
+  }, [unifiedMovements]);
+
+  const handleSelectAllUnified = (checked: boolean) => {
+    const visibleDebitIds = new Set(processedDebitMovements.map(m => m.id));
+    const visibleCreditIds = new Set(processedCreditMovements.map(m => m.id));
+
+    setDebitMovements(prev => prev.map(m => {
+      if (visibleDebitIds.has(m.id)) {
+        return { ...m, selected: checked, settled_amount: checked ? m.open_amount : 0 };
+      }
+      return m;
+    }));
+
+    setCreditMovements(prev => prev.map(m => {
+      if (visibleCreditIds.has(m.id)) {
+        return { ...m, selected: checked, settled_amount: checked ? m.open_amount : 0 };
+      }
+      return m;
+    }));
+  };
 
   // Handlers for checkboxes & inputs
   const handleToggleDebit = (id: string, checked: boolean) => {
@@ -1129,7 +1182,8 @@ export const SupplierSettlements: React.FC = () => {
                           { key: 'purchase_invoices', label: 'فواتير مشتريات' },
                           { key: 'payment_vouchers', label: 'سندات صرف' },
                           { key: 'purchase_returns', label: 'مرتجعات' },
-                          { key: 'journal_entries', label: 'قيود يومية' }
+                          { key: 'journal_entries', label: 'قيود يومية' },
+                          { key: 'discounts', label: 'الخصومات' }
                         ].map(type => (
                           <label key={type.key} className="flex items-center gap-2 p-2 bg-zinc-50 hover:bg-zinc-100 rounded-xl cursor-pointer select-none border border-transparent hover:border-zinc-200/50">
                             <input
@@ -1185,7 +1239,17 @@ export const SupplierSettlements: React.FC = () => {
                       <table className="w-full text-right border-collapse text-xs border border-zinc-200">
                         <thead>
                           <tr className="bg-zinc-100 text-zinc-600 font-bold uppercase tracking-wider text-[10px]">
-                            <th className="p-1.5 border border-zinc-200 w-10 text-center">تحديد</th>
+                            <th className="p-1.5 border border-zinc-200 w-20 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <input 
+                                  type="checkbox"
+                                  className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
+                                  checked={isAllDebitSelected}
+                                  onChange={(e) => handleSelectAllDebits(e.target.checked)}
+                                />
+                                <span>تحديد</span>
+                              </div>
+                            </th>
                             <th className="p-1.5 border border-zinc-200">نوع الحركة</th>
                             <th className="p-1.5 border border-zinc-200">رقم المستند</th>
                             <th className="p-1.5 border border-zinc-200">التاريخ</th>
@@ -1257,7 +1321,17 @@ export const SupplierSettlements: React.FC = () => {
                       <table className="w-full text-right border-collapse text-xs border border-zinc-200">
                         <thead>
                           <tr className="bg-zinc-100 text-zinc-600 font-bold uppercase tracking-wider text-[10px]">
-                            <th className="p-1.5 border border-zinc-200 w-10 text-center">تحديد</th>
+                            <th className="p-1.5 border border-zinc-200 w-20 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <input 
+                                  type="checkbox"
+                                  className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
+                                  checked={isAllCreditSelected}
+                                  onChange={(e) => handleSelectAllCredits(e.target.checked)}
+                                />
+                                <span>تحديد</span>
+                              </div>
+                            </th>
                             <th className="p-1.5 border border-zinc-200">نوع الحركة</th>
                             <th className="p-1.5 border border-zinc-200">رقم المستند</th>
                             <th className="p-1.5 border border-zinc-200">التاريخ</th>
@@ -1335,7 +1409,17 @@ export const SupplierSettlements: React.FC = () => {
                     <table className="w-full text-right border-collapse text-xs border border-zinc-200">
                       <thead>
                         <tr className="bg-zinc-100 text-zinc-600 font-black text-[10px] uppercase">
-                          <th className="p-2 border border-zinc-200 w-10 text-center" rowSpan={2}>تحديد</th>
+                          <th className="p-2 border border-zinc-200 w-20 text-center" rowSpan={2}>
+                            <div className="flex flex-col items-center justify-center gap-0.5">
+                              <input 
+                                type="checkbox"
+                                className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
+                                checked={isAllUnifiedSelected}
+                                onChange={(e) => handleSelectAllUnified(e.target.checked)}
+                              />
+                              <span>تحديد الكل</span>
+                            </div>
+                          </th>
                           <th className="p-2 border border-zinc-200" rowSpan={2}>التاريخ</th>
                           <th className="p-2 border border-zinc-200" rowSpan={2}>نوع الحركة</th>
                           <th className="p-2 border border-zinc-200" rowSpan={2}>رقم المستند</th>
