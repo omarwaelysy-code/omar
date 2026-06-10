@@ -80,6 +80,7 @@ export const Invoices: React.FC = () => {
   const isInitialLoad = useRef(true);
   const [isAiParsing, setIsAiParsing] = useState(false);
   const [showSidePanel, setShowSidePanel] = useState(false);
+  const [showAiInput, setShowAiInput] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
@@ -2485,14 +2486,22 @@ export const Invoices: React.FC = () => {
               </button>
             </div>
 
-              <div className="flex-1 flex justify-center">
+              <div className="flex-1 flex justify-center gap-2">
                 <button 
                   type="button"
                   onClick={() => setShowSidePanel(!showSidePanel)}
-                  className={`flex items-center gap-3 px-6 py-2.5 rounded-2xl text-sm font-black transition-all border shadow-sm ${showSidePanel ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-zinc-50'}`}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm ${showSidePanel ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-zinc-50'}`}
                 >
-                  <History size={18} />
-                  <span>قيد اليومية \ سجل التعديلات</span>
+                  <History size={14} />
+                  <span>{language === 'ar' ? 'سجل التعديلات والقيد' : 'Activity Log & Journal'}</span>
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setShowAiInput(!showAiInput)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm ${showAiInput ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-zinc-50'}`}
+                >
+                  <Sparkles size={14} />
+                  <span>{language === 'ar' ? 'الإنشاء الذكي' : 'Smart AI'}</span>
                 </button>
               </div>
 
@@ -2554,17 +2563,53 @@ export const Invoices: React.FC = () => {
                 )}
               </AnimatePresence>
 
-              <div className="flex-1 p-4 md:p-6 space-y-6 overflow-y-auto pb-32 md:pb-6">
-                <div className="space-y-6">
-                  {/* AI Tools */}
-                  <SmartAIInput 
-                    onDataExtracted={applyAiData}
-                    transactionType="sales_invoice"
-                  />
+              {/* AI Drawer (Smart Creation) sliding from the right */}
+              <AnimatePresence>
+                {showAiInput && (
+                  <motion.div 
+                    initial={{ x: dir === 'rtl' ? '-100%' : '100%' }}
+                    animate={{ x: 0 }}
+                    exit={{ x: dir === 'rtl' ? '-100%' : '100%' }}
+                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                    className={`absolute inset-y-0 ${dir === 'rtl' ? 'left-0' : 'right-0'} z-50 w-full lg:w-[480px] shadow-2xl border-l border-slate-100 bg-white flex flex-col`}
+                  >
+                    <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-indigo-600 font-bold">
+                        <Sparkles size={20} className="animate-pulse" />
+                        <span className="text-sm font-black">{language === 'ar' ? 'الإنشاء الذكي بالذكاء الاصطناعي' : 'Smart AI Creation'}</span>
+                      </div>
+                      <button onClick={() => setShowAiInput(false)} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50 transition-all">
+                        <X size={20} />
+                      </button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50">
+                      <SmartAIInput 
+                        onDataExtracted={applyAiData}
+                        transactionType="sales_invoice"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-                  <form id="invoice-form" onSubmit={handleSubmit} className="space-y-8">
+              {/* Floating button on the side to toggle AI Smart Creation */}
+              <button
+                type="button"
+                onClick={() => setShowAiInput(!showAiInput)}
+                className={`absolute ${dir === 'rtl' ? 'left-0 rounded-r-xl border-l-0' : 'right-0 rounded-l-xl border-r-0'} top-1/4 z-[60] flex items-center gap-2 px-2 py-3 bg-indigo-600 text-white font-black text-[10px] shadow-lg hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all [writing-mode:vertical-lr] border border-indigo-500 ${showAiInput ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+                style={{ direction: 'ltr' }}
+              >
+                <Sparkles size={12} className="animate-bounce mb-1" />
+                <span>{language === 'ar' ? 'الإنشاء الذكي بالذكاء الاصطناعي' : 'Smart AI Creation'}</span>
+              </button>
+
+              <div className="flex-1 p-4 md:p-6 space-y-3 overflow-y-auto pb-32 md:pb-6">
+                <div className="space-y-3">
+
+
+                  <form id="invoice-form" onSubmit={handleSubmit} className="space-y-3">
                     {/* Card 1: المعلومات الأساسية */}
-                    <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
+                    <section className="bg-white px-4 py-3 rounded-2xl border border-zinc-200 shadow-sm space-y-3 relative pt-8">
                       {editingInvoice && (
                         <div className={`absolute ${dir === 'rtl' ? 'left-12' : 'right-12'} top-4 z-20 pointer-events-none select-none opacity-80 transform -rotate-12`}>
                           {(() => {
@@ -2588,32 +2633,32 @@ export const Invoices: React.FC = () => {
                           })()}
                         </div>
                       )}
-                      <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50/50 px-3 py-1 rounded-full border border-emerald-100">
+                      <div className="absolute top-2 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50/50 px-3 py-1 rounded-full border border-emerald-100">
                         <FileText className="w-4 h-4" />
-                        <span className="text-xs font-bold">invoices.basic_info</span>
+                        <span className="text-xs font-bold">{t('invoices.basic_info')}</span>
                       </div>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                         <div className="order-3 md:order-1">
-                          <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('invoices.column_date')}</label>
+                          <label className="block text-[11px] font-bold text-zinc-400 tracking-tighter mb-1 px-2 uppercase">{t('invoices.column_date')}</label>
                           <div className="relative">
                             <input
                               required
                               type="date"
-                              className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-sm`}
+                              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 rounded-xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs`}
                               value={date}
                               onChange={(e) => setDate(e.target.value)}
                             />
-                            <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                            <Calendar className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                           </div>
                         </div>
 
                         <div className="order-2 md:order-2 lg:col-span-1">
-                          <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('invoices.form_customer')} {selectedCustomerId ? `(ID: ${selectedCustomerId.slice(-4)})` : ''}</label>
+                          <label className="block text-[11px] font-bold text-zinc-400 tracking-tighter mb-1 px-2 uppercase">{t('invoices.form_customer')} {selectedCustomerId ? `(ID: ${selectedCustomerId.slice(-4)})` : ''}</label>
                           <div className="relative group">
                             <select 
                               required
-                              className={`w-full ${dir === 'rtl' ? 'pr-12' : 'pl-12'} py-3 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm`}
+                              className={`w-full ${dir === 'rtl' ? 'pr-10' : 'pl-10'} py-2 rounded-xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-xs`}
                               value={selectedCustomerId}
                               onChange={(e) => {
                                 if (e.target.value === 'new_customer') {
@@ -2629,64 +2674,64 @@ export const Invoices: React.FC = () => {
                               {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                               <option value="new_customer" className="font-bold text-emerald-600 italic">+ {t('customers.add')}</option>
                             </select>
-                            <Building2 className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
-                            <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                            <Building2 className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                            <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3.5' : 'right-3.5'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                           </div>
                         </div>
 
                         {invoiceType === 'items' && (
                           <div className="order-3 md:order-3 lg:col-span-1">
-                            <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
+                            <label className="block text-[11px] font-bold text-zinc-400 tracking-tighter mb-1 px-2 uppercase">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
                             <div className="relative group">
                               <select 
                                 required
-                                className={`w-full ${dir === 'rtl' ? 'pr-12' : 'pl-12'} py-3 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm`}
+                                className={`w-full ${dir === 'rtl' ? 'pr-10' : 'pl-10'} py-2 rounded-xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-xs`}
                                 value={selectedWarehouseId}
                                 onChange={(e) => setSelectedWarehouseId(e.target.value)}
                               >
                                 <option value="">{language === 'ar' ? 'اختر المخزن' : 'Select Warehouse'}</option>
                                 {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                               </select>
-                              <Box className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
-                              <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                              <Box className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                              <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3.5' : 'right-3.5'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                             </div>
                           </div>
                         )}
 
                         <div className={`order-1 ${invoiceType === 'items' ? 'md:order-4' : 'md:order-3'}`}>
-                          <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('invoices.column_number')}</label>
+                          <label className="block text-[11px] font-bold text-zinc-400 tracking-tighter mb-1 px-2 uppercase">{t('invoices.column_number')}</label>
                           <div className="relative">
                             <input
                               required
                               type="text"
                               readOnly
-                              className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 rounded-2xl bg-zinc-100 border border-zinc-200 cursor-not-allowed outline-none font-bold text-zinc-500 text-sm`}
+                              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 rounded-xl bg-zinc-100 border border-zinc-200 cursor-not-allowed outline-none font-bold text-zinc-500 text-xs`}
                               value={invoiceNumber}
                             />
-                            <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                            <Hash className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                           </div>
                         </div>
 
                         {editingInvoice?.entry_number && (
                           <div className="order-1 md:order-5">
-                            <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'رقم القيد المرتبط' : 'Linked Journal Entry'}</label>
+                            <label className="block text-[11px] font-bold text-zinc-400 tracking-tighter mb-1 px-2 uppercase">{language === 'ar' ? 'رقم القيد المرتبط' : 'Linked Journal Entry'}</label>
                             <div className="relative">
                               <input
                                 readOnly
                                 type="text"
-                                className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 rounded-2xl bg-emerald-50 border border-emerald-200 outline-none font-bold text-emerald-800 text-sm`}
+                                className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 rounded-xl bg-emerald-50 border border-emerald-200 outline-none font-bold text-emerald-800 text-xs`}
                                 value={editingInvoice.entry_number}
                               />
-                              <Layers className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-emerald-500 pointer-events-none`} />
+                              <Layers className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-2.5 w-4 h-4 text-emerald-500 pointer-events-none`} />
                             </div>
                           </div>
                         )}
                       </div>
 
-                      <div className="pt-4 border-t border-zinc-100">
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'موضوع الفاتورة' : 'Invoice Subject'}</label>
+                      <div className="pt-2 border-t border-zinc-100">
+                        <label className="block text-[11px] font-bold text-zinc-400 tracking-tighter mb-1 px-2 uppercase">{language === 'ar' ? 'موضوع الفاتورة' : 'Invoice Subject'}</label>
                         <textarea
-                          className="w-full px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 min-h-[100px] resize-none text-sm placeholder:text-zinc-300"
+                          className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 min-h-[50px] resize-none text-xs placeholder:text-zinc-300"
                           placeholder={language === 'ar' ? 'أدخل وصفاً عاماً يظهر في أعلى الفاتورة...' : 'Enter a general description...'}
                           value={description}
                           onChange={(e) => setDescription(e.target.value)}
@@ -2694,26 +2739,26 @@ export const Invoices: React.FC = () => {
                       </div>
 
                       {pendingOrders.length > 0 && (
-                        <div className="pt-4 border-t border-zinc-100 space-y-3">
+                        <div className="pt-2 border-t border-zinc-100 space-y-2">
                           <label className="block text-xs font-bold text-emerald-600 tracking-tighter px-2 uppercase flex items-center gap-2">
                             <FileText className="w-4 h-4" />
                             {language === 'ar' ? 'ربط بأوامر البيع المعلقة' : 'Link Pending Sales Orders'}
                           </label>
-                          <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-4 overflow-hidden">
+                          <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-3 overflow-hidden">
                             <div className="overflow-x-auto">
                               <table className="w-full text-xs text-right">
                                 <thead>
-                                  <tr className="text-zinc-400 font-bold border-b border-zinc-200 pb-2">
-                                    <th className="py-2 text-center w-10"></th>
-                                    <th className="py-2 text-right">{language === 'ar' ? 'رقم الأمر' : 'Order No'}</th>
-                                    <th className="py-2 text-right">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
-                                    <th className="py-2 text-right">{language === 'ar' ? 'الإجمالي' : 'Total'}</th>
+                                  <tr className="text-zinc-400 font-bold border-b border-zinc-200 pb-1">
+                                    <th className="py-1 text-center w-10"></th>
+                                    <th className="py-1 text-right">{language === 'ar' ? 'رقم الأمر' : 'Order No'}</th>
+                                    <th className="py-1 text-right">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                                    <th className="py-1 text-right">{language === 'ar' ? 'الإجمالي' : 'Total'}</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-zinc-100">
                                   {pendingOrders.map(order => (
                                     <tr key={order.id} className="hover:bg-zinc-100/50">
-                                      <td className="py-3 text-center">
+                                      <td className="py-2 text-center">
                                         <input 
                                           type="checkbox"
                                           checked={selectedOrderIds.includes(order.id)}
@@ -2721,9 +2766,9 @@ export const Invoices: React.FC = () => {
                                           className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
                                         />
                                       </td>
-                                      <td className="py-3 font-mono text-emerald-700 font-bold">{order.order_number}</td>
-                                      <td className="py-3 text-zinc-500">{formatDate(order.date)}</td>
-                                      <td className="py-3 text-zinc-900 font-bold">{formatMoney(order.total_amount)} {t('invoices.currency')}</td>
+                                      <td className="py-2 font-mono text-emerald-700 font-bold">{order.order_number}</td>
+                                      <td className="py-2 text-zinc-500">{formatDate(order.date)}</td>
+                                      <td className="py-2 text-zinc-900 font-bold">{formatMoney(order.total_amount)} {t('invoices.currency')}</td>
                                     </tr>
                                   ))}
                                 </tbody>
@@ -2735,41 +2780,41 @@ export const Invoices: React.FC = () => {
                     </section>
 
                     {/* Card 2: إعدادات الدفع */}
-                    <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                      <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50/50 px-3 py-1 rounded-full border border-emerald-100">
+                    <section className="bg-white px-4 py-3 rounded-2xl border border-zinc-200 shadow-sm space-y-3 relative pt-8">
+                      <div className="absolute top-2 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50/50 px-3 py-1 rounded-full border border-emerald-100">
                         <Wallet className="w-4 h-4" />
-                        <span className="text-xs font-bold">invoices.payment_settings</span>
+                        <span className="text-xs font-bold">{t('invoices.payment_settings')}</span>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-2">
                         <button 
                           type="button"
                           onClick={() => setPaymentType('cash')}
-                          className={`flex-1 py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-3 border ${paymentType === 'cash' ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg scale-[1.02]' : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'}`}
+                          className={`flex-1 py-1.5 rounded-lg font-bold transition-all flex items-center justify-center gap-2 border text-xs ${paymentType === 'cash' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md scale-[1.01]' : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'}`}
                         >
-                          <Wallet size={18} />
+                          <Wallet size={14} />
                           {t('invoices.payment_cash')}
                         </button>
                         <button 
                           type="button"
                           onClick={() => setPaymentType('credit')}
-                          className={`flex-1 py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-3 border ${paymentType === 'credit' ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg scale-[1.02]' : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'}`}
+                          className={`flex-1 py-1.5 rounded-lg font-bold transition-all flex items-center justify-center gap-2 border text-xs ${paymentType === 'credit' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md scale-[1.01]' : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'}`}
                         >
-                          <CreditCard size={18} />
+                          <CreditCard size={14} />
                           {t('invoices.payment_credit')}
                         </button>
                       </div>
 
                       {paymentType === 'cash' && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 pt-6 border-t border-zinc-100">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3 pt-3 border-t border-zinc-100">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-sm font-medium text-zinc-700 mb-2">{t('invoices.form_payment_method')}</label>
+                              <label className="block text-[11px] font-bold text-zinc-400 tracking-tighter mb-1 px-2 uppercase">{t('invoices.form_payment_method')}</label>
                               <div className="relative group">
-                                <CreditCard className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 w-4 h-4 text-zinc-400 Transition-colors`} />
+                                <CreditCard className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-2.5 w-4 h-4 text-zinc-400 transition-colors`} />
                                 <select 
                                   required
-                                  className={`w-full ${dir === 'rtl' ? 'pr-10' : 'pl-10'} py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer`}
+                                  className={`w-full ${dir === 'rtl' ? 'pr-10' : 'pl-10'} py-1.5 rounded-xl border border-zinc-200 bg-zinc-50 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-xs`}
                                   value={paymentMethodId}
                                   onChange={(e) => {
                                     if (e.target.value === 'new_payment_method') {
@@ -2783,7 +2828,7 @@ export const Invoices: React.FC = () => {
                                   {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
                                   <option value="new_payment_method" className="font-bold text-emerald-600 italic">+ {t('payment_methods.add')}</option>
                                 </select>
-                                <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                                <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3.5' : 'right-3.5'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                               </div>
                             </div>
                           </div>
@@ -2791,16 +2836,16 @@ export const Invoices: React.FC = () => {
                       )}
 
                       {paymentType === 'credit' && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 pt-6 border-t border-zinc-100">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3 pt-3 border-t border-zinc-100">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-sm font-bold text-zinc-700 mb-2">
+                              <label className="block text-[11px] font-bold text-zinc-400 tracking-tighter mb-1 px-2 uppercase">
                                 {language === 'ar' ? 'شروط السداد' : 'Payment Terms'}
                               </label>
                               <div className="relative group">
-                                <Calendar className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                                <Calendar className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                                 <select 
-                                  className={`w-full ${dir === 'rtl' ? 'pr-10' : 'pl-10'} py-2.5 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer`}
+                                  className={`w-full ${dir === 'rtl' ? 'pr-10' : 'pl-10'} py-1.5 rounded-xl border border-zinc-200 bg-zinc-50 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-xs`}
                                   value={paymentTerms}
                                   onChange={(e) => {
                                     const term = e.target.value;
@@ -2836,18 +2881,18 @@ export const Invoices: React.FC = () => {
                                   <option value="advance_50_50">{language === 'ar' ? '50% مقدم والباقي عند التسليم' : '50% Advance / 50% on Delivery'}</option>
                                   <option value="custom">{language === 'ar' ? 'مخصص (أيام / نسب مقدمة مخصصة)' : 'Custom Days & Percentage'}</option>
                                 </select>
-                                <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                                <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3.5' : 'right-3.5'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                               </div>
                             </div>
 
                             <div>
-                              <label className="block text-sm font-bold text-zinc-700 mb-2">
+                              <label className="block text-[11px] font-bold text-zinc-400 tracking-tighter mb-1 px-2 uppercase">
                                 {language === 'ar' ? 'تاريخ الاستحقاق' : 'Due Date'}
                               </label>
                               <div className="relative">
                                 <input
                                   type="date"
-                                  className="w-full px-4 py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800"
+                                  className="w-full px-3 py-1.5 rounded-xl border border-zinc-200 bg-zinc-50 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs"
                                   value={dueDate}
                                   onChange={(e) => setDueDate(e.target.value)}
                                 />
@@ -2857,26 +2902,26 @@ export const Invoices: React.FC = () => {
                             {paymentTerms === 'custom' && (
                               <>
                                 <div>
-                                  <label className="block text-sm font-bold text-zinc-700 mb-2">
+                                  <label className="block text-[11px] font-bold text-zinc-400 mb-1 px-2">
                                     {language === 'ar' ? 'فترة السداد بالأيام' : 'Payment Terms (Days)'}
                                   </label>
                                   <input
                                     type="number"
                                     min={0}
-                                    className="w-full px-4 py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800"
+                                    className="w-full px-3 py-1.5 rounded-xl border border-zinc-200 bg-zinc-50 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs"
                                     value={paymentTermsDays}
                                     onChange={(e) => setPaymentTermsDays(Number(e.target.value) || 0)}
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-sm font-bold text-zinc-700 mb-2">
+                                  <label className="block text-[11px] font-bold text-zinc-400 mb-1 px-2">
                                     {language === 'ar' ? 'نسبة الدفعة المقدمة %' : 'Advance Percentage %'}
                                   </label>
                                   <input
                                     type="number"
                                     min={0}
                                     max={100}
-                                    className="w-full px-4 py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800"
+                                    className="w-full px-3 py-1.5 rounded-xl border border-zinc-200 bg-zinc-50 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs"
                                     value={advancePercentage}
                                     onChange={(e) => setAdvancePercentage(Number(e.target.value) || 0)}
                                   />
@@ -2914,46 +2959,20 @@ export const Invoices: React.FC = () => {
                         return null;
                       })()}
 
-                      {/* Currency Selection - REMOVED */}
-                    </section>
-
                     {/* Card 3: الأصناف */}
-                    <section className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-6">
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
+                    <section className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3">
+                      <div className="flex flex-row items-center justify-between gap-3 mb-3">
                         <div className="flex items-center gap-2 text-emerald-600">
                           <Package className="w-5 h-5" />
                           <h2 className="font-semibold text-zinc-900">{t('invoices.form_items')}</h2>
                         </div>
 
-                        <div className="flex gap-2 bg-zinc-50 p-1 rounded-lg border border-zinc-200">
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              setInvoiceType('items');
-                              setItems([]);
-                            }}
-                            className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${invoiceType === 'items' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
-                          >
-                            مبيعات سلع
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              setInvoiceType('services');
-                              setItems([]);
-                            }}
-                            className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${invoiceType === 'services' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
-                          >
-                            مبيعات خدمات
-                          </button>
-                        </div>
-
                         <button 
                           type="button"
                           onClick={() => addEmptyRow()}
-                          className="px-6 py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-all flex items-center gap-2 shadow-sm text-sm"
+                          className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-all flex items-center gap-1.5 shadow-sm text-xs"
                         >
-                          <Plus size={18} />
+                          <Plus size={14} />
                           {t('invoices.form_add_item')}
                         </button>
                       </div>
@@ -2961,46 +2980,36 @@ export const Invoices: React.FC = () => {
                       <div className="overflow-x-auto rounded-xl border border-zinc-200 overflow-hidden">
                         <table className="w-full text-sm text-right border-collapse">
                           <thead>
-                            <tr className="bg-zinc-50 border-b border-zinc-200">
-                              <th className="px-6 py-4 font-bold text-zinc-700">{t('invoices.item_name')}</th>
-                              <th className="px-6 py-4 font-bold text-zinc-700 w-24">صورة</th>
-                              <th className="px-6 py-4 font-bold text-zinc-700 w-32">باركود</th>
-                              <th className="px-6 py-4 font-bold text-zinc-700 w-32">{t('invoices.item_quantity')}</th>
-                              <th className="px-6 py-4 font-bold text-zinc-700 w-40">{t('invoices.item_price')}</th>
-                              <th className="px-6 py-4 font-bold text-zinc-700 w-40">{t('invoices.item_total')}</th>
-                              <th className="px-6 py-4 w-20"></th>
+                            <tr className="bg-zinc-100 border-b border-zinc-200 text-zinc-700 text-xs font-bold">
+                              <th className="p-1.5 border-r border-zinc-200 text-right">{t('invoices.item_name')}</th>
+                              <th className="p-1.5 border-r border-zinc-200 text-center w-16">{language === 'ar' ? 'صورة' : 'Image'}</th>
+                              <th className="p-1.5 border-r border-zinc-200 text-center w-28">{language === 'ar' ? 'باركود' : 'Barcode'}</th>
+                              <th className="p-1.5 border-r border-zinc-200 text-center w-24">{t('invoices.item_quantity')}</th>
+                              <th className="p-1.5 border-r border-zinc-200 text-center w-32">{t('invoices.item_price')}</th>
+                              <th className="p-1.5 border-r border-zinc-200 text-center w-32">{t('invoices.item_total')}</th>
+                              <th className="p-1.5 w-10"></th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-zinc-100">
                             {items.map((item, index) => (
                               <tr key={index} className="group hover:bg-zinc-50 transition-colors">
-                                <td className="px-6 py-4">
-                                  {invoiceType === 'items' ? (
-                                    <div className="relative">
-                                      <select 
-                                        className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2 outline-none font-bold text-zinc-800 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 appearance-none transition-all"
-                                        value={item.product_id}
-                                        onChange={(e) => updateItem(index, 'product_id', e.target.value)}
-                                      >
-                                        <option value="">{t('common.select_product')}</option>
-                                        {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                      </select>
-                                      <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 w-4 h-4 text-zinc-400 pointer-events-none`} />
-                                    </div>
-                                  ) : (
-                                    <input 
-                                      type="text" 
-                                      className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2 outline-none font-bold text-zinc-800 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold"
-                                      placeholder="وصف الخدمة..."
-                                      value={item.product_name || ''}
-                                      onChange={(e) => updateItem(index, 'product_name', e.target.value)}
-                                    />
-                                  )}
+                                <td className="p-1 border-b border-r border-zinc-200">
+                                  <div className="relative">
+                                    <select 
+                                      className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-2 py-1 outline-none font-bold text-zinc-800 appearance-none transition-all text-xs"
+                                      value={item.product_id}
+                                      onChange={(e) => updateItem(index, 'product_id', e.target.value)}
+                                    >
+                                      <option value="">{t('common.select_product')}</option>
+                                      {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                    </select>
+                                    <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-2' : 'right-2'} top-2 w-3.5 h-3.5 text-zinc-400 pointer-events-none`} />
+                                  </div>
                                 </td>
-                                <td className="px-6 py-4">
-                                  <div className="flex flex-col items-center gap-1">
+                                <td className="p-1 border-b border-r border-zinc-200 w-16 text-center">
+                                  <div className="flex justify-center items-center">
                                     {item.image_url ? (
-                                      <div className="relative group w-10 h-10">
+                                      <div className="relative group w-8 h-8">
                                         <img src={item.image_url} alt="" className="w-full h-full object-cover rounded shadow-sm" referrerPolicy="no-referrer" />
                                         <button 
                                           onClick={() => updateItem(index, 'image_url', '')}
@@ -3010,8 +3019,8 @@ export const Invoices: React.FC = () => {
                                         </button>
                                       </div>
                                     ) : (
-                                      <label className="cursor-pointer p-2 bg-zinc-50 border border-zinc-200 border-dashed rounded-lg hover:bg-zinc-100 transition-colors">
-                                        <ImageIcon size={16} className="text-zinc-400" />
+                                      <label className="cursor-pointer p-1.5 bg-zinc-50 border border-zinc-200 border-dashed rounded hover:bg-zinc-100 transition-colors inline-block">
+                                        <ImageIcon size={14} className="text-zinc-400" />
                                         <input 
                                           type="file" 
                                           className="hidden" 
@@ -3029,61 +3038,61 @@ export const Invoices: React.FC = () => {
                                     )}
                                   </div>
                                 </td>
-                                <td className="px-6 py-4">
-                                  <div className="flex flex-col items-center gap-1">
+                                <td className="p-1 border-b border-r border-zinc-200 w-28 text-center">
+                                  <div className="flex flex-col items-center gap-0.5">
                                     <input 
                                       type="text" 
-                                      placeholder="الباركود..."
-                                      className="w-full bg-white border border-zinc-200 rounded-lg px-2 py-1 text-center font-bold text-xs text-zinc-800 outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-mono"
+                                      placeholder={language === 'ar' ? 'الباركود...' : 'Barcode...'}
+                                      className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-center font-bold text-xs text-zinc-800 outline-none transition-all font-mono"
                                       value={item.barcode || ''}
                                       onChange={(e) => updateItem(index, 'barcode', e.target.value)}
                                     />
                                     {item.barcode && (
-                                      <div className="mt-1 bg-white p-1 rounded border border-zinc-100 shadow-sm">
+                                      <div className="bg-white p-0.5 rounded border border-zinc-100 shadow-sm scale-90">
                                         <Barcode 
                                           value={item.barcode} 
-                                          width={0.6} 
-                                          height={15} 
-                                          fontSize={6}
+                                          width={0.5} 
+                                          height={10} 
+                                          fontSize={4}
                                           margin={0}
                                         />
                                       </div>
                                     )}
                                   </div>
                                 </td>
-                                <td className="px-6 py-4">
+                                <td className="p-1 border-b border-r border-zinc-200 w-24">
                                   <input 
                                     type="number" 
-                                    className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2 text-center font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-bold"
+                                    className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-center font-bold text-zinc-800 outline-none transition-all text-xs font-bold"
                                     value={item.quantity}
                                     onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
                                   />
                                 </td>
-                                <td className="px-6 py-4">
+                                <td className="p-1 border-b border-r border-zinc-200 w-32">
                                   <input 
                                     type="number" 
-                                    className="w-full bg-white border border-zinc-200 rounded-lg px-4 py-2 text-center font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-bold"
+                                    className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-center font-bold text-zinc-800 outline-none transition-all text-xs font-bold"
                                     value={item.unit_price}
                                     onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
                                   />
                                 </td>
-                                <td className="px-6 py-4 text-left font-black text-emerald-600 text-lg">
+                                <td className="p-1 border-b border-r border-zinc-200 w-32 text-center font-bold text-emerald-600 text-xs">
                                   {formatMoney(item.total)}
                                 </td>
-                                <td className="px-6 py-4 text-center">
+                                <td className="p-1 border-b border-zinc-200 w-10 text-center">
                                   <button 
                                     type="button"
                                     onClick={() => removeItem(index)}
-                                    className="p-2 text-zinc-300 hover:text-emerald-500 transition-colors"
+                                    className="p-1 text-zinc-300 hover:text-red-500 transition-colors"
                                   >
-                                    <Trash2 size={18} />
+                                    <Trash2 size={14} />
                                   </button>
                                 </td>
                               </tr>
                             ))}
                             {items.length === 0 && (
                               <tr>
-                                <td colSpan={8} className="px-6 py-12 text-center text-zinc-400 italic">
+                                <td colSpan={8} className="px-3 py-6 text-center text-zinc-400 italic text-xs">
                                   {t('common.no_items')}
                                 </td>
                               </tr>
@@ -3094,36 +3103,36 @@ export const Invoices: React.FC = () => {
                     </section>
 
                     {/* Totals & Notes Section */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                      <section className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-6">
-                        <div className="flex items-center gap-2 mb-4 text-emerald-600">
-                          <Layers className="w-5 h-5" />
-                          <h2 className="font-semibold text-zinc-900">ملخص الفاتورة</h2>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <section className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3">
+                        <div className="flex items-center gap-2 mb-2 text-emerald-600">
+                          <Layers className="w-4 h-4" />
+                          <h2 className="font-semibold text-zinc-900 text-xs">{language === 'ar' ? 'ملخص الفاتورة' : 'Invoice Summary'}</h2>
                         </div>
 
-                        <div className="bg-zinc-50 rounded-lg p-6 border border-zinc-100 space-y-4">
-                          <div className="flex justify-between items-center text-zinc-600">
-                            <span className="font-medium text-sm">{t('invoices.summary_subtotal')}</span>
-                            <span className="font-bold text-lg">
+                        <div className="bg-zinc-50 rounded-lg p-4 border border-zinc-100 space-y-2">
+                          <div className="flex justify-between items-center text-zinc-600 text-xs">
+                            <span className="font-medium">{t('invoices.summary_subtotal')}</span>
+                            <span className="font-bold text-sm">
                               {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}
                             </span>
                           </div>
-                          <div className="flex justify-between items-center text-emerald-600">
-                            <div className="flex items-center gap-4">
-                              <span className="font-medium text-sm">{t('invoices.summary_discount')}</span>
+                          <div className="flex justify-between items-center text-emerald-600 text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{t('invoices.summary_discount')}</span>
                               <input 
                                 type="number" 
-                                className="w-24 bg-white border border-zinc-200 rounded-lg px-2 py-1 text-center font-bold text-emerald-600 focus:ring-2 focus:ring-emerald-500 outline-none"
+                                className="w-20 bg-white border border-zinc-200 rounded px-1.5 py-0.5 text-center font-bold text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
                                 value={Number(discount)}
                                 onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
                               />
                             </div>
-                            <span className="font-bold text-lg">-{formatMoney(discount)}</span>
+                            <span className="font-bold text-sm">-{formatMoney(discount)}</span>
                           </div>
-                          <div className="flex justify-between items-center text-emerald-600">
-                            <span className="font-black text-lg">{t('invoices.summary_total')}</span>
+                          <div className="flex justify-between items-center text-emerald-600 text-xs pt-1 border-t border-zinc-200">
+                            <span className="font-black text-sm">{t('invoices.summary_total')}</span>
                             <div className="flex flex-col items-end">
-                              <span className="font-black text-2xl tracking-tighter text-left">
+                              <span className="font-black text-lg tracking-tighter text-left">
                                 {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) - discount)} {companyData?.settings?.currency || ''}
                               </span>
                             </div>
@@ -3132,13 +3141,13 @@ export const Invoices: React.FC = () => {
                       </section>
 
                       {/* Notes Card */}
-                      <section className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-6">
-                        <div className="flex items-center gap-2 mb-4 text-emerald-600">
-                          <Tag className="w-5 h-5" />
-                          <h2 className="font-semibold text-zinc-900">{language === 'ar' ? 'الملاحظات' : 'Notes'}</h2>
+                      <section className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3">
+                        <div className="flex items-center gap-2 mb-2 text-emerald-600">
+                          <Tag className="w-4 h-4" />
+                          <h2 className="font-semibold text-zinc-900 text-xs">{language === 'ar' ? 'الملاحظات' : 'Notes'}</h2>
                         </div>
                         <textarea 
-                          className="w-full min-h-[150px] bg-zinc-50 border border-zinc-200 rounded-lg p-4 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500 transition-all font-medium text-zinc-700 font-bold"
+                          className="w-full min-h-[80px] bg-zinc-50 border border-zinc-200 rounded-lg p-3 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500 transition-all font-medium text-zinc-700 font-bold text-xs"
                           placeholder={language === 'ar' ? 'أدخل أي ملاحظات إضافية هنا...' : 'Enter any additional notes...'}
                           value={description}
                           onChange={(e) => setDescription(e.target.value)}

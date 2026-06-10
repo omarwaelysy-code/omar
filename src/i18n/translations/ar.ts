@@ -263,6 +263,14 @@ export const ar = {
   'invoices.log_add_msg': 'إضافة فاتورة جديدة رقم: {number}',
   'invoices.log_delete': 'حذف فاتورة',
   'invoices.log_delete_msg': 'حذف فاتورة رقم: {number}',
+  'invoices.item_name': 'اسم الصنف',
+  'invoices.item_quantity': 'الكمية',
+  'invoices.item_price': 'سعر الوحدة',
+  'invoices.item_total': 'الإجمالي',
+  'invoices.form_add_item': 'إضافة صنف',
+  'invoices.basic_info': 'البيانات الأساسية',
+  'invoices.payment_settings': 'إعدادات الدفع وشروط السداد',
+  'common.no_items': 'لا توجد أصناف مضافة',
 
   // Returns
   'returns.title': 'مرتجع المبيعات',

@@ -262,6 +262,14 @@ export const en = {
   'invoices.log_add_msg': 'Added new invoice No: {number}',
   'invoices.log_delete': 'Delete Invoice',
   'invoices.log_delete_msg': 'Deleted invoice No: {number}',
+  'invoices.item_name': 'Item Name',
+  'invoices.item_quantity': 'Quantity',
+  'invoices.item_price': 'Unit Price',
+  'invoices.item_total': 'Total',
+  'invoices.form_add_item': 'Add Item',
+  'invoices.basic_info': 'Basic Information',
+  'invoices.payment_settings': 'Payment Settings & Terms',
+  'common.no_items': 'No items added',
 
   // Returns
   'returns.title': 'Sales Returns',
