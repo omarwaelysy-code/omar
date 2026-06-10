@@ -23,7 +23,7 @@ const tryParseNumber = (value: any): any => {
       return trimmed;
     }
     // Check if it has time or timezone info
-    if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/.test(trimmed)) {
+    if (/^\d{4}-\d{2}-\d{2}[T ]/.test(trimmed) || /^\d{2}[-/]\d{2}[-/]\d{4}[T ]/.test(trimmed)) {
       return trimmed;
     }
     // Check if it's a code with leading zeros (e.g. '00123' or '05')
@@ -96,9 +96,20 @@ export const sanitizeForExcel = (data: any[]): any[] => {
         return;
       }
 
-      // Convert ISO Date-time string to Date-only string YYYY-MM-DD
-      if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/.test(value)) {
-        value = value.substring(0, 10);
+      // Convert Date object to date-only string YYYY-MM-DD
+      if (value instanceof Date) {
+        const day = String(value.getUTCDate()).padStart(2, '0');
+        const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+        const year = value.getUTCFullYear();
+        value = `${year}-${month}-${day}`;
+      }
+
+      // Convert ISO Date-time or formatted date-time string to Date-only string
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (/^\d{4}-\d{2}-\d{2}[T ]/.test(trimmed) || /^\d{2}[-/]\d{2}[-/]\d{4}[T ]/.test(trimmed)) {
+          value = trimmed.substring(0, 10);
+        }
       }
 
       // Convert to number if it's a numeric string
