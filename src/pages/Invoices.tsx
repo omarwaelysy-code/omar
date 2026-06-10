@@ -2958,6 +2958,7 @@ export const Invoices: React.FC = () => {
                         }
                         return null;
                       })()}
+                    </section>
 
                     {/* Card 3: الأصناف */}
                     <section className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3">
