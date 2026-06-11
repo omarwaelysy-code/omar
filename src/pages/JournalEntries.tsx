@@ -156,7 +156,7 @@ export const JournalEntries: React.FC = () => {
     const matchesSearch = 
       entry.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       entry.reference_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      entry.items?.some(item => item.account_name.toLowerCase().includes(searchTerm.toLowerCase()));
+      entry.items?.some(item => (item.account_name || accounts.find(a => a.id === item.account_id)?.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
     
     const entryDate = new Date(entry.date);
     const startDate = new Date(dateRange.start);
@@ -484,7 +484,7 @@ export const JournalEntries: React.FC = () => {
                       {selectedEntry.items?.map((item, idx) => (
                         <tr key={idx}>
                           <td className="px-4 py-3">
-                            <p className="text-sm font-bold text-zinc-900">{item.account_name}</p>
+                            <p className="text-sm font-bold text-zinc-900">{item.account_name || accounts.find(a => a.id === item.account_id)?.name || ''}</p>
                             {(item.customer_name || item.supplier_name) && (
                               <p className="text-[10px] text-emerald-600 font-black mt-0.5">
                                 {item.customer_name || item.supplier_name}

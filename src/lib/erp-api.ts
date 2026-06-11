@@ -1239,6 +1239,15 @@ modules.forEach(moduleName => {
     }
 
     if (itemsTable) {
+      if (module === 'journal_entries') {
+        const { rows } = await pool.query(`
+          SELECT jel.*, COALESCE(jel.account_name, acc.name) AS account_name
+          FROM "journal_entry_lines" jel
+          LEFT JOIN "accounts" acc ON acc.id = jel.account_id
+          WHERE jel."journal_entry_id" = $1
+        `, [id]);
+        return rows;
+      }
       const { rows } = await pool.query(`SELECT * FROM "${itemsTable}" WHERE "${foreignKey}" = $1`, [id]);
       return rows;
     }
@@ -3613,35 +3622,93 @@ router.post('/opening_stock_balances', authenticateToken, async (req: AuthReques
       ]
     );
 
-    // Debit line (Inventory)
-    await client.query(
-      `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, debit, credit, description, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
-      [
-        uuidv4(),
-        companyId,
-        entryId,
-        docData.debit_account_id,
-        totalValue,
-        0,
-        `افتتاح مخزون - سند رقم ${docData.document_number}`,
-      ]
-    );
+    // Fetch account names
+    const debitAccRes = await client.query('SELECT name FROM accounts WHERE id = $1', [docData.debit_account_id]);
+    const debitAccName = debitAccRes.rows[0]?.name || '';
+    const creditAccRes = await client.query('SELECT name FROM accounts WHERE id = $1', [docData.credit_account_id]);
+    const creditAccName = creditAccRes.rows[0]?.name || '';
 
-    // Credit line (Capital / Counter Account)
-    await client.query(
-      `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, debit, credit, description, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
-      [
-        uuidv4(),
-        companyId,
-        entryId,
-        docData.credit_account_id,
-        0,
-        totalValue,
-        `افتتاح مخزون - مقابل - سند رقم ${docData.document_number}`,
-      ]
-    );
+    // Insert itemized lines per product
+    let lineInserted = false;
+    for (const item of (items || [])) {
+      const qty = parseFloat(item.quantity || '0');
+      const cost = parseFloat(item.unit_cost || '0') || 0;
+      const itemTotal = qty * cost;
+
+      if (itemTotal > 0) {
+        // Find product name
+        const prodRes = await client.query('SELECT name FROM products WHERE id = $1', [item.product_id]);
+        const prodName = prodRes.rows[0]?.name || 'صنف غير معروف';
+
+        // Debit line (Inventory)
+        await client.query(
+          `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, account_name, debit, credit, description, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+          [
+            uuidv4(),
+            companyId,
+            entryId,
+            docData.debit_account_id,
+            debitAccName,
+            itemTotal,
+            0,
+            `افتتاح مخزون - صنف: ${prodName} - سند رقم ${docData.document_number}`,
+          ]
+        );
+
+        // Credit line (Capital / Counter Account)
+        await client.query(
+          `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, account_name, debit, credit, description, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+          [
+            uuidv4(),
+            companyId,
+            entryId,
+            docData.credit_account_id,
+            creditAccName,
+            0,
+            itemTotal,
+            `افتتاح مخزون - مقابل - صنف: ${prodName} - سند رقم ${docData.document_number}`,
+          ]
+        );
+        lineInserted = true;
+      }
+    }
+
+    // Fallback if no itemized lines were inserted (e.g. totalValue is 0)
+    if (!lineInserted) {
+      // Debit line
+      await client.query(
+        `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, account_name, debit, credit, description, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+        [
+          uuidv4(),
+          companyId,
+          entryId,
+          docData.debit_account_id,
+          debitAccName,
+          0,
+          0,
+          `افتتاح مخزون - سند رقم ${docData.document_number}`,
+        ]
+      );
+
+      // Credit line
+      await client.query(
+        `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, account_name, debit, credit, description, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+        [
+          uuidv4(),
+          companyId,
+          entryId,
+          docData.credit_account_id,
+          creditAccName,
+          0,
+          0,
+          `افتتاح مخزون - مقابل - سند رقم ${docData.document_number}`,
+        ]
+      );
+    }
 
     if (productsToSync.length > 0) {
       await syncProductsCostAndJEs(client, companyId, productsToSync);
@@ -3770,35 +3837,93 @@ router.put('/opening_stock_balances/:id', authenticateToken, async (req: AuthReq
       ]
     );
 
-    // Debit line
-    await client.query(
-      `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, debit, credit, description, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
-      [
-        uuidv4(),
-        companyId,
-        entryId,
-        docData.debit_account_id,
-        totalValue,
-        0,
-        `افتتاح مخزون - سند رقم ${rawDocData.document_number}`,
-      ]
-    );
+    // Fetch account names
+    const debitAccRes = await client.query('SELECT name FROM accounts WHERE id = $1', [docData.debit_account_id]);
+    const debitAccName = debitAccRes.rows[0]?.name || '';
+    const creditAccRes = await client.query('SELECT name FROM accounts WHERE id = $1', [docData.credit_account_id]);
+    const creditAccName = creditAccRes.rows[0]?.name || '';
 
-    // Credit line
-    await client.query(
-      `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, debit, credit, description, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
-      [
-        uuidv4(),
-        companyId,
-        entryId,
-        docData.credit_account_id,
-        0,
-        totalValue,
-        `افتتاح مخزون - مقابل - سند رقم ${rawDocData.document_number}`,
-      ]
-    );
+    // Insert itemized lines per product
+    let lineInserted = false;
+    for (const item of (items || [])) {
+      const qty = parseFloat(item.quantity || '0');
+      const cost = parseFloat(item.unit_cost || '0') || 0;
+      const itemTotal = qty * cost;
+
+      if (itemTotal > 0) {
+        // Find product name
+        const prodRes = await client.query('SELECT name FROM products WHERE id = $1', [item.product_id]);
+        const prodName = prodRes.rows[0]?.name || 'صنف غير معروف';
+
+        // Debit line (Inventory)
+        await client.query(
+          `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, account_name, debit, credit, description, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+          [
+            uuidv4(),
+            companyId,
+            entryId,
+            docData.debit_account_id,
+            debitAccName,
+            itemTotal,
+            0,
+            `افتتاح مخزون - صنف: ${prodName} - سند رقم ${rawDocData.document_number}`,
+          ]
+        );
+
+        // Credit line (Capital / Counter Account)
+        await client.query(
+          `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, account_name, debit, credit, description, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+          [
+            uuidv4(),
+            companyId,
+            entryId,
+            docData.credit_account_id,
+            creditAccName,
+            0,
+            itemTotal,
+            `افتتاح مخزون - مقابل - صنف: ${prodName} - سند رقم ${rawDocData.document_number}`,
+          ]
+        );
+        lineInserted = true;
+      }
+    }
+
+    // Fallback if no itemized lines were inserted (e.g. totalValue is 0)
+    if (!lineInserted) {
+      // Debit line
+      await client.query(
+        `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, account_name, debit, credit, description, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+        [
+          uuidv4(),
+          companyId,
+          entryId,
+          docData.debit_account_id,
+          debitAccName,
+          0,
+          0,
+          `افتتاح مخزون - سند رقم ${rawDocData.document_number}`,
+        ]
+      );
+
+      // Credit line
+      await client.query(
+        `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, account_name, debit, credit, description, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+        [
+          uuidv4(),
+          companyId,
+          entryId,
+          docData.credit_account_id,
+          creditAccName,
+          0,
+          0,
+          `افتتاح مخزون - مقابل - سند رقم ${rawDocData.document_number}`,
+        ]
+      );
+    }
 
     if (productsToSync.length > 0) {
       await syncProductsCostAndJEs(client, companyId, productsToSync);
@@ -3977,14 +4102,17 @@ router.post('/stock_adjustments', authenticateToken, async (req: AuthRequest, re
       );
 
       for (const line of journalLines) {
+        const accRes = await client.query('SELECT name FROM accounts WHERE id = $1', [line.account_id]);
+        const accName = accRes.rows[0]?.name || '';
         await client.query(
-          `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, debit, credit, description, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+          `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, account_name, debit, credit, description, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
           [
             uuidv4(),
             companyId,
             entryId,
             line.account_id,
+            accName,
             line.debit,
             line.credit,
             line.description,
@@ -4162,14 +4290,17 @@ router.put('/stock_adjustments/:id', authenticateToken, async (req: AuthRequest,
       );
 
       for (const line of journalLines) {
+        const accRes = await client.query('SELECT name FROM accounts WHERE id = $1', [line.account_id]);
+        const accName = accRes.rows[0]?.name || '';
         await client.query(
-          `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, debit, credit, description, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+          `INSERT INTO "journal_entry_lines" (id, company_id, journal_entry_id, account_id, account_name, debit, credit, description, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
           [
             uuidv4(),
             companyId,
             entryId,
             line.account_id,
+            accName,
             line.debit,
             line.credit,
             line.description,

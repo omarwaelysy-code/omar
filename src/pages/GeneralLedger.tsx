@@ -183,10 +183,11 @@ export const GeneralLedger: React.FC = () => {
         const account = accounts.find(a => a.id === item.account_id);
         const typeInfo = accountTypes.find(t => t.id === account?.type_id);
         const typeLabel = typeInfo ? typeInfo.name : (account?.type_name || '-');
+        const resolvedAccountName = item.account_name || account?.name || '';
 
         const matchesSearch = 
           !detailedSearchTerm ||
-          item.account_name.toLowerCase().includes(detailedSearchTerm.toLowerCase()) ||
+          resolvedAccountName.toLowerCase().includes(detailedSearchTerm.toLowerCase()) ||
           (item.description || '').toLowerCase().includes(detailedSearchTerm.toLowerCase()) ||
           entry.description.toLowerCase().includes(detailedSearchTerm.toLowerCase()) ||
           (entry.entry_number || '').toLowerCase().includes(detailedSearchTerm.toLowerCase()) ||
@@ -201,7 +202,7 @@ export const GeneralLedger: React.FC = () => {
           date: entry.date,
           entry_number: entry.entry_number,
           account_id: item.account_id,
-          account_name: item.account_name,
+          account_name: resolvedAccountName,
           account_type: typeLabel,
           reference: entry.reference_number || '-',
           reference_type: entry.reference_type,
