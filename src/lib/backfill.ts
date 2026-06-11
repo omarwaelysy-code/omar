@@ -1,9 +1,31 @@
 import crypto from 'crypto';
+import { generateNextSequence } from './erp-api';
 
 export async function backfillMissingJournalEntries(pool: any) {
   console.log("🔄 [BACKFILL] STARTING BACKFILL OF MISSING JOURNAL ENTRIES...");
   const client = await pool.connect();
   try {
+    // 0. Rename any legacy JE-BF- journal entries to match the standard format
+    const legacyEntries = await client.query(`
+      SELECT id, company_id, date, entry_number 
+      FROM journal_entries 
+      WHERE entry_number LIKE 'JE-BF-%'
+      ORDER BY date ASC, entry_number ASC
+    `);
+    
+    if (legacyEntries.rows.length > 0) {
+      console.log(`🔄 [BACKFILL] Found ${legacyEntries.rows.length} legacy JE-BF- entries. Renaming to standard sequence...`);
+      for (const entry of legacyEntries.rows) {
+        const nextNum = await generateNextSequence(client, entry.company_id, 'journal_entries', entry.date);
+        await client.query(`
+          UPDATE journal_entries 
+          SET entry_number = $1 
+          WHERE id = $2
+        `, [nextNum, entry.id]);
+        console.log(`   [BACKFILL] Renamed legacy entry: ${entry.entry_number} -> ${nextNum}`);
+      }
+    }
+
     // 1. Find all purchase invoices that don't have journal entries
     const missingInvoicesRes = await client.query(`
       SELECT pi.* 
@@ -53,11 +75,9 @@ export async function backfillMissingJournalEntries(pool: any) {
         supplierAccountId = fallback?.id || 'suppliers_account_default';
         supplierAccountName = fallback?.name || 'حساب الموردين';
       }
-
-      // Generate a temporary JE number based on invoice number to keep it traceable
-      const countRes = await client.query('SELECT COUNT(*) FROM journal_entries WHERE company_id = $1', [companyId]);
-      const jeCount = parseInt(countRes.rows[0].count || '0') + 1;
-      const entryNumber = `JE-BF-${invoiceNumber}-${jeCount}`;
+ 
+      // Generate standard sequence journal entry number
+      const entryNumber = await generateNextSequence(client, companyId, 'journal_entries', invoice.date);
 
       const journalItems: any[] = [];
       
