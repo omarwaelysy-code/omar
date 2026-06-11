@@ -536,6 +536,7 @@ export const en = {
   'journal.title': 'Journal Entries',
   'journal.subtitle': 'View and track all accounting entries.',
   'journal.column_date': 'Date',
+  'journal.column_entry_number': 'Entry Number',
   'journal.column_description': 'Description',
   'journal.column_reference': 'Reference',
   'journal.column_debit': 'Debit',
@@ -597,6 +598,8 @@ export const en = {
 
   'ledger.title': 'General Ledger',
   'ledger.subtitle': 'Detailed view of account movements.',
+  'ledger.detailed_entries': 'Detailed Entries',
+  'ledger.single_account': 'General Ledger',
   'ledger.select_account': 'Select account...',
   'ledger.filter_entities': 'Filter by customers or suppliers (optional)',
   'ledger.deselect_all': 'Deselect All',

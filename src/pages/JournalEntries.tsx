@@ -287,6 +287,14 @@ export const JournalEntries: React.FC = () => {
                     </span>
                   </div>
                 </th>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('entry_number')}>
+                  <div className="flex items-center gap-1">
+                    {t('journal.column_entry_number')}
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sortBy === 'entry_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
                 <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_description')}</th>
                 <th className="px-6 py-4 text-sm font-bold text-zinc-700 cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('reference_number')}>
                   <div className="flex items-center gap-1">
@@ -319,6 +327,20 @@ export const JournalEntries: React.FC = () => {
               {filteredEntries.map((entry) => (
                 <tr key={entry.id} className="hover:bg-zinc-50/50 transition-colors group">
                   <td className="px-6 py-4 text-sm font-bold text-zinc-900">{formatDate(entry.date)}</td>
+                  <td className="px-6 py-4">
+                    {entry.entry_number ? (
+                      <span 
+                        onClick={() => setSelectedEntry(entry)}
+                        className="px-3 py-1 bg-zinc-100 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 font-mono"
+                      >
+                        {entry.entry_number}
+                      </span>
+                    ) : (
+                      <span className="px-3 py-1 bg-zinc-100 text-zinc-400 rounded-lg text-xs font-bold font-mono">
+                        -
+                      </span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-sm font-medium text-zinc-600 max-w-xs truncate">{entry.description}</td>
                   <td className="px-6 py-4">
                     {entry.reference_number && entry.reference_number !== '-' ? (
@@ -358,7 +380,7 @@ export const JournalEntries: React.FC = () => {
               ))}
               {filteredEntries.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-zinc-500 font-medium">
+                  <td colSpan={7} className="px-6 py-12 text-center text-zinc-500 font-medium">
                     {t('journal.no_entries')}
                   </td>
                 </tr>
@@ -367,7 +389,7 @@ export const JournalEntries: React.FC = () => {
             {entries.length > 0 && (
               <tfoot className="bg-zinc-900 text-white font-black">
                 <tr>
-                  <td colSpan={3} className="px-6 py-4 text-center border-l border-zinc-700">{t('journal.total')}</td>
+                  <td colSpan={4} className="px-6 py-4 text-center border-l border-zinc-700">{t('journal.total')}</td>
                   <td className="px-6 py-4 text-center border-l border-zinc-700">
                     {serverSummary.total_debit ? formatMoney(serverSummary.total_debit) : '0.00'}
                   </td>

@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
-import { JournalEntry, Account, Customer, Supplier, LedgerLine } from '../types';
-import { Search, Calendar, FileText, Download, Printer, Filter, BookOpen, ArrowLeftRight, User, Users, RefreshCcw } from 'lucide-react';
+import { JournalEntry, Account, Customer, Supplier, LedgerLine, AccountType } from '../types';
+import { Search, Calendar, FileText, Download, Printer, Filter, BookOpen, ArrowLeftRight, User, Users, RefreshCcw, LayoutGrid, List } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
@@ -20,6 +20,9 @@ export const GeneralLedger: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [ledgerMode, setLedgerMode] = useState<'single' | 'detailed'>('single');
+  const [accountTypes, setAccountTypes] = useState<AccountType[]>([]);
+  const [detailedSearchTerm, setDetailedSearchTerm] = useState('');
 
   const handleTransactionClick = (type: string | undefined, reference: string) => {
     if (!reference || reference === '-' || reference === '') return;
@@ -91,12 +94,14 @@ export const GeneralLedger: React.FC = () => {
     const unsubscribeAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
     const unsubscribeCustomers = dbService.subscribe<Customer>('customers', user.company_id, setCustomers);
     const unsubscribeSuppliers = dbService.subscribe<Supplier>('suppliers', user.company_id, setSuppliers);
+    const unsubscribeAccountTypes = dbService.subscribe<AccountType>('account_types', user.company_id, setAccountTypes);
 
     return () => {
       unsubscribeEntries();
       unsubscribeAccounts();
       unsubscribeCustomers();
       unsubscribeSuppliers();
+      unsubscribeAccountTypes();
     };
   }, [user, refreshTrigger]);
 
@@ -104,6 +109,131 @@ export const GeneralLedger: React.FC = () => {
     setLoading(true);
     setRefreshTrigger(prev => prev + 1);
   };
+
+  // Flattening journal items for the Detailed Journal Entries table
+  const detailedLines = React.useMemo(() => {
+    if (ledgerMode !== 'detailed') return [];
+
+    const start = new Date(dateRange.start);
+    const end = new Date(dateRange.end);
+    end.setHours(23, 59, 59, 999);
+
+    const lines: any[] = [];
+
+    entries.forEach(entry => {
+      const entryDate = new Date(entry.date);
+      if (entryDate < start || entryDate > end) return;
+
+      entry.items?.forEach(item => {
+        // Apply entity filters if selected
+        if (selectedEntityIds.length > 0) {
+          const matchesEntity = selectedEntityIds.includes(item.customer_id || '') || 
+                               selectedEntityIds.includes(item.supplier_id || '') ||
+                               selectedEntityIds.includes(item.sub_account_id || '');
+          if (!matchesEntity) return;
+        }
+
+        let entityName = item.customer_name || item.supplier_name || '';
+        if (!entityName) {
+          if (item.customer_id && customers) {
+            const found = customers.find(c => c.id === item.customer_id);
+            if (found) entityName = found.name;
+          }
+          if (!entityName && item.supplier_id && suppliers) {
+            const found = suppliers.find(s => s.id === item.supplier_id);
+            if (found) entityName = found.name;
+          }
+          if (!entityName && item.sub_account_id && customers && (item.sub_account_type === 'customer' || !item.sub_account_type)) {
+            const found = customers.find(c => c.id === item.sub_account_id);
+            if (found) entityName = found.name;
+          }
+          if (!entityName && item.sub_account_id && suppliers && (item.sub_account_type === 'supplier' || !item.sub_account_type)) {
+            const found = suppliers.find(s => s.id === item.sub_account_id);
+            if (found) entityName = found.name;
+          }
+        }
+        if (!entityName) {
+          entityName = item.sub_account_type === 'payment_method' ? 'خزينة/بنك' : '';
+        }
+
+        // Sub-account / Product name parser helper
+        const getSubAccountOrProduct = (itm: any) => {
+          const desc = itm.description || entry.description || '';
+          // Match "صنف: X" or "الصنف: X"
+          const productMatch = desc.match(/(?:صنف|الصنف)\s*:\s*([^-\n\r]+)/i);
+          if (productMatch && productMatch[1]) {
+            return productMatch[1].trim();
+          }
+          
+          if (itm.sub_account_id) {
+            if (itm.sub_account_type === 'payment_method') {
+              return 'خزينة / بنك';
+            }
+            if (itm.sub_account_type === 'expense') {
+              return 'مصروف';
+            }
+            return itm.sub_account_id;
+          }
+          return '-';
+        };
+
+        const subAccountOrProduct = getSubAccountOrProduct(item);
+
+        // Account type resolution
+        const account = accounts.find(a => a.id === item.account_id);
+        const typeInfo = accountTypes.find(t => t.id === account?.type_id);
+        const typeLabel = typeInfo ? typeInfo.name : (account?.type_name || '-');
+
+        const matchesSearch = 
+          !detailedSearchTerm ||
+          item.account_name.toLowerCase().includes(detailedSearchTerm.toLowerCase()) ||
+          (item.description || '').toLowerCase().includes(detailedSearchTerm.toLowerCase()) ||
+          entry.description.toLowerCase().includes(detailedSearchTerm.toLowerCase()) ||
+          (entry.entry_number || '').toLowerCase().includes(detailedSearchTerm.toLowerCase()) ||
+          (entry.reference_number || '').toLowerCase().includes(detailedSearchTerm.toLowerCase()) ||
+          entityName.toLowerCase().includes(detailedSearchTerm.toLowerCase()) ||
+          subAccountOrProduct.toLowerCase().includes(detailedSearchTerm.toLowerCase());
+
+        if (!matchesSearch) return;
+
+        lines.push({
+          id: entry.id,
+          date: entry.date,
+          entry_number: entry.entry_number,
+          account_id: item.account_id,
+          account_name: item.account_name,
+          account_type: typeLabel,
+          reference: entry.reference_number || '-',
+          reference_type: entry.reference_type,
+          entity_name: entityName || '-',
+          sub_account_product: subAccountOrProduct,
+          debit: Number(item.debit) || 0,
+          credit: Number(item.credit) || 0,
+          description: item.description || entry.description
+        });
+      });
+    });
+
+    // Sort by date, with entry_number and ID as tie-breakers
+    return lines.sort((a, b) => {
+      const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+      if (dateDiff !== 0) return dateDiff;
+      
+      const aNo = a.entry_number || '';
+      const bNo = b.entry_number || '';
+      const noDiff = aNo.localeCompare(bNo, undefined, { numeric: true });
+      if (noDiff !== 0) return noDiff;
+
+      return (a.id || '').localeCompare(b.id || '');
+    });
+  }, [ledgerMode, entries, dateRange.start, dateRange.end, selectedEntityIds, detailedSearchTerm, accounts, accountTypes, customers, suppliers]);
+
+  const detailedTotals = React.useMemo(() => {
+    return detailedLines.reduce((acc, line) => ({
+      debit: acc.debit + line.debit,
+      credit: acc.credit + line.credit
+    }), { debit: 0, credit: 0 });
+  }, [detailedLines]);
 
   const selectedAccount = accounts.find(a => a.id === selectedAccountId);
 
@@ -131,28 +261,53 @@ export const GeneralLedger: React.FC = () => {
 
   const handleExportPDF = async () => {
     if (reportRef.current) {
-      const account = accounts.find(a => a.id === selectedAccountId);
-      await exportToPDF(reportRef.current, { 
-        filename: `General_Ledger_${account?.name || 'Account'}`, 
-        orientation: 'landscape',
-        reportTitle: `${t('ledger.title')}: ${account?.name || ''}`
-      });
+      if (ledgerMode === 'detailed') {
+        await exportToPDF(reportRef.current, { 
+          filename: `Detailed_Journal_Entries`, 
+          orientation: 'landscape',
+          reportTitle: t('ledger.detailed_entries')
+        });
+      } else {
+        const account = accounts.find(a => a.id === selectedAccountId);
+        await exportToPDF(reportRef.current, { 
+          filename: `General_Ledger_${account?.name || 'Account'}`, 
+          orientation: 'landscape',
+          reportTitle: `${t('ledger.title')}: ${account?.name || ''}`
+        });
+      }
     }
   };
 
   const handleExportExcel = () => {
-    const account = accounts.find(a => a.id === selectedAccountId);
-    const data = ledgerData.map(tx => ({
-      [t('journal.column_date')]: tx.date,
-      [t('ledger.column_entity')]: tx.entity_name || '-',
-      [t('journal.column_description')]: tx.description,
-      [t('journal.column_reference')]: tx.reference || '-',
-      [language === 'ar' ? 'رقم القيد' : 'Entry No.']: tx.entry_number || '-',
-      [t('journal.column_debit')]: tx.debit,
-      [t('journal.column_credit')]: tx.credit,
-      [t('ledger.column_balance')]: tx.balance
-    }));
-    exportToExcel(data, { filename: `General_Ledger_${account?.name || 'Account'}` });
+    if (ledgerMode === 'detailed') {
+      const data = detailedLines.map(line => ({
+        [t('journal.column_date')]: line.date,
+        [language === 'ar' ? 'رقم القيد' : 'Entry No.']: line.entry_number || '-',
+        [t('accounts.column_name')]: line.account_name,
+        [t('accounts.column_type')]: line.account_type,
+        [t('journal.column_reference')]: line.reference,
+        [t('journal.type')]: line.reference_type,
+        [t('ledger.column_entity')]: line.entity_name,
+        [language === 'ar' ? 'الحساب الفرعي/الصنف' : 'Sub-account/Product']: line.sub_account_product,
+        [t('journal.column_debit')]: line.debit,
+        [t('journal.column_credit')]: line.credit,
+        [t('journal.column_description')]: line.description
+      }));
+      exportToExcel(data, { filename: 'Detailed_Journal_Entries' });
+    } else {
+      const account = accounts.find(a => a.id === selectedAccountId);
+      const data = ledgerData.map(tx => ({
+        [t('journal.column_date')]: tx.date,
+        [t('ledger.column_entity')]: tx.entity_name || '-',
+        [t('journal.column_description')]: tx.description,
+        [t('journal.column_reference')]: tx.reference || '-',
+        [language === 'ar' ? 'رقم القيد' : 'Entry No.']: tx.entry_number || '-',
+        [t('journal.column_debit')]: tx.debit,
+        [t('journal.column_credit')]: tx.credit,
+        [t('ledger.column_balance')]: tx.balance
+      }));
+      exportToExcel(data, { filename: `General_Ledger_${account?.name || 'Account'}` });
+    }
   };
 
   if (loading) {
@@ -163,6 +318,8 @@ export const GeneralLedger: React.FC = () => {
     );
   }
 
+  const isExportDisabled = ledgerMode === 'single' ? !selectedAccountId : false;
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -170,37 +327,66 @@ export const GeneralLedger: React.FC = () => {
           <h2 className="text-2xl font-black text-zinc-900">{t('ledger.title')}</h2>
           <p className="text-zinc-500 font-medium mt-1">{t('ledger.subtitle')}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={handleRefresh}
-            className="p-3 bg-white border border-zinc-200 text-zinc-600 rounded-2xl hover:bg-zinc-50 hover:text-emerald-600 transition-all hover:scale-105 active:scale-95 shadow-sm"
-            title={t('reports.update_data')}
-          >
-            <RefreshCcw size={20} className={loading ? 'animate-spin' : ''} />
-          </button>
-          <button onClick={handleExportPDF} disabled={!selectedAccountId} className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 transition-all shadow-sm disabled:opacity-50"><Printer size={20} /></button>
-          <button onClick={handleExportExcel} disabled={!selectedAccountId} className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 transition-all shadow-sm disabled:opacity-50"><Download size={20} /></button>
+        <div className="flex items-center gap-4">
+          <div className="flex bg-zinc-100 p-1 rounded-2xl border border-zinc-200/50 shadow-inner w-fit">
+            <button
+              onClick={() => setLedgerMode('single')}
+              className={`p-2 px-6 rounded-xl transition-all font-bold text-sm ${ledgerMode === 'single' ? 'bg-white text-emerald-600 shadow-sm border border-zinc-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+            >
+              {t('ledger.single_account')}
+            </button>
+            <button
+              onClick={() => setLedgerMode('detailed')}
+              className={`p-2 px-6 rounded-xl transition-all font-bold text-sm ${ledgerMode === 'detailed' ? 'bg-white text-emerald-600 shadow-sm border border-zinc-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+            >
+              {t('ledger.detailed_entries')}
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={handleRefresh}
+              className="p-3 bg-white border border-zinc-200 text-zinc-600 rounded-2xl hover:bg-zinc-50 hover:text-emerald-600 transition-all hover:scale-105 active:scale-95 shadow-sm"
+              title={t('reports.update_data')}
+            >
+              <RefreshCcw size={20} className={loading ? 'animate-spin' : ''} />
+            </button>
+            <button onClick={handleExportPDF} disabled={isExportDisabled} className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 transition-all shadow-sm disabled:opacity-50"><Printer size={20} /></button>
+            <button onClick={handleExportExcel} disabled={isExportDisabled} className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 transition-all shadow-sm disabled:opacity-50"><Download size={20} /></button>
+          </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="md:col-span-2 relative">
-          <BookOpen className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={20} />
-          <select
-            className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-white border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium appearance-none`}
-            value={selectedAccountId}
-            onChange={(e) => {
-              setSelectedAccountId(e.target.value);
-            }}
-          >
-            <option value="">{t('ledger.select_account')}</option>
-            {accounts.map(account => (
-              <option key={account.id} value={account.id}>
-                {account.code} - {account.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {ledgerMode === 'detailed' ? (
+          <div className="md:col-span-2 relative">
+            <Search className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3.5 text-zinc-400`} size={20} />
+            <input
+              type="text"
+              placeholder={t('journal.search_placeholder')}
+              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-white border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium`}
+              value={detailedSearchTerm}
+              onChange={(e) => setDetailedSearchTerm(e.target.value)}
+            />
+          </div>
+        ) : (
+          <div className="md:col-span-2 relative">
+            <BookOpen className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={20} />
+            <select
+              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-white border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium appearance-none`}
+              value={selectedAccountId}
+              onChange={(e) => {
+                setSelectedAccountId(e.target.value);
+              }}
+            >
+              <option value="">{t('ledger.select_account')}</option>
+              {accounts.map(account => (
+                <option key={account.id} value={account.id}>
+                  {account.code} - {account.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="relative">
           <Calendar className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={20} />
           <input
@@ -296,29 +482,21 @@ export const GeneralLedger: React.FC = () => {
         </div>
       </div>
 
-      {!selectedAccountId ? (
-        <div className="bg-white border border-zinc-200 rounded-3xl p-12 text-center">
-          <div className="w-16 h-16 bg-zinc-100 rounded-2xl flex items-center justify-center text-zinc-400 mx-auto mb-4">
-            <BookOpen size={32} />
-          </div>
-          <h3 className="text-lg font-bold text-zinc-900">{t('ledger.please_select')}</h3>
-          <p className="text-zinc-500 font-medium">{t('ledger.select_hint')}</p>
-        </div>
-      ) : (
+      {ledgerMode === 'detailed' ? (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className={`bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
               <p className="text-xs font-black text-zinc-400 uppercase tracking-widest mb-1">{t('ledger.total_debit')}</p>
-              <p className="text-2xl font-black text-emerald-600">{formatNumber(totals.debit)}</p>
+              <p className="text-2xl font-black text-emerald-600">{formatNumber(detailedTotals.debit)}</p>
             </div>
             <div className={`bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
               <p className="text-xs font-black text-zinc-400 uppercase tracking-widest mb-1">{t('ledger.total_credit')}</p>
-              <p className="text-2xl font-black text-emerald-600">{formatNumber(totals.credit)}</p>
+              <p className="text-2xl font-black text-emerald-600">{formatNumber(detailedTotals.credit)}</p>
             </div>
             <div className={`bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-              <p className="text-xs font-black text-zinc-400 uppercase tracking-widest mb-1">{t('ledger.final_balance')}</p>
-              <p className={`text-2xl font-black ${currentBalance >= 0 ? 'text-emerald-600' : 'text-emerald-600'}`}>
-                {formatNumber(currentBalance)}
+              <p className="text-xs font-black text-zinc-400 uppercase tracking-widest mb-1">{language === 'ar' ? 'صافي الحركات' : 'Net Activity'}</p>
+              <p className="text-2xl font-black text-emerald-600">
+                {formatNumber(detailedTotals.debit - detailedTotals.credit)}
               </p>
             </div>
           </div>
@@ -329,84 +507,199 @@ export const GeneralLedger: React.FC = () => {
                 <thead>
                   <tr className="bg-zinc-50 border-b border-zinc-200">
                     <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_date')}</th>
-                    <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('ledger.column_entity')}</th>
-                    <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_description')}</th>
+                    <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_entry_number')}</th>
+                    <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('accounts.column_name')}</th>
+                    <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('accounts.column_type')}</th>
                     <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_reference')}</th>
-                    <th className="px-6 py-4 text-sm font-bold text-zinc-700">{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</th>
+                    <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.type')}</th>
+                    <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('ledger.column_entity')}</th>
+                    <th className="px-6 py-4 text-sm font-bold text-zinc-700">{language === 'ar' ? 'الحساب الفرعي / الصنف' : 'Sub-account / Product'}</th>
                     <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center">{t('journal.column_debit')}</th>
                     <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center">{t('journal.column_credit')}</th>
-                    <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center">{t('ledger.column_balance')}</th>
+                    <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_description')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
-                  {/* Opening Balance Row */}
-                  <tr className="bg-zinc-50/50">
-                    <td className="px-6 py-4 text-sm font-bold text-zinc-900">{dateRange.start}</td>
-                    <td className="px-6 py-4 text-sm text-zinc-400">-</td>
-                    <td className="px-6 py-4 text-sm font-medium text-zinc-600">{t('ledger.opening_balance_row')}</td>
-                    <td className="px-6 py-4 text-sm text-zinc-400 text-center">-</td>
-                    <td className="px-6 py-4 text-sm text-zinc-400 text-center">-</td>
-                    <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{startBalance > 0 ? formatNumber(startBalance) : '-'}</td>
-                    <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{startBalance < 0 ? formatNumber(Math.abs(startBalance)) : '-'}</td>
-                    <td className="px-6 py-4 text-sm font-black text-zinc-900 text-center">{formatNumber(startBalance)}</td>
-                  </tr>
-                  {ledgerData.map((tx, idx) => (
+                  {detailedLines.map((tx, idx) => (
                     <tr key={idx} className="hover:bg-zinc-50/50 transition-colors">
                       <td className="px-6 py-4 text-sm font-bold text-zinc-900">{formatDate(tx.date)}</td>
-                      <td className="px-6 py-4 text-sm font-bold text-emerald-600">
-                        {tx.entity_name || '-'}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-medium text-zinc-600 max-w-xs truncate">
-                        {tx.description}
-                      </td>
-                      <td className="px-6 py-4">
-                        {tx.reference && tx.reference !== '-' ? (
-                          <span 
-                            onClick={() => handleTransactionClick(tx.reference_type, tx.reference)}
-                            className="px-3 py-1 bg-zinc-100 text-emerald-600 hover:text-emerald-705 hover:bg-emerald-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95"
-                          >
-                            {tx.reference}
-                          </span>
-                        ) : (
-                          <span className="px-3 py-1 bg-zinc-100 text-zinc-400 rounded-lg text-xs font-bold">
-                            -
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 text-sm font-bold text-indigo-600">
                         {tx.entry_number ? (
                           <span 
                             onClick={() => {
                               setPendingViewDoc({ type: 'journal', idOrNumber: tx.entry_number! });
                               setCurrentPage('journal_entries');
                             }}
-                            className="px-3 py-1 bg-zinc-100 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95"
+                            className="px-3 py-1 bg-zinc-100 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 font-mono"
                           >
                             {tx.entry_number}
                           </span>
                         ) : (
-                          <span className="px-3 py-1 bg-zinc-100 text-zinc-400 rounded-lg text-xs font-bold">
-                            -
-                          </span>
+                          '-'
                         )}
                       </td>
+                      <td className="px-6 py-4 text-sm font-bold text-zinc-900">{tx.account_name}</td>
+                      <td className="px-6 py-4 text-sm text-zinc-500 font-bold">{tx.account_type}</td>
+                      <td className="px-6 py-4 text-sm">
+                        {tx.reference && tx.reference !== '-' ? (
+                          <span 
+                            onClick={() => handleTransactionClick(tx.reference_type, tx.reference)}
+                            className="px-3 py-1 bg-zinc-100 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 font-mono"
+                          >
+                            {tx.reference}
+                          </span>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-zinc-500 font-bold">{t(`reference_types.${tx.reference_type}`) || tx.reference_type}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-emerald-600">{tx.entity_name}</td>
+                      <td className="px-6 py-4 text-sm font-medium text-zinc-600">{tx.sub_account_product}</td>
                       <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{tx.debit > 0 ? formatNumber(tx.debit) : '-'}</td>
                       <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{tx.credit > 0 ? formatNumber(tx.credit) : '-'}</td>
-                      <td className="px-6 py-4 text-sm font-black text-zinc-900 text-center">{formatNumber(tx.balance)}</td>
+                      <td className="px-6 py-4 text-sm font-medium text-zinc-500 max-w-xs truncate">{tx.description}</td>
                     </tr>
                   ))}
-                  {ledgerData.length === 0 && (
+                  {detailedLines.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="px-6 py-12 text-center text-zinc-500 font-medium">
+                      <td colSpan={11} className="px-6 py-12 text-center text-zinc-500 font-medium">
                         {t('ledger.no_transactions')}
                       </td>
                     </tr>
                   )}
                 </tbody>
+                {detailedLines.length > 0 && (
+                  <tfoot className="bg-zinc-900 text-white font-black">
+                    <tr>
+                      <td colSpan={8} className="px-6 py-4 text-center border-l border-zinc-700">{t('journal.total')}</td>
+                      <td className="px-6 py-4 text-center border-l border-zinc-700">
+                        {detailedTotals.debit ? formatNumber(detailedTotals.debit) : '0.00'}
+                      </td>
+                      <td className="px-6 py-4 text-center border-l border-zinc-700">
+                        {detailedTotals.credit ? formatNumber(detailedTotals.credit) : '0.00'}
+                      </td>
+                      <td className="px-6 py-4"></td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           </div>
         </div>
+      ) : (
+        /* Single Account Ledger Mode */
+        !selectedAccountId ? (
+          <div className="bg-white border border-zinc-200 rounded-3xl p-12 text-center">
+            <div className="w-16 h-16 bg-zinc-100 rounded-2xl flex items-center justify-center text-zinc-400 mx-auto mb-4">
+              <BookOpen size={32} />
+            </div>
+            <h3 className="text-lg font-bold text-zinc-900">{t('ledger.please_select')}</h3>
+            <p className="text-zinc-500 font-medium">{t('ledger.select_hint')}</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className={`bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                <p className="text-xs font-black text-zinc-400 uppercase tracking-widest mb-1">{t('ledger.total_debit')}</p>
+                <p className="text-2xl font-black text-emerald-600">{formatNumber(totals.debit)}</p>
+              </div>
+              <div className={`bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                <p className="text-xs font-black text-zinc-400 uppercase tracking-widest mb-1">{t('ledger.total_credit')}</p>
+                <p className="text-2xl font-black text-emerald-600">{formatNumber(totals.credit)}</p>
+              </div>
+              <div className={`bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                <p className="text-xs font-black text-zinc-400 uppercase tracking-widest mb-1">{t('ledger.final_balance')}</p>
+                <p className={`text-2xl font-black ${currentBalance >= 0 ? 'text-emerald-600' : 'text-emerald-600'}`}>
+                  {formatNumber(currentBalance)}
+                </p>
+              </div>
+            </div>
+
+            <div ref={reportRef} className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'} border-collapse`}>
+                  <thead>
+                    <tr className="bg-zinc-50 border-b border-zinc-200">
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_date')}</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('ledger.column_entity')}</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_description')}</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_reference')}</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center">{t('journal.column_debit')}</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center">{t('journal.column_credit')}</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center">{t('ledger.column_balance')}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100">
+                    {/* Opening Balance Row */}
+                    <tr className="bg-zinc-50/50">
+                      <td className="px-6 py-4 text-sm font-bold text-zinc-900">{dateRange.start}</td>
+                      <td className="px-6 py-4 text-sm text-zinc-400">-</td>
+                      <td className="px-6 py-4 text-sm font-medium text-zinc-600">{t('ledger.opening_balance_row')}</td>
+                      <td className="px-6 py-4 text-sm text-zinc-400 text-center">-</td>
+                      <td className="px-6 py-4 text-sm text-zinc-400 text-center">-</td>
+                      <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{startBalance > 0 ? formatNumber(startBalance) : '-'}</td>
+                      <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{startBalance < 0 ? formatNumber(Math.abs(startBalance)) : '-'}</td>
+                      <td className="px-6 py-4 text-sm font-black text-zinc-900 text-center">{formatNumber(startBalance)}</td>
+                    </tr>
+                    {ledgerData.map((tx, idx) => (
+                      <tr key={idx} className="hover:bg-zinc-50/50 transition-colors">
+                        <td className="px-6 py-4 text-sm font-bold text-zinc-900">{formatDate(tx.date)}</td>
+                        <td className="px-6 py-4 text-sm font-bold text-emerald-600">
+                          {tx.entity_name || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-zinc-600 max-w-xs truncate">
+                          {tx.description}
+                        </td>
+                        <td className="px-6 py-4">
+                          {tx.reference && tx.reference !== '-' ? (
+                            <span 
+                              onClick={() => handleTransactionClick(tx.reference_type, tx.reference)}
+                              className="px-3 py-1 bg-zinc-100 text-emerald-600 hover:text-emerald-705 hover:bg-emerald-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 font-mono"
+                            >
+                              {tx.reference}
+                            </span>
+                          ) : (
+                            <span className="px-3 py-1 bg-zinc-100 text-zinc-400 rounded-lg text-xs font-bold font-mono">
+                              -
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          {tx.entry_number ? (
+                            <span 
+                              onClick={() => {
+                                setPendingViewDoc({ type: 'journal', idOrNumber: tx.entry_number! });
+                                setCurrentPage('journal_entries');
+                              }}
+                              className="px-3 py-1 bg-zinc-100 text-indigo-600 hover:text-indigo-707 hover:bg-indigo-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 font-mono"
+                            >
+                              {tx.entry_number}
+                            </span>
+                          ) : (
+                            <span className="px-3 py-1 bg-zinc-100 text-zinc-400 rounded-lg text-xs font-bold font-mono">
+                              -
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{tx.debit > 0 ? formatNumber(tx.debit) : '-'}</td>
+                        <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{tx.credit > 0 ? formatNumber(tx.credit) : '-'}</td>
+                        <td className="px-6 py-4 text-sm font-black text-zinc-900 text-center">{formatNumber(tx.balance)}</td>
+                      </tr>
+                    ))}
+                    {ledgerData.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="px-6 py-12 text-center text-zinc-500 font-medium">
+                          {t('ledger.no_transactions')}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )
       )}
     </div>
   );

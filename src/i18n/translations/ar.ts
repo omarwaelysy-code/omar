@@ -536,6 +536,7 @@ export const ar = {
   'journal.title': 'قيود اليومية',
   'journal.subtitle': 'استعراض وإدارة كافة القيود المحاسبية.',
   'journal.column_date': 'التاريخ',
+  'journal.column_entry_number': 'رقم القيد',
   'journal.column_description': 'البيان',
   'journal.column_reference': 'المرجع',
   'journal.column_debit': 'مدين',
@@ -597,6 +598,8 @@ export const ar = {
 
   'ledger.title': 'حساب الأستاذ',
   'ledger.subtitle': 'عرض تفصيلي لحركات الحسابات.',
+  'ledger.detailed_entries': 'القيود التفصيلية',
+  'ledger.single_account': 'دفتر الأستاذ',
   'ledger.select_account': 'اختر الحساب...',
   'ledger.filter_entities': 'تصفية حسب العملاء أو الموردين (اختياري)',
   'ledger.deselect_all': 'إلغاء تحديد الكل',
