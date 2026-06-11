@@ -48,6 +48,7 @@ export const Invoices: React.FC = () => {
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [activeCell, setActiveCell] = useState<{ index: number; field: 'operation' | 'department' | 'cost_center' } | null>(null);
   const [cellSearchTerm, setCellSearchTerm] = useState('');
+  const [activeCellRect, setActiveCellRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
   const [focusedPriceIndex, setFocusedPriceIndex] = useState<number | null>(null);
   const [tempPriceValue, setTempPriceValue] = useState<string>('');
   const [allReceipts, setAllReceipts] = useState<any[]>([]);
@@ -144,6 +145,19 @@ export const Invoices: React.FC = () => {
   const [paymentMethodId, setPaymentMethodId] = useState<string | ''>('');
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  
+  // Floating popover lookup search states
+  const [activeSearch, setActiveSearch] = useState<{
+    index: number;
+    type: 'operation' | 'department' | 'cost_center';
+    query: string;
+  } | null>(null);
+
+  const [popoverRect, setPopoverRect] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
   
   // Form Settlements State
   const [formSettlementNumber, setFormSettlementNumber] = useState<string>('');
@@ -2560,13 +2574,6 @@ export const Invoices: React.FC = () => {
                   <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
                     {editingInvoice ? 'تعديل الفاتورة' : 'إنشاء فاتورة جديدة'}
                   </h3>
-                  <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1 rounded-xl flex items-center gap-2 shadow-sm">
-                    <span className="text-xs font-bold text-emerald-600">{language === 'ar' ? 'الإجمالي الجاري:' : 'Running Total:'}</span>
-                    <span className="text-lg font-black font-mono">
-                      {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) - discount)}
-                    </span>
-                    <span className="text-xs font-bold text-emerald-600">{t('invoices.currency')}</span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -2645,268 +2652,307 @@ export const Invoices: React.FC = () => {
               <div className="flex-1 p-4 md:p-6 space-y-3 overflow-y-auto pb-32 md:pb-6">
                 <div className="space-y-3">
 
-
-                  <form id="invoice-form" onSubmit={handleSubmit} className="space-y-3">
-                    {/* Unified Metadata & Payment Settings Panel */}
-                    <section className="bg-white p-3 rounded-xl border border-zinc-200 shadow-sm space-y-2 relative">
-                      {editingInvoice && (
-                        <div className={`absolute ${dir === 'rtl' ? 'left-12' : 'right-12'} top-2 z-20 pointer-events-none select-none opacity-40 transform -rotate-12`}>
-                          {(() => {
-                            const status = getPaymentStatus(editingInvoice);
-                            const statusLabels = {
-                              paid: language === 'ar' ? 'مدفوعة' : 'Paid',
-                              partial: language === 'ar' ? 'مدفوعة جزئياً' : 'Partially Paid',
-                              unpaid: language === 'ar' ? 'غير مدفوعة' : 'Unpaid'
-                            };
-                            const statusColors = {
-                              paid: 'text-emerald-600 border-emerald-600 bg-emerald-50/70',
-                              partial: 'text-blue-600 border-blue-600 bg-blue-50/70',
-                              unpaid: 'text-red-500 border-red-500 bg-red-50/70'
-                            };
-                            const colorClass = statusColors[status] || statusColors.unpaid;
-                            return (
-                              <div className={`px-4 py-1 border border-dashed ${colorClass} font-black text-sm tracking-wider uppercase rounded`}>
-                                {statusLabels[status]}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      )}
+                  <form id="invoice-form" onSubmit={handleSubmit} className="space-y-3">                    {/* Upper Layout: Totals Summary on the Left, Metadata Form on the Right */}
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 items-stretch">
                       
-                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                        {/* 1. Invoice Number */}
-                        <div>
-                          <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.column_number')}</label>
-                          <input
-                            required
-                            type="text"
-                            readOnly
-                            className="w-full px-2 py-1 rounded-lg bg-zinc-100 border border-zinc-200 outline-none font-bold text-zinc-500 text-xs cursor-not-allowed"
-                            value={invoiceNumber}
-                          />
+                      {/* Left: Invoice Summary Card */}
+                      <section className="bg-white p-3.5 rounded-xl border border-zinc-200 shadow-sm flex flex-col justify-center space-y-2.5">
+                        <div className="flex items-center gap-2 mb-1 text-emerald-600">
+                          <Layers className="w-4 h-4" />
+                          <h2 className="font-semibold text-zinc-900 text-xs">{language === 'ar' ? 'ملخص الفاتورة' : 'Invoice Summary'}</h2>
                         </div>
 
-                        {/* 2. Date */}
-                        <div>
-                          <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.column_date')}</label>
-                          <input
-                            required
-                            type="date"
-                            className="w-full px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs"
-                            value={date}
-                            onChange={(e) => setDate(e.target.value)}
-                          />
+                        <div className="bg-zinc-50 rounded-lg p-3 border border-zinc-100 space-y-2">
+                          <div className="flex justify-between items-center text-zinc-600 text-xs">
+                            <span className="font-medium">{t('invoices.summary_subtotal')}</span>
+                            <span className="font-bold text-sm">
+                              {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-emerald-600 text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{t('invoices.summary_discount')}</span>
+                              <input 
+                                type="number" 
+                                className="w-16 bg-white border border-zinc-200 rounded px-1 py-0.5 text-center font-bold text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
+                                value={Number(discount)}
+                                onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                              />
+                            </div>
+                            <span className="font-bold text-sm">-{formatMoney(discount)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-emerald-600 text-xs pt-1.5 border-t border-zinc-200">
+                            <span className="font-black text-sm">{t('invoices.summary_total')}</span>
+                            <div className="flex flex-col items-end">
+                              <span className="font-black text-lg tracking-tighter text-left">
+                                {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) - discount)} {companyData?.settings?.currency || ''}
+                              </span>
+                            </div>
+                          </div>
                         </div>
+                      </section>
 
-                        {/* 3. Customer */}
-                        <div className="col-span-1 md:col-span-2 lg:col-span-2">
-                          <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.form_customer')}</label>
-                          <select 
-                            required
-                            className="w-full px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs cursor-pointer"
-                            value={selectedCustomerId}
-                            onChange={(e) => {
-                              if (e.target.value === 'new_customer') {
-                                setIsCustomerModalOpen(true);
-                              } else {
-                                setSelectedCustomerId(e.target.value);
-                                setFormSettlements([]);
-                                setFormSettlementNumber('');
-                              }
-                            }}
-                          >
-                            <option value="">{t('common.select_customer')}</option>
-                            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                            <option value="new_customer" className="font-bold text-emerald-600 italic">+ {t('customers.add')}</option>
-                          </select>
-                        </div>
-
-                        {/* 4. Warehouse */}
-                        {invoiceType === 'items' && (
+                      {/* Right: Unified Metadata & Payment Settings Panel */}
+                      <section className="lg:col-span-3 bg-white p-3 rounded-xl border border-zinc-200 shadow-sm space-y-2 relative">
+                        {editingInvoice && (
+                          <div className={`absolute ${dir === 'rtl' ? 'left-12' : 'right-12'} top-2 z-20 pointer-events-none select-none opacity-40 transform -rotate-12`}>
+                            {(() => {
+                              const status = getPaymentStatus(editingInvoice);
+                              const statusLabels = {
+                                paid: language === 'ar' ? 'مدفوعة' : 'Paid',
+                                partial: language === 'ar' ? 'مدفوعة جزئياً' : 'Partially Paid',
+                                unpaid: language === 'ar' ? 'غير مدفوعة' : 'Unpaid'
+                              };
+                              const statusColors = {
+                                paid: 'text-emerald-600 border-emerald-600 bg-emerald-50/70',
+                                partial: 'text-blue-600 border-blue-600 bg-blue-50/70',
+                                unpaid: 'text-red-500 border-red-500 bg-red-50/70'
+                              };
+                              const colorClass = statusColors[status] || statusColors.unpaid;
+                              return (
+                                <div className={`px-4 py-1 border border-dashed ${colorClass} font-black text-sm tracking-wider uppercase rounded`}>
+                                  {statusLabels[status]}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                          {/* 1. Invoice Number */}
                           <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
+                            <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.column_number')}</label>
+                            <input
+                              required
+                              type="text"
+                              readOnly
+                              className="w-full px-2 py-1 rounded-lg bg-zinc-100 border border-zinc-200 outline-none font-bold text-zinc-500 text-xs cursor-not-allowed"
+                              value={invoiceNumber}
+                            />
+                          </div>
+
+                          {/* 2. Date */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.column_date')}</label>
+                            <input
+                              required
+                              type="date"
+                              className="w-full px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs"
+                              value={date}
+                              onChange={(e) => setDate(e.target.value)}
+                            />
+                          </div>
+
+                          {/* 3. Customer */}
+                          <div className="col-span-1 md:col-span-2 lg:col-span-2">
+                            <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.form_customer')}</label>
                             <select 
                               required
                               className="w-full px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs cursor-pointer"
-                              value={selectedWarehouseId}
-                              onChange={(e) => setSelectedWarehouseId(e.target.value)}
-                            >
-                              <option value="">{language === 'ar' ? 'اختر المخزن' : 'Select Warehouse'}</option>
-                              {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                            </select>
-                          </div>
-                        )}
-
-                        {/* 5. Payment Type (Cash/Credit) */}
-                        <div>
-                          <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.form_payment_type')}</label>
-                          <div className="flex border border-zinc-200 rounded-lg overflow-hidden bg-zinc-50 p-0.5 h-[26px]">
-                            <button 
-                              type="button"
-                              onClick={() => setPaymentType('cash')}
-                              className={`flex-1 text-[10px] font-bold rounded transition-all ${paymentType === 'cash' ? 'bg-emerald-600 text-white shadow' : 'text-zinc-500 hover:bg-zinc-100'}`}
-                            >
-                              {t('invoices.payment_cash')}
-                            </button>
-                            <button 
-                              type="button"
-                              onClick={() => setPaymentType('credit')}
-                              className={`flex-1 text-[10px] font-bold rounded transition-all ${paymentType === 'credit' ? 'bg-emerald-600 text-white shadow' : 'text-zinc-500 hover:bg-zinc-100'}`}
-                            >
-                              {t('invoices.payment_credit')}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Second Row of metadata */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                        {/* 6. Payment Terms or Method */}
-                        {paymentType === 'cash' ? (
-                          <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.form_payment_method')}</label>
-                            <select 
-                              required
-                              className="w-full px-2 py-1 rounded-lg border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs cursor-pointer"
-                              value={paymentMethodId}
+                              value={selectedCustomerId}
                               onChange={(e) => {
-                                if (e.target.value === 'new_payment_method') {
-                                  setIsPaymentMethodModalOpen(true);
+                                if (e.target.value === 'new_customer') {
+                                  setIsCustomerModalOpen(true);
                                 } else {
-                                  setPaymentMethodId(e.target.value);
+                                  setSelectedCustomerId(e.target.value);
+                                  setFormSettlements([]);
+                                  setFormSettlementNumber('');
                                 }
                               }}
                             >
-                              <option value="">{t('common.select_method')}</option>
-                              {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
-                              <option value="new_payment_method" className="font-bold text-emerald-600 italic">+ {t('payment_methods.add')}</option>
+                              <option value="">{t('common.select_customer')}</option>
+                              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                              <option value="new_customer" className="font-bold text-emerald-600 italic">+ {t('customers.add')}</option>
                             </select>
                           </div>
-                        ) : (
-                          <>
+
+                          {/* 4. Warehouse */}
+                          {invoiceType === 'items' && (
                             <div>
-                              <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'شروط السداد' : 'Payment Terms'}</label>
+                              <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
                               <select 
-                                className="w-full px-2 py-1 rounded-lg border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs cursor-pointer"
-                                value={paymentTerms}
-                                onChange={(e) => {
-                                  const term = e.target.value;
-                                  let days = 0;
-                                  let pct = 0;
-                                  if (term === 'net_7') days = 7;
-                                  else if (term === 'net_15') days = 15;
-                                  else if (term === 'net_30') days = 30;
-                                  else if (term === 'net_45') days = 45;
-                                  else if (term === 'net_60') days = 60;
-                                  else if (term === 'net_90') days = 90;
-                                  else if (term === 'net_180') days = 180;
-                                  else if (term === 'advance_50_50') pct = 50;
-                                  else if (term === 'advance') pct = 100;
-                                  
-                                  setPaymentTerms(term);
-                                  setPaymentTermsDays(days);
-                                  setAdvancePercentage(pct);
-                                }}
+                                required
+                                className="w-full px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs cursor-pointer"
+                                value={selectedWarehouseId}
+                                onChange={(e) => setSelectedWarehouseId(e.target.value)}
                               >
-                                <option value="cash">{language === 'ar' ? 'نقدي عند التسليم' : 'Cash on Delivery'}</option>
-                                <option value="due_on_receipt">{language === 'ar' ? 'مستحق فور استلام الفاتورة' : 'Due on Receipt'}</option>
-                                <option value="net_7">{language === 'ar' ? 'خلال 7 أيام' : 'Net 7 Days'}</option>
-                                <option value="net_15">{language === 'ar' ? 'خلال 15 يوماً' : 'Net 15 Days'}</option>
-                                <option value="net_30">{language === 'ar' ? 'خلال 30 يوماً' : 'Net 30 Days'}</option>
-                                <option value="net_45">{language === 'ar' ? 'خلال 45 يوماً' : 'Net 45 Days'}</option>
-                                <option value="net_60">{language === 'ar' ? 'خلال 60 يوماً' : 'Net 60 Days'}</option>
-                                <option value="net_90">{language === 'ar' ? 'خلال 90 يوماً' : 'Net 90 Days'}</option>
-                                <option value="net_180">{language === 'ar' ? 'خلال 180 يوماً' : 'Net 180 Days'}</option>
-                                <option value="eom">{language === 'ar' ? 'نهاية الشهر (EOM)' : 'End of Month (EOM)'}</option>
-                                <option value="eom_30">{language === 'ar' ? 'السداد بعد 30 يوم من نهاية الشهر' : '30 Days EOM'}</option>
-                                <option value="advance">{language === 'ar' ? 'دفعة مقدمة قبل التوريد' : 'Advance Payment (100%)'}</option>
-                                <option value="advance_50_50">{language === 'ar' ? '50% مقدم والباقي عند التسليم' : '50% Advance / 50% on Delivery'}</option>
-                                <option value="custom">{language === 'ar' ? 'مخصص (أيام / نسب مقدمة مخصصة)' : 'Custom Days & Percentage'}</option>
+                                <option value="">{language === 'ar' ? 'اختر المخزن' : 'Select Warehouse'}</option>
+                                {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                               </select>
                             </div>
+                          )}
+
+                          {/* 5. Payment Type (Cash/Credit) */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.form_payment_type')}</label>
+                            <div className="flex border border-zinc-200 rounded-lg overflow-hidden bg-zinc-50 p-0.5 h-[26px]">
+                              <button 
+                                type="button"
+                                onClick={() => setPaymentType('cash')}
+                                className={`flex-1 text-[10px] font-bold rounded transition-all ${paymentType === 'cash' ? 'bg-emerald-600 text-white shadow' : 'text-zinc-500 hover:bg-zinc-100'}`}
+                              >
+                                {t('invoices.payment_cash')}
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => setPaymentType('credit')}
+                                className={`flex-1 text-[10px] font-bold rounded transition-all ${paymentType === 'credit' ? 'bg-emerald-600 text-white shadow' : 'text-zinc-500 hover:bg-zinc-100'}`}
+                              >
+                                {t('invoices.payment_credit')}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Second Row of metadata */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                          {/* 6. Payment Terms or Method */}
+                          {paymentType === 'cash' ? (
                             <div>
-                              <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'تاريخ الاستحقاق' : 'Due Date'}</label>
+                              <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.form_payment_method')}</label>
+                              <select 
+                                required
+                                className="w-full px-2 py-1 rounded-lg border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs cursor-pointer"
+                                value={paymentMethodId}
+                                onChange={(e) => {
+                                  if (e.target.value === 'new_payment_method') {
+                                    setIsPaymentMethodModalOpen(true);
+                                  } else {
+                                    setPaymentMethodId(e.target.value);
+                                  }
+                                }}
+                              >
+                                <option value="">{t('common.select_method')}</option>
+                                {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
+                                <option value="new_payment_method" className="font-bold text-emerald-600 italic">+ {t('payment_methods.add')}</option>
+                              </select>
+                            </div>
+                          ) : (
+                            <>
+                              <div>
+                                <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'شروط السداد' : 'Payment Terms'}</label>
+                                <select 
+                                  className="w-full px-2 py-1 rounded-lg border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs cursor-pointer"
+                                  value={paymentTerms}
+                                  onChange={(e) => {
+                                    const term = e.target.value;
+                                    let days = 0;
+                                    let pct = 0;
+                                    if (term === 'net_7') days = 7;
+                                    else if (term === 'net_15') days = 15;
+                                    else if (term === 'net_30') days = 30;
+                                    else if (term === 'net_45') days = 45;
+                                    else if (term === 'net_60') days = 60;
+                                    else if (term === 'net_90') days = 90;
+                                    else if (term === 'net_180') days = 180;
+                                    else if (term === 'advance_50_50') pct = 50;
+                                    else if (term === 'advance') pct = 100;
+                                    
+                                    setPaymentTerms(term);
+                                    setPaymentTermsDays(days);
+                                    setAdvancePercentage(pct);
+                                  }}
+                                >
+                                  <option value="cash">{language === 'ar' ? 'نقدي عند التسليم' : 'Cash on Delivery'}</option>
+                                  <option value="due_on_receipt">{language === 'ar' ? 'مستحق فور استلام الفاتورة' : 'Due on Receipt'}</option>
+                                  <option value="net_7">{language === 'ar' ? 'خلال 7 أيام' : 'Net 7 Days'}</option>
+                                  <option value="net_15">{language === 'ar' ? 'خلال 15 يوماً' : 'Net 15 Days'}</option>
+                                  <option value="net_30">{language === 'ar' ? 'خلال 30 يوماً' : 'Net 30 Days'}</option>
+                                  <option value="net_45">{language === 'ar' ? 'خلال 45 يوماً' : 'Net 45 Days'}</option>
+                                  <option value="net_60">{language === 'ar' ? 'خلال 60 يوماً' : 'Net 60 Days'}</option>
+                                  <option value="net_90">{language === 'ar' ? 'خلال 90 يوماً' : 'Net 90 Days'}</option>
+                                  <option value="net_180">{language === 'ar' ? 'خلال 180 يوماً' : 'Net 180 Days'}</option>
+                                  <option value="eom">{language === 'ar' ? 'نهاية الشهر (EOM)' : 'End of Month (EOM)'}</option>
+                                  <option value="eom_30">{language === 'ar' ? 'السداد بعد 30 يوم من نهاية الشهر' : '30 Days EOM'}</option>
+                                  <option value="advance">{language === 'ar' ? 'دفعة مقدمة قبل التوريد' : 'Advance Payment (100%)'}</option>
+                                  <option value="advance_50_50">{language === 'ar' ? '50% مقدم والباقي عند التسليم' : '50% Advance / 50% on Delivery'}</option>
+                                  <option value="custom">{language === 'ar' ? 'مخصص (أيام / نسب مقدمة مخصصة)' : 'Custom Days & Percentage'}</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'تاريخ الاستحقاق' : 'Due Date'}</label>
+                                <input
+                                  type="date"
+                                  className="w-full px-2 py-1 rounded-lg border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs"
+                                  value={dueDate}
+                                  onChange={(e) => setDueDate(e.target.value)}
+                                />
+                              </div>
+                            </>
+                          )}
+
+                          {/* 7. Subject / Description */}
+                          <div className="col-span-1 md:col-span-2">
+                            <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'موضوع الفاتورة' : 'Invoice Subject'}</label>
+                            <input
+                              type="text"
+                              className="w-full px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs placeholder:text-zinc-300"
+                              placeholder={language === 'ar' ? 'أدخل وصفاً عاماً يظهر في أعلى الفاتورة...' : 'Enter a general description...'}
+                              value={description}
+                              onChange={(e) => setDescription(e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Linked journal entry and Custom payment terms warnings if any */}
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          {editingInvoice?.entry_number && (
+                            <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-100 font-bold">
+                              <span>{language === 'ar' ? 'رقم القيد المرتبط:' : 'Linked Journal Entry:'}</span>
+                              <span className="font-mono">{editingInvoice.entry_number}</span>
+                            </div>
+                          )}
+                          {paymentType === 'credit' && paymentTerms === 'custom' && (
+                            <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-md font-bold">
+                              <span className="text-[10px] font-bold text-zinc-400 uppercase">{language === 'ar' ? 'أيام السداد:' : 'Days:'}</span>
                               <input
-                                type="date"
-                                className="w-full px-2 py-1 rounded-lg border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs"
-                                value={dueDate}
-                                onChange={(e) => setDueDate(e.target.value)}
+                                type="number"
+                                min={0}
+                                className="w-12 bg-transparent border-b border-zinc-300 focus:border-emerald-500 outline-none text-center font-bold text-zinc-800"
+                                value={paymentTermsDays}
+                                onChange={(e) => setPaymentTermsDays(Number(e.target.value) || 0)}
+                              />
+                              <span className="text-[10px] font-bold text-zinc-400 uppercase">{language === 'ar' ? 'دفعة مقدمة %:' : 'Advance %:'}</span>
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                className="w-12 bg-transparent border-b border-zinc-300 focus:border-emerald-500 outline-none text-center font-bold text-zinc-800"
+                                value={advancePercentage}
+                                onChange={(e) => setAdvancePercentage(Number(e.target.value) || 0)}
                               />
                             </div>
-                          </>
-                        )}
-
-                        {/* 7. Subject / Description */}
-                        <div className="col-span-1 md:col-span-2">
-                          <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'موضوع الفاتورة' : 'Invoice Subject'}</label>
-                          <input
-                            type="text"
-                            className="w-full px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs placeholder:text-zinc-300"
-                            placeholder={language === 'ar' ? 'أدخل وصفاً عاماً يظهر في أعلى الفاتورة...' : 'Enter a general description...'}
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                          />
+                          )}
                         </div>
-                      </div>
 
-                      {/* Linked journal entry and Custom payment terms warnings if any */}
-                      <div className="flex flex-wrap gap-2 text-xs">
-                        {editingInvoice?.entry_number && (
-                          <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-100 font-bold">
-                            <span>{language === 'ar' ? 'رقم القيد المرتبط:' : 'Linked Journal Entry:'}</span>
-                            <span className="font-mono">{editingInvoice.entry_number}</span>
-                          </div>
-                        )}
-                        {paymentType === 'credit' && paymentTerms === 'custom' && (
-                          <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-md font-bold">
-                            <span className="text-[10px] font-bold text-zinc-400 uppercase">{language === 'ar' ? 'أيام السداد:' : 'Days:'}</span>
-                            <input
-                              type="number"
-                              min={0}
-                              className="w-12 bg-transparent border-b border-zinc-300 focus:border-emerald-500 outline-none text-center font-bold text-zinc-800"
-                              value={paymentTermsDays}
-                              onChange={(e) => setPaymentTermsDays(Number(e.target.value) || 0)}
-                            />
-                            <span className="text-[10px] font-bold text-zinc-400 uppercase">{language === 'ar' ? 'دفعة مقدمة %:' : 'Advance %:'}</span>
-                            <input
-                              type="number"
-                              min={0}
-                              max={100}
-                              className="w-12 bg-transparent border-b border-zinc-300 focus:border-emerald-500 outline-none text-center font-bold text-zinc-800"
-                              value={advancePercentage}
-                              onChange={(e) => setAdvancePercentage(Number(e.target.value) || 0)}
-                            />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Credit Limit Warning Banner */}
-                      {paymentType === 'credit' && selectedCustomerId && (() => {
-                        const currentCustomer = customers.find(c => c.id === selectedCustomerId);
-                        const totalInvoiceAmount = items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) - discount;
-                        const customerBalance = getCustomerBalance(selectedCustomerId);
-                        const totalTentativeBalance = customerBalance + totalInvoiceAmount;
-                        
-                        if (currentCustomer && currentCustomer.credit_limit > 0 && totalTentativeBalance > currentCustomer.credit_limit) {
-                          return (
-                            <div className="mt-2 p-2 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-2 text-rose-800 animate-in fade-in slide-in-from-top-2 duration-300">
-                              <span className="text-xs">⚠️</span>
-                              <div className="flex-1 text-[11px] font-medium">
-                                <p className="font-bold text-rose-950 mb-0.5">
-                                  {language === 'ar' ? 'تنبيه: تجاوز حد الائتمان!' : 'Warning: Credit Limit Exceeded!'}
-                                </p>
-                                <p>
-                                  {language === 'ar' 
-                                    ? `سيؤدي حفظ هذه الفاتورة إلى تجاوز حد الائتمان المسموح به للعميل (${formatMoney(currentCustomer.credit_limit)}). الرصيد الحالي للعميل: ${formatMoney(customerBalance)} + إجمالي الفاتورة: ${formatMoney(totalInvoiceAmount)} = الإجمالي المتوقع: ${formatMoney(totalTentativeBalance)}.`
-                                    : `Saving this invoice will exceed the customer's credit limit (${formatMoney(currentCustomer.credit_limit)}). Current balance: ${formatMoney(customerBalance)} + Invoice total: ${formatMoney(totalInvoiceAmount)} = Tentative total: ${formatMoney(totalTentativeBalance)}.`}
-                                </p>
+                        {/* Credit Limit Warning Banner */}
+                        {paymentType === 'credit' && selectedCustomerId && (() => {
+                          const currentCustomer = customers.find(c => c.id === selectedCustomerId);
+                          const totalInvoiceAmount = items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) - discount;
+                          const customerBalance = getCustomerBalance(selectedCustomerId);
+                          const totalTentativeBalance = customerBalance + totalInvoiceAmount;
+                          
+                          if (currentCustomer && currentCustomer.credit_limit > 0 && totalTentativeBalance > currentCustomer.credit_limit) {
+                            return (
+                              <div className="mt-2 p-2 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-2 text-rose-800 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <span className="text-xs">⚠️</span>
+                                <div className="flex-1 text-[11px] font-medium">
+                                  <p className="font-bold text-rose-950 mb-0.5">
+                                    {language === 'ar' ? 'تنبيه: تجاوز حد الائتمان!' : 'Warning: Credit Limit Exceeded!'}
+                                  </p>
+                                  <p>
+                                    {language === 'ar' 
+                                      ? `سيؤدي حفظ هذه الفاتورة إلى تجاوز حد الائتمان المسموح به للعميل (${formatMoney(currentCustomer.credit_limit)}). الرصيد الحالي للعميل: ${formatMoney(customerBalance)} + إجمالي الفاتورة: ${formatMoney(totalInvoiceAmount)} = الإجمالي المتوقع: ${formatMoney(totalTentativeBalance)}.`
+                                      : `Saving this invoice will exceed the customer's credit limit (${formatMoney(currentCustomer.credit_limit)}). Current balance: ${formatMoney(customerBalance)} + Invoice total: ${formatMoney(totalInvoiceAmount)} = Tentative total: ${formatMoney(totalTentativeBalance)}.`}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </section>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </section>
+                    </div>
 
                     {/* Card 3: الأصناف */}
                     <section className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3">
@@ -3018,26 +3064,36 @@ export const Invoices: React.FC = () => {
                                   <div className="flex items-center gap-1 w-full relative">
                                     <input 
                                       type="text" 
-                                      list={`ops-list-${index}`}
                                       placeholder={language === 'ar' ? 'ابحث عن عملية...' : 'Search operation...'}
                                       className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
-                                      value={operations.find(op => op.id === item.operation_id)?.operation_number || ''}
+                                      value={
+                                        activeSearch && activeSearch.index === index && activeSearch.type === 'operation'
+                                          ? activeSearch.query
+                                          : (operations.find(op => op.id === item.operation_id)?.operation_number || '')
+                                      }
                                       onChange={(e) => {
-                                        const selectedOp = operations.find(o => o.operation_number === e.target.value);
-                                        if (selectedOp) {
-                                          updateItem(index, 'operation_id', selectedOp.id);
-                                        } else if (e.target.value === '') {
-                                          updateItem(index, 'operation_id', null);
+                                        setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
+                                      }}
+                                      onFocus={(e) => {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        const dropdownWidth = 420;
+                                        let left = rect.left;
+                                        if (dir === 'rtl') {
+                                          left = rect.left + rect.width - dropdownWidth;
                                         }
+                                        left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
+                                        setActiveSearch({
+                                          index,
+                                          type: 'operation',
+                                          query: operations.find(op => op.id === item.operation_id)?.operation_number || ''
+                                        });
+                                        setPopoverRect({
+                                          top: rect.bottom,
+                                          left: left,
+                                          width: dropdownWidth
+                                        });
                                       }}
                                     />
-                                    <datalist id={`ops-list-${index}`}>
-                                      {operations.map(op => (
-                                        <option key={op.id} value={op.operation_number}>
-                                          {op.customer_name ? `(${op.customer_name})` : ''}
-                                        </option>
-                                      ))}
-                                    </datalist>
                                     {item.operation_id && (
                                       <button
                                         type="button"
@@ -3059,48 +3115,72 @@ export const Invoices: React.FC = () => {
                                 <td className="p-1 border-b border-r border-zinc-200 w-36 text-center">
                                   <input 
                                     type="text" 
-                                    list={`depts-list-${index}`}
                                     placeholder={language === 'ar' ? 'ابحث عن إدارة...' : 'Search department...'}
                                     className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
-                                    value={departments.find(d => d.id === item.department_id)?.name || ''}
+                                    value={
+                                      activeSearch && activeSearch.index === index && activeSearch.type === 'department'
+                                        ? activeSearch.query
+                                        : (departments.find(d => d.id === item.department_id)?.name || '')
+                                    }
                                     onChange={(e) => {
-                                      const selectedDept = departments.find(d => d.name === e.target.value);
-                                      if (selectedDept) {
-                                        updateItem(index, 'department_id', selectedDept.id);
-                                      } else if (e.target.value === '') {
-                                        updateItem(index, 'department_id', null);
+                                      setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
+                                    }}
+                                    onFocus={(e) => {
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      const dropdownWidth = 350;
+                                      let left = rect.left;
+                                      if (dir === 'rtl') {
+                                        left = rect.left + rect.width - dropdownWidth;
                                       }
+                                      left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
+                                      setActiveSearch({
+                                        index,
+                                        type: 'department',
+                                        query: departments.find(d => d.id === item.department_id)?.name || ''
+                                      });
+                                      setPopoverRect({
+                                        top: rect.bottom,
+                                        left: left,
+                                        width: dropdownWidth
+                                      });
                                     }}
                                   />
-                                  <datalist id={`depts-list-${index}`}>
-                                    {departments.map(d => (
-                                      <option key={d.id} value={d.name} />
-                                    ))}
-                                  </datalist>
                                 </td>
 
                                 {/* مركز التكلفة */}
                                 <td className="p-1 border-b border-r border-zinc-200 w-36 text-center">
                                   <input 
                                     type="text" 
-                                    list={`cc-list-${index}`}
                                     placeholder={language === 'ar' ? 'ابحث عن مركز...' : 'Search cost center...'}
                                     className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
-                                    value={costCenters.find(cc => cc.id === item.cost_center_id)?.name || ''}
+                                    value={
+                                      activeSearch && activeSearch.index === index && activeSearch.type === 'cost_center'
+                                        ? activeSearch.query
+                                        : (costCenters.find(cc => cc.id === item.cost_center_id)?.name || '')
+                                    }
                                     onChange={(e) => {
-                                      const selectedCc = costCenters.find(cc => cc.name === e.target.value);
-                                      if (selectedCc) {
-                                        updateItem(index, 'cost_center_id', selectedCc.id);
-                                      } else if (e.target.value === '') {
-                                        updateItem(index, 'cost_center_id', null);
+                                      setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
+                                    }}
+                                    onFocus={(e) => {
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      const dropdownWidth = 350;
+                                      let left = rect.left;
+                                      if (dir === 'rtl') {
+                                        left = rect.left + rect.width - dropdownWidth;
                                       }
+                                      left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
+                                      setActiveSearch({
+                                        index,
+                                        type: 'cost_center',
+                                        query: costCenters.find(cc => cc.id === item.cost_center_id)?.name || ''
+                                      });
+                                      setPopoverRect({
+                                        top: rect.bottom,
+                                        left: left,
+                                        width: dropdownWidth
+                                      });
                                     }}
                                   />
-                                  <datalist id={`cc-list-${index}`}>
-                                    {costCenters.map(cc => (
-                                      <option key={cc.id} value={cc.name} />
-                                    ))}
-                                  </datalist>
                                 </td>
 
                                 <td className="p-1 border-b border-r border-zinc-200 w-24">
@@ -3158,58 +3238,19 @@ export const Invoices: React.FC = () => {
                       </div>
                     </section>
 
-                    {/* Totals & Notes Section */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      <section className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3">
-                        <div className="flex items-center gap-2 mb-2 text-emerald-600">
-                          <Layers className="w-4 h-4" />
-                          <h2 className="font-semibold text-zinc-900 text-xs">{language === 'ar' ? 'ملخص الفاتورة' : 'Invoice Summary'}</h2>
-                        </div>
-
-                        <div className="bg-zinc-50 rounded-lg p-4 border border-zinc-100 space-y-2">
-                          <div className="flex justify-between items-center text-zinc-600 text-xs">
-                            <span className="font-medium">{t('invoices.summary_subtotal')}</span>
-                            <span className="font-bold text-sm">
-                              {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center text-emerald-600 text-xs">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">{t('invoices.summary_discount')}</span>
-                              <input 
-                                type="number" 
-                                className="w-20 bg-white border border-zinc-200 rounded px-1.5 py-0.5 text-center font-bold text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
-                                value={Number(discount)}
-                                onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
-                              />
-                            </div>
-                            <span className="font-bold text-sm">-{formatMoney(discount)}</span>
-                          </div>
-                          <div className="flex justify-between items-center text-emerald-600 text-xs pt-1 border-t border-zinc-200">
-                            <span className="font-black text-sm">{t('invoices.summary_total')}</span>
-                            <div className="flex flex-col items-end">
-                              <span className="font-black text-lg tracking-tighter text-left">
-                                {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) - discount)} {companyData?.settings?.currency || ''}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </section>
-
-                      {/* Notes Card */}
-                      <section className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3">
-                        <div className="flex items-center gap-2 mb-2 text-emerald-600">
-                          <Tag className="w-4 h-4" />
-                          <h2 className="font-semibold text-zinc-900 text-xs">{language === 'ar' ? 'الملاحظات' : 'Notes'}</h2>
-                        </div>
-                        <textarea 
-                          className="w-full min-h-[80px] bg-zinc-50 border border-zinc-200 rounded-lg p-3 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500 transition-all font-medium text-zinc-700 font-bold text-xs"
-                          placeholder={language === 'ar' ? 'أدخل أي ملاحظات إضافية هنا...' : 'Enter any additional notes...'}
-                          value={description}
-                          onChange={(e) => setDescription(e.target.value)}
-                        />
-                      </section>
-                    </div>
+                    {/* Notes Section - Full Width */}
+                    <section className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3">
+                      <div className="flex items-center gap-2 mb-2 text-emerald-600">
+                        <Tag className="w-4 h-4" />
+                        <h2 className="font-semibold text-zinc-900 text-xs">{language === 'ar' ? 'الملاحظات' : 'Notes'}</h2>
+                      </div>
+                      <textarea 
+                        className="w-full min-h-[80px] bg-zinc-50 border border-zinc-200 rounded-lg p-3 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500 transition-all font-medium text-zinc-700 font-bold text-xs"
+                        placeholder={language === 'ar' ? 'أدخل أي ملاحظات إضافية هنا...' : 'Enter any additional notes...'}
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                      />
+                    </section>
 
                     {/* Settlements Table Card in Form */}
                     {selectedCustomerId && paymentType === 'credit' && (() => {
@@ -3427,6 +3468,171 @@ export const Invoices: React.FC = () => {
                         </section>
                       );
                     })()}
+
+                    {/* Floating Autocomplete Popover */}
+                    {activeSearch && popoverRect && (
+                      <>
+                        <div 
+                          className="fixed inset-0 z-[100]" 
+                          onClick={() => setActiveSearch(null)} 
+                        />
+                        <div 
+                          className="fixed z-[110] bg-white rounded-xl border border-zinc-200 shadow-2xl overflow-y-auto text-xs text-right scrollbar-thin scrollbar-thumb-zinc-300"
+                          style={{
+                            top: popoverRect.top,
+                            left: popoverRect.left,
+                            width: popoverRect.width,
+                            maxHeight: '260px',
+                          }}
+                        >
+                          {activeSearch.type === 'operation' && (() => {
+                            const filtered = operations.filter(op => {
+                              const q = activeSearch.query.toLowerCase().trim();
+                              if (!q) return true;
+                              return (
+                                (op.operation_number || '').toLowerCase().includes(q) ||
+                                (op.customer_name || '').toLowerCase().includes(q) ||
+                                (op.description || '').toLowerCase().includes(q)
+                              );
+                            });
+                            return (
+                              <table className="w-full text-right border-collapse">
+                                <thead>
+                                  <tr className="bg-zinc-100 border-b border-zinc-200 text-zinc-600 font-bold text-[10px] sticky top-0 z-10">
+                                    <th className="p-2 text-right">{language === 'ar' ? 'رقم العملية' : 'Op Number'}</th>
+                                    <th className="p-2 text-right">{language === 'ar' ? 'العميل' : 'Customer'}</th>
+                                    <th className="p-2 text-right">{language === 'ar' ? 'التفاصيل' : 'Details'}</th>
+                                    <th className="p-2 text-center">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                                    <th className="p-2 text-center">{language === 'ar' ? 'الحالة' : 'Status'}</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-zinc-100">
+                                  {filtered.map(op => (
+                                    <tr 
+                                      key={op.id} 
+                                      onClick={() => {
+                                        updateItem(activeSearch.index, 'operation_id', op.id);
+                                        setActiveSearch(null);
+                                      }}
+                                      className="hover:bg-emerald-50 cursor-pointer transition-colors"
+                                    >
+                                      <td className="p-2 font-bold text-zinc-900">{op.operation_number || 'N/A'}</td>
+                                      <td className="p-2 text-zinc-600 font-bold">{op.customer_name || '-'}</td>
+                                      <td className="p-2 text-zinc-500 truncate max-w-[120px]" title={op.description}>{op.description || '-'}</td>
+                                      <td className="p-2 text-center text-zinc-500 font-mono">{op.operation_date || op.date || '-'}</td>
+                                      <td className="p-2 text-center">
+                                        <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${op.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                                          {op.status}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                  {filtered.length === 0 && (
+                                    <tr>
+                                      <td colSpan={5} className="p-4 text-center text-zinc-400 italic">
+                                        {language === 'ar' ? 'لا توجد نتائج' : 'No results found'}
+                                      </td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            );
+                          })()}
+
+                          {activeSearch.type === 'department' && (() => {
+                            const filtered = departments.filter(d => {
+                              const q = activeSearch.query.toLowerCase().trim();
+                              if (!q) return true;
+                              return (
+                                (d.code || '').toLowerCase().includes(q) ||
+                                (d.name || '').toLowerCase().includes(q) ||
+                                (d.description || '').toLowerCase().includes(q)
+                              );
+                            });
+                            return (
+                              <table className="w-full text-right border-collapse">
+                                <thead>
+                                  <tr className="bg-zinc-100 border-b border-zinc-200 text-zinc-600 font-bold text-[10px] sticky top-0 z-10">
+                                    <th className="p-2 text-right">{language === 'ar' ? 'الكود' : 'Code'}</th>
+                                    <th className="p-2 text-right">{language === 'ar' ? 'الاسم' : 'Name'}</th>
+                                    <th className="p-2 text-right">{language === 'ar' ? 'الوصف' : 'Description'}</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-zinc-100">
+                                  {filtered.map(d => (
+                                    <tr 
+                                      key={d.id} 
+                                      onClick={() => {
+                                        updateItem(activeSearch.index, 'department_id', d.id);
+                                        setActiveSearch(null);
+                                      }}
+                                      className="hover:bg-emerald-50 cursor-pointer transition-colors"
+                                    >
+                                      <td className="p-2 font-mono text-zinc-900 font-bold">{d.code || '-'}</td>
+                                      <td className="p-2 text-zinc-600 font-bold">{d.name}</td>
+                                      <td className="p-2 text-zinc-500 truncate max-w-[150px]" title={d.description}>{d.description || '-'}</td>
+                                    </tr>
+                                  ))}
+                                  {filtered.length === 0 && (
+                                    <tr>
+                                      <td colSpan={3} className="p-4 text-center text-zinc-400 italic">
+                                        {language === 'ar' ? 'لا توجد نتائج' : 'No results found'}
+                                      </td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            );
+                          })()}
+
+                          {activeSearch.type === 'cost_center' && (() => {
+                            const filtered = costCenters.filter(cc => {
+                              const q = activeSearch.query.toLowerCase().trim();
+                              if (!q) return true;
+                              return (
+                                (cc.code || '').toLowerCase().includes(q) ||
+                                (cc.name || '').toLowerCase().includes(q) ||
+                                (cc.description || '').toLowerCase().includes(q)
+                              );
+                            });
+                            return (
+                              <table className="w-full text-right border-collapse">
+                                <thead>
+                                  <tr className="bg-zinc-100 border-b border-zinc-200 text-zinc-600 font-bold text-[10px] sticky top-0 z-10">
+                                    <th className="p-2 text-right">{language === 'ar' ? 'الكود' : 'Code'}</th>
+                                    <th className="p-2 text-right">{language === 'ar' ? 'الاسم' : 'Name'}</th>
+                                    <th className="p-2 text-right">{language === 'ar' ? 'الوصف' : 'Description'}</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-zinc-100">
+                                  {filtered.map(cc => (
+                                    <tr 
+                                      key={cc.id} 
+                                      onClick={() => {
+                                        updateItem(activeSearch.index, 'cost_center_id', cc.id);
+                                        setActiveSearch(null);
+                                      }}
+                                      className="hover:bg-emerald-50 cursor-pointer transition-colors"
+                                    >
+                                      <td className="p-2 font-mono text-zinc-900 font-bold">{cc.code || '-'}</td>
+                                      <td className="p-2 text-zinc-600 font-bold">{cc.name}</td>
+                                      <td className="p-2 text-zinc-500 truncate max-w-[150px]" title={cc.description}>{cc.description || '-'}</td>
+                                    </tr>
+                                  ))}
+                                  {filtered.length === 0 && (
+                                    <tr>
+                                      <td colSpan={3} className="p-4 text-center text-zinc-400 italic">
+                                        {language === 'ar' ? 'لا توجد نتائج' : 'No results found'}
+                                      </td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            );
+                          })()}
+                        </div>
+                      </>
+                    )}
 
                     {/* Actions removed from bottom of scrollable area as they are in the fixed footer */}
                   </form>
