@@ -284,6 +284,7 @@ export interface Invoice {
   subtotal?: number;
   discount?: number;
   discount_amount?: number;
+  tax_amount?: number;
   total_amount: number;
   payment_type: 'credit' | 'cash';
   payment_method_id?: string;
@@ -317,6 +318,7 @@ export interface PurchaseInvoice {
   description?: string;
   subtotal?: number;
   discount?: number;
+  tax_amount?: number;
   total_amount: number;
   payment_type: 'credit' | 'cash';
   payment_method_id?: string;
