@@ -350,6 +350,9 @@ export interface InvoiceItem {
   total: number;
   barcode?: string;
   image_url?: string;
+  operation_id?: string | null;
+  department_id?: string | null;
+  cost_center_id?: string | null;
 }
 
 export interface ReceiptVoucherItem {

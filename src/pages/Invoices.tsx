@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
-import { Invoice, Customer, Product, InvoiceItem, Account, JournalEntry, JournalEntryItem, ActivityLog, Company } from '../types';
+import { Invoice, Customer, Product, InvoiceItem, Account, JournalEntry, JournalEntryItem, ActivityLog, Company, Operation, Department, CostCenter } from '../types';
 import { 
   Search, Plus, Trash2, X, Eye, Download, Sparkles, Mic, 
   Image as ImageIcon, FileText, Pencil, History, Printer, 
   ChevronLeft, ChevronRight, Maximize2, Minimize2, Hash, 
   Wallet, Calendar, Package, Tag, Layers, Box, Paperclip, 
   Phone, Mail, Lock, LayoutGrid, List, Building2, ChevronDown, 
-  CreditCard, RotateCcw, Save
+  CreditCard, RotateCcw, Save, ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Barcode from 'react-barcode';
@@ -43,6 +43,11 @@ export const Invoices: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [operations, setOperations] = useState<Operation[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
+  const [activeCell, setActiveCell] = useState<{ index: number; field: 'operation' | 'department' | 'cost_center' } | null>(null);
+  const [cellSearchTerm, setCellSearchTerm] = useState('');
   const [allReceipts, setAllReceipts] = useState<any[]>([]);
   const [allPayments, setAllPayments] = useState<any[]>([]);
   const [allReturns, setAllReturns] = useState<any[]>([]);
@@ -167,6 +172,9 @@ export const Invoices: React.FC = () => {
       });
       const unsubCustomers = dbService.subscribe<Customer>('customers', user.company_id, setCustomers);
       const unsubProducts = dbService.subscribe<Product>('products', user.company_id, setProducts);
+      const unsubOps = dbService.subscribe<Operation>('operations', user.company_id, setOperations);
+      const unsubDepts = dbService.subscribe<Department>('departments', user.company_id, setDepartments);
+      const unsubCC = dbService.subscribe<CostCenter>('cost_centers', user.company_id, setCostCenters);
       const unsubPM = dbService.subscribe<any>('payment_methods', user.company_id, setPaymentMethods);
       const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
       const unsubWarehouses = dbService.subscribe<any>('warehouses', user.company_id, setWarehouses);
@@ -205,6 +213,9 @@ export const Invoices: React.FC = () => {
         unsubInvoices();
         unsubCustomers();
         unsubProducts();
+        unsubOps();
+        unsubDepts();
+        unsubCC();
         unsubPM();
         unsubAccounts();
         unsubWarehouses();
@@ -1179,6 +1190,18 @@ export const Invoices: React.FC = () => {
           item.image_url = '';
         }
       }
+
+      if (field === 'operation_id') {
+        const op = operations.find(o => o.id === value);
+        if (op) {
+          if (op.department_id) {
+            item.department_id = op.department_id;
+          }
+          if (op.cost_center_id) {
+            item.cost_center_id = op.cost_center_id;
+          }
+        }
+      }
       
       if (field === 'quantity' || field === 'unit_price') {
         item.total = (item.quantity || 0) * (item.unit_price || 0);
@@ -1242,7 +1265,10 @@ export const Invoices: React.FC = () => {
         unit_price: Number(i.unit_price) || 0,
         total: Number((Number(i.quantity) || 0) * (Number(i.unit_price) || 0)) || 0,
         barcode: i.barcode || '',
-        image_url: i.image_url || ''
+        image_url: i.image_url || '',
+        operation_id: i.operation_id || null,
+        department_id: i.department_id || null,
+        cost_center_id: i.cost_center_id || null
       }));
 
       const invoiceData = { 
@@ -2985,6 +3011,9 @@ export const Invoices: React.FC = () => {
                               <th className="p-1.5 border-r border-zinc-200 text-right">{t('invoices.item_name')}</th>
                               <th className="p-1.5 border-r border-zinc-200 text-center w-16">{language === 'ar' ? 'صورة' : 'Image'}</th>
                               <th className="p-1.5 border-r border-zinc-200 text-center w-28">{language === 'ar' ? 'باركود' : 'Barcode'}</th>
+                              <th className="p-1.5 border-r border-zinc-200 text-center w-36">{language === 'ar' ? 'رقم عملية' : 'Operation No'}</th>
+                              <th className="p-1.5 border-r border-zinc-200 text-center w-36">{language === 'ar' ? 'الإدارة' : 'Department'}</th>
+                              <th className="p-1.5 border-r border-zinc-200 text-center w-36">{language === 'ar' ? 'مركز التكلفة' : 'Cost Center'}</th>
                               <th className="p-1.5 border-r border-zinc-200 text-center w-24">{t('invoices.item_quantity')}</th>
                               <th className="p-1.5 border-r border-zinc-200 text-center w-32">{t('invoices.item_price')}</th>
                               <th className="p-1.5 border-r border-zinc-200 text-center w-32">{t('invoices.item_total')}</th>
@@ -3061,6 +3090,167 @@ export const Invoices: React.FC = () => {
                                     )}
                                   </div>
                                 </td>
+                                
+                                {/* رقم عملية */}
+                                <td className="p-1 border-b border-r border-zinc-200 w-36 text-center relative">
+                                  <div className="flex items-center gap-1 w-full relative">
+                                    <input 
+                                      type="text" 
+                                      placeholder={language === 'ar' ? 'ابحث عن عملية...' : 'Search operation...'}
+                                      className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
+                                      value={
+                                        activeCell?.index === index && activeCell?.field === 'operation'
+                                          ? cellSearchTerm
+                                          : (operations.find(op => op.id === item.operation_id)?.operation_number || item.operation_id || '')
+                                      }
+                                      onFocus={() => {
+                                        setActiveCell({ index, field: 'operation' });
+                                        setCellSearchTerm('');
+                                      }}
+                                      onChange={(e) => setCellSearchTerm(e.target.value)}
+                                      onBlur={() => {
+                                        setTimeout(() => setActiveCell(null), 200);
+                                      }}
+                                    />
+                                    {item.operation_id && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setIsModalOpen(false);
+                                          setPendingViewDoc({ type: 'operation', idOrNumber: item.operation_id! });
+                                          setCurrentPage('operations');
+                                        }}
+                                        className="p-0.5 hover:bg-zinc-100 rounded text-zinc-400 hover:text-emerald-600 transition-colors flex-shrink-0"
+                                        title={language === 'ar' ? 'انتقال إلى العملية' : 'Go to operation'}
+                                      >
+                                        <ExternalLink size={12} />
+                                      </button>
+                                    )}
+                                  </div>
+                                  {activeCell?.index === index && activeCell?.field === 'operation' && (
+                                    <div className="absolute left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border border-zinc-200 rounded-lg shadow-lg z-50 py-1 divide-y divide-zinc-50">
+                                      <div 
+                                        onMouseDown={() => updateItem(index, 'operation_id', null)}
+                                        className="px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 cursor-pointer font-bold text-right"
+                                      >
+                                        {language === 'ar' ? 'إلغاء التحديد' : 'Clear Selection'}
+                                      </div>
+                                      {operations
+                                        .filter(op => {
+                                          const term = cellSearchTerm.toLowerCase();
+                                          return (
+                                            (op.operation_number || '').toLowerCase().includes(term) ||
+                                            (op.customer_name || '').toLowerCase().includes(term) ||
+                                            (op.description || '').toLowerCase().includes(term)
+                                          );
+                                        })
+                                        .slice(0, 10)
+                                        .map(op => (
+                                          <div
+                                            key={op.id}
+                                            onMouseDown={() => {
+                                              updateItem(index, 'operation_id', op.id);
+                                            }}
+                                            className="px-3 py-1.5 text-xs text-zinc-700 hover:bg-emerald-50 hover:text-emerald-700 cursor-pointer transition-colors font-semibold text-right"
+                                          >
+                                            {op.operation_number} {op.customer_name ? `(${op.customer_name})` : ''}
+                                          </div>
+                                        ))
+                                      }
+                                    </div>
+                                  )}
+                                </td>
+
+                                {/* الإدارة */}
+                                <td className="p-1 border-b border-r border-zinc-200 w-36 text-center relative">
+                                  <input 
+                                    type="text" 
+                                    placeholder={language === 'ar' ? 'ابحث عن إدارة...' : 'Search department...'}
+                                    className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
+                                    value={
+                                      activeCell?.index === index && activeCell?.field === 'department'
+                                        ? cellSearchTerm
+                                        : (departments.find(d => d.id === item.department_id)?.name || '')
+                                    }
+                                    onFocus={() => {
+                                      setActiveCell({ index, field: 'department' });
+                                      setCellSearchTerm('');
+                                    }}
+                                    onChange={(e) => setCellSearchTerm(e.target.value)}
+                                    onBlur={() => {
+                                      setTimeout(() => setActiveCell(null), 200);
+                                    }}
+                                  />
+                                  {activeCell?.index === index && activeCell?.field === 'department' && (
+                                    <div className="absolute left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border border-zinc-200 rounded-lg shadow-lg z-50 py-1 divide-y divide-zinc-50">
+                                      <div 
+                                        onMouseDown={() => updateItem(index, 'department_id', null)}
+                                        className="px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 cursor-pointer font-bold text-right"
+                                      >
+                                        {language === 'ar' ? 'إلغاء التحديد' : 'Clear Selection'}
+                                      </div>
+                                      {departments
+                                        .filter(d => (d.name || '').toLowerCase().includes(cellSearchTerm.toLowerCase()))
+                                        .slice(0, 10)
+                                        .map(d => (
+                                          <div
+                                            key={d.id}
+                                            onMouseDown={() => updateItem(index, 'department_id', d.id)}
+                                            className="px-3 py-1.5 text-xs text-zinc-700 hover:bg-emerald-50 hover:text-emerald-700 cursor-pointer transition-colors font-semibold text-right"
+                                          >
+                                            {d.name}
+                                          </div>
+                                        ))
+                                      }
+                                    </div>
+                                  )}
+                                </td>
+
+                                {/* مركز التكلفة */}
+                                <td className="p-1 border-b border-r border-zinc-200 w-36 text-center relative">
+                                  <input 
+                                    type="text" 
+                                    placeholder={language === 'ar' ? 'ابحث عن مركز...' : 'Search cost center...'}
+                                    className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
+                                    value={
+                                      activeCell?.index === index && activeCell?.field === 'cost_center'
+                                        ? cellSearchTerm
+                                        : (costCenters.find(cc => cc.id === item.cost_center_id)?.name || '')
+                                    }
+                                    onFocus={() => {
+                                      setActiveCell({ index, field: 'cost_center' });
+                                      setCellSearchTerm('');
+                                    }}
+                                    onChange={(e) => setCellSearchTerm(e.target.value)}
+                                    onBlur={() => {
+                                      setTimeout(() => setActiveCell(null), 200);
+                                    }}
+                                  />
+                                  {activeCell?.index === index && activeCell?.field === 'cost_center' && (
+                                    <div className="absolute left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border border-zinc-200 rounded-lg shadow-lg z-50 py-1 divide-y divide-zinc-50">
+                                      <div 
+                                        onMouseDown={() => updateItem(index, 'cost_center_id', null)}
+                                        className="px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 cursor-pointer font-bold text-right"
+                                      >
+                                        {language === 'ar' ? 'إلغاء التحديد' : 'Clear Selection'}
+                                      </div>
+                                      {costCenters
+                                        .filter(cc => (cc.name || '').toLowerCase().includes(cellSearchTerm.toLowerCase()))
+                                        .slice(0, 10)
+                                        .map(cc => (
+                                          <div
+                                            key={cc.id}
+                                            onMouseDown={() => updateItem(index, 'cost_center_id', cc.id)}
+                                            className="px-3 py-1.5 text-xs text-zinc-700 hover:bg-emerald-50 hover:text-emerald-700 cursor-pointer transition-colors font-semibold text-right"
+                                          >
+                                            {cc.name}
+                                          </div>
+                                        ))
+                                      }
+                                    </div>
+                                  )}
+                                </td>
+
                                 <td className="p-1 border-b border-r border-zinc-200 w-24">
                                   <input 
                                     type="number" 
@@ -3093,7 +3283,7 @@ export const Invoices: React.FC = () => {
                             ))}
                             {items.length === 0 && (
                               <tr>
-                                <td colSpan={8} className="px-3 py-6 text-center text-zinc-400 italic text-xs">
+                                <td colSpan={10} className="px-3 py-6 text-center text-zinc-400 italic text-xs">
                                   {t('common.no_items')}
                                 </td>
                               </tr>

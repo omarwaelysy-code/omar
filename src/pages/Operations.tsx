@@ -18,10 +18,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
 import { useViewPreference } from '../hooks/useViewPreference';
+import { useNavigation } from '../contexts/NavigationContext';
 
 export const Operations: React.FC = () => {
   const { t, dir, language } = useLanguage();
   const { user } = useAuth();
+  const { pendingViewDoc, setPendingViewDoc } = useNavigation();
   
   const [view, setView] = useViewPreference('operations', 'card');
   const [operations, setOperations] = useState<Operation[]>([]);
@@ -67,6 +69,37 @@ export const Operations: React.FC = () => {
       setDynamicFields([]);
     }
   }, [selectedCategory]);
+
+  useEffect(() => {
+    if (pendingViewDoc && pendingViewDoc.type === 'operation') {
+      const loadPendingOperation = async () => {
+        try {
+          let op = operations.find(o => o.id === pendingViewDoc.idOrNumber || o.operation_number === pendingViewDoc.idOrNumber);
+          if (!op) {
+            op = await dbService.get<Operation>('operations', pendingViewDoc.idOrNumber);
+          }
+          if (op) {
+            setEditingOperation(op);
+            setFormData({ ...op });
+            setSelectedCategory(op.category_id);
+            const values = await apiRequest<any[]>(`/operations/${op.id}/values`);
+            const extraFormData: any = {};
+            values.forEach(v => { extraFormData[v.field_id] = v.value; });
+            setFormData((prev: any) => ({ ...prev, ...extraFormData }));
+            setIsModalOpen(true);
+          }
+        } catch (error) {
+          console.error('Failed to load pending operation:', error);
+        } finally {
+          setPendingViewDoc(null);
+        }
+      };
+      
+      if (!loading) {
+        loadPendingOperation();
+      }
+    }
+  }, [pendingViewDoc, loading, operations]);
 
   const fetchInitialData = async () => {
     if (!user) return;
