@@ -353,6 +353,8 @@ export interface InvoiceItem {
   operation_id?: string | null;
   department_id?: string | null;
   cost_center_id?: string | null;
+  vat_rate?: number;
+  vat_amount?: number;
 }
 
 export interface ReceiptVoucherItem {

@@ -172,6 +172,8 @@ export const Invoices: React.FC = () => {
   const [view, setView] = useViewPreference('invoices', 'table');
   const [invoiceType, setInvoiceType] = useState<'items' | 'services'>('items');
 
+  const isVatEnabled = companyData?.settings?.vat_enabled || companyData?.vat_enabled || false;
+
   useEffect(() => {
     if (user) {
       const unsubInvoices = dbService.subscribePaginated<Invoice>('invoices', {
@@ -1036,7 +1038,10 @@ export const Invoices: React.FC = () => {
 
     const generatePreview = () => {
       const subtotal = (items || []).reduce((sum, item) => sum + item.total, 0);
-      const total_amount = subtotal - discount;
+      const vatTotal = isVatEnabled
+        ? (items || []).reduce((sum, item) => sum + (Number(item.vat_amount) || 0), 0)
+        : 0;
+      const total_amount = subtotal + vatTotal - discount;
       if (subtotal <= 0) {
         setPreviewJournalEntry(null);
         setPreviewActivityLog(null);
@@ -1132,6 +1137,28 @@ export const Invoices: React.FC = () => {
         });
       });
 
+      // Credit: VAT Liability Account (if VAT is enabled and total VAT > 0)
+      if (isVatEnabled && vatTotal > 0) {
+        const vatAccount = accounts.find(a => 
+          a.name.includes('ضريبة القيمة المضافة') || 
+          a.name.includes('قيمة مضافة') || 
+          a.name.includes('ضريبة مبيعات')
+        );
+        const vatAccountId = vatAccount?.id || 'vat_liability_default';
+        const vatAccountName = vatAccount?.name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة (افتراضي)' : 'VAT Liability Account (Default)');
+
+        journalItems.push({
+          account_id: vatAccountId,
+          account_name: vatAccountName,
+          debit: 0,
+          credit: vatTotal,
+          description: `ضريبة القيمة المضافة - فاتورة رقم ${invoice_number}`
+        });
+      }
+
+      const sumDebits = Number(journalItems.reduce((s, x) => s + (x.debit || 0), 0).toFixed(2)) || 0;
+      const sumCredits = Number(journalItems.reduce((s, x) => s + (x.credit || 0), 0).toFixed(2)) || 0;
+
       setPreviewJournalEntry({
         id: 'preview',
         date,
@@ -1140,8 +1167,8 @@ export const Invoices: React.FC = () => {
         reference_type: 'invoice',
         description: `قيد فاتورة مبيعات رقم ${invoice_number}`,
         items: journalItems,
-        total_debit: total_amount,
-        total_credit: total_amount,
+        total_debit: sumDebits,
+        total_credit: sumCredits,
         company_id: user.company_id,
         created_at: new Date().toISOString(),
         created_by: user.id
@@ -1161,6 +1188,8 @@ export const Invoices: React.FC = () => {
       product_image_url: product.image_url,
       quantity: 1,
       unit_price: product.sale_price,
+      vat_rate: product.vat_rate || 0,
+      vat_amount: product.sale_price * ((product.vat_rate || 0) / 100),
       total: product.sale_price,
       barcode: product.barcode || '',
       image_url: product.image_url || ''
@@ -1173,6 +1202,8 @@ export const Invoices: React.FC = () => {
       product_name: '',
       quantity: 1,
       unit_price: 0,
+      vat_rate: 0,
+      vat_amount: 0,
       total: 0,
       barcode: '',
       image_url: ''
@@ -1194,14 +1225,18 @@ export const Invoices: React.FC = () => {
           item.product_name = product.name;
           item.product_image_url = product.image_url;
           item.unit_price = product.sale_price;
+          item.vat_rate = product.vat_rate || 0;
           item.total = (item.quantity || 0) * (item.unit_price || 0);
+          item.vat_amount = item.total * ((product.vat_rate || 0) / 100);
           item.barcode = product.barcode || '';
           item.image_url = product.image_url || '';
         } else {
           item.product_name = '';
           item.product_image_url = '';
           item.unit_price = 0;
+          item.vat_rate = 0;
           item.total = 0;
+          item.vat_amount = 0;
           item.barcode = '';
           item.image_url = '';
         }
@@ -1219,8 +1254,9 @@ export const Invoices: React.FC = () => {
         }
       }
       
-      if (field === 'quantity' || field === 'unit_price') {
+      if (field === 'quantity' || field === 'unit_price' || field === 'vat_rate') {
         item.total = (item.quantity || 0) * (item.unit_price || 0);
+        item.vat_amount = item.total * ((item.vat_rate || 0) / 100);
       }
       
       newItems[index] = item;
@@ -1260,7 +1296,35 @@ export const Invoices: React.FC = () => {
     try {
       const subtotal = Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)), 0)) || 0;
       const discount_amount = Number(discount) || 0;
-      const total_amount = Number(subtotal - discount_amount) || 0;
+
+      const sanitizedItems = validItems.map(i => {
+        const prod = products.find(p => p.id === i.product_id);
+        const rate = i.vat_rate !== undefined ? i.vat_rate : (prod?.vat_rate || 0);
+        const total = Number((Number(i.quantity) || 0) * (Number(i.unit_price) || 0)) || 0;
+        const vat_amount = isVatEnabled ? Number((total * (rate / 100)).toFixed(2)) : 0;
+        return {
+          product_id: i.product_id,
+          product_name: i.product_name,
+          product_code: i.product_code || '',
+          product_image_url: i.product_image_url || i.image_url || '',
+          quantity: Number(i.quantity) || 0,
+          unit_price: Number(i.unit_price) || 0,
+          total: total,
+          vat_rate: rate,
+          vat_amount: vat_amount,
+          barcode: i.barcode || '',
+          image_url: i.image_url || '',
+          operation_id: i.operation_id || null,
+          department_id: i.department_id || null,
+          cost_center_id: i.cost_center_id || null
+        };
+      });
+
+      const vatTotal = isVatEnabled
+        ? Number(sanitizedItems.reduce((sum, item) => sum + (Number(item.vat_amount) || 0), 0).toFixed(2))
+        : 0;
+
+      const total_amount = Number(subtotal + vatTotal - discount_amount) || 0;
 
       // Over-settlement validation
       const totalSettled = formSettlements.reduce((sum, s) => sum + Number(s.settled_amount), 0);
@@ -1271,21 +1335,6 @@ export const Invoices: React.FC = () => {
       
       const customer = customers.find(c => c.id === selectedCustomerId);
       const paymentMethod = paymentMethods.find(pm => pm.id === paymentMethodId);
-      
-      const sanitizedItems = validItems.map(i => ({
-        product_id: i.product_id,
-        product_name: i.product_name,
-        product_code: i.product_code || '',
-        product_image_url: i.product_image_url || i.image_url || '',
-        quantity: Number(i.quantity) || 0,
-        unit_price: Number(i.unit_price) || 0,
-        total: Number((Number(i.quantity) || 0) * (Number(i.unit_price) || 0)) || 0,
-        barcode: i.barcode || '',
-        image_url: i.image_url || '',
-        operation_id: i.operation_id || null,
-        department_id: i.department_id || null,
-        cost_center_id: i.cost_center_id || null
-      }));
 
       const invoiceData = { 
         settlement_number: null,
@@ -1300,6 +1349,7 @@ export const Invoices: React.FC = () => {
         description,
         items: sanitizedItems,
         subtotal,
+        tax_amount: vatTotal,
         discount_amount,
         total_amount,
         payment_type: paymentType,
@@ -1365,6 +1415,24 @@ export const Invoices: React.FC = () => {
           description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoiceNumber}${description ? ` - ${description}` : ''}`
         });
       });
+
+      if (isVatEnabled && vatTotal > 0) {
+        const vatAccount = accounts.find(a => 
+          a.name.includes('ضريبة القيمة المضافة') || 
+          a.name.includes('قيمة مضافة') || 
+          a.name.includes('ضريبة مبيعات')
+        );
+        const vatAccountId = vatAccount?.id || 'vat_liability_default';
+        const vatAccountName = vatAccount?.name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة (افتراضي)' : 'VAT Liability Account (Default)');
+        
+        journalItems.push({
+          account_id: vatAccountId,
+          account_name: vatAccountName,
+          debit: 0,
+          credit: vatTotal,
+          description: `ضريبة القيمة المضافة - فاتورة رقم ${invoiceNumber}${description ? ` - ${description}` : ''}`
+        });
+      }
 
       if (paymentType === 'cash') {
         const pm = paymentMethods.find(p => p.id === paymentMethodId);
@@ -2517,66 +2585,71 @@ export const Invoices: React.FC = () => {
       ) : (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
           {/* Form Header */}
-          <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70]">
-            <div className="flex items-center gap-3">
+          <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70]" dir={dir}>
+            {/* Left side: Save and Cancel buttons */}
+            <div className="flex items-center gap-2">
               <button 
-                onClick={closeModal} 
-                className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all font-black text-sm"
+                type="submit"
+                form="invoice-form"
+                onClick={handleSubmit}
+                className="px-5 py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-2 active:scale-95 shadow-sm text-xs md:text-sm"
               >
-                <ChevronRight size={20} />
-                <span>العودة للقائمة</span>
+                <Save size={16} />
+                <span>{language === 'ar' ? 'حفظ' : 'Save'}</span>
+              </button>
+              <button 
+                type="button"
+                onClick={closeModal}
+                className="px-4 py-2 rounded-xl bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-all flex items-center gap-2 active:scale-95 border border-zinc-200 shadow-sm text-xs md:text-sm"
+              >
+                <RotateCcw size={16} />
+                <span>{language === 'ar' ? 'إلغاء' : 'Cancel'}</span>
               </button>
             </div>
 
-              <div className="flex-1 flex justify-center gap-2">
-                <button 
-                  type="button"
-                  onClick={() => setShowSidePanel(!showSidePanel)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm ${showSidePanel ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-zinc-50'}`}
-                >
-                  <History size={14} />
-                  <span>{language === 'ar' ? 'سجل التعديلات والقيد' : 'Activity Log & Journal'}</span>
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => setShowAiInput(!showAiInput)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm ${showAiInput ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-zinc-50'}`}
-                >
-                  <Sparkles size={14} />
-                  <span>{language === 'ar' ? 'الإنشاء الذكي' : 'Smart AI'}</span>
-                </button>
-              </div>
+            {/* Right side: Navigation & Info */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <button 
+                type="button"
+                onClick={closeModal} 
+                className="flex items-center gap-1.5 px-3 py-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all font-bold text-xs"
+              >
+                <ChevronRight size={18} />
+                <span>{language === 'ar' ? 'العودة للقائمة' : 'Return to List'}</span>
+              </button>
+              
+              <div className="h-4 w-px bg-slate-200" />
+              
+              <button 
+                type="button"
+                onClick={() => setShowSidePanel(!showSidePanel)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm ${showSidePanel ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-zinc-50'}`}
+              >
+                <History size={14} />
+                <span>{language === 'ar' ? 'سجل التعديلات والقيد' : 'Activity Log & Journal'}</span>
+              </button>
+              
+              <button 
+                type="button"
+                onClick={() => setShowAiInput(!showAiInput)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm ${showAiInput ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-zinc-50'}`}
+              >
+                <Sparkles size={14} />
+                <span>{language === 'ar' ? 'الإنشاء الذكي' : 'Smart AI'}</span>
+              </button>
+              
+              <div className="h-4 w-px bg-slate-200" />
 
-              <div className="flex items-center gap-4">
-                {editingInvoice && (
-                  <div className="hidden lg:flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl">
-                    <button 
-                      type="button"
-                      onClick={handlePrevInvoice}
-                      className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-slate-600 disabled:opacity-30 text-xs font-black"
-                      disabled={invoices.findIndex(inv => inv.id === editingInvoice.id) === 0}
-                    >
-                      <ChevronRight size={16} />
-                      السابق
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={handleNextInvoice}
-                      className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-slate-600 disabled:opacity-30 text-xs font-black"
-                      disabled={invoices.findIndex(inv => inv.id === editingInvoice.id) === invoices.length - 1}
-                    >
-                      التالي
-                      <ChevronLeft size={16} />
-                    </button>
-                  </div>
-                )}
-                <div className="flex items-center gap-4 flex-wrap">
-                  <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
-                    {editingInvoice ? 'تعديل الفاتورة' : 'إنشاء فاتورة جديدة'}
-                  </h3>
-                </div>
+              <h3 className="text-base md:text-lg font-black text-slate-900 tracking-tight">
+                {editingInvoice ? (language === 'ar' ? 'تعديل الفاتورة' : 'Edit Invoice') : (language === 'ar' ? 'إنشاء فاتورة جديدة' : 'Create New Invoice')}
+              </h3>
+
+              <div className="flex flex-col items-center border border-zinc-200 bg-zinc-50 rounded-xl px-3 py-1 font-mono">
+                <span className="text-[8px] font-bold text-zinc-400 leading-none mb-0.5">{language === 'ar' ? 'رقم الفاتورة' : 'Invoice No'}</span>
+                <span className="text-xs font-bold text-zinc-650 tracking-tight leading-none">{invoiceNumber}</span>
               </div>
             </div>
+          </div>
             
             <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full relative">
               {/* Side Panel for Activity Log and Journal Entry */}
@@ -2649,7 +2722,7 @@ export const Invoices: React.FC = () => {
                 <span>{language === 'ar' ? 'الإنشاء الذكي بالذكاء الاصطناعي' : 'Smart AI Creation'}</span>
               </button>
 
-              <div className="flex-1 p-4 md:p-6 space-y-3 overflow-y-auto pb-32 md:pb-6">
+              <div className="flex-1 p-4 md:p-6 space-y-3 overflow-y-auto pb-6">
                 <div className="space-y-3">
 
                   <form id="invoice-form" onSubmit={handleSubmit} className="space-y-3">                    {/* Upper Layout: Totals Summary on the Left, Metadata Form on the Right */}
@@ -2681,11 +2754,23 @@ export const Invoices: React.FC = () => {
                             </div>
                             <span className="font-bold text-sm">-{formatMoney(discount)}</span>
                           </div>
+                          {isVatEnabled && (
+                            <div className="flex justify-between items-center text-zinc-650 text-xs pt-1 border-t border-dashed border-zinc-200">
+                              <span className="font-medium">{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</span>
+                              <span className="font-bold text-sm">
+                                +{formatMoney(items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0))}
+                              </span>
+                            </div>
+                          )}
                           <div className="flex justify-between items-center text-emerald-600 text-xs pt-1.5 border-t border-zinc-200">
                             <span className="font-black text-sm">{t('invoices.summary_total')}</span>
                             <div className="flex flex-col items-end">
                               <span className="font-black text-lg tracking-tighter text-left">
-                                {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) - discount)} {companyData?.settings?.currency || ''}
+                                {formatMoney(
+                                  items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) + 
+                                  (isVatEnabled ? items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0) : 0) - 
+                                  discount
+                                )} {companyData?.settings?.currency || ''}
                               </span>
                             </div>
                           </div>
@@ -2718,20 +2803,8 @@ export const Invoices: React.FC = () => {
                           </div>
                         )}
                         
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                          {/* 1. Invoice Number */}
-                          <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.column_number')}</label>
-                            <input
-                              required
-                              type="text"
-                              readOnly
-                              className="w-full px-2 py-1 rounded-lg bg-zinc-100 border border-zinc-200 outline-none font-bold text-zinc-500 text-xs cursor-not-allowed"
-                              value={invoiceNumber}
-                            />
-                          </div>
-
-                          {/* 2. Date */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                          {/* 1. Date */}
                           <div>
                             <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.column_date')}</label>
                             <input
@@ -2743,7 +2816,7 @@ export const Invoices: React.FC = () => {
                             />
                           </div>
 
-                          {/* 3. Customer */}
+                          {/* 2. Customer */}
                           <div className="col-span-1 md:col-span-2 lg:col-span-2">
                             <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.form_customer')}</label>
                             <select 
@@ -2766,7 +2839,7 @@ export const Invoices: React.FC = () => {
                             </select>
                           </div>
 
-                          {/* 4. Warehouse */}
+                          {/* 3. Warehouse */}
                           {invoiceType === 'items' && (
                             <div>
                               <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
@@ -2782,31 +2855,30 @@ export const Invoices: React.FC = () => {
                             </div>
                           )}
 
-                          {/* 5. Payment Type (Cash/Credit) */}
+                          {/* 4. Payment Type */}
                           <div>
                             <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.form_payment_type')}</label>
-                            <div className="flex border border-zinc-200 rounded-lg overflow-hidden bg-zinc-50 p-0.5 h-[26px]">
-                              <button 
-                                type="button"
-                                onClick={() => setPaymentType('cash')}
-                                className={`flex-1 text-[10px] font-bold rounded transition-all ${paymentType === 'cash' ? 'bg-emerald-600 text-white shadow' : 'text-zinc-500 hover:bg-zinc-100'}`}
+                            <div className="flex items-center gap-1.5 h-[26px]">
+                              {paymentType === 'credit' && (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-50 text-teal-705 border border-teal-205">
+                                  {language === 'ar' ? 'أجل' : 'Credit'}
+                                </span>
+                              )}
+                              <select 
+                                className="flex-1 px-2 py-1 rounded-lg border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs cursor-pointer"
+                                value={paymentType}
+                                onChange={(e) => setPaymentType(e.target.value as 'cash' | 'credit')}
                               >
-                                {t('invoices.payment_cash')}
-                              </button>
-                              <button 
-                                type="button"
-                                onClick={() => setPaymentType('credit')}
-                                className={`flex-1 text-[10px] font-bold rounded transition-all ${paymentType === 'credit' ? 'bg-emerald-600 text-white shadow' : 'text-zinc-500 hover:bg-zinc-100'}`}
-                              >
-                                {t('invoices.payment_credit')}
-                              </button>
+                                <option value="cash">{t('invoices.payment_cash')}</option>
+                                <option value="credit">{t('invoices.payment_credit')}</option>
+                              </select>
                             </div>
                           </div>
                         </div>
 
                         {/* Second Row of metadata */}
                         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                          {/* 6. Payment Terms or Method */}
+                          {/* 5. Payment Terms or Method */}
                           {paymentType === 'cash' ? (
                             <div>
                               <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.form_payment_method')}</label>
@@ -2881,7 +2953,7 @@ export const Invoices: React.FC = () => {
                             </>
                           )}
 
-                          {/* 7. Subject / Description */}
+                          {/* 6. Subject / Description */}
                           <div className="col-span-1 md:col-span-2">
                             <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'موضوع الفاتورة' : 'Invoice Subject'}</label>
                             <input
@@ -2984,6 +3056,9 @@ export const Invoices: React.FC = () => {
                               <th className="p-1.5 border-r border-zinc-200 text-center w-36">{language === 'ar' ? 'مركز التكلفة' : 'Cost Center'}</th>
                               <th className="p-1.5 border-r border-zinc-200 text-center w-24">{t('invoices.item_quantity')}</th>
                               <th className="p-1.5 border-r border-zinc-200 text-center w-32">{t('invoices.item_price')}</th>
+                              {isVatEnabled && (
+                                <th className="p-1.5 border-r border-zinc-200 text-center w-20">{language === 'ar' ? 'ض ق م' : 'VAT %'}</th>
+                              )}
                               <th className="p-1.5 border-r border-zinc-200 text-center w-32">{t('invoices.item_total')}</th>
                               <th className="p-1.5 w-10"></th>
                             </tr>
@@ -3212,6 +3287,21 @@ export const Invoices: React.FC = () => {
                                     }}
                                   />
                                 </td>
+                                {isVatEnabled && (
+                                  <td className="p-1 border-b border-r border-zinc-200 w-20">
+                                    <div className="flex items-center justify-center gap-0.5">
+                                      <input 
+                                        type="number" 
+                                        min={0}
+                                        max={100}
+                                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-bold text-zinc-800 outline-none transition-all text-xs"
+                                        value={item.vat_rate || 0}
+                                        onChange={(e) => updateItem(index, 'vat_rate', parseFloat(e.target.value) || 0)}
+                                      />
+                                      <span className="text-[10px] text-zinc-400 font-bold">%</span>
+                                    </div>
+                                  </td>
+                                )}
                                 <td className="p-1 border-b border-r border-zinc-200 w-32 text-center font-bold text-emerald-600 text-xs">
                                   {formatMoney(item.total)}
                                 </td>
@@ -3228,7 +3318,7 @@ export const Invoices: React.FC = () => {
                             ))}
                             {items.length === 0 && (
                               <tr>
-                                <td colSpan={10} className="px-3 py-6 text-center text-zinc-400 italic text-xs">
+                                <td colSpan={isVatEnabled ? 11 : 10} className="px-3 py-6 text-center text-zinc-400 italic text-xs">
                                   {t('common.no_items')}
                                 </td>
                               </tr>
@@ -3238,19 +3328,7 @@ export const Invoices: React.FC = () => {
                       </div>
                     </section>
 
-                    {/* Notes Section - Full Width */}
-                    <section className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3">
-                      <div className="flex items-center gap-2 mb-2 text-emerald-600">
-                        <Tag className="w-4 h-4" />
-                        <h2 className="font-semibold text-zinc-900 text-xs">{language === 'ar' ? 'الملاحظات' : 'Notes'}</h2>
-                      </div>
-                      <textarea 
-                        className="w-full min-h-[80px] bg-zinc-50 border border-zinc-200 rounded-lg p-3 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500 transition-all font-medium text-zinc-700 font-bold text-xs"
-                        placeholder={language === 'ar' ? 'أدخل أي ملاحظات إضافية هنا...' : 'Enter any additional notes...'}
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                      />
-                    </section>
+
 
                     {/* Settlements Table Card in Form */}
                     {selectedCustomerId && paymentType === 'credit' && (() => {
@@ -3640,26 +3718,7 @@ export const Invoices: React.FC = () => {
               </div>
             </div>
 
-            {/* Form Footer */}
-            <div className="p-4 md:p-6 border-t border-slate-100 bg-white/80 backdrop-blur-md sticky bottom-0 z-[70] flex items-center justify-between gap-4">
-              <button 
-                type="button"
-                onClick={closeModal}
-                className="flex-1 max-w-[200px] py-4 rounded-2xl bg-zinc-100 text-zinc-600 font-black hover:bg-zinc-200 transition-all flex items-center justify-center gap-3 active:scale-95"
-              >
-                <RotateCcw size={20} />
-                إلغاء
-              </button>
-              <button 
-                type="submit"
-                form="invoice-form"
-                onClick={handleSubmit}
-                className="flex-1 py-4 rounded-2xl bg-emerald-600 text-white font-black hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 shadow-xl shadow-emerald-600/20 active:scale-95"
-              >
-                <Save size={20} />
-                حفظ
-              </button>
-            </div>
+
           </div>
       )}
 
@@ -3837,6 +3896,12 @@ export const Invoices: React.FC = () => {
                         <tr>
                           <td colSpan={5} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-red-400 font-bold text-[10px] uppercase tracking-wider`}>{t('invoices.summary_discount')}</td>
                           <td className="px-6 py-3 text-red-600 text-base">-{formatMoney(viewInvoice.discount_amount || viewInvoice.discount)} {t('invoices.currency')}</td>
+                        </tr>
+                      )}
+                      {Number(viewInvoice.tax_amount) > 0 && (
+                        <tr>
+                          <td colSpan={5} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-zinc-600 font-bold text-[10px] uppercase tracking-wider`}>{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</td>
+                          <td className="px-6 py-3 text-zinc-750 text-base">+{formatMoney(viewInvoice.tax_amount)} {t('invoices.currency')}</td>
                         </tr>
                       )}
                       <tr className="bg-slate-900 text-white">

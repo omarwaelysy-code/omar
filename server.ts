@@ -32,9 +32,13 @@ async function startServer() {
       'ALTER TABLE "invoice_items" ADD COLUMN IF NOT EXISTS "operation_id" VARCHAR(36)',
       'ALTER TABLE "invoice_items" ADD COLUMN IF NOT EXISTS "department_id" VARCHAR(36)',
       'ALTER TABLE "invoice_items" ADD COLUMN IF NOT EXISTS "cost_center_id" VARCHAR(36)',
+      'ALTER TABLE "invoice_items" ADD COLUMN IF NOT EXISTS "vat_rate" DECIMAL(10, 4) DEFAULT 0',
+      'ALTER TABLE "invoice_items" ADD COLUMN IF NOT EXISTS "vat_amount" DECIMAL(18, 4) DEFAULT 0',
       'ALTER TABLE "purchase_invoice_items" ADD COLUMN IF NOT EXISTS "operation_id" VARCHAR(36)',
       'ALTER TABLE "purchase_invoice_items" ADD COLUMN IF NOT EXISTS "department_id" VARCHAR(36)',
       'ALTER TABLE "purchase_invoice_items" ADD COLUMN IF NOT EXISTS "cost_center_id" VARCHAR(36)',
+      'ALTER TABLE "purchase_invoice_items" ADD COLUMN IF NOT EXISTS "vat_rate" DECIMAL(10, 4) DEFAULT 0',
+      'ALTER TABLE "purchase_invoice_items" ADD COLUMN IF NOT EXISTS "vat_amount" DECIMAL(18, 4) DEFAULT 0',
       
       // Journal Entries
       'ALTER TABLE "journal_entries" ADD COLUMN IF NOT EXISTS "entry_number" VARCHAR(50)',

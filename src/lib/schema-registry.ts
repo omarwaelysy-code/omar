@@ -52,7 +52,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'id', 'invoice_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
     'product_name', 'product_code', 'product_image_url', 'image_url', 'barcode',
     'unit_cost', 'total_cost', 'costing_method_used', 'company_id',
-    'operation_id', 'department_id', 'cost_center_id'
+    'operation_id', 'department_id', 'cost_center_id', 'vat_rate', 'vat_amount'
   ],
   sales_orders: [
     'id', 'company_id', 'customer_id', 'customer_name', 'warehouse_id', 'order_number', 'date', 'delivery_date', 'subtotal',
@@ -88,7 +88,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   purchase_invoice_items: [
     'id', 'invoice_id', 'product_id', 'expense_category_id', 'description', 'quantity', 'unit_price', 'total',
     'product_name', 'category_name', 'product_code', 'product_image_url',
-    'operation_id', 'department_id', 'cost_center_id'
+    'operation_id', 'department_id', 'cost_center_id', 'vat_rate', 'vat_amount'
   ],
   purchase_returns: [
     'id', 'company_id', 'supplier_id', 'supplier_name', 'warehouse_id', 'return_number', 'date', 'total_amount', 
