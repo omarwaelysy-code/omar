@@ -1037,11 +1037,11 @@ export const Invoices: React.FC = () => {
     }
 
     const generatePreview = () => {
-      const subtotal = (items || []).reduce((sum, item) => sum + item.total, 0);
+      const subtotal = (items || []).reduce((sum, item) => sum + (Number(item.total) || 0), 0);
       const vatTotal = isVatEnabled
         ? (items || []).reduce((sum, item) => sum + (Number(item.vat_amount) || 0), 0)
         : 0;
-      const total_amount = subtotal + vatTotal - discount;
+      const total_amount = subtotal + vatTotal - Number(discount || 0);
       if (subtotal <= 0) {
         setPreviewJournalEntry(null);
         setPreviewActivityLog(null);
@@ -1094,7 +1094,7 @@ export const Invoices: React.FC = () => {
       journalItems.push({
         account_id: debitAccountId,
         account_name: debitAccountName,
-        debit: total_amount,
+        debit: Number(total_amount) || 0,
         credit: 0,
         description: `فاتورة مبيعات رقم ${invoice_number} - ${customer?.name || '...'}`,
         sub_account_id: paymentType === 'cash' ? paymentMethodId : customer?.id,
@@ -1102,13 +1102,13 @@ export const Invoices: React.FC = () => {
       });
 
       // Debit: Discount Account (if any)
-      if (discount > 0) {
+      if (Number(discount) > 0) {
         const discountAccount = accounts.find(a => a.id === settings?.customer_discount_account_id) || 
                                 accounts.find(a => a.name.includes('خصم مسموح به') || a.name.includes('خصم مبيعات'));
         journalItems.push({
           account_id: discountAccount?.id || 'sales_discount_default',
           account_name: discountAccount?.name || 'حساب الخصم المسموح به (افتراضي)',
-          debit: discount,
+          debit: Number(discount) || 0,
           credit: 0,
           description: `خصم مسموح به - فاتورة رقم ${invoice_number}`
         });
@@ -1132,7 +1132,7 @@ export const Invoices: React.FC = () => {
           account_id: creditAccountId,
           account_name: creditAccountName,
           debit: 0,
-          credit: item.total,
+          credit: Number(item.total) || 0,
           description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoice_number}`
         });
       });
@@ -1151,13 +1151,13 @@ export const Invoices: React.FC = () => {
           account_id: vatAccountId,
           account_name: vatAccountName,
           debit: 0,
-          credit: vatTotal,
+          credit: Number(vatTotal) || 0,
           description: `ضريبة القيمة المضافة - فاتورة رقم ${invoice_number}`
         });
       }
 
-      const sumDebits = Number(journalItems.reduce((s, x) => s + (x.debit || 0), 0).toFixed(2)) || 0;
-      const sumCredits = Number(journalItems.reduce((s, x) => s + (x.credit || 0), 0).toFixed(2)) || 0;
+      const sumDebits = Number(journalItems.reduce((s, x) => s + (Number(x.debit) || 0), 0).toFixed(2)) || 0;
+      const sumCredits = Number(journalItems.reduce((s, x) => s + (Number(x.credit) || 0), 0).toFixed(2)) || 0;
 
       setPreviewJournalEntry({
         id: 'preview',
