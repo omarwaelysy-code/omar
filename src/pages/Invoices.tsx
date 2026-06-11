@@ -48,6 +48,8 @@ export const Invoices: React.FC = () => {
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [activeCell, setActiveCell] = useState<{ index: number; field: 'operation' | 'department' | 'cost_center' } | null>(null);
   const [cellSearchTerm, setCellSearchTerm] = useState('');
+  const [focusedPriceIndex, setFocusedPriceIndex] = useState<number | null>(null);
+  const [tempPriceValue, setTempPriceValue] = useState<string>('');
   const [allReceipts, setAllReceipts] = useState<any[]>([]);
   const [allPayments, setAllPayments] = useState<any[]>([]);
   const [allReturns, setAllReturns] = useState<any[]>([]);
@@ -2554,7 +2556,18 @@ export const Invoices: React.FC = () => {
                     </button>
                   </div>
                 )}
-                <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">{editingInvoice ? 'تعديل الفاتورة' : 'إنشاء فاتورة جديدة'}</h3>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
+                    {editingInvoice ? 'تعديل الفاتورة' : 'إنشاء فاتورة جديدة'}
+                  </h3>
+                  <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1 rounded-xl flex items-center gap-2 shadow-sm">
+                    <span className="text-xs font-bold text-emerald-600">{language === 'ar' ? 'الإجمالي الجاري:' : 'Running Total:'}</span>
+                    <span className="text-lg font-black font-mono">
+                      {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) - discount)}
+                    </span>
+                    <span className="text-xs font-bold text-emerald-600">{t('invoices.currency')}</span>
+                  </div>
+                </div>
               </div>
             </div>
             
@@ -2634,10 +2647,10 @@ export const Invoices: React.FC = () => {
 
 
                   <form id="invoice-form" onSubmit={handleSubmit} className="space-y-3">
-                    {/* Card 1: المعلومات الأساسية */}
-                    <section className="bg-white px-4 py-3 rounded-2xl border border-zinc-200 shadow-sm space-y-3 relative pt-8">
+                    {/* Unified Metadata & Payment Settings Panel */}
+                    <section className="bg-white p-3 rounded-xl border border-zinc-200 shadow-sm space-y-2 relative">
                       {editingInvoice && (
-                        <div className={`absolute ${dir === 'rtl' ? 'left-12' : 'right-12'} top-4 z-20 pointer-events-none select-none opacity-80 transform -rotate-12`}>
+                        <div className={`absolute ${dir === 'rtl' ? 'left-12' : 'right-12'} top-2 z-20 pointer-events-none select-none opacity-40 transform -rotate-12`}>
                           {(() => {
                             const status = getPaymentStatus(editingInvoice);
                             const statusLabels = {
@@ -2652,311 +2665,220 @@ export const Invoices: React.FC = () => {
                             };
                             const colorClass = statusColors[status] || statusColors.unpaid;
                             return (
-                              <div className={`px-6 py-2 border-y-2 border-dashed ${colorClass} font-black text-xl tracking-widest uppercase rounded`}>
+                              <div className={`px-4 py-1 border border-dashed ${colorClass} font-black text-sm tracking-wider uppercase rounded`}>
                                 {statusLabels[status]}
                               </div>
                             );
                           })()}
                         </div>
                       )}
-                      <div className="absolute top-2 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50/50 px-3 py-1 rounded-full border border-emerald-100">
-                        <FileText className="w-4 h-4" />
-                        <span className="text-xs font-bold">{t('invoices.basic_info')}</span>
-                      </div>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                        <div className="order-3 md:order-1">
-                          <label className="block text-[11px] font-bold text-zinc-400 tracking-tighter mb-1 px-2 uppercase">{t('invoices.column_date')}</label>
-                          <div className="relative">
-                            <input
-                              required
-                              type="date"
-                              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 rounded-xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs`}
-                              value={date}
-                              onChange={(e) => setDate(e.target.value)}
-                            />
-                            <Calendar className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
-                          </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                        {/* 1. Invoice Number */}
+                        <div>
+                          <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.column_number')}</label>
+                          <input
+                            required
+                            type="text"
+                            readOnly
+                            className="w-full px-2 py-1 rounded-lg bg-zinc-100 border border-zinc-200 outline-none font-bold text-zinc-500 text-xs cursor-not-allowed"
+                            value={invoiceNumber}
+                          />
                         </div>
 
-                        <div className="order-2 md:order-2 lg:col-span-1">
-                          <label className="block text-[11px] font-bold text-zinc-400 tracking-tighter mb-1 px-2 uppercase">{t('invoices.form_customer')} {selectedCustomerId ? `(ID: ${selectedCustomerId.slice(-4)})` : ''}</label>
-                          <div className="relative group">
+                        {/* 2. Date */}
+                        <div>
+                          <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.column_date')}</label>
+                          <input
+                            required
+                            type="date"
+                            className="w-full px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs"
+                            value={date}
+                            onChange={(e) => setDate(e.target.value)}
+                          />
+                        </div>
+
+                        {/* 3. Customer */}
+                        <div className="col-span-1 md:col-span-2 lg:col-span-2">
+                          <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.form_customer')}</label>
+                          <select 
+                            required
+                            className="w-full px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs cursor-pointer"
+                            value={selectedCustomerId}
+                            onChange={(e) => {
+                              if (e.target.value === 'new_customer') {
+                                setIsCustomerModalOpen(true);
+                              } else {
+                                setSelectedCustomerId(e.target.value);
+                                setFormSettlements([]);
+                                setFormSettlementNumber('');
+                              }
+                            }}
+                          >
+                            <option value="">{t('common.select_customer')}</option>
+                            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            <option value="new_customer" className="font-bold text-emerald-600 italic">+ {t('customers.add')}</option>
+                          </select>
+                        </div>
+
+                        {/* 4. Warehouse */}
+                        {invoiceType === 'items' && (
+                          <div>
+                            <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
                             <select 
                               required
-                              className={`w-full ${dir === 'rtl' ? 'pr-10' : 'pl-10'} py-2 rounded-xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-xs`}
-                              value={selectedCustomerId}
+                              className="w-full px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs cursor-pointer"
+                              value={selectedWarehouseId}
+                              onChange={(e) => setSelectedWarehouseId(e.target.value)}
+                            >
+                              <option value="">{language === 'ar' ? 'اختر المخزن' : 'Select Warehouse'}</option>
+                              {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                            </select>
+                          </div>
+                        )}
+
+                        {/* 5. Payment Type (Cash/Credit) */}
+                        <div>
+                          <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.form_payment_type')}</label>
+                          <div className="flex border border-zinc-200 rounded-lg overflow-hidden bg-zinc-50 p-0.5 h-[26px]">
+                            <button 
+                              type="button"
+                              onClick={() => setPaymentType('cash')}
+                              className={`flex-1 text-[10px] font-bold rounded transition-all ${paymentType === 'cash' ? 'bg-emerald-600 text-white shadow' : 'text-zinc-500 hover:bg-zinc-100'}`}
+                            >
+                              {t('invoices.payment_cash')}
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => setPaymentType('credit')}
+                              className={`flex-1 text-[10px] font-bold rounded transition-all ${paymentType === 'credit' ? 'bg-emerald-600 text-white shadow' : 'text-zinc-500 hover:bg-zinc-100'}`}
+                            >
+                              {t('invoices.payment_credit')}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Second Row of metadata */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                        {/* 6. Payment Terms or Method */}
+                        {paymentType === 'cash' ? (
+                          <div>
+                            <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.form_payment_method')}</label>
+                            <select 
+                              required
+                              className="w-full px-2 py-1 rounded-lg border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs cursor-pointer"
+                              value={paymentMethodId}
                               onChange={(e) => {
-                                if (e.target.value === 'new_customer') {
-                                  setIsCustomerModalOpen(true);
+                                if (e.target.value === 'new_payment_method') {
+                                  setIsPaymentMethodModalOpen(true);
                                 } else {
-                                  setSelectedCustomerId(e.target.value);
-                                  setFormSettlements([]);
-                                  setFormSettlementNumber('');
+                                  setPaymentMethodId(e.target.value);
                                 }
                               }}
                             >
-                              <option value="">{t('common.select_customer')}</option>
-                              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                              <option value="new_customer" className="font-bold text-emerald-600 italic">+ {t('customers.add')}</option>
+                              <option value="">{t('common.select_method')}</option>
+                              {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
+                              <option value="new_payment_method" className="font-bold text-emerald-600 italic">+ {t('payment_methods.add')}</option>
                             </select>
-                            <Building2 className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
-                            <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3.5' : 'right-3.5'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                           </div>
-                        </div>
-
-                        {invoiceType === 'items' && (
-                          <div className="order-3 md:order-3 lg:col-span-1">
-                            <label className="block text-[11px] font-bold text-zinc-400 tracking-tighter mb-1 px-2 uppercase">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
-                            <div className="relative group">
+                        ) : (
+                          <>
+                            <div>
+                              <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'شروط السداد' : 'Payment Terms'}</label>
                               <select 
-                                required
-                                className={`w-full ${dir === 'rtl' ? 'pr-10' : 'pl-10'} py-2 rounded-xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-xs`}
-                                value={selectedWarehouseId}
-                                onChange={(e) => setSelectedWarehouseId(e.target.value)}
+                                className="w-full px-2 py-1 rounded-lg border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs cursor-pointer"
+                                value={paymentTerms}
+                                onChange={(e) => {
+                                  const term = e.target.value;
+                                  let days = 0;
+                                  let pct = 0;
+                                  if (term === 'net_7') days = 7;
+                                  else if (term === 'net_15') days = 15;
+                                  else if (term === 'net_30') days = 30;
+                                  else if (term === 'net_45') days = 45;
+                                  else if (term === 'net_60') days = 60;
+                                  else if (term === 'net_90') days = 90;
+                                  else if (term === 'net_180') days = 180;
+                                  else if (term === 'advance_50_50') pct = 50;
+                                  else if (term === 'advance') pct = 100;
+                                  
+                                  setPaymentTerms(term);
+                                  setPaymentTermsDays(days);
+                                  setAdvancePercentage(pct);
+                                }}
                               >
-                                <option value="">{language === 'ar' ? 'اختر المخزن' : 'Select Warehouse'}</option>
-                                {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                <option value="cash">{language === 'ar' ? 'نقدي عند التسليم' : 'Cash on Delivery'}</option>
+                                <option value="due_on_receipt">{language === 'ar' ? 'مستحق فور استلام الفاتورة' : 'Due on Receipt'}</option>
+                                <option value="net_7">{language === 'ar' ? 'خلال 7 أيام' : 'Net 7 Days'}</option>
+                                <option value="net_15">{language === 'ar' ? 'خلال 15 يوماً' : 'Net 15 Days'}</option>
+                                <option value="net_30">{language === 'ar' ? 'خلال 30 يوماً' : 'Net 30 Days'}</option>
+                                <option value="net_45">{language === 'ar' ? 'خلال 45 يوماً' : 'Net 45 Days'}</option>
+                                <option value="net_60">{language === 'ar' ? 'خلال 60 يوماً' : 'Net 60 Days'}</option>
+                                <option value="net_90">{language === 'ar' ? 'خلال 90 يوماً' : 'Net 90 Days'}</option>
+                                <option value="net_180">{language === 'ar' ? 'خلال 180 يوماً' : 'Net 180 Days'}</option>
+                                <option value="eom">{language === 'ar' ? 'نهاية الشهر (EOM)' : 'End of Month (EOM)'}</option>
+                                <option value="eom_30">{language === 'ar' ? 'السداد بعد 30 يوم من نهاية الشهر' : '30 Days EOM'}</option>
+                                <option value="advance">{language === 'ar' ? 'دفعة مقدمة قبل التوريد' : 'Advance Payment (100%)'}</option>
+                                <option value="advance_50_50">{language === 'ar' ? '50% مقدم والباقي عند التسليم' : '50% Advance / 50% on Delivery'}</option>
+                                <option value="custom">{language === 'ar' ? 'مخصص (أيام / نسب مقدمة مخصصة)' : 'Custom Days & Percentage'}</option>
                               </select>
-                              <Box className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
-                              <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3.5' : 'right-3.5'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                             </div>
-                          </div>
-                        )}
-
-                        <div className={`order-1 ${invoiceType === 'items' ? 'md:order-4' : 'md:order-3'}`}>
-                          <label className="block text-[11px] font-bold text-zinc-400 tracking-tighter mb-1 px-2 uppercase">{t('invoices.column_number')}</label>
-                          <div className="relative">
-                            <input
-                              required
-                              type="text"
-                              readOnly
-                              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 rounded-xl bg-zinc-100 border border-zinc-200 cursor-not-allowed outline-none font-bold text-zinc-500 text-xs`}
-                              value={invoiceNumber}
-                            />
-                            <Hash className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
-                          </div>
-                        </div>
-
-                        {editingInvoice?.entry_number && (
-                          <div className="order-1 md:order-5">
-                            <label className="block text-[11px] font-bold text-zinc-400 tracking-tighter mb-1 px-2 uppercase">{language === 'ar' ? 'رقم القيد المرتبط' : 'Linked Journal Entry'}</label>
-                            <div className="relative">
+                            <div>
+                              <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'تاريخ الاستحقاق' : 'Due Date'}</label>
                               <input
-                                readOnly
-                                type="text"
-                                className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 rounded-xl bg-emerald-50 border border-emerald-200 outline-none font-bold text-emerald-800 text-xs`}
-                                value={editingInvoice.entry_number}
+                                type="date"
+                                className="w-full px-2 py-1 rounded-lg border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs"
+                                value={dueDate}
+                                onChange={(e) => setDueDate(e.target.value)}
                               />
-                              <Layers className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-2.5 w-4 h-4 text-emerald-500 pointer-events-none`} />
                             </div>
+                          </>
+                        )}
+
+                        {/* 7. Subject / Description */}
+                        <div className="col-span-1 md:col-span-2">
+                          <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'موضوع الفاتورة' : 'Invoice Subject'}</label>
+                          <input
+                            type="text"
+                            className="w-full px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs placeholder:text-zinc-300"
+                            placeholder={language === 'ar' ? 'أدخل وصفاً عاماً يظهر في أعلى الفاتورة...' : 'Enter a general description...'}
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Linked journal entry and Custom payment terms warnings if any */}
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        {editingInvoice?.entry_number && (
+                          <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-100 font-bold">
+                            <span>{language === 'ar' ? 'رقم القيد المرتبط:' : 'Linked Journal Entry:'}</span>
+                            <span className="font-mono">{editingInvoice.entry_number}</span>
+                          </div>
+                        )}
+                        {paymentType === 'credit' && paymentTerms === 'custom' && (
+                          <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-md font-bold">
+                            <span className="text-[10px] font-bold text-zinc-400 uppercase">{language === 'ar' ? 'أيام السداد:' : 'Days:'}</span>
+                            <input
+                              type="number"
+                              min={0}
+                              className="w-12 bg-transparent border-b border-zinc-300 focus:border-emerald-500 outline-none text-center font-bold text-zinc-800"
+                              value={paymentTermsDays}
+                              onChange={(e) => setPaymentTermsDays(Number(e.target.value) || 0)}
+                            />
+                            <span className="text-[10px] font-bold text-zinc-400 uppercase">{language === 'ar' ? 'دفعة مقدمة %:' : 'Advance %:'}</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              className="w-12 bg-transparent border-b border-zinc-300 focus:border-emerald-500 outline-none text-center font-bold text-zinc-800"
+                              value={advancePercentage}
+                              onChange={(e) => setAdvancePercentage(Number(e.target.value) || 0)}
+                            />
                           </div>
                         )}
                       </div>
-
-                      <div className="pt-2 border-t border-zinc-100">
-                        <label className="block text-[11px] font-bold text-zinc-400 tracking-tighter mb-1 px-2 uppercase">{language === 'ar' ? 'موضوع الفاتورة' : 'Invoice Subject'}</label>
-                        <textarea
-                          className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 min-h-[50px] resize-none text-xs placeholder:text-zinc-300"
-                          placeholder={language === 'ar' ? 'أدخل وصفاً عاماً يظهر في أعلى الفاتورة...' : 'Enter a general description...'}
-                          value={description}
-                          onChange={(e) => setDescription(e.target.value)}
-                        />
-                      </div>
-
-                      {pendingOrders.length > 0 && (
-                        <div className="pt-2 border-t border-zinc-100 space-y-2">
-                          <label className="block text-xs font-bold text-emerald-600 tracking-tighter px-2 uppercase flex items-center gap-2">
-                            <FileText className="w-4 h-4" />
-                            {language === 'ar' ? 'ربط بأوامر البيع المعلقة' : 'Link Pending Sales Orders'}
-                          </label>
-                          <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-3 overflow-hidden">
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-xs text-right">
-                                <thead>
-                                  <tr className="text-zinc-400 font-bold border-b border-zinc-200 pb-1">
-                                    <th className="py-1 text-center w-10"></th>
-                                    <th className="py-1 text-right">{language === 'ar' ? 'رقم الأمر' : 'Order No'}</th>
-                                    <th className="py-1 text-right">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
-                                    <th className="py-1 text-right">{language === 'ar' ? 'الإجمالي' : 'Total'}</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-zinc-100">
-                                  {pendingOrders.map(order => (
-                                    <tr key={order.id} className="hover:bg-zinc-100/50">
-                                      <td className="py-2 text-center">
-                                        <input 
-                                          type="checkbox"
-                                          checked={selectedOrderIds.includes(order.id)}
-                                          onChange={(e) => handleOrderCheckboxChange(order.id, e.target.checked)}
-                                          className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
-                                        />
-                                      </td>
-                                      <td className="py-2 font-mono text-emerald-700 font-bold">{order.order_number}</td>
-                                      <td className="py-2 text-zinc-500">{formatDate(order.date)}</td>
-                                      <td className="py-2 text-zinc-900 font-bold">{formatMoney(order.total_amount)} {t('invoices.currency')}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </section>
-
-                    {/* Card 2: إعدادات الدفع */}
-                    <section className="bg-white px-4 py-3 rounded-2xl border border-zinc-200 shadow-sm space-y-3 relative pt-8">
-                      <div className="absolute top-2 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50/50 px-3 py-1 rounded-full border border-emerald-100">
-                        <Wallet className="w-4 h-4" />
-                        <span className="text-xs font-bold">{t('invoices.payment_settings')}</span>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-2">
-                        <button 
-                          type="button"
-                          onClick={() => setPaymentType('cash')}
-                          className={`flex-1 py-1.5 rounded-lg font-bold transition-all flex items-center justify-center gap-2 border text-xs ${paymentType === 'cash' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md scale-[1.01]' : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'}`}
-                        >
-                          <Wallet size={14} />
-                          {t('invoices.payment_cash')}
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => setPaymentType('credit')}
-                          className={`flex-1 py-1.5 rounded-lg font-bold transition-all flex items-center justify-center gap-2 border text-xs ${paymentType === 'credit' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md scale-[1.01]' : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'}`}
-                        >
-                          <CreditCard size={14} />
-                          {t('invoices.payment_credit')}
-                        </button>
-                      </div>
-
-                      {paymentType === 'cash' && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3 pt-3 border-t border-zinc-100">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-[11px] font-bold text-zinc-400 tracking-tighter mb-1 px-2 uppercase">{t('invoices.form_payment_method')}</label>
-                              <div className="relative group">
-                                <CreditCard className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-2.5 w-4 h-4 text-zinc-400 transition-colors`} />
-                                <select 
-                                  required
-                                  className={`w-full ${dir === 'rtl' ? 'pr-10' : 'pl-10'} py-1.5 rounded-xl border border-zinc-200 bg-zinc-50 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-xs`}
-                                  value={paymentMethodId}
-                                  onChange={(e) => {
-                                    if (e.target.value === 'new_payment_method') {
-                                      setIsPaymentMethodModalOpen(true);
-                                    } else {
-                                      setPaymentMethodId(e.target.value);
-                                    }
-                                  }}
-                                >
-                                  <option value="">{t('common.select_method')}</option>
-                                  {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
-                                  <option value="new_payment_method" className="font-bold text-emerald-600 italic">+ {t('payment_methods.add')}</option>
-                                </select>
-                                <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3.5' : 'right-3.5'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
-                              </div>
-                            </div>
-                          </div>
-                        </motion.div>
-                      )}
-
-                      {paymentType === 'credit' && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3 pt-3 border-t border-zinc-100">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-[11px] font-bold text-zinc-400 tracking-tighter mb-1 px-2 uppercase">
-                                {language === 'ar' ? 'شروط السداد' : 'Payment Terms'}
-                              </label>
-                              <div className="relative group">
-                                <Calendar className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
-                                <select 
-                                  className={`w-full ${dir === 'rtl' ? 'pr-10' : 'pl-10'} py-1.5 rounded-xl border border-zinc-200 bg-zinc-50 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-xs`}
-                                  value={paymentTerms}
-                                  onChange={(e) => {
-                                    const term = e.target.value;
-                                    let days = 0;
-                                    let pct = 0;
-                                    if (term === 'net_7') days = 7;
-                                    else if (term === 'net_15') days = 15;
-                                    else if (term === 'net_30') days = 30;
-                                    else if (term === 'net_45') days = 45;
-                                    else if (term === 'net_60') days = 60;
-                                    else if (term === 'net_90') days = 90;
-                                    else if (term === 'net_180') days = 180;
-                                    else if (term === 'advance_50_50') pct = 50;
-                                    else if (term === 'advance') pct = 100;
-                                    
-                                    setPaymentTerms(term);
-                                    setPaymentTermsDays(days);
-                                    setAdvancePercentage(pct);
-                                  }}
-                                >
-                                  <option value="cash">{language === 'ar' ? 'نقدي عند التسليم' : 'Cash on Delivery'}</option>
-                                  <option value="due_on_receipt">{language === 'ar' ? 'مستحق فور استلام الفاتورة' : 'Due on Receipt'}</option>
-                                  <option value="net_7">{language === 'ar' ? 'خلال 7 أيام' : 'Net 7 Days'}</option>
-                                  <option value="net_15">{language === 'ar' ? 'خلال 15 يوماً' : 'Net 15 Days'}</option>
-                                  <option value="net_30">{language === 'ar' ? 'خلال 30 يوماً' : 'Net 30 Days'}</option>
-                                  <option value="net_45">{language === 'ar' ? 'خلال 45 يوماً' : 'Net 45 Days'}</option>
-                                  <option value="net_60">{language === 'ar' ? 'خلال 60 يوماً' : 'Net 60 Days'}</option>
-                                  <option value="net_90">{language === 'ar' ? 'خلال 90 يوماً' : 'Net 90 Days'}</option>
-                                  <option value="net_180">{language === 'ar' ? 'خلال 180 يوماً' : 'Net 180 Days'}</option>
-                                  <option value="eom">{language === 'ar' ? 'نهاية الشهر (EOM)' : 'End of Month (EOM)'}</option>
-                                  <option value="eom_30">{language === 'ar' ? 'السداد بعد 30 يوم من نهاية الشهر' : '30 Days EOM'}</option>
-                                  <option value="advance">{language === 'ar' ? 'دفعة مقدمة قبل التوريد' : 'Advance Payment (100%)'}</option>
-                                  <option value="advance_50_50">{language === 'ar' ? '50% مقدم والباقي عند التسليم' : '50% Advance / 50% on Delivery'}</option>
-                                  <option value="custom">{language === 'ar' ? 'مخصص (أيام / نسب مقدمة مخصصة)' : 'Custom Days & Percentage'}</option>
-                                </select>
-                                <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3.5' : 'right-3.5'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
-                              </div>
-                            </div>
-
-                            <div>
-                              <label className="block text-[11px] font-bold text-zinc-400 tracking-tighter mb-1 px-2 uppercase">
-                                {language === 'ar' ? 'تاريخ الاستحقاق' : 'Due Date'}
-                              </label>
-                              <div className="relative">
-                                <input
-                                  type="date"
-                                  className="w-full px-3 py-1.5 rounded-xl border border-zinc-200 bg-zinc-50 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs"
-                                  value={dueDate}
-                                  onChange={(e) => setDueDate(e.target.value)}
-                                />
-                              </div>
-                            </div>
-
-                            {paymentTerms === 'custom' && (
-                              <>
-                                <div>
-                                  <label className="block text-[11px] font-bold text-zinc-400 mb-1 px-2">
-                                    {language === 'ar' ? 'فترة السداد بالأيام' : 'Payment Terms (Days)'}
-                                  </label>
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    className="w-full px-3 py-1.5 rounded-xl border border-zinc-200 bg-zinc-50 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs"
-                                    value={paymentTermsDays}
-                                    onChange={(e) => setPaymentTermsDays(Number(e.target.value) || 0)}
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-[11px] font-bold text-zinc-400 mb-1 px-2">
-                                    {language === 'ar' ? 'نسبة الدفعة المقدمة %' : 'Advance Percentage %'}
-                                  </label>
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    className="w-full px-3 py-1.5 rounded-xl border border-zinc-200 bg-zinc-50 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs"
-                                    value={advancePercentage}
-                                    onChange={(e) => setAdvancePercentage(Number(e.target.value) || 0)}
-                                  />
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        </motion.div>
-                      )}
 
                       {/* Credit Limit Warning Banner */}
                       {paymentType === 'credit' && selectedCustomerId && (() => {
@@ -2967,10 +2889,10 @@ export const Invoices: React.FC = () => {
                         
                         if (currentCustomer && currentCustomer.credit_limit > 0 && totalTentativeBalance > currentCustomer.credit_limit) {
                           return (
-                            <div className="mt-4 p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-3 text-rose-800 animate-in fade-in slide-in-from-top-2 duration-300">
-                              <span className="text-xl">⚠️</span>
-                              <div className="flex-1 text-sm font-medium">
-                                <p className="font-bold text-rose-950 mb-1">
+                            <div className="mt-2 p-2 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-2 text-rose-800 animate-in fade-in slide-in-from-top-2 duration-300">
+                              <span className="text-xs">⚠️</span>
+                              <div className="flex-1 text-[11px] font-medium">
+                                <p className="font-bold text-rose-950 mb-0.5">
                                   {language === 'ar' ? 'تنبيه: تجاوز حد الائتمان!' : 'Warning: Credit Limit Exceeded!'}
                                 </p>
                                 <p>
@@ -3092,26 +3014,30 @@ export const Invoices: React.FC = () => {
                                 </td>
                                 
                                 {/* رقم عملية */}
-                                <td className="p-1 border-b border-r border-zinc-200 w-36 text-center relative">
+                                <td className="p-1 border-b border-r border-zinc-200 w-36 text-center">
                                   <div className="flex items-center gap-1 w-full relative">
                                     <input 
                                       type="text" 
+                                      list={`ops-list-${index}`}
                                       placeholder={language === 'ar' ? 'ابحث عن عملية...' : 'Search operation...'}
                                       className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
-                                      value={
-                                        activeCell?.index === index && activeCell?.field === 'operation'
-                                          ? cellSearchTerm
-                                          : (operations.find(op => op.id === item.operation_id)?.operation_number || item.operation_id || '')
-                                      }
-                                      onFocus={() => {
-                                        setActiveCell({ index, field: 'operation' });
-                                        setCellSearchTerm('');
-                                      }}
-                                      onChange={(e) => setCellSearchTerm(e.target.value)}
-                                      onBlur={() => {
-                                        setTimeout(() => setActiveCell(null), 200);
+                                      value={operations.find(op => op.id === item.operation_id)?.operation_number || ''}
+                                      onChange={(e) => {
+                                        const selectedOp = operations.find(o => o.operation_number === e.target.value);
+                                        if (selectedOp) {
+                                          updateItem(index, 'operation_id', selectedOp.id);
+                                        } else if (e.target.value === '') {
+                                          updateItem(index, 'operation_id', null);
+                                        }
                                       }}
                                     />
+                                    <datalist id={`ops-list-${index}`}>
+                                      {operations.map(op => (
+                                        <option key={op.id} value={op.operation_number}>
+                                          {op.customer_name ? `(${op.customer_name})` : ''}
+                                        </option>
+                                      ))}
+                                    </datalist>
                                     {item.operation_id && (
                                       <button
                                         type="button"
@@ -3127,128 +3053,54 @@ export const Invoices: React.FC = () => {
                                       </button>
                                     )}
                                   </div>
-                                  {activeCell?.index === index && activeCell?.field === 'operation' && (
-                                    <div className="absolute left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border border-zinc-200 rounded-lg shadow-lg z-50 py-1 divide-y divide-zinc-50">
-                                      <div 
-                                        onMouseDown={() => updateItem(index, 'operation_id', null)}
-                                        className="px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 cursor-pointer font-bold text-right"
-                                      >
-                                        {language === 'ar' ? 'إلغاء التحديد' : 'Clear Selection'}
-                                      </div>
-                                      {operations
-                                        .filter(op => {
-                                          const term = cellSearchTerm.toLowerCase();
-                                          return (
-                                            (op.operation_number || '').toLowerCase().includes(term) ||
-                                            (op.customer_name || '').toLowerCase().includes(term) ||
-                                            (op.description || '').toLowerCase().includes(term)
-                                          );
-                                        })
-                                        .slice(0, 10)
-                                        .map(op => (
-                                          <div
-                                            key={op.id}
-                                            onMouseDown={() => {
-                                              updateItem(index, 'operation_id', op.id);
-                                            }}
-                                            className="px-3 py-1.5 text-xs text-zinc-700 hover:bg-emerald-50 hover:text-emerald-700 cursor-pointer transition-colors font-semibold text-right"
-                                          >
-                                            {op.operation_number} {op.customer_name ? `(${op.customer_name})` : ''}
-                                          </div>
-                                        ))
-                                      }
-                                    </div>
-                                  )}
                                 </td>
 
                                 {/* الإدارة */}
-                                <td className="p-1 border-b border-r border-zinc-200 w-36 text-center relative">
+                                <td className="p-1 border-b border-r border-zinc-200 w-36 text-center">
                                   <input 
                                     type="text" 
+                                    list={`depts-list-${index}`}
                                     placeholder={language === 'ar' ? 'ابحث عن إدارة...' : 'Search department...'}
                                     className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
-                                    value={
-                                      activeCell?.index === index && activeCell?.field === 'department'
-                                        ? cellSearchTerm
-                                        : (departments.find(d => d.id === item.department_id)?.name || '')
-                                    }
-                                    onFocus={() => {
-                                      setActiveCell({ index, field: 'department' });
-                                      setCellSearchTerm('');
-                                    }}
-                                    onChange={(e) => setCellSearchTerm(e.target.value)}
-                                    onBlur={() => {
-                                      setTimeout(() => setActiveCell(null), 200);
+                                    value={departments.find(d => d.id === item.department_id)?.name || ''}
+                                    onChange={(e) => {
+                                      const selectedDept = departments.find(d => d.name === e.target.value);
+                                      if (selectedDept) {
+                                        updateItem(index, 'department_id', selectedDept.id);
+                                      } else if (e.target.value === '') {
+                                        updateItem(index, 'department_id', null);
+                                      }
                                     }}
                                   />
-                                  {activeCell?.index === index && activeCell?.field === 'department' && (
-                                    <div className="absolute left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border border-zinc-200 rounded-lg shadow-lg z-50 py-1 divide-y divide-zinc-50">
-                                      <div 
-                                        onMouseDown={() => updateItem(index, 'department_id', null)}
-                                        className="px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 cursor-pointer font-bold text-right"
-                                      >
-                                        {language === 'ar' ? 'إلغاء التحديد' : 'Clear Selection'}
-                                      </div>
-                                      {departments
-                                        .filter(d => (d.name || '').toLowerCase().includes(cellSearchTerm.toLowerCase()))
-                                        .slice(0, 10)
-                                        .map(d => (
-                                          <div
-                                            key={d.id}
-                                            onMouseDown={() => updateItem(index, 'department_id', d.id)}
-                                            className="px-3 py-1.5 text-xs text-zinc-700 hover:bg-emerald-50 hover:text-emerald-700 cursor-pointer transition-colors font-semibold text-right"
-                                          >
-                                            {d.name}
-                                          </div>
-                                        ))
-                                      }
-                                    </div>
-                                  )}
+                                  <datalist id={`depts-list-${index}`}>
+                                    {departments.map(d => (
+                                      <option key={d.id} value={d.name} />
+                                    ))}
+                                  </datalist>
                                 </td>
 
                                 {/* مركز التكلفة */}
-                                <td className="p-1 border-b border-r border-zinc-200 w-36 text-center relative">
+                                <td className="p-1 border-b border-r border-zinc-200 w-36 text-center">
                                   <input 
                                     type="text" 
+                                    list={`cc-list-${index}`}
                                     placeholder={language === 'ar' ? 'ابحث عن مركز...' : 'Search cost center...'}
                                     className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
-                                    value={
-                                      activeCell?.index === index && activeCell?.field === 'cost_center'
-                                        ? cellSearchTerm
-                                        : (costCenters.find(cc => cc.id === item.cost_center_id)?.name || '')
-                                    }
-                                    onFocus={() => {
-                                      setActiveCell({ index, field: 'cost_center' });
-                                      setCellSearchTerm('');
-                                    }}
-                                    onChange={(e) => setCellSearchTerm(e.target.value)}
-                                    onBlur={() => {
-                                      setTimeout(() => setActiveCell(null), 200);
+                                    value={costCenters.find(cc => cc.id === item.cost_center_id)?.name || ''}
+                                    onChange={(e) => {
+                                      const selectedCc = costCenters.find(cc => cc.name === e.target.value);
+                                      if (selectedCc) {
+                                        updateItem(index, 'cost_center_id', selectedCc.id);
+                                      } else if (e.target.value === '') {
+                                        updateItem(index, 'cost_center_id', null);
+                                      }
                                     }}
                                   />
-                                  {activeCell?.index === index && activeCell?.field === 'cost_center' && (
-                                    <div className="absolute left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border border-zinc-200 rounded-lg shadow-lg z-50 py-1 divide-y divide-zinc-50">
-                                      <div 
-                                        onMouseDown={() => updateItem(index, 'cost_center_id', null)}
-                                        className="px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 cursor-pointer font-bold text-right"
-                                      >
-                                        {language === 'ar' ? 'إلغاء التحديد' : 'Clear Selection'}
-                                      </div>
-                                      {costCenters
-                                        .filter(cc => (cc.name || '').toLowerCase().includes(cellSearchTerm.toLowerCase()))
-                                        .slice(0, 10)
-                                        .map(cc => (
-                                          <div
-                                            key={cc.id}
-                                            onMouseDown={() => updateItem(index, 'cost_center_id', cc.id)}
-                                            className="px-3 py-1.5 text-xs text-zinc-700 hover:bg-emerald-50 hover:text-emerald-700 cursor-pointer transition-colors font-semibold text-right"
-                                          >
-                                            {cc.name}
-                                          </div>
-                                        ))
-                                      }
-                                    </div>
-                                  )}
+                                  <datalist id={`cc-list-${index}`}>
+                                    {costCenters.map(cc => (
+                                      <option key={cc.id} value={cc.name} />
+                                    ))}
+                                  </datalist>
                                 </td>
 
                                 <td className="p-1 border-b border-r border-zinc-200 w-24">
@@ -3261,10 +3113,23 @@ export const Invoices: React.FC = () => {
                                 </td>
                                 <td className="p-1 border-b border-r border-zinc-200 w-32">
                                   <input 
-                                    type="number" 
-                                    className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-center font-bold text-zinc-800 outline-none transition-all text-xs font-bold"
-                                    value={item.unit_price}
-                                    onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                                    type="text" 
+                                    className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-center font-bold text-zinc-800 outline-none transition-all text-xs font-bold font-mono"
+                                    value={focusedPriceIndex === index ? tempPriceValue : formatMoney(item.unit_price)}
+                                    onFocus={() => {
+                                      setFocusedPriceIndex(index);
+                                      setTempPriceValue(item.unit_price ? String(item.unit_price) : '');
+                                    }}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (/^\d*\.?\d*$/.test(val)) {
+                                        setTempPriceValue(val);
+                                        updateItem(index, 'unit_price', parseFloat(val) || 0);
+                                      }
+                                    }}
+                                    onBlur={() => {
+                                      setFocusedPriceIndex(null);
+                                    }}
                                   />
                                 </td>
                                 <td className="p-1 border-b border-r border-zinc-200 w-32 text-center font-bold text-emerald-600 text-xs">
