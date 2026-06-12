@@ -3261,8 +3261,8 @@ export const Invoices: React.FC = () => {
                                 <td className="p-1 border-b border-r border-zinc-200 w-24">
                                   <input 
                                     type="number" 
-                                    className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-center font-bold text-zinc-800 outline-none transition-all text-xs font-bold"
-                                    value={item.quantity}
+                                    className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs"
+                                    value={item.quantity !== undefined && item.quantity !== null ? Number(item.quantity) : ''}
                                     onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
                                   />
                                 </td>
@@ -3294,11 +3294,11 @@ export const Invoices: React.FC = () => {
                                         type="number" 
                                         min={0}
                                         max={100}
-                                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-bold text-zinc-800 outline-none transition-all text-xs"
-                                        value={item.vat_rate || 0}
+                                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs"
+                                        value={item.vat_rate !== undefined && item.vat_rate !== null ? Number(item.vat_rate) : 0}
                                         onChange={(e) => updateItem(index, 'vat_rate', parseFloat(e.target.value) || 0)}
                                       />
-                                      <span className="text-[10px] text-zinc-400 font-bold">%</span>
+                                      <span className="text-sm text-zinc-900 font-black">%</span>
                                     </div>
                                   </td>
                                 )}
@@ -3881,7 +3881,7 @@ export const Invoices: React.FC = () => {
                               </div>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-[#71717a]">{item.quantity}</td>
+                          <td className="px-4 py-3 text-[#71717a]">{item.quantity !== undefined && item.quantity !== null ? Number(item.quantity) : ''}</td>
                           <td className="px-4 py-3 text-[#71717a]">{formatMoney(item.unit_price)} {t('invoices.currency')}</td>
                           <td className="px-4 py-3 font-bold text-[#18181b]">{formatMoney(item.total)} {t('invoices.currency')}</td>
                         </tr>
