@@ -864,6 +864,24 @@ export async function initDatabase() {
     await safeQuery('CREATE INDEX IF NOT EXISTS "idx_invoices_date" ON "invoices"("company_id", "date" DESC);', 'invoices date index');
     await safeQuery('CREATE INDEX IF NOT EXISTS "idx_accounts_code" ON "accounts"("company_id", "code");', 'accounts code index');
 
+    // Performance Optimization Indices
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_journal_entries_ref_id" ON "journal_entries"("reference_id");', 'idx_journal_entries_ref_id');
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_invoice_items_invoice_id" ON "invoice_items"("invoice_id");', 'idx_invoice_items_invoice_id');
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_purchase_invoice_items_invoice_id" ON "purchase_invoice_items"("invoice_id");', 'idx_purchase_invoice_items_invoice_id');
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_journal_entry_lines_je_id" ON "journal_entry_lines"("journal_entry_id");', 'idx_journal_entry_lines_je_id');
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_receipt_vouchers_company_id" ON "receipt_vouchers"("company_id");', 'idx_receipt_vouchers_company_id');
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_payment_vouchers_company_id" ON "payment_vouchers"("company_id");', 'idx_payment_vouchers_company_id');
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_returns_company_id" ON "returns"("company_id");', 'idx_returns_company_id');
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_purchase_returns_company_id" ON "purchase_returns"("company_id");', 'idx_purchase_returns_company_id');
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_purchase_invoices_date" ON "purchase_invoices"("company_id", "date" DESC);', 'idx_purchase_invoices_date');
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_return_items_return_id" ON "return_items"("return_id");', 'idx_return_items_return_id');
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_purchase_return_items_return_id" ON "purchase_return_items"("return_id");', 'idx_purchase_return_items_return_id');
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_sales_order_items_order_id" ON "sales_order_items"("order_id");', 'idx_sales_order_items_order_id');
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_purchase_order_items_order_id" ON "purchase_order_items"("order_id");', 'idx_purchase_order_items_order_id');
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_warehouse_transfer_items_transfer_id" ON "warehouse_transfer_items"("transfer_id");', 'idx_warehouse_transfer_items_transfer_id');
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_opening_stock_items_opening_stock_id" ON "opening_stock_items"("opening_stock_id");', 'idx_opening_stock_items_opening_stock_id');
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_stock_adjustment_items_adjustment_id" ON "stock_adjustment_items"("adjustment_id");', 'idx_stock_adjustment_items_adjustment_id');
+
     // Add item_group_id and item_group_name column safeguards if they do not exist
     if (!(await checkColumnExists('products', 'item_group_id'))) {
       await safeQuery('ALTER TABLE "products" ADD COLUMN "item_group_id" VARCHAR(36);', 'add item_group_id to products');

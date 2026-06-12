@@ -1128,8 +1128,10 @@ modules.forEach(moduleName => {
           rows = paginatedRes.rows;
 
           if (transactionalModules.includes(moduleName)) {
+            const rowIds = rows.map((r: any) => r.id);
+            const itemsMap = await fetchItemsForMultiple(moduleName, rowIds);
             for (let row of rows) {
-              row.items = await fetchItems(moduleName, row.id);
+              row.items = itemsMap[row.id] || [];
             }
           }
           
@@ -1146,9 +1148,10 @@ modules.forEach(moduleName => {
 
         // Fetch sub-items for relevant modules
         if (transactionalModules.includes(moduleName)) {
+          const rowIds = rows.map((r: any) => r.id);
+          const itemsMap = await fetchItemsForMultiple(moduleName, rowIds);
           for (let row of rows) {
-            const items = await fetchItems(moduleName, row.id);
-            row.items = items;
+            row.items = itemsMap[row.id] || [];
           }
         }
       }
@@ -1200,6 +1203,78 @@ modules.forEach(moduleName => {
       }
     });
   });
+
+  // Helper to fetch items for multiple parent IDs in a single query
+  async function fetchItemsForMultiple(module: string, ids: string[]) {
+    if (!ids || ids.length === 0) return {};
+    let itemsTable = '';
+    let foreignKey = '';
+    
+    if (module === 'journal_entries') {
+      itemsTable = 'journal_entry_lines';
+      foreignKey = 'journal_entry_id';
+    } else if (module === 'invoices') {
+      itemsTable = 'invoice_items';
+      foreignKey = 'invoice_id';
+    } else if (module === 'returns') {
+      itemsTable = 'return_items';
+      foreignKey = 'return_id';
+    } else if (module === 'purchase_invoices') {
+      itemsTable = 'purchase_invoice_items';
+      foreignKey = 'invoice_id';
+    } else if (module === 'purchase_returns') {
+      itemsTable = 'purchase_return_items';
+      foreignKey = 'return_id';
+    } else if (module === 'sales_orders') {
+      itemsTable = 'sales_order_items';
+      foreignKey = 'order_id';
+    } else if (module === 'purchase_orders') {
+      itemsTable = 'purchase_order_items';
+      foreignKey = 'order_id';
+    } else if (module === 'warehouse_transfers') {
+      itemsTable = 'warehouse_transfer_items';
+      foreignKey = 'transfer_id';
+    } else if (module === 'opening_stock_balances') {
+      itemsTable = 'opening_stock_items';
+      foreignKey = 'opening_stock_id';
+    } else if (module === 'stock_adjustments') {
+      itemsTable = 'stock_adjustment_items';
+      foreignKey = 'adjustment_id';
+    }
+
+    if (itemsTable) {
+      if (module === 'journal_entries') {
+        const { rows } = await pool.query(`
+          SELECT jel.*, COALESCE(jel.account_name, acc.name) AS account_name
+          FROM "journal_entry_lines" jel
+          LEFT JOIN "accounts" acc ON acc.id = jel.account_id
+          WHERE jel."journal_entry_id" = ANY($1)
+        `, [ids]);
+        
+        const mapping: Record<string, any[]> = {};
+        for (const id of ids) mapping[id] = [];
+        for (const r of rows) {
+          const parentId = r.journal_entry_id;
+          if (mapping[parentId]) {
+            mapping[parentId].push(r);
+          }
+        }
+        return mapping;
+      }
+      
+      const { rows } = await pool.query(`SELECT * FROM "${itemsTable}" WHERE "${foreignKey}" = ANY($1)`, [ids]);
+      const mapping: Record<string, any[]> = {};
+      for (const id of ids) mapping[id] = [];
+      for (const r of rows) {
+        const parentId = r[foreignKey];
+        if (mapping[parentId]) {
+          mapping[parentId].push(r);
+        }
+      }
+      return mapping;
+    }
+    return {};
+  }
 
   // Helper to fetch items
   async function fetchItems(module: string, id: string) {

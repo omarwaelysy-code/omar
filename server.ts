@@ -191,30 +191,35 @@ async function startServer() {
 
     await runMigrations();
 
-    // Auto-backfill any missing journal entries for documents on server start
-    try {
-      const { backfillMissingJournalEntries } = await import("./src/lib/backfill.js");
-      await backfillMissingJournalEntries(pool);
-    } catch (e: any) {
-      console.error("⚠️ Failed to backfill missing journal entries:", e.message);
-    }
+    // Auto-backfill any missing journal entries for documents on server start (in background)
+    import("./src/lib/backfill.js")
+      .then(({ backfillMissingJournalEntries }) => {
+        backfillMissingJournalEntries(pool).catch((err: any) => {
+          console.error("⚠️ Failed to backfill missing journal entries:", err.message);
+        });
+      })
+      .catch((e) => {
+        console.error("⚠️ Failed to load backfill module:", e.message);
+      });
     
-    // Auto-fix orphaned movements on startup
-    console.log("🧹 Cleaning up orphaned inventory movements...");
-    try {
-      const tables = [
-        { type: 'invoice', table: 'invoices' },
-        { type: 'purchase_invoice', table: 'purchase_invoices' },
-        { type: 'returns', table: 'returns' },
-        { type: 'purchase_returns', table: 'purchase_returns' }
-      ];
-      for (const { type, table } of tables) {
-        await pool.query(`DELETE FROM inventory_movements WHERE reference_type = $1 AND reference_id NOT IN (SELECT id FROM "${table}")`, [type]);
+    // Auto-fix orphaned movements on startup (in background)
+    setTimeout(async () => {
+      console.log("🧹 Cleaning up orphaned inventory movements in background...");
+      try {
+        const tables = [
+          { type: 'invoice', table: 'invoices' },
+          { type: 'purchase_invoice', table: 'purchase_invoices' },
+          { type: 'returns', table: 'returns' },
+          { type: 'purchase_returns', table: 'purchase_returns' }
+        ];
+        for (const { type, table } of tables) {
+          await pool.query(`DELETE FROM inventory_movements WHERE reference_type = $1 AND reference_id NOT IN (SELECT id FROM "${table}")`, [type]);
+        }
+        console.log("✅ Orphan cleanup complete.");
+      } catch(err: any) {
+        console.error("⚠️ Failed to clean orphans:", err.message);
       }
-      console.log("✅ Orphan cleanup complete.");
-    } catch(err: any) {
-      console.error("⚠️ Failed to clean orphans:", err.message);
-    }
+    }, 0);
     
   } catch (err) {
     console.error("❌ CRITICAL: Failed to initialize PostgreSQL database or run migrations. Server will start but may be degraded.");

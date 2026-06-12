@@ -183,18 +183,6 @@ export const PurchaseInvoices: React.FC = () => {
         setServerSummary(result.summary);
       });
       const unsubSuppliers = dbService.subscribe<Supplier>('suppliers', user.company_id, setSuppliers);
-      const unsubProducts = dbService.subscribe<Product>('products', user.company_id, setProducts);
-      const unsubPM = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setPaymentMethods);
-      const unsubCategories = dbService.subscribe<ExpenseCategory>('expense_categories', user.company_id, setCategories);
-      const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
-      const unsubWarehouses = dbService.subscribe<any>('warehouses', user.company_id, setWarehouses);
-      const unsubEntries = dbService.subscribe<JournalEntry>('journal_entries', user.company_id, setEntries);
-      const unsubReceipts = dbService.subscribe<any>('receipt_vouchers', user.company_id, setAllReceipts);
-      const unsubPayments = dbService.subscribe<any>('payment_vouchers', user.company_id, setAllPayments);
-      const unsubReturns = dbService.subscribe<any>('returns', user.company_id, setAllReturns);
-      const unsubPR = dbService.subscribe<any>('purchase_returns', user.company_id, setAllPurchaseReturns);
-      const unsubAllInvoices = dbService.subscribe<any>('invoices', user.company_id, setAllInvoices);
-      const unsubAllPurchaseInvoices = dbService.subscribe<any>('purchase_invoices', user.company_id, setAllPurchaseInvoices);
       
       const fetchSettings = async () => {
         const docs = await dbService.getDocsByFilter<any>('settings', user.company_id, [
@@ -223,6 +211,27 @@ export const PurchaseInvoices: React.FC = () => {
       return () => {
         unsubPI();
         unsubSuppliers();
+      };
+    }
+  }, [user, page, limit, sortBy, sortOrder, searchTerm]);
+
+  useEffect(() => {
+    const needFullData = isModalOpen || !!viewInvoice || !!editingInvoice;
+    if (user && needFullData) {
+      const unsubProducts = dbService.subscribe<Product>('products', user.company_id, setProducts);
+      const unsubPM = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setPaymentMethods);
+      const unsubCategories = dbService.subscribe<ExpenseCategory>('expense_categories', user.company_id, setCategories);
+      const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
+      const unsubWarehouses = dbService.subscribe<any>('warehouses', user.company_id, setWarehouses);
+      const unsubEntries = dbService.subscribe<JournalEntry>('journal_entries', user.company_id, setEntries);
+      const unsubReceipts = dbService.subscribe<any>('receipt_vouchers', user.company_id, setAllReceipts);
+      const unsubPayments = dbService.subscribe<any>('payment_vouchers', user.company_id, setAllPayments);
+      const unsubReturns = dbService.subscribe<any>('returns', user.company_id, setAllReturns);
+      const unsubPR = dbService.subscribe<any>('purchase_returns', user.company_id, setAllPurchaseReturns);
+      const unsubAllInvoices = dbService.subscribe<any>('invoices', user.company_id, setAllInvoices);
+      const unsubAllPurchaseInvoices = dbService.subscribe<any>('purchase_invoices', user.company_id, setAllPurchaseInvoices);
+
+      return () => {
         unsubProducts();
         unsubPM();
         unsubCategories();
@@ -237,7 +246,7 @@ export const PurchaseInvoices: React.FC = () => {
         unsubAllPurchaseInvoices();
       };
     }
-  }, [user, page, limit, sortBy, sortOrder, searchTerm]);
+  }, [user, isModalOpen, viewInvoice, editingInvoice]);
 
   useEffect(() => {
     if (isProductModalOpen) {
@@ -474,8 +483,10 @@ export const PurchaseInvoices: React.FC = () => {
     if (!inv) return 'unpaid';
     if (inv.payment_type === 'cash') return 'paid';
     
-    const settlements = getInvoiceSettlements(inv);
-    const totalSettled = settlements.reduce((sum, s) => sum + s.amount, 0);
+    // Only query heavy references if they are loaded (i.e. modal is open)
+    const hasFullData = allReceipts.length > 0 || allPayments.length > 0 || entries.length > 0;
+    const settlements = hasFullData ? getInvoiceSettlements(inv) : (inv.settlements || []);
+    const totalSettled = settlements.reduce((sum: number, s: any) => sum + (Number(s.settled_amount || s.amount) || 0), 0);
     
     if (totalSettled <= 0) return 'unpaid';
     if (totalSettled >= inv.total_amount - 0.01) return 'paid';
