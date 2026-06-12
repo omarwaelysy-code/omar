@@ -85,116 +85,66 @@ export const SupplierBalances: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [sups, invoices, returns, vouchers, discounts, journalEntries] = await Promise.all([
+      const [sups, journalEntries] = await Promise.all([
         dbService.list<Supplier>('suppliers', user.company_id),
-        dbService.list<any>('purchase_invoices', user.company_id),
-        dbService.list<any>('purchase_returns', user.company_id),
-        dbService.list<any>('payment_vouchers', user.company_id),
-        dbService.list<any>('supplier_discounts', user.company_id),
         dbService.list<any>('journal_entries', user.company_id)
       ]);
 
       const balances = sups.map((supplier: any) => {
-        const supInvoices = invoices.filter((i: any) => i.supplier_id === supplier.id);
-        const supReturns = returns.filter((r: any) => r.supplier_id === supplier.id);
-        const supVouchers = vouchers.filter((v: any) => {
-          if (v.supplier_id === supplier.id) return true;
-          const isMulti = v.voucher_type === 'multi' || v.type === 'multi';
-          if (isMulti && v.items && Array.isArray(v.items)) {
-            return v.items.some((item: any) => item.type === 'supplier' && item.entity_id === supplier.id);
-          }
-          return false;
-        });
-        const supDiscounts = discounts.filter((d: any) => d.supplier_id === supplier.id);
-
-        const getVoucherAmount = (v: any) => {
-          const isMulti = v.voucher_type === 'multi' || v.type === 'multi';
-          if (isMulti && v.items && Array.isArray(v.items)) {
-             return v.items
-               .filter((item: any) => item.type === 'supplier' && item.entity_id === supplier.id)
-               .reduce((itemSum: number, item: any) => itemSum + (Number(item.amount) || 0), 0);
-          }
-          if (v.supplier_id === supplier.id) {
-             return Number(v.amount) || 0;
-          }
-          return 0;
-        };
-
-        const invoicesBefore = supInvoices.filter((i: any) => startDate && i.date < startDate);
-        const invoicesPeriod = supInvoices.filter((i: any) => (!startDate || i.date >= startDate) && (!endDate || i.date <= endDate));
-
-        const returnsBefore = supReturns.filter((r: any) => startDate && r.date < startDate);
-        const returnsPeriod = supReturns.filter((r: any) => (!startDate || r.date >= startDate) && (!endDate || r.date <= endDate));
-
-        const discountsBefore = supDiscounts.filter((d: any) => startDate && d.date < startDate);
-        const discountsPeriod = supDiscounts.filter((d: any) => (!startDate || d.date >= startDate) && (!endDate || d.date <= endDate));
-
-        const vouchersBefore = supVouchers.filter((v: any) => startDate && v.date < startDate);
-        const vouchersPeriod = supVouchers.filter((v: any) => (!startDate || v.date >= startDate) && (!endDate || v.date <= endDate));
-
-        // Cash Invoices
-        const cashInvoicesBefore = invoicesBefore.filter((i: any) => i.payment_type === 'cash')
-          .reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
-        const cashInvoicesPeriod = invoicesPeriod.filter((i: any) => i.payment_type === 'cash')
-          .reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
-
-        const totalInvoicesBefore = invoicesBefore.reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
-        const totalInvoicesPeriod = invoicesPeriod.reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
-
-        const totalReturnsBefore = returnsBefore.reduce((sum: number, r: any) => sum + (Number(r.total_amount) || 0), 0);
-        const totalReturnsPeriod = returnsPeriod.reduce((sum: number, r: any) => sum + (Number(r.total_amount) || 0), 0);
-
-        const totalDiscountsBefore = discountsBefore.reduce((sum: number, d: any) => sum + (Number(d.amount) || 0), 0);
-        const totalDiscountsPeriod = discountsPeriod.reduce((sum: number, d: any) => sum + (Number(d.amount) || 0), 0);
-
-        const totalVouchersBefore = vouchersBefore.reduce((sum: number, v: any) => sum + getVoucherAmount(v), 0) + cashInvoicesBefore;
-        const totalVouchersPeriod = vouchersPeriod.reduce((sum: number, v: any) => sum + getVoucherAmount(v), 0) + cashInvoicesPeriod;
-
-        let manualJournalDebitBefore = 0;
-        let manualJournalCreditBefore = 0;
-        let manualJournalDebitPeriod = 0;
-        let manualJournalCreditPeriod = 0;
-
+        // Find all journal entry lines matching this supplier and their ledger account
+        const supplierLines: any[] = [];
         journalEntries.forEach((je: any) => {
           je.items?.forEach((item: any) => {
             if (item.supplier_id === supplier.id && item.account_id === supplier.account_id) {
-              const debit = Number(item.debit) || 0;
-              const credit = Number(item.credit) || 0;
-              
-              const standardTypes = [
-                'purchase_invoice', 'purchase_return', 
-                'payment', 'payment_voucher', 
-                'supplier_discount', 'opening_balance',
-                'invoice', 'return'
-              ];
-              
-              if (je.reference_type === 'manual' || je.reference_type === 'journal' || 
-                  !standardTypes.includes(je.reference_type)) {
-                if (startDate && je.date < startDate) {
-                  manualJournalDebitBefore += debit;
-                  manualJournalCreditBefore += credit;
-                } else if ((!startDate || je.date >= startDate) && (!endDate || je.date <= endDate)) {
-                  manualJournalDebitPeriod += debit;
-                  manualJournalCreditPeriod += credit;
-                }
-              }
+              supplierLines.push({
+                date: je.date,
+                reference_type: je.reference_type,
+                debit: Number(item.debit) || 0,
+                credit: Number(item.credit) || 0,
+                description: item.description || je.description || ''
+              });
             }
           });
         });
 
-        // Current balance formula for supplier: Credit (+) is debt, Debit (-) is payment
-        const openingBalance = (Number(supplier.opening_balance) || 0) + 
-                               totalInvoicesBefore - 
-                               totalReturnsBefore - 
-                               totalVouchersBefore - 
-                               totalDiscountsBefore + 
-                               (manualJournalCreditBefore - manualJournalDebitBefore);
+        // Determine if opening balance is already represented in journal entries
+        const hasOpeningBalanceInEntries = supplierLines.some(
+          (line: any) => line.reference_type === 'opening_balance' || line.description.includes('رصيد افتتاحي')
+        );
+        const manualOpBal = hasOpeningBalanceInEntries ? 0 : (Number(supplier.opening_balance) || 0);
 
-        const totalInvoices = totalInvoicesPeriod;
-        const totalReturns = totalReturnsPeriod;
-        const totalVouchers = totalVouchersPeriod;
-        const totalDiscounts = totalDiscountsPeriod;
-        const manualJournalImpact = manualJournalCreditPeriod - manualJournalDebitPeriod;
+        let openingBalance = manualOpBal;
+        let totalInvoices = 0;
+        let totalReturns = 0;
+        let totalVouchers = 0;
+        let totalDiscounts = 0;
+        let manualJournalImpact = 0;
+
+        supplierLines.forEach((line: any) => {
+          const isBefore = startDate && line.date < startDate;
+          const isAfter = endDate && line.date > endDate;
+
+          if (isBefore) {
+            openingBalance += (line.credit - line.debit);
+          } else if (!isAfter) {
+            // Group by standard accounting reference types
+            if (line.reference_type === 'purchase_invoice' || line.reference_type === 'invoice') {
+              totalInvoices += line.credit;
+              totalVouchers += line.debit; // Cash purchase payments
+            } else if (line.reference_type === 'purchase_return' || line.reference_type === 'return') {
+              totalReturns += (line.debit - line.credit);
+            } else if (line.reference_type === 'payment' || line.reference_type === 'payment_voucher') {
+              totalVouchers += (line.debit - line.credit);
+            } else if (line.reference_type === 'supplier_discount' || line.reference_type === 'discount') {
+              totalDiscounts += (line.debit - line.credit);
+            } else if (line.reference_type === 'opening_balance') {
+              openingBalance += (line.credit - line.debit);
+            } else {
+              // Manual journals and non-standard reference types
+              manualJournalImpact += (line.credit - line.debit);
+            }
+          }
+        });
 
         const currentBalance = openingBalance + totalInvoices - totalReturns - totalVouchers - totalDiscounts + manualJournalImpact;
 

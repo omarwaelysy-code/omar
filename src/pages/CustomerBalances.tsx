@@ -85,117 +85,66 @@ export const CustomerBalances: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [custs, invoices, returns, receipts, discounts, journalEntries] = await Promise.all([
+      const [custs, journalEntries] = await Promise.all([
         dbService.list<Customer>('customers', user.company_id),
-        dbService.list<any>('invoices', user.company_id),
-        dbService.list<any>('returns', user.company_id),
-        dbService.list<any>('receipt_vouchers', user.company_id),
-        dbService.list<any>('customer_discounts', user.company_id),
         dbService.list<any>('journal_entries', user.company_id)
       ]);
 
       const balances = custs.map((customer: any) => {
-        const custInvoices = invoices.filter((i: any) => i.customer_id === customer.id);
-        const custReturns = returns.filter((r: any) => r.customer_id === customer.id);
-        const custReceipts = receipts.filter((r: any) => {
-          if (r.customer_id === customer.id) return true;
-          const isMulti = r.voucher_type === 'multi' || r.type === 'multi';
-          if (isMulti && r.items && Array.isArray(r.items)) {
-            return r.items.some((item: any) => item.type === 'customer' && item.entity_id === customer.id);
-          }
-          return false;
-        });
-        const custDiscounts = discounts.filter((d: any) => d.customer_id === customer.id);
-
-        const getReceiptAmount = (r: any) => {
-          const isMulti = r.voucher_type === 'multi' || r.type === 'multi';
-          if (isMulti && r.items && Array.isArray(r.items)) {
-             return r.items
-               .filter((item: any) => item.type === 'customer' && item.entity_id === customer.id)
-               .reduce((itemSum: number, item: any) => itemSum + (Number(item.amount) || 0), 0);
-          }
-          if (r.customer_id === customer.id) {
-             return Number(r.amount) || 0;
-          }
-          return 0;
-        };
-
-        // Split standard transactions into "before" and "within" period
-        const invoicesBefore = custInvoices.filter((i: any) => startDate && i.date < startDate);
-        const invoicesPeriod = custInvoices.filter((i: any) => (!startDate || i.date >= startDate) && (!endDate || i.date <= endDate));
-
-        const returnsBefore = custReturns.filter((r: any) => startDate && r.date < startDate);
-        const returnsPeriod = custReturns.filter((r: any) => (!startDate || r.date >= startDate) && (!endDate || r.date <= endDate));
-
-        const discountsBefore = custDiscounts.filter((d: any) => startDate && d.date < startDate);
-        const discountsPeriod = custDiscounts.filter((d: any) => (!startDate || d.date >= startDate) && (!endDate || d.date <= endDate));
-
-        const receiptsBefore = custReceipts.filter((r: any) => startDate && r.date < startDate);
-        const receiptsPeriod = custReceipts.filter((r: any) => (!startDate || r.date >= startDate) && (!endDate || r.date <= endDate));
-
-        // Cash Invoices amount behaves like a receipt
-        const cashInvoicesBefore = invoicesBefore.filter((i: any) => i.payment_type === 'cash')
-          .reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
-        const cashInvoicesPeriod = invoicesPeriod.filter((i: any) => i.payment_type === 'cash')
-          .reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
-
-        const totalInvoicesBefore = invoicesBefore.reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
-        const totalInvoicesPeriod = invoicesPeriod.reduce((sum: number, i: any) => sum + (Number(i.total_amount) || 0), 0);
-
-        const totalReturnsBefore = returnsBefore.reduce((sum: number, r: any) => sum + (Number(r.total_amount) || 0), 0);
-        const totalReturnsPeriod = returnsPeriod.reduce((sum: number, r: any) => sum + (Number(r.total_amount) || 0), 0);
-
-        const totalDiscountsBefore = discountsBefore.reduce((sum: number, d: any) => sum + (Number(d.amount) || 0), 0);
-        const totalDiscountsPeriod = discountsPeriod.reduce((sum: number, d: any) => sum + (Number(d.amount) || 0), 0);
-
-        const totalReceiptsBefore = receiptsBefore.reduce((sum: number, r: any) => sum + getReceiptAmount(r), 0) + cashInvoicesBefore;
-        const totalReceiptsPeriod = receiptsPeriod.reduce((sum: number, r: any) => sum + getReceiptAmount(r), 0) + cashInvoicesPeriod;
-
-        let manualJournalDebitBefore = 0;
-        let manualJournalCreditBefore = 0;
-        let manualJournalDebitPeriod = 0;
-        let manualJournalCreditPeriod = 0;
-
+        // Find all journal entry lines matching this customer and their ledger account
+        const customerLines: any[] = [];
         journalEntries.forEach((je: any) => {
           je.items?.forEach((item: any) => {
             if (item.customer_id === customer.id && item.account_id === customer.account_id) {
-              const debit = Number(item.debit) || 0;
-              const credit = Number(item.credit) || 0;
-              
-              const standardTypes = [
-                'invoice', 'sales_invoice', 'cash_invoice', 
-                'return', 'sales_return', 
-                'receipt', 'receipt_voucher', 
-                'customer_discount', 'discount',
-                'opening_balance'
-              ];
-              
-              if (je.reference_type === 'manual' || je.reference_type === 'journal' || 
-                  !standardTypes.includes(je.reference_type)) {
-                if (startDate && je.date < startDate) {
-                  manualJournalDebitBefore += debit;
-                  manualJournalCreditBefore += credit;
-                } else if ((!startDate || je.date >= startDate) && (!endDate || je.date <= endDate)) {
-                  manualJournalDebitPeriod += debit;
-                  manualJournalCreditPeriod += credit;
-                }
-              }
+              customerLines.push({
+                date: je.date,
+                reference_type: je.reference_type,
+                debit: Number(item.debit) || 0,
+                credit: Number(item.credit) || 0,
+                description: item.description || je.description || ''
+              });
             }
           });
         });
 
-        const openingBalance = (Number(customer.opening_balance) || 0) + 
-                               totalInvoicesBefore - 
-                               totalReturnsBefore - 
-                               totalReceiptsBefore - 
-                               totalDiscountsBefore + 
-                               (manualJournalDebitBefore - manualJournalCreditBefore);
+        // Determine if opening balance is already represented in journal entries
+        const hasOpeningBalanceInEntries = customerLines.some(
+          (line: any) => line.reference_type === 'opening_balance' || line.description.includes('رصيد افتتاحي')
+        );
+        const manualOpBal = hasOpeningBalanceInEntries ? 0 : (Number(customer.opening_balance) || 0);
 
-        const totalInvoices = totalInvoicesPeriod;
-        const totalReturns = totalReturnsPeriod;
-        const totalReceipts = totalReceiptsPeriod;
-        const totalDiscounts = totalDiscountsPeriod;
-        const manualJournalImpact = manualJournalDebitPeriod - manualJournalCreditPeriod;
+        let openingBalance = manualOpBal;
+        let totalInvoices = 0;
+        let totalReturns = 0;
+        let totalReceipts = 0;
+        let totalDiscounts = 0;
+        let manualJournalImpact = 0;
+
+        customerLines.forEach((line: any) => {
+          const isBefore = startDate && line.date < startDate;
+          const isAfter = endDate && line.date > endDate;
+
+          if (isBefore) {
+            openingBalance += (line.debit - line.credit);
+          } else if (!isAfter) {
+            // Group by standard accounting reference types
+            if (line.reference_type === 'invoice' || line.reference_type === 'sales_invoice' || line.reference_type === 'cash_invoice') {
+              totalInvoices += line.debit;
+              totalReceipts += line.credit; // Cash invoice receipts
+            } else if (line.reference_type === 'return' || line.reference_type === 'sales_return') {
+              totalReturns += (line.credit - line.debit);
+            } else if (line.reference_type === 'receipt' || line.reference_type === 'receipt_voucher') {
+              totalReceipts += (line.credit - line.debit);
+            } else if (line.reference_type === 'customer_discount' || line.reference_type === 'discount') {
+              totalDiscounts += (line.credit - line.debit);
+            } else if (line.reference_type === 'opening_balance') {
+              openingBalance += (line.debit - line.credit);
+            } else {
+              // Manual journals and non-standard reference types
+              manualJournalImpact += (line.debit - line.credit);
+            }
+          }
+        });
 
         const currentBalance = openingBalance + totalInvoices - totalReturns - totalReceipts - totalDiscounts + manualJournalImpact;
 
