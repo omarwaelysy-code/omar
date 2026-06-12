@@ -161,7 +161,10 @@ async function startServer() {
       'ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "advance_percentage" DECIMAL(5, 2) DEFAULT 0',
       'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "payment_terms" VARCHAR(100)',
       'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "payment_terms_days" INTEGER DEFAULT 0',
-      'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "advance_percentage" DECIMAL(5, 2) DEFAULT 0'
+      'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "advance_percentage" DECIMAL(5, 2) DEFAULT 0',
+      
+      // Cash Transfers Serial
+      'ALTER TABLE "cash_transfers" ADD COLUMN IF NOT EXISTS "transfer_number" VARCHAR(50)'
     ];
     
     for (const q of syncQueries) {
@@ -188,6 +191,13 @@ async function startServer() {
       SET cost_policy = 'wac' 
       WHERE date <= '2026-05-31'
     `).catch(e => console.warn('⚠️ Failed to restore historical WAC movements:', e.message));
+
+    // Backfill transfer_number for existing cash_transfers
+    await pool.query(`
+      UPDATE "cash_transfers" 
+      SET "transfer_number" = 'CT-' || TO_CHAR(date, 'YYYY-MM') || '-' || LPAD(SUBSTRING(id FROM 1 FOR 8), 6, '0') 
+      WHERE "transfer_number" IS NULL
+    `).catch(e => console.warn('⚠️ Failed to backfill transfer_number:', e.message));
 
     await runMigrations();
 

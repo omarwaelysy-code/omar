@@ -136,6 +136,7 @@ export const CashTransferSchema = BaseSchema.extend({
   to_payment_method_name: z.string().optional(),
   description: z.string().optional(),
   notes: z.string().optional(),
+  transfer_number: z.string().optional(),
 });
 
 // Discount

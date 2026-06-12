@@ -116,7 +116,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   cash_transfers: [
     'id', 'company_id', 'date', 'amount', 'from_payment_method_id', 'to_payment_method_id', 
-    'from_payment_method_name', 'to_payment_method_name', 'description', 'created_by', 'created_at'
+    'from_payment_method_name', 'to_payment_method_name', 'description', 'created_by', 'created_at', 'transfer_number'
   ],
   expense_categories: [
     'id', 'company_id', 'code', 'name', 'description', 'account_id', 'account_name'

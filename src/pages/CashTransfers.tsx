@@ -19,7 +19,7 @@ import { InlineActivityLog } from '../components/InlineActivityLog';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
-import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
+import { formatNumber, formatDate, formatMoney, parseNumber } from '../utils/formatUtils';
 import { ExportButtons } from '../components/ExportButtons';
 import { PaginationControls } from '../components/PaginationControls';
 import { useNavigation } from '../contexts/NavigationContext';
@@ -72,7 +72,8 @@ export const CashTransfers: React.FC = () => {
       amount: 0,
       from_payment_method_id: '',
       to_payment_method_id: '',
-      description: ''
+      description: '',
+      transfer_number: ''
     });
   };
 
@@ -84,10 +85,11 @@ export const CashTransfers: React.FC = () => {
       setEditingTransfer(prev);
       setFormData({
         date: prev.date ? prev.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
-        amount: prev.amount,
+        amount: Number(prev.amount) || 0,
         from_payment_method_id: prev.from_payment_method_id,
         to_payment_method_id: prev.to_payment_method_id,
-        description: prev.description
+        description: prev.description,
+        transfer_number: prev.transfer_number || ''
       });
     }
   };
@@ -100,10 +102,11 @@ export const CashTransfers: React.FC = () => {
       setEditingTransfer(next);
       setFormData({
         date: next.date ? next.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
-        amount: next.amount,
+        amount: Number(next.amount) || 0,
         from_payment_method_id: next.from_payment_method_id,
         to_payment_method_id: next.to_payment_method_id,
-        description: next.description
+        description: next.description,
+        transfer_number: next.transfer_number || ''
       });
     }
   };
@@ -128,8 +131,11 @@ export const CashTransfers: React.FC = () => {
     amount: 0,
     from_payment_method_id: '',
     to_payment_method_id: '',
-    description: ''
+    description: '',
+    transfer_number: ''
   });
+
+  const [isAmountFocused, setIsAmountFocused] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -251,7 +257,8 @@ export const CashTransfers: React.FC = () => {
         to_payment_method_name: toPM?.name || '',
         company_id: user.company_id,
         created_at: editingTransfer ? editingTransfer.created_at : new Date().toISOString(),
-        created_by: editingTransfer ? editingTransfer.created_by : user.id
+        created_by: editingTransfer ? editingTransfer.created_by : user.id,
+        transfer_number: formData.transfer_number
       };
 
       const journalItems = [
@@ -314,7 +321,8 @@ export const CashTransfers: React.FC = () => {
         amount: 0,
         from_payment_method_id: '',
         to_payment_method_id: '',
-        description: ''
+        description: '',
+        transfer_number: ''
       });
       showNotification(editingTransfer ? 'تم تحديث التحويل بنجاح' : 'تم إضافة التحويل بنجاح', 'success');
 
@@ -480,7 +488,8 @@ export const CashTransfers: React.FC = () => {
                 amount: 0,
                 from_payment_method_id: '',
                 to_payment_method_id: '',
-                description: ''
+                description: '',
+                transfer_number: ''
               });
               setIsModalOpen(true);
             }}
@@ -535,6 +544,14 @@ export const CashTransfers: React.FC = () => {
                       </span>
                     </div>
                   </th>
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('transfer_number')}>
+                    <div className="flex items-center gap-1">
+                      رقم التحويل
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        {sortBy === 'transfer_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </div>
+                  </th>
                   <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100 cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('from_payment_method_name')}>
                     <div className="flex items-center gap-1">
                       من خزينة
@@ -573,15 +590,21 @@ export const CashTransfers: React.FC = () => {
                       setEditingTransfer(transfer);
                       setFormData({
                         date: transfer.date ? transfer.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
-                        amount: transfer.amount,
+                        amount: Number(transfer.amount) || 0,
                         from_payment_method_id: transfer.from_payment_method_id,
                         to_payment_method_id: transfer.to_payment_method_id,
-                        description: transfer.description
+                        description: transfer.description,
+                        transfer_number: transfer.transfer_number || ''
                       });
                       setIsModalOpen(true);
                     }}
                   >
                     <td className="px-6 py-4 text-zinc-900 font-bold">{formatDate(transfer.date)}</td>
+                    <td className="px-6 py-4">
+                      <span className="font-mono text-xs bg-zinc-50 px-2 py-1 rounded text-zinc-600 font-bold border border-zinc-100">
+                        {transfer.transfer_number || '-'}
+                      </span>
+                    </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 bg-red-50 text-red-600 rounded-lg flex items-center justify-center">
@@ -637,10 +660,11 @@ export const CashTransfers: React.FC = () => {
                             setEditingTransfer(transfer);
                             setFormData({
                               date: transfer.date ? transfer.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
-                              amount: transfer.amount,
+                              amount: Number(transfer.amount) || 0,
                               from_payment_method_id: transfer.from_payment_method_id,
                               to_payment_method_id: transfer.to_payment_method_id,
-                              description: transfer.description
+                              description: transfer.description,
+                              transfer_number: transfer.transfer_number || ''
                             });
                             setIsModalOpen(true);
                           }}
@@ -677,10 +701,11 @@ export const CashTransfers: React.FC = () => {
                   setEditingTransfer(transfer);
                   setFormData({
                     date: transfer.date ? transfer.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
-                    amount: transfer.amount,
+                    amount: Number(transfer.amount) || 0,
                     from_payment_method_id: transfer.from_payment_method_id,
                     to_payment_method_id: transfer.to_payment_method_id,
-                    description: transfer.description
+                    description: transfer.description,
+                    transfer_number: transfer.transfer_number || ''
                   });
                   setIsModalOpen(true);
                 }}
@@ -702,10 +727,11 @@ export const CashTransfers: React.FC = () => {
                       setEditingTransfer(transfer);
                       setFormData({
                         date: transfer.date ? transfer.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
-                        amount: transfer.amount,
+                        amount: Number(transfer.amount) || 0,
                         from_payment_method_id: transfer.from_payment_method_id,
                         to_payment_method_id: transfer.to_payment_method_id,
-                        description: transfer.description
+                        description: transfer.description,
+                        transfer_number: transfer.transfer_number || ''
                       });
                       setIsModalOpen(true);
                     }}
@@ -728,7 +754,12 @@ export const CashTransfers: React.FC = () => {
                 <div className="flex flex-col h-full justify-between">
                   <div className="space-y-4">
                     <div className="flex items-center justify-between border-b border-zinc-100/60 pb-2">
-                      <span className="text-xs text-zinc-400 font-semibold">{formatDate(transfer.date)}</span>
+                      <div className="flex flex-col text-right">
+                        <span className="text-xs text-zinc-400 font-semibold">{formatDate(transfer.date)}</span>
+                        {transfer.transfer_number && (
+                          <span className="font-mono text-[10px] text-emerald-700 font-bold mt-0.5">{transfer.transfer_number}</span>
+                        )}
+                      </div>
                       {transfer.entry_number && (
                         <button
                           onClick={(e) => {
@@ -901,13 +932,26 @@ export const CashTransfers: React.FC = () => {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
+                          <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2">رقم التحويل</label>
+                          <div className="relative group">
+                            <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-emerald-500 pointer-events-none transition-colors`} />
+                            <input 
+                              readOnly
+                              type="text" 
+                              className="w-full ps-12 pe-4 py-3 bg-emerald-50/50 border border-transparent rounded-2xl outline-none transition-all font-mono font-bold text-emerald-800 text-sm"
+                              value={formData.transfer_number || (language === 'ar' ? 'تلقائي' : 'Automatic')}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
                           <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2">تاريخ التحويل</label>
                           <div className="relative group">
                             <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none group-focus-within:text-emerald-500 transition-colors`} />
                             <input 
                               required
                               type="date" 
-                              className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white focus:border-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                              className="w-full ps-12 pe-4 py-3 bg-zinc-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white focus:border-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm"
                               value={formData.date}
                               onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                             />
@@ -922,7 +966,7 @@ export const CashTransfers: React.FC = () => {
                               <input 
                                 readOnly
                                 type="text"
-                                className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-emerald-50 border border-transparent rounded-2xl outline-none transition-all font-bold text-emerald-800 text-sm`}
+                                className="w-full ps-12 pe-4 py-3 bg-emerald-50 border border-transparent rounded-2xl outline-none transition-all font-bold text-emerald-800 text-sm"
                                 value={editingTransfer.entry_number}
                               />
                             </div>
@@ -935,13 +979,22 @@ export const CashTransfers: React.FC = () => {
                             <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none group-focus-within:text-emerald-500 transition-colors`} />
                             <input 
                               required
-                              type="number" 
-                              step="0.01"
-                              min="0.01"
+                              type="text" 
                               placeholder="0.00"
-                              className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white focus:border-emerald-500 outline-none transition-all font-black text-emerald-600 text-lg`}
-                              value={formData.amount || ''}
-                              onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
+                              className="w-full ps-12 pe-4 py-3 bg-zinc-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white focus:border-emerald-500 outline-none transition-all font-black text-emerald-600 text-lg"
+                              value={isAmountFocused ? (formData.amount || '') : formatNumber(formData.amount)}
+                              onFocus={() => setIsAmountFocused(true)}
+                              onBlur={() => {
+                                setIsAmountFocused(false);
+                                const cleanVal = parseNumber(formData.amount);
+                                setFormData({ ...formData, amount: cleanVal });
+                              }}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === '' || /^[0-9.,]*$/.test(val)) {
+                                  setFormData({ ...formData, amount: val as any });
+                                }
+                              }}
                             />
                           </div>
                         </div>
@@ -952,7 +1005,7 @@ export const CashTransfers: React.FC = () => {
                         <div className="relative group">
                           <FileText className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none group-focus-within:text-emerald-500 transition-colors`} />
                           <textarea 
-                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white focus:border-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm min-h-[100px] resize-none`}
+                            className="w-full ps-12 pe-4 py-3 bg-zinc-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white focus:border-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm min-h-[100px] resize-none"
                             rows={3}
                             placeholder="وصف إضافي لعملية التحويل..."
                             value={formData.description}
@@ -986,7 +1039,7 @@ export const CashTransfers: React.FC = () => {
                             <Wallet className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none group-focus-within:text-red-500 transition-colors`} />
                             <select
                               required
-                              className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-red-500/20 focus:bg-white focus:border-red-500 outline-none transition-all appearance-none font-bold text-zinc-800`}
+                              className="w-full ps-12 pe-10 py-3 bg-zinc-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-red-500/20 focus:bg-white focus:border-red-500 outline-none transition-all appearance-none font-bold text-zinc-800"
                               value={formData.from_payment_method_id}
                               onChange={(e) => setFormData({ ...formData, from_payment_method_id: e.target.value })}
                             >
@@ -1012,7 +1065,7 @@ export const CashTransfers: React.FC = () => {
                             <Wallet className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none group-focus-within:text-emerald-500 transition-colors`} />
                             <select
                               required
-                              className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white focus:border-emerald-500 outline-none transition-all appearance-none font-bold text-zinc-800`}
+                              className="w-full ps-12 pe-10 py-3 bg-zinc-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white focus:border-emerald-500 outline-none transition-all appearance-none font-bold text-zinc-800"
                               value={formData.to_payment_method_id}
                               onChange={(e) => setFormData({ ...formData, to_payment_method_id: e.target.value })}
                             >
@@ -1295,6 +1348,15 @@ export const CashTransfers: React.FC = () => {
                   </div>
                 </div>
                 <div className="space-y-4">
+                  {viewTransfer.transfer_number && (
+                    <div className="flex items-center gap-3 text-zinc-600">
+                      <Hash size={18} className="text-zinc-400" />
+                      <span className="font-bold">رقم التحويل:</span>
+                      <span className="font-mono font-bold bg-zinc-50 px-2 py-0.5 rounded border border-zinc-100">
+                        {viewTransfer.transfer_number}
+                      </span>
+                    </div>
+                  )}
                   {viewTransfer.entry_number && (
                     <div className="flex items-center gap-3 text-zinc-600">
                       <Layers size={18} className="text-zinc-400" />

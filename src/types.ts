@@ -238,6 +238,7 @@ export interface CashTransfer {
   created_at: string;
   created_by: string;
   entry_number?: string;
+  transfer_number?: string;
 }
 
 export interface Product {

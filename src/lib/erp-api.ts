@@ -863,6 +863,7 @@ export async function generateNextSequence(client: any, companyId: string, modul
     case 'warehouse_transfers': numField = 'transfer_number'; prefix = 'TR'; break;
     case 'opening_stock_balances': numField = 'document_number'; prefix = 'OPB'; break;
     case 'stock_adjustments': numField = 'adjustment_number'; prefix = 'ADJ'; break;
+    case 'cash_transfers': numField = 'transfer_number'; prefix = 'CT'; break;
   }
 
   if (moduleName === 'employees') {
@@ -1352,6 +1353,13 @@ modules.forEach(moduleName => {
           if (moduleName === 'employees') {
             if (!req.body.employee_code) {
               req.body.employee_code = await generateNextSequence(pool, companyId, 'employees', '');
+            }
+          }
+
+          // Special case for cash_transfers: handle automatic transfer_number generation
+          if (moduleName === 'cash_transfers') {
+            if (!req.body.transfer_number) {
+              req.body.transfer_number = await generateNextSequence(pool, companyId, 'cash_transfers', req.body.date || new Date().toISOString().slice(0, 10));
             }
           }
 

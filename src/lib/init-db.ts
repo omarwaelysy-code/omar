@@ -495,6 +495,7 @@ export async function initDatabase() {
         "created_by" VARCHAR(36),
         "from_payment_method_name" VARCHAR(255),
         "to_payment_method_name" VARCHAR(255),
+        "transfer_number" VARCHAR(50),
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `, 'cash_transfers table');
