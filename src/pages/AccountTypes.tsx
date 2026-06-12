@@ -322,13 +322,14 @@ export const AccountTypes: React.FC = () => {
         ) : (
           filteredTypes.map(type => (
           <div key={type.id} className="group bg-white p-4 rounded-2xl border border-zinc-100 shadow-sm hover:shadow-md hover:border-emerald-100 transition-all duration-300 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold shadow-lg shadow-emerald-500/20">
+            <div className="flex items-center flex-1 gap-4">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold shadow-lg shadow-emerald-500/20 shrink-0">
                 <PieChart size={20} />
               </div>
-              <div>
+              <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 flex-1">
                 <h3 className="text-lg font-bold text-zinc-900">{type.name}</h3>
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-zinc-300 hidden md:inline font-light">|</span>
                   <span className="inline-block text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md uppercase tracking-wider">{type.code}</span>
                   <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
                     type.statement_type === 'balance_sheet' ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50'
