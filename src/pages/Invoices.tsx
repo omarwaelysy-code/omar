@@ -2638,80 +2638,65 @@ export const Invoices: React.FC = () => {
               )}
             </div>
 
-            {/* Left side (end): Actions: Save, Cancel, Return to List, and Log */}
-            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-              <button 
-                type="submit"
-                form="invoice-form"
-                onClick={handleSubmit}
-                className="px-5 py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-2 active:scale-95 shadow-sm text-xs md:text-sm whitespace-nowrap"
-              >
-                <Save size={16} />
-                <span>{language === 'ar' ? 'حفظ' : 'Save'}</span>
-              </button>
-              <button 
-                type="button"
-                onClick={closeModal}
-                className="px-4 py-2 rounded-xl bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-all flex items-center gap-2 active:scale-95 border border-zinc-200 shadow-sm text-xs md:text-sm whitespace-nowrap"
-              >
-                <RotateCcw size={16} />
-                <span>{language === 'ar' ? 'إلغاء' : 'Cancel'}</span>
-              </button>
-
-              <div className="h-4 w-px bg-slate-200 hidden sm:block" />
-
+            {/* Left side (end): Actions: Save, Cancel, Return to List */}
+            <div className="flex flex-col items-end gap-1.5 shrink-0">
               <button 
                 type="button"
                 onClick={closeModal} 
-                className="flex items-center gap-1.5 px-3 py-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all font-bold text-xs whitespace-nowrap"
+                className="flex items-center gap-1.5 px-3 py-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all font-bold text-xs whitespace-nowrap"
               >
                 {dir === 'rtl' ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
                 <span>{language === 'ar' ? 'العودة للقائمة' : 'Return to List'}</span>
               </button>
-
-              {editingInvoice && (
-                <>
-                  <div className="h-4 w-px bg-slate-200 hidden sm:block" />
-                  
-                  <button 
-                    type="button"
-                    onClick={() => setShowSidePanel(!showSidePanel)}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm whitespace-nowrap ${showSidePanel ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-zinc-50'}`}
-                  >
-                    <History size={14} />
-                    <span>{language === 'ar' ? 'سجل التعديلات والقيد' : 'Activity Log & Journal'}</span>
-                  </button>
-                </>
-              )}
+              <div className="flex items-center gap-2">
+                <button 
+                  type="button"
+                  onClick={closeModal}
+                  className="px-4 py-2 rounded-xl bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-all flex items-center gap-2 active:scale-95 border border-zinc-200 shadow-sm text-xs whitespace-nowrap"
+                >
+                  <RotateCcw size={16} />
+                  <span>{language === 'ar' ? 'إلغاء' : 'Cancel'}</span>
+                </button>
+                <button 
+                  type="submit"
+                  form="invoice-form"
+                  onClick={handleSubmit}
+                  className="px-5 py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-2 active:scale-95 shadow-sm text-xs whitespace-nowrap"
+                >
+                  <Save size={16} />
+                  <span>{language === 'ar' ? 'حفظ' : 'Save'}</span>
+                </button>
+              </div>
             </div>
           </div>
             
             <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full relative">
-              {/* Side Panel for Activity Log and Journal Entry */}
+              {/* Bottom Drawer for Activity Log and Journal Entry */}
               <AnimatePresence>
                 {showSidePanel && (
                   <motion.div 
-                    initial={{ x: '-100%' }}
-                    animate={{ x: 0 }}
-                    exit={{ x: '-100%' }}
+                    initial={{ y: '100%' }}
+                    animate={{ y: 0 }}
+                    exit={{ y: '100%' }}
                     transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    className="absolute inset-y-0 left-0 z-50 w-full lg:w-80 shadow-2xl lg:shadow-none lg:relative lg:inset-auto"
+                    className="absolute bottom-0 inset-x-0 z-50 h-[350px] bg-white border-t border-slate-200 shadow-2xl flex flex-col"
                   >
-                    <div className="h-full bg-white border-r border-slate-100 flex flex-col">
-                      <div className="p-4 border-b border-slate-100 flex items-center justify-between lg:hidden">
-                        <h3 className="font-bold text-slate-900">سجل النشاط والقيد</h3>
-                        <button onClick={() => setShowSidePanel(false)} className="p-2 text-slate-400 hover:text-slate-600">
-                          <X size={20} />
-                        </button>
-                      </div>
-                      <div className="flex-1 overflow-hidden">
-                        <TransactionSidePanel 
-                          documentId={editingInvoice?.id || ''} 
-                          category="invoices" 
-                          previewJournalEntry={previewJournalEntry}
-                          previewActivityLog={previewActivityLog}
-                        />
-                      </div>
+                    <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-zinc-50 sticky top-0">
+                      <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                        <History size={16} className="text-emerald-600" />
+                        <span>{language === 'ar' ? 'سجل التعديلات والقيد' : 'Activity Log & Journal'}</span>
+                      </h3>
+                      <button onClick={() => setShowSidePanel(false)} className="p-1.5 text-slate-400 hover:text-slate-650 hover:bg-slate-200/50 rounded-lg transition-all">
+                        <X size={18} />
+                      </button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto">
+                      <TransactionSidePanel 
+                        documentId={editingInvoice?.id || ''} 
+                        category="invoices" 
+                        previewJournalEntry={previewJournalEntry}
+                        previewActivityLog={previewActivityLog}
+                      />
                     </div>
                   </motion.div>
                 )}
@@ -3711,6 +3696,19 @@ export const Invoices: React.FC = () => {
                           })()}
                         </div>
                       </>
+                    )}
+
+                    {editingInvoice && (
+                      <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-start">
+                        <button 
+                          type="button"
+                          onClick={() => setShowSidePanel(!showSidePanel)}
+                          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm ${showSidePanel ? 'bg-emerald-600 text-white border-emerald-600 shadow-emerald-500/10' : 'bg-white text-slate-755 border-slate-200 hover:bg-zinc-50'}`}
+                        >
+                          <History size={14} />
+                          <span>{language === 'ar' ? 'سجل التعديلات والقيد' : 'Activity Log & Journal'}</span>
+                        </button>
+                      </div>
                     )}
 
                     {/* Actions removed from bottom of scrollable area as they are in the fixed footer */}
