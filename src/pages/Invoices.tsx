@@ -2596,14 +2596,55 @@ export const Invoices: React.FC = () => {
       ) : (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
           {/* Form Header */}
-          <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70]" dir={dir}>
-            {/* Left side: Save and Cancel buttons */}
-            <div className="flex items-center gap-2">
+          <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70] flex-wrap gap-4" dir={dir}>
+            {/* Right side (start): Title & Document Info */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <h3 className="text-base md:text-lg font-black text-slate-900 tracking-tight">
+                {editingInvoice ? (language === 'ar' ? 'تعديل فاتورة المبيعات' : 'Edit Sales Invoice') : (language === 'ar' ? 'إنشاء فاتورة مبيعات جديدة' : 'Create New Sales Invoice')}
+              </h3>
+
+              <div className="flex flex-col items-center border border-zinc-200 bg-zinc-50 rounded-xl px-3 py-1 font-mono">
+                <span className="text-[8px] font-bold text-zinc-400 leading-none mb-0.5">{language === 'ar' ? 'رقم الفاتورة' : 'Invoice No'}</span>
+                <span className="text-xs font-bold text-zinc-650 tracking-tight leading-none">{invoiceNumber}</span>
+              </div>
+
+              {editingInvoice && (
+                (() => {
+                  const status = getPaymentStatus(editingInvoice);
+                  const statusLabels = {
+                    paid: language === 'ar' ? 'مدفوعة' : 'Paid',
+                    partial: language === 'ar' ? 'مدفوعة جزئياً' : 'Partially Paid',
+                    unpaid: language === 'ar' ? 'غير مدفوعة' : 'Unpaid'
+                  };
+                  const statusColors = {
+                    paid: 'text-emerald-750 bg-emerald-50 border-emerald-200',
+                    partial: 'text-blue-750 bg-blue-50 border-blue-200',
+                    unpaid: 'text-red-750 bg-red-50 border-red-200'
+                  };
+                  const colorClass = statusColors[status] || statusColors.unpaid;
+                  return (
+                    <div className={`px-2.5 py-1 border border-solid ${colorClass} font-black text-xs rounded-xl`}>
+                      {statusLabels[status]}
+                    </div>
+                  );
+                })()
+              )}
+
+              {editingInvoice?.entry_number && (
+                <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-xl border border-emerald-100 text-xs font-bold font-mono">
+                  <span className="text-[10px] text-emerald-600 font-bold uppercase">{language === 'ar' ? 'القيد المرتبط:' : 'Linked JE:'}</span>
+                  <span>{editingInvoice.entry_number}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Left side (end): Actions: Save, Cancel, Return to List, and Log */}
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
               <button 
                 type="submit"
                 form="invoice-form"
                 onClick={handleSubmit}
-                className="px-5 py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-2 active:scale-95 shadow-sm text-xs md:text-sm"
+                className="px-5 py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-2 active:scale-95 shadow-sm text-xs md:text-sm whitespace-nowrap"
               >
                 <Save size={16} />
                 <span>{language === 'ar' ? 'حفظ' : 'Save'}</span>
@@ -2611,54 +2652,37 @@ export const Invoices: React.FC = () => {
               <button 
                 type="button"
                 onClick={closeModal}
-                className="px-4 py-2 rounded-xl bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-all flex items-center gap-2 active:scale-95 border border-zinc-200 shadow-sm text-xs md:text-sm"
+                className="px-4 py-2 rounded-xl bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-all flex items-center gap-2 active:scale-95 border border-zinc-200 shadow-sm text-xs md:text-sm whitespace-nowrap"
               >
                 <RotateCcw size={16} />
                 <span>{language === 'ar' ? 'إلغاء' : 'Cancel'}</span>
               </button>
-            </div>
 
-            {/* Right side: Navigation & Info */}
-            <div className="flex items-center gap-3 flex-wrap">
+              <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+
               <button 
                 type="button"
                 onClick={closeModal} 
-                className="flex items-center gap-1.5 px-3 py-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all font-bold text-xs"
+                className="flex items-center gap-1.5 px-3 py-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all font-bold text-xs whitespace-nowrap"
               >
-                <ChevronRight size={18} />
+                {dir === 'rtl' ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
                 <span>{language === 'ar' ? 'العودة للقائمة' : 'Return to List'}</span>
               </button>
-              
-              <div className="h-4 w-px bg-slate-200" />
-              
-              <button 
-                type="button"
-                onClick={() => setShowSidePanel(!showSidePanel)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm ${showSidePanel ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-zinc-50'}`}
-              >
-                <History size={14} />
-                <span>{language === 'ar' ? 'سجل التعديلات والقيد' : 'Activity Log & Journal'}</span>
-              </button>
-              
-              <button 
-                type="button"
-                onClick={() => setShowAiInput(!showAiInput)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm ${showAiInput ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-zinc-50'}`}
-              >
-                <Sparkles size={14} />
-                <span>{language === 'ar' ? 'الإنشاء الذكي' : 'Smart AI'}</span>
-              </button>
-              
-              <div className="h-4 w-px bg-slate-200" />
 
-              <h3 className="text-base md:text-lg font-black text-slate-900 tracking-tight">
-                {editingInvoice ? (language === 'ar' ? 'تعديل الفاتورة' : 'Edit Invoice') : (language === 'ar' ? 'إنشاء فاتورة جديدة' : 'Create New Invoice')}
-              </h3>
-
-              <div className="flex flex-col items-center border border-zinc-200 bg-zinc-50 rounded-xl px-3 py-1 font-mono">
-                <span className="text-[8px] font-bold text-zinc-400 leading-none mb-0.5">{language === 'ar' ? 'رقم الفاتورة' : 'Invoice No'}</span>
-                <span className="text-xs font-bold text-zinc-650 tracking-tight leading-none">{invoiceNumber}</span>
-              </div>
+              {editingInvoice && (
+                <>
+                  <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+                  
+                  <button 
+                    type="button"
+                    onClick={() => setShowSidePanel(!showSidePanel)}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm whitespace-nowrap ${showSidePanel ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-zinc-50'}`}
+                  >
+                    <History size={14} />
+                    <span>{language === 'ar' ? 'سجل التعديلات والقيد' : 'Activity Log & Journal'}</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
             
@@ -2790,29 +2814,6 @@ export const Invoices: React.FC = () => {
 
                       {/* Right: Unified Metadata & Payment Settings Panel */}
                       <section className="lg:col-span-3 bg-white p-3 rounded-xl border border-zinc-200 shadow-sm space-y-2 relative">
-                        {editingInvoice && (
-                          <div className={`absolute ${dir === 'rtl' ? 'left-12' : 'right-12'} top-2 z-20 pointer-events-none select-none opacity-40 transform -rotate-12`}>
-                            {(() => {
-                              const status = getPaymentStatus(editingInvoice);
-                              const statusLabels = {
-                                paid: language === 'ar' ? 'مدفوعة' : 'Paid',
-                                partial: language === 'ar' ? 'مدفوعة جزئياً' : 'Partially Paid',
-                                unpaid: language === 'ar' ? 'غير مدفوعة' : 'Unpaid'
-                              };
-                              const statusColors = {
-                                paid: 'text-emerald-600 border-emerald-600 bg-emerald-50/70',
-                                partial: 'text-blue-600 border-blue-600 bg-blue-50/70',
-                                unpaid: 'text-red-500 border-red-500 bg-red-50/70'
-                              };
-                              const colorClass = statusColors[status] || statusColors.unpaid;
-                              return (
-                                <div className={`px-4 py-1 border border-dashed ${colorClass} font-black text-sm tracking-wider uppercase rounded`}>
-                                  {statusLabels[status]}
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        )}
                         
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
                           {/* 1. Date */}
@@ -2870,11 +2871,6 @@ export const Invoices: React.FC = () => {
                           <div>
                             <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.form_payment_type')}</label>
                             <div className="flex items-center gap-1.5 h-[26px]">
-                              {paymentType === 'credit' && (
-                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-50 text-teal-705 border border-teal-205">
-                                  {language === 'ar' ? 'أجل' : 'Credit'}
-                                </span>
-                              )}
                               <select 
                                 className="flex-1 px-2 py-1 rounded-lg border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs cursor-pointer"
                                 value={paymentType}
@@ -2979,12 +2975,6 @@ export const Invoices: React.FC = () => {
 
                         {/* Linked journal entry and Custom payment terms warnings if any */}
                         <div className="flex flex-wrap gap-2 text-xs">
-                          {editingInvoice?.entry_number && (
-                            <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-100 font-bold">
-                              <span>{language === 'ar' ? 'رقم القيد المرتبط:' : 'Linked Journal Entry:'}</span>
-                              <span className="font-mono">{editingInvoice.entry_number}</span>
-                            </div>
-                          )}
                           {paymentType === 'credit' && paymentTerms === 'custom' && (
                             <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-md font-bold">
                               <span className="text-[10px] font-bold text-zinc-400 uppercase">{language === 'ar' ? 'أيام السداد:' : 'Days:'}</span>

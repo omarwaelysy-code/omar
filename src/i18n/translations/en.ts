@@ -223,8 +223,8 @@ export const en = {
   // Invoices
   'invoices.title': 'Sales Invoices',
   'invoices.subtitle': 'Create and manage sales invoices for customers.',
-  'invoices.add_invoice': 'Add Invoice',
-  'invoices.edit_invoice': 'Edit Invoice',
+  'invoices.add_invoice': 'Add Sales Invoice',
+  'invoices.edit_invoice': 'Edit Sales Invoice',
   'invoices.search_placeholder': 'Search invoices...',
   'invoices.column_number': 'Invoice No.',
   'invoices.column_customer': 'Customer',

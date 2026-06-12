@@ -224,8 +224,8 @@ export const ar = {
   // Invoices
   'invoices.title': 'فواتير المبيعات',
   'invoices.subtitle': 'إنشاء وإدارة فواتير المبيعات للعملاء.',
-  'invoices.add_invoice': 'إضافة فاتورة',
-  'invoices.edit_invoice': 'تعديل فاتورة',
+  'invoices.add_invoice': 'إضافة فاتورة مبيعات',
+  'invoices.edit_invoice': 'تعديل فاتورة مبيعات',
   'invoices.search_placeholder': 'البحث عن فواتير...',
   'invoices.column_number': 'رقم الفاتورة',
   'invoices.column_customer': 'العميل',
