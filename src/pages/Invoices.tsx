@@ -2612,58 +2612,58 @@ export const Invoices: React.FC = () => {
       ) : (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
           {/* Form Header */}
-          <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70] flex-wrap gap-4" dir={dir}>
+          <div className="p-2 md:p-2.5 md:px-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70] flex-wrap gap-2" dir={dir}>
             {/* Right side (start in RTL): Actions: Save, Cancel, Return to List */}
-            <div className="flex flex-col items-start gap-1.5 shrink-0">
+            <div className="flex flex-col items-start gap-1 shrink-0">
               <button 
                 type="button"
                 onClick={closeModal} 
-                className="flex items-center gap-1.5 px-3 py-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all font-bold text-xs whitespace-nowrap"
+                className="flex items-center gap-1 px-2.5 py-0.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap"
               >
-                {dir === 'rtl' ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+                {dir === 'rtl' ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
                 <span>{language === 'ar' ? 'العودة للقائمة' : 'Return to List'}</span>
               </button>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button 
                   type="button"
                   onClick={closeModal}
-                  className="w-24 py-2 rounded-xl bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-all flex items-center gap-1.5 justify-center active:scale-95 border border-zinc-200 shadow-sm text-xs whitespace-nowrap font-sans"
+                  className="w-20 py-1 rounded-lg bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-all flex items-center gap-1 justify-center active:scale-95 border border-zinc-200 shadow-sm text-[11px] whitespace-nowrap font-sans"
                 >
-                  <RotateCcw size={16} />
+                  <RotateCcw size={12} />
                   <span>{language === 'ar' ? 'إلغاء' : 'Cancel'}</span>
                 </button>
                 <button 
                   type="submit"
                   form="invoice-form"
                   onClick={handleSubmit}
-                  className="w-24 py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-1.5 justify-center active:scale-95 shadow-sm text-xs whitespace-nowrap font-sans"
+                  className="w-20 py-1 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-1 justify-center active:scale-95 shadow-sm text-[11px] whitespace-nowrap font-sans"
                 >
-                  <Save size={16} />
+                  <Save size={12} />
                   <span>{language === 'ar' ? 'حفظ' : 'Save'}</span>
                 </button>
               </div>
             </div>
 
             {/* Left side (end in RTL): Document Info: Title, Invoice No, Linked Journal, and Status Badge */}
-            <div className="flex items-center gap-6 flex-wrap">
+            <div className="flex items-center gap-4 flex-wrap">
               {/* Text Info Column */}
-              <div className="flex flex-col gap-1.5 items-start">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-base md:text-lg font-black text-slate-900 tracking-tight leading-none font-sans">
+              <div className="flex flex-col gap-1 items-start">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h3 className="text-sm md:text-base font-black text-slate-900 tracking-tight leading-none font-sans">
                     {editingInvoice ? (language === 'ar' ? 'تعديل فاتورة المبيعات' : 'Edit Sales Invoice') : (language === 'ar' ? 'إنشاء فاتورة مبيعات جديدة' : 'Create New Sales Invoice')}
                   </h3>
-                  <span className="text-xs font-mono font-black text-slate-800 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-lg select-all shadow-sm">
+                  <span className="text-[11px] font-mono font-black text-slate-800 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-lg select-all shadow-sm">
                     {invoiceNumber}
                   </span>
                 </div>
 
                 {editingInvoice?.entry_number ? (
-                  <div className="flex items-center gap-1.5 text-emerald-700 text-[11px] font-bold font-mono leading-none mt-1">
+                  <div className="flex items-center gap-1 text-emerald-700 text-[10px] font-bold font-mono leading-none mt-0.5">
                     <span className="text-emerald-500 font-sans font-bold">{language === 'ar' ? 'القيد المرتبط:' : 'Linked JE:'}</span>
-                    <span className="bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 font-black">{editingInvoice.entry_number}</span>
+                    <span className="bg-emerald-50 px-1 py-0.5 rounded border border-emerald-100 font-black">{editingInvoice.entry_number}</span>
                   </div>
                 ) : (
-                  <div className="text-[10px] font-bold text-zinc-400 mt-1">
+                  <div className="text-[9px] font-bold text-zinc-400 mt-0.5">
                     {language === 'ar' ? 'القيد المرتبط: لا يوجد قيد مرتبط بعد' : 'Linked JE: No journal entry linked yet'}
                   </div>
                 )}
@@ -2675,8 +2675,8 @@ export const Invoices: React.FC = () => {
                   const isCash = paymentType === 'cash';
                   if (isCash) {
                     return (
-                      <div className="px-3.5 py-1.5 border-2 border-emerald-600 text-emerald-600 bg-emerald-50/50 font-black text-xs uppercase rounded-xl select-none tracking-wider shadow-sm flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                      <div className="px-2.5 py-1 border-2 border-emerald-600 text-emerald-600 bg-emerald-50/50 font-black text-[11px] uppercase rounded-xl select-none tracking-wider shadow-sm flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
                         {language === 'ar' ? 'فاتورة نقدية' : 'Cash Invoice'}
                       </div>
                     );
@@ -2696,15 +2696,15 @@ export const Invoices: React.FC = () => {
                     };
                     const colorClass = statusColors[status] || statusColors.unpaid;
                     return (
-                      <div className={`px-3.5 py-1.5 border-2 ${colorClass} font-black text-xs uppercase rounded-xl select-none tracking-wider shadow-sm flex items-center gap-1.5`}>
-                        <span className={`w-2.5 h-2.5 rounded-full ${status === 'paid' ? 'bg-emerald-600 animate-pulse' : status === 'partial' ? 'bg-blue-600' : 'bg-rose-600 animate-ping'}`}></span>
+                      <div className={`px-2.5 py-1 border-2 ${colorClass} font-black text-[11px] uppercase rounded-xl select-none tracking-wider shadow-sm flex items-center gap-1`}>
+                        <span className={`w-2 h-2 rounded-full ${status === 'paid' ? 'bg-emerald-600 animate-pulse' : status === 'partial' ? 'bg-blue-600' : 'bg-rose-600 animate-ping'}`}></span>
                         {statusLabels[status]}
                       </div>
                     );
                   } else {
                     return (
-                      <div className="px-3.5 py-1.5 border-2 border-blue-600 text-blue-600 bg-blue-50/50 font-black text-xs uppercase rounded-xl select-none tracking-wider shadow-sm flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                      <div className="px-2.5 py-1 border-2 border-blue-600 text-blue-600 bg-blue-50/50 font-black text-[11px] uppercase rounded-xl select-none tracking-wider shadow-sm flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                         {language === 'ar' ? 'فاتورة آجلة' : 'Credit Invoice'}
                       </div>
                     );
@@ -2786,51 +2786,51 @@ export const Invoices: React.FC = () => {
                 <span>{language === 'ar' ? 'الإنشاء الذكي بالذكاء الاصطناعي' : 'Smart AI Creation'}</span>
               </button>
 
-              <div className="flex-1 p-2 md:p-3.5 space-y-2 overflow-y-auto pb-4">
-                <div className="space-y-2">
+              <div className="flex-1 p-1.5 md:p-2.5 space-y-1.5 overflow-y-auto pb-3">
+                <div className="space-y-1.5">
 
-                  <form id="invoice-form" onSubmit={handleSubmit} className="space-y-2">
+                  <form id="invoice-form" onSubmit={handleSubmit} className="space-y-1.5">
                     {/* Upper Layout: Combined Totals Summary and Metadata Form into a single card */}
-                    <section className="bg-white p-2.5 rounded-xl border border-zinc-200 shadow-sm grid grid-cols-1 lg:grid-cols-4 gap-3 items-stretch">
+                    <section className="bg-white p-2 md:p-2.5 rounded-xl border border-zinc-200 shadow-sm grid grid-cols-1 lg:grid-cols-4 gap-2 lg:gap-2.5 items-stretch">
                       
                       {/* Left: Invoice Summary Card Column */}
-                      <div className="flex flex-col justify-center space-y-1.5 p-1">
-                        <div className="flex items-center gap-1.5 mb-0.5 text-emerald-600">
+                      <div className="flex flex-col justify-center space-y-1 p-0.5">
+                        <div className="flex items-center gap-1 mb-0.5 text-emerald-600">
                           <Layers className="w-3.5 h-3.5" />
-                          <h2 className="font-semibold text-zinc-900 text-[11px]">{language === 'ar' ? 'ملخص الفاتورة' : 'Invoice Summary'}</h2>
+                          <h2 className="font-semibold text-zinc-900 text-[10px]">{language === 'ar' ? 'ملخص الفاتورة' : 'Invoice Summary'}</h2>
                         </div>
 
-                        <div className="bg-zinc-50 rounded-lg p-2 border border-zinc-100 space-y-1">
-                          <div className="flex justify-between items-center text-zinc-650 text-[11px]">
+                        <div className="bg-zinc-50 rounded-lg p-1.5 border border-zinc-100 space-y-0.5">
+                          <div className="flex justify-between items-center text-zinc-650 text-[10px]">
                             <span className="font-medium">{t('invoices.summary_subtotal')}</span>
-                            <span className="font-bold text-xs">
+                            <span className="font-bold text-[11px]">
                               {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}
                             </span>
                           </div>
-                          <div className="flex justify-between items-center text-emerald-600 text-[11px]">
-                            <div className="flex items-center gap-1.5">
+                          <div className="flex justify-between items-center text-emerald-600 text-[10px]">
+                            <div className="flex items-center gap-1">
                               <span className="font-medium">{t('invoices.summary_discount')}</span>
                               <input 
                                 type="number" 
-                                className="w-12 bg-white border border-zinc-200 rounded px-1 py-0.5 text-center font-bold text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-[11px]"
+                                className="w-11 bg-white border border-zinc-200 rounded px-1 py-0.5 text-center font-bold text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-[10px]"
                                 value={Number(discount)}
                                 onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
                               />
                             </div>
-                            <span className="font-bold text-xs">-{formatMoney(discount)}</span>
+                            <span className="font-bold text-[11px]">-{formatMoney(discount)}</span>
                           </div>
                           {isVatEnabled && (
-                            <div className="flex justify-between items-center text-zinc-650 text-[11px] pt-0.5 border-t border-dashed border-zinc-200">
+                            <div className="flex justify-between items-center text-zinc-650 text-[10px] pt-0.5 border-t border-dashed border-zinc-200">
                               <span className="font-medium">{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</span>
-                              <span className="font-bold text-xs">
+                              <span className="font-bold text-[11px]">
                                 +{formatMoney(items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0))}
                               </span>
                             </div>
                           )}
-                          <div className="flex justify-between items-center text-emerald-600 text-[11px] pt-1 border-t border-zinc-200">
-                            <span className="font-black text-xs">{t('invoices.summary_total')}</span>
+                          <div className="flex justify-between items-center text-emerald-600 text-[10px] pt-0.5 border-t border-zinc-200">
+                            <span className="font-black text-[11px]">{t('invoices.summary_total')}</span>
                             <div className="flex flex-col items-end">
-                              <span className="font-black text-sm tracking-tighter text-left">
+                              <span className="font-black text-xs tracking-tighter text-left">
                                 {formatMoney(
                                   items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) + 
                                   (isVatEnabled ? items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0) : 0) - 
@@ -2843,16 +2843,16 @@ export const Invoices: React.FC = () => {
                       </div>
 
                       {/* Right: Unified Metadata & Payment Settings Panel Column */}
-                      <div className="lg:col-span-3 space-y-1.5 relative lg:border-s lg:border-zinc-150 lg:ps-3 flex flex-col justify-between">
+                      <div className="lg:col-span-3 space-y-1 relative lg:border-s lg:border-zinc-150 lg:ps-2.5 flex flex-col justify-between">
                         
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-1.5">
                           {/* 1. Date */}
                           <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.column_date')}</label>
+                            <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{t('invoices.column_date')}</label>
                             <input
                               required
                               type="date"
-                              className="w-full px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs"
+                              className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px]"
                               value={date}
                               onChange={(e) => setDate(e.target.value)}
                             />
@@ -2860,10 +2860,10 @@ export const Invoices: React.FC = () => {
 
                           {/* 2. Customer */}
                           <div className="col-span-1 md:col-span-2 lg:col-span-2">
-                            <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.form_customer')}</label>
+                            <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{t('invoices.form_customer')}</label>
                             <select 
                               required
-                              className="w-full px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs cursor-pointer"
+                              className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer"
                               value={selectedCustomerId}
                               onChange={(e) => {
                                 if (e.target.value === 'new_customer') {
@@ -2884,10 +2884,10 @@ export const Invoices: React.FC = () => {
                           {/* 3. Warehouse */}
                           {invoiceType === 'items' && (
                             <div>
-                              <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
+                              <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
                               <select 
                                 required
-                                className="w-full px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs cursor-pointer"
+                                className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer"
                                 value={selectedWarehouseId}
                                 onChange={(e) => setSelectedWarehouseId(e.target.value)}
                               >
@@ -2899,9 +2899,9 @@ export const Invoices: React.FC = () => {
 
                           {/* 4. Payment Type */}
                           <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'طريقة الدفع' : 'Payment Type'}</label>
+                            <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'طريقة الدفع' : 'Payment Type'}</label>
                             <select 
-                              className="w-full px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs cursor-pointer"
+                              className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer"
                               value={paymentType}
                               onChange={(e) => setPaymentType(e.target.value as 'cash' | 'credit')}
                             >
@@ -2912,14 +2912,14 @@ export const Invoices: React.FC = () => {
                         </div>
 
                         {/* Second Row of metadata */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mt-1.5 pt-1.5 border-t border-zinc-100">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 mt-1 pt-1 border-t border-zinc-100">
                           {/* 5. Payment Terms or Method */}
                           {paymentType === 'cash' ? (
                             <div>
-                              <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.form_payment_method')}</label>
+                              <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{t('invoices.form_payment_method')}</label>
                               <select 
                                 required
-                                className="w-full px-2 py-1 rounded-lg border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs cursor-pointer"
+                                className="w-full px-1.5 py-0.5 rounded-md border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer"
                                 value={paymentMethodId}
                                 onChange={(e) => {
                                   if (e.target.value === 'new_payment_method') {
@@ -2937,9 +2937,9 @@ export const Invoices: React.FC = () => {
                           ) : (
                             <>
                               <div>
-                                <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'شروط السداد' : 'Payment Terms'}</label>
+                                <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'شروط السداد' : 'Payment Terms'}</label>
                                 <select 
-                                  className="w-full px-2 py-1 rounded-lg border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs cursor-pointer"
+                                  className="w-full px-1.5 py-0.5 rounded-md border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer"
                                   value={paymentTerms}
                                   onChange={(e) => {
                                     const term = e.target.value;
@@ -2980,22 +2980,22 @@ export const Invoices: React.FC = () => {
                               {paymentTerms === 'custom' && (
                                 <>
                                   <div>
-                                    <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'أيام السداد' : 'Payment Days'}</label>
+                                    <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'أيام السداد' : 'Payment Days'}</label>
                                     <input
                                       type="number"
                                       min={0}
-                                      className="w-full px-2 py-1 rounded-lg border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs"
+                                      className="w-full px-1.5 py-0.5 rounded-md border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px]"
                                       value={paymentTermsDays}
                                       onChange={(e) => setPaymentTermsDays(Number(e.target.value) || 0)}
                                     />
                                   </div>
                                   <div>
-                                    <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'دفعة مقدمة %' : 'Advance %'}</label>
+                                    <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'دفعة مقدمة %' : 'Advance %'}</label>
                                     <input
                                       type="number"
                                       min={0}
                                       max={100}
-                                      className="w-full px-2 py-1 rounded-lg border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs"
+                                      className="w-full px-1.5 py-0.5 rounded-md border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px]"
                                       value={advancePercentage}
                                       onChange={(e) => setAdvancePercentage(Number(e.target.value) || 0)}
                                     />
@@ -3004,10 +3004,10 @@ export const Invoices: React.FC = () => {
                               )}
 
                               <div>
-                                <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'تاريخ الاستحقاق' : 'Due Date'}</label>
+                                <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'تاريخ الاستحقاق' : 'Due Date'}</label>
                                 <input
                                   type="date"
-                                  className="w-full px-2 py-1 rounded-lg border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs"
+                                  className="w-full px-1.5 py-0.5 rounded-md border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px]"
                                   value={dueDate}
                                   onChange={(e) => setDueDate(e.target.value)}
                                 />
@@ -3017,11 +3017,11 @@ export const Invoices: React.FC = () => {
                         </div>
 
                         {/* 6. Subject / Description - Full width at the bottom of the metadata card */}
-                        <div className="pt-1.5 border-t border-zinc-100 mt-1.5">
-                          <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'موضوع الفاتورة' : 'Invoice Subject'}</label>
+                        <div className="pt-1 border-t border-zinc-100 mt-1">
+                          <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'موضوع الفاتورة' : 'Invoice Subject'}</label>
                           <input
                             type="text"
-                            className="w-full px-3 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-850 text-xs placeholder:text-zinc-300 font-sans"
+                            className="w-full px-3 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-850 text-[11px] placeholder:text-zinc-300 font-sans"
                             placeholder={language === 'ar' ? 'أدخل وصفاً عاماً يظهر في أعلى الفاتورة...' : 'Enter a general description...'}
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
@@ -3062,10 +3062,10 @@ export const Invoices: React.FC = () => {
                           
                           if (currentCustomer && currentCustomer.credit_limit > 0 && totalTentativeBalance > currentCustomer.credit_limit) {
                             return (
-                              <div className="mt-1.5 p-1.5 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-2 text-rose-800 animate-in fade-in slide-in-from-top-2 duration-300">
+                              <div className="mt-1 p-1 bg-rose-50 border border-rose-200 rounded-md flex items-start gap-1.5 text-rose-800 animate-in fade-in slide-in-from-top-2 duration-300">
                                 <span className="text-xs">⚠️</span>
-                                <div className="flex-1 text-[10px] font-medium text-right">
-                                  <p className="font-bold text-rose-950 mb-0.5">
+                                <div className="flex-1 text-[9px] font-medium text-right">
+                                  <p className="font-bold text-rose-950 mb-0">
                                     {language === 'ar' ? 'تنبيه: تجاوز حد الائتمان!' : 'Warning: Credit Limit Exceeded!'}
                                   </p>
                                   <p>
@@ -3083,19 +3083,19 @@ export const Invoices: React.FC = () => {
                     </section>
 
                     {/* Card 3: الأصناف */}
-                    <section className="bg-white p-3 rounded-xl border border-zinc-200 shadow-sm space-y-2">
-                      <div className="flex flex-row items-center justify-between gap-2 mb-1.5">
+                    <section className="bg-white p-2.5 rounded-xl border border-zinc-200 shadow-sm space-y-1.5">
+                      <div className="flex flex-row items-center justify-between gap-1.5 mb-1">
                         <div className="flex items-center gap-1.5 text-emerald-600">
-                          <Package className="w-4 h-4" />
-                          <h2 className="font-semibold text-zinc-900 text-xs">{t('invoices.form_items')}</h2>
+                          <Package className="w-3.5 h-3.5" />
+                          <h2 className="font-semibold text-zinc-900 text-[11px]">{t('invoices.form_items')}</h2>
                         </div>
 
                         <button 
                           type="button"
                           onClick={() => addEmptyRow()}
-                          className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-sm text-[11px]"
+                          className="px-2 py-0.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-sm text-[10px]"
                         >
-                          <Plus size={12} />
+                          <Plus size={10} />
                           {t('invoices.form_add_item')}
                         </button>
                       </div>
