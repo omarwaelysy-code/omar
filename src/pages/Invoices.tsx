@@ -8,7 +8,7 @@ import {
   ChevronLeft, ChevronRight, Maximize2, Minimize2, Hash, 
   Wallet, Calendar, Package, Tag, Layers, Box, Paperclip, 
   Phone, Mail, Lock, LayoutGrid, List, Building2, ChevronDown, 
-  CreditCard, RotateCcw, Save, ExternalLink, CheckCheck
+  CreditCard, RotateCcw, Save, ExternalLink, CheckCheck, Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Barcode from 'react-barcode';
@@ -2008,6 +2008,42 @@ export const Invoices: React.FC = () => {
     showNotification(language === 'ar' ? 'تم تطبيق مركز التكلفة على كافة الأصناف' : 'Cost center applied to all items', 'success');
   };
 
+  const handleCopyInvoice = async () => {
+    if (!editingInvoice) return;
+    try {
+      setEditingInvoice(null);
+      
+      const todayDate = new Date().toISOString().slice(0, 10);
+      setDate(todayDate);
+      
+      const newNum = await generateInvoiceNumber(todayDate);
+      setInvoiceNumber(newNum);
+      
+      const days = Number(paymentTermsDays) || 0;
+      if (days > 0) {
+        const d = new Date(todayDate);
+        d.setDate(d.getDate() + days);
+        setDueDate(d.toISOString().slice(0, 10));
+      } else {
+        setDueDate(todayDate);
+      }
+      
+      setFormSettlementNumber('');
+      setFormSettlementDate(todayDate);
+      setFormSettlements([]);
+      setRowSettlementDates({});
+      setSelectedOrderIds([]);
+      
+      showNotification(
+        language === 'ar' ? 'تم نسخ الفاتورة بالكامل كمسودة جديدة وتحديث رقمها وتاريخها' : 'Invoice copied completely as a new draft with updated number and date',
+        'success'
+      );
+    } catch (error: any) {
+      console.error('[COPY] Error copying invoice:', error);
+      showNotification('فشل نسخ الفاتورة: ' + error.message, 'error');
+    }
+  };
+
   const handleExportPDF = async () => {
     if (tableRef.current) {
       await exportToPDFUtil(tableRef.current, { 
@@ -2651,14 +2687,26 @@ export const Invoices: React.FC = () => {
           <div className="p-2 md:p-2.5 md:px-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70] flex-wrap gap-2" dir={dir}>
             {/* Right side (start in RTL): Actions: Save, Cancel, Return to List */}
             <div className="flex flex-col items-start gap-1 shrink-0">
-              <button 
-                type="button"
-                onClick={closeModal} 
-                className="flex items-center gap-1 px-2.5 py-0.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap"
-              >
-                {dir === 'rtl' ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-                <span>{language === 'ar' ? 'العودة للقائمة' : 'Return to List'}</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  type="button"
+                  onClick={closeModal} 
+                  className="flex items-center gap-1 px-2.5 py-0.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap"
+                >
+                  {dir === 'rtl' ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+                  <span>{language === 'ar' ? 'العودة للقائمة' : 'Return to List'}</span>
+                </button>
+                {editingInvoice && (
+                  <button 
+                    type="button"
+                    onClick={handleCopyInvoice} 
+                    className="flex items-center gap-1 px-2 py-0.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
+                  >
+                    <Copy size={11} />
+                    <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+                  </button>
+                )}
+              </div>
               <div className="flex items-center gap-1.5">
                 <button 
                   type="button"
