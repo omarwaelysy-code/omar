@@ -220,9 +220,9 @@ export const Invoices: React.FC = () => {
     }
   }, [user, page, limit, sortBy, sortOrder, searchTerm]);
 
+  // Subscribe to static dropdown catalogs once on component mount
   useEffect(() => {
-    const needFullData = isModalOpen || !!viewInvoice || !!editingInvoice;
-    if (user && needFullData) {
+    if (user) {
       const unsubProducts = dbService.subscribe<Product>('products', user.company_id, setProducts);
       const unsubOps = dbService.subscribe<Operation>('operations', user.company_id, setOperations);
       const unsubDepts = dbService.subscribe<Department>('departments', user.company_id, setDepartments);
@@ -230,13 +230,6 @@ export const Invoices: React.FC = () => {
       const unsubPM = dbService.subscribe<any>('payment_methods', user.company_id, setPaymentMethods);
       const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
       const unsubWarehouses = dbService.subscribe<any>('warehouses', user.company_id, setWarehouses);
-      const unsubEntries = dbService.subscribe<JournalEntry>('journal_entries', user.company_id, setEntries);
-      const unsubReceipts = dbService.subscribe<any>('receipt_vouchers', user.company_id, setAllReceipts);
-      const unsubPayments = dbService.subscribe<any>('payment_vouchers', user.company_id, setAllPayments);
-      const unsubReturns = dbService.subscribe<any>('returns', user.company_id, setAllReturns);
-      const unsubPR = dbService.subscribe<any>('purchase_returns', user.company_id, setAllPurchaseReturns);
-      const unsubAllInvoices = dbService.subscribe<any>('invoices', user.company_id, setAllInvoices);
-      const unsubAllPurchaseInvoices = dbService.subscribe<any>('purchase_invoices', user.company_id, setAllPurchaseInvoices);
 
       return () => {
         unsubProducts();
@@ -246,15 +239,38 @@ export const Invoices: React.FC = () => {
         unsubPM();
         unsubAccounts();
         unsubWarehouses();
-        unsubEntries();
-        unsubReceipts();
-        unsubPayments();
-        unsubReturns();
-        unsubPR();
-        unsubAllInvoices();
-        unsubAllPurchaseInvoices();
       };
     }
+  }, [user]);
+
+  // Load transaction and settlements data once (non-polling) when modal is opened or document is viewed
+  useEffect(() => {
+    const loadSettlementData = async () => {
+      const needData = isModalOpen || !!viewInvoice || !!editingInvoice;
+      if (user && needData) {
+        try {
+          const [receipts, payments, rets, prs, invs, pinvs, jEntries] = await Promise.all([
+            dbService.list<any>('receipt_vouchers', user.company_id),
+            dbService.list<any>('payment_vouchers', user.company_id),
+            dbService.list<any>('returns', user.company_id),
+            dbService.list<any>('purchase_returns', user.company_id),
+            dbService.list<any>('invoices', user.company_id),
+            dbService.list<any>('purchase_invoices', user.company_id),
+            dbService.list<JournalEntry>('journal_entries', user.company_id)
+          ]);
+          setAllReceipts(receipts);
+          setAllPayments(payments);
+          setAllReturns(rets);
+          setAllPurchaseReturns(prs);
+          setAllInvoices(invs);
+          setAllPurchaseInvoices(pinvs);
+          setEntries(jEntries);
+        } catch (error) {
+          console.error('Failed to load transaction data:', error);
+        }
+      }
+    };
+    loadSettlementData();
   }, [user, isModalOpen, viewInvoice, editingInvoice]);
 
   const generateInvoiceNumber = async (dateStr: string) => {
@@ -2597,49 +2613,8 @@ export const Invoices: React.FC = () => {
         <div className="bg-white rounded-3xl border border-slate-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
           {/* Form Header */}
           <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70] flex-wrap gap-4" dir={dir}>
-            {/* Right side (start): Title & Document Info */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <h3 className="text-base md:text-lg font-black text-slate-900 tracking-tight">
-                {editingInvoice ? (language === 'ar' ? 'تعديل فاتورة المبيعات' : 'Edit Sales Invoice') : (language === 'ar' ? 'إنشاء فاتورة مبيعات جديدة' : 'Create New Sales Invoice')}
-              </h3>
-
-              <div className="flex flex-col items-center border border-zinc-200 bg-zinc-50 rounded-xl px-3 py-1 font-mono">
-                <span className="text-[8px] font-bold text-zinc-400 leading-none mb-0.5">{language === 'ar' ? 'رقم الفاتورة' : 'Invoice No'}</span>
-                <span className="text-xs font-bold text-zinc-650 tracking-tight leading-none">{invoiceNumber}</span>
-              </div>
-
-              {editingInvoice && (
-                (() => {
-                  const status = getPaymentStatus(editingInvoice);
-                  const statusLabels = {
-                    paid: language === 'ar' ? 'مدفوعة' : 'Paid',
-                    partial: language === 'ar' ? 'مدفوعة جزئياً' : 'Partially Paid',
-                    unpaid: language === 'ar' ? 'غير مدفوعة' : 'Unpaid'
-                  };
-                  const statusColors = {
-                    paid: 'text-emerald-750 bg-emerald-50 border-emerald-200',
-                    partial: 'text-blue-750 bg-blue-50 border-blue-200',
-                    unpaid: 'text-red-750 bg-red-50 border-red-200'
-                  };
-                  const colorClass = statusColors[status] || statusColors.unpaid;
-                  return (
-                    <div className={`px-2.5 py-1 border border-solid ${colorClass} font-black text-xs rounded-xl`}>
-                      {statusLabels[status]}
-                    </div>
-                  );
-                })()
-              )}
-
-              {editingInvoice?.entry_number && (
-                <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-xl border border-emerald-100 text-xs font-bold font-mono">
-                  <span className="text-[10px] text-emerald-600 font-bold uppercase">{language === 'ar' ? 'القيد المرتبط:' : 'Linked JE:'}</span>
-                  <span>{editingInvoice.entry_number}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Left side (end): Actions: Save, Cancel, Return to List */}
-            <div className="flex flex-col items-end gap-1.5 shrink-0">
+            {/* Right side (start in RTL): Actions: Save, Cancel, Return to List */}
+            <div className="flex flex-col items-start gap-1.5 shrink-0">
               <button 
                 type="button"
                 onClick={closeModal} 
@@ -2652,7 +2627,7 @@ export const Invoices: React.FC = () => {
                 <button 
                   type="button"
                   onClick={closeModal}
-                  className="px-4 py-2 rounded-xl bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-all flex items-center gap-2 active:scale-95 border border-zinc-200 shadow-sm text-xs whitespace-nowrap"
+                  className="w-24 py-2 rounded-xl bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-all flex items-center gap-1.5 justify-center active:scale-95 border border-zinc-200 shadow-sm text-xs whitespace-nowrap font-sans"
                 >
                   <RotateCcw size={16} />
                   <span>{language === 'ar' ? 'إلغاء' : 'Cancel'}</span>
@@ -2661,11 +2636,80 @@ export const Invoices: React.FC = () => {
                   type="submit"
                   form="invoice-form"
                   onClick={handleSubmit}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-2 active:scale-95 shadow-sm text-xs whitespace-nowrap"
+                  className="w-24 py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-1.5 justify-center active:scale-95 shadow-sm text-xs whitespace-nowrap font-sans"
                 >
                   <Save size={16} />
                   <span>{language === 'ar' ? 'حفظ' : 'Save'}</span>
                 </button>
+              </div>
+            </div>
+
+            {/* Left side (end in RTL): Document Info: Title, Invoice No, Linked Journal, and Status Badge */}
+            <div className="flex items-center gap-6 flex-wrap">
+              {/* Text Info Column */}
+              <div className="flex flex-col gap-1.5 items-start">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-base md:text-lg font-black text-slate-900 tracking-tight leading-none font-sans">
+                    {editingInvoice ? (language === 'ar' ? 'تعديل فاتورة المبيعات' : 'Edit Sales Invoice') : (language === 'ar' ? 'إنشاء فاتورة مبيعات جديدة' : 'Create New Sales Invoice')}
+                  </h3>
+                  <span className="text-xs font-mono font-black text-slate-800 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-lg select-all shadow-sm">
+                    {invoiceNumber}
+                  </span>
+                </div>
+
+                {editingInvoice?.entry_number ? (
+                  <div className="flex items-center gap-1.5 text-emerald-700 text-[11px] font-bold font-mono leading-none mt-1">
+                    <span className="text-emerald-500 font-sans font-bold">{language === 'ar' ? 'القيد المرتبط:' : 'Linked JE:'}</span>
+                    <span className="bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 font-black">{editingInvoice.entry_number}</span>
+                  </div>
+                ) : (
+                  <div className="text-[10px] font-bold text-zinc-400 mt-1">
+                    {language === 'ar' ? 'القيد المرتبط: لا يوجد قيد مرتبط بعد' : 'Linked JE: No journal entry linked yet'}
+                  </div>
+                )}
+              </div>
+
+              {/* Payment Status Badge */}
+              <div className="flex items-center">
+                {(() => {
+                  const isCash = paymentType === 'cash';
+                  if (isCash) {
+                    return (
+                      <div className="px-3.5 py-1.5 border-2 border-emerald-600 text-emerald-600 bg-emerald-50/50 font-black text-xs uppercase rounded-xl select-none tracking-wider shadow-sm flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                        {language === 'ar' ? 'فاتورة نقدية' : 'Cash Invoice'}
+                      </div>
+                    );
+                  }
+                  
+                  if (editingInvoice) {
+                    const status = getPaymentStatus(editingInvoice);
+                    const statusLabels = {
+                      paid: language === 'ar' ? 'مدفوعة' : 'Paid',
+                      partial: language === 'ar' ? 'مدفوعة جزئياً' : 'Partially Paid',
+                      unpaid: language === 'ar' ? 'غير مدفوعة' : 'Unpaid'
+                    };
+                    const statusColors = {
+                      paid: 'border-emerald-600 text-emerald-600 bg-emerald-50/50',
+                      partial: 'border-blue-600 text-blue-600 bg-blue-50/50',
+                      unpaid: 'border-rose-600 text-rose-600 bg-rose-50/50 font-black'
+                    };
+                    const colorClass = statusColors[status] || statusColors.unpaid;
+                    return (
+                      <div className={`px-3.5 py-1.5 border-2 ${colorClass} font-black text-xs uppercase rounded-xl select-none tracking-wider shadow-sm flex items-center gap-1.5`}>
+                        <span className={`w-2.5 h-2.5 rounded-full ${status === 'paid' ? 'bg-emerald-600 animate-pulse' : status === 'partial' ? 'bg-blue-600' : 'bg-rose-600 animate-ping'}`}></span>
+                        {statusLabels[status]}
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="px-3.5 py-1.5 border-2 border-blue-600 text-blue-600 bg-blue-50/50 font-black text-xs uppercase rounded-xl select-none tracking-wider shadow-sm flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                        {language === 'ar' ? 'فاتورة آجلة' : 'Credit Invoice'}
+                      </div>
+                    );
+                  }
+                })()}
               </div>
             </div>
           </div>
@@ -2854,22 +2898,20 @@ export const Invoices: React.FC = () => {
 
                           {/* 4. Payment Type */}
                           <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{t('invoices.form_payment_type')}</label>
-                            <div className="flex items-center gap-1.5 h-[26px]">
-                              <select 
-                                className="flex-1 px-2 py-1 rounded-lg border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs cursor-pointer"
-                                value={paymentType}
-                                onChange={(e) => setPaymentType(e.target.value as 'cash' | 'credit')}
-                              >
-                                <option value="cash">{t('invoices.payment_cash')}</option>
-                                <option value="credit">{t('invoices.payment_credit')}</option>
-                              </select>
-                            </div>
+                            <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'طريقة الدفع' : 'Payment Type'}</label>
+                            <select 
+                              className="w-full px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs cursor-pointer"
+                              value={paymentType}
+                              onChange={(e) => setPaymentType(e.target.value as 'cash' | 'credit')}
+                            >
+                              <option value="credit">{language === 'ar' ? 'آجل' : 'Credit'}</option>
+                              <option value="cash">{language === 'ar' ? 'نقدي' : 'Cash'}</option>
+                            </select>
                           </div>
                         </div>
 
                         {/* Second Row of metadata */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mt-2 pt-2 border-t border-zinc-100">
                           {/* 5. Payment Terms or Method */}
                           {paymentType === 'cash' ? (
                             <div>
@@ -2933,6 +2975,33 @@ export const Invoices: React.FC = () => {
                                   <option value="custom">{language === 'ar' ? 'مخصص (أيام / نسب مقدمة مخصصة)' : 'Custom Days & Percentage'}</option>
                                 </select>
                               </div>
+
+                              {paymentTerms === 'custom' && (
+                                <>
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'أيام السداد' : 'Payment Days'}</label>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      className="w-full px-2 py-1 rounded-lg border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs"
+                                      value={paymentTermsDays}
+                                      onChange={(e) => setPaymentTermsDays(Number(e.target.value) || 0)}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'دفعة مقدمة %' : 'Advance %'}</label>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      className="w-full px-2 py-1 rounded-lg border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs"
+                                      value={advancePercentage}
+                                      onChange={(e) => setAdvancePercentage(Number(e.target.value) || 0)}
+                                    />
+                                  </div>
+                                </>
+                              )}
+
                               <div>
                                 <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'تاريخ الاستحقاق' : 'Due Date'}</label>
                                 <input
@@ -2944,18 +3013,18 @@ export const Invoices: React.FC = () => {
                               </div>
                             </>
                           )}
+                        </div>
 
-                          {/* 6. Subject / Description */}
-                          <div className="col-span-1 md:col-span-2">
-                            <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'موضوع الفاتورة' : 'Invoice Subject'}</label>
-                            <input
-                              type="text"
-                              className="w-full px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-xs placeholder:text-zinc-300"
-                              placeholder={language === 'ar' ? 'أدخل وصفاً عاماً يظهر في أعلى الفاتورة...' : 'Enter a general description...'}
-                              value={description}
-                              onChange={(e) => setDescription(e.target.value)}
-                            />
-                          </div>
+                        {/* 6. Subject / Description - Full width at the bottom of the metadata card */}
+                        <div className="pt-2 border-t border-zinc-100 mt-2">
+                          <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'موضوع الفاتورة' : 'Invoice Subject'}</label>
+                          <input
+                            type="text"
+                            className="w-full px-3 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-850 text-xs placeholder:text-zinc-300 font-sans"
+                            placeholder={language === 'ar' ? 'أدخل وصفاً عاماً يظهر في أعلى الفاتورة...' : 'Enter a general description...'}
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                          />
                         </div>
 
                         {/* Linked journal entry and Custom payment terms warnings if any */}
