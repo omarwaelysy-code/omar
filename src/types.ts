@@ -130,6 +130,7 @@ export interface Customer {
   payment_terms?: string;
   payment_terms_days?: number;
   advance_percentage?: number;
+  is_active?: boolean;
 }
 
 export interface Supplier {
@@ -150,6 +151,7 @@ export interface Supplier {
   payment_terms?: string;
   payment_terms_days?: number;
   advance_percentage?: number;
+  is_active?: boolean;
 }
 
 export interface Warehouse {
@@ -271,6 +273,7 @@ export interface Product {
   item_group_id?: string;
   item_group_name?: string;
   company_id: string;
+  is_active?: boolean;
 }
 
 export interface Invoice {
@@ -571,6 +574,7 @@ export interface AccountType {
   statement_type: 'income_statement' | 'balance_sheet';
   classification: 'asset' | 'liability' | 'equity' | 'revenue' | 'cost' | 'expense' | 'liability_equity'; // liability_equity kept for backward compatibility/choice
   company_id: string;
+  is_active?: boolean;
 }
 
 export interface Account {
@@ -584,6 +588,7 @@ export interface Account {
   opening_balance: number;
   opening_balance_date?: string;
   required_sub_account?: boolean;
+  is_active?: boolean;
 }
 
 export interface Setting {

@@ -15,6 +15,7 @@ import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { useRef } from 'react';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { useNavigation } from '../contexts/NavigationContext';
+import { FormattedNumberInput } from '../components/FormattedNumberInput';
 
 export const Accounts: React.FC = () => {
   const { user } = useAuth();
@@ -61,7 +62,8 @@ export const Accounts: React.FC = () => {
     type_id: '',
     opening_balance: 0,
     required_sub_account: false,
-    parent_id: ''
+    parent_id: '',
+    is_active: true
   });
 
   useEffect(() => {
@@ -89,7 +91,8 @@ export const Accounts: React.FC = () => {
           type_id: matchingType?.id || '',
           opening_balance: 0,
           required_sub_account: result.name?.toLowerCase().includes('عملاء') || result.name?.toLowerCase().includes('موردين') || false,
-          parent_id: ''
+          parent_id: '',
+          is_active: true
         });
         showNotification(t('common.ai_parse_success'), 'success');
         setAiText('');
@@ -119,7 +122,8 @@ export const Accounts: React.FC = () => {
           { field: 'code', label: 'الكود' },
           { field: 'name', label: 'الاسم' },
           { field: 'type_id', label: 'نوع الحساب' },
-          { field: 'required_sub_account', label: 'يلزم حساب فرعي' }
+          { field: 'required_sub_account', label: 'يلزم حساب فرعي' },
+          { field: 'is_active', label: 'نشط' }
         ];
         await dbService.updateWithLog(
           'accounts',
@@ -178,7 +182,8 @@ export const Accounts: React.FC = () => {
         type_id: account.type_id,
         opening_balance: account.opening_balance || 0,
         required_sub_account: requiredSubAccount,
-        parent_id: account.parent_id || ''
+        parent_id: account.parent_id || '',
+        is_active: account.is_active !== false
       };
       console.log('[ERP] Form State being set:', newFormData);
       setFormData(newFormData);
@@ -190,7 +195,8 @@ export const Accounts: React.FC = () => {
         type_id: '',
         opening_balance: 0,
         required_sub_account: false,
-        parent_id: ''
+        parent_id: '',
+        is_active: true
       });
     }
     setIsModalOpen(true);
@@ -309,7 +315,12 @@ export const Accounts: React.FC = () => {
                     }}
                     className="px-6 py-4 text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer font-bold"
                   >
-                    {account.type_name}
+                    <div className="flex items-center gap-2">
+                      <span>{account.type_name}</span>
+                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${account.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                        {account.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-left no-pdf">
                     <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
@@ -373,6 +384,9 @@ export const Accounts: React.FC = () => {
                         className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md uppercase tracking-wider cursor-pointer hover:bg-emerald-100 transition-colors"
                       >
                         {account.type_name}
+                      </span>
+                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${account.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                        {account.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
                       </span>
                     </div>
                   </div>
@@ -553,14 +567,12 @@ export const Accounts: React.FC = () => {
                             <label className={`block text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}</label>
                             <div className="relative group mb-4">
                               <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
-                              <input 
+                              <FormattedNumberInput
                                 required
-                                type="number" 
-                                step="0.01"
                                 className="w-full px-6 py-5 bg-white border border-slate-200 rounded-2xl text-3xl font-black text-emerald-600 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14"
                                 placeholder="0.00"
                                 value={formData.opening_balance}
-                                onChange={(e) => setFormData({...formData, opening_balance: parseFloat(e.target.value) || 0})}
+                                onChange={(val) => setFormData({...formData, opening_balance: val})}
                               />
                             </div>
                             <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl w-fit border border-emerald-100/50 mx-auto">
@@ -574,7 +586,7 @@ export const Accounts: React.FC = () => {
                             onClick={() => setFormData({...formData, required_sub_account: !formData.required_sub_account})}
                           >
                             <div className="flex items-center gap-5">
-                              <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center transition-all duration-500 ${formData.required_sub_account ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-500/30 rotate-6' : 'bg-slate-100 text-slate-400'}`}>
+                              <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center transition-all duration-500 ${formData.required_sub_account ? 'bg-emerald-600 font-black text-white shadow-xl shadow-emerald-500/30 rotate-6' : 'bg-slate-100 text-slate-400 font-bold'}`}>
                                  <User size={32} />
                               </div>
                               <div>
@@ -584,6 +596,24 @@ export const Accounts: React.FC = () => {
                             </div>
                             <div className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 ${formData.required_sub_account ? 'bg-emerald-500' : 'bg-slate-200'}`}>
                                <div className={`w-6 h-6 bg-white rounded-full transition-transform duration-300 shadow-md ${formData.required_sub_account ? (dir === 'rtl' ? '-translate-x-6' : 'translate-x-6') : 'translate-x-0'}`} />
+                            </div>
+                          </div>
+
+                          <div 
+                            className={`p-8 bg-white border border-slate-200 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-200 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}
+                            onClick={() => setFormData({...formData, is_active: !formData.is_active})}
+                          >
+                            <div className="flex items-center gap-5">
+                              <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center transition-all duration-500 ${formData.is_active ? 'bg-emerald-600 font-black text-white shadow-xl shadow-emerald-500/30 rotate-6' : 'bg-slate-100 text-slate-400 font-bold'}`}>
+                                 <AlertCircle size={32} />
+                              </div>
+                              <div>
+                                 <p className="font-black text-slate-900 text-xl leading-tight mb-1">{language === 'ar' ? 'حالة النشاط' : 'Active Status'}</p>
+                                 <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">{language === 'ar' ? 'تحديد ما إذا كان الحساب نشطاً في النظام أم لا' : 'Specify if the account is active in the system'}</p>
+                              </div>
+                            </div>
+                            <div className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 ${formData.is_active ? 'bg-emerald-500' : 'bg-slate-200'}`}>
+                               <div className={`w-6 h-6 bg-white rounded-full transition-transform duration-300 shadow-md ${formData.is_active ? (dir === 'rtl' ? '-translate-x-6' : 'translate-x-6') : 'translate-x-0'}`} />
                             </div>
                           </div>
                         </div>

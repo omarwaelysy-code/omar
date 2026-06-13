@@ -30,7 +30,8 @@ export const AccountTypes: React.FC = () => {
     code: '',
     name: '',
     statement_type: 'balance_sheet' as 'income_statement' | 'balance_sheet',
-    classification: 'asset' as 'asset' | 'liability' | 'equity' | 'liability_equity' | 'revenue' | 'cost' | 'expense'
+    classification: 'asset' as 'asset' | 'liability' | 'equity' | 'liability_equity' | 'revenue' | 'cost' | 'expense',
+    is_active: true
   });
 
   useEffect(() => {
@@ -64,7 +65,8 @@ export const AccountTypes: React.FC = () => {
             code: item.code || '',
             name: item.name || '',
             statement_type: item.statementType || 'balance_sheet',
-            classification: item.classification || (item.statementType === 'income_statement' ? 'revenue' : 'asset')
+            classification: item.classification || (item.statementType === 'income_statement' ? 'revenue' : 'asset'),
+            is_active: true
           });
         } else {
           // Multiple items: show notification and maybe handle later, but for now we can add them directly
@@ -75,7 +77,8 @@ export const AccountTypes: React.FC = () => {
                 name: item.name || '',
                 statement_type: item.statementType || 'balance_sheet',
                 classification: item.classification || (item.statementType === 'income_statement' ? 'revenue' : 'asset'),
-                company_id: user?.company_id
+                company_id: user?.company_id,
+                is_active: true
               });
             }
             showNotification(`تم إضافة ${result.types.length} أنواع حسابات بنجاح`, 'success');
@@ -103,7 +106,8 @@ export const AccountTypes: React.FC = () => {
           { field: 'code', label: 'الكود' },
           { field: 'name', label: 'الاسم' },
           { field: 'statement_type', label: 'نوع القائمة' },
-          { field: 'classification', label: 'التصنيف' }
+          { field: 'classification', label: 'التصنيف' },
+          { field: 'is_active', label: 'نشط' }
         ];
         await dbService.updateWithLog(
           'account_types',
@@ -154,7 +158,8 @@ export const AccountTypes: React.FC = () => {
         code: type.code,
         name: type.name,
         statement_type: type.statement_type,
-        classification: type.classification || (type.statement_type === 'income_statement' ? 'revenue' : 'asset')
+        classification: type.classification || (type.statement_type === 'income_statement' ? 'revenue' : 'asset'),
+        is_active: type.is_active !== false
       });
     } else {
       setEditingType(null);
@@ -162,7 +167,8 @@ export const AccountTypes: React.FC = () => {
         code: '',
         name: '',
         statement_type: 'balance_sheet',
-        classification: 'asset'
+        classification: 'asset',
+        is_active: true
       });
     }
     setIsModalOpen(true);
@@ -267,11 +273,16 @@ export const AccountTypes: React.FC = () => {
                       {type.name}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                        type.statement_type === 'balance_sheet' ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50'
-                      }`}>
-                        {type.statement_type === 'balance_sheet' ? 'الميزانية' : 'قائمة الدخل'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                          type.statement_type === 'balance_sheet' ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50'
+                        }`}>
+                          {type.statement_type === 'balance_sheet' ? 'الميزانية' : 'قائمة الدخل'}
+                        </span>
+                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${type.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                          {type.is_active !== false ? 'نشط' : 'غير نشط'}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-zinc-500">
                       {type.classification === 'asset' ? 'أصل' : 
@@ -335,6 +346,9 @@ export const AccountTypes: React.FC = () => {
                     type.statement_type === 'balance_sheet' ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50'
                   }`}>
                     {type.statement_type === 'balance_sheet' ? 'الميزانية' : 'قائمة الدخل'}
+                  </span>
+                  <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider border ${type.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                    {type.is_active !== false ? 'نشط' : 'غير نشط'}
                   </span>
                   <span className="inline-block text-[10px] font-bold text-zinc-600 bg-zinc-100 px-2 py-0.5 rounded-md uppercase tracking-wider">
                     {type.classification === 'asset' ? 'أصل' : 
@@ -478,6 +492,22 @@ export const AccountTypes: React.FC = () => {
                     )}
                   </select>
                 </div>
+              </div>
+              {/* Active / Inactive Status Toggle */}
+              <div className="pt-4 pb-4 border-t border-slate-100 flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-zinc-900 leading-none mb-1">حالة النشاط</h4>
+                  <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">تحديد ما إذا كان نوع الحساب نشطاً في النظام أم لا</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.is_active ? 'bg-emerald-600' : 'bg-slate-200'}`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.is_active ? '-translate-x-6' : '-translate-x-1'}`}
+                  />
+                </button>
               </div>
               <div className="pt-4 flex gap-3">
                 <button 

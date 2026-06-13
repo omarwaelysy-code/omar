@@ -95,20 +95,40 @@ export const InlineActivityLog: React.FC<InlineActivityLogProps> = ({ category, 
 
                     {log.changes && log.changes.length > 0 && (
                       <div className="mt-2 pt-2 border-t border-zinc-50 space-y-1.5">
-                        {log.changes.map((change, idx) => (
-                          <div key={idx} className="text-[10px] flex flex-col gap-0.5">
-                            <span className="font-bold text-zinc-500">{change.field}:</span>
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-red-500 line-through bg-red-50/50 px-1 rounded">
-                                {typeof change.old_value === 'object' ? 'كائن' : String(change.old_value || 'فارغ')}
-                              </span>
-                              <span className="text-zinc-300">←</span>
-                              <span className="text-emerald-600 bg-emerald-50/50 px-1 rounded font-bold">
-                                {typeof change.new_value === 'object' ? 'كائن' : String(change.new_value || 'فارغ')}
-                              </span>
+                        {log.changes.map((change, idx) => {
+                          const formatLogValue = (val: any) => {
+                            if (val === undefined || val === null || val === '') return 'فارغ';
+                            if (typeof val === 'object') return 'كائن';
+                            const str = String(val);
+                            if (/^-?\d+(\.\d+)?$/.test(str)) {
+                              const num = parseFloat(str);
+                              if (!isNaN(num)) {
+                                if (str.length === 10 && /^\d{4}-\d{2}-\d{2}$/.test(str)) {
+                                  return str;
+                                }
+                                return new Intl.NumberFormat('en-US', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2
+                                }).format(num);
+                              }
+                            }
+                            return str;
+                          };
+                          return (
+                            <div key={idx} className="text-[10px] flex flex-col gap-0.5">
+                              <span className="font-bold text-zinc-500">{change.field}:</span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-red-500 line-through bg-red-50/50 px-1 rounded">
+                                  {formatLogValue(change.old_value)}
+                                </span>
+                                <span className="text-zinc-300">←</span>
+                                <span className="text-emerald-600 bg-emerald-50/50 px-1 rounded font-bold">
+                                  {formatLogValue(change.new_value)}
+                                </span>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>

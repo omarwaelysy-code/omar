@@ -19,6 +19,7 @@ import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { formatNumber } from '../utils/formatUtils';
 import { useRef } from 'react';
 import { useViewPreference } from '../hooks/useViewPreference';
+import { FormattedNumberInput } from '../components/FormattedNumberInput';
 
 export const Suppliers: React.FC = () => {
   const { user } = useAuth();
@@ -75,7 +76,8 @@ export const Suppliers: React.FC = () => {
     credit_limit: 0,
     payment_terms: 'due_on_receipt',
     payment_terms_days: 0,
-    advance_percentage: 0
+    advance_percentage: 0,
+    is_active: true
   });
 
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -167,7 +169,8 @@ export const Suppliers: React.FC = () => {
           { field: 'credit_limit', label: 'حد الائتمان' },
           { field: 'payment_terms', label: 'شروط السداد' },
           { field: 'payment_terms_days', label: 'أيام شروط السداد' },
-          { field: 'advance_percentage', label: 'نسبة الدفعة المقدمة' }
+          { field: 'advance_percentage', label: 'نسبة الدفعة المقدمة' },
+          { field: 'is_active', label: 'نشط' }
         ];
         await dbService.updateWithLog(
           'suppliers', 
@@ -324,7 +327,8 @@ export const Suppliers: React.FC = () => {
           credit_limit: fullData.credit_limit || 0,
           payment_terms: fullData.payment_terms || 'due_on_receipt',
           payment_terms_days: fullData.payment_terms_days || 0,
-          advance_percentage: fullData.advance_percentage || 0
+          advance_percentage: fullData.advance_percentage || 0,
+          is_active: fullData.is_active !== false
         });
         console.log('[EDIT] Form updated with supplier:', fullData.id);
       } catch (error: any) {
@@ -350,7 +354,8 @@ export const Suppliers: React.FC = () => {
         credit_limit: 0,
         payment_terms: 'due_on_receipt',
         payment_terms_days: 0,
-        advance_percentage: 0
+        advance_percentage: 0,
+        is_active: true
       });
     }
     setIsModalOpen(true);
@@ -496,6 +501,9 @@ export const Suppliers: React.FC = () => {
                                       {language === 'ar' ? 'حد: ' : 'Limit: '}{formatNumber(supplier.credit_limit)}
                                     </span>
                                   )}
+                                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${supplier.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                    {supplier.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
+                                  </span>
                                 </div>
                              </div>
                           </td>
@@ -558,6 +566,9 @@ export const Suppliers: React.FC = () => {
                                 {language === 'ar' ? 'حد الائتمان: ' : 'Limit: '}{formatNumber(supplier.credit_limit)}
                               </span>
                             )}
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${supplier.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                              {supplier.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
+                            </span>
                           </div>
                         </div>
                         <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-transform group-hover:scale-110 ${getSupplierBalance(supplier.id) >= 0 ? 'bg-emerald-600 shadow-emerald-500/20 text-white' : 'bg-rose-600 shadow-rose-500/20 text-white'}`}>
@@ -695,11 +706,10 @@ export const Suppliers: React.FC = () => {
                           <label className={`block text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_opening_balance')}</label>
                           <div className="relative group">
                             <Wallet className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-emerald-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
-                            <input
-                              type="number"
+                            <FormattedNumberInput
                               className="w-full px-8 py-5 bg-white border border-emerald-100 rounded-[1.5rem] text-3xl font-black text-emerald-600 shadow-sm transition-all focus:ring-8 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14"
                               value={formData.opening_balance}
-                              onChange={(e) => setFormData({ ...formData, opening_balance: Number(e.target.value) })}
+                              onChange={(val) => setFormData({ ...formData, opening_balance: val })}
                             />
                             <p className="text-[11px] font-bold text-slate-400 mt-4 italic leading-relaxed px-1">
                                {language === 'ar' 
@@ -785,12 +795,10 @@ export const Suppliers: React.FC = () => {
                             </label>
                             <div className="relative group">
                               <span className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 font-black text-lg`}>$</span>
-                              <input
-                                type="number"
-                                min={0}
+                              <FormattedNumberInput
                                 className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14"
                                 value={formData.credit_limit || 0}
-                                onChange={(e) => setFormData({ ...formData, credit_limit: Number(e.target.value) })}
+                                onChange={(val) => setFormData({ ...formData, credit_limit: val })}
                               />
                             </div>
                           </div>
@@ -879,6 +887,26 @@ export const Suppliers: React.FC = () => {
                               </div>
                             </>
                           )}
+                          {/* Active / Inactive Status Toggle */}
+                          <div className="md:col-span-2 pt-4 border-t border-slate-50 flex items-center justify-between">
+                            <div>
+                              <h4 className="text-sm font-black text-slate-900 leading-none mb-1">
+                                {language === 'ar' ? 'حالة النشاط' : 'Active Status'}
+                              </h4>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                {language === 'ar' ? 'تحديد ما إذا كان المورد نشطاً في النظام أم لا' : 'Specify if the supplier is active in the system'}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
+                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.is_active ? 'bg-emerald-600' : 'bg-slate-200'}`}
+                            >
+                              <span
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.is_active ? (dir === 'rtl' ? '-translate-x-6' : 'translate-x-6') : (dir === 'rtl' ? '-translate-x-1' : 'translate-x-1')}`}
+                              />
+                            </button>
+                          </div>
                         </div>
                       </div>
 

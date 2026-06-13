@@ -129,20 +129,40 @@ interface PageActivityLogProps {
                             <div className="mt-3 pt-3 border-t border-zinc-100 space-y-2">
                               <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-2">التغييرات بالتفصيل:</p>
                               <div className="grid gap-2">
-                                {log.changes.map((change, idx) => (
-                                  <div key={idx} className="bg-white rounded-lg p-2 border border-zinc-100 text-[11px] flex flex-col gap-1">
-                                    <span className="font-bold text-zinc-600">{change.field}:</span>
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="text-red-500 line-through bg-red-50 px-1.5 rounded">
-                                        {typeof change.old_value === 'object' ? JSON.stringify(change.old_value) : String(change.old_value || 'فارغ')}
-                                      </span>
-                                      <span className="text-zinc-400">←</span>
-                                      <span className="text-emerald-600 bg-emerald-50 px-1.5 rounded font-bold">
-                                        {typeof change.new_value === 'object' ? JSON.stringify(change.new_value) : String(change.new_value || 'فارغ')}
-                                      </span>
+                                {log.changes.map((change, idx) => {
+                                  const formatLogValue = (val: any) => {
+                                    if (val === undefined || val === null || val === '') return 'فارغ';
+                                    if (typeof val === 'object') return JSON.stringify(val);
+                                    const str = String(val);
+                                    if (/^-?\d+(\.\d+)?$/.test(str)) {
+                                      const num = parseFloat(str);
+                                      if (!isNaN(num)) {
+                                        if (str.length === 10 && /^\d{4}-\d{2}-\d{2}$/.test(str)) {
+                                          return str;
+                                        }
+                                        return new Intl.NumberFormat('en-US', {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2
+                                        }).format(num);
+                                      }
+                                    }
+                                    return str;
+                                  };
+                                  return (
+                                    <div key={idx} className="bg-white rounded-lg p-2 border border-zinc-100 text-[11px] flex flex-col gap-1">
+                                      <span className="font-bold text-zinc-600">{change.field}:</span>
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-red-500 line-through bg-red-50 px-1.5 rounded">
+                                          {formatLogValue(change.old_value)}
+                                        </span>
+                                        <span className="text-zinc-400">←</span>
+                                        <span className="text-emerald-600 bg-emerald-50 px-1.5 rounded font-bold">
+                                          {formatLogValue(change.new_value)}
+                                        </span>
+                                      </div>
                                     </div>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           )}

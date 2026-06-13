@@ -891,6 +891,20 @@ export async function initDatabase() {
       await safeQuery('ALTER TABLE "products" ADD COLUMN "item_group_name" VARCHAR(255);', 'add item_group_name to products');
     }
 
+    // Add is_active column safeguards if they do not exist
+    if (!(await checkColumnExists('customers', 'is_active'))) {
+      await safeQuery('ALTER TABLE "customers" ADD COLUMN "is_active" BOOLEAN DEFAULT TRUE;', 'add is_active to customers');
+    }
+    if (!(await checkColumnExists('suppliers', 'is_active'))) {
+      await safeQuery('ALTER TABLE "suppliers" ADD COLUMN "is_active" BOOLEAN DEFAULT TRUE;', 'add is_active to suppliers');
+    }
+    if (!(await checkColumnExists('products', 'is_active'))) {
+      await safeQuery('ALTER TABLE "products" ADD COLUMN "is_active" BOOLEAN DEFAULT TRUE;', 'add is_active to products');
+    }
+    if (!(await checkColumnExists('account_types', 'is_active'))) {
+      await safeQuery('ALTER TABLE "account_types" ADD COLUMN "is_active" BOOLEAN DEFAULT TRUE;', 'add is_active to account_types');
+    }
+
     console.log('✅ Base Schema Guardrails active.');
 
     // Seeding

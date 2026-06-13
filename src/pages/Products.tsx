@@ -22,6 +22,7 @@ import { InlineActivityLog } from '../components/InlineActivityLog';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { formatNumber } from '../utils/formatUtils';
+import { FormattedNumberInput } from '../components/FormattedNumberInput';
 
 interface ItemGroup {
   id: string;
@@ -30,83 +31,6 @@ interface ItemGroup {
   code: string;
   type: string;
 }
-
-interface FormattedNumberInputProps {
-  value: number;
-  onChange: (val: number) => void;
-  className?: string;
-  disabled?: boolean;
-  required?: boolean;
-  placeholder?: string;
-}
-
-const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
-  value,
-  onChange,
-  className = '',
-  disabled = false,
-  required = false,
-  placeholder = ''
-}) => {
-  const [isFocused, setIsFocused] = useState(false);
-  const [inputValue, setInputValue] = useState('');
-
-  const formatValue = (num: number) => {
-    if (num === undefined || num === null || isNaN(num)) return '';
-    return new Intl.NumberFormat('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(num);
-  };
-
-  useEffect(() => {
-    if (!isFocused) {
-      setInputValue(value === 0 ? '' : String(value));
-    }
-  }, [value, isFocused]);
-
-  const handleFocus = () => {
-    setIsFocused(true);
-    setInputValue(value === 0 ? '' : String(value));
-  };
-
-  const handleBlur = () => {
-    setIsFocused(false);
-    const parsed = parseFloat(inputValue.replace(/,/g, '')) || 0;
-    onChange(parsed);
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    // Allow digits, dot, and minus
-    let clean = val.replace(/[^0-9.-]/g, '');
-    const parts = clean.split('.');
-    if (parts.length > 2) {
-      clean = parts[0] + '.' + parts.slice(1).join('');
-    }
-    setInputValue(clean);
-    
-    // Notify parent on change so state is reactive
-    const parsed = parseFloat(clean) || 0;
-    onChange(parsed);
-  };
-
-  const displayValue = isFocused ? inputValue : formatValue(value);
-
-  return (
-    <input
-      type="text"
-      required={required}
-      disabled={disabled}
-      placeholder={placeholder}
-      className={className}
-      value={displayValue}
-      onFocus={handleFocus}
-      onBlur={handleBlur}
-      onChange={handleChange}
-    />
-  );
-};
 
 export const Products: React.FC = () => {
   const { user } = useAuth();
@@ -162,7 +86,8 @@ export const Products: React.FC = () => {
     vat_account_id: '',
     vat_rate: 0,
     counter_account_id: '',
-    item_group_id: ''
+    item_group_id: '',
+    is_active: true
   });
 
   useEffect(() => {
@@ -382,7 +307,7 @@ export const Products: React.FC = () => {
       sale_price: 0, cost_price: 0, description: '', image_url: '', 
       barcode: '', stock: 0, min_stock: 0, revenue_account_id: '', 
       cost_account_id: '', inventory_account_id: '', inventory_cost_method: 'wac', vat_account_id: '',
-      vat_rate: 0, counter_account_id: '', item_group_id: ''
+      vat_rate: 0, counter_account_id: '', item_group_id: '', is_active: true
     });
     setDateFrom('');
     setDateTo('');
@@ -410,7 +335,8 @@ export const Products: React.FC = () => {
         vat_account_id: product.vat_account_id || '',
         vat_rate: product.vat_rate || 0,
         counter_account_id: product.counter_account_id || '',
-        item_group_id: product.item_group_id || ''
+        item_group_id: product.item_group_id || '',
+        is_active: product.is_active !== false
       } as any);
     } else {
       resetForm();
@@ -705,7 +631,12 @@ export const Products: React.FC = () => {
                                   </div>
                                   <div className="flex flex-col">
                                      <span className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors">{product.name}</span>
-                                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{t(`products.type_${product.type}`)}</span>
+                                     <div className="flex items-center gap-2 mt-1">
+                                       <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{t(`products.type_${product.type}`)}</span>
+                                       <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${product.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                         {product.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
+                                       </span>
+                                     </div>
                                   </div>
                                </div>
                             </td>
@@ -761,7 +692,12 @@ export const Products: React.FC = () => {
                           <div className="flex flex-col gap-2 text-right">
                             <span className="font-mono text-[10px] bg-slate-50 px-3 py-1 rounded-lg text-slate-400 font-black w-fit border border-slate-100 uppercase tracking-widest">{product.code}</span>
                             <h4 className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors text-2xl tracking-tighter leading-none italic serif">{product.name}</h4>
-                            <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none">{t(`products.type_${product.type}`)}</span>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none">{t(`products.type_${product.type}`)}</span>
+                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${product.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                {product.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
+                              </span>
+                            </div>
                           </div>
                           <div className="w-20 h-20 rounded-[2rem] bg-slate-50 text-slate-300 flex items-center justify-center overflow-hidden border border-slate-100 group-hover:scale-105 transition-all shadow-inner">
                              {product.image_url ? <img src={product.image_url} alt="" className="w-full h-full object-cover" /> : <Package size={32} />}
@@ -1318,8 +1254,28 @@ export const Products: React.FC = () => {
                                </div>
                              </>
                            )}
-                        </div>
-                     </div>
+                            {/* Active / Inactive Status Toggle */}
+                            <div className="md:col-span-2 pt-4 border-t border-slate-50 flex items-center justify-between">
+                              <div>
+                                <h4 className="text-sm font-black text-slate-900 leading-none mb-1">
+                                  {language === 'ar' ? 'حالة النشاط' : 'Active Status'}
+                                </h4>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                  {language === 'ar' ? 'تحديد ما إذا كان الصنف نشطاً في النظام أم لا' : 'Specify if the product is active in the system'}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.is_active ? 'bg-emerald-600' : 'bg-slate-200'}`}
+                              >
+                                <span
+                                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.is_active ? (dir === 'rtl' ? '-translate-x-6' : 'translate-x-6') : (dir === 'rtl' ? '-translate-x-1' : 'translate-x-1')}`}
+                                />
+                              </button>
+                            </div>
+                         </div>
+                      </div>
                   </form>
                 </div>
               </div>
