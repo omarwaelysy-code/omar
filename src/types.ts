@@ -309,6 +309,9 @@ export interface Invoice {
   settlements?: any[];
   settlement_number?: string | null;
   settlement_date?: string | null;
+  operation_id?: string | null;
+  department_id?: string | null;
+  cost_center_id?: string | null;
 }
 
 export interface PurchaseInvoice {
@@ -342,6 +345,9 @@ export interface PurchaseInvoice {
   settlements?: any[];
   settlement_number?: string | null;
   settlement_date?: string | null;
+  operation_id?: string | null;
+  department_id?: string | null;
+  cost_center_id?: string | null;
 }
 
 export interface InvoiceItem {

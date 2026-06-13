@@ -69,6 +69,9 @@ export const InvoiceSchema = BaseSchema.extend({
   settlements: z.array(z.any()).optional().nullable(),
   settlement_number: z.string().optional().nullable(),
   settlement_date: z.string().optional().nullable(),
+  operation_id: z.string().nullable().optional(),
+  department_id: z.string().nullable().optional(),
+  cost_center_id: z.string().nullable().optional(),
 });
 
 // Voucher (Receipt/Payment)

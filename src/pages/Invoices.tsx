@@ -8,7 +8,7 @@ import {
   ChevronLeft, ChevronRight, Maximize2, Minimize2, Hash, 
   Wallet, Calendar, Package, Tag, Layers, Box, Paperclip, 
   Phone, Mail, Lock, LayoutGrid, List, Building2, ChevronDown, 
-  CreditCard, RotateCcw, Save, ExternalLink
+  CreditCard, RotateCcw, Save, ExternalLink, CheckCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Barcode from 'react-barcode';
@@ -145,6 +145,9 @@ export const Invoices: React.FC = () => {
   const [paymentMethodId, setPaymentMethodId] = useState<string | ''>('');
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selectedOperationId, setSelectedOperationId] = useState<string>('');
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
+  const [selectedCostCenterId, setSelectedCostCenterId] = useState<string>('');
   
   // Floating popover lookup search states
   const [activeSearch, setActiveSearch] = useState<{
@@ -1219,7 +1222,10 @@ export const Invoices: React.FC = () => {
       vat_amount: product.sale_price * ((product.vat_rate || 0) / 100),
       total: product.sale_price,
       barcode: product.barcode || '',
-      image_url: product.image_url || ''
+      image_url: product.image_url || '',
+      operation_id: selectedOperationId || null,
+      department_id: selectedDepartmentId || null,
+      cost_center_id: selectedCostCenterId || null
     }]);
   };
 
@@ -1233,7 +1239,10 @@ export const Invoices: React.FC = () => {
       vat_amount: 0,
       total: 0,
       barcode: '',
-      image_url: ''
+      image_url: '',
+      operation_id: selectedOperationId || null,
+      department_id: selectedDepartmentId || null,
+      cost_center_id: selectedCostCenterId || null
     }]);
   };
 
@@ -1388,7 +1397,10 @@ export const Invoices: React.FC = () => {
         payment_terms: paymentTerms,
         payment_terms_days: paymentTermsDays,
         advance_percentage: advancePercentage,
-        due_date: dueDate
+        due_date: dueDate,
+        operation_id: selectedOperationId || null,
+        department_id: selectedDepartmentId || null,
+        cost_center_id: selectedCostCenterId || null
       };
 
       // Journal items generation
@@ -1978,6 +1990,24 @@ export const Invoices: React.FC = () => {
     exportToExcel(formattedData, { filename: 'Invoices_Report', sheetName: 'الفواتير' });
   };
 
+  const applyOperationToAllItems = () => {
+    if (!selectedOperationId) return;
+    setItems(prev => prev.map(item => ({ ...item, operation_id: selectedOperationId })));
+    showNotification(language === 'ar' ? 'تم تطبيق العملية على كافة الأصناف' : 'Operation applied to all items', 'success');
+  };
+
+  const applyDepartmentToAllItems = () => {
+    if (!selectedDepartmentId) return;
+    setItems(prev => prev.map(item => ({ ...item, department_id: selectedDepartmentId })));
+    showNotification(language === 'ar' ? 'تم تطبيق الإدارة على كافة الأصناف' : 'Department applied to all items', 'success');
+  };
+
+  const applyCostCenterToAllItems = () => {
+    if (!selectedCostCenterId) return;
+    setItems(prev => prev.map(item => ({ ...item, cost_center_id: selectedCostCenterId })));
+    showNotification(language === 'ar' ? 'تم تطبيق مركز التكلفة على كافة الأصناف' : 'Cost center applied to all items', 'success');
+  };
+
   const handleExportPDF = async () => {
     if (tableRef.current) {
       await exportToPDFUtil(tableRef.current, { 
@@ -1993,6 +2023,9 @@ export const Invoices: React.FC = () => {
     setEditingInvoice(null);
     setSelectedCustomerId('');
     setSelectedWarehouseId('');
+    setSelectedOperationId('');
+    setSelectedDepartmentId('');
+    setSelectedCostCenterId('');
     const newDate = new Date().toISOString().slice(0, 10);
     setDate(newDate);
     const num = await generateInvoiceNumber(newDate);
@@ -2029,6 +2062,9 @@ export const Invoices: React.FC = () => {
       setEditingInvoice(fullData);
       setSelectedCustomerId(fullData.customer_id);
       setSelectedWarehouseId(fullData.warehouse_id || '');
+      setSelectedOperationId((fullData as any).operation_id || '');
+      setSelectedDepartmentId((fullData as any).department_id || '');
+      setSelectedCostCenterId((fullData as any).cost_center_id || '');
       
       // Determine invoice type based on items or warehouse_id
       if (fullData.warehouse_id) {
@@ -3016,6 +3052,192 @@ export const Invoices: React.FC = () => {
                           )}
                         </div>
 
+                        {/* Third Row of metadata: Operation, Department, Cost Center */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-1.5 mt-1 pt-1 border-t border-zinc-100">
+                          {/* Operation input */}
+                          <div>
+                            <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'العملية' : 'Operation'}</label>
+                            <div className="flex items-center gap-1">
+                              <div className="relative flex-1">
+                                <input 
+                                  type="text" 
+                                  placeholder={language === 'ar' ? 'ابحث عن عملية...' : 'Search operation...'}
+                                  className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px]"
+                                  value={
+                                    activeSearch && activeSearch.index === -1 && activeSearch.type === 'operation'
+                                      ? activeSearch.query
+                                      : (operations.find(op => op.id === selectedOperationId)?.operation_number || '')
+                                  }
+                                  onChange={(e) => {
+                                    setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
+                                  }}
+                                  onFocus={(e) => {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const dropdownWidth = 420;
+                                    let left = rect.left;
+                                    if (dir === 'rtl') {
+                                      left = rect.left + rect.width - dropdownWidth;
+                                    }
+                                    left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
+                                    setActiveSearch({
+                                      index: -1,
+                                      type: 'operation',
+                                      query: operations.find(op => op.id === selectedOperationId)?.operation_number || ''
+                                    });
+                                    setPopoverRect({
+                                      top: rect.bottom,
+                                      left: left,
+                                      width: dropdownWidth
+                                    });
+                                  }}
+                                />
+                                {selectedOperationId && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedOperationId('')}
+                                    className={`absolute ${dir === 'rtl' ? 'left-1.5' : 'right-1.5'} inset-y-0 flex items-center px-1 text-zinc-400 hover:text-red-500`}
+                                    title={language === 'ar' ? 'مسح' : 'Clear'}
+                                  >
+                                    <X size={10} />
+                                  </button>
+                                )}
+                              </div>
+                              {selectedOperationId && (
+                                <button
+                                  type="button"
+                                  onClick={() => applyOperationToAllItems()}
+                                  className="p-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded text-emerald-600 hover:text-emerald-700 transition-colors flex-shrink-0"
+                                  title={language === 'ar' ? 'تطبيق المختار على كافة الأصناف' : 'Apply to all items'}
+                                >
+                                  <CheckCheck size={12} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Department input */}
+                          <div>
+                            <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'الإدارة' : 'Department'}</label>
+                            <div className="flex items-center gap-1">
+                              <div className="relative flex-1">
+                                <input 
+                                  type="text" 
+                                  placeholder={language === 'ar' ? 'ابحث عن إدارة...' : 'Search department...'}
+                                  className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px]"
+                                  value={
+                                    activeSearch && activeSearch.index === -1 && activeSearch.type === 'department'
+                                      ? activeSearch.query
+                                      : (departments.find(d => d.id === selectedDepartmentId)?.name || '')
+                                  }
+                                  onChange={(e) => {
+                                    setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
+                                  }}
+                                  onFocus={(e) => {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const dropdownWidth = 350;
+                                    let left = rect.left;
+                                    if (dir === 'rtl') {
+                                      left = rect.left + rect.width - dropdownWidth;
+                                    }
+                                    left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
+                                    setActiveSearch({
+                                      index: -1,
+                                      type: 'department',
+                                      query: departments.find(d => d.id === selectedDepartmentId)?.name || ''
+                                    });
+                                    setPopoverRect({
+                                      top: rect.bottom,
+                                      left: left,
+                                      width: dropdownWidth
+                                    });
+                                  }}
+                                />
+                                {selectedDepartmentId && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedDepartmentId('')}
+                                    className={`absolute ${dir === 'rtl' ? 'left-1.5' : 'right-1.5'} inset-y-0 flex items-center px-1 text-zinc-400 hover:text-red-500`}
+                                    title={language === 'ar' ? 'مسح' : 'Clear'}
+                                  >
+                                    <X size={10} />
+                                  </button>
+                                )}
+                              </div>
+                              {selectedDepartmentId && (
+                                <button
+                                  type="button"
+                                  onClick={() => applyDepartmentToAllItems()}
+                                  className="p-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded text-emerald-600 hover:text-emerald-700 transition-colors flex-shrink-0"
+                                  title={language === 'ar' ? 'تطبيق المختار على كافة الأصناف' : 'Apply to all items'}
+                                >
+                                  <CheckCheck size={12} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Cost Center input */}
+                          <div>
+                            <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'مركز التكلفة' : 'Cost Center'}</label>
+                            <div className="flex items-center gap-1">
+                              <div className="relative flex-1">
+                                <input 
+                                  type="text" 
+                                  placeholder={language === 'ar' ? 'ابحث عن مركز...' : 'Search cost center...'}
+                                  className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px]"
+                                  value={
+                                    activeSearch && activeSearch.index === -1 && activeSearch.type === 'cost_center'
+                                      ? activeSearch.query
+                                      : (costCenters.find(cc => cc.id === selectedCostCenterId)?.name || '')
+                                  }
+                                  onChange={(e) => {
+                                    setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
+                                  }}
+                                  onFocus={(e) => {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const dropdownWidth = 350;
+                                    let left = rect.left;
+                                    if (dir === 'rtl') {
+                                      left = rect.left + rect.width - dropdownWidth;
+                                    }
+                                    left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
+                                    setActiveSearch({
+                                      index: -1,
+                                      type: 'cost_center',
+                                      query: costCenters.find(cc => cc.id === selectedCostCenterId)?.name || ''
+                                    });
+                                    setPopoverRect({
+                                      top: rect.bottom,
+                                      left: left,
+                                      width: dropdownWidth
+                                    });
+                                  }}
+                                />
+                                {selectedCostCenterId && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedCostCenterId('')}
+                                    className={`absolute ${dir === 'rtl' ? 'left-1.5' : 'right-1.5'} inset-y-0 flex items-center px-1 text-zinc-400 hover:text-red-500`}
+                                    title={language === 'ar' ? 'مسح' : 'Clear'}
+                                  >
+                                    <X size={10} />
+                                  </button>
+                                )}
+                              </div>
+                              {selectedCostCenterId && (
+                                <button
+                                  type="button"
+                                  onClick={() => applyCostCenterToAllItems()}
+                                  className="p-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded text-emerald-600 hover:text-emerald-700 transition-colors flex-shrink-0"
+                                  title={language === 'ar' ? 'تطبيق المختار على كافة الأصناف' : 'Apply to all items'}
+                                >
+                                  <CheckCheck size={12} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
                         {/* 6. Subject / Description - Full width at the bottom of the metadata card */}
                         <div className="pt-1 border-t border-zinc-100 mt-1">
                           <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'موضوع الفاتورة' : 'Invoice Subject'}</label>
@@ -3645,7 +3867,11 @@ export const Invoices: React.FC = () => {
                                     <tr 
                                       key={op.id} 
                                       onClick={() => {
-                                        updateItem(activeSearch.index, 'operation_id', op.id);
+                                        if (activeSearch.index === -1) {
+                                          setSelectedOperationId(op.id);
+                                        } else {
+                                          updateItem(activeSearch.index, 'operation_id', op.id);
+                                        }
                                         setActiveSearch(null);
                                       }}
                                       className="hover:bg-emerald-50 cursor-pointer transition-colors"
@@ -3697,7 +3923,11 @@ export const Invoices: React.FC = () => {
                                     <tr 
                                       key={d.id} 
                                       onClick={() => {
-                                        updateItem(activeSearch.index, 'department_id', d.id);
+                                        if (activeSearch.index === -1) {
+                                          setSelectedDepartmentId(d.id);
+                                        } else {
+                                          updateItem(activeSearch.index, 'department_id', d.id);
+                                        }
                                         setActiveSearch(null);
                                       }}
                                       className="hover:bg-emerald-50 cursor-pointer transition-colors"
@@ -3743,7 +3973,11 @@ export const Invoices: React.FC = () => {
                                     <tr 
                                       key={cc.id} 
                                       onClick={() => {
-                                        updateItem(activeSearch.index, 'cost_center_id', cc.id);
+                                        if (activeSearch.index === -1) {
+                                          setSelectedCostCenterId(cc.id);
+                                        } else {
+                                          updateItem(activeSearch.index, 'cost_center_id', cc.id);
+                                        }
                                         setActiveSearch(null);
                                       }}
                                       className="hover:bg-emerald-50 cursor-pointer transition-colors"
