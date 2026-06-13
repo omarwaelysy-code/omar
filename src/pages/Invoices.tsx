@@ -2786,50 +2786,51 @@ export const Invoices: React.FC = () => {
                 <span>{language === 'ar' ? 'الإنشاء الذكي بالذكاء الاصطناعي' : 'Smart AI Creation'}</span>
               </button>
 
-              <div className="flex-1 p-4 md:p-6 space-y-3 overflow-y-auto pb-6">
-                <div className="space-y-3">
+              <div className="flex-1 p-2 md:p-3.5 space-y-2 overflow-y-auto pb-4">
+                <div className="space-y-2">
 
-                  <form id="invoice-form" onSubmit={handleSubmit} className="space-y-3">                    {/* Upper Layout: Totals Summary on the Left, Metadata Form on the Right */}
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 items-stretch">
+                  <form id="invoice-form" onSubmit={handleSubmit} className="space-y-2">
+                    {/* Upper Layout: Combined Totals Summary and Metadata Form into a single card */}
+                    <section className="bg-white p-2.5 rounded-xl border border-zinc-200 shadow-sm grid grid-cols-1 lg:grid-cols-4 gap-3 items-stretch">
                       
-                      {/* Left: Invoice Summary Card */}
-                      <section className="bg-white p-3.5 rounded-xl border border-zinc-200 shadow-sm flex flex-col justify-center space-y-2.5">
-                        <div className="flex items-center gap-2 mb-1 text-emerald-600">
-                          <Layers className="w-4 h-4" />
-                          <h2 className="font-semibold text-zinc-900 text-xs">{language === 'ar' ? 'ملخص الفاتورة' : 'Invoice Summary'}</h2>
+                      {/* Left: Invoice Summary Card Column */}
+                      <div className="flex flex-col justify-center space-y-1.5 p-1">
+                        <div className="flex items-center gap-1.5 mb-0.5 text-emerald-600">
+                          <Layers className="w-3.5 h-3.5" />
+                          <h2 className="font-semibold text-zinc-900 text-[11px]">{language === 'ar' ? 'ملخص الفاتورة' : 'Invoice Summary'}</h2>
                         </div>
 
-                        <div className="bg-zinc-50 rounded-lg p-3 border border-zinc-100 space-y-2">
-                          <div className="flex justify-between items-center text-zinc-600 text-xs">
+                        <div className="bg-zinc-50 rounded-lg p-2 border border-zinc-100 space-y-1">
+                          <div className="flex justify-between items-center text-zinc-650 text-[11px]">
                             <span className="font-medium">{t('invoices.summary_subtotal')}</span>
-                            <span className="font-bold text-sm">
+                            <span className="font-bold text-xs">
                               {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}
                             </span>
                           </div>
-                          <div className="flex justify-between items-center text-emerald-600 text-xs">
-                            <div className="flex items-center gap-2">
+                          <div className="flex justify-between items-center text-emerald-600 text-[11px]">
+                            <div className="flex items-center gap-1.5">
                               <span className="font-medium">{t('invoices.summary_discount')}</span>
                               <input 
                                 type="number" 
-                                className="w-16 bg-white border border-zinc-200 rounded px-1 py-0.5 text-center font-bold text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
+                                className="w-12 bg-white border border-zinc-200 rounded px-1 py-0.5 text-center font-bold text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-[11px]"
                                 value={Number(discount)}
                                 onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
                               />
                             </div>
-                            <span className="font-bold text-sm">-{formatMoney(discount)}</span>
+                            <span className="font-bold text-xs">-{formatMoney(discount)}</span>
                           </div>
                           {isVatEnabled && (
-                            <div className="flex justify-between items-center text-zinc-650 text-xs pt-1 border-t border-dashed border-zinc-200">
+                            <div className="flex justify-between items-center text-zinc-650 text-[11px] pt-0.5 border-t border-dashed border-zinc-200">
                               <span className="font-medium">{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</span>
-                              <span className="font-bold text-sm">
+                              <span className="font-bold text-xs">
                                 +{formatMoney(items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0))}
                               </span>
                             </div>
                           )}
-                          <div className="flex justify-between items-center text-emerald-600 text-xs pt-1.5 border-t border-zinc-200">
-                            <span className="font-black text-sm">{t('invoices.summary_total')}</span>
+                          <div className="flex justify-between items-center text-emerald-600 text-[11px] pt-1 border-t border-zinc-200">
+                            <span className="font-black text-xs">{t('invoices.summary_total')}</span>
                             <div className="flex flex-col items-end">
-                              <span className="font-black text-lg tracking-tighter text-left">
+                              <span className="font-black text-sm tracking-tighter text-left">
                                 {formatMoney(
                                   items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) + 
                                   (isVatEnabled ? items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0) : 0) - 
@@ -2839,10 +2840,10 @@ export const Invoices: React.FC = () => {
                             </div>
                           </div>
                         </div>
-                      </section>
+                      </div>
 
-                      {/* Right: Unified Metadata & Payment Settings Panel */}
-                      <section className="lg:col-span-3 bg-white p-3 rounded-xl border border-zinc-200 shadow-sm space-y-2 relative">
+                      {/* Right: Unified Metadata & Payment Settings Panel Column */}
+                      <div className="lg:col-span-3 space-y-1.5 relative lg:border-s lg:border-zinc-150 lg:ps-3 flex flex-col justify-between">
                         
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
                           {/* 1. Date */}
@@ -2911,7 +2912,7 @@ export const Invoices: React.FC = () => {
                         </div>
 
                         {/* Second Row of metadata */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mt-2 pt-2 border-t border-zinc-100">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mt-1.5 pt-1.5 border-t border-zinc-100">
                           {/* 5. Payment Terms or Method */}
                           {paymentType === 'cash' ? (
                             <div>
@@ -3016,11 +3017,11 @@ export const Invoices: React.FC = () => {
                         </div>
 
                         {/* 6. Subject / Description - Full width at the bottom of the metadata card */}
-                        <div className="pt-2 border-t border-zinc-100 mt-2">
+                        <div className="pt-1.5 border-t border-zinc-100 mt-1.5">
                           <label className="block text-[10px] font-bold text-zinc-400 mb-0.5 px-1">{language === 'ar' ? 'موضوع الفاتورة' : 'Invoice Subject'}</label>
                           <input
                             type="text"
-                            className="w-full px-3 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-850 text-xs placeholder:text-zinc-300 font-sans"
+                            className="w-full px-3 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-850 text-xs placeholder:text-zinc-300 font-sans"
                             placeholder={language === 'ar' ? 'أدخل وصفاً عاماً يظهر في أعلى الفاتورة...' : 'Enter a general description...'}
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
@@ -3061,9 +3062,9 @@ export const Invoices: React.FC = () => {
                           
                           if (currentCustomer && currentCustomer.credit_limit > 0 && totalTentativeBalance > currentCustomer.credit_limit) {
                             return (
-                              <div className="mt-2 p-2 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-2 text-rose-800 animate-in fade-in slide-in-from-top-2 duration-300">
+                              <div className="mt-1.5 p-1.5 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-2 text-rose-800 animate-in fade-in slide-in-from-top-2 duration-300">
                                 <span className="text-xs">⚠️</span>
-                                <div className="flex-1 text-[11px] font-medium">
+                                <div className="flex-1 text-[10px] font-medium text-right">
                                   <p className="font-bold text-rose-950 mb-0.5">
                                     {language === 'ar' ? 'تنبيه: تجاوز حد الائتمان!' : 'Warning: Credit Limit Exceeded!'}
                                   </p>
@@ -3078,23 +3079,23 @@ export const Invoices: React.FC = () => {
                           }
                           return null;
                         })()}
-                      </section>
-                    </div>
+                      </div>
+                    </section>
 
                     {/* Card 3: الأصناف */}
-                    <section className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3">
-                      <div className="flex flex-row items-center justify-between gap-3 mb-3">
-                        <div className="flex items-center gap-2 text-emerald-600">
-                          <Package className="w-5 h-5" />
-                          <h2 className="font-semibold text-zinc-900">{t('invoices.form_items')}</h2>
+                    <section className="bg-white p-3 rounded-xl border border-zinc-200 shadow-sm space-y-2">
+                      <div className="flex flex-row items-center justify-between gap-2 mb-1.5">
+                        <div className="flex items-center gap-1.5 text-emerald-600">
+                          <Package className="w-4 h-4" />
+                          <h2 className="font-semibold text-zinc-900 text-xs">{t('invoices.form_items')}</h2>
                         </div>
 
                         <button 
                           type="button"
                           onClick={() => addEmptyRow()}
-                          className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-all flex items-center gap-1.5 shadow-sm text-xs"
+                          className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-sm text-[11px]"
                         >
-                          <Plus size={14} />
+                          <Plus size={12} />
                           {t('invoices.form_add_item')}
                         </button>
                       </div>
