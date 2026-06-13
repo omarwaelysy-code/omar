@@ -3101,28 +3101,28 @@ export const Invoices: React.FC = () => {
                       </div>
 
                       <div className="overflow-x-auto rounded-xl border border-zinc-200 overflow-hidden">
-                        <table className="w-full text-sm text-right border-collapse">
+                        <table className="w-full text-sm text-right border-collapse table-fixed min-w-[1150px]">
                           <thead>
                             <tr className="bg-zinc-100 border-b border-zinc-200 text-zinc-700 text-xs font-bold">
-                              <th className="p-1.5 border-r border-zinc-200 text-right">{t('invoices.item_name')}</th>
-                              <th className="p-1.5 border-r border-zinc-200 text-center w-16">{language === 'ar' ? 'صورة' : 'Image'}</th>
-                              <th className="p-1.5 border-r border-zinc-200 text-center w-28">{language === 'ar' ? 'باركود' : 'Barcode'}</th>
-                              <th className="p-1.5 border-r border-zinc-200 text-center w-36">{language === 'ar' ? 'رقم عملية' : 'Operation No'}</th>
-                              <th className="p-1.5 border-r border-zinc-200 text-center w-36">{language === 'ar' ? 'الإدارة' : 'Department'}</th>
-                              <th className="p-1.5 border-r border-zinc-200 text-center w-36">{language === 'ar' ? 'مركز التكلفة' : 'Cost Center'}</th>
-                              <th className="p-1.5 border-r border-zinc-200 text-center w-24">{t('invoices.item_quantity')}</th>
-                              <th className="p-1.5 border-r border-zinc-200 text-center w-32">{t('invoices.item_price')}</th>
+                              <th className="p-1.5 border-r border-zinc-200 text-right w-80 min-w-[320px]">{t('invoices.item_name')}</th>
+                              <th className="p-1.5 border-r border-zinc-200 text-center w-12">{language === 'ar' ? 'صورة' : 'Image'}</th>
+                              <th className="p-1.5 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'باركود' : 'Barcode'}</th>
+                              <th className="p-1.5 border-r border-zinc-200 text-center w-28">{language === 'ar' ? 'رقم عملية' : 'Operation No'}</th>
+                              <th className="p-1.5 border-r border-zinc-200 text-center w-28">{language === 'ar' ? 'الإدارة' : 'Department'}</th>
+                              <th className="p-1.5 border-r border-zinc-200 text-center w-28">{language === 'ar' ? 'مركز التكلفة' : 'Cost Center'}</th>
+                              <th className="p-1.5 border-r border-zinc-200 text-center w-16">{t('invoices.item_quantity')}</th>
+                              <th className="p-1.5 border-r border-zinc-200 text-center w-24">{t('invoices.item_price')}</th>
                               {isVatEnabled && (
-                                <th className="p-1.5 border-r border-zinc-200 text-center w-20">{language === 'ar' ? 'ض ق م' : 'VAT %'}</th>
+                                <th className="p-1.5 border-r border-zinc-200 text-center w-14">{language === 'ar' ? 'ض ق م' : 'VAT %'}</th>
                               )}
-                              <th className="p-1.5 border-r border-zinc-200 text-center w-32">{t('invoices.item_total')}</th>
+                              <th className="p-1.5 border-r border-zinc-200 text-center w-24">{t('invoices.item_total')}</th>
                               <th className="p-1.5 w-10"></th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-zinc-100">
                             {items.map((item, index) => (
                               <tr key={index} className="group hover:bg-zinc-50 transition-colors">
-                                <td className="p-1 border-b border-r border-zinc-200">
+                                <td className="p-1 border-b border-r border-zinc-200 w-80 min-w-[320px]">
                                   <div className="relative">
                                     <select 
                                       className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-2 py-1 outline-none font-bold text-zinc-800 appearance-none transition-all text-xs"
@@ -3135,7 +3135,7 @@ export const Invoices: React.FC = () => {
                                     <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-2' : 'right-2'} top-2 w-3.5 h-3.5 text-zinc-400 pointer-events-none`} />
                                   </div>
                                 </td>
-                                <td className="p-1 border-b border-r border-zinc-200 w-16 text-center">
+                                <td className="p-1 border-b border-r border-zinc-200 w-12 text-center">
                                   <div className="flex justify-center items-center">
                                     {item.image_url ? (
                                       <div className="relative group w-8 h-8">
@@ -3167,7 +3167,7 @@ export const Invoices: React.FC = () => {
                                     )}
                                   </div>
                                 </td>
-                                <td className="p-1 border-b border-r border-zinc-200 w-28 text-center">
+                                <td className="p-1 border-b border-r border-zinc-200 w-24 text-center">
                                   <div className="flex flex-col items-center gap-0.5">
                                     <input 
                                       type="text" 
@@ -3191,7 +3191,7 @@ export const Invoices: React.FC = () => {
                                 </td>
                                 
                                 {/* رقم عملية */}
-                                <td className="p-1 border-b border-r border-zinc-200 w-36 text-center">
+                                <td className="p-1 border-b border-r border-zinc-200 w-28 text-center">
                                   <div className="flex items-center gap-1 w-full relative">
                                     <input 
                                       type="text" 
@@ -3243,7 +3243,7 @@ export const Invoices: React.FC = () => {
                                 </td>
 
                                 {/* الإدارة */}
-                                <td className="p-1 border-b border-r border-zinc-200 w-36 text-center">
+                                <td className="p-1 border-b border-r border-zinc-200 w-28 text-center">
                                   <input 
                                     type="text" 
                                     placeholder={language === 'ar' ? 'ابحث عن إدارة...' : 'Search department...'}
@@ -3279,7 +3279,7 @@ export const Invoices: React.FC = () => {
                                 </td>
 
                                 {/* مركز التكلفة */}
-                                <td className="p-1 border-b border-r border-zinc-200 w-36 text-center">
+                                <td className="p-1 border-b border-r border-zinc-200 w-28 text-center">
                                   <input 
                                     type="text" 
                                     placeholder={language === 'ar' ? 'ابحث عن مركز...' : 'Search cost center...'}
@@ -3314,7 +3314,7 @@ export const Invoices: React.FC = () => {
                                   />
                                 </td>
 
-                                <td className="p-1 border-b border-r border-zinc-200 w-24">
+                                <td className="p-1 border-b border-r border-zinc-200 w-16">
                                   <input 
                                     type="number" 
                                     className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs"
@@ -3322,7 +3322,7 @@ export const Invoices: React.FC = () => {
                                     onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
                                   />
                                 </td>
-                                <td className="p-1 border-b border-r border-zinc-200 w-32">
+                                <td className="p-1 border-b border-r border-zinc-200 w-24">
                                   <input 
                                     type="text" 
                                     className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-center font-bold text-zinc-800 outline-none transition-all text-xs font-bold font-mono"
@@ -3344,7 +3344,7 @@ export const Invoices: React.FC = () => {
                                   />
                                 </td>
                                 {isVatEnabled && (
-                                  <td className="p-1 border-b border-r border-zinc-200 w-20">
+                                  <td className="p-1 border-b border-r border-zinc-200 w-14">
                                     <div className="flex items-center justify-center gap-0.5">
                                       <input 
                                         type="number" 
@@ -3358,7 +3358,7 @@ export const Invoices: React.FC = () => {
                                     </div>
                                   </td>
                                 )}
-                                <td className="p-1 border-b border-r border-zinc-200 w-32 text-center font-bold text-emerald-600 text-xs">
+                                <td className="p-1 border-b border-r border-zinc-200 w-24 text-center font-bold text-emerald-600 text-xs">
                                   {formatMoney(item.total)}
                                 </td>
                                 <td className="p-1 border-b border-zinc-200 w-10 text-center">
