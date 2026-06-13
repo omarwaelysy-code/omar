@@ -3415,38 +3415,50 @@ export const Invoices: React.FC = () => {
                                 {/* رقم عملية */}
                                 <td className="p-1 border-b border-r border-zinc-200 w-28 text-center">
                                   <div className="flex items-center gap-1 w-full relative">
-                                    <input 
-                                      type="text" 
-                                      placeholder={language === 'ar' ? 'ابحث عن عملية...' : 'Search operation...'}
-                                      className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
-                                      value={
-                                        activeSearch && activeSearch.index === index && activeSearch.type === 'operation'
-                                          ? activeSearch.query
-                                          : (operations.find(op => op.id === item.operation_id)?.operation_number || '')
-                                      }
-                                      onChange={(e) => {
-                                        setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
-                                      }}
-                                      onFocus={(e) => {
-                                        const rect = e.currentTarget.getBoundingClientRect();
-                                        const dropdownWidth = 420;
-                                        let left = rect.left;
-                                        if (dir === 'rtl') {
-                                          left = rect.left + rect.width - dropdownWidth;
+                                    <div className="relative flex-1">
+                                      <input 
+                                        type="text" 
+                                        placeholder={language === 'ar' ? 'ابحث عن عملية...' : 'Search operation...'}
+                                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
+                                        value={
+                                          activeSearch && activeSearch.index === index && activeSearch.type === 'operation'
+                                            ? activeSearch.query
+                                            : (operations.find(op => op.id === item.operation_id)?.operation_number || '')
                                         }
-                                        left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
-                                        setActiveSearch({
-                                          index,
-                                          type: 'operation',
-                                          query: operations.find(op => op.id === item.operation_id)?.operation_number || ''
-                                        });
-                                        setPopoverRect({
-                                          top: rect.bottom,
-                                          left: left,
-                                          width: dropdownWidth
-                                        });
-                                      }}
-                                    />
+                                        onChange={(e) => {
+                                          setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
+                                        }}
+                                        onFocus={(e) => {
+                                          const rect = e.currentTarget.getBoundingClientRect();
+                                          const dropdownWidth = 420;
+                                          let left = rect.left;
+                                          if (dir === 'rtl') {
+                                            left = rect.left + rect.width - dropdownWidth;
+                                          }
+                                          left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
+                                          setActiveSearch({
+                                            index,
+                                            type: 'operation',
+                                            query: operations.find(op => op.id === item.operation_id)?.operation_number || ''
+                                          });
+                                          setPopoverRect({
+                                            top: rect.bottom,
+                                            left: left,
+                                            width: dropdownWidth
+                                          });
+                                        }}
+                                      />
+                                      {item.operation_id && (
+                                        <button
+                                          type="button"
+                                          onClick={() => updateItem(index, 'operation_id', '')}
+                                          className={`absolute ${dir === 'rtl' ? 'left-1' : 'right-1'} inset-y-0 flex items-center px-1 text-zinc-400 hover:text-red-500`}
+                                          title={language === 'ar' ? 'مسح' : 'Clear'}
+                                        >
+                                          <X size={10} />
+                                        </button>
+                                      )}
+                                    </div>
                                     {item.operation_id && (
                                       <button
                                         type="button"
@@ -3466,74 +3478,102 @@ export const Invoices: React.FC = () => {
 
                                 {/* الإدارة */}
                                 <td className="p-1 border-b border-r border-zinc-200 w-28 text-center">
-                                  <input 
-                                    type="text" 
-                                    placeholder={language === 'ar' ? 'ابحث عن إدارة...' : 'Search department...'}
-                                    className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
-                                    value={
-                                      activeSearch && activeSearch.index === index && activeSearch.type === 'department'
-                                        ? activeSearch.query
-                                        : (departments.find(d => d.id === item.department_id)?.name || '')
-                                    }
-                                    onChange={(e) => {
-                                      setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
-                                    }}
-                                    onFocus={(e) => {
-                                      const rect = e.currentTarget.getBoundingClientRect();
-                                      const dropdownWidth = 350;
-                                      let left = rect.left;
-                                      if (dir === 'rtl') {
-                                        left = rect.left + rect.width - dropdownWidth;
-                                      }
-                                      left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
-                                      setActiveSearch({
-                                        index,
-                                        type: 'department',
-                                        query: departments.find(d => d.id === item.department_id)?.name || ''
-                                      });
-                                      setPopoverRect({
-                                        top: rect.bottom,
-                                        left: left,
-                                        width: dropdownWidth
-                                      });
-                                    }}
-                                  />
+                                  <div className="flex items-center gap-1 w-full relative">
+                                    <div className="relative flex-1">
+                                      <input 
+                                        type="text" 
+                                        placeholder={language === 'ar' ? 'ابحث عن إدارة...' : 'Search department...'}
+                                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
+                                        value={
+                                          activeSearch && activeSearch.index === index && activeSearch.type === 'department'
+                                            ? activeSearch.query
+                                            : (departments.find(d => d.id === item.department_id)?.name || '')
+                                        }
+                                        onChange={(e) => {
+                                          setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
+                                        }}
+                                        onFocus={(e) => {
+                                          const rect = e.currentTarget.getBoundingClientRect();
+                                          const dropdownWidth = 350;
+                                          let left = rect.left;
+                                          if (dir === 'rtl') {
+                                            left = rect.left + rect.width - dropdownWidth;
+                                          }
+                                          left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
+                                          setActiveSearch({
+                                            index,
+                                            type: 'department',
+                                            query: departments.find(d => d.id === item.department_id)?.name || ''
+                                          });
+                                          setPopoverRect({
+                                            top: rect.bottom,
+                                            left: left,
+                                            width: dropdownWidth
+                                          });
+                                        }}
+                                      />
+                                      {item.department_id && (
+                                        <button
+                                          type="button"
+                                          onClick={() => updateItem(index, 'department_id', '')}
+                                          className={`absolute ${dir === 'rtl' ? 'left-1' : 'right-1'} inset-y-0 flex items-center px-1 text-zinc-400 hover:text-red-500`}
+                                          title={language === 'ar' ? 'مسح' : 'Clear'}
+                                        >
+                                          <X size={10} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
                                 </td>
 
                                 {/* مركز التكلفة */}
                                 <td className="p-1 border-b border-r border-zinc-200 w-28 text-center">
-                                  <input 
-                                    type="text" 
-                                    placeholder={language === 'ar' ? 'ابحث عن مركز...' : 'Search cost center...'}
-                                    className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
-                                    value={
-                                      activeSearch && activeSearch.index === index && activeSearch.type === 'cost_center'
-                                        ? activeSearch.query
-                                        : (costCenters.find(cc => cc.id === item.cost_center_id)?.name || '')
-                                    }
-                                    onChange={(e) => {
-                                      setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
-                                    }}
-                                    onFocus={(e) => {
-                                      const rect = e.currentTarget.getBoundingClientRect();
-                                      const dropdownWidth = 350;
-                                      let left = rect.left;
-                                      if (dir === 'rtl') {
-                                        left = rect.left + rect.width - dropdownWidth;
-                                      }
-                                      left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
-                                      setActiveSearch({
-                                        index,
-                                        type: 'cost_center',
-                                        query: costCenters.find(cc => cc.id === item.cost_center_id)?.name || ''
-                                      });
-                                      setPopoverRect({
-                                        top: rect.bottom,
-                                        left: left,
-                                        width: dropdownWidth
-                                      });
-                                    }}
-                                  />
+                                  <div className="flex items-center gap-1 w-full relative">
+                                    <div className="relative flex-1">
+                                      <input 
+                                        type="text" 
+                                        placeholder={language === 'ar' ? 'ابحث عن مركز...' : 'Search cost center...'}
+                                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
+                                        value={
+                                          activeSearch && activeSearch.index === index && activeSearch.type === 'cost_center'
+                                            ? activeSearch.query
+                                            : (costCenters.find(cc => cc.id === item.cost_center_id)?.name || '')
+                                        }
+                                        onChange={(e) => {
+                                          setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
+                                        }}
+                                        onFocus={(e) => {
+                                          const rect = e.currentTarget.getBoundingClientRect();
+                                          const dropdownWidth = 350;
+                                          let left = rect.left;
+                                          if (dir === 'rtl') {
+                                            left = rect.left + rect.width - dropdownWidth;
+                                          }
+                                          left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
+                                          setActiveSearch({
+                                            index,
+                                            type: 'cost_center',
+                                            query: costCenters.find(cc => cc.id === item.cost_center_id)?.name || ''
+                                          });
+                                          setPopoverRect({
+                                            top: rect.bottom,
+                                            left: left,
+                                            width: dropdownWidth
+                                          });
+                                        }}
+                                      />
+                                      {item.cost_center_id && (
+                                        <button
+                                          type="button"
+                                          onClick={() => updateItem(index, 'cost_center_id', '')}
+                                          className={`absolute ${dir === 'rtl' ? 'left-1' : 'right-1'} inset-y-0 flex items-center px-1 text-zinc-400 hover:text-red-500`}
+                                          title={language === 'ar' ? 'مسح' : 'Clear'}
+                                        >
+                                          <X size={10} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
                                 </td>
 
                                 <td className="p-1 border-b border-r border-zinc-200 w-16">
@@ -3869,6 +3909,12 @@ export const Invoices: React.FC = () => {
                                       onClick={() => {
                                         if (activeSearch.index === -1) {
                                           setSelectedOperationId(op.id);
+                                          if (op.department_id) {
+                                            setSelectedDepartmentId(op.department_id);
+                                          }
+                                          if (op.cost_center_id) {
+                                            setSelectedCostCenterId(op.cost_center_id);
+                                          }
                                         } else {
                                           updateItem(activeSearch.index, 'operation_id', op.id);
                                         }
