@@ -11,9 +11,8 @@ export class AccountingEngine {
     endDate: string
   ) {
     const startTime = performance.now();
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
+    const startVal = startDate || '';
+    const endVal = endDate || '';
 
     const result = accounts.map(account => {
       let openingDebit = Number(account.opening_balance) > 0 ? Number(account.opening_balance) : 0;
@@ -22,16 +21,19 @@ export class AccountingEngine {
       let movementCredit = 0;
 
       entries.forEach(entry => {
-        const entryDate = new Date(entry.date);
+        const entryDateStr = (entry.date || '').slice(0, 10);
         entry.items?.forEach(item => {
           if (item.account_id === account.id) {
             const debit = Number(item.debit) || 0;
             const credit = Number(item.credit) || 0;
             
-            if (entryDate < start) {
+            const isBefore = startVal && entryDateStr < startVal;
+            const isAfter = endVal && entryDateStr > endVal;
+
+            if (isBefore) {
               openingDebit += debit;
               openingCredit += credit;
-            } else if (entryDate >= start && entryDate <= end) {
+            } else if (!isBefore && !isAfter) {
               movementDebit += debit;
               movementCredit += credit;
             }
@@ -77,9 +79,8 @@ export class AccountingEngine {
     customers?: Customer[],
     suppliers?: Supplier[]
   ): { lines: LedgerLine[]; openingBalance: number } {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
+    const startVal = startDate || '';
+    const endVal = endDate || '';
 
     let openingDebit = (entityIds && entityIds.length > 0) ? 0 : (Number(account.opening_balance) > 0 ? Number(account.opening_balance) : 0);
     let openingCredit = (entityIds && entityIds.length > 0) ? 0 : (Number(account.opening_balance) < 0 ? Math.abs(Number(account.opening_balance)) : 0);
@@ -87,7 +88,7 @@ export class AccountingEngine {
     const relevantEntries: LedgerLine[] = [];
 
     entries.forEach(entry => {
-      const entryDate = new Date(entry.date);
+      const entryDateStr = (entry.date || '').slice(0, 10);
       entry.items?.forEach(item => {
         if (item.account_id === account.id) {
           const debit = Number(item.debit) || 0;
@@ -101,10 +102,13 @@ export class AccountingEngine {
             if (!matchesEntity) return;
           }
 
-          if (entryDate < start) {
+          const isBefore = startVal && entryDateStr < startVal;
+          const isAfter = endVal && entryDateStr > endVal;
+
+          if (isBefore) {
             openingDebit += debit;
             openingCredit += credit;
-          } else if (entryDate >= start && entryDate <= end) {
+          } else if (!isBefore && !isAfter) {
             let entityName = item.customer_name || item.supplier_name || '';
             if (!entityName) {
               if (item.customer_id && customers) {
@@ -291,7 +295,7 @@ export class AccountingEngine {
     const totalLiabilitiesEquity = liabilitiesSum + equitySum + incomeStatement.netProfit;
 
     // Additional Diagnostics
-    const entriesBeforeDate = entries.filter(e => new Date(e.date) <= new Date(endDate));
+    const entriesBeforeDate = entries.filter(e => !endDate || (e.date || '').slice(0, 10) <= endDate);
     
     const unbalancedEntries: string[] = [];
     const missingAccountType: string[] = [];

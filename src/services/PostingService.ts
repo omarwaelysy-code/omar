@@ -27,40 +27,62 @@ export class PostingService {
 
     const journalItems: JournalEntryItem[] = [];
     
-    // Debit side: Customer or Cash/Bank
-    let debitAccountId = '';
-    let debitAccountName = '';
-    
-    if (invoice.payment_type === 'cash') {
-      const pm = paymentMethods.find(p => p.id === invoice.payment_method_id);
-      debitAccountId = pm?.account_id || '';
-      debitAccountName = pm?.account_name || '';
-      
-      if (!debitAccountId) {
-        const fallback = accounts.find(a => a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق'));
-        debitAccountId = fallback?.id || 'cash_default';
-        debitAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
-      }
-    } else {
-      debitAccountId = customer?.account_id || '';
-      debitAccountName = customer?.account_name || '';
-      
-      if (!debitAccountId) {
-        const fallback = accounts.find(a => a.name.includes('عملاء'));
-        debitAccountId = fallback?.id || 'customers_default';
-        debitAccountName = fallback?.name || 'حساب العملاء (افتراضي)';
-      }
+    // Get Customer Account ID
+    let customerAccountId = customer?.account_id || '';
+    let customerAccountName = customer?.account_name || '';
+    if (!customerAccountId) {
+      const fallback = accounts.find(a => a.name.includes('عملاء'));
+      customerAccountId = fallback?.id || 'customers_default';
+      customerAccountName = fallback?.name || 'حساب العملاء (افتراضي)';
     }
 
+    // Main Sales Invoice Debit Line (Customer Account)
     journalItems.push({
-      account_id: debitAccountId,
-      account_name: debitAccountName,
+      account_id: customerAccountId,
+      account_name: customerAccountName,
       debit: total_amount,
       credit: 0,
       description: `فاتورة مبيعات رقم ${invoice.invoice_number} - ${customer?.name || ''}`,
       customer_id: invoice.customer_id,
       customer_name: customer?.name
     });
+
+    // Cash payments logic
+    if (invoice.payment_type === 'cash') {
+      const pm = paymentMethods.find(p => p.id === invoice.payment_method_id);
+      let cashAccountId = pm?.account_id || '';
+      let cashAccountName = pm?.account_name || '';
+      
+      if (!cashAccountId) {
+        const fallback = accounts.find(a => a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق'));
+        cashAccountId = fallback?.id || 'cash_default';
+        cashAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
+      }
+
+      // Debit Cash/Bank
+      journalItems.push({
+        account_id: cashAccountId,
+        account_name: cashAccountName,
+        debit: total_amount,
+        credit: 0,
+        description: `تحصيل فاتورة مبيعات رقم ${invoice.invoice_number} - ${customer?.name || ''}`,
+        sub_account_id: invoice.payment_method_id,
+        sub_account_type: 'payment_method'
+      });
+
+      // Credit Customer (to clear the receivable)
+      journalItems.push({
+        account_id: customerAccountId,
+        account_name: customerAccountName,
+        debit: 0,
+        credit: total_amount,
+        description: `سداد فاتورة مبيعات رقم ${invoice.invoice_number} - ${customer?.name || ''}`,
+        customer_id: invoice.customer_id,
+        customer_name: customer?.name,
+        sub_account_id: invoice.customer_id,
+        sub_account_type: 'customer'
+      });
+    }
 
     // Discount
     if (discount > 0) {
@@ -181,28 +203,53 @@ export class PostingService {
       });
     });
 
-    // Credit side: Customer or Cash
-    let creditAccountId = '';
-    let creditAccountName = '';
-
-    if (doc.payment_type === 'cash') {
-      const pm = paymentMethods.find(p => p.id === doc.payment_method_id);
-      creditAccountId = pm?.account_id || '';
-      creditAccountName = pm?.account_name || '';
-    } else {
-      creditAccountId = customer?.account_id || '';
-      creditAccountName = customer?.account_name || '';
+    // Debit Customer Account (Clear customer balance on return)
+    let customerAccountId = customer?.account_id || '';
+    let customerAccountName = customer?.account_name || '';
+    if (!customerAccountId) {
+      const fallback = accounts.find(a => a.name.includes('عملاء'));
+      customerAccountId = fallback?.id || 'customers_account_default';
+      customerAccountName = fallback?.name || 'حساب العملاء (افتراضي)';
     }
 
     journalItems.push({
-      account_id: creditAccountId || 'counter_account_default',
-      account_name: creditAccountName || 'حساب العميل/النقدية',
+      account_id: customerAccountId,
+      account_name: customerAccountName,
       debit: 0,
       credit: total_amount,
       description: `مرتجع مبيعات رقم ${doc.return_number || doc.id.slice(-6)} - ${customer?.name || ''}`,
       customer_id: doc.customer_id,
       customer_name: customer?.name
     });
+
+    if (doc.payment_type === 'cash') {
+      const pm = paymentMethods.find(p => p.id === doc.payment_method_id);
+      let cashAccountId = pm?.account_id || '';
+      let cashAccountName = pm?.account_name || '';
+      if (!cashAccountId) {
+        const fallback = accounts.find(a => a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق'));
+        cashAccountId = fallback?.id || 'cash_account_default';
+        cashAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
+      }
+
+      // Debit Customer (to offset the credit return)
+      journalItems.push({
+        account_id: customerAccountId,
+        account_name: customerAccountName,
+        debit: total_amount,
+        credit: 0,
+        description: `تسوية نقدية لمرتجع مبيعات رقم ${doc.return_number || doc.id.slice(-6)} - ${customer?.name || ''}`
+      });
+
+      // Credit Cash/Bank
+      journalItems.push({
+        account_id: cashAccountId,
+        account_name: cashAccountName,
+        debit: 0,
+        credit: total_amount,
+        description: `دفع نقدية مقابل مرتجع مبيعات رقم ${doc.return_number || doc.id.slice(-6)} - ${customer?.name || ''}`
+      });
+    }
 
     return {
       date: doc.date,
@@ -246,28 +293,59 @@ export class PostingService {
       });
     });
 
-    // Credit side: Supplier or Cash
-    let creditAccountId = '';
-    let creditAccountName = '';
-
-    if (doc.payment_type === 'cash') {
-      const pm = paymentMethods.find(p => p.id === doc.payment_method_id);
-      creditAccountId = pm?.account_id || '';
-      creditAccountName = pm?.account_name || '';
-    } else {
-      creditAccountId = supplier?.account_id || '';
-      creditAccountName = supplier?.account_name || '';
+    // Credit Supplier Account (Account Payable)
+    let supplierAccountId = supplier?.account_id || '';
+    let supplierAccountName = supplier?.account_name || '';
+    if (!supplierAccountId) {
+      const fallback = accounts.find(a => a.name.includes('موردين'));
+      supplierAccountId = fallback?.id || 'supplier_account_default';
+      supplierAccountName = fallback?.name || 'حساب الموردين (افتراضي)';
     }
 
     journalItems.push({
-      account_id: creditAccountId || 'supplier_account_default',
-      account_name: creditAccountName || 'حساب الموردين/نقدية',
+      account_id: supplierAccountId,
+      account_name: supplierAccountName,
       debit: 0,
       credit: total_amount,
       description: `فاتورة مشتريات رقم ${doc.invoice_number} - ${supplier?.name || ''}`,
       supplier_id: doc.supplier_id,
       supplier_name: supplier?.name
     });
+
+    if (doc.payment_type === 'cash') {
+      const pm = paymentMethods.find(p => p.id === doc.payment_method_id);
+      let cashAccountId = pm?.account_id || '';
+      let cashAccountName = pm?.account_name || '';
+      if (!cashAccountId) {
+        const fallback = accounts.find(a => a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق'));
+        cashAccountId = fallback?.id || 'cash_account_default';
+        cashAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
+      }
+
+      // Credit Cash/Bank
+      journalItems.push({
+        account_id: cashAccountId,
+        account_name: cashAccountName,
+        debit: 0,
+        credit: total_amount,
+        description: `دفع نقدية مقابل فاتورة مشتريات رقم ${doc.invoice_number} - ${supplier?.name || ''}`,
+        sub_account_id: doc.payment_method_id,
+        sub_account_type: 'payment_method'
+      });
+
+      // Debit Supplier (to clear the payable)
+      journalItems.push({
+        account_id: supplierAccountId,
+        account_name: supplierAccountName,
+        debit: total_amount,
+        credit: 0,
+        description: `تسوية نقدية لفاتورة مشتريات رقم ${doc.invoice_number} - ${supplier?.name || ''}`,
+        supplier_id: doc.supplier_id,
+        supplier_name: supplier?.name,
+        sub_account_id: doc.supplier_id,
+        sub_account_type: 'supplier'
+      });
+    }
 
     return {
       date: doc.date,
@@ -290,28 +368,55 @@ export class PostingService {
 
     const journalItems: JournalEntryItem[] = [];
 
-    // Debit side: Supplier or Cash
-    let debitAccountId = '';
-    let debitAccountName = '';
-
-    if (doc.payment_type === 'cash') {
-      const pm = paymentMethods.find(p => p.id === doc.payment_method_id);
-      debitAccountId = pm?.account_id || '';
-      debitAccountName = pm?.account_name || '';
-    } else {
-      debitAccountId = supplier?.account_id || '';
-      debitAccountName = supplier?.account_name || '';
+    // Supplier account ID
+    let supplierAccountId = supplier?.account_id || '';
+    let supplierAccountName = supplier?.account_name || '';
+    if (!supplierAccountId) {
+      const fallback = accounts.find(a => a.name.includes('موردين'));
+      supplierAccountId = fallback?.id || 'suppliers_account_default';
+      supplierAccountName = fallback?.name || 'حساب الموردين (افتراضي)';
     }
 
     journalItems.push({
-      account_id: debitAccountId || 'target_account_default',
-      account_name: debitAccountName || 'حساب الموردين/نقدية',
+      account_id: supplierAccountId,
+      account_name: supplierAccountName,
       debit: total_amount,
       credit: 0,
       description: `مرتجع مشتريات رقم ${doc.return_number || doc.id.slice(-6)} - ${supplier?.name || ''}`,
       supplier_id: doc.supplier_id,
       supplier_name: supplier?.name
     });
+
+    if (doc.payment_type === 'cash') {
+      const pm = paymentMethods.find(p => p.id === doc.payment_method_id);
+      let cashAccountId = pm?.account_id || '';
+      let cashAccountName = pm?.account_name || '';
+      if (!cashAccountId) {
+        const fallback = accounts.find(a => a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق'));
+        cashAccountId = fallback?.id || 'cash_account_default';
+        cashAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
+      }
+
+      // Debit Cash/Bank
+      journalItems.push({
+        account_id: cashAccountId,
+        account_name: cashAccountName,
+        debit: total_amount,
+        credit: 0,
+        description: `استلام نقدية مقابل مرتجع مشتريات رقم ${doc.return_number || doc.id.slice(-6)} - ${supplier?.name || ''}`
+      });
+
+      // Credit Supplier
+      journalItems.push({
+        account_id: supplierAccountId,
+        account_name: supplierAccountName,
+        debit: 0,
+        credit: total_amount,
+        description: `تسوية نقدية لمرتجع مشتريات رقم ${doc.return_number || doc.id.slice(-6)} - ${supplier?.name || ''}`,
+        supplier_id: doc.supplier_id,
+        supplier_name: supplier?.name
+      });
+    }
 
     // Credit side: Purchase Returns / Inventory reduction
     doc.items?.forEach(item => {

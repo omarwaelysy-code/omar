@@ -95,7 +95,8 @@ export const CustomerBalances: React.FC = () => {
         const customerLines: any[] = [];
         journalEntries.forEach((je: any) => {
           je.items?.forEach((item: any) => {
-            if (item.customer_id === customer.id && item.account_id === customer.account_id) {
+            const matchesEntity = item.customer_id === customer.id || item.sub_account_id === customer.id;
+            if (matchesEntity && item.account_id === customer.account_id) {
               customerLines.push({
                 date: je.date,
                 reference_type: je.reference_type,
@@ -121,8 +122,9 @@ export const CustomerBalances: React.FC = () => {
         let manualJournalImpact = 0;
 
         customerLines.forEach((line: any) => {
-          const isBefore = startDate && line.date < startDate;
-          const isAfter = endDate && line.date > endDate;
+          const lineDateStr = (line.date || '').slice(0, 10);
+          const isBefore = startDate && lineDateStr < startDate;
+          const isAfter = endDate && lineDateStr > endDate;
 
           if (isBefore) {
             openingBalance += (line.debit - line.credit);

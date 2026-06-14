@@ -154,7 +154,8 @@ export const SupplierSettlements: React.FC = () => {
                             je.reference_number?.toLowerCase().includes(inv.invoice_number.toLowerCase());
                             
       je.items?.forEach((item: any, idx: number) => {
-        if (item.supplier_id === inv.supplier_id && Number(item.debit) > 0) {
+        const matchesEntity = item.supplier_id === inv.supplier_id || item.sub_account_id === inv.supplier_id;
+        if (matchesEntity && Number(item.debit) > 0) {
           const lineDescMatches = item.description?.toLowerCase().includes(inv.invoice_number.toLowerCase());
           if (jeDescMatches || lineDescMatches) {
             jeSettlements.push({
@@ -356,13 +357,16 @@ export const SupplierSettlements: React.FC = () => {
       }
     });
 
+    const supplier = suppliers.find(s => s.id === selectedSupplierId);
+
     // 3. Debit JEs
     allJournalEntries.forEach(je => {
       const standardTypes = ['invoice', 'purchase_invoice', 'receipt', 'payment', 'return', 'purchase_return', 'receipt_voucher', 'payment_voucher'];
       if (je.reference_type && standardTypes.includes(je.reference_type)) return;
 
       je.items?.forEach((item: any, idx: number) => {
-        if (item.supplier_id === selectedSupplierId && Number(item.debit) > 0) {
+        const matchesEntity = item.supplier_id === selectedSupplierId || item.sub_account_id === selectedSupplierId;
+        if (matchesEntity && Number(item.debit) > 0 && item.account_id === supplier?.account_id) {
           const originalAmount = Number(item.debit) || 0;
           const settled = getSettlementsForTarget(`${je.id}-${idx}`, je.reference_type);
           const openAmount = originalAmount - settled;
@@ -424,7 +428,8 @@ export const SupplierSettlements: React.FC = () => {
       if (je.reference_type && standardTypes.includes(je.reference_type)) return;
 
       je.items?.forEach((item: any, idx: number) => {
-        if (item.supplier_id === selectedSupplierId && Number(item.credit) > 0) {
+        const matchesEntity = item.supplier_id === selectedSupplierId || item.sub_account_id === selectedSupplierId;
+        if (matchesEntity && Number(item.credit) > 0 && item.account_id === supplier?.account_id) {
           const originalAmount = Number(item.credit) || 0;
           const settled = getSettlementsForTarget(`${je.id}-${idx}`, je.reference_type);
           const openAmount = originalAmount - settled;
@@ -453,7 +458,7 @@ export const SupplierSettlements: React.FC = () => {
 
     setDebitMovements(debits.sort((a, b) => b.date.localeCompare(a.date)));
     setCreditMovements(credits.sort((a, b) => b.date.localeCompare(a.date)));
-  }, [selectedSupplierId, allPurchaseInvoices, allPayments, allPurchaseReturns, allJournalEntries]);
+  }, [selectedSupplierId, allPurchaseInvoices, allPayments, allPurchaseReturns, allJournalEntries, suppliers]);
 
   // Apply Advanced Filtering
   const applyFilters = (list: Movement[]) => {

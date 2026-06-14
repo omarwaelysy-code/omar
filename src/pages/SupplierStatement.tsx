@@ -102,7 +102,8 @@ export const SupplierStatement: React.FC = () => {
 
             journalEntries.forEach((je: any) => {
               je.items?.forEach((item: any) => {
-                if (item.supplier_id === savedSupId && item.account_id === supplier?.account_id) {
+                const matchesEntity = item.supplier_id === savedSupId || item.sub_account_id === savedSupId;
+                if (matchesEntity && item.account_id === supplier?.account_id) {
                   let notes = item.description || je.description || 'قيد مالي';
                   let mappedType = je.reference_type || 'manual';
                   if (mappedType === 'payment') mappedType = 'payment_voucher';
@@ -141,11 +142,8 @@ export const SupplierStatement: React.FC = () => {
             const endVal = savedEnd || new Date().toISOString().slice(0, 10);
 
             const filteredItems = allItems.filter(item => {
-              const itemDate = new Date(item.date);
-              const start = startVal ? new Date(startVal) : new Date(0);
-              const end = endVal ? new Date(endVal) : new Date();
-              end.setHours(23, 59, 59, 999);
-              return itemDate >= start && itemDate <= end;
+              const itemDateStr = (item.date || '').slice(0, 10);
+              return (!startVal || itemDateStr >= startVal) && (!endVal || itemDateStr <= endVal);
             });
 
             const supplierOpBal = Number(supplier?.opening_balance || 0);
@@ -154,7 +152,7 @@ export const SupplierStatement: React.FC = () => {
             let balanceBefore = 0;
             
             if (startVal) {
-              const itemsBefore = allItems.filter(item => new Date(item.date) < new Date(startVal));
+              const itemsBefore = allItems.filter(item => (item.date || '').slice(0, 10) < startVal);
               balanceBefore = manualOpBal + itemsBefore.reduce((sum, item) => sum + (Number(item.credit || 0) - Number(item.debit || 0)), 0);
             } else {
               if (manualOpBal !== 0) {
@@ -223,7 +221,8 @@ export const SupplierStatement: React.FC = () => {
         je.items?.forEach((item: any) => {
           // Only count lines that have the supplier_id AND match the supplier's ledger account
           // This prevents double entries if supplier_id was accidentally set on both sides of a transaction
-          if (item.supplier_id === selectedSupplierId && item.account_id === supplier?.account_id) {
+          const matchesEntity = item.supplier_id === selectedSupplierId || item.sub_account_id === selectedSupplierId;
+          if (matchesEntity && item.account_id === supplier?.account_id) {
             let notes = item.description || je.description || 'قيد مالي';
             let mappedType = je.reference_type || 'manual';
             if (mappedType === 'payment') mappedType = 'payment_voucher';
@@ -261,11 +260,8 @@ export const SupplierStatement: React.FC = () => {
 
       // Filter by date range
       const filteredItems = allItems.filter(item => {
-        const itemDate = new Date(item.date);
-        const start = startDate ? new Date(startDate) : new Date(0);
-        const end = endDate ? new Date(endDate) : new Date();
-        end.setHours(23, 59, 59, 999);
-        return itemDate >= start && itemDate <= end;
+        const itemDateStr = (item.date || '').slice(0, 10);
+        return (!startDate || itemDateStr >= startDate) && (!endDate || itemDateStr <= endDate);
       });
 
       // Calculate balance forward
@@ -276,7 +272,7 @@ export const SupplierStatement: React.FC = () => {
       let balanceBefore = 0;
       
       if (startDate) {
-        const itemsBefore = allItems.filter(item => new Date(item.date) < new Date(startDate));
+        const itemsBefore = allItems.filter(item => (item.date || '').slice(0, 10) < startDate);
         balanceBefore = manualOpBal + itemsBefore.reduce((sum, item) => sum + (Number(item.credit || 0) - Number(item.debit || 0)), 0);
       } else {
         if (manualOpBal !== 0) {

@@ -95,7 +95,8 @@ export const CustomerStatement: React.FC = () => {
             let allEntries: any[] = [];
             journalEntries.forEach((je: any) => {
               je.items?.forEach((item: any) => {
-                if (item.customer_id === savedCustId && item.account_id === customer?.account_id) {
+                const matchesEntity = item.customer_id === savedCustId || item.sub_account_id === savedCustId;
+                if (matchesEntity && item.account_id === customer?.account_id) {
                   let description = item.description || je.description || 'قيد مالي';
                   let mappedType = je.reference_type || 'journal';
                   if (mappedType === 'receipt') mappedType = 'receipt_voucher';
@@ -142,9 +143,9 @@ export const CustomerStatement: React.FC = () => {
             const endVal = savedEnd || new Date().toISOString().slice(0, 10);
 
             if (startVal) {
-              const entriesBefore = allEntries.filter(e => e.date < startVal);
+              const entriesBefore = allEntries.filter(e => (e.date || '').slice(0, 10) < startVal);
               balanceForward = manualOpBal + entriesBefore.reduce((sum, e) => sum + (Number(e.debit || 0) - Number(e.credit || 0)), 0);
-              filteredEntries = allEntries.filter(e => e.date >= startVal);
+              filteredEntries = allEntries.filter(e => (e.date || '').slice(0, 10) >= startVal);
               
               finalAllEntries.push({
                 id: 'balance-forward',
@@ -173,7 +174,7 @@ export const CustomerStatement: React.FC = () => {
             }
 
             let currentBalance = balanceForward;
-            const finalEntries = filteredEntries.filter(e => !endVal || e.date <= endVal).map(entry => {
+            const finalEntries = filteredEntries.filter(e => !endVal || (e.date || '').slice(0, 10) <= endVal).map(entry => {
               currentBalance += (entry.debit - entry.credit);
               return { ...entry, balance: currentBalance };
             });
@@ -228,7 +229,8 @@ export const CustomerStatement: React.FC = () => {
         je.items?.forEach((item: any) => {
           // Only count lines that have the customer_id AND match the customer's ledger account
           // This prevents double entries if customer_id was accidentally set on both sides of a transaction
-          if (item.customer_id === selectedCustomerId && item.account_id === customer?.account_id) {
+          const matchesEntity = item.customer_id === selectedCustomerId || item.sub_account_id === selectedCustomerId;
+          if (matchesEntity && item.account_id === customer?.account_id) {
             let description = item.description || je.description || 'قيد مالي';
             let mappedType = je.reference_type || 'journal';
             if (mappedType === 'receipt') mappedType = 'receipt_voucher';
@@ -278,9 +280,9 @@ export const CustomerStatement: React.FC = () => {
       const finalAllEntries = [];
 
       if (startDate) {
-        const entriesBefore = allEntries.filter(e => e.date < startDate);
+        const entriesBefore = allEntries.filter(e => (e.date || '').slice(0, 10) < startDate);
         balanceForward = manualOpBal + entriesBefore.reduce((sum, e) => sum + (Number(e.debit || 0) - Number(e.credit || 0)), 0);
-        filteredEntries = allEntries.filter(e => e.date >= startDate);
+        filteredEntries = allEntries.filter(e => (e.date || '').slice(0, 10) >= startDate);
         
         // Always add balance forward (as "carried over" balance)
         finalAllEntries.push({
@@ -311,7 +313,7 @@ export const CustomerStatement: React.FC = () => {
 
       // Calculate running balance
       let currentBalance = balanceForward;
-      const finalEntries = filteredEntries.filter(e => !endDate || e.date <= endDate).map(entry => {
+      const finalEntries = filteredEntries.filter(e => !endDate || (e.date || '').slice(0, 10) <= endDate).map(entry => {
         currentBalance += (entry.debit - entry.credit);
         return { ...entry, balance: currentBalance };
       });

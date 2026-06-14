@@ -95,7 +95,8 @@ export const SupplierBalances: React.FC = () => {
         const supplierLines: any[] = [];
         journalEntries.forEach((je: any) => {
           je.items?.forEach((item: any) => {
-            if (item.supplier_id === supplier.id && item.account_id === supplier.account_id) {
+            const matchesEntity = item.supplier_id === supplier.id || item.sub_account_id === supplier.id;
+            if (matchesEntity && item.account_id === supplier.account_id) {
               supplierLines.push({
                 date: je.date,
                 reference_type: je.reference_type,
@@ -121,8 +122,9 @@ export const SupplierBalances: React.FC = () => {
         let manualJournalImpact = 0;
 
         supplierLines.forEach((line: any) => {
-          const isBefore = startDate && line.date < startDate;
-          const isAfter = endDate && line.date > endDate;
+          const lineDateStr = (line.date || '').slice(0, 10);
+          const isBefore = startDate && lineDateStr < startDate;
+          const isAfter = endDate && lineDateStr > endDate;
 
           if (isBefore) {
             openingBalance += (line.credit - line.debit);
