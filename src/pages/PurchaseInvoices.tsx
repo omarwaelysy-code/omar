@@ -1473,12 +1473,7 @@ export const PurchaseInvoices: React.FC = () => {
       return;
     }
 
-    const hasPhysicalProduct = items.some(item => {
-      const prod = products.find(p => p.id === item.product_id);
-      return prod && prod.type !== 'service';
-    });
-
-    if (invoiceData.purchase_type === 'items' && hasPhysicalProduct && !invoiceData.warehouse_id) {
+    if (invoiceData.purchase_type === 'items' && !invoiceData.warehouse_id) {
       showNotification('يرجى اختيار المخزن', 'error');
       return;
     }

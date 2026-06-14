@@ -1307,13 +1307,8 @@ export const Invoices: React.FC = () => {
       showNotification('يرجى اختيار العميل', 'error');
       return;
     }
-    
-    const hasPhysicalProduct = items.some(item => {
-      const prod = products.find(p => p.id === item.product_id);
-      return prod && prod.type !== 'service';
-    });
 
-    if (invoiceType === 'items' && hasPhysicalProduct && !selectedWarehouseId) {
+    if (invoiceType === 'items' && !selectedWarehouseId) {
       showNotification('يرجى اختيار المخزن', 'error');
       return;
     }
