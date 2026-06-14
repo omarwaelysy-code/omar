@@ -142,7 +142,7 @@ export const CustomerSettlements: React.FC = () => {
       if (String(je.reference_id) === String(inv.id) || je.reference_number === inv.invoice_number) {
         return;
       }
-      const standardTypes = ['invoice', 'purchase_invoice', 'receipt', 'payment', 'return', 'purchase_return', 'opening_balance', 'receipt_voucher', 'payment_voucher'];
+      const standardTypes = ['invoice', 'purchase_invoice', 'receipt', 'payment', 'return', 'purchase_return', 'receipt_voucher', 'payment_voucher'];
       if (je.reference_type && standardTypes.includes(je.reference_type)) {
         return;
       }
@@ -203,14 +203,14 @@ export const CustomerSettlements: React.FC = () => {
     return [...voucherSettlements, ...returnSettlements, ...jeSettlements, ...invoiceSideSettlements];
   };
 
-  const getSettlementsForTarget = (targetId: string) => {
+  const getSettlementsForTarget = (targetId: string, jeRefType?: string) => {
     let settledSum = 0;
     
     // Sum from invoices
     allInvoices.forEach(inv => {
       if (inv.settlements && Array.isArray(inv.settlements)) {
         inv.settlements.forEach((s: any) => {
-          if (s.target_id === targetId) {
+          if (s.target_id === targetId || (jeRefType === 'opening_balance' && s.target_id === `OPEN-${selectedCustomerId}`)) {
             settledSum += Number(s.settled_amount) || 0;
           }
         });
@@ -223,7 +223,7 @@ export const CustomerSettlements: React.FC = () => {
         v.items.forEach(item => {
           if (item.settlements && Array.isArray(item.settlements)) {
             item.settlements.forEach((s: any) => {
-              if (s.target_id === targetId) {
+              if (s.target_id === targetId || (jeRefType === 'opening_balance' && s.target_id === `OPEN-${selectedCustomerId}`)) {
                 settledSum += Number(s.settled_amount) || 0;
               }
             });
@@ -299,22 +299,23 @@ export const CustomerSettlements: React.FC = () => {
 
     // 2. Debit JEs
     allJournalEntries.forEach(je => {
-      const standardTypes = ['invoice', 'purchase_invoice', 'receipt', 'payment', 'return', 'purchase_return', 'opening_balance', 'receipt_voucher', 'payment_voucher'];
+      const standardTypes = ['invoice', 'purchase_invoice', 'receipt', 'payment', 'return', 'purchase_return', 'receipt_voucher', 'payment_voucher'];
       if (je.reference_type && standardTypes.includes(je.reference_type)) return;
 
       je.items?.forEach((item: any, idx: number) => {
         if (item.customer_id === selectedCustomerId && Number(item.debit) > 0) {
           const originalAmount = Number(item.debit) || 0;
-          const settled = getSettlementsForTarget(`${je.id}-${idx}`);
+          const settled = getSettlementsForTarget(`${je.id}-${idx}`, je.reference_type);
           const openAmount = originalAmount - settled;
 
           if (openAmount > 0.01) {
             const isDiscount = je.reference_type === 'customer_discount';
+            const isOpBal = je.reference_type === 'opening_balance';
             debits.push({
               id: `${je.id}-${idx}`,
               original_id: je.id,
               date: je.date,
-              type_label: isDiscount ? 'خصم مسموح به' : 'قيد يومية (مدين)',
+              type_label: isOpBal ? 'قيد رصيد أول' : (isDiscount ? 'خصم مسموح به' : 'قيد يومية (مدين)'),
               number: je.entry_number || je.id.slice(0, 8),
               page_name: isDiscount ? 'discounts' : 'journal_entries',
               original_amount: originalAmount,
@@ -410,22 +411,23 @@ export const CustomerSettlements: React.FC = () => {
 
     // 3. Credit JEs
     allJournalEntries.forEach(je => {
-      const standardTypes = ['invoice', 'purchase_invoice', 'receipt', 'payment', 'return', 'purchase_return', 'opening_balance', 'receipt_voucher', 'payment_voucher'];
+      const standardTypes = ['invoice', 'purchase_invoice', 'receipt', 'payment', 'return', 'purchase_return', 'receipt_voucher', 'payment_voucher'];
       if (je.reference_type && standardTypes.includes(je.reference_type)) return;
 
       je.items?.forEach((item: any, idx: number) => {
         if (item.customer_id === selectedCustomerId && Number(item.credit) > 0) {
           const originalAmount = Number(item.credit) || 0;
-          const settled = getSettlementsForTarget(`${je.id}-${idx}`);
+          const settled = getSettlementsForTarget(`${je.id}-${idx}`, je.reference_type);
           const openAmount = originalAmount - settled;
 
           if (openAmount > 0.01) {
             const isDiscount = je.reference_type === 'customer_discount';
+            const isOpBal = je.reference_type === 'opening_balance';
             credits.push({
               id: `${je.id}-${idx}`,
               original_id: je.id,
               date: je.date,
-              type_label: isDiscount ? 'خصم مسموح به' : 'قيد يومية (دائن)',
+              type_label: isOpBal ? 'قيد رصيد أول' : (isDiscount ? 'خصم مسموح به' : 'قيد يومية (دائن)'),
               number: je.entry_number || je.id.slice(0, 8),
               page_name: isDiscount ? 'discounts' : 'journal_entries',
               original_amount: originalAmount,

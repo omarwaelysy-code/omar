@@ -549,7 +549,7 @@ export const PurchaseInvoices: React.FC = () => {
     return `${prefix}-${nextSeq}`;
   };
 
-  const getSettlementsForTarget = (targetId: string, excludeInvoiceId?: string) => {
+  const getSettlementsForTarget = (targetId: string, excludeInvoiceId?: string, jeRefType?: string) => {
     let settledSum = 0;
     
     const sumInvoiceSettlements = (invoicesList: any[]) => {
@@ -557,7 +557,7 @@ export const PurchaseInvoices: React.FC = () => {
         if (excludeInvoiceId && inv.id === excludeInvoiceId) return;
         if (inv.settlements && Array.isArray(inv.settlements)) {
           inv.settlements.forEach((s: any) => {
-            if (s.target_id === targetId) {
+            if (s.target_id === targetId || (jeRefType === 'opening_balance' && s.target_id === `OPEN-${invoiceData.supplier_id}`)) {
               settledSum += Number(s.settled_amount) || 0;
             }
           });
@@ -571,7 +571,7 @@ export const PurchaseInvoices: React.FC = () => {
           v.items.forEach(item => {
             if (item.settlements && Array.isArray(item.settlements)) {
               item.settlements.forEach((s: any) => {
-                if (s.target_id === targetId) {
+                if (s.target_id === targetId || (jeRefType === 'opening_balance' && s.target_id === `OPEN-${invoiceData.supplier_id}`)) {
                   settledSum += Number(s.settled_amount) || 0;
                 }
               });
@@ -711,7 +711,7 @@ export const PurchaseInvoices: React.FC = () => {
 
     // 3. Manual JEs
     entries.forEach(je => {
-      const standardTypes = ['invoice', 'purchase_invoice', 'receipt', 'payment', 'return', 'purchase_return', 'opening_balance', 'receipt_voucher', 'payment_voucher'];
+      const standardTypes = ['invoice', 'purchase_invoice', 'receipt', 'payment', 'return', 'purchase_return', 'receipt_voucher', 'payment_voucher'];
       if (je.reference_type && standardTypes.includes(je.reference_type)) {
         return;
       }
@@ -719,7 +719,7 @@ export const PurchaseInvoices: React.FC = () => {
       je.items?.forEach((item: any, idx: number) => {
         if (item.supplier_id === supplierId && Number(item.debit) > 0) {
           const originalAmount = Number(item.debit) || 0;
-          const invoiceSettled = getSettlementsForTarget(`${je.id}-${idx}`, editingInvoice?.id);
+          const invoiceSettled = getSettlementsForTarget(`${je.id}-${idx}`, editingInvoice?.id, je.reference_type);
           const openAmount = originalAmount - invoiceSettled;
 
           if (openAmount > 0.01 || formSettlements.some(fs => fs.target_id === `${je.id}-${idx}`)) {
@@ -727,7 +727,7 @@ export const PurchaseInvoices: React.FC = () => {
               id: `${je.id}-${idx}`,
               original_id: je.id,
               date: je.date,
-              type_label: 'قيد يومية',
+              type_label: je.reference_type === 'opening_balance' ? 'رصيد افتتاحي' : 'قيد يومية',
               number: je.entry_number || je.id.slice(0, 8),
               page_name: 'journal_entries',
               original_amount: originalAmount,
