@@ -3344,6 +3344,47 @@ export const Invoices: React.FC = () => {
                           }
                           return null;
                         })()}
+
+                        {/* Pending Sales Orders List */}
+                        {pendingOrders.length > 0 && (
+                          <div className="pt-1 border-t border-zinc-100 mt-1 space-y-1">
+                            <label className="block text-[9px] font-bold text-emerald-600 tracking-tighter px-0.5 uppercase flex items-center gap-1">
+                              <FileText className="w-3 h-3" />
+                              {language === 'ar' ? 'ربط بأوامر البيع المعلقة' : 'Link Pending Sales Orders'}
+                            </label>
+                            <div className="bg-zinc-50 border border-zinc-200 rounded-md p-1.5 overflow-hidden">
+                              <div className="overflow-x-auto max-h-24">
+                                <table className="w-full text-[10px] text-right">
+                                  <thead>
+                                    <tr className="text-zinc-400 font-bold border-b border-zinc-200 pb-0.5">
+                                      <th className="py-0.5 text-center w-6"></th>
+                                      <th className="py-0.5 text-right">{language === 'ar' ? 'رقم الأمر' : 'Order No'}</th>
+                                      <th className="py-0.5 text-right">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                                      <th className="py-0.5 text-right">{language === 'ar' ? 'الإجمالي' : 'Total'}</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-zinc-100">
+                                    {pendingOrders.map(order => (
+                                      <tr key={order.id} className="hover:bg-zinc-100/50">
+                                        <td className="py-1 text-center">
+                                          <input 
+                                            type="checkbox"
+                                            checked={selectedOrderIds.includes(order.id)}
+                                            onChange={(e) => handleOrderCheckboxChange(order.id, e.target.checked)}
+                                            className="rounded text-emerald-600 focus:ring-emerald-500 w-3 h-3 cursor-pointer"
+                                          />
+                                        </td>
+                                        <td className="py-1 font-mono text-emerald-700 font-bold">{order.order_number}</td>
+                                        <td className="py-1 text-zinc-500">{formatDate(order.date)}</td>
+                                        <td className="py-1 text-zinc-900 font-bold">{formatMoney(order.total_amount)} {companyData?.settings?.currency || ''}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </section>
 
