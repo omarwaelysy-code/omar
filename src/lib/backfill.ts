@@ -237,8 +237,234 @@ export async function backfillMissingJournalEntries(pool: any) {
       await client.query('COMMIT');
       console.log(`✅ [BACKFILL] Backfilled JE for Purchase Invoice ${invoiceNumber} successfully.`);
     }
+
+    // 2. Find all sales invoices that don't have journal entries
+    const missingSalesInvoicesRes = await client.query(`
+      SELECT i.* 
+      FROM invoices i
+      LEFT JOIN journal_entries je ON je.reference_id = i.id AND je.reference_type = 'invoice'
+      WHERE je.id IS NULL
+    `);
+    
+    console.log(`🔎 [BACKFILL] Found ${missingSalesInvoicesRes.rows.length} sales invoices missing journal entries.`);
+    
+    for (const invoice of missingSalesInvoicesRes.rows) {
+      try {
+        console.log(`⚙️ [BACKFILL] Backfilling JE for Sales Invoice ${invoice.invoice_number} (ID: ${invoice.id})...`);
+        
+        const invoiceId = invoice.id;
+        const companyId = invoice.company_id;
+        const invoiceNumber = invoice.invoice_number;
+        const totalAmount = parseFloat(invoice.total_amount || '0');
+        const discount = parseFloat(invoice.discount_amount || invoice.discount || '0');
+        const paymentType = invoice.payment_type || 'credit';
+        const paymentMethodId = invoice.payment_method_id;
+        
+        // Fetch customer
+        const customerRes = await client.query('SELECT * FROM customers WHERE id = $1', [invoice.customer_id]);
+        const customer = customerRes.rows[0];
+        
+        // Fetch invoice items
+        const itemsRes = await client.query('SELECT * FROM invoice_items WHERE invoice_id = $1', [invoiceId]);
+        const items = itemsRes.rows;
+        
+        // Fetch accounts
+        const accountsRes = await client.query('SELECT * FROM accounts WHERE company_id = $1', [companyId]);
+        const accounts = accountsRes.rows;
+        
+        // Fetch products
+        const productsRes = await client.query('SELECT * FROM products WHERE company_id = $1', [companyId]);
+        const products = productsRes.rows;
+        
+        // Fetch payment methods
+        const pmRes = await client.query('SELECT * FROM payment_methods WHERE company_id = $1', [companyId]);
+        const paymentMethods = pmRes.rows;
+
+        await client.query('BEGIN');
+        
+        // Determine Customer Account
+        let customerAccountId = customer?.account_id;
+        let customerAccountName = customer?.account_name;
+        if (!customerAccountId) {
+          const fallback = accounts.find((a: any) => a.name.includes('عملاء') || a.name.toLowerCase().includes('customer'));
+          customerAccountId = fallback?.id || 'customers_account_default';
+          customerAccountName = fallback?.name || 'حساب العملاء';
+        }
+   
+        // Generate standard sequence journal entry number
+        const entryNumber = await generateNextSequence(client, companyId, 'journal_entries', invoice.date);
+
+        const journalItems: any[] = [];
+        
+        // 1. Customer Debit Line (Accounts Receivable)
+        journalItems.push({
+          id: crypto.randomUUID(),
+          account_id: customerAccountId,
+          account_name: customerAccountName,
+          debit: totalAmount,
+          credit: 0,
+          description: `فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name || ''}`,
+          customer_id: invoice.customer_id,
+          customer_name: customer?.name,
+          sub_account_id: invoice.customer_id,
+          sub_account_type: 'customer'
+        });
+
+        // 2. Discount Line (if any)
+        if (discount > 0) {
+          const discountAccount = accounts.find((a: any) => 
+            a.name.includes('خصم مسموح به') || a.name.includes('خصم مبيعات') ||
+            a.name.toLowerCase().includes('discount allowed') || a.name.toLowerCase().includes('sales discount')
+          );
+          journalItems.push({
+            id: crypto.randomUUID(),
+            account_id: discountAccount?.id || 'sales_discount_default',
+            account_name: discountAccount?.name || 'حساب الخصم المسموح به',
+            debit: discount,
+            credit: 0,
+            description: `خصم فاتورة مبيعات رقم ${invoiceNumber}`
+          });
+        }
+
+        // 3. Items Credit Lines (Sales Revenue)
+        for (const item of items) {
+          const product = products.find((p: any) => p.id === item.product_id);
+          let creditAccountId = product?.revenue_account_id || '';
+          let creditAccountName = product?.revenue_account_name || '';
+          
+          if (!creditAccountId) {
+            const fallback = accounts.find((a: any) => a.name.includes('مبيعات') || a.name.includes('إيراد') || a.name.toLowerCase().includes('sales') || a.name.toLowerCase().includes('revenue'));
+            creditAccountId = fallback?.id || 'sales_account_default';
+            creditAccountName = fallback?.name || 'حساب المبيعات';
+          }
+
+          journalItems.push({
+            id: crypto.randomUUID(),
+            account_id: creditAccountId,
+            account_name: creditAccountName,
+            debit: 0,
+            credit: parseFloat(item.total || '0'),
+            description: `مبيعات صنف: ${item.product_name || ''} - فاتورة ${invoiceNumber}`
+          });
+        }
+
+        // 4. VAT Line (if any)
+        const vatTotal = items.reduce((sum, item) => sum + parseFloat(item.vat_amount || '0'), 0);
+        if (vatTotal > 0) {
+          const vatAccount = accounts.find((a: any) => 
+            a.name.includes('ضريبة القيمة المضافة') || a.name.includes('قيمة مضافة') || a.name.includes('ضريبة مبيعات') ||
+            a.name.toLowerCase().includes('vat') || a.name.toLowerCase().includes('tax')
+          );
+          const vatAccountId = vatAccount?.id || 'vat_liability_default';
+          const vatAccountName = vatAccount?.name || 'حساب ضريبة القيمة المضافة';
+          
+          journalItems.push({
+            id: crypto.randomUUID(),
+            account_id: vatAccountId,
+            account_name: vatAccountName,
+            debit: 0,
+            credit: vatTotal,
+            description: `ضريبة القيمة المضافة - فاتورة رقم ${invoiceNumber}`
+          });
+        }
+
+        // 5. Cash Payment Lines (if cash sale)
+        if (paymentType === 'cash') {
+          const pm = paymentMethods.find((p: any) => p.id === paymentMethodId);
+          let cashAccountId = pm?.account_id;
+          let cashAccountName = pm?.account_name;
+          if (!cashAccountId) {
+            const fallback = accounts.find((a: any) => 
+              a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق') ||
+              a.name.toLowerCase().includes('cash') || a.name.toLowerCase().includes('safe') || a.name.toLowerCase().includes('fund')
+            );
+            cashAccountId = fallback?.id || 'cash_account_default';
+            cashAccountName = fallback?.name || 'حساب النقدية';
+          }
+          
+          // Debit Cash
+          journalItems.push({
+            id: crypto.randomUUID(),
+            account_id: cashAccountId,
+            account_name: cashAccountName,
+            debit: totalAmount,
+            credit: 0,
+            description: `تحصيل فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name || ''}`,
+            sub_account_id: paymentMethodId,
+            sub_account_type: 'payment_method'
+          });
+
+          // Credit Customer
+          journalItems.push({
+            id: crypto.randomUUID(),
+            account_id: customerAccountId,
+            account_name: customerAccountName,
+            debit: 0,
+            credit: totalAmount,
+            description: `سداد فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name || ''}`,
+            customer_id: invoice.customer_id,
+            customer_name: customer?.name,
+            sub_account_id: invoice.customer_id,
+            sub_account_type: 'customer'
+          });
+        }
+
+        const totalDebit = journalItems.reduce((sum, item) => sum + item.debit, 0);
+        const totalCredit = journalItems.reduce((sum, item) => sum + item.credit, 0);
+        
+        const entryId = crypto.randomUUID();
+        
+        // Insert Journal Entry
+        await client.query(
+          `INSERT INTO "journal_entries" (id, company_id, entry_number, date, description, reference_id, reference_type, reference_number, total_debit, total_credit, created_at, created_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), 'system')`,
+          [
+            entryId,
+            companyId,
+            entryNumber,
+            invoice.date,
+            `قيد فاتورة مبيعات رقم: ${invoiceNumber}`,
+            invoiceId,
+            'invoice',
+            invoiceNumber,
+            totalDebit,
+            totalCredit
+          ]
+        );
+
+        // Insert Journal Entry Lines
+        for (const line of journalItems) {
+          await client.query(
+            `INSERT INTO "journal_entry_lines" 
+              (id, company_id, journal_entry_id, account_id, account_name, debit, credit, description, customer_id, supplier_id, customer_name, supplier_name, sub_account_id, sub_account_type, created_at)
+             VALUES 
+              ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL, $10, NULL, $11, $12, NOW())`,
+            [
+              line.id,
+              companyId,
+              entryId,
+              line.account_id,
+              line.account_name,
+              line.debit,
+              line.credit,
+              line.description,
+              line.customer_id || null,
+              line.customer_name || null,
+              line.sub_account_id || null,
+              line.sub_account_type || null
+            ]
+          );
+        }
+
+        await client.query('COMMIT');
+        console.log(`✅ [BACKFILL] Backfilled JE for Sales Invoice ${invoiceNumber} successfully.`);
+      } catch (invErr: any) {
+        if (client) await client.query('ROLLBACK');
+        console.error(`❌ [BACKFILL] Failed backfilling JE for Sales Invoice ${invoice.invoice_number}:`, invErr.message);
+      }
+    }
+
   } catch (err: any) {
-    if (client) await client.query('ROLLBACK');
     console.error("❌ [BACKFILL] Failed during backfilling missing journal entries:", err.message);
   } finally {
     client.release();
