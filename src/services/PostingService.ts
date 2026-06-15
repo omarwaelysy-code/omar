@@ -21,9 +21,9 @@ export class PostingService {
    */
   static generateInvoiceJournal(invoice: Invoice, customers: Customer[], products: Product[], accounts: Account[], paymentMethods: PaymentMethod[]): Omit<JournalEntry, 'id'> {
     const customer = customers.find(c => c.id === invoice.customer_id);
-    const subtotal = invoice.subtotal || 0;
-    const discount = invoice.discount_amount || invoice.discount || 0;
-    const total_amount = invoice.total_amount;
+    const subtotal = Number(invoice.subtotal) || 0;
+    const discount = Number(invoice.discount_amount || invoice.discount) || 0;
+    const total_amount = Number(invoice.total_amount) || 0;
 
     const journalItems: JournalEntryItem[] = [];
     
@@ -112,7 +112,7 @@ export class PostingService {
         account_id: salesAccountId,
         account_name: salesAccountName,
         debit: 0,
-        credit: item.total,
+        credit: Number(item.total) || 0,
         description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoice.invoice_number}`
       });
     });
@@ -124,8 +124,8 @@ export class PostingService {
       reference_type: 'invoice',
       description: `قيد فاتورة مبيعات رقم: ${invoice.invoice_number}`,
       items: journalItems,
-      total_debit: total_amount + discount,
-      total_credit: total_amount + discount,
+      total_debit: Number(journalItems.reduce((sum, i) => sum + (Number(i.debit) || 0), 0).toFixed(2)),
+      total_credit: Number(journalItems.reduce((sum, i) => sum + (Number(i.credit) || 0), 0).toFixed(2)),
       company_id: invoice.company_id || '',
       created_at: new Date().toISOString(),
       created_by: invoice.id // Placeholder or system
@@ -178,7 +178,7 @@ export class PostingService {
 
   static generateReturnJournal(doc: Return, customers: Customer[], products: Product[], accounts: Account[], paymentMethods: PaymentMethod[]): Omit<JournalEntry, 'id'> {
     const customer = customers.find(c => c.id === doc.customer_id);
-    const total_amount = doc.total_amount;
+    const total_amount = Number(doc.total_amount) || 0;
 
     const journalItems: JournalEntryItem[] = [];
 
@@ -197,7 +197,7 @@ export class PostingService {
       journalItems.push({
         account_id: salesReturnAccountId,
         account_name: salesReturnAccountName,
-        debit: item.total,
+        debit: Number(item.total) || 0,
         credit: 0,
         description: `مردودات مبيعات: ${item.product_name} - مرتجع ${doc.return_number || doc.id.slice(-6)}`
       });
@@ -264,8 +264,8 @@ export class PostingService {
       reference_type: 'return',
       description: `قيد مرتجع مبيعات رقم: ${doc.return_number || ''}`,
       items: journalItems,
-      total_debit: journalItems.reduce((sum, i) => sum + i.debit, 0),
-      total_credit: journalItems.reduce((sum, i) => sum + i.credit, 0),
+      total_debit: Number(journalItems.reduce((sum, i) => sum + (Number(i.debit) || 0), 0).toFixed(2)),
+      total_credit: Number(journalItems.reduce((sum, i) => sum + (Number(i.credit) || 0), 0).toFixed(2)),
       company_id: '',
       created_at: new Date().toISOString(),
       created_by: 'system'
@@ -274,7 +274,7 @@ export class PostingService {
 
   static generatePurchaseInvoiceJournal(doc: PurchaseInvoice, suppliers: Supplier[], products: Product[], accounts: Account[], paymentMethods: PaymentMethod[]): Omit<JournalEntry, 'id'> {
     const supplier = suppliers.find(s => s.id === doc.supplier_id);
-    const total_amount = doc.total_amount;
+    const total_amount = Number(doc.total_amount) || 0;
 
     const journalItems: JournalEntryItem[] = [];
 
@@ -293,7 +293,7 @@ export class PostingService {
       journalItems.push({
         account_id: purchaseAccountId,
         account_name: purchaseAccountName,
-        debit: item.total,
+        debit: Number(item.total) || 0,
         credit: 0,
         description: `مشتريات: ${item.product_name} - فاتورة ${doc.invoice_number}`
       });
@@ -360,8 +360,8 @@ export class PostingService {
       reference_type: 'purchase_invoice',
       description: `قيد فاتورة مشتريات رقم: ${doc.invoice_number}`,
       items: journalItems,
-      total_debit: total_amount,
-      total_credit: total_amount,
+      total_debit: Number(journalItems.reduce((sum, i) => sum + (Number(i.debit) || 0), 0).toFixed(2)),
+      total_credit: Number(journalItems.reduce((sum, i) => sum + (Number(i.credit) || 0), 0).toFixed(2)),
       company_id: '',
       created_at: new Date().toISOString(),
       created_by: 'system'
@@ -370,7 +370,7 @@ export class PostingService {
 
   static generatePurchaseReturnJournal(doc: PurchaseReturn, suppliers: Supplier[], products: Product[], accounts: Account[], paymentMethods: PaymentMethod[]): Omit<JournalEntry, 'id'> {
     const supplier = suppliers.find(s => s.id === doc.supplier_id);
-    const total_amount = doc.total_amount;
+    const total_amount = Number(doc.total_amount) || 0;
 
     const journalItems: JournalEntryItem[] = [];
 
@@ -444,7 +444,7 @@ export class PostingService {
         account_id: purchaseReturnAccountId,
         account_name: purchaseReturnAccountName,
         debit: 0,
-        credit: item.total,
+        credit: Number(item.total) || 0,
         description: `مرتجع مشتريات: ${item.product_name} - رقم ${doc.return_number}`
       });
     });
@@ -456,8 +456,8 @@ export class PostingService {
       reference_type: 'purchase_return',
       description: `قيد مرتجع مشتريات رقم: ${doc.return_number || ''}`,
       items: journalItems,
-      total_debit: total_amount,
-      total_credit: total_amount,
+      total_debit: Number(journalItems.reduce((sum, i) => sum + (Number(i.debit) || 0), 0).toFixed(2)),
+      total_credit: Number(journalItems.reduce((sum, i) => sum + (Number(i.credit) || 0), 0).toFixed(2)),
       company_id: '',
       created_at: new Date().toISOString(),
       created_by: 'system'
@@ -467,7 +467,7 @@ export class PostingService {
   static generateTransferJournal(doc: any, paymentMethods: PaymentMethod[], accounts: Account[]): Omit<JournalEntry, 'id'> {
     const fromPm = paymentMethods.find(p => p.id === doc.from_payment_method_id);
     const toPm = paymentMethods.find(p => p.id === doc.to_payment_method_id);
-    const amount = doc.amount;
+    const amount = Number(doc.amount) || 0;
 
     return {
       date: doc.date,
@@ -506,6 +506,7 @@ export class PostingService {
   static generateReceiptJournal(doc: ReceiptVoucher, customers: Customer[], accounts: Account[], paymentMethods: PaymentMethod[]): Omit<JournalEntry, 'id'> {
     const customer = customers.find(c => c.id === doc.customer_id);
     const pm = paymentMethods.find(p => p.id === doc.payment_method_id);
+    const amount = Number(doc.amount) || 0;
     
     let cashAccountId = pm?.account_id || '';
     let cashAccountName = pm?.account_name || '';
@@ -533,7 +534,7 @@ export class PostingService {
         {
           account_id: cashAccountId,
           account_name: cashAccountName,
-          debit: doc.amount,
+          debit: amount,
           credit: 0,
           description: `تحصيل من العميل: ${doc.customer_name || customer?.name || ''}`
         },
@@ -541,14 +542,14 @@ export class PostingService {
           account_id: customerAccountId,
           account_name: customerAccountName,
           debit: 0,
-          credit: doc.amount,
+          credit: amount,
           description: `سند قبض رقم: ${doc.voucher_number || ''}`,
           customer_id: doc.customer_id,
           customer_name: doc.customer_name || customer?.name
         }
       ],
-      total_debit: doc.amount,
-      total_credit: doc.amount,
+      total_debit: amount,
+      total_credit: amount,
       company_id: '',
       created_at: new Date().toISOString(),
       created_by: 'system'
@@ -558,6 +559,7 @@ export class PostingService {
   static generatePaymentVoucherJournal(doc: PaymentVoucher, suppliers: Supplier[], accounts: Account[], paymentMethods: PaymentMethod[]): Omit<JournalEntry, 'id'> {
     const supplier = suppliers.find(s => s.id === doc.supplier_id);
     const pm = paymentMethods.find(p => p.id === doc.payment_method_id);
+    const amount = Number(doc.amount) || 0;
     
     let cashAccountId = pm?.account_id || '';
     let cashAccountName = pm?.account_name || '';
@@ -591,7 +593,7 @@ export class PostingService {
         {
           account_id: targetAccountId,
           account_name: targetAccountName || 'حساب مدين',
-          debit: doc.amount,
+          debit: amount,
           credit: 0,
           description: doc.description,
           supplier_id: doc.supplier_id,
