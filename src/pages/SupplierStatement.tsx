@@ -82,12 +82,13 @@ export const SupplierStatement: React.FC = () => {
             const opBal = supplier?.opening_balance || 0;
             setOpeningBalance(opBal);
 
-            const [invoices, returns, vouchers, discounts, journalEntries] = await Promise.all([
+            const [invoices, returns, vouchers, discounts, journalEntries, accounts] = await Promise.all([
               dbService.list<PurchaseInvoice>('purchase_invoices', user.company_id),
               dbService.list<PurchaseReturn>('purchase_returns', user.company_id),
               dbService.list<PaymentVoucher>('payment_vouchers', user.company_id),
               dbService.list<any>('supplier_discounts', user.company_id),
-              dbService.list<any>('journal_entries', user.company_id)
+              dbService.list<any>('journal_entries', user.company_id),
+              dbService.list<any>('accounts', user.company_id)
             ]);
 
             const invoicesMap = invoices.reduce((acc, inv) => { acc[inv.invoice_number] = inv; return acc; }, {} as Record<string, PurchaseInvoice>);
@@ -103,7 +104,15 @@ export const SupplierStatement: React.FC = () => {
             journalEntries.forEach((je: any) => {
               je.items?.forEach((item: any) => {
                 const matchesEntity = item.supplier_id === savedSupId || item.sub_account_id === savedSupId;
-                if (matchesEntity && item.account_id === supplier?.account_id) {
+                const isSupplierAccount = (() => {
+                  if (supplier?.account_id) {
+                    return item.account_id === supplier.account_id;
+                  }
+                  const fallback = accounts.find((a: any) => a.name.includes('موردين'));
+                  const fallbackId = fallback?.id || 'suppliers_account_default';
+                  return item.account_id === fallbackId || item.account_id === 'suppliers_default' || item.account_id === 'suppliers_account_default' || item.account_id === 'supplier_account_default';
+                })();
+                if (matchesEntity && isSupplierAccount) {
                   let notes = item.description || je.description || 'قيد مالي';
                   let mappedType = je.reference_type || 'manual';
                   if (mappedType === 'payment') mappedType = 'payment_voucher';
@@ -189,12 +198,13 @@ export const SupplierStatement: React.FC = () => {
       const opBal = supplier?.opening_balance || 0;
       setOpeningBalance(opBal);
 
-      const [invoices, returns, vouchers, discounts, journalEntries] = await Promise.all([
+      const [invoices, returns, vouchers, discounts, journalEntries, accounts] = await Promise.all([
         dbService.list<PurchaseInvoice>('purchase_invoices', user.company_id),
         dbService.list<PurchaseReturn>('purchase_returns', user.company_id),
         dbService.list<PaymentVoucher>('payment_vouchers', user.company_id),
         dbService.list<any>('supplier_discounts', user.company_id),
-        dbService.list<any>('journal_entries', user.company_id)
+        dbService.list<any>('journal_entries', user.company_id),
+        dbService.list<any>('accounts', user.company_id)
       ]);
 
       // Create maps for efficient lookups
@@ -222,7 +232,15 @@ export const SupplierStatement: React.FC = () => {
           // Only count lines that have the supplier_id AND match the supplier's ledger account
           // This prevents double entries if supplier_id was accidentally set on both sides of a transaction
           const matchesEntity = item.supplier_id === selectedSupplierId || item.sub_account_id === selectedSupplierId;
-          if (matchesEntity && item.account_id === supplier?.account_id) {
+          const isSupplierAccount = (() => {
+            if (supplier?.account_id) {
+              return item.account_id === supplier.account_id;
+            }
+            const fallback = accounts.find((a: any) => a.name.includes('موردين'));
+            const fallbackId = fallback?.id || 'suppliers_account_default';
+            return item.account_id === fallbackId || item.account_id === 'suppliers_default' || item.account_id === 'suppliers_account_default' || item.account_id === 'supplier_account_default';
+          })();
+          if (matchesEntity && isSupplierAccount) {
             let notes = item.description || je.description || 'قيد مالي';
             let mappedType = je.reference_type || 'manual';
             if (mappedType === 'payment') mappedType = 'payment_voucher';

@@ -85,9 +85,10 @@ export const CustomerBalances: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [custs, journalEntries] = await Promise.all([
+      const [custs, journalEntries, accounts] = await Promise.all([
         dbService.list<Customer>('customers', user.company_id),
-        dbService.list<any>('journal_entries', user.company_id)
+        dbService.list<any>('journal_entries', user.company_id),
+        dbService.list<any>('accounts', user.company_id)
       ]);
 
       const balances = custs.map((customer: any) => {
@@ -96,7 +97,15 @@ export const CustomerBalances: React.FC = () => {
         journalEntries.forEach((je: any) => {
           je.items?.forEach((item: any) => {
             const matchesEntity = item.customer_id === customer.id || item.sub_account_id === customer.id;
-            if (matchesEntity && item.account_id === customer.account_id) {
+            const isCustomerAccount = (() => {
+              if (customer?.account_id) {
+                return item.account_id === customer.account_id;
+              }
+              const fallback = accounts.find((a: any) => a.name.includes('عملاء'));
+              const fallbackId = fallback?.id || 'customers_default';
+              return item.account_id === fallbackId || item.account_id === 'customers_default' || item.account_id === 'customers_account_default';
+            })();
+            if (matchesEntity && isCustomerAccount) {
               customerLines.push({
                 date: je.date,
                 reference_type: je.reference_type,

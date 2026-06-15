@@ -39,6 +39,7 @@ export const SupplierSettlements: React.FC = () => {
   const [allJournalEntries, setAllJournalEntries] = useState<any[]>([]);
   const [allPurchaseInvoices, setAllPurchaseInvoices] = useState<any[]>([]);
   const [allPayments, setAllPayments] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Active states
@@ -63,7 +64,6 @@ export const SupplierSettlements: React.FC = () => {
   // History Detail modal
   const [selectedHistory, setSelectedHistory] = useState<any | null>(null);
 
-  // Subscribe to all required DB collections
   useEffect(() => {
     if (user) {
       const unsubSuppliers = dbService.subscribe<Supplier>('suppliers', user.company_id, setSuppliers);
@@ -74,6 +74,7 @@ export const SupplierSettlements: React.FC = () => {
       const unsubJEs = dbService.subscribe<any>('journal_entries', user.company_id, setAllJournalEntries);
       const unsubPI = dbService.subscribe<any>('purchase_invoices', user.company_id, setAllPurchaseInvoices);
       const unsubPayments = dbService.subscribe<any>('payment_vouchers', user.company_id, setAllPayments);
+      const unsubAccounts = dbService.subscribe<any>('accounts', user.company_id, setAccounts);
 
       setLoading(false);
 
@@ -86,6 +87,7 @@ export const SupplierSettlements: React.FC = () => {
         unsubJEs();
         unsubPI();
         unsubPayments();
+        unsubAccounts();
       };
     }
   }, [user]);
@@ -366,7 +368,15 @@ export const SupplierSettlements: React.FC = () => {
 
       je.items?.forEach((item: any, idx: number) => {
         const matchesEntity = item.supplier_id === selectedSupplierId || item.sub_account_id === selectedSupplierId;
-        if (matchesEntity && Number(item.debit) > 0 && item.account_id === supplier?.account_id) {
+        const isSupplierAccount = (() => {
+          if (supplier?.account_id) {
+            return item.account_id === supplier.account_id;
+          }
+          const fallback = accounts.find((a: any) => a.name.includes('موردين'));
+          const fallbackId = fallback?.id || 'suppliers_account_default';
+          return item.account_id === fallbackId || item.account_id === 'suppliers_default' || item.account_id === 'suppliers_account_default' || item.account_id === 'supplier_account_default';
+        })();
+        if (matchesEntity && Number(item.debit) > 0 && isSupplierAccount) {
           const originalAmount = Number(item.debit) || 0;
           const settled = getSettlementsForTarget(`${je.id}-${idx}`, je.reference_type);
           const openAmount = originalAmount - settled;
@@ -429,7 +439,15 @@ export const SupplierSettlements: React.FC = () => {
 
       je.items?.forEach((item: any, idx: number) => {
         const matchesEntity = item.supplier_id === selectedSupplierId || item.sub_account_id === selectedSupplierId;
-        if (matchesEntity && Number(item.credit) > 0 && item.account_id === supplier?.account_id) {
+        const isSupplierAccount = (() => {
+          if (supplier?.account_id) {
+            return item.account_id === supplier.account_id;
+          }
+          const fallback = accounts.find((a: any) => a.name.includes('موردين'));
+          const fallbackId = fallback?.id || 'suppliers_account_default';
+          return item.account_id === fallbackId || item.account_id === 'suppliers_default' || item.account_id === 'suppliers_account_default' || item.account_id === 'supplier_account_default';
+        })();
+        if (matchesEntity && Number(item.credit) > 0 && isSupplierAccount) {
           const originalAmount = Number(item.credit) || 0;
           const settled = getSettlementsForTarget(`${je.id}-${idx}`, je.reference_type);
           const openAmount = originalAmount - settled;

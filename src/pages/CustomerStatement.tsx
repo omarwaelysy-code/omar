@@ -78,14 +78,14 @@ export const CustomerStatement: React.FC = () => {
           setLoading(true);
           const customer = customers.find(c => c.id === savedCustId) || null;
           setCustomerInfo(customer);
-          
           try {
-            const [invoices, receipts, returns, discounts, journalEntries] = await Promise.all([
+            const [invoices, receipts, returns, discounts, journalEntries, accounts] = await Promise.all([
               dbService.list<Invoice>('invoices', user.company_id),
               dbService.list<ReceiptVoucher>('receipt_vouchers', user.company_id),
               dbService.list<Return>('returns', user.company_id),
               dbService.list<any>('customer_discounts', user.company_id),
-              dbService.list<any>('journal_entries', user.company_id)
+              dbService.list<any>('journal_entries', user.company_id),
+              dbService.list<any>('accounts', user.company_id)
             ]);
 
             const invoicesMap = invoices.reduce((acc, inv) => { acc[inv.invoice_number] = inv; return acc; }, {} as Record<string, Invoice>);
@@ -96,7 +96,15 @@ export const CustomerStatement: React.FC = () => {
             journalEntries.forEach((je: any) => {
               je.items?.forEach((item: any) => {
                 const matchesEntity = item.customer_id === savedCustId || item.sub_account_id === savedCustId;
-                if (matchesEntity && item.account_id === customer?.account_id) {
+                const isCustomerAccount = (() => {
+                  if (customer?.account_id) {
+                    return item.account_id === customer.account_id;
+                  }
+                  const fallback = accounts.find((a: any) => a.name.includes('عملاء'));
+                  const fallbackId = fallback?.id || 'customers_default';
+                  return item.account_id === fallbackId || item.account_id === 'customers_default' || item.account_id === 'customers_account_default';
+                })();
+                if (matchesEntity && isCustomerAccount) {
                   let description = item.description || je.description || 'قيد مالي';
                   let mappedType = je.reference_type || 'journal';
                   if (mappedType === 'receipt') mappedType = 'receipt_voucher';
@@ -196,14 +204,14 @@ export const CustomerStatement: React.FC = () => {
     setLoading(true);
     const customer = customers.find(c => c.id === selectedCustomerId) || null;
     setCustomerInfo(customer);
-
     try {
-      const [invoices, receipts, returns, discounts, journalEntries] = await Promise.all([
+      const [invoices, receipts, returns, discounts, journalEntries, accounts] = await Promise.all([
         dbService.list<Invoice>('invoices', user.company_id),
         dbService.list<ReceiptVoucher>('receipt_vouchers', user.company_id),
         dbService.list<Return>('returns', user.company_id),
         dbService.list<any>('customer_discounts', user.company_id),
-        dbService.list<any>('journal_entries', user.company_id)
+        dbService.list<any>('journal_entries', user.company_id),
+        dbService.list<any>('accounts', user.company_id)
       ]);
 
       // Create maps for efficient lookups
@@ -230,7 +238,15 @@ export const CustomerStatement: React.FC = () => {
           // Only count lines that have the customer_id AND match the customer's ledger account
           // This prevents double entries if customer_id was accidentally set on both sides of a transaction
           const matchesEntity = item.customer_id === selectedCustomerId || item.sub_account_id === selectedCustomerId;
-          if (matchesEntity && item.account_id === customer?.account_id) {
+          const isCustomerAccount = (() => {
+            if (customer?.account_id) {
+              return item.account_id === customer.account_id;
+            }
+            const fallback = accounts.find((a: any) => a.name.includes('عملاء'));
+            const fallbackId = fallback?.id || 'customers_default';
+            return item.account_id === fallbackId || item.account_id === 'customers_default' || item.account_id === 'customers_account_default';
+          })();
+          if (matchesEntity && isCustomerAccount) {
             let description = item.description || je.description || 'قيد مالي';
             let mappedType = je.reference_type || 'journal';
             if (mappedType === 'receipt') mappedType = 'receipt_voucher';

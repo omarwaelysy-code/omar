@@ -85,9 +85,10 @@ export const SupplierBalances: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [sups, journalEntries] = await Promise.all([
+      const [sups, journalEntries, accounts] = await Promise.all([
         dbService.list<Supplier>('suppliers', user.company_id),
-        dbService.list<any>('journal_entries', user.company_id)
+        dbService.list<any>('journal_entries', user.company_id),
+        dbService.list<any>('accounts', user.company_id)
       ]);
 
       const balances = sups.map((supplier: any) => {
@@ -96,7 +97,15 @@ export const SupplierBalances: React.FC = () => {
         journalEntries.forEach((je: any) => {
           je.items?.forEach((item: any) => {
             const matchesEntity = item.supplier_id === supplier.id || item.sub_account_id === supplier.id;
-            if (matchesEntity && item.account_id === supplier.account_id) {
+            const isSupplierAccount = (() => {
+              if (supplier?.account_id) {
+                return item.account_id === supplier.account_id;
+              }
+              const fallback = accounts.find((a: any) => a.name.includes('موردين'));
+              const fallbackId = fallback?.id || 'suppliers_account_default';
+              return item.account_id === fallbackId || item.account_id === 'suppliers_default' || item.account_id === 'suppliers_account_default' || item.account_id === 'supplier_account_default';
+            })();
+            if (matchesEntity && isSupplierAccount) {
               supplierLines.push({
                 date: je.date,
                 reference_type: je.reference_type,

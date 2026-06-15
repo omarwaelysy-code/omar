@@ -38,6 +38,7 @@ export const CustomerSettlements: React.FC = () => {
   const [allPurchaseReturns, setAllPurchaseReturns] = useState<any[]>([]);
   const [allJournalEntries, setAllJournalEntries] = useState<any[]>([]);
   const [allPurchaseInvoices, setAllPurchaseInvoices] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Active states
@@ -62,7 +63,6 @@ export const CustomerSettlements: React.FC = () => {
   // History Detail modal
   const [selectedHistory, setSelectedHistory] = useState<any | null>(null);
 
-  // Subscribe to all required DB collections
   useEffect(() => {
     if (user) {
       const unsubCustomers = dbService.subscribe<Customer>('customers', user.company_id, setCustomers);
@@ -72,6 +72,7 @@ export const CustomerSettlements: React.FC = () => {
       const unsubPR = dbService.subscribe<any>('purchase_returns', user.company_id, setAllPurchaseReturns);
       const unsubJEs = dbService.subscribe<any>('journal_entries', user.company_id, setAllJournalEntries);
       const unsubPI = dbService.subscribe<any>('purchase_invoices', user.company_id, setAllPurchaseInvoices);
+      const unsubAccounts = dbService.subscribe<any>('accounts', user.company_id, setAccounts);
 
       setLoading(false);
 
@@ -83,6 +84,7 @@ export const CustomerSettlements: React.FC = () => {
         unsubPR();
         unsubJEs();
         unsubPI();
+        unsubAccounts();
       };
     }
   }, [user]);
@@ -307,7 +309,15 @@ export const CustomerSettlements: React.FC = () => {
 
       je.items?.forEach((item: any, idx: number) => {
         const matchesEntity = item.customer_id === selectedCustomerId || item.sub_account_id === selectedCustomerId;
-        if (matchesEntity && Number(item.debit) > 0 && item.account_id === customer?.account_id) {
+        const isCustomerAccount = (() => {
+          if (customer?.account_id) {
+            return item.account_id === customer.account_id;
+          }
+          const fallback = accounts.find((a: any) => a.name.includes('عملاء'));
+          const fallbackId = fallback?.id || 'customers_default';
+          return item.account_id === fallbackId || item.account_id === 'customers_default' || item.account_id === 'customers_account_default';
+        })();
+        if (matchesEntity && Number(item.debit) > 0 && isCustomerAccount) {
           const originalAmount = Number(item.debit) || 0;
           const settled = getSettlementsForTarget(`${je.id}-${idx}`, je.reference_type);
           const openAmount = originalAmount - settled;
@@ -420,7 +430,15 @@ export const CustomerSettlements: React.FC = () => {
 
       je.items?.forEach((item: any, idx: number) => {
         const matchesEntity = item.customer_id === selectedCustomerId || item.sub_account_id === selectedCustomerId;
-        if (matchesEntity && Number(item.credit) > 0 && item.account_id === customer?.account_id) {
+        const isCustomerAccount = (() => {
+          if (customer?.account_id) {
+            return item.account_id === customer.account_id;
+          }
+          const fallback = accounts.find((a: any) => a.name.includes('عملاء'));
+          const fallbackId = fallback?.id || 'customers_default';
+          return item.account_id === fallbackId || item.account_id === 'customers_default' || item.account_id === 'customers_account_default';
+        })();
+        if (matchesEntity && Number(item.credit) > 0 && isCustomerAccount) {
           const originalAmount = Number(item.credit) || 0;
           const settled = getSettlementsForTarget(`${je.id}-${idx}`, je.reference_type);
           const openAmount = originalAmount - settled;

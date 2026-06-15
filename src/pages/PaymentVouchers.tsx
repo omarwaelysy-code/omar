@@ -212,52 +212,7 @@ export const PaymentVouchers: React.FC = () => {
   };
 
   const getUniqueSettlementsForVoucherItem = (item: any, idx: number) => {
-    const uniqueMap = new Map<string, any>();
-
-    // 1. Add voucher side settlements
-    if (item.settlements && Array.isArray(item.settlements)) {
-      item.settlements.forEach((s: any) => {
-        uniqueMap.set(s.target_id, {
-          target_id: s.target_id,
-          settled_amount: Number(s.settled_amount) || 0,
-          settlement_number: s.settlement_number || '',
-          settlement_date: s.settlement_date || '',
-          type_label: s.type_label || '',
-          reference_number: s.reference_number || ''
-        });
-      });
-    }
-
-    // 2. Add invoice side settlements
-    if (editingVoucher) {
-      const targetId = `${editingVoucher.id}-${idx}`;
-      const sumFromList = (list: any[]) => {
-        if (!Array.isArray(list)) return;
-        list.forEach(inv => {
-          if (!inv) return;
-          if (inv.settlements && Array.isArray(inv.settlements)) {
-            inv.settlements.forEach((s: any) => {
-              if (s && String(s.target_id) === String(targetId)) {
-                if (!uniqueMap.has(inv.id)) {
-                  uniqueMap.set(inv.id, {
-                    target_id: inv.id,
-                    settled_amount: Number(s.settled_amount || s.amount) || 0,
-                    settlement_number: s.settlement_number || '',
-                    settlement_date: s.settlement_date || s.date || '',
-                    type_label: 'فاتورة مشتريات',
-                    reference_number: inv.invoice_number || ''
-                  });
-                }
-              }
-            });
-          }
-        });
-      };
-      sumFromList(allInvoices);
-      sumFromList(allPurchaseInvoices);
-    }
-
-    return Array.from(uniqueMap.values());
+    return item.settlements || [];
   };
 
   const calculateOpenAmounts = (
@@ -1452,7 +1407,6 @@ export const PaymentVouchers: React.FC = () => {
       
       if (!fullData) throw new Error('Payment voucher not found');
 
-      setEditingVoucher(fullData);
       setInternalRef(fullData.internal_reference || fullData.voucher_number || '');
       
       // Ensure we have a clean copy of items or create from old format
@@ -1485,7 +1439,6 @@ export const PaymentVouchers: React.FC = () => {
         });
       } else {
         // Convert old single-type format to multi-item array
-        // IMPORTANT: We prioritize supplier_id and expense_category_id as the "Benefit" side.
         if (fullData.supplier_id && fullData.supplier_id !== '') {
           items.push({ 
             type: 'supplier', 
@@ -1508,7 +1461,6 @@ export const PaymentVouchers: React.FC = () => {
             description: fullData.description || '' 
           });
         } else if (fullData.account_id && fullData.account_id !== '' && fullData.account_id !== fullData.payment_method_account_id) {
-          // Careful: do not map the payment method's account as the beneficiary
           const isPaymentMethodAccount = paymentMethods.some(pm => pm.account_id === fullData.account_id);
           if (!isPaymentMethodAccount || (!fullData.supplier_id && !fullData.expense_category_id && !fullData.customer_id)) {
             items.push({ 
@@ -1521,11 +1473,72 @@ export const PaymentVouchers: React.FC = () => {
         }
       }
 
+      const mergedItems = items.map((item: any, idx: number) => {
+        const uniqueMap = new Map<string, any>();
+        
+        // 1. Add voucher side settlements
+        if (item.settlements && Array.isArray(item.settlements)) {
+          item.settlements.forEach((s: any) => {
+            uniqueMap.set(s.target_id, {
+              target_id: s.target_id,
+              settled_amount: Number(s.settled_amount) || 0,
+              settlement_number: s.settlement_number || '',
+              settlement_date: s.settlement_date || '',
+              type: s.type || 'purchase_invoice',
+              type_label: s.type_label || '',
+              reference_number: s.reference_number || '',
+              entry_number: s.entry_number || '',
+              date: s.date || '',
+              original_amount: s.original_amount || 0
+            });
+          });
+        }
+
+        // 2. Add invoice side settlements
+        const targetId = `${fullData.id}-${idx}`;
+        const mergeFromList = (list: any[], type: 'invoice' | 'purchase_invoice', typeLabel: string) => {
+          if (!Array.isArray(list)) return;
+          list.forEach(inv => {
+            if (!inv) return;
+            if (inv.settlements && Array.isArray(inv.settlements)) {
+              inv.settlements.forEach((s: any) => {
+                if (s && String(s.target_id) === String(targetId)) {
+                  if (!uniqueMap.has(inv.id)) {
+                    uniqueMap.set(inv.id, {
+                      target_id: inv.id,
+                      settled_amount: Number(s.settled_amount || s.amount) || 0,
+                      settlement_number: s.settlement_number || '',
+                      settlement_date: s.settlement_date || s.date || '',
+                      type,
+                      type_label: typeLabel,
+                      reference_number: inv.invoice_number || '',
+                      entry_number: inv.entry_number || '',
+                      date: inv.date || '',
+                      original_amount: inv.total_amount || 0
+                    });
+                  }
+                }
+              });
+            }
+          });
+        };
+        mergeFromList(allInvoices, 'invoice', 'فاتورة مبيعات');
+        mergeFromList(allPurchaseInvoices, 'purchase_invoice', 'فاتورة مشتريات');
+
+        return {
+          ...item,
+          settlements: Array.from(uniqueMap.values())
+        };
+      });
+
+      fullData.items = mergedItems;
+      setEditingVoucher(fullData);
+
       setVoucherData({
         internal_reference: fullData.internal_reference || fullData.voucher_number || fullData.number || '',
         manual_reference: fullData.manual_reference || '',
-        items: items,
-        type: 'multi', // Force multi mode for everything going forward
+        items: mergedItems,
+        type: 'multi',
         supplier_id: fullData.supplier_id?.toString() || '',
         expense_category_id: fullData.expense_category_id?.toString() || '',
         customer_id: fullData.customer_id?.toString() || '',
@@ -1535,8 +1548,8 @@ export const PaymentVouchers: React.FC = () => {
         notes: fullData.description || fullData.notes || ''
       });
       const datesDict: Record<string, string> = {};
-      if (items && Array.isArray(items)) {
-        items.forEach((item: any, itemIdx: number) => {
+      if (mergedItems && Array.isArray(mergedItems)) {
+        mergedItems.forEach((item: any, itemIdx: number) => {
           if (item.settlements && Array.isArray(item.settlements)) {
             item.settlements.forEach((s: any) => {
               if (s.target_id) {
