@@ -6,7 +6,7 @@ import { FileSpreadsheet, Download, Search, User, Wallet, ArrowUpRight, RefreshC
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
-import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
+import { formatNumber, formatMoney, formatDate, isCustomerAccount } from '../utils/formatUtils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNavigation } from '../contexts/NavigationContext';
 
@@ -97,15 +97,7 @@ export const CustomerBalances: React.FC = () => {
         journalEntries.forEach((je: any) => {
           je.items?.forEach((item: any) => {
             const matchesEntity = item.customer_id === customer.id || item.sub_account_id === customer.id;
-            const isCustomerAccount = (() => {
-              if (customer?.account_id) {
-                return item.account_id === customer.account_id;
-              }
-              const fallback = accounts.find((a: any) => a.name.includes('عملاء'));
-              const fallbackId = fallback?.id || 'customers_default';
-              return item.account_id === fallbackId || item.account_id === 'customers_default' || item.account_id === 'customers_account_default';
-            })();
-            if (matchesEntity && isCustomerAccount) {
+            if (matchesEntity && isCustomerAccount(item.account_id, customer, accounts)) {
               customerLines.push({
                 date: je.date,
                 reference_type: je.reference_type,

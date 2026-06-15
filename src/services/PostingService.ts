@@ -16,6 +16,35 @@ import {
 import { dbService } from './dbService';
 
 export class PostingService {
+  static resolveAccount(
+    accounts: Account[],
+    keywords: string[],
+    fallbackId: string,
+    fallbackName: string
+  ): { id: string; name: string } {
+    // 1. Try finding by exact matching name (case-insensitive)
+    for (const kw of keywords) {
+      const found = accounts.find(a => a.name.trim().toLowerCase() === kw.trim().toLowerCase());
+      if (found) return { id: found.id, name: found.name };
+    }
+
+    // 2. Try finding by includes matching name (case-insensitive)
+    for (const kw of keywords) {
+      const found = accounts.find(a => a.name.toLowerCase().includes(kw.toLowerCase()));
+      if (found) return { id: found.id, name: found.name };
+    }
+
+    // 3. Fallback to any active account in the list to avoid foreign key violations
+    if (accounts && accounts.length > 0) {
+      const activeAccount = accounts.find(a => a.is_active !== false);
+      if (activeAccount) return { id: activeAccount.id, name: activeAccount.name };
+      return { id: accounts[0].id, name: accounts[0].name };
+    }
+
+    // 4. Extreme fallback
+    return { id: fallbackId, name: fallbackName };
+  }
+
   /**
    * Generates a Journal Entry from an Invoice
    */
@@ -31,9 +60,9 @@ export class PostingService {
     let customerAccountId = customer?.account_id || '';
     let customerAccountName = customer?.account_name || '';
     if (!customerAccountId) {
-      const fallback = accounts.find(a => a.name.includes('عملاء'));
-      customerAccountId = fallback?.id || 'customers_default';
-      customerAccountName = fallback?.name || 'حساب العملاء (افتراضي)';
+      const resolved = this.resolveAccount(accounts, ['عملاء', 'العملاء', 'ذمم مدينة', 'الذمم المدينة', 'مدينون', 'customers', 'customer', 'receivables', 'receivable', 'debtors', 'debtor', 'trade debtors'], 'customers_default', 'حساب العملاء (افتراضي)');
+      customerAccountId = resolved.id;
+      customerAccountName = resolved.name;
     }
 
     // Main Sales Invoice Debit Line (Customer Account)
@@ -54,9 +83,9 @@ export class PostingService {
       let cashAccountName = pm?.account_name || '';
       
       if (!cashAccountId) {
-        const fallback = accounts.find(a => a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق'));
-        cashAccountId = fallback?.id || 'cash_default';
-        cashAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
+        const resolved = this.resolveAccount(accounts, ['نقدية', 'خزينة', 'صندوق', 'بنك', 'البنك', 'النقدية', 'الخزينة', 'الصندوق', 'cash', 'bank', 'treasury', 'safe', 'petty cash'], 'cash_default', 'حساب النقدية (افتراضي)');
+        cashAccountId = resolved.id;
+        cashAccountName = resolved.name;
       }
 
       // Debit Cash/Bank
@@ -86,10 +115,10 @@ export class PostingService {
 
     // Discount
     if (discount > 0) {
-      const discountAccount = accounts.find(a => a.name.includes('خصم مسموح به') || a.name.includes('خصم مبيعات'));
+      const discountAccount = this.resolveAccount(accounts, ['خصم مسموح به', 'خصم مبيعات', 'الخصم المسموح به', 'discount allowed', 'sales discount', 'discount'], 'discount_allowed_default', 'حساب الخصم المسموح به');
       journalItems.push({
-        account_id: discountAccount?.id || 'discount_allowed_default',
-        account_name: discountAccount?.name || 'حساب الخصم المسموح به',
+        account_id: discountAccount.id,
+        account_name: discountAccount.name,
         debit: discount,
         credit: 0,
         description: `خصم مسموح به - فاتورة رقم ${invoice.invoice_number}`
@@ -103,9 +132,9 @@ export class PostingService {
       let salesAccountName = product?.revenue_account_name || '';
       
       if (!salesAccountId) {
-        const fallback = accounts.find(a => a.name.includes('مبيعات') || a.name.includes('إيراد'));
-        salesAccountId = fallback?.id || 'sales_default';
-        salesAccountName = fallback?.name || 'حساب المبيعات (افتراضي)';
+        const resolved = this.resolveAccount(accounts, ['مبيعات', 'المبيعات', 'إيراد', 'إيرادات', 'sales', 'sale', 'revenue', 'income'], 'sales_default', 'حساب المبيعات (افتراضي)');
+        salesAccountId = resolved.id;
+        salesAccountName = resolved.name;
       }
 
       journalItems.push({
@@ -189,9 +218,9 @@ export class PostingService {
       let salesReturnAccountName = product?.revenue_account_name || '';
 
       if (!salesReturnAccountId) {
-        const fallback = accounts.find(a => a.name.includes('مردودات مبيعات') || a.name.includes('مبيعات'));
-        salesReturnAccountId = fallback?.id || 'sales_returns_default';
-        salesReturnAccountName = fallback?.name || 'حساب مردودات المبيعات';
+        const resolved = this.resolveAccount(accounts, ['مردودات مبيعات', 'مردودات المبيعات', 'مرتجع مبيعات', 'sales returns', 'sales return', 'sales refund'], 'sales_returns_default', 'حساب مردودات المبيعات');
+        salesReturnAccountId = resolved.id;
+        salesReturnAccountName = resolved.name;
       }
 
       journalItems.push({
@@ -207,9 +236,9 @@ export class PostingService {
     let customerAccountId = customer?.account_id || '';
     let customerAccountName = customer?.account_name || '';
     if (!customerAccountId) {
-      const fallback = accounts.find(a => a.name.includes('عملاء'));
-      customerAccountId = fallback?.id || 'customers_account_default';
-      customerAccountName = fallback?.name || 'حساب العملاء (افتراضي)';
+      const resolved = this.resolveAccount(accounts, ['عملاء', 'العملاء', 'ذمم مدينة', 'الذمم المدينة', 'مدينون', 'customers', 'customer', 'receivables', 'receivable', 'debtors', 'debtor', 'trade debtors'], 'customers_account_default', 'حساب العملاء (افتراضي)');
+      customerAccountId = resolved.id;
+      customerAccountName = resolved.name;
     }
 
     journalItems.push({
@@ -227,9 +256,9 @@ export class PostingService {
       let cashAccountId = pm?.account_id || '';
       let cashAccountName = pm?.account_name || '';
       if (!cashAccountId) {
-        const fallback = accounts.find(a => a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق'));
-        cashAccountId = fallback?.id || 'cash_account_default';
-        cashAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
+        const resolved = this.resolveAccount(accounts, ['نقدية', 'خزينة', 'صندوق', 'بنك', 'البنك', 'النقدية', 'الخزينة', 'الصندوق', 'cash', 'bank', 'treasury', 'safe', 'petty cash'], 'cash_account_default', 'حساب النقدية (افتراضي)');
+        cashAccountId = resolved.id;
+        cashAccountName = resolved.name;
       }
 
       // Debit Customer (to offset the credit return)
@@ -285,9 +314,9 @@ export class PostingService {
       let purchaseAccountName = product?.cost_account_name || '';
 
       if (!purchaseAccountId) {
-        const fallback = accounts.find(a => a.name.includes('مشتريات') || a.name.includes('مخزون'));
-        purchaseAccountId = fallback?.id || 'purchases_default';
-        purchaseAccountName = fallback?.name || 'حساب المشتريات';
+        const resolved = this.resolveAccount(accounts, ['مشتريات', 'المشتريات', 'مخزون', 'المخزون', 'purchases', 'purchase', 'inventory', 'cost of sales', 'cogs'], 'purchases_default', 'حساب المشتريات');
+        purchaseAccountId = resolved.id;
+        purchaseAccountName = resolved.name;
       }
 
       journalItems.push({
@@ -303,9 +332,9 @@ export class PostingService {
     let supplierAccountId = supplier?.account_id || '';
     let supplierAccountName = supplier?.account_name || '';
     if (!supplierAccountId) {
-      const fallback = accounts.find(a => a.name.includes('موردين'));
-      supplierAccountId = fallback?.id || 'supplier_account_default';
-      supplierAccountName = fallback?.name || 'حساب الموردين (افتراضي)';
+      const resolved = this.resolveAccount(accounts, ['موردين', 'الموردين', 'ذمم دائنة', 'الذمم الدائنة', 'دائنون', 'suppliers', 'supplier', 'payables', 'payable', 'creditors', 'creditor', 'trade creditors'], 'supplier_account_default', 'حساب الموردين (افتراضي)');
+      supplierAccountId = resolved.id;
+      supplierAccountName = resolved.name;
     }
 
     journalItems.push({
@@ -323,9 +352,9 @@ export class PostingService {
       let cashAccountId = pm?.account_id || '';
       let cashAccountName = pm?.account_name || '';
       if (!cashAccountId) {
-        const fallback = accounts.find(a => a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق'));
-        cashAccountId = fallback?.id || 'cash_account_default';
-        cashAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
+        const resolved = this.resolveAccount(accounts, ['نقدية', 'خزينة', 'صندوق', 'بنك', 'البنك', 'النقدية', 'الخزينة', 'الصندوق', 'cash', 'bank', 'treasury', 'safe', 'petty cash'], 'cash_account_default', 'حساب النقدية (افتراضي)');
+        cashAccountId = resolved.id;
+        cashAccountName = resolved.name;
       }
 
       // Credit Cash/Bank
@@ -378,9 +407,9 @@ export class PostingService {
     let supplierAccountId = supplier?.account_id || '';
     let supplierAccountName = supplier?.account_name || '';
     if (!supplierAccountId) {
-      const fallback = accounts.find(a => a.name.includes('موردين'));
-      supplierAccountId = fallback?.id || 'suppliers_account_default';
-      supplierAccountName = fallback?.name || 'حساب الموردين (افتراضي)';
+      const resolved = this.resolveAccount(accounts, ['موردين', 'الموردين', 'ذمم دائنة', 'الذمم الدائنة', 'دائنون', 'suppliers', 'supplier', 'payables', 'payable', 'creditors', 'creditor', 'trade creditors'], 'suppliers_account_default', 'حساب الموردين (افتراضي)');
+      supplierAccountId = resolved.id;
+      supplierAccountName = resolved.name;
     }
 
     journalItems.push({
@@ -398,9 +427,9 @@ export class PostingService {
       let cashAccountId = pm?.account_id || '';
       let cashAccountName = pm?.account_name || '';
       if (!cashAccountId) {
-        const fallback = accounts.find(a => a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق'));
-        cashAccountId = fallback?.id || 'cash_account_default';
-        cashAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
+        const resolved = this.resolveAccount(accounts, ['نقدية', 'خزينة', 'صندوق', 'بنك', 'البنك', 'النقدية', 'الخزينة', 'الصندوق', 'cash', 'bank', 'treasury', 'safe', 'petty cash'], 'cash_account_default', 'حساب النقدية (افتراضي)');
+        cashAccountId = resolved.id;
+        cashAccountName = resolved.name;
       }
 
       // Debit Cash/Bank
@@ -435,9 +464,9 @@ export class PostingService {
       let purchaseReturnAccountName = product?.cost_account_name || '';
 
       if (!purchaseReturnAccountId) {
-        const fallback = accounts.find(a => a.name.includes('مردودات مشتريات') || a.name.includes('مشتريات'));
-        purchaseReturnAccountId = fallback?.id || 'purchase_returns_default';
-        purchaseReturnAccountName = fallback?.name || 'حساب مردودات مشتريات';
+        const resolved = this.resolveAccount(accounts, ['مردودات مشتريات', 'مردودات المشتريات', 'مرتجع مشتريات', 'purchase returns', 'purchase return', 'purchase refund'], 'purchase_returns_default', 'حساب مردودات مشتريات');
+        purchaseReturnAccountId = resolved.id;
+        purchaseReturnAccountName = resolved.name;
       }
 
       journalItems.push({
@@ -511,17 +540,17 @@ export class PostingService {
     let cashAccountId = pm?.account_id || '';
     let cashAccountName = pm?.account_name || '';
     if (!cashAccountId) {
-      const fallback = accounts.find(a => a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق'));
-      cashAccountId = fallback?.id || 'cash_default';
-      cashAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
+      const resolved = this.resolveAccount(accounts, ['نقدية', 'خزينة', 'صندوق', 'بنك', 'البنك', 'النقدية', 'الخزينة', 'الصندوق', 'cash', 'bank', 'treasury', 'safe', 'petty cash'], 'cash_default', 'حساب النقدية (افتراضي)');
+      cashAccountId = resolved.id;
+      cashAccountName = resolved.name;
     }
 
     let customerAccountId = customer?.account_id || '';
     let customerAccountName = customer?.account_name || '';
     if (!customerAccountId) {
-      const fallback = accounts.find(a => a.name.includes('عملاء'));
-      customerAccountId = fallback?.id || 'customers_default';
-      customerAccountName = fallback?.name || 'حساب العملاء (افتراضي)';
+      const resolved = this.resolveAccount(accounts, ['عملاء', 'العملاء', 'ذمم مدينة', 'الذمم المدينة', 'مدينون', 'customers', 'customer', 'receivables', 'receivable', 'debtors', 'debtor', 'trade debtors'], 'customers_default', 'حساب العملاء (افتراضي)');
+      customerAccountId = resolved.id;
+      customerAccountName = resolved.name;
     }
 
     return {
@@ -564,9 +593,9 @@ export class PostingService {
     let cashAccountId = pm?.account_id || '';
     let cashAccountName = pm?.account_name || '';
     if (!cashAccountId) {
-      const fallback = accounts.find(a => a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق'));
-      cashAccountId = fallback?.id || 'cash_default';
-      cashAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
+      const resolved = this.resolveAccount(accounts, ['نقدية', 'خزينة', 'صندوق', 'بنك', 'البنك', 'النقدية', 'الخزينة', 'الصندوق', 'cash', 'bank', 'treasury', 'safe', 'petty cash'], 'cash_default', 'حساب النقدية (افتراضي)');
+      cashAccountId = resolved.id;
+      cashAccountName = resolved.name;
     }
 
     let targetAccountId = doc.account_id || '';
@@ -578,9 +607,9 @@ export class PostingService {
     }
 
     if (!targetAccountId) {
-      const fallback = accounts.find(a => a.name.includes('موردين') || a.name.includes('مصروف'));
-      targetAccountId = fallback?.id || 'expense_default';
-      targetAccountName = fallback?.name || 'حساب مصروف (افتراضي)';
+      const resolved = this.resolveAccount(accounts, ['موردين', 'الموردين', 'ذمم دائنة', 'الذمم الدائنة', 'دائنون', 'suppliers', 'supplier', 'payables', 'payable', 'creditors', 'creditor', 'trade creditors', 'مصروف', 'مصاريف', 'expense', 'expenses'], 'expense_default', 'حساب مصروف (افتراضي)');
+      targetAccountId = resolved.id;
+      targetAccountName = resolved.name;
     }
 
     return {

@@ -5,7 +5,7 @@ import { Search, FileText, Download, Calendar, User, ArrowUpRight, ArrowDownLeft
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
-import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
+import { formatNumber, formatMoney, formatDate, isCustomerAccount } from '../utils/formatUtils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNavigation } from '../contexts/NavigationContext';
 
@@ -96,15 +96,7 @@ export const CustomerStatement: React.FC = () => {
             journalEntries.forEach((je: any) => {
               je.items?.forEach((item: any) => {
                 const matchesEntity = item.customer_id === savedCustId || item.sub_account_id === savedCustId;
-                const isCustomerAccount = (() => {
-                  if (customer?.account_id) {
-                    return item.account_id === customer.account_id;
-                  }
-                  const fallback = accounts.find((a: any) => a.name.includes('عملاء'));
-                  const fallbackId = fallback?.id || 'customers_default';
-                  return item.account_id === fallbackId || item.account_id === 'customers_default' || item.account_id === 'customers_account_default';
-                })();
-                if (matchesEntity && isCustomerAccount) {
+                if (matchesEntity && isCustomerAccount(item.account_id, customer, accounts)) {
                   let description = item.description || je.description || 'قيد مالي';
                   let mappedType = je.reference_type || 'journal';
                   if (mappedType === 'receipt') mappedType = 'receipt_voucher';
@@ -238,15 +230,7 @@ export const CustomerStatement: React.FC = () => {
           // Only count lines that have the customer_id AND match the customer's ledger account
           // This prevents double entries if customer_id was accidentally set on both sides of a transaction
           const matchesEntity = item.customer_id === selectedCustomerId || item.sub_account_id === selectedCustomerId;
-          const isCustomerAccount = (() => {
-            if (customer?.account_id) {
-              return item.account_id === customer.account_id;
-            }
-            const fallback = accounts.find((a: any) => a.name.includes('عملاء'));
-            const fallbackId = fallback?.id || 'customers_default';
-            return item.account_id === fallbackId || item.account_id === 'customers_default' || item.account_id === 'customers_account_default';
-          })();
-          if (matchesEntity && isCustomerAccount) {
+          if (matchesEntity && isCustomerAccount(item.account_id, customer, accounts)) {
             let description = item.description || je.description || 'قيد مالي';
             let mappedType = je.reference_type || 'journal';
             if (mappedType === 'receipt') mappedType = 'receipt_voucher';

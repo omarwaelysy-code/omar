@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
 import { useNavigation } from '../contexts/NavigationContext';
-import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
+import { formatNumber, formatDate, formatMoney, isSupplierAccount } from '../utils/formatUtils';
 
 interface Movement {
   id: string; // unique composite key (e.g. "INV_ID" or "VOU_ID-itemIdx")
@@ -368,15 +368,7 @@ export const SupplierSettlements: React.FC = () => {
 
       je.items?.forEach((item: any, idx: number) => {
         const matchesEntity = item.supplier_id === selectedSupplierId || item.sub_account_id === selectedSupplierId;
-        const isSupplierAccount = (() => {
-          if (supplier?.account_id) {
-            return item.account_id === supplier.account_id;
-          }
-          const fallback = accounts.find((a: any) => a.name.includes('موردين'));
-          const fallbackId = fallback?.id || 'suppliers_account_default';
-          return item.account_id === fallbackId || item.account_id === 'suppliers_default' || item.account_id === 'suppliers_account_default' || item.account_id === 'supplier_account_default';
-        })();
-        if (matchesEntity && Number(item.debit) > 0 && isSupplierAccount) {
+        if (matchesEntity && Number(item.debit) > 0 && isSupplierAccount(item.account_id, supplier, accounts)) {
           const originalAmount = Number(item.debit) || 0;
           const settled = getSettlementsForTarget(`${je.id}-${idx}`, je.reference_type);
           const openAmount = originalAmount - settled;
@@ -439,15 +431,7 @@ export const SupplierSettlements: React.FC = () => {
 
       je.items?.forEach((item: any, idx: number) => {
         const matchesEntity = item.supplier_id === selectedSupplierId || item.sub_account_id === selectedSupplierId;
-        const isSupplierAccount = (() => {
-          if (supplier?.account_id) {
-            return item.account_id === supplier.account_id;
-          }
-          const fallback = accounts.find((a: any) => a.name.includes('موردين'));
-          const fallbackId = fallback?.id || 'suppliers_account_default';
-          return item.account_id === fallbackId || item.account_id === 'suppliers_default' || item.account_id === 'suppliers_account_default' || item.account_id === 'supplier_account_default';
-        })();
-        if (matchesEntity && Number(item.credit) > 0 && isSupplierAccount) {
+        if (matchesEntity && Number(item.credit) > 0 && isSupplierAccount(item.account_id, supplier, accounts)) {
           const originalAmount = Number(item.credit) || 0;
           const settled = getSettlementsForTarget(`${je.id}-${idx}`, je.reference_type);
           const openAmount = originalAmount - settled;

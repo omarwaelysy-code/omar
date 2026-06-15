@@ -5,7 +5,7 @@ import { Search, Calendar, FileText, Download, User, ArrowUpRight, ArrowDownLeft
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
-import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
+import { formatNumber, formatMoney, formatDate, isSupplierAccount } from '../utils/formatUtils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNavigation } from '../contexts/NavigationContext';
 
@@ -104,15 +104,7 @@ export const SupplierStatement: React.FC = () => {
             journalEntries.forEach((je: any) => {
               je.items?.forEach((item: any) => {
                 const matchesEntity = item.supplier_id === savedSupId || item.sub_account_id === savedSupId;
-                const isSupplierAccount = (() => {
-                  if (supplier?.account_id) {
-                    return item.account_id === supplier.account_id;
-                  }
-                  const fallback = accounts.find((a: any) => a.name.includes('موردين'));
-                  const fallbackId = fallback?.id || 'suppliers_account_default';
-                  return item.account_id === fallbackId || item.account_id === 'suppliers_default' || item.account_id === 'suppliers_account_default' || item.account_id === 'supplier_account_default';
-                })();
-                if (matchesEntity && isSupplierAccount) {
+                if (matchesEntity && isSupplierAccount(item.account_id, supplier, accounts)) {
                   let notes = item.description || je.description || 'قيد مالي';
                   let mappedType = je.reference_type || 'manual';
                   if (mappedType === 'payment') mappedType = 'payment_voucher';
@@ -232,15 +224,7 @@ export const SupplierStatement: React.FC = () => {
           // Only count lines that have the supplier_id AND match the supplier's ledger account
           // This prevents double entries if supplier_id was accidentally set on both sides of a transaction
           const matchesEntity = item.supplier_id === selectedSupplierId || item.sub_account_id === selectedSupplierId;
-          const isSupplierAccount = (() => {
-            if (supplier?.account_id) {
-              return item.account_id === supplier.account_id;
-            }
-            const fallback = accounts.find((a: any) => a.name.includes('موردين'));
-            const fallbackId = fallback?.id || 'suppliers_account_default';
-            return item.account_id === fallbackId || item.account_id === 'suppliers_default' || item.account_id === 'suppliers_account_default' || item.account_id === 'supplier_account_default';
-          })();
-          if (matchesEntity && isSupplierAccount) {
+          if (matchesEntity && isSupplierAccount(item.account_id, supplier, accounts)) {
             let notes = item.description || je.description || 'قيد مالي';
             let mappedType = je.reference_type || 'manual';
             if (mappedType === 'payment') mappedType = 'payment_voucher';

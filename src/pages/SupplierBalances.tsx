@@ -6,7 +6,7 @@ import { FileSpreadsheet, Download, Search, Truck, ArrowDownLeft, Wallet, Refres
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
-import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
+import { formatNumber, formatMoney, formatDate, isSupplierAccount } from '../utils/formatUtils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNavigation } from '../contexts/NavigationContext';
 
@@ -97,15 +97,7 @@ export const SupplierBalances: React.FC = () => {
         journalEntries.forEach((je: any) => {
           je.items?.forEach((item: any) => {
             const matchesEntity = item.supplier_id === supplier.id || item.sub_account_id === supplier.id;
-            const isSupplierAccount = (() => {
-              if (supplier?.account_id) {
-                return item.account_id === supplier.account_id;
-              }
-              const fallback = accounts.find((a: any) => a.name.includes('موردين'));
-              const fallbackId = fallback?.id || 'suppliers_account_default';
-              return item.account_id === fallbackId || item.account_id === 'suppliers_default' || item.account_id === 'suppliers_account_default' || item.account_id === 'supplier_account_default';
-            })();
-            if (matchesEntity && isSupplierAccount) {
+            if (matchesEntity && isSupplierAccount(item.account_id, supplier, accounts)) {
               supplierLines.push({
                 date: je.date,
                 reference_type: je.reference_type,
