@@ -2,12 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Customer, Account } from '../types';
-import { Search, Trash2, X, Layers, User, Calendar, RotateCcw, ChevronDown, Check, AlertCircle, Info, ArrowLeftRight, LayoutGrid, SlidersHorizontal, ExternalLink } from 'lucide-react';
+import { Search, Trash2, X, Layers, User, Calendar, RotateCcw, ChevronDown, Check, AlertCircle, Info, ArrowLeftRight, LayoutGrid, SlidersHorizontal, ExternalLink, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
 import { useNavigation } from '../contexts/NavigationContext';
 import { formatNumber, formatDate, formatMoney, isCustomerAccount } from '../utils/formatUtils';
+import { exportToExcel } from '../utils/excelUtils';
 
 interface Movement {
   id: string; // unique composite key (e.g. "INV_ID" or "VOU_ID-itemIdx")
@@ -953,6 +954,40 @@ export const CustomerSettlements: React.FC = () => {
     ).sort((a, b) => b.settlement_number.localeCompare(a.settlement_number));
   }, [allInvoices, allReceipts, searchTerm]);
 
+  // Export Settlement to Excel
+  const handleExportSettlementExcel = (h: any) => {
+    const excelData: any[] = [];
+    
+    h.debitDocs.forEach((doc: any) => {
+      excelData.push({
+        [language === 'ar' ? 'رقم التسوية' : 'Settlement No.']: h.settlement_number,
+        [language === 'ar' ? 'تاريخ التسوية' : 'Settlement Date']: formatDate(h.date),
+        [language === 'ar' ? 'العميل' : 'Customer']: h.entity_name,
+        [language === 'ar' ? 'نوع المستند' : 'Doc Type']: doc.type_label,
+        [language === 'ar' ? 'رقم المستند' : 'Doc No.']: doc.number,
+        [language === 'ar' ? 'مدين (مسوى)' : 'Debit Settled']: doc.amount,
+        [language === 'ar' ? 'دائن (مسوى)' : 'Credit Settled']: 0
+      });
+    });
+
+    h.creditDocs.forEach((doc: any) => {
+      excelData.push({
+        [language === 'ar' ? 'رقم التسوية' : 'Settlement No.']: h.settlement_number,
+        [language === 'ar' ? 'تاريخ التسوية' : 'Settlement Date']: formatDate(h.date),
+        [language === 'ar' ? 'العميل' : 'Customer']: h.entity_name,
+        [language === 'ar' ? 'نوع المستند' : 'Doc Type']: doc.type_label,
+        [language === 'ar' ? 'رقم المستند' : 'Doc No.']: doc.number,
+        [language === 'ar' ? 'مدين (مسوى)' : 'Debit Settled']: 0,
+        [language === 'ar' ? 'دائن (مسوى)' : 'Credit Settled']: doc.amount
+      });
+    });
+
+    exportToExcel(excelData, {
+      filename: `settlement_${h.settlement_number}`,
+      sheetName: 'Settlement'
+    });
+  };
+
   // Rollback Settlement
   const handleDeleteSettlement = async (settlementNumber: string, customerName: string) => {
     if (!user) return;
@@ -1585,17 +1620,31 @@ export const CustomerSettlements: React.FC = () => {
                   ) : (
                     historyList.map(h => (
                       <tr key={h.settlement_number} className="hover:bg-zinc-50/50 transition-colors group">
-                        <td className="px-6 py-4 font-bold text-zinc-900">{h.settlement_number}</td>
+                        <td className="px-6 py-4 font-mono font-bold">
+                          <span
+                            onClick={() => setSelectedHistory(h)}
+                            className="text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer transition-colors"
+                          >
+                            {h.settlement_number}
+                          </span>
+                        </td>
                         <td className="px-6 py-4 text-zinc-500 font-semibold">{formatDate(h.date)}</td>
                         <td className="px-6 py-4 font-bold text-zinc-700">{h.entity_name}</td>
                         <td className="px-6 py-4 text-left font-black text-emerald-600">{formatMoney(h.total_amount)} ج.م</td>
                         <td className="px-6 py-4 text-left">
-                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex items-center justify-end gap-2 transition-all">
                             <button
                               onClick={() => setSelectedHistory(h)}
                               className="px-3 py-1 text-xs font-bold bg-zinc-100 text-zinc-600 rounded-lg hover:bg-zinc-200 transition-all"
                             >
                               عرض التفاصيل
+                            </button>
+                            <button
+                              onClick={() => handleExportSettlementExcel(h)}
+                              className="px-3 py-1 text-xs font-bold bg-white text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-all flex items-center gap-1 shadow-sm"
+                            >
+                              <Download size={12} />
+                              تصدير Excel
                             </button>
                             <button
                               onClick={() => handleDeleteSettlement(h.settlement_number, h.entity_name)}
@@ -1628,7 +1677,16 @@ export const CustomerSettlements: React.FC = () => {
             >
               <div className="p-6 border-b border-zinc-100 bg-zinc-50 flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-bold text-zinc-900">تفاصيل التسوية: {selectedHistory.settlement_number}</h3>
+                  <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-3">
+                    <span>تفاصيل التسوية: {selectedHistory.settlement_number}</span>
+                    <button
+                      onClick={() => handleExportSettlementExcel(selectedHistory)}
+                      className="px-3 py-1 text-xs font-bold bg-white text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-all flex items-center gap-1 shadow-sm"
+                    >
+                      <Download size={12} />
+                      تصدير Excel
+                    </button>
+                  </h3>
                   <p className="text-xs text-zinc-400 font-bold mt-1">تاريخ التسوية: {formatDate(selectedHistory.date)} • العميل: {selectedHistory.entity_name}</p>
                 </div>
                 <button
