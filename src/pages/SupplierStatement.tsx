@@ -14,6 +14,7 @@ interface StatementItem {
   date: string;
   type: string;
   reference: string;
+  entry_number?: string;
   debit: number; // المبلغ المستحق علينا (مشتريات)
   credit: number; // المبلغ المدفوع منا (سندات صرف، مرتجعات، خصومات)
   notes: string;
@@ -125,6 +126,7 @@ export const SupplierStatement: React.FC = () => {
                     date: je.date,
                     type: mappedType,
                     reference: je.reference_number || '-',
+                    entry_number: je.entry_number || '',
                     debit: item.debit || 0,
                     credit: item.credit || 0,
                     notes: notes
@@ -245,6 +247,7 @@ export const SupplierStatement: React.FC = () => {
               date: je.date,
               type: mappedType,
               reference: je.reference_number || '-',
+              entry_number: je.entry_number || '',
               debit: item.debit || 0,
               credit: item.credit || 0,
               notes: notes
@@ -311,6 +314,7 @@ export const SupplierStatement: React.FC = () => {
     const data = statement.map(entry => ({
       [language === 'ar' ? 'التاريخ' : 'Date']: entry.date,
       [language === 'ar' ? 'النوع' : 'Type']: entry.type,
+      [language === 'ar' ? 'رقم القيد' : 'Entry No.']: entry.entry_number || '-',
       [language === 'ar' ? 'المرجع' : 'Reference']: entry.reference,
       [language === 'ar' ? 'البيان' : 'Description']: entry.notes,
       [language === 'ar' ? 'مدين (-)' : 'Debit (-)']: entry.debit,
@@ -440,13 +444,14 @@ export const SupplierStatement: React.FC = () => {
                 <table className="w-full text-right border-collapse">
                   <thead>
                     <tr className="bg-zinc-50 border-y border-zinc-100">
-                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">التاريخ</th>
-                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">النوع</th>
-                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">المرجع</th>
-                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">البيان</th>
-                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">مدين</th>
-                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">دائن</th>
-                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">الرصيد</th>
+                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'النوع' : 'Type'}</th>
+                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</th>
+                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'المرجع' : 'Reference'}</th>
+                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'البيان' : 'Description'}</th>
+                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'مدين' : 'Debit'}</th>
+                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'دائن' : 'Credit'}</th>
+                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'الرصيد' : 'Balance'}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -455,6 +460,7 @@ export const SupplierStatement: React.FC = () => {
                       <tr className="border-b border-zinc-50 bg-zinc-50/30">
                         <td className="px-4 py-3 text-sm font-mono">{startDate || '-'}</td>
                         <td className="px-4 py-3 text-sm"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600">رصيد</span></td>
+                        <td className="px-4 py-3 text-sm font-mono">-</td>
                         <td className="px-4 py-3 text-sm font-mono">-</td>
                         <td className="px-4 py-3 text-sm">{startDate ? 'رصيد منقول' : 'رصيد افتتاحي'}</td>
                         <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance > 0 ? formatNumber(startBalance) : '-'}</td>
@@ -485,6 +491,21 @@ export const SupplierStatement: React.FC = () => {
                              item.type === 'discount' ? 'خصم' : 'قيد يومية'}
                           </span>
                         </td>
+                        <td className="px-4 py-3 text-sm font-mono">
+                          {item.entry_number ? (
+                            <span 
+                              onClick={() => {
+                                setPendingViewDoc({ type: 'journal', idOrNumber: item.entry_number! });
+                                setCurrentPage('journal_entries');
+                              }}
+                              className="text-indigo-600 hover:text-indigo-700 hover:underline cursor-pointer font-bold font-mono transition-colors"
+                            >
+                              {item.entry_number}
+                            </span>
+                          ) : (
+                            '-'
+                          )}
+                        </td>
                         <td 
                           onClick={() => handleTransactionClick(item.type, item.reference)}
                           className={`px-4 py-3 text-sm font-bold font-mono transition-colors ${item.reference !== '-' ? 'text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer' : ''}`}
@@ -499,13 +520,13 @@ export const SupplierStatement: React.FC = () => {
                     ))}
                     {statement.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="px-4 py-8 text-center text-zinc-400 italic">لا توجد حركات في هذه الفترة</td>
+                        <td colSpan={8} className="px-4 py-8 text-center text-zinc-400 italic">لا توجد حركات في هذه الفترة</td>
                       </tr>
                     )}
                   </tbody>
                   <tfoot>
                     <tr className="bg-zinc-900 text-white font-bold">
-                      <td colSpan={4} className="px-4 py-3 text-left">الرصيد الختامي</td>
+                      <td colSpan={5} className="px-4 py-3 text-left">الرصيد الختامي</td>
                       <td className="px-4 py-3">{formatNumber(statement.reduce((sum, e) => sum + (Number(e.debit) || 0), 0) + (startBalance < 0 ? Math.abs(startBalance) : 0))}</td>
                       <td className="px-4 py-3">{formatNumber(statement.reduce((sum, e) => sum + (Number(e.credit) || 0), 0) + (startBalance > 0 ? startBalance : 0))}</td>
                       <td className="px-4 py-3">{formatBalance(statement.length > 0 ? (statement[statement.length - 1].balance || 0) : startBalance)}</td>

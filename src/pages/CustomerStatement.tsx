@@ -14,6 +14,7 @@ interface StatementEntry {
   date: string;
   type: string;
   reference: string;
+  entry_number?: string;
   description: string;
   debit: number;
   credit: number;
@@ -117,6 +118,7 @@ export const CustomerStatement: React.FC = () => {
                     date: je.date,
                     type: mappedType,
                     reference: je.reference_number || '-',
+                    entry_number: je.entry_number || '',
                     description: description,
                     debit: item.debit || 0,
                     credit: item.credit || 0,
@@ -251,6 +253,7 @@ export const CustomerStatement: React.FC = () => {
               date: je.date,
               type: mappedType,
               reference: je.reference_number || '-',
+              entry_number: je.entry_number || '',
               description: description,
               debit: item.debit || 0,
               credit: item.credit || 0,
@@ -337,6 +340,7 @@ export const CustomerStatement: React.FC = () => {
     const data = entries.map(entry => ({
       [language === 'ar' ? 'التاريخ' : 'Date']: entry.date,
       [language === 'ar' ? 'النوع' : 'Type']: entry.type,
+      [language === 'ar' ? 'رقم القيد' : 'Entry No.']: entry.entry_number || '-',
       [language === 'ar' ? 'المرجع' : 'Reference']: entry.reference,
       [language === 'ar' ? 'البيان' : 'Description']: entry.description,
       [language === 'ar' ? 'مدين (+)' : 'Debit (+)']: entry.debit,
@@ -465,13 +469,14 @@ export const CustomerStatement: React.FC = () => {
                 <table className="w-full text-right border-collapse">
                   <thead>
                     <tr className="bg-zinc-50 border-y border-zinc-100">
-                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">التاريخ</th>
-                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">النوع</th>
-                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">المرجع</th>
-                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">البيان</th>
-                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">مدين</th>
-                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">دائن</th>
-                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">الرصيد</th>
+                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'النوع' : 'Type'}</th>
+                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</th>
+                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'المرجع' : 'Reference'}</th>
+                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'البيان' : 'Description'}</th>
+                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'مدين' : 'Debit'}</th>
+                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'دائن' : 'Credit'}</th>
+                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'الرصيد' : 'Balance'}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -502,6 +507,21 @@ export const CustomerStatement: React.FC = () => {
                              entry.type === 'discount' ? 'خصم' : 'قيد يومية'}
                           </span>
                         </td>
+                        <td className="px-4 py-3 text-sm font-mono">
+                          {entry.entry_number ? (
+                            <span 
+                              onClick={() => {
+                                setPendingViewDoc({ type: 'journal', idOrNumber: entry.entry_number! });
+                                setCurrentPage('journal_entries');
+                              }}
+                              className="text-indigo-600 hover:text-indigo-700 hover:underline cursor-pointer font-bold font-mono transition-colors"
+                            >
+                              {entry.entry_number}
+                            </span>
+                          ) : (
+                            '-'
+                          )}
+                        </td>
                         <td 
                           onClick={() => handleTransactionClick(entry.type, entry.reference)}
                           className={`px-4 py-3 text-sm font-bold font-mono transition-colors ${entry.reference !== '-' ? 'text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer' : ''}`}
@@ -516,13 +536,13 @@ export const CustomerStatement: React.FC = () => {
                     ))}
                     {entries.length === 1 && entries[0].id === 'balance-forward' && (
                       <tr>
-                        <td colSpan={7} className="px-4 py-8 text-center text-zinc-400 italic">لا توجد حركات في هذه الفترة</td>
+                        <td colSpan={8} className="px-4 py-8 text-center text-zinc-400 italic">لا توجد حركات في هذه الفترة</td>
                       </tr>
                     )}
                   </tbody>
                   <tfoot>
                     <tr className="bg-zinc-900 text-white font-bold">
-                      <td colSpan={4} className="px-4 py-3 text-left">الرصيد الختامي</td>
+                      <td colSpan={5} className="px-4 py-3 text-left">الرصيد الختامي</td>
                       <td className="px-4 py-3">{formatNumber(entries.reduce((sum, e) => sum + (Number(e.debit) || 0), 0))}</td>
                       <td className="px-4 py-3">{formatNumber(entries.reduce((sum, e) => sum + (Number(e.credit) || 0), 0))}</td>
                       <td className="px-4 py-3">{formatBalance(entries[entries.length - 1]?.balance || 0)}</td>
