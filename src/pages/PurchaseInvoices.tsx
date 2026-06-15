@@ -687,7 +687,7 @@ export const PurchaseInvoices: React.FC = () => {
 
     // 2. Purchase Returns
     allPurchaseReturns.forEach(r => {
-      if (r.supplier_id === supplierId) {
+      if (r.supplier_id === supplierId && r.payment_type !== 'cash') {
         const invoiceSettled = getSettlementsForTarget(r.id, editingInvoice?.id);
         const originalAmount = Number(r.total_amount) || 0;
         const openAmount = originalAmount - invoiceSettled;

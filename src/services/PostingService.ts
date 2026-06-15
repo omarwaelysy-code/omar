@@ -238,7 +238,11 @@ export class PostingService {
         account_name: customerAccountName,
         debit: total_amount,
         credit: 0,
-        description: `تسوية نقدية لمرتجع مبيعات رقم ${doc.return_number || doc.id.slice(-6)} - ${customer?.name || ''}`
+        description: `تسوية نقدية لمرتجع مبيعات رقم ${doc.return_number || doc.id.slice(-6)} - ${customer?.name || ''}`,
+        customer_id: doc.customer_id,
+        customer_name: customer?.name,
+        sub_account_id: doc.customer_id,
+        sub_account_type: 'customer'
       });
 
       // Credit Cash/Bank
@@ -247,7 +251,9 @@ export class PostingService {
         account_name: cashAccountName,
         debit: 0,
         credit: total_amount,
-        description: `دفع نقدية مقابل مرتجع مبيعات رقم ${doc.return_number || doc.id.slice(-6)} - ${customer?.name || ''}`
+        description: `دفع نقدية مقابل مرتجع مبيعات رقم ${doc.return_number || doc.id.slice(-6)} - ${customer?.name || ''}`,
+        sub_account_id: doc.payment_method_id,
+        sub_account_type: 'payment_method'
       });
     }
 
@@ -403,7 +409,9 @@ export class PostingService {
         account_name: cashAccountName,
         debit: total_amount,
         credit: 0,
-        description: `استلام نقدية مقابل مرتجع مشتريات رقم ${doc.return_number || doc.id.slice(-6)} - ${supplier?.name || ''}`
+        description: `استلام نقدية مقابل مرتجع مشتريات رقم ${doc.return_number || doc.id.slice(-6)} - ${supplier?.name || ''}`,
+        sub_account_id: doc.payment_method_id,
+        sub_account_type: 'payment_method'
       });
 
       // Credit Supplier
@@ -414,7 +422,9 @@ export class PostingService {
         credit: total_amount,
         description: `تسوية نقدية لمرتجع مشتريات رقم ${doc.return_number || doc.id.slice(-6)} - ${supplier?.name || ''}`,
         supplier_id: doc.supplier_id,
-        supplier_name: supplier?.name
+        supplier_name: supplier?.name,
+        sub_account_id: doc.supplier_id,
+        sub_account_type: 'supplier'
       });
     }
 

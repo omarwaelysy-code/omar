@@ -123,7 +123,7 @@ export const CustomerSettlements: React.FC = () => {
                           r.return_number?.toLowerCase().includes(inv.invoice_number.toLowerCase());
       
       const isCorrectEntity = r.customer_id === inv.customer_id;
-      if (descMatches && isCorrectEntity) {
+      if (descMatches && isCorrectEntity && r.payment_type !== 'cash') {
         returnSettlements.push({
           id: r.id,
           date: r.date,
@@ -389,7 +389,7 @@ export const CustomerSettlements: React.FC = () => {
 
     // 2. Sales Returns
     allReturns.forEach(r => {
-      if (r.customer_id === selectedCustomerId) {
+      if (r.customer_id === selectedCustomerId && r.payment_type !== 'cash') {
         const settled = getSettlementsForTarget(r.id);
         const originalAmount = Number(r.total_amount) || 0;
         const openAmount = originalAmount - settled;
