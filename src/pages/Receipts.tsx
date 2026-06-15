@@ -673,15 +673,7 @@ export const Receipts: React.FC = () => {
 
       // Debit: Payment Method (Cash/Bank)
       let debitAccountId = paymentMethod?.account_id || '';
-      let debitAccountName = paymentMethod?.name || '';
-      
-      if (!debitAccountId) {
-        const fallbackAccount = accounts.find(a => 
-          a.name.includes('صندوق') || a.name.includes('بنك') || a.name.includes('خزينة')
-        );
-        debitAccountId = fallbackAccount?.id || 'cash_account_default';
-        debitAccountName = fallbackAccount?.name || 'حساب الصندوق (افتراضي)';
-      }
+      let debitAccountName = paymentMethod?.name || 'حساب النقدية';
 
       journalItems.push({
         account_id: debitAccountId,
@@ -983,14 +975,7 @@ export const Receipts: React.FC = () => {
 
       // Debit: Payment Method
       let debitAccountId = paymentMethod?.account_id || '';
-      let debitAccountName = paymentMethod?.name || '';
-      if (!debitAccountId) {
-        const fallback = accounts.find(a => 
-          a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق') || a.name.includes('بنك')
-        );
-        debitAccountId = fallback?.id || 'cash_account_default';
-        debitAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
-      }
+      let debitAccountName = paymentMethod?.name || 'حساب النقدية';
 
       journalItems.push({
         account_id: debitAccountId,

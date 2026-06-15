@@ -194,13 +194,7 @@ export const SupplierDiscounts: React.FC = () => {
 
       // Debit: Supplier
       let debitAccountId = supplier?.account_id || '';
-      let debitAccountName = supplier?.account_name || '';
-      
-      if (!debitAccountId) {
-        const fallbackAccount = accounts.find(a => a.name.includes('موردين'));
-        debitAccountId = fallbackAccount?.id || 'suppliers_account_default';
-        debitAccountName = fallbackAccount?.name || 'حساب الموردين (افتراضي)';
-      }
+      let debitAccountName = supplier?.account_name || 'حساب الموردين';
 
       journalItems.push({
         account_id: debitAccountId,
@@ -211,10 +205,9 @@ export const SupplierDiscounts: React.FC = () => {
       });
 
       // Credit: Selected Account (or Purchase Discount Account)
-      const creditAccount = accounts.find(a => a.id === discountData.account_id) || 
-                           accounts.find(a => a.name.includes('خصم مكتسب') || a.name.includes('خصومات مشتريات'));
-      const creditAccountId = creditAccount?.id || 'purchase_discount_account_default';
-      const creditAccountName = creditAccount?.name || 'حساب الخصم المكتسب (افتراضي)';
+      const creditAccount = accounts.find(a => a.id === discountData.account_id);
+      const creditAccountId = creditAccount?.id || '';
+      const creditAccountName = creditAccount?.name || 'حساب الخصم المكتسب';
 
       journalItems.push({
         account_id: creditAccountId,
@@ -309,13 +302,7 @@ export const SupplierDiscounts: React.FC = () => {
 
       const journalItems: any[] = [];
       let debitAccountId = supplier?.account_id || '';
-      let debitAccountName = supplier?.account_name || '';
-
-      if (!debitAccountId) {
-        const fallback = accounts.find(a => a.name.includes('موردين'));
-        debitAccountId = fallback?.id || 'suppliers_account_default';
-        debitAccountName = fallback?.name || 'حساب الموردين (افتراضي)';
-      }
+      let debitAccountName = supplier?.account_name || 'حساب الموردين';
 
       journalItems.push({
         account_id: debitAccountId,
@@ -327,10 +314,9 @@ export const SupplierDiscounts: React.FC = () => {
         supplier_name: supplier?.name
       });
 
-      const discountAccount = accounts.find(a => a.id === discountData.account_id) || 
-                              accounts.find(a => a.name.includes('خصم مكتسب') || a.name.includes('خصومات مكتسبة'));
-      const creditAccountId = discountAccount?.id || 'discount_received_default';
-      const creditAccountName = discountAccount?.name || 'حساب الخصم المكتسب (افتراضي)';
+      const discountAccount = accounts.find(a => a.id === discountData.account_id);
+      const creditAccountId = discountAccount?.id || '';
+      const creditAccountName = discountAccount?.name || 'حساب الخصم المكتسب';
 
       journalItems.push({
         account_id: creditAccountId,

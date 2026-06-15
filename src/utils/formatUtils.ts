@@ -64,43 +64,9 @@ export const parseNumber = (value: any): number => {
 };
 
 export const isCustomerAccount = (accountId: string, customer: any, accountsList: any[]) => {
-  if (customer?.account_id) {
-    return accountId === customer.account_id;
-  }
-  const keywords = ['عملاء', 'العملاء', 'ذمم مدينة', 'الذمم المدينة', 'مدينون', 'customers', 'customer', 'receivables', 'receivable', 'debtors', 'debtor', 'trade debtors'];
-  for (const kw of keywords) {
-    const found = accountsList.find((a: any) => a.name.trim().toLowerCase() === kw.toLowerCase());
-    if (found) return accountId === found.id;
-  }
-  for (const kw of keywords) {
-    const found = accountsList.find((a: any) => a.name.toLowerCase().includes(kw.toLowerCase()));
-    if (found) return accountId === found.id;
-  }
-  if (accountsList && accountsList.length > 0) {
-    const activeAccount = accountsList.find((a: any) => a.is_active !== false);
-    const firstId = activeAccount ? activeAccount.id : accountsList[0].id;
-    if (accountId === firstId) return true;
-  }
-  return accountId === 'customers_default' || accountId === 'customers_account_default';
+  return customer?.account_id ? accountId === customer.account_id : false;
 };
 
 export const isSupplierAccount = (accountId: string, supplier: any, accountsList: any[]) => {
-  if (supplier?.account_id) {
-    return accountId === supplier.account_id;
-  }
-  const keywords = ['موردين', 'الموردين', 'ذمم دائنة', 'الذمم الدائنة', 'دائنون', 'suppliers', 'supplier', 'payables', 'payable', 'creditors', 'creditor', 'trade creditors'];
-  for (const kw of keywords) {
-    const found = accountsList.find((a: any) => a.name.trim().toLowerCase() === kw.toLowerCase());
-    if (found) return accountId === found.id;
-  }
-  for (const kw of keywords) {
-    const found = accountsList.find((a: any) => a.name.toLowerCase().includes(kw.toLowerCase()));
-    if (found) return accountId === found.id;
-  }
-  if (accountsList && accountsList.length > 0) {
-    const activeAccount = accountsList.find((a: any) => a.is_active !== false);
-    const firstId = activeAccount ? activeAccount.id : accountsList[0].id;
-    if (accountId === firstId) return true;
-  }
-  return accountId === 'suppliers_default' || accountId === 'suppliers_account_default' || accountId === 'supplier_account_default';
+  return supplier?.account_id ? accountId === supplier.account_id : false;
 };

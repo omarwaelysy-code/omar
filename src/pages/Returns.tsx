@@ -214,15 +214,7 @@ export const Returns: React.FC = () => {
       (items || []).forEach(item => {
         const product = products.find(p => p.id === item.product_id);
         let debitAccountId = product?.revenue_account_id || '';
-        let debitAccountName = product?.revenue_account_name || '';
-
-        if (!debitAccountId) {
-          const fallbackAccount = accounts.find(a => 
-            a.name.includes('مبيعات') || a.name.includes('إيراد')
-          );
-          debitAccountId = fallbackAccount?.id || 'sales_account_default';
-          debitAccountName = fallbackAccount?.name || 'حساب المبيعات (افتراضي)';
-        }
+        let debitAccountName = product?.revenue_account_name || 'حساب مردودات المبيعات';
 
         journalItems.push({
           account_id: debitAccountId,
@@ -240,16 +232,10 @@ export const Returns: React.FC = () => {
       if (paymentType === 'cash' && paymentMethodId) {
         const method = paymentMethods.find(m => m.id === paymentMethodId);
         creditAccountId = method?.account_id || '';
-        creditAccountName = method?.account_name || '';
+        creditAccountName = method?.account_name || 'حساب النقدية';
       } else {
         creditAccountId = customer?.account_id || '';
-        creditAccountName = customer?.account_name || '';
-        
-        if (!creditAccountId) {
-          const fallbackAccount = accounts.find(a => a.name.includes('عملاء'));
-          creditAccountId = fallbackAccount?.id || 'customers_account_default';
-          creditAccountName = fallbackAccount?.name || 'حساب العملاء (افتراضي)';
-        }
+        creditAccountName = customer?.account_name || 'حساب العملاء';
       }
 
       journalItems.push({
@@ -497,12 +483,7 @@ export const Returns: React.FC = () => {
       // Journal Items
       const journalItems: any[] = [];
       let customerAccountId = customer?.account_id || '';
-      let customerAccountName = customer?.account_name || '';
-      if (!customerAccountId) {
-        const fallback = accounts.find(a => a.name.includes('عملاء'));
-        customerAccountId = fallback?.id || 'customers_account_default';
-        customerAccountName = fallback?.name || 'حساب العملاء (افتراضي)';
-      }
+      let customerAccountName = customer?.account_name || 'حساب العملاء';
 
       journalItems.push({
         account_id: customerAccountId,
@@ -517,12 +498,7 @@ export const Returns: React.FC = () => {
       sanitizedItems.forEach(item => {
         const product = products.find(p => p.id === item.product_id);
         let debitAccountId = product?.revenue_account_id || '';
-        let debitAccountName = product?.revenue_account_name || '';
-        if (!debitAccountId) {
-          const fallback = accounts.find(a => a.name.includes('مبيعات') || a.name.includes('إيراد'));
-          debitAccountId = fallback?.id || 'sales_account_default';
-          debitAccountName = fallback?.name || 'حساب المبيعات (افتراضي)';
-        }
+        let debitAccountName = product?.revenue_account_name || 'حساب مردودات المبيعات';
         journalItems.push({
           account_id: debitAccountId,
           account_name: debitAccountName,
@@ -535,12 +511,7 @@ export const Returns: React.FC = () => {
       if (paymentType === 'cash' && paymentMethodId) {
         const pm = paymentMethods.find(p => p.id === paymentMethodId);
         let cashAccountId = pm?.account_id || '';
-        let cashAccountName = pm?.account_name || '';
-        if (!cashAccountId) {
-          const fallback = accounts.find(a => a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق'));
-          cashAccountId = fallback?.id || 'cash_account_default';
-          cashAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
-        }
+        let cashAccountName = pm?.account_name || 'حساب النقدية';
         journalItems.push({
           account_id: customerAccountId,
           account_name: customerAccountName,

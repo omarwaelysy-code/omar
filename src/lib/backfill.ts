@@ -68,13 +68,8 @@ export async function backfillMissingJournalEntries(pool: any) {
       await client.query('BEGIN');
       
       // Determine Supplier Account
-      let supplierAccountId = supplier?.account_id;
-      let supplierAccountName = supplier?.account_name;
-      if (!supplierAccountId) {
-        const fallback = accounts.find((a: any) => a.name.includes('موردين') || a.name.toLowerCase().includes('supplier'));
-        supplierAccountId = fallback?.id || 'suppliers_account_default';
-        supplierAccountName = fallback?.name || 'حساب الموردين';
-      }
+      let supplierAccountId = supplier?.account_id || '';
+      let supplierAccountName = supplier?.account_name || 'حساب الموردين';
  
       // Generate standard sequence journal entry number
       const entryNumber = await generateNextSequence(client, companyId, 'journal_entries', invoice.date);
@@ -103,7 +98,7 @@ export async function backfillMissingJournalEntries(pool: any) {
         );
         journalItems.push({
           id: crypto.randomUUID(),
-          account_id: discountAccount?.id || 'purchase_discount_default',
+          account_id: discountAccount?.id || '',
           account_name: discountAccount?.name || 'حساب الخصم المكتسب',
           debit: 0,
           credit: discount,
@@ -120,20 +115,15 @@ export async function backfillMissingJournalEntries(pool: any) {
           const product = products.find((p: any) => p.id === item.product_id);
           if (product?.type !== 'service' && !product?.is_service) {
             debitAccountId = product?.inventory_account_id || product?.cost_account_id || '';
-            debitAccountName = product?.inventory_account_name || product?.cost_account_name || '';
+            debitAccountName = product?.inventory_account_name || product?.cost_account_name || 'حساب المشتريات/المخزون';
           } else {
             debitAccountId = product?.cost_account_id || '';
-            debitAccountName = product?.cost_account_name || '';
-          }
-          if (!debitAccountId) {
-            const fallback = accounts.find((a: any) => a.name.includes('مخزون') || a.name.includes('مشتريات') || a.name.includes('تكلفة') || a.name.toLowerCase().includes('inventory') || a.name.toLowerCase().includes('purchase'));
-            debitAccountId = fallback?.id || 'purchase_account_default';
-            debitAccountName = fallback?.name || 'حساب المشتريات';
+            debitAccountName = product?.cost_account_name || 'حساب المشتريات';
           }
         } else {
-          const fallback = accounts.find((a: any) => a.name.includes('مصروفات') || a.name.toLowerCase().includes('expense'));
-          debitAccountId = fallback?.id || 'expense_account_default';
-          debitAccountName = fallback?.name || 'حساب المصروفات';
+          const categoryAccount = accounts.find((a: any) => a.name.includes('مصروف') || a.name.toLowerCase().includes('expense'));
+          debitAccountId = categoryAccount?.id || '';
+          debitAccountName = categoryAccount?.name || 'حساب المصروف';
         }
 
         journalItems.push({
@@ -149,16 +139,8 @@ export async function backfillMissingJournalEntries(pool: any) {
       // 4. Cash Payment Lines (if cash purchase)
       if (invoice.payment_type === 'cash') {
         const pm = paymentMethods.find((p: any) => p.id === invoice.payment_method_id);
-        let cashAccountId = pm?.account_id;
-        let cashAccountName = pm?.account_name;
-        if (!cashAccountId) {
-          const fallback = accounts.find((a: any) => 
-            a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق') ||
-            a.name.toLowerCase().includes('cash') || a.name.toLowerCase().includes('safe') || a.name.toLowerCase().includes('fund')
-          );
-          cashAccountId = fallback?.id || 'cash_account_default';
-          cashAccountName = fallback?.name || 'حساب النقدية';
-        }
+        let cashAccountId = pm?.account_id || '';
+        let cashAccountName = pm?.account_name || 'حساب النقدية';
         
         // Credit Cash
         journalItems.push({
@@ -283,14 +265,9 @@ export async function backfillMissingJournalEntries(pool: any) {
         await client.query('BEGIN');
         
         // Determine Customer Account
-        let customerAccountId = customer?.account_id;
-        let customerAccountName = customer?.account_name;
-        if (!customerAccountId) {
-          const fallback = accounts.find((a: any) => a.name.includes('عملاء') || a.name.toLowerCase().includes('customer'));
-          customerAccountId = fallback?.id || 'customers_account_default';
-          customerAccountName = fallback?.name || 'حساب العملاء';
-        }
-   
+        let customerAccountId = customer?.account_id || '';
+        let customerAccountName = customer?.account_name || 'حساب العملاء';
+
         // Generate standard sequence journal entry number
         const entryNumber = await generateNextSequence(client, companyId, 'journal_entries', invoice.date);
 
@@ -318,7 +295,7 @@ export async function backfillMissingJournalEntries(pool: any) {
           );
           journalItems.push({
             id: crypto.randomUUID(),
-            account_id: discountAccount?.id || 'sales_discount_default',
+            account_id: discountAccount?.id || '',
             account_name: discountAccount?.name || 'حساب الخصم المسموح به',
             debit: discount,
             credit: 0,
@@ -330,13 +307,7 @@ export async function backfillMissingJournalEntries(pool: any) {
         for (const item of items) {
           const product = products.find((p: any) => p.id === item.product_id);
           let creditAccountId = product?.revenue_account_id || '';
-          let creditAccountName = product?.revenue_account_name || '';
-          
-          if (!creditAccountId) {
-            const fallback = accounts.find((a: any) => a.name.includes('مبيعات') || a.name.includes('إيراد') || a.name.toLowerCase().includes('sales') || a.name.toLowerCase().includes('revenue'));
-            creditAccountId = fallback?.id || 'sales_account_default';
-            creditAccountName = fallback?.name || 'حساب المبيعات';
-          }
+          let creditAccountName = product?.revenue_account_name || 'حساب المبيعات';
 
           journalItems.push({
             id: crypto.randomUUID(),
@@ -355,7 +326,7 @@ export async function backfillMissingJournalEntries(pool: any) {
             a.name.includes('ضريبة القيمة المضافة') || a.name.includes('قيمة مضافة') || a.name.includes('ضريبة مبيعات') ||
             a.name.toLowerCase().includes('vat') || a.name.toLowerCase().includes('tax')
           );
-          const vatAccountId = vatAccount?.id || 'vat_liability_default';
+          const vatAccountId = vatAccount?.id || '';
           const vatAccountName = vatAccount?.name || 'حساب ضريبة القيمة المضافة';
           
           journalItems.push({
@@ -371,16 +342,8 @@ export async function backfillMissingJournalEntries(pool: any) {
         // 5. Cash Payment Lines (if cash sale)
         if (paymentType === 'cash') {
           const pm = paymentMethods.find((p: any) => p.id === paymentMethodId);
-          let cashAccountId = pm?.account_id;
-          let cashAccountName = pm?.account_name;
-          if (!cashAccountId) {
-            const fallback = accounts.find((a: any) => 
-              a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق') ||
-              a.name.toLowerCase().includes('cash') || a.name.toLowerCase().includes('safe') || a.name.toLowerCase().includes('fund')
-            );
-            cashAccountId = fallback?.id || 'cash_account_default';
-            cashAccountName = fallback?.name || 'حساب النقدية';
-          }
+          let cashAccountId = pm?.account_id || '';
+          let cashAccountName = pm?.account_name || 'حساب النقدية';
           
           // Debit Cash
           journalItems.push({

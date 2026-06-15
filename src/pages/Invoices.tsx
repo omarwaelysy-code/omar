@@ -1101,24 +1101,10 @@ export const Invoices: React.FC = () => {
       if (paymentType === 'cash') {
         const pm = paymentMethods.find(p => p.id === paymentMethodId);
         debitAccountId = pm?.account_id || '';
-        debitAccountName = pm?.account_name || '';
-        
-        if (!debitAccountId) {
-          const fallbackAccount = accounts.find(a => 
-            a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق')
-          );
-          debitAccountId = fallbackAccount?.id || 'cash_account_default';
-          debitAccountName = fallbackAccount?.name || 'حساب النقدية (افتراضي)';
-        }
+        debitAccountName = pm?.account_name || 'حساب النقدية';
       } else {
         debitAccountId = customer?.account_id || '';
-        debitAccountName = customer?.account_name || '';
-        
-        if (!debitAccountId) {
-          const fallbackAccount = accounts.find(a => a.name.includes('عملاء'));
-          debitAccountId = fallbackAccount?.id || 'customers_account_default';
-          debitAccountName = fallbackAccount?.name || 'حساب العملاء (افتراضي)';
-        }
+        debitAccountName = customer?.account_name || 'حساب العملاء';
       }
 
       journalItems.push({
@@ -1133,11 +1119,11 @@ export const Invoices: React.FC = () => {
 
       // Debit: Discount Account (if any)
       if (Number(discount) > 0) {
-        const discountAccount = accounts.find(a => a.id === settings?.customer_discount_account_id) || 
-                                accounts.find(a => a.name.includes('خصم مسموح به') || a.name.includes('خصم مبيعات'));
+        const discountAccountId = settings?.customer_discount_account_id || '';
+        const discountAccount = accounts.find(a => a.id === discountAccountId);
         journalItems.push({
-          account_id: discountAccount?.id || 'sales_discount_default',
-          account_name: discountAccount?.name || 'حساب الخصم المسموح به (افتراضي)',
+          account_id: discountAccountId,
+          account_name: discountAccount?.name || 'حساب الخصم المسموح به',
           debit: Number(discount) || 0,
           credit: 0,
           description: `خصم مسموح به - فاتورة رقم ${invoice_number}`
@@ -1148,15 +1134,7 @@ export const Invoices: React.FC = () => {
       (items || []).forEach(item => {
         const product = products.find(p => p.id === item.product_id);
         let creditAccountId = product?.revenue_account_id || '';
-        let creditAccountName = product?.revenue_account_name || '';
-
-        if (!creditAccountId) {
-          const fallbackAccount = accounts.find(a => 
-            a.name.includes('مبيعات') || a.name.includes('إيراد')
-          );
-          creditAccountId = fallbackAccount?.id || 'sales_account_default';
-          creditAccountName = fallbackAccount?.name || 'حساب المبيعات (افتراضي)';
-        }
+        let creditAccountName = product?.revenue_account_name || 'حساب المبيعات';
 
         journalItems.push({
           account_id: creditAccountId,
@@ -1174,8 +1152,8 @@ export const Invoices: React.FC = () => {
           a.name.includes('قيمة مضافة') || 
           a.name.includes('ضريبة مبيعات')
         );
-        const vatAccountId = vatAccount?.id || 'vat_liability_default';
-        const vatAccountName = vatAccount?.name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة (افتراضي)' : 'VAT Liability Account (Default)');
+        const vatAccountId = vatAccount?.id || '';
+        const vatAccountName = vatAccount?.name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Liability Account');
 
         journalItems.push({
           account_id: vatAccountId,
@@ -1401,12 +1379,7 @@ export const Invoices: React.FC = () => {
       // Journal items generation
       const journalItems: any[] = [];
       let customerAccountId = customer?.account_id || '';
-      let customerAccountName = customer?.account_name || '';
-      if (!customerAccountId) {
-        const fallback = accounts.find(a => a.name.includes('عملاء'));
-        customerAccountId = fallback?.id || 'customers_account_default';
-        customerAccountName = fallback?.name || 'حساب العملاء (افتراضي)';
-      }
+      let customerAccountName = customer?.account_name || 'حساب العملاء';
 
       journalItems.push({
         account_id: customerAccountId,
@@ -1421,11 +1394,11 @@ export const Invoices: React.FC = () => {
       });
 
       if (discount > 0) {
-        const discountAccount = accounts.find(a => a.id === settings?.customer_discount_account_id) || 
-                                 accounts.find(a => a.name.includes('خصم مسموح به') || a.name.includes('خصم مبيعات'));
+        const discountAccountId = settings?.customer_discount_account_id || '';
+        const discountAccount = accounts.find(a => a.id === discountAccountId);
         journalItems.push({
-          account_id: discountAccount?.id || 'sales_discount_default',
-          account_name: discountAccount?.name || 'حساب الخصم المسموح به (افتراضي)',
+          account_id: discountAccountId,
+          account_name: discountAccount?.name || 'حساب الخصم المسموح به',
           debit: discount,
           credit: 0,
           description: `خصم مسموح به - فاتورة رقم ${invoiceNumber}${description ? ` - ${description}` : ''}`
@@ -1435,12 +1408,7 @@ export const Invoices: React.FC = () => {
       sanitizedItems.forEach(item => {
         const product = products.find(p => p.id === item.product_id);
         let creditAccountId = product?.revenue_account_id || '';
-        let creditAccountName = product?.revenue_account_name || '';
-        if (!creditAccountId) {
-          const fallback = accounts.find(a => a.name.includes('مبيعات') || a.name.includes('إيراد'));
-          creditAccountId = fallback?.id || 'sales_account_default';
-          creditAccountName = fallback?.name || 'حساب المبيعات (افتراضي)';
-        }
+        let creditAccountName = product?.revenue_account_name || 'حساب المبيعات';
         journalItems.push({
           account_id: creditAccountId,
           account_name: creditAccountName,
@@ -1456,8 +1424,8 @@ export const Invoices: React.FC = () => {
           a.name.includes('قيمة مضافة') || 
           a.name.includes('ضريبة مبيعات')
         );
-        const vatAccountId = vatAccount?.id || 'vat_liability_default';
-        const vatAccountName = vatAccount?.name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة (افتراضي)' : 'VAT Liability Account (Default)');
+        const vatAccountId = vatAccount?.id || '';
+        const vatAccountName = vatAccount?.name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Liability Account');
         
         journalItems.push({
           account_id: vatAccountId,
@@ -1471,12 +1439,7 @@ export const Invoices: React.FC = () => {
       if (paymentType === 'cash') {
         const pm = paymentMethods.find(p => p.id === paymentMethodId);
         let cashAccountId = pm?.account_id || '';
-        let cashAccountName = pm?.account_name || '';
-        if (!cashAccountId) {
-          const fallback = accounts.find(a => a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق'));
-          cashAccountId = fallback?.id || 'cash_account_default';
-          cashAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
-        }
+        let cashAccountName = pm?.account_name || 'حساب النقدية';
         journalItems.push({
           account_id: cashAccountId,
           account_name: cashAccountName,

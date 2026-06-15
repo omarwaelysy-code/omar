@@ -682,20 +682,10 @@ export const PaymentVouchers: React.FC = () => {
 
         if (voucherData.type === 'supplier') {
           debitAccountId = supplier?.account_id || '';
-          debitAccountName = supplier?.account_name || '';
-          if (!debitAccountId) {
-            const fallbackAccount = accounts.find(a => a.name.includes('موردين'));
-            debitAccountId = fallbackAccount?.id || 'suppliers_account_default';
-            debitAccountName = fallbackAccount?.name || 'حساب الموردين (افتراضي)';
-          }
+          debitAccountName = supplier?.account_name || 'حساب الموردين';
         } else {
           debitAccountId = category?.account_id || '';
           debitAccountName = category?.name || '';
-          if (!debitAccountId) {
-            const fallbackAccount = accounts.find(a => a.name.includes('مصروف'));
-            debitAccountId = fallbackAccount?.id || 'expenses_account_default';
-            debitAccountName = fallbackAccount?.name || 'حساب المصروفات (افتراضي)';
-          }
         }
 
         journalItems.push({
@@ -715,15 +705,7 @@ export const PaymentVouchers: React.FC = () => {
 
       // Credit: Payment Method (Cash/Bank)
       let creditAccountId = paymentMethod?.account_id || '';
-      let creditAccountName = paymentMethod?.name || '';
-      
-      if (!creditAccountId) {
-        const fallbackAccount = accounts.find(a => 
-          a.name.includes('صندوق') || a.name.includes('بنك') || a.name.includes('خزينة')
-        );
-        creditAccountId = fallbackAccount?.id || 'cash_account_default';
-        creditAccountName = fallbackAccount?.name || 'حساب الصندوق (افتراضي)';
-      }
+      let creditAccountName = paymentMethod?.name || 'حساب النقدية';
 
       journalItems.push({
         account_id: creditAccountId,

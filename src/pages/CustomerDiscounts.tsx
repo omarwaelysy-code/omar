@@ -193,10 +193,9 @@ export const CustomerDiscounts: React.FC = () => {
       const journalItems: JournalEntryItem[] = [];
 
       // Debit: Selected Account (or Sales Discount Account)
-      const debitAccount = accounts.find(a => a.id === discountData.account_id) || 
-                          accounts.find(a => a.name.includes('خصم مسموح به') || a.name.includes('خصومات مبيعات'));
-      const debitAccountId = debitAccount?.id || 'sales_discount_account_default';
-      const debitAccountName = debitAccount?.name || 'حساب الخصم المسموح به (افتراضي)';
+      const debitAccount = accounts.find(a => a.id === discountData.account_id);
+      const debitAccountId = debitAccount?.id || '';
+      const debitAccountName = debitAccount?.name || 'حساب الخصم المسموح به';
 
       journalItems.push({
         account_id: debitAccountId,
@@ -208,13 +207,7 @@ export const CustomerDiscounts: React.FC = () => {
 
       // Credit: Customer
       let creditAccountId = customer?.account_id || '';
-      let creditAccountName = customer?.account_name || '';
-      
-      if (!creditAccountId) {
-        const fallbackAccount = accounts.find(a => a.name.includes('عملاء'));
-        creditAccountId = fallbackAccount?.id || 'customers_account_default';
-        creditAccountName = fallbackAccount?.name || 'حساب العملاء (افتراضي)';
-      }
+      let creditAccountName = customer?.account_name || 'حساب العملاء';
 
       journalItems.push({
         account_id: creditAccountId,
@@ -308,10 +301,9 @@ export const CustomerDiscounts: React.FC = () => {
       }
 
       const journalItems: any[] = [];
-      const discountAccount = accounts.find(a => a.id === discountData.account_id) || 
-                              accounts.find(a => a.name.includes('خصم مسموح به') || a.name.includes('خصومات مسموح بها'));
-      const debitAccountId = discountAccount?.id || 'discount_allowed_default';
-      const debitAccountName = discountAccount?.name || 'حساب الخصم المسموح به (افتراضي)';
+      const discountAccount = accounts.find(a => a.id === discountData.account_id);
+      const debitAccountId = discountAccount?.id || '';
+      const debitAccountName = discountAccount?.name || 'حساب الخصم المسموح به';
 
       journalItems.push({
         account_id: debitAccountId,
@@ -322,12 +314,7 @@ export const CustomerDiscounts: React.FC = () => {
       });
 
       let creditAccountId = customer?.account_id || '';
-      let creditAccountName = customer?.account_name || '';
-      if (!creditAccountId) {
-        const fallback = accounts.find(a => a.name.includes('عملاء'));
-        creditAccountId = fallback?.id || 'customers_account_default';
-        creditAccountName = fallback?.name || 'حساب العملاء (افتراضي)';
-      }
+      let creditAccountName = customer?.account_name || 'حساب العملاء';
 
       journalItems.push({
         account_id: creditAccountId,

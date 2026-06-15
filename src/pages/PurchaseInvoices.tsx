@@ -1022,27 +1022,15 @@ export const PurchaseInvoices: React.FC = () => {
           
           if (product?.type !== 'service') {
             debitAccountId = product?.inventory_account_id || product?.cost_account_id || '';
-            debitAccountName = product?.inventory_account_name || product?.cost_account_name || '';
+            debitAccountName = product?.inventory_account_name || product?.cost_account_name || 'حساب المشتريات/المخزون';
           } else {
             debitAccountId = product?.cost_account_id || '';
-            debitAccountName = product?.cost_account_name || '';
-          }
-          
-          if (!debitAccountId) {
-            const fallbackAccount = accounts.find(a => a.name.includes('مخزون') || a.name.includes('مشتريات') || a.name.toLowerCase().includes('inventory') || a.name.toLowerCase().includes('purchase'));
-            debitAccountId = fallbackAccount?.id || 'purchase_account_default';
-            debitAccountName = fallbackAccount?.name || t('pi.purchase_account_default');
+            debitAccountName = product?.cost_account_name || 'حساب المشتريات';
           }
         } else {
           const category = categories.find(c => c.id === item.expense_category_id);
           debitAccountId = category?.account_id || '';
-          debitAccountName = category?.account_name || '';
-          
-          if (!debitAccountId) {
-            const fallbackAccount = accounts.find(a => a.name.includes('مصروف') || a.name.toLowerCase().includes('expense'));
-            debitAccountId = fallbackAccount?.id || 'expense_account_default';
-            debitAccountName = fallbackAccount?.name || t('pi.expense_account_default');
-          }
+          debitAccountName = category?.account_name || 'حساب المصروف';
         }
 
         journalItems.push({
@@ -1061,25 +1049,10 @@ export const PurchaseInvoices: React.FC = () => {
       if (invoiceData.payment_type === 'cash') {
         const pm = paymentMethods.find(p => p.id === invoiceData.payment_method_id);
         creditAccountId = pm?.account_id || '';
-        creditAccountName = pm?.account_name || '';
-        
-        if (!creditAccountId) {
-          const fallbackAccount = accounts.find(a => 
-            a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق') ||
-            a.name.toLowerCase().includes('cash') || a.name.toLowerCase().includes('safe') || a.name.toLowerCase().includes('fund')
-          );
-          creditAccountId = fallbackAccount?.id || 'cash_account_default';
-          creditAccountName = fallbackAccount?.name || t('pi.cash_account_default');
-        }
+        creditAccountName = pm?.account_name || 'حساب النقدية';
       } else {
         creditAccountId = supplier?.account_id || '';
-        creditAccountName = supplier?.account_name || '';
-        
-        if (!creditAccountId) {
-          const fallbackAccount = accounts.find(a => a.name.includes('موردين') || a.name.toLowerCase().includes('supplier'));
-          creditAccountId = fallbackAccount?.id || 'suppliers_account_default';
-          creditAccountName = fallbackAccount?.name || t('pi.suppliers_account_default');
-        }
+        creditAccountName = supplier?.account_name || 'حساب الموردين';
       }
 
       journalItems.push({
@@ -1094,11 +1067,10 @@ export const PurchaseInvoices: React.FC = () => {
 
       // Credit: Discount Account (if any)
       if (invoiceData.discount > 0) {
-        const discountAccount = accounts.find(a => a.id === settings?.supplier_discount_account_id) || 
-                                accounts.find(a => a.name.includes('خصم مكتسب') || a.name.includes('خصم مشتريات') ||
-                                             a.name.toLowerCase().includes('discount earned') || a.name.toLowerCase().includes('purchase discount'));
+        const discountAccountId = settings?.supplier_discount_account_id || '';
+        const discountAccount = accounts.find(a => a.id === discountAccountId);
         journalItems.push({
-          account_id: discountAccount?.id || 'purchase_discount_default',
+          account_id: discountAccountId,
           account_name: discountAccount?.name || t('pi.discount_account_default'),
           debit: 0,
           credit: invoiceData.discount,
@@ -1534,12 +1506,7 @@ export const PurchaseInvoices: React.FC = () => {
       // Journal items generation
       const journalItems: any[] = [];
       let supplierAccountId = supplier?.account_id || '';
-      let supplierAccountName = supplier?.account_name || '';
-      if (!supplierAccountId) {
-        const fallback = accounts.find(a => a.name.includes('موردين') || a.name.toLowerCase().includes('supplier'));
-        supplierAccountId = fallback?.id || 'suppliers_account_default';
-        supplierAccountName = fallback?.name || t('pi.supplier_account_default');
-      }
+      let supplierAccountName = supplier?.account_name || 'حساب الموردين';
 
       journalItems.push({
         account_id: supplierAccountId,
@@ -1554,11 +1521,10 @@ export const PurchaseInvoices: React.FC = () => {
       });
 
       if (invoiceData.discount > 0) {
-        const discountAccount = accounts.find(a => a.id === settings?.supplier_discount_account_id) || 
-                                accounts.find(a => a.name.includes('خصم مكتسب') || a.name.includes('خصم مشتريات') ||
-                                             a.name.toLowerCase().includes('discount earned') || a.name.toLowerCase().includes('purchase discount'));
+        const discountAccountId = settings?.supplier_discount_account_id || '';
+        const discountAccount = accounts.find(a => a.id === discountAccountId);
         journalItems.push({
-          account_id: discountAccount?.id || 'purchase_discount_default',
+          account_id: discountAccountId,
           account_name: discountAccount?.name || t('pi.discount_account_default'),
           debit: 0,
           credit: invoiceData.discount,
@@ -1575,26 +1541,15 @@ export const PurchaseInvoices: React.FC = () => {
           
           if (product?.type !== 'service') {
             debitAccountId = product?.inventory_account_id || product?.cost_account_id || '';
-            debitAccountName = product?.inventory_account_name || product?.cost_account_name || '';
+            debitAccountName = product?.inventory_account_name || product?.cost_account_name || 'حساب المشتريات/المخزون';
           } else {
             debitAccountId = product?.cost_account_id || '';
-            debitAccountName = product?.cost_account_name || '';
-          }
-          
-          if (!debitAccountId) {
-            const fallback = accounts.find(a => a.name.includes('مخزون') || a.name.includes('مشتريات') || a.name.includes('تكلفة') || a.name.toLowerCase().includes('inventory') || a.name.toLowerCase().includes('purchase'));
-            debitAccountId = fallback?.id || 'purchase_account_default';
-            debitAccountName = fallback?.name || t('pi.purchase_account_default');
+            debitAccountName = product?.cost_account_name || 'حساب المشتريات';
           }
         } else {
           const category = categories.find(c => c.id === item.expense_category_id);
           debitAccountId = (category as any)?.account_id || '';
-          debitAccountName = (category as any)?.account_name || '';
-          if (!debitAccountId) {
-            const fallback = accounts.find(a => (category && a.name.includes(category.name)) || a.name.includes('مصروفات') || a.name.toLowerCase().includes('expense'));
-            debitAccountId = fallback?.id || 'expense_account_default';
-            debitAccountName = fallback?.name || t('pi.expense_account_default');
-          }
+          debitAccountName = (category as any)?.account_name || 'حساب المصروف';
         }
         journalItems.push({
           account_id: debitAccountId,
@@ -1608,15 +1563,7 @@ export const PurchaseInvoices: React.FC = () => {
       if (invoiceData.payment_type === 'cash') {
         const pm = paymentMethods.find(p => p.id === invoiceData.payment_method_id);
         let cashAccountId = pm?.account_id || '';
-        let cashAccountName = pm?.account_name || '';
-        if (!cashAccountId) {
-          const fallback = accounts.find(a => 
-            a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق') ||
-            a.name.toLowerCase().includes('cash') || a.name.toLowerCase().includes('safe') || a.name.toLowerCase().includes('fund')
-          );
-          cashAccountId = fallback?.id || 'cash_account_default';
-          cashAccountName = fallback?.name || t('pi.cash_account_default');
-        }
+        let cashAccountName = pm?.account_name || 'حساب النقدية';
         journalItems.push({
           account_id: cashAccountId,
           account_name: cashAccountName,

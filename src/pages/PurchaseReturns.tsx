@@ -233,16 +233,10 @@ export const PurchaseReturns: React.FC = () => {
       if (returnData.payment_type === 'cash' && returnData.payment_method_id) {
         const pm = paymentMethods.find(p => p.id === returnData.payment_method_id);
         debitAccountId = pm?.account_id || '';
-        debitAccountName = pm?.account_name || '';
+        debitAccountName = pm?.account_name || 'حساب النقدية';
       } else {
         debitAccountId = supplier?.account_id || '';
-        debitAccountName = supplier?.account_name || '';
-        
-        if (!debitAccountId) {
-          const fallbackAccount = accounts.find(a => a.name.includes('موردين'));
-          debitAccountId = fallbackAccount?.id || 'suppliers_account_default';
-          debitAccountName = fallbackAccount?.name || 'حساب الموردين (افتراضي)';
-        }
+        debitAccountName = supplier?.account_name || 'حساب الموردين';
       }
 
       journalItems.push({
@@ -263,18 +257,10 @@ export const PurchaseReturns: React.FC = () => {
 
         if (product && product.type !== 'service') {
           creditAccountId = product.inventory_account_id || product.cost_account_id || '';
-          creditAccountName = product.inventory_account_name || product.cost_account_name || '';
+          creditAccountName = product.inventory_account_name || product.cost_account_name || 'حساب المخزون/المشتريات';
         } else {
           creditAccountId = product?.cost_account_id || '';
-          creditAccountName = product?.cost_account_name || '';
-        }
-
-        if (!creditAccountId) {
-          const fallbackAccount = accounts.find(a => 
-            a.name.includes('مخزون') || a.name.includes('مشتريات') || a.name.toLowerCase().includes('inventory')
-          );
-          creditAccountId = fallbackAccount?.id || 'inventory_account_default';
-          creditAccountName = fallbackAccount?.name || 'حساب المخزون (افتراضي)';
+          creditAccountName = product?.cost_account_name || 'حساب المشتريات';
         }
 
         journalItems.push({
@@ -515,12 +501,7 @@ export const PurchaseReturns: React.FC = () => {
 
       const journalItems: any[] = [];
       let supplierAccountId = supplier?.account_id || '';
-      let supplierAccountName = supplier?.account_name || '';
-      if (!supplierAccountId) {
-        const fallback = accounts.find(a => a.name.includes('موردين'));
-        supplierAccountId = fallback?.id || 'suppliers_account_default';
-        supplierAccountName = fallback?.name || 'حساب الموردين (افتراضي)';
-      }
+      let supplierAccountName = supplier?.account_name || 'حساب الموردين';
 
       journalItems.push({
         account_id: supplierAccountId,
@@ -539,16 +520,10 @@ export const PurchaseReturns: React.FC = () => {
         
         if (product && product.type !== 'service') {
           creditAccountId = product.inventory_account_id || product.cost_account_id || '';
-          creditAccountName = product.inventory_account_name || product.cost_account_name || product.revenue_account_name || '';
+          creditAccountName = product.inventory_account_name || product.cost_account_name || product.revenue_account_name || 'حساب المخزون/المشتريات';
         } else {
           creditAccountId = product?.cost_account_id || '';
-          creditAccountName = product?.cost_account_name || product?.revenue_account_name || '';
-        }
-
-        if (!creditAccountId) {
-          const fallback = accounts.find(a => a.name.includes('مخزون') || a.name.includes('مشتريات') || a.name.includes('تكلفة') || a.name.toLowerCase().includes('inventory'));
-          creditAccountId = fallback?.id || 'purchase_account_default';
-          creditAccountName = fallback?.name || 'حساب المشتريات (افتراضي)';
+          creditAccountName = product?.cost_account_name || product?.revenue_account_name || 'حساب المشتريات';
         }
         journalItems.push({
           account_id: creditAccountId,
@@ -562,12 +537,7 @@ export const PurchaseReturns: React.FC = () => {
       if (returnData.payment_type === 'cash' && returnData.payment_method_id) {
         const pm = paymentMethods.find(p => p.id === returnData.payment_method_id);
         let cashAccountId = pm?.account_id || '';
-        let cashAccountName = pm?.account_name || '';
-        if (!cashAccountId) {
-          const fallback = accounts.find(a => a.name.includes('نقدية') || a.name.includes('خزينة') || a.name.includes('صندوق'));
-          cashAccountId = fallback?.id || 'cash_account_default';
-          cashAccountName = fallback?.name || 'حساب النقدية (افتراضي)';
-        }
+        let cashAccountName = pm?.account_name || 'حساب النقدية';
         journalItems.push({
           account_id: cashAccountId,
           account_name: cashAccountName,
