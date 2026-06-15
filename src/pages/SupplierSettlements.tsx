@@ -850,6 +850,18 @@ export const SupplierSettlements: React.FC = () => {
     }
   };
 
+  const getJournalEntryNumber = (docId: string, docNumber: string, pageName: string) => {
+    const je = allJournalEntries.find((je: any) => 
+      je.reference_id === docId || 
+      je.reference_number === docNumber
+    );
+    if (!je && pageName === 'journal_entries') {
+      const directJe = allJournalEntries.find((je: any) => je.id === docId || je.entry_number === docNumber);
+      return directJe?.entry_number || '-';
+    }
+    return je?.entry_number || '-';
+  };
+
   // Build History list
   const historyList = useMemo(() => {
     const historyMap = new Map<string, {
@@ -858,8 +870,8 @@ export const SupplierSettlements: React.FC = () => {
       entity_name: string;
       entity_id: string;
       total_amount: number;
-      debitDocs: { number: string; type_label: string; amount: number; page_name: string; original_id: string }[];
-      creditDocs: { number: string; type_label: string; amount: number; page_name: string; original_id: string }[];
+      debitDocs: { number: string; type_label: string; amount: number; page_name: string; original_id: string; date: string; je_number: string }[];
+      creditDocs: { number: string; type_label: string; amount: number; page_name: string; original_id: string; date: string; je_number: string }[];
     }>();
 
     // 1. Scan Purchase Invoices
@@ -887,7 +899,9 @@ export const SupplierSettlements: React.FC = () => {
                 type_label: 'فاتورة مشتريات',
                 amount: Number(s.settled_amount) || 0,
                 page_name: 'purchase_invoices',
-                original_id: inv.id
+                original_id: inv.id,
+                date: inv.date,
+                je_number: getJournalEntryNumber(inv.id, inv.invoice_number, 'purchase_invoices')
               });
             }
             if (!entry.debitDocs.some(d => d.number === s.reference_number)) {
@@ -897,7 +911,9 @@ export const SupplierSettlements: React.FC = () => {
                 type_label: s.type_label || 'تسوية',
                 amount: Number(s.settled_amount) || 0,
                 page_name: s.type || 'payment_vouchers',
-                original_id: targetOriginalId
+                original_id: targetOriginalId,
+                date: s.date || inv.date,
+                je_number: getJournalEntryNumber(targetOriginalId, s.reference_number, s.type || 'payment_vouchers')
               });
             }
           }
@@ -932,7 +948,9 @@ export const SupplierSettlements: React.FC = () => {
                     type_label: 'سند صرف',
                     amount: Number(s.settled_amount) || 0,
                     page_name: 'payment_vouchers',
-                    original_id: v.id
+                    original_id: v.id,
+                    date: v.date,
+                    je_number: getJournalEntryNumber(v.id, v.voucher_number || v.number, 'payment_vouchers')
                   });
                 }
                 if (!entry.creditDocs.some(c => c.number === s.reference_number)) {
@@ -941,7 +959,9 @@ export const SupplierSettlements: React.FC = () => {
                     type_label: s.type_label || 'تسوية',
                     amount: Number(s.settled_amount) || 0,
                     page_name: s.type || 'purchase_invoices',
-                    original_id: s.target_id
+                    original_id: s.target_id,
+                    date: s.date || v.date,
+                    je_number: getJournalEntryNumber(s.target_id, s.reference_number, s.type || 'purchase_invoices')
                   });
                 }
               }
@@ -974,6 +994,8 @@ export const SupplierSettlements: React.FC = () => {
         [language === 'ar' ? 'المورد' : 'Supplier']: h.entity_name,
         [language === 'ar' ? 'نوع المستند' : 'Doc Type']: doc.type_label,
         [language === 'ar' ? 'رقم المستند' : 'Doc No.']: doc.number,
+        [language === 'ar' ? 'تاريخ المستند' : 'Doc Date']: formatDate(doc.date),
+        [language === 'ar' ? 'رقم القيد' : 'JE No.']: doc.je_number || '-',
         [language === 'ar' ? 'مدين (مسوى)' : 'Debit Settled']: doc.amount,
         [language === 'ar' ? 'دائن (مسوى)' : 'Credit Settled']: 0
       });
@@ -986,6 +1008,8 @@ export const SupplierSettlements: React.FC = () => {
         [language === 'ar' ? 'المورد' : 'Supplier']: h.entity_name,
         [language === 'ar' ? 'نوع المستند' : 'Doc Type']: doc.type_label,
         [language === 'ar' ? 'رقم المستند' : 'Doc No.']: doc.number,
+        [language === 'ar' ? 'تاريخ المستند' : 'Doc Date']: formatDate(doc.date),
+        [language === 'ar' ? 'رقم القيد' : 'JE No.']: doc.je_number || '-',
         [language === 'ar' ? 'مدين (مسوى)' : 'Debit Settled']: 0,
         [language === 'ar' ? 'دائن (مسوى)' : 'Credit Settled']: doc.amount
       });
@@ -1719,6 +1743,20 @@ export const SupplierSettlements: React.FC = () => {
                               <ExternalLink size={10} className="opacity-40" />
                             </button>
                             <span className="text-[10px] text-zinc-400 font-semibold">{doc.type_label}</span>
+                            <div className="text-[10px] text-zinc-500 font-semibold mt-1">
+                              تاريخ المستند: {formatDate(doc.date)} • رقم القيد: <span 
+                                onClick={() => {
+                                  if (doc.je_number && doc.je_number !== '-') {
+                                    setPendingViewDoc({ type: 'journal', idOrNumber: doc.je_number });
+                                    setCurrentPage('journal_entries');
+                                    setSelectedHistory(null);
+                                  }
+                                }}
+                                className={doc.je_number && doc.je_number !== '-' ? "text-indigo-600 hover:underline cursor-pointer font-bold" : ""}
+                              >
+                                {doc.je_number || '-'}
+                              </span>
+                            </div>
                           </div>
                           <span className="font-black text-red-500">{formatMoney(doc.amount)} ج.م</span>
                         </div>
@@ -1744,6 +1782,20 @@ export const SupplierSettlements: React.FC = () => {
                               <ExternalLink size={10} className="opacity-40" />
                             </button>
                             <span className="text-[10px] text-zinc-400 font-semibold">{doc.type_label}</span>
+                            <div className="text-[10px] text-zinc-500 font-semibold mt-1">
+                              تاريخ المستند: {formatDate(doc.date)} • رقم القيد: <span 
+                                onClick={() => {
+                                  if (doc.je_number && doc.je_number !== '-') {
+                                    setPendingViewDoc({ type: 'journal', idOrNumber: doc.je_number });
+                                    setCurrentPage('journal_entries');
+                                    setSelectedHistory(null);
+                                  }
+                                }}
+                                className={doc.je_number && doc.je_number !== '-' ? "text-indigo-600 hover:underline cursor-pointer font-bold" : ""}
+                              >
+                                {doc.je_number || '-'}
+                              </span>
+                            </div>
                           </div>
                           <span className="font-black text-emerald-500">{formatMoney(doc.amount)} ج.م</span>
                         </div>
