@@ -131,10 +131,10 @@ export class PostingService {
         entry = this.generateInvoiceJournal(doc, dependencies.customers, dependencies.products, dependencies.accounts, dependencies.paymentMethods, dependencies.settings);
         break;
       case 'receipt_vouchers':
-        entry = this.generateReceiptJournal(doc, dependencies.customers, dependencies.accounts, dependencies.paymentMethods);
+        entry = this.generateReceiptJournal(doc, dependencies.customers, dependencies.suppliers, dependencies.accounts, dependencies.paymentMethods, dependencies.expenseCategories);
         break;
       case 'payment_vouchers':
-        entry = this.generatePaymentVoucherJournal(doc, dependencies.suppliers, dependencies.accounts, dependencies.paymentMethods);
+        entry = this.generatePaymentVoucherJournal(doc, dependencies.suppliers, dependencies.customers, dependencies.accounts, dependencies.paymentMethods, dependencies.expenseCategories);
         break;
       case 'returns':
         entry = this.generateReturnJournal(doc, dependencies.customers, dependencies.products, dependencies.accounts, dependencies.paymentMethods);
@@ -440,41 +440,99 @@ export class PostingService {
     };
   }
 
-  static generateReceiptJournal(doc: ReceiptVoucher, customers: Customer[], accounts: Account[], paymentMethods: PaymentMethod[]): Omit<JournalEntry, 'id'> {
-    const customer = customers.find(c => c.id === doc.customer_id);
+  static generateReceiptJournal(
+    doc: ReceiptVoucher, 
+    customers: Customer[], 
+    suppliers: Supplier[], 
+    accounts: Account[], 
+    paymentMethods: PaymentMethod[],
+    expenseCategories: any[] = []
+  ): Omit<JournalEntry, 'id'> {
     const pm = paymentMethods.find(p => p.id === doc.payment_method_id);
     const amount = Number(doc.amount) || 0;
     
     let cashAccountId = pm?.account_id || '';
     let cashAccountName = pm?.account_name || 'حساب النقدية';
 
-    let customerAccountId = customer?.account_id || '';
-    let customerAccountName = customer?.account_name || 'حساب العملاء';
+    const journalItems: JournalEntryItem[] = [];
+    const isMulti = doc.voucher_type === 'multi' || (doc.items && doc.items.length > 0);
+
+    if (isMulti) {
+      doc.items?.forEach(item => {
+        let creditAccountId = '';
+        let creditAccountName = '';
+        let subAccountId = item.sub_account_id || undefined;
+        let subAccountType = item.sub_account_type || undefined;
+
+        if (item.type === 'customer') {
+          const customer = customers.find(c => c.id === item.entity_id);
+          creditAccountId = customer?.account_id || '';
+          creditAccountName = customer?.account_name || 'حساب العملاء';
+          subAccountId = customer?.id;
+          subAccountType = 'customer';
+        } else if (item.type === 'supplier') {
+          const supplier = suppliers.find(s => s.id === item.entity_id);
+          creditAccountId = supplier?.account_id || '';
+          creditAccountName = supplier?.account_name || 'حساب الموردين';
+          subAccountId = supplier?.id;
+          subAccountType = 'supplier';
+        } else if (item.type === 'expense') {
+          const category = expenseCategories.find(c => c.id === item.entity_id);
+          creditAccountId = category?.account_id || '';
+          creditAccountName = category?.name || 'حساب المصروف';
+          subAccountId = category?.id;
+          subAccountType = 'expense';
+        } else {
+          const account = accounts.find(a => a.id === item.entity_id);
+          creditAccountId = account?.id || '';
+          creditAccountName = account?.name || '';
+        }
+
+        journalItems.push({
+          account_id: creditAccountId,
+          account_name: creditAccountName,
+          debit: 0,
+          credit: Number(item.amount) || 0,
+          description: item.description || `سند قبض رقم ${doc.voucher_number || doc.id.slice(-6)}`,
+          sub_account_id: subAccountId,
+          sub_account_type: subAccountType as any,
+          customer_id: item.type === 'customer' ? item.entity_id : undefined,
+          supplier_id: item.type === 'supplier' ? item.entity_id : undefined,
+        });
+      });
+    } else {
+      const customer = customers.find(c => c.id === doc.customer_id);
+      let customerAccountId = customer?.account_id || '';
+      let customerAccountName = customer?.account_name || 'حساب العملاء';
+
+      journalItems.push({
+        account_id: customerAccountId,
+        account_name: customerAccountName,
+        debit: 0,
+        credit: amount,
+        description: `سند قبض رقم: ${doc.voucher_number || ''}`,
+        customer_id: doc.customer_id,
+        customer_name: doc.customer_name || customer?.name
+      });
+    }
+
+    journalItems.push({
+      account_id: cashAccountId,
+      account_name: cashAccountName,
+      debit: amount,
+      credit: 0,
+      description: isMulti
+        ? `سند قبض رقم ${doc.voucher_number || doc.id.slice(-6)} إلى حساب: ${pm?.name || ''}`
+        : `تحصيل من العميل: ${doc.customer_name || ''}`
+    });
 
     return {
       date: doc.date,
       reference_number: doc.voucher_number || doc.id.slice(-6),
       reference_id: doc.id,
       reference_type: 'receipt',
-      description: `سند قبض رقم: ${doc.voucher_number || ''} - ${doc.description}`,
-      items: [
-        {
-          account_id: cashAccountId,
-          account_name: cashAccountName,
-          debit: amount,
-          credit: 0,
-          description: `تحصيل من العميل: ${doc.customer_name || customer?.name || ''}`
-        },
-        {
-          account_id: customerAccountId,
-          account_name: customerAccountName,
-          debit: 0,
-          credit: amount,
-          description: `سند قبض رقم: ${doc.voucher_number || ''}`,
-          customer_id: doc.customer_id,
-          customer_name: doc.customer_name || customer?.name
-        }
-      ],
+      description: `سند قبض رقم: ${doc.voucher_number || ''} - ${doc.description || ''}`,
+      items: journalItems,
       total_debit: amount,
       total_credit: amount,
       company_id: '',
@@ -483,52 +541,110 @@ export class PostingService {
     };
   }
 
-  static generatePaymentVoucherJournal(doc: PaymentVoucher, suppliers: Supplier[], accounts: Account[], paymentMethods: PaymentMethod[]): Omit<JournalEntry, 'id'> {
-    const supplier = suppliers.find(s => s.id === doc.supplier_id);
+  static generatePaymentVoucherJournal(
+    doc: PaymentVoucher, 
+    suppliers: Supplier[], 
+    customers: Customer[], 
+    accounts: Account[], 
+    paymentMethods: PaymentMethod[],
+    expenseCategories: any[] = []
+  ): Omit<JournalEntry, 'id'> {
     const pm = paymentMethods.find(p => p.id === doc.payment_method_id);
     const amount = Number(doc.amount) || 0;
     
     let cashAccountId = pm?.account_id || '';
     let cashAccountName = pm?.account_name || 'حساب النقدية';
 
-    let targetAccountId = '';
-    let targetAccountName = '';
+    const journalItems: JournalEntryItem[] = [];
+    const isMulti = doc.voucher_type === 'multi' || (doc.items && doc.items.length > 0);
 
-    if (doc.supplier_id) {
-      targetAccountId = supplier?.account_id || '';
-      targetAccountName = supplier?.account_name || 'حساب الموردين';
+    if (isMulti) {
+      doc.items?.forEach(item => {
+        let debitAccountId = '';
+        let debitAccountName = '';
+        let subAccountId = item.sub_account_id || undefined;
+        let subAccountType = item.sub_account_type || undefined;
+
+        if (item.type === 'supplier') {
+          const supplier = suppliers.find(s => s.id === item.entity_id);
+          debitAccountId = supplier?.account_id || '';
+          debitAccountName = supplier?.account_name || 'حساب الموردين';
+          subAccountId = supplier?.id;
+          subAccountType = 'supplier';
+        } else if (item.type === 'customer') {
+          const customer = customers.find(c => c.id === item.entity_id);
+          debitAccountId = customer?.account_id || '';
+          debitAccountName = customer?.account_name || 'حساب العملاء';
+          subAccountId = customer?.id;
+          subAccountType = 'customer';
+        } else if (item.type === 'expense') {
+          const category = expenseCategories.find(c => c.id === item.entity_id);
+          debitAccountId = category?.account_id || '';
+          debitAccountName = category?.name || 'حساب المصروف';
+          subAccountId = category?.id;
+          subAccountType = 'expense';
+        } else {
+          const account = accounts.find(a => a.id === item.entity_id);
+          debitAccountId = account?.id || '';
+          debitAccountName = account?.name || '';
+        }
+
+        journalItems.push({
+          account_id: debitAccountId,
+          account_name: debitAccountName,
+          debit: Number(item.amount) || 0,
+          credit: 0,
+          description: item.description || `سند صرف رقم ${doc.voucher_number || doc.id.slice(-6)}`,
+          sub_account_id: subAccountId,
+          sub_account_type: subAccountType as any,
+          customer_id: item.type === 'customer' ? item.entity_id : undefined,
+          supplier_id: item.type === 'supplier' ? item.entity_id : undefined,
+        });
+      });
     } else {
-      targetAccountId = doc.account_id || '';
-      const acc = accounts.find(a => a.id === targetAccountId);
-      targetAccountName = acc?.name || '';
+      let targetAccountId = '';
+      let targetAccountName = '';
+
+      if (doc.supplier_id) {
+        const supplier = suppliers.find(s => s.id === doc.supplier_id);
+        targetAccountId = supplier?.account_id || '';
+        targetAccountName = supplier?.account_name || 'حساب الموردين';
+      } else {
+        targetAccountId = doc.account_id || '';
+        const acc = accounts.find(a => a.id === targetAccountId);
+        targetAccountName = acc?.name || '';
+      }
+
+      journalItems.push({
+        account_id: targetAccountId,
+        account_name: targetAccountName || 'حساب مدين',
+        debit: amount,
+        credit: 0,
+        description: doc.description || `سند صرف رقم ${doc.voucher_number || doc.id.slice(-6)}`,
+        supplier_id: doc.supplier_id,
+        supplier_name: doc.supplier_name
+      });
     }
+
+    journalItems.push({
+      account_id: cashAccountId,
+      account_name: cashAccountName,
+      debit: 0,
+      credit: amount,
+      description: isMulti
+        ? `سند صرف رقم ${doc.voucher_number || doc.id.slice(-6)} من حساب: ${pm?.name || ''}`
+        : `صرف من: ${pm?.name || ''}`
+    });
 
     return {
       date: doc.date,
       reference_number: doc.voucher_number || doc.id.slice(-6),
       reference_id: doc.id,
       reference_type: 'payment',
-      description: `سند صرف رقم: ${doc.voucher_number || ''} - ${doc.description}`,
-      items: [
-        {
-          account_id: targetAccountId,
-          account_name: targetAccountName || 'حساب مدين',
-          debit: amount,
-          credit: 0,
-          description: doc.description,
-          supplier_id: doc.supplier_id,
-          supplier_name: doc.supplier_name
-        },
-        {
-          account_id: cashAccountId,
-          account_name: cashAccountName,
-          debit: 0,
-          credit: doc.amount,
-          description: `صرف من: ${pm?.name || ''}`
-        }
-      ],
-      total_debit: doc.amount,
-      total_credit: doc.amount,
+      description: `سند صرف رقم: ${doc.voucher_number || ''} - ${doc.description || ''}`,
+      items: journalItems,
+      total_debit: amount,
+      total_credit: amount,
       company_id: '',
       created_at: new Date().toISOString(),
       created_by: 'system'

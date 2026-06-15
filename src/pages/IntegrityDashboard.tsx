@@ -34,7 +34,7 @@ export const IntegrityDashboard: React.FC = () => {
     if (!user) return;
     setIsReposting(true);
     try {
-      const [invoices, receipts, vouchers, returns, purchaseInvoices, purchaseReturns, transfers, customers, suppliers, products, accounts, paymentMethods, settings] = await Promise.all([
+      const [invoices, receipts, vouchers, returns, purchaseInvoices, purchaseReturns, transfers, customers, suppliers, products, accounts, paymentMethods, settings, expenseCategories] = await Promise.all([
         dbService.list<any>('invoices', user.company_id),
         dbService.list<any>('receipt_vouchers', user.company_id),
         dbService.list<any>('payment_vouchers', user.company_id),
@@ -47,10 +47,11 @@ export const IntegrityDashboard: React.FC = () => {
         dbService.list<any>('products', user.company_id),
         dbService.list<any>('accounts', user.company_id),
         dbService.list<any>('payment_methods', user.company_id),
-        dbService.list<any>('settings', user.company_id)
+        dbService.list<any>('settings', user.company_id),
+        dbService.list<any>('expense_categories', user.company_id)
       ]);
 
-      const dependencies = { customers, suppliers, products, accounts, paymentMethods, settings: settings[0] };
+      const dependencies = { customers, suppliers, products, accounts, paymentMethods, settings: settings[0], expenseCategories };
       let count = 0;
 
       const { PostingService } = await import('../services/PostingService');

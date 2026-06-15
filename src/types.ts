@@ -376,6 +376,7 @@ export interface ReceiptVoucherItem {
   amount: number;
   description?: string;
   sub_account_id?: string;
+  sub_account_type?: string;
   settlements?: any[];
   settlement_number?: string;
   settlement_date?: string;
@@ -412,6 +413,7 @@ export interface PaymentVoucherItem {
   amount: number;
   description?: string;
   sub_account_id?: string;
+  sub_account_type?: string;
   settlements?: any[];
   settlement_number?: string;
   settlement_date?: string;
@@ -436,6 +438,7 @@ export interface PaymentVoucher {
   items?: PaymentVoucherItem[];
   entry_number?: string;
   number?: string;
+  voucher_type?: string;
   created_at?: string;
   created_by?: string;
 }
