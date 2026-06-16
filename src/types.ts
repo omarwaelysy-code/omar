@@ -902,3 +902,76 @@ export interface StockAdjustment {
   entry_number?: string;
 }
 
+// ─── ExchangeRateService Types ────────────────────────────────────────────────
+
+/**
+ * A single currency rate entry as returned by the ExchangeRateService.
+ * Intentionally decoupled from the DB model so accounting logic is unaffected.
+ */
+export interface FetchedCurrencyRate {
+  /** ISO 4217 currency code, e.g. "USD", "EUR" */
+  currencyCode: string;
+  /** Exchange rate relative to the configured base currency */
+  rate: number;
+  /** ISO 8601 date string of when this rate was valid, e.g. "2026-06-16" */
+  rateDate: string;
+}
+
+/**
+ * Options accepted by ExchangeRateService.fetchLatestRates().
+ */
+export interface ExchangeRateFetchOptions {
+  /** ISO 4217 base currency code. Defaults to "EGP" if omitted. */
+  baseCurrency?: string;
+  /**
+   * Request timeout in milliseconds.
+   * Defaults to 10 000 ms (10 s) if omitted.
+   */
+  timeoutMs?: number;
+}
+
+/** Discriminated-union result – either success or a typed failure. */
+export type ExchangeRateFetchResult =
+  | {
+      success: true;
+      /** The base currency used for this fetch */
+      baseCurrency: string;
+      /** ISO 8601 date string reported by the API */
+      rateDate: string;
+      /** All rates returned by the API, parsed into application models */
+      rates: FetchedCurrencyRate[];
+      /** Unix timestamp (ms) when the response was received */
+      fetchedAt: number;
+    }
+  | {
+      success: false;
+      /** Machine-readable reason code */
+      error:
+        | 'NETWORK_TIMEOUT'
+        | 'API_UNAVAILABLE'
+        | 'INVALID_JSON'
+        | 'PARSE_ERROR'
+        | 'UNKNOWN';
+      /** Human-readable message suitable for logging */
+      message: string;
+    };
+
+// ─── ExchangeRatePersistenceService Types ────────────────────────────────────
+
+/**
+ * Summary returned by ExchangeRatePersistenceService.persistLatestRates()
+ * after a fetch-and-save cycle completes.
+ */
+export interface PersistRatesResult {
+  /** Whether the entire operation (fetch + DB transaction) succeeded */
+  success: boolean;
+  /** Number of new rows inserted into currency_rates */
+  inserted: number;
+  /** Number of existing rows (same currency_id + rate_date) updated */
+  updated: number;
+  /** Number of currencies in the API response that had no matching row in the currencies table */
+  skipped: number;
+  /** Human-readable summary message */
+  message: string;
+}
+

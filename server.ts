@@ -170,7 +170,10 @@ async function startServer() {
       'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "advance_percentage" DECIMAL(5, 2) DEFAULT 0',
       
       // Cash Transfers Serial
-      'ALTER TABLE "cash_transfers" ADD COLUMN IF NOT EXISTS "transfer_number" VARCHAR(50)'
+      'ALTER TABLE "cash_transfers" ADD COLUMN IF NOT EXISTS "transfer_number" VARCHAR(50)',
+
+      // Currency Rates
+      'CREATE TABLE IF NOT EXISTS "currency_rates" ("id" VARCHAR(36) PRIMARY KEY, "currency_id" VARCHAR(36) REFERENCES "currencies"("id") ON DELETE CASCADE, "rate" DECIMAL(18, 6) NOT NULL, "rate_date" DATE NOT NULL, "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)'
     ];
     
     for (const q of syncQueries) {

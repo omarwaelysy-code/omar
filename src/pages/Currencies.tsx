@@ -14,7 +14,8 @@ import {
   List,
   PlusCircle,
   Search,
-  Trash2
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { useAuth } from '../contexts/AuthContext';
@@ -23,6 +24,7 @@ import { Currency, ExchangeRate, Company } from '../types';
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
 import { WORLD_CURRENCIES, WorldCurrency } from '../constants/worldCurrencies';
+import { apiRequest } from '../services/dbService';
 
 export default function Currencies() {
   const { language, t, dir } = useLanguage();
@@ -40,6 +42,47 @@ export default function Currencies() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [mainSearchQuery, setMainSearchQuery] = useState('');
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [isUpdatingRates, setIsUpdatingRates] = useState(false);
+  /** Latest rate from currency_rates table, keyed by currency_id */
+  const [autoRates, setAutoRates] = useState<Record<string, { rate: number; rate_date: string } | null>>({});
+
+  const handleUpdateRates = async () => {
+    if (!company) return;
+    setIsUpdatingRates(true);
+    try {
+      const baseCurrency = company.settings?.currency || 'EGP';
+      // Call the server-side API route — keeps Node.js code off the browser bundle
+      const result = await apiRequest<{
+        success: boolean;
+        inserted: number;
+        updated: number;
+        skipped: number;
+        message: string;
+      }>('/currencies/update-rates', 'POST', { baseCurrency });
+
+      if (result.success) {
+        toast.success(
+          language === 'ar'
+            ? `تم تحديث أسعار الصرف بنجاح.\nمضاف: ${result.inserted} | محدَّث: ${result.updated} | متجاوَز: ${result.skipped}`
+            : `Exchange rates updated successfully.\nInserted: ${result.inserted} | Updated: ${result.updated} | Skipped: ${result.skipped}`,
+          { duration: 5000 }
+        );
+        // Refresh the list without reloading the whole page
+        await loadData();
+      } else {
+        toast.error(
+          language === 'ar'
+            ? `فشل تحديث أسعار الصرف: ${result.message}`
+            : `Failed to update exchange rates: ${result.message}`
+        );
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(language === 'ar' ? `خطأ: ${msg}` : `Error: ${msg}`);
+    } finally {
+      setIsUpdatingRates(false);
+    }
+  };
 
   // Search in selection
   const [searchQuery, setSearchQuery] = useState('');
@@ -102,6 +145,27 @@ export default function Currencies() {
         ratesMap[curr.id] = latestRate;
       }
       setExchangeRates(ratesMap);
+
+      // Phase 5: load latest rates from currency_rates (LEFT JOIN, read-only)
+      try {
+        const latestAutoRates = await apiRequest<Array<{
+          currency_id: string;
+          rate: number | null;
+          rate_date: string | null;
+        }>>(`/currency-rates/latest?company_id=${user.company_id}`);
+
+        const autoMap: Record<string, { rate: number; rate_date: string } | null> = {};
+        for (const row of latestAutoRates) {
+          autoMap[row.currency_id] =
+            row.rate !== null && row.rate_date !== null
+              ? { rate: Number(row.rate), rate_date: row.rate_date }
+              : null;
+        }
+        setAutoRates(autoMap);
+      } catch {
+        // Non-blocking: auto-rates display degrades gracefully if endpoint fails
+        setAutoRates({});
+      }
     } catch (error) {
       console.error('Failed to load currency data:', error);
       toast.error(t('common.error'));
@@ -337,6 +401,16 @@ export default function Currencies() {
             </button>
           </div>
           <button
+            onClick={handleUpdateRates}
+            disabled={isUpdatingRates}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors w-full md:w-auto justify-center whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={`w-4 h-4 ${isUpdatingRates ? 'animate-spin' : ''}`} />
+            {isUpdatingRates
+              ? (language === 'ar' ? 'جاري التحديث...' : 'Updating...')
+              : (language === 'ar' ? 'تحديث أسعار الصرف' : 'Update Exchange Rates')}
+          </button>
+          <button
             onClick={() => setIsAddCurrencyOpen(true)}
             className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors w-full md:w-auto justify-center whitespace-nowrap"
           >
@@ -404,6 +478,41 @@ export default function Currencies() {
                     </div>
                   </div>
 
+                  {/* Phase 5 – currency_rates auto-fetched rate (read-only, LEFT JOIN) */}
+                  {(() => {
+                    const ar = autoRates[curr.id];
+                    const hasAutoRate = ar !== undefined; // key present means API returned a row
+                    if (!hasAutoRate) return null; // still loading or currency not yet in map
+                    return (
+                      <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-blue-500 uppercase font-bold tracking-wider">
+                            {language === 'ar' ? 'سعر تلقائي' : 'Live Rate'}
+                          </span>
+                          {ar ? (
+                            <span className="text-base font-bold text-blue-800">
+                              {ar.rate.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 6 })}
+                            </span>
+                          ) : (
+                            <span className="text-xs italic text-blue-300">
+                              {language === 'ar' ? 'لا يوجد سعر صرف' : 'No exchange rate available'}
+                            </span>
+                          )}
+                        </div>
+                        {ar && (
+                          <div className="flex flex-col items-end">
+                            <span className="text-[10px] text-blue-400 font-bold uppercase">
+                              {t('currencies.rate_date')}
+                            </span>
+                            <span className="text-xs text-blue-600">
+                              {format(new Date(ar.rate_date), 'dd/MM/yyyy')}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   <div className="flex gap-2">
                     <button
                       onClick={() => {
@@ -456,6 +565,7 @@ export default function Currencies() {
                   <th className="px-6 py-4 text-center font-bold text-zinc-500 uppercase tracking-wider">{t('currencies.code')}</th>
                   <th className="px-6 py-4 text-center font-bold text-zinc-500 uppercase tracking-wider">{t('currencies.symbol')}</th>
                   <th className="px-6 py-4 text-center font-bold text-zinc-500 uppercase tracking-wider">{t('currencies.rate')}</th>
+                  <th className="px-6 py-4 text-center font-bold text-blue-400 uppercase tracking-wider">{language === 'ar' ? 'سعر تلقائي' : 'Live Rate'}</th>
                   <th className="px-6 py-4 text-center font-bold text-zinc-500 uppercase tracking-wider">{t('common.status')}</th>
                   <th className="px-6 py-4 text-center font-bold text-zinc-500 uppercase tracking-wider">{t('common.actions')}</th>
                 </tr>
@@ -482,6 +592,28 @@ export default function Currencies() {
                         ) : (
                           <span className="text-zinc-300">---</span>
                         )}
+                      </td>
+                      {/* Phase 5 – Live Rate from currency_rates */}
+                      <td className="px-6 py-4 text-center">
+                        {(() => {
+                          const ar = autoRates[curr.id];
+                          if (ar === undefined) return <span className="text-zinc-200">—</span>;
+                          if (ar === null) return (
+                            <span className="text-[10px] italic text-blue-300">
+                              {language === 'ar' ? 'لا يوجد سعر صرف' : 'No exchange rate available'}
+                            </span>
+                          );
+                          return (
+                            <div className="flex flex-col">
+                              <span className="font-bold text-blue-800">
+                                {ar.rate.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 6 })}
+                              </span>
+                              <span className="text-[10px] text-blue-400 font-mono">
+                                {format(new Date(ar.rate_date), 'dd/MM/yyyy')}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <button 

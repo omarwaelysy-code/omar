@@ -218,6 +218,16 @@ export async function initDatabase() {
       );
     `, 'exchange_rates table');
 
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "currency_rates" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "currency_id" VARCHAR(36) REFERENCES "currencies"("id") ON DELETE CASCADE,
+        "rate" DECIMAL(18, 6) NOT NULL,
+        "rate_date" DATE NOT NULL,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'currency_rates table');
+
     // Phase 3: Masters
     await safeQuery(`
       CREATE TABLE IF NOT EXISTS "warehouses" (

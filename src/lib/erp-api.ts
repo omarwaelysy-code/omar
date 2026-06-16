@@ -4421,4 +4421,78 @@ router.put('/stock_adjustments/:id', authenticateToken, async (req: AuthRequest,
   }
 });
 
+// ─── Exchange Rate Auto-Update ────────────────────────────────────────────────
+
+/**
+ * POST /api/erp/currencies/update-rates
+ *
+ * Fetches live rates from exchangerate.host and persists them to currency_rates.
+ * Runs entirely on the server — no Node.js modules leak into the browser bundle.
+ *
+ * Body (optional): { baseCurrency?: string }
+ * Returns: PersistRatesResult { success, inserted, updated, skipped, message }
+ */
+router.post('/currencies/update-rates', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { ExchangeRatePersistenceService } = await import('../services/ExchangeRatePersistenceService.js');
+    const baseCurrency: string = req.body?.baseCurrency || 'EGP';
+
+    console.log(`[ERP] /currencies/update-rates called by user=${req.user?.id} base=${baseCurrency}`);
+
+    const result = await ExchangeRatePersistenceService.persistLatestRates({ baseCurrency });
+
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(502).json(result);
+    }
+  } catch (error: any) {
+    console.error('[ERP] /currencies/update-rates error:', error);
+    res.status(500).json({
+      success: false,
+      inserted: 0,
+      updated: 0,
+      skipped: 0,
+      message: error.message || 'Internal server error',
+    });
+  }
+});
+
+// ─── Phase 5: Latest Exchange Rates from currency_rates ───────────────────────
+
+/**
+ * GET /api/erp/currency-rates/latest?company_id=<id>
+ *
+ * Returns one row per currency in the company with its latest rate from the
+ * `currency_rates` table (Phase 1 schema). Uses LEFT JOIN so currencies that
+ * have no persisted rate still appear with null rate / rate_date.
+ *
+ * Response: Array<{ currency_id, rate: number|null, rate_date: string|null }>
+ */
+router.get('/currency-rates/latest', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const companyId = (req.query.company_id as string) || req.user?.company_id;
+    if (!companyId) return res.status(400).json({ error: 'company_id is required' });
+
+    // DISTINCT ON gives the most-recent rate_date row per currency_id.
+    // LEFT JOIN ensures currencies with no currency_rates row are included (rate = NULL).
+    const { rows } = await pool.query(
+      `SELECT DISTINCT ON (c.id)
+          c.id             AS currency_id,
+          cr.rate          AS rate,
+          cr.rate_date::text AS rate_date
+       FROM currencies c
+       LEFT JOIN currency_rates cr ON cr.currency_id = c.id
+       WHERE c.company_id = $1
+       ORDER BY c.id, cr.rate_date DESC NULLS LAST`,
+      [companyId]
+    );
+
+    res.json(rows);
+  } catch (error: any) {
+    console.error('[ERP] GET /currency-rates/latest error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;
