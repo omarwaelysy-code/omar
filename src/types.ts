@@ -82,6 +82,12 @@ export interface Company {
     language: 'ar' | 'en';
     fiscal_year_start: string;
     enable_multi_currency?: boolean;
+    exchange_rate_update_method?: 'manual' | 'auto';
+    er_auto_update?: boolean;
+    er_frequency?: 'daily' | 'weekly';
+    er_last_update?: string | null;
+    er_conn_status?: 'idle' | 'ok' | 'error';
+    er_last_result?: string | null;
     inventory_cost_method?: 'wac' | 'fifo' | 'lifo';
     inventory_cost_method_level?: 'company' | 'item';
     vat_enabled?: boolean;

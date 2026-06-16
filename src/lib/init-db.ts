@@ -915,6 +915,21 @@ export async function initDatabase() {
       await safeQuery('ALTER TABLE "account_types" ADD COLUMN "is_active" BOOLEAN DEFAULT TRUE;', 'add is_active to account_types');
     }
 
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "exchange_rate_history" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id"),
+        "currency_code" VARCHAR(10) NOT NULL,
+        "exchange_rate" DECIMAL(18, 6) NOT NULL,
+        "provider" VARCHAR(50) NOT NULL,
+        "retrieved_date" VARCHAR(20) NOT NULL,
+        "retrieved_time" VARCHAR(20) NOT NULL,
+        "updated_by" VARCHAR(100) NOT NULL,
+        "status" VARCHAR(20) NOT NULL,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'exchange_rate_history table');
+
     console.log('✅ Base Schema Guardrails active.');
 
     // Seeding

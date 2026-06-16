@@ -30,48 +30,91 @@ import type {
 // ─── Logging tag ──────────────────────────────────────────────────────────────
 const TAG = '[ExchangeRatePersistenceService]';
 
-// ─── Service ──────────────────────────────────────────────────────────────────
+// ─── Helper for Date/Time formatting ──────────────────────────────────────────
+function getFormattedDateTime() {
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = now.getFullYear();
+  const dateStr = `${day}/${month}/${year}`;
 
+  let hours = now.getHours();
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const hoursStr = String(hours).padStart(2, '0');
+  const timeStr = `${hoursStr}:${minutes}:${seconds} ${ampm}`;
+
+  return { dateStr, timeStr };
+}
+
+// ─── Helper to log sync history ──────────────────────────────────────────────
+async function logSyncRunToHistory(
+  companyId: string | undefined,
+  updatedBy: string,
+  status: 'Success' | 'Failed',
+  ratesToLog: { currencyCode: string; rate: number }[],
+  provider: string = 'ExchangeRate.host'
+) {
+  if (!companyId) return;
+  try {
+    const { dateStr, timeStr } = getFormattedDateTime();
+    let currenciesToLog = ratesToLog;
+
+    if (status === 'Failed' || currenciesToLog.length === 0) {
+      // Load all active currencies for the company to show they all failed
+      const { rows } = await pool.query(
+        'SELECT UPPER(code) as code FROM currencies WHERE company_id = $1 AND is_active = true',
+        [companyId]
+      );
+      if (rows.length > 0) {
+        currenciesToLog = rows.map((r: any) => ({ currencyCode: r.code, rate: 0 }));
+      } else {
+        currenciesToLog = [{ currencyCode: 'USD', rate: 0 }];
+      }
+    }
+
+    for (const item of currenciesToLog) {
+      const newId = randomUUID();
+      await pool.query(
+        `INSERT INTO exchange_rate_history (id, company_id, currency_code, exchange_rate, provider, retrieved_date, retrieved_time, updated_by, status, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+        [newId, companyId, item.currencyCode.toUpperCase(), item.rate, provider, dateStr, timeStr, updatedBy, status]
+      );
+    }
+  } catch (err) {
+    console.error(`${TAG} Failed to log sync history:`, err);
+  }
+}
+
+// ─── Service ────────────────────────────────────────────
 export class ExchangeRatePersistenceService {
   /**
    * Fetch the latest exchange rates and persist them to `currency_rates`.
-   *
-   * Algorithm per fetched currency code:
-   *   1. Look up `currencies` table by ISO code (case-insensitive).
-   *   2. If no match → skip + warn (never create a dangling FK row).
-   *   3. If match exists, check `currency_rates` for (currency_id, rate_date).
-   *      a. Row exists  → UPDATE rate  (updated++)
-   *      b. No row      → INSERT       (inserted++)
-   *
-   * The entire set of DB mutations runs inside a single transaction.
-   * Any DB error causes a full ROLLBACK and the function returns success=false.
-   *
-   * @param fetchOptions  Passed verbatim to ExchangeRateService (base currency, timeout).
-   * @returns             Strongly-typed { success, inserted, updated, skipped, message }
-   *
-   * @example
-   * ```ts
-   * const result = await ExchangeRatePersistenceService.persistLatestRates({ baseCurrency: 'EGP' });
-   * if (result.success) {
-   *   console.log(`Inserted: ${result.inserted}, Updated: ${result.updated}, Skipped: ${result.skipped}`);
-   * }
-   * ```
    */
   static async persistLatestRates(
-    fetchOptions: ExchangeRateFetchOptions = {}
+    fetchOptions: ExchangeRateFetchOptions = {},
+    companyId?: string,
+    updatedBy?: string
   ): Promise<PersistRatesResult> {
-
+    const updatedByVal = updatedBy || 'Automatic';
+    
     // ── Step 1: Fetch rates from external API ─────────────────────────────
     console.log(`${TAG} Starting fetch-and-persist cycle (base=${fetchOptions.baseCurrency ?? 'EGP'})…`);
 
     const fetchResult = await ExchangeRateService.fetchLatestRates(fetchOptions);
 
     if (!fetchResult.success) {
-      // Explicitly narrow to the failure branch – control-flow narrowing of a
-      // structurally-inferred discriminated union is not guaranteed in this
-      // tsconfig (no "strict", bundler moduleResolution).
       const failure = fetchResult as Extract<ExchangeRateFetchResult, { success: false }>;
       console.error(`${TAG} Fetch failed [${failure.error}]: ${failure.message}`);
+      
+      // Log failed sync run to history
+      if (companyId) {
+        await logSyncRunToHistory(companyId, updatedByVal, 'Failed', []);
+      }
+
       return {
         success: false,
         inserted: 0,
@@ -92,12 +135,12 @@ export class ExchangeRatePersistenceService {
     let inserted = 0;
     let updated  = 0;
     let skipped  = 0;
+    const activeRatesSynced: { currencyCode: string; rate: number }[] = [];
 
     try {
       await client.query('BEGIN');
 
       // Build an in-memory ISO-code → currency_id lookup for this company scope.
-      // We read ALL rows from `currencies` once to minimise round-trips.
       const { rows: currencyRows } = await client.query<{ id: string; code: string }>(
         `SELECT id, UPPER(code) AS code FROM currencies`
       );
@@ -117,12 +160,12 @@ export class ExchangeRatePersistenceService {
 
         // ── 2a. Skip unknown currencies ───────────────────────────────────
         if (!currencyId) {
-          console.warn(
-            `${TAG} ⚠️  Skipping unknown currency: ${isoCode} (not found in currencies table)`
-          );
           skipped++;
           continue;
         }
+
+        // Keep track of rates successfully matched with local currencies
+        activeRatesSynced.push({ currencyCode: isoCode, rate: fetchedRate.rate });
 
         // ── 2b. Check for existing row (same currency_id + rate_date) ─────
         const { rows: existing } = await client.query<{ id: string }>(
@@ -143,9 +186,6 @@ export class ExchangeRatePersistenceService {
             [fetchedRate.rate, existing[0].id]
           );
           updated++;
-          console.log(
-            `${TAG}   ↻ Updated  ${isoCode} → rate=${fetchedRate.rate} (id=${existing[0].id})`
-          );
         } else {
           // ── INSERT new row ───────────────────────────────────────────────
           const newId = randomUUID();
@@ -155,9 +195,6 @@ export class ExchangeRatePersistenceService {
             [newId, currencyId, fetchedRate.rate, rateDate]
           );
           inserted++;
-          console.log(
-            `${TAG}   + Inserted ${isoCode} → rate=${fetchedRate.rate} (id=${newId})`
-          );
         }
       }
 
@@ -166,17 +203,25 @@ export class ExchangeRatePersistenceService {
       const summary = `Inserted: ${inserted}, Updated: ${updated}, Skipped: ${skipped} (base=${baseCurrency}, date=${rateDate})`;
       console.log(`${TAG} ✅ Transaction committed. ${summary}`);
 
+      // Log success to history
+      if (companyId) {
+        await logSyncRunToHistory(companyId, updatedByVal, 'Success', activeRatesSynced);
+      }
+
       return { success: true, inserted, updated, skipped, message: summary };
 
     } catch (err: unknown) {
-      // ── Rollback on any DB failure ────────────────────────────────────────
       await client.query('ROLLBACK').catch((rbErr: unknown) => {
-        // Swallow secondary errors during rollback to preserve the original
         console.error(`${TAG} Rollback itself failed:`, rbErr instanceof Error ? rbErr.message : String(rbErr));
       });
 
       const message = err instanceof Error ? err.message : String(err);
       console.error(`${TAG} ❌ Transaction rolled back due to error: ${message}`);
+
+      // Log failed sync run to history
+      if (companyId) {
+        await logSyncRunToHistory(companyId, updatedByVal, 'Failed', []);
+      }
 
       return {
         success: false,

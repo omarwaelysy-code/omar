@@ -173,7 +173,8 @@ async function startServer() {
       'ALTER TABLE "cash_transfers" ADD COLUMN IF NOT EXISTS "transfer_number" VARCHAR(50)',
 
       // Currency Rates
-      'CREATE TABLE IF NOT EXISTS "currency_rates" ("id" VARCHAR(36) PRIMARY KEY, "currency_id" VARCHAR(36) REFERENCES "currencies"("id") ON DELETE CASCADE, "rate" DECIMAL(18, 6) NOT NULL, "rate_date" DATE NOT NULL, "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)'
+      'CREATE TABLE IF NOT EXISTS "currency_rates" ("id" VARCHAR(36) PRIMARY KEY, "currency_id" VARCHAR(36) REFERENCES "currencies"("id") ON DELETE CASCADE, "rate" DECIMAL(18, 6) NOT NULL, "rate_date" DATE NOT NULL, "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)',
+      'CREATE TABLE IF NOT EXISTS "exchange_rate_history" ("id" VARCHAR(36) PRIMARY KEY, "company_id" VARCHAR(36) REFERENCES "companies"("id"), "currency_code" VARCHAR(10) NOT NULL, "exchange_rate" DECIMAL(18, 6) NOT NULL, "provider" VARCHAR(50) NOT NULL, "retrieved_date" VARCHAR(20) NOT NULL, "retrieved_time" VARCHAR(20) NOT NULL, "updated_by" VARCHAR(100) NOT NULL, "status" VARCHAR(20) NOT NULL, "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)'
     ];
     
     for (const q of syncQueries) {
@@ -313,10 +314,87 @@ async function startServer() {
       console.log('Successfully altered journal_entries');
     } catch (e) { console.error('Failed to alter', e); }
     
+  async function runScheduledExchangeRateSync() {
+    try {
+      const pool = (await import("./src/lib/postgres.js")).default;
+      const { ExchangeRatePersistenceService } = await import('./src/services/ExchangeRatePersistenceService.js');
+      
+      const { rows: companies } = await pool.query('SELECT id, name, settings FROM companies');
+      const now = new Date();
+      
+      for (const company of companies) {
+        const settings = company.settings || {};
+        if (!settings.enable_multi_currency) continue;
+        if (settings.exchange_rate_update_method !== 'auto') continue;
+        if (!settings.er_auto_update) continue;
+        
+        const lastUpdateStr = settings.er_last_update;
+        const frequency = settings.er_frequency || 'daily';
+        
+        let shouldSync = false;
+        if (!lastUpdateStr) {
+          shouldSync = true;
+        } else {
+          const lastUpdate = new Date(lastUpdateStr);
+          if (isNaN(lastUpdate.getTime())) {
+            shouldSync = true;
+          } else {
+            const diffMs = now.getTime() - lastUpdate.getTime();
+            const diffDays = diffMs / (1000 * 60 * 60 * 24);
+            if (frequency === 'daily' && diffDays >= 1) {
+              shouldSync = true;
+            } else if (frequency === 'weekly' && diffDays >= 7) {
+              shouldSync = true;
+            }
+          }
+        }
+        
+        if (shouldSync) {
+          console.log(`[Scheduler] Exchange rate sync triggered automatically for company: ${company.name} (${company.id})`);
+          const baseCurrency = settings.currency || 'EGP';
+          const result = await ExchangeRatePersistenceService.persistLatestRates(
+            { baseCurrency },
+            company.id,
+            'Automatic'
+          );
+          
+          if (result.success) {
+            const updatedSettings = {
+              ...settings,
+              er_last_update: now.toISOString(),
+              er_conn_status: 'ok',
+              er_last_result: `تم بنجاح (تلقائي) — مضاف: ${result.inserted} | محدّث: ${result.updated} | متجاوز: ${result.skipped}`
+            };
+            await pool.query('UPDATE companies SET settings = $1 WHERE id = $2', [JSON.stringify(updatedSettings), company.id]);
+            console.log(`[Scheduler] Exchange rate sync succeeded for company: ${company.name}`);
+          } else {
+            const updatedSettings = {
+              ...settings,
+              er_conn_status: 'error',
+              er_last_result: `فشل (تلقائي): ${result.message}`
+            };
+            await pool.query('UPDATE companies SET settings = $1 WHERE id = $2', [JSON.stringify(updatedSettings), company.id]);
+            console.error(`[Scheduler] Exchange rate sync failed for company ${company.name}: ${result.message}`);
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error('[Scheduler] Error running scheduled exchange rate sync:', err.message);
+    }
+  }
+
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 Server ready at http://0.0.0.0:${PORT}`);
     
-    // Removed auto trigger
+    // Delayed worker start
+    setTimeout(() => {
+      runScheduledExchangeRateSync().catch(console.error);
+    }, 15000);
+    
+    // Poll every 30 minutes
+    setInterval(() => {
+      runScheduledExchangeRateSync().catch(console.error);
+    }, 30 * 60 * 1000);
   });
 }
 

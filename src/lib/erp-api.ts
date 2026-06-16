@@ -4453,9 +4453,23 @@ router.post('/currencies/update-rates', authenticateToken, async (req: AuthReque
     const { ExchangeRatePersistenceService } = await import('../services/ExchangeRatePersistenceService.js');
     const baseCurrency: string = req.body?.baseCurrency || 'EGP';
 
-    console.log(`[ERP] /currencies/update-rates called by user=${req.user?.id} base=${baseCurrency}`);
+    const userId = req.user?.id;
+    let updatedBy = 'Automatic';
+    if (userId) {
+      const { rows } = await pool.query('SELECT name, username FROM users WHERE id = $1', [userId]);
+      if (rows.length > 0) {
+        updatedBy = rows[0].name || rows[0].username || 'User';
+      }
+    }
+    const companyId = req.user?.company_id || 'SYSTEM';
 
-    const result = await ExchangeRatePersistenceService.persistLatestRates({ baseCurrency });
+    console.log(`[ERP] /currencies/update-rates called by user=${req.user?.id} base=${baseCurrency} company=${companyId} by=${updatedBy}`);
+
+    const result = await ExchangeRatePersistenceService.persistLatestRates(
+      { baseCurrency },
+      companyId,
+      updatedBy
+    );
 
     if (result.success) {
       res.json(result);
@@ -4471,6 +4485,36 @@ router.post('/currencies/update-rates', authenticateToken, async (req: AuthReque
       skipped: 0,
       message: error.message || 'Internal server error',
     });
+  }
+});
+
+/**
+ * GET /api/erp/currency-rates/history?currency_code=<CODE>&company_id=<ID>
+ *
+ * Returns sorted sync history records filtered by company_id and currency_code.
+ */
+router.get('/currency-rates/history', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const companyId = (req.query.company_id as string) || req.user?.company_id;
+    const currencyCode = req.query.currency_code as string;
+
+    if (!companyId || !currencyCode) {
+      return res.status(400).json({ error: 'company_id and currency_code are required' });
+    }
+
+    const { rows } = await pool.query(
+      `SELECT id, company_id, currency_code, exchange_rate, provider, retrieved_date, retrieved_time, updated_by, status, created_at
+       FROM exchange_rate_history
+       WHERE company_id = $1 AND UPPER(currency_code) = UPPER($2)
+       ORDER BY created_at DESC, retrieved_date DESC, retrieved_time DESC
+       LIMIT 100`,
+      [companyId, currencyCode]
+    );
+
+    res.json(rows);
+  } catch (error: any) {
+    console.error('[ERP] /currency-rates/history error:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });
 

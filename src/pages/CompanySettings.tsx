@@ -41,6 +41,7 @@ interface CompanyData {
   fiscal_year_day: number;
   fiscal_year_month: number;
   enable_multi_currency: boolean;
+  exchange_rate_update_method?: 'manual' | 'auto';
   inventory_cost_method?: 'wac' | 'fifo' | 'lifo';
   inventory_cost_method_level?: 'company' | 'item';
   vat_enabled: boolean;
@@ -168,6 +169,7 @@ export function CompanySettings() {
     fiscal_year_day: 31,
     fiscal_year_month: 12,
     enable_multi_currency: false,
+    exchange_rate_update_method: 'manual',
     inventory_cost_method: 'wac',
     inventory_cost_method_level: 'item',
     vat_enabled: false,
@@ -182,6 +184,21 @@ export function CompanySettings() {
   const [erLastUpdate,   setErLastUpdate]   = useState<string | null>(null);
   const [erConnStatus,   setErConnStatus]   = useState<'idle' | 'ok' | 'error'>('idle');
   const [erLastResult,   setErLastResult]   = useState<string | null>(null);
+
+  const formatSyncDateTime = () => {
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = now.getFullYear();
+    let hours = now.getHours();
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const hoursStr = String(hours).padStart(2, '0');
+    return `${day}/${month}/${year} ${hoursStr}:${minutes}:${seconds} ${ampm}`;
+  };
 
   /** Update Exchange Rates Now */
   const handleErUpdate = useCallback(async () => {
@@ -198,8 +215,9 @@ export function CompanySettings() {
       }>('/currencies/update-rates', 'POST', { baseCurrency: data.currency });
 
       if (result.success) {
-        const summary = `تم بنجاح — مضاف: ${result.inserted} | محدّث: ${result.updated} | متجاوز: ${result.skipped}`;
-        setErLastUpdate(new Date().toLocaleString('ar-EG'));
+        const totalUpdated = result.updated + result.inserted;
+        const summary = `${totalUpdated} currencies updated successfully. (تم تحديث ${totalUpdated} من العملات بنجاح.)`;
+        setErLastUpdate(formatSyncDateTime());
         setErConnStatus('ok');
         setErLastResult(summary);
         toast.success('تم تحديث أسعار الصرف بنجاح');
@@ -278,7 +296,8 @@ export function CompanySettings() {
           }
         }
 
-          setOriginalSettings(company.settings || {});
+          const settings = company.settings || {};
+          setOriginalSettings(settings);
           setData({
             id: company.id,
             name: company.name || '',
@@ -287,15 +306,22 @@ export function CompanySettings() {
             tax_number: company.tax_number || '',
             country: company.country || '',
             address: company.address || '',
-            currency: company.settings?.currency || company.currency || 'EGP',
+            currency: settings.currency || company.currency || 'EGP',
             fiscal_year_day: fday,
             fiscal_year_month: fmonth,
-            enable_multi_currency: company.settings?.enable_multi_currency || false,
-            inventory_cost_method: company.settings?.inventory_cost_method || 'wac',
+            enable_multi_currency: settings.enable_multi_currency || false,
+            exchange_rate_update_method: settings.exchange_rate_update_method || 'manual',
+            inventory_cost_method: settings.inventory_cost_method || 'wac',
             inventory_cost_method_level: 'item',
-            vat_enabled: company.settings?.vat_enabled || company.vat_enabled || false,
-            wht_enabled: company.settings?.wht_enabled || company.wht_enabled || false
+            vat_enabled: settings.vat_enabled || company.vat_enabled || false,
+            wht_enabled: settings.wht_enabled || company.wht_enabled || false
           });
+
+          setErAutoUpdate(settings.er_auto_update || false);
+          setErFrequency(settings.er_frequency || 'daily');
+          setErLastUpdate(settings.er_last_update || null);
+          setErConnStatus(settings.er_conn_status || 'idle');
+          setErLastResult(settings.er_last_result || null);
       }
     } catch (error) {
       console.error('Failed to load company data:', error);
@@ -319,6 +345,22 @@ export function CompanySettings() {
       const dayStr = String(data.fiscal_year_day).padStart(2, '0');
       const fiscalYearEnd = `${currentYear}-${monthStr}-${dayStr}`;
       
+      const newSettings = {
+        ...originalSettings,
+        currency: data.currency,
+        enable_multi_currency: data.enable_multi_currency,
+        exchange_rate_update_method: data.exchange_rate_update_method || 'manual',
+        er_auto_update: erAutoUpdate,
+        er_frequency: erFrequency,
+        er_last_update: erLastUpdate,
+        er_conn_status: erConnStatus,
+        er_last_result: erLastResult,
+        inventory_cost_method_level: 'item',
+        inventory_cost_method: data.inventory_cost_method || 'wac',
+        vat_enabled: data.vat_enabled,
+        wht_enabled: data.wht_enabled
+      };
+
       await dbService.update('companies', user.company_id, {
         name: data.name,
         logo_url: data.logo_url,
@@ -329,27 +371,11 @@ export function CompanySettings() {
         fiscal_year_end: fiscalYearEnd,
         vat_enabled: data.vat_enabled,
         wht_enabled: data.wht_enabled,
-        settings: {
-          ...originalSettings,
-          currency: data.currency,
-          enable_multi_currency: data.enable_multi_currency,
-          inventory_cost_method_level: 'item',
-          inventory_cost_method: data.inventory_cost_method || 'wac',
-          vat_enabled: data.vat_enabled,
-          wht_enabled: data.wht_enabled
-        }
+        settings: newSettings
       });
       
       // Update local original settings to reflect the save
-      setOriginalSettings({
-        ...originalSettings,
-        currency: data.currency,
-        enable_multi_currency: data.enable_multi_currency,
-        inventory_cost_method_level: 'item',
-        inventory_cost_method: data.inventory_cost_method || 'wac',
-        vat_enabled: data.vat_enabled,
-        wht_enabled: data.wht_enabled
-      });
+      setOriginalSettings(newSettings);
       
       toast.success(t('company_settings.save_success'));
     } catch (error) {
@@ -679,147 +705,211 @@ export function CompanySettings() {
               </div>
             </div>
 
+            {/* Method selection (Manual vs Auto) */}
+            {data.enable_multi_currency && (
+              <div className="md:col-span-2 pt-6 border-t border-slate-100 space-y-3">
+                <label className="block text-sm font-semibold text-slate-500">
+                  {language === 'ar' ? 'طريقة تحديث أسعار الصرف' : 'Exchange Rate Update Method'}
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Manual option */}
+                  <div
+                    onClick={() => setData(prev => ({ ...prev, exchange_rate_update_method: 'manual' }))}
+                    className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                      data.exchange_rate_update_method === 'manual'
+                        ? 'border-indigo-600 bg-indigo-50/20'
+                        : 'border-slate-100 bg-white hover:border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-800 text-sm">التحديث اليدوي (Manual)</span>
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                        data.exchange_rate_update_method === 'manual' ? 'border-indigo-600' : 'border-slate-300'
+                      }`}>
+                        {data.exchange_rate_update_method === 'manual' && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
+                      </div>
+                    </div>
+                    <span className="text-xs text-slate-400 mt-2 leading-relaxed">
+                      يقوم المستخدم بإدخال أسعار الصرف يدوياً وإدارتها بنفسه.
+                    </span>
+                  </div>
+
+                  {/* Auto option */}
+                  <div
+                    onClick={() => setData(prev => ({ ...prev, exchange_rate_update_method: 'auto' }))}
+                    className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                      data.exchange_rate_update_method === 'auto'
+                        ? 'border-indigo-600 bg-indigo-50/20'
+                        : 'border-slate-100 bg-white hover:border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-800 text-sm">التحديث التلقائي (Automatic)</span>
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                        data.exchange_rate_update_method === 'auto' ? 'border-indigo-600' : 'border-slate-300'
+                      }`}>
+                        {data.exchange_rate_update_method === 'auto' && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
+                      </div>
+                    </div>
+                    <span className="text-xs text-slate-400 mt-2 leading-relaxed">
+                      يتم جلب أسعار الصرف تلقائياً من مزود خارجي.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
 
         {/* Card 4: Exchange Rate Settings — إعدادات أسعار الصرف */}
-        <div className="bg-white p-8 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-6" dir="rtl">
-          {/* Card header */}
-          <div className="flex items-center gap-2 text-indigo-600 justify-end">
-            <span className="font-bold text-lg">إعدادات أسعار الصرف</span>
-            <TrendingUp className="w-5 h-5" />
-          </div>
+        {data.enable_multi_currency && data.exchange_rate_update_method === 'auto' && (
+          <div className="bg-white p-8 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-6" dir="rtl">
+            {/* Card header */}
+            <div className="flex items-center gap-2 text-indigo-600 justify-end">
+              <span className="font-bold text-lg">إعدادات أسعار الصرف التلقائية</span>
+              <TrendingUp className="w-5 h-5" />
+            </div>
 
-          {/* Provider info row */}
-          <div className="flex items-center justify-between bg-slate-50 rounded-2xl px-5 py-4 border border-slate-100">
-            <div className="flex items-center gap-3">
-              {erConnStatus === 'ok'  && <Wifi    className="w-5 h-5 text-emerald-500" />}
-              {erConnStatus === 'error' && <WifiOff className="w-5 h-5 text-rose-500" />}
-              {erConnStatus === 'idle'  && <Wifi    className="w-5 h-5 text-slate-300" />}
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">حالة الاتصال</span>
-                <span className={`text-sm font-bold ${
-                  erConnStatus === 'ok'    ? 'text-emerald-600'
-                  : erConnStatus === 'error' ? 'text-rose-600'
-                  : 'text-slate-400'
-                }`}>
-                  {erConnStatus === 'ok'    ? 'متصل' : erConnStatus === 'error' ? 'غير متصل' : 'لم يختبر بعد'}
+            {/* Provider info row */}
+            <div className="flex items-center justify-between bg-slate-50 rounded-2xl px-5 py-4 border border-slate-100">
+              <div className="flex items-center gap-3">
+                {erConnStatus === 'ok'  && <Wifi    className="w-5 h-5 text-emerald-500" />}
+                {erConnStatus === 'error' && <WifiOff className="w-5 h-5 text-rose-500" />}
+                {erConnStatus === 'idle'  && <Wifi    className="w-5 h-5 text-slate-300" />}
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">حالة الاتصال (Connection Status)</span>
+                  <span className={`text-sm font-bold ${
+                    erConnStatus === 'ok'    ? 'text-emerald-600'
+                    : erConnStatus === 'error' ? 'text-rose-600'
+                    : 'text-slate-400'
+                  }`}>
+                    {erConnStatus === 'ok'    ? 'متصل (Connected)' : erConnStatus === 'error' ? 'فشل الاتصال (Failed)' : 'لم يختبر بعد'}
+                  </span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">اسم مزود الأسعار</span>
+                <span className="text-sm font-bold text-slate-700 block">ExchangeRate.host</span>
+                <a 
+                  href="https://exchangerate.host" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="text-xs text-indigo-600 hover:underline font-semibold block mt-0.5"
+                >
+                  https://exchangerate.host
+                </a>
+              </div>
+            </div>
+
+            {/* Last update row */}
+            <div className="flex items-center gap-3 px-1">
+              <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+              <div>
+                <span className="text-xs font-bold text-slate-400">آخر مزامنة ناجحة (Last Successful Sync): </span>
+                <span className="text-xs font-semibold text-slate-600">
+                  {erLastUpdate ?? 'لم يتم التحديث بعد'}
                 </span>
               </div>
             </div>
-            <div className="text-right">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">مزود البيانات</span>
-              <span className="text-sm font-bold text-slate-700">open.er-api.com</span>
-            </div>
-          </div>
 
-          {/* Last update row */}
-          <div className="flex items-center gap-3 px-1">
-            <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-            <div>
-              <span className="text-xs font-bold text-slate-400">آخر تحديث ناجح: </span>
-              <span className="text-xs font-semibold text-slate-600">
-                {erLastUpdate ?? 'لم يتم التحديث بعد'}
-              </span>
-            </div>
-          </div>
-
-          {/* Action buttons row */}
-          <div className="flex flex-wrap gap-3">
-            {/* Update Now */}
-            <button
-              type="button"
-              id="er-update-now-btn"
-              onClick={handleErUpdate}
-              disabled={erIsUpdating}
-              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white px-5 py-2.5 rounded-2xl font-bold text-sm transition-all shadow-sm shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <RefreshCw className={`w-4 h-4 ${erIsUpdating ? 'animate-spin' : ''}`} />
-              {erIsUpdating ? 'جاري التحديث...' : 'تحديث أسعار الصرف الآن'}
-            </button>
-
-            {/* Test Connection */}
-            <button
-              type="button"
-              id="er-test-conn-btn"
-              onClick={handleErTest}
-              disabled={erIsTesting}
-              className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 px-5 py-2.5 rounded-2xl font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {erIsTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-              {erIsTesting ? 'جاري الاختبار...' : 'اختبار الاتصال'}
-            </button>
-          </div>
-
-          {/* Last sync result */}
-          {erLastResult && (
-            <div className={`flex items-start gap-3 rounded-2xl px-4 py-3 border ${
-              erConnStatus === 'ok'
-                ? 'bg-emerald-50 border-emerald-100'
-                : 'bg-rose-50 border-rose-100'
-            }`}>
-              {erConnStatus === 'ok'
-                ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                : <XCircle      className="w-4 h-4 text-rose-500    shrink-0 mt-0.5" />}
-              <span className={`text-xs font-semibold ${
-                erConnStatus === 'ok' ? 'text-emerald-700' : 'text-rose-700'
-              }`}>
-                {erLastResult}
-              </span>
-            </div>
-          )}
-
-          {/* Divider */}
-          <div className="border-t border-slate-100" />
-
-          {/* Automatic Update toggle */}
-          <div
-            className="flex items-center justify-between cursor-pointer select-none"
-            onClick={() => setErAutoUpdate(p => !p)}
-          >
-            <div className="flex flex-col gap-0.5">
-              <span className="font-bold text-slate-800 text-base">تحديث تلقائي</span>
-              <span className="text-xs font-semibold text-slate-400">تحديث أسعار الصرف تلقائياً وفق الجدول المحدد</span>
-            </div>
-            <div className={`relative w-14 h-8 rounded-full transition-all duration-300 shadow-inner ${erAutoUpdate ? 'bg-indigo-600' : 'bg-slate-200'}`}>
-              <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform translate-x-[-120%] ${
-                erAutoUpdate ? 'translate-x-[-120%]' : 'translate-x-[-10%]'
-              }`} />
-            </div>
-          </div>
-
-          {/* Update Frequency — only shown when auto update is on */}
-          <AnimatePresence>
-            {erAutoUpdate && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="overflow-hidden"
+            {/* Action buttons row */}
+            <div className="flex flex-wrap gap-3">
+              {/* Update Now */}
+              <button
+                type="button"
+                id="er-update-now-btn"
+                onClick={handleErUpdate}
+                disabled={erIsUpdating}
+                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white px-5 py-2.5 rounded-2xl font-bold text-sm transition-all shadow-sm shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <div className="pt-2">
-                  <label className="block text-sm font-semibold text-slate-500 mb-3">تكرار التحديث</label>
-                  <div className="flex gap-3">
-                    {(['daily', 'weekly'] as const).map(freq => (
-                      <button
-                        key={freq}
-                        type="button"
-                        onClick={() => setErFrequency(freq)}
-                        className={`flex-1 py-2.5 rounded-2xl text-sm font-bold border transition-all ${
-                          erFrequency === freq
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-500/20'
-                            : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400'
-                        }`}
-                      >
-                        {freq === 'daily' ? 'يومي (Daily)' : 'أسبوعي (Weekly)'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </motion.div>
+                <RefreshCw className={`w-4 h-4 ${erIsUpdating ? 'animate-spin' : ''}`} />
+                {erIsUpdating ? 'جاري التحديث...' : 'تحديث أسعار الصرف الآن (Sync Now)'}
+              </button>
+
+              {/* Test Connection */}
+              <button
+                type="button"
+                id="er-test-conn-btn"
+                onClick={handleErTest}
+                disabled={erIsTesting}
+                className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 px-5 py-2.5 rounded-2xl font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {erIsTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                {erIsTesting ? 'جاري الاختبار...' : 'اختبار الاتصال (Test)'}
+              </button>
+            </div>
+
+            {/* Last sync result */}
+            {erLastResult && (
+              <div className={`flex items-start gap-3 rounded-2xl px-4 py-3 border ${
+                erConnStatus === 'ok'
+                  ? 'bg-emerald-50 border-emerald-100'
+                  : 'bg-rose-50 border-rose-100'
+              }`}>
+                {erConnStatus === 'ok'
+                  ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                  : <XCircle      className="w-4 h-4 text-rose-500    shrink-0 mt-0.5" />}
+                <span className={`text-xs font-semibold ${
+                  erConnStatus === 'ok' ? 'text-emerald-700' : 'text-rose-700'
+                }`}>
+                  {erLastResult}
+                </span>
+              </div>
             )}
-          </AnimatePresence>
-        </div>
+
+            {/* Divider */}
+            <div className="border-t border-slate-100" />
+
+            {/* Automatic Update toggle */}
+            <div
+              className="flex items-center justify-between cursor-pointer select-none"
+              onClick={() => setErAutoUpdate(p => !p)}
+            >
+              <div className="flex flex-col gap-0.5">
+                <span className="font-bold text-slate-800 text-base">تحديث تلقائي (Auto Update)</span>
+                <span className="text-xs font-semibold text-slate-400">تحديث أسعار الصرف تلقائياً وفق الجدول المحدد</span>
+              </div>
+              <div className={`relative w-14 h-8 rounded-full transition-all duration-300 shadow-inner ${erAutoUpdate ? 'bg-indigo-600' : 'bg-slate-200'}`}>
+                <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
+                  erAutoUpdate ? 'translate-x-[-120%]' : 'translate-x-[-10%]'
+                }`} />
+              </div>
+            </div>
+
+            {/* Update Frequency — only shown when auto update is on */}
+            <AnimatePresence>
+              {erAutoUpdate && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="pt-2">
+                    <label className="block text-sm font-semibold text-slate-500 mb-3">تكرار التحديث (Frequency)</label>
+                    <div className="flex gap-3">
+                      {(['daily', 'weekly'] as const).map(freq => (
+                        <button
+                          key={freq}
+                          type="button"
+                          onClick={() => setErFrequency(freq)}
+                          className={`flex-1 py-2.5 rounded-2xl text-sm font-bold border transition-all ${
+                            erFrequency === freq
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-500/20'
+                              : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400'
+                          }`}
+                        >
+                          {freq === 'daily' ? 'يومي (Once Daily)' : 'أسبوعي (Once Weekly)'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
 
         {/* Submit Action */}
         <div className="pt-4 flex justify-start pb-20">

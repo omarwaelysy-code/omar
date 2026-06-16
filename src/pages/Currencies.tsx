@@ -45,6 +45,7 @@ export default function Currencies() {
   const [isUpdatingRates, setIsUpdatingRates] = useState(false);
   /** Latest rate from currency_rates table, keyed by currency_id */
   const [autoRates, setAutoRates] = useState<Record<string, { rate: number; rate_date: string } | null>>({});
+  const [autoHistory, setAutoHistory] = useState<any[]>([]);
 
   const handleUpdateRates = async () => {
     if (!company) return;
@@ -174,16 +175,22 @@ export default function Currencies() {
     }
   };
 
-  const loadHistory = async (currencyId: string) => {
+  const loadHistory = async (curr: Currency) => {
     if (!user?.company_id) return;
     setLoadingHistory(true);
     try {
-      const rates = await dbService.list<ExchangeRate>('exchange_rates', {
-        currency_id: currencyId,
-        company_id: user.company_id
-      });
-      const sorted = rates.sort((a, b) => new Date(b.rate_date).getTime() - new Date(a.rate_date).getTime());
-      setExchangeRates(prev => ({ ...prev, [currencyId]: sorted }));
+      const isAuto = company?.settings?.exchange_rate_update_method === 'auto';
+      if (isAuto) {
+        const data = await apiRequest<any[]>(`/currency-rates/history?currency_code=${curr.code}&company_id=${user.company_id}`);
+        setAutoHistory(data);
+      } else {
+        const rates = await dbService.list<ExchangeRate>('exchange_rates', {
+          currency_id: curr.id,
+          company_id: user.company_id
+        });
+        const sorted = rates.sort((a, b) => new Date(b.rate_date).getTime() - new Date(a.rate_date).getTime());
+        setExchangeRates(prev => ({ ...prev, [curr.id]: sorted }));
+      }
     } catch (error) {
       console.error('Failed to load rate history:', error);
       toast.error(t('common.error'));
@@ -400,16 +407,18 @@ export default function Currencies() {
               <List className="w-5 h-5" />
             </button>
           </div>
-          <button
-            onClick={handleUpdateRates}
-            disabled={isUpdatingRates}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors w-full md:w-auto justify-center whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            <RefreshCw className={`w-4 h-4 ${isUpdatingRates ? 'animate-spin' : ''}`} />
-            {isUpdatingRates
-              ? (language === 'ar' ? 'جاري التحديث...' : 'Updating...')
-              : (language === 'ar' ? 'تحديث أسعار الصرف' : 'Update Exchange Rates')}
-          </button>
+          {company?.settings?.exchange_rate_update_method === 'auto' && (
+            <button
+              onClick={handleUpdateRates}
+              disabled={isUpdatingRates}
+              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors w-full md:w-auto justify-center whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`w-4 h-4 ${isUpdatingRates ? 'animate-spin' : ''}`} />
+              {isUpdatingRates
+                ? (language === 'ar' ? 'جاري التحديث...' : 'Updating...')
+                : (language === 'ar' ? 'تحديث أسعار الصرف (Sync)' : 'Update Exchange Rates')}
+            </button>
+          )}
           <button
             onClick={() => setIsAddCurrencyOpen(true)}
             className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors w-full md:w-auto justify-center whitespace-nowrap"
@@ -514,25 +523,28 @@ export default function Currencies() {
                   })()}
 
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        setSelectedCurrency(curr);
-                        setIsAddRateOpen(true);
-                      }}
-                      className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-black transition-colors"
-                    >
-                      <PlusCircle className="w-4 h-4" />
-                      {t('currencies.add_rate')}
-                    </button>
+                    {company?.settings?.exchange_rate_update_method !== 'auto' && (
+                      <button
+                        onClick={() => {
+                          setSelectedCurrency(curr);
+                          setIsAddRateOpen(true);
+                        }}
+                        className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-black transition-colors"
+                      >
+                        <PlusCircle className="w-4 h-4" />
+                        {t('currencies.add_rate')}
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         setSelectedCurrency(curr);
                         setIsHistoryOpen(true);
-                        loadHistory(curr.id);
+                        loadHistory(curr);
                       }}
-                      className="w-12 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-xl hover:bg-zinc-200 transition-colors"
+                      className={`${company?.settings?.exchange_rate_update_method === 'auto' ? 'flex-1' : 'w-12'} flex items-center justify-center gap-2 bg-zinc-100 text-zinc-600 py-2.5 rounded-xl hover:bg-zinc-200 transition-colors font-medium text-sm`}
                     >
                       <History className="w-5 h-5" />
+                      {company?.settings?.exchange_rate_update_method === 'auto' && (language === 'ar' ? 'سجل المزامنة' : 'Sync History')}
                     </button>
                     {(!latestRate || exchangeRates[curr.id]?.length === 0) && (
                       <button
@@ -629,24 +641,26 @@ export default function Currencies() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-3">
-                          <button
-                            onClick={() => {
-                              setSelectedCurrency(curr);
-                              setIsAddRateOpen(true);
-                            }}
-                            className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                            title={t('currencies.add_rate')}
-                          >
-                            <PlusCircle className="w-5 h-5" />
-                          </button>
+                          {company?.settings?.exchange_rate_update_method !== 'auto' && (
+                            <button
+                              onClick={() => {
+                                setSelectedCurrency(curr);
+                                setIsAddRateOpen(true);
+                              }}
+                              className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                              title={t('currencies.add_rate')}
+                            >
+                              <PlusCircle className="w-5 h-5" />
+                            </button>
+                          )}
                           <button
                             onClick={() => {
                               setSelectedCurrency(curr);
                               setIsHistoryOpen(true);
-                              loadHistory(curr.id);
+                              loadHistory(curr);
                             }}
                             className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                            title={t('currencies.history')}
+                            title={company?.settings?.exchange_rate_update_method === 'auto' ? (language === 'ar' ? 'سجل المزامنة' : 'Sync History') : t('currencies.history')}
                           >
                             <History className="w-5 h-5" />
                           </button>
@@ -1016,11 +1030,23 @@ export default function Currencies() {
               </div>
             </div>
             
-            <div className="border-b border-zinc-100 bg-zinc-50/50 px-6 py-3 grid grid-cols-4 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-              <div className="col-span-1">{t('currencies.rate')}</div>
-              <div className="col-span-1">{t('currencies.rate_date')}</div>
-              <div className="col-span-2">{t('common.notes')}</div>
-            </div>
+            {company?.settings?.exchange_rate_update_method === 'auto' ? (
+              <div className="border-b border-zinc-100 bg-zinc-50/50 px-6 py-3 grid grid-cols-7 text-[10px] font-bold text-zinc-400 uppercase tracking-wider" dir={dir}>
+                <div className="col-span-1">{language === 'ar' ? 'العملة' : 'Currency'}</div>
+                <div className="col-span-1">{language === 'ar' ? 'سعر الصرف' : 'Rate'}</div>
+                <div className="col-span-1">{language === 'ar' ? 'المزود' : 'Provider'}</div>
+                <div className="col-span-1">{language === 'ar' ? 'التاريخ' : 'Date'}</div>
+                <div className="col-span-1">{language === 'ar' ? 'الوقت' : 'Time'}</div>
+                <div className="col-span-1">{language === 'ar' ? 'بواسطة' : 'By'}</div>
+                <div className="col-span-1">{language === 'ar' ? 'الحالة' : 'Status'}</div>
+              </div>
+            ) : (
+              <div className="border-b border-zinc-100 bg-zinc-50/50 px-6 py-3 grid grid-cols-4 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                <div className="col-span-1">{t('currencies.rate')}</div>
+                <div className="col-span-1">{t('currencies.rate_date')}</div>
+                <div className="col-span-2">{t('common.notes')}</div>
+              </div>
+            )}
             
             <div className="flex-1 overflow-y-auto p-0">
               {loadingHistory ? (
@@ -1031,38 +1057,105 @@ export default function Currencies() {
                   </p>
                 </div>
               ) : (() => {
-                let filteredRates = (exchangeRates[selectedCurrency.id] || []);
-                if (historySearchQuery) {
-                  const query = historySearchQuery.toLowerCase();
-                  filteredRates = filteredRates.filter(r => 
-                    r.exchange_rate.toString().includes(query) || 
-                    (r.notes || '').toLowerCase().includes(query)
+                const isAuto = company?.settings?.exchange_rate_update_method === 'auto';
+                if (isAuto) {
+                  let filteredHistory = [...autoHistory];
+                  if (historySearchQuery) {
+                    const query = historySearchQuery.toLowerCase();
+                    filteredHistory = filteredHistory.filter(r => 
+                      r.currency_code.toLowerCase().includes(query) || 
+                      r.exchange_rate.toString().includes(query) ||
+                      r.provider.toLowerCase().includes(query) ||
+                      r.updated_by.toLowerCase().includes(query)
+                    );
+                  }
+                  if (historyDateFrom) {
+                    filteredHistory = filteredHistory.filter(r => {
+                      const parts = r.retrieved_date.split('/');
+                      if (parts.length === 3) {
+                        const formatted = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                        return formatted >= historyDateFrom;
+                      }
+                      return true;
+                    });
+                  }
+                  if (historyDateTo) {
+                    filteredHistory = filteredHistory.filter(r => {
+                      const parts = r.retrieved_date.split('/');
+                      if (parts.length === 3) {
+                        const formatted = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                        return formatted <= historyDateTo;
+                      }
+                      return true;
+                    });
+                  }
+
+                  if (filteredHistory.length > 0) {
+                    return filteredHistory.map((rate, idx) => (
+                      <div 
+                        key={rate.id} 
+                        className={`px-6 py-4 grid grid-cols-7 items-center text-xs border-b border-zinc-100 last:border-0 hover:bg-zinc-50 transition-colors ${idx === 0 && !historySearchQuery && !historyDateFrom && !historyDateTo ? 'bg-emerald-50/30' : ''}`}
+                        dir={dir}
+                      >
+                        <div className="col-span-1 font-bold text-zinc-850 text-zinc-800">{rate.currency_code}</div>
+                        <div className="col-span-1 font-bold text-zinc-800">
+                          {rate.status === 'Failed' ? '---' : Number(rate.exchange_rate).toLocaleString()}
+                        </div>
+                        <div className="col-span-1 text-zinc-500">{rate.provider}</div>
+                        <div className="col-span-1 text-zinc-500 font-mono text-[11px]">{rate.retrieved_date}</div>
+                        <div className="col-span-1 text-zinc-400 font-mono text-[10px]">{rate.retrieved_time}</div>
+                        <div className="col-span-1 text-zinc-500">{rate.updated_by}</div>
+                        <div className="col-span-1">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            rate.status === 'Success' 
+                              ? 'bg-emerald-50 text-emerald-700' 
+                              : 'bg-rose-50 text-rose-700'
+                          }`}>
+                            {rate.status === 'Success' ? (language === 'ar' ? 'ناجح' : 'Success') : (language === 'ar' ? 'فشل' : 'Failed')}
+                          </span>
+                        </div>
+                      </div>
+                    ));
+                  }
+                  return (
+                    <div className="p-12 text-center text-zinc-400 italic">
+                      {t('common.no_data')}
+                    </div>
+                  );
+                } else {
+                  let filteredRates = (exchangeRates[selectedCurrency.id] || []);
+                  if (historySearchQuery) {
+                    const query = historySearchQuery.toLowerCase();
+                    filteredRates = filteredRates.filter(r => 
+                      r.exchange_rate.toString().includes(query) || 
+                      (r.notes || '').toLowerCase().includes(query)
+                    );
+                  }
+                  if (historyDateFrom) {
+                    filteredRates = filteredRates.filter(r => r.rate_date >= historyDateFrom);
+                  }
+                  if (historyDateTo) {
+                    filteredRates = filteredRates.filter(r => r.rate_date <= historyDateTo);
+                  }
+
+                  if (filteredRates.length > 0) {
+                    return filteredRates.map((rate, idx) => (
+                      <div 
+                        key={rate.id} 
+                        className={`px-6 py-4 grid grid-cols-4 items-center text-sm border-b border-zinc-100 last:border-0 hover:bg-zinc-50 transition-colors ${idx === 0 && !historySearchQuery && !historyDateFrom && !historyDateTo ? 'bg-emerald-50/30' : ''}`}
+                      >
+                        <div className="col-span-1 font-bold text-zinc-800">{rate.exchange_rate.toLocaleString()}</div>
+                        <div className="col-span-1 text-zinc-500 font-mono text-xs">{format(new Date(rate.rate_date), 'dd/MM/yyyy')}</div>
+                        <div className="col-span-2 text-zinc-400 text-xs italic">{rate.notes || '---'}</div>
+                      </div>
+                    ));
+                  }
+                  return (
+                    <div className="p-12 text-center text-zinc-400 italic">
+                      {t('common.no_data')}
+                    </div>
                   );
                 }
-                if (historyDateFrom) {
-                  filteredRates = filteredRates.filter(r => r.rate_date >= historyDateFrom);
-                }
-                if (historyDateTo) {
-                  filteredRates = filteredRates.filter(r => r.rate_date <= historyDateTo);
-                }
-
-                if (filteredRates.length > 0) {
-                  return filteredRates.map((rate, idx) => (
-                    <div 
-                      key={rate.id} 
-                      className={`px-6 py-4 grid grid-cols-4 items-center text-sm border-b border-zinc-100 last:border-0 hover:bg-zinc-50 transition-colors ${idx === 0 && !historySearchQuery && !historyDateFrom && !historyDateTo ? 'bg-emerald-50/30' : ''}`}
-                    >
-                      <div className="col-span-1 font-bold text-zinc-800">{rate.exchange_rate.toLocaleString()}</div>
-                      <div className="col-span-1 text-zinc-500 font-mono text-xs">{format(new Date(rate.rate_date), 'dd/MM/yyyy')}</div>
-                      <div className="col-span-2 text-zinc-400 text-xs italic">{rate.notes || '---'}</div>
-                    </div>
-                  ));
-                }
-                return (
-                  <div className="p-12 text-center text-zinc-400 italic">
-                    {t('common.no_data')}
-                  </div>
-                );
               })()}
             </div>
           </div>
