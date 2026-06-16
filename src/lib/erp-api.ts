@@ -534,6 +534,11 @@ const getList = async (table: string, filters: any) => {
   
   let paramIndex = 1;
   Object.keys(filters).forEach((key) => {
+    // ── Skip meta-params (_limit, _sort, _order, _page, _search, etc.)
+    //    They are NOT column names. The paginated branch already guards these;
+    //    this guard was missing here, causing HTTP 500 on exchange_rates queries.
+    if (key.startsWith('_')) return;
+
     const value = filters[key];
     
     if (key === 'date_from') {
@@ -556,6 +561,17 @@ const getList = async (table: string, filters: any) => {
   const reportTables = ['journal_entries', 'invoices', 'receipt_vouchers', 'payment_vouchers', 'purchase_invoices', 'purchase_returns', 'returns'];
   if (reportTables.includes(table)) {
     sql += ' ORDER BY date DESC, id DESC';
+  } else if (filters._sort) {
+    // Honour explicit _sort / _order meta-params when present (e.g. exchange_rates?_sort=rate_date&_order=desc)
+    const col   = String(filters._sort).replace(/[^a-zA-Z0-9_]/g, '');   // sanitise
+    const order = String(filters._order || 'asc').toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+    sql += ` ORDER BY "${col}" ${order}`;
+  }
+
+  // Honour _limit meta-param
+  if (filters._limit) {
+    const lim = parseInt(String(filters._limit), 10);
+    if (!isNaN(lim) && lim > 0) sql += ` LIMIT ${lim}`;
   }
   
   const { rows } = await pool.query(sql, values);

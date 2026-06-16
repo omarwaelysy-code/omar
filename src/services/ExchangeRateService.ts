@@ -22,10 +22,11 @@ import type {
 const SERVICE_TAG = '[ExchangeRateService]';
 
 /**
- * Base URL of the exchangerate.host REST endpoint.
- * Using the /latest path which returns all available currencies in one call.
+ * Base URL for the free, key-less open.er-api.com exchange rate service.
+ * (exchangerate.host was deprecated to paid-only — error code 101 missing_access_key)
+ * Verified working: HTTP 200 with full rates map, no authentication required.
  */
-const API_BASE_URL = 'https://api.exchangerate.host/latest';
+const API_BASE_URL = 'https://open.er-api.com/v6/latest';
 
 /** Default base currency used when no override is supplied by the caller. */
 const DEFAULT_BASE_CURRENCY = 'EGP';
@@ -36,15 +37,22 @@ const DEFAULT_TIMEOUT_MS = 10_000;
 // ─── Raw API response shape (internal – not exported) ─────────────────────────
 
 /**
- * Shape of the JSON object returned by exchangerate.host /latest.
- * Typed conservatively so the parser can validate before trusting any field.
+ * Shape of the JSON object returned by open.er-api.com /v6/latest/{base}.
+ * Also accepts the old exchangerate.host shape as a fallback.
  */
 interface ExchangeRateHostResponse {
+  /** open.er-api.com: "success" | "error"  (old: boolean true/false) */
+  result?: string;
+  /** Legacy field from exchangerate.host */
   success?: boolean;
+  /** open.er-api.com uses base_code; old API used base */
+  base_code?: string;
   base?: string;
+  /** open.er-api.com: RFC-2822 date string; old: YYYY-MM-DD */
+  time_last_update_utc?: string;
   date?: string;
   rates?: Record<string, unknown>;
-  /** Error object present when success === false */
+  /** Error object present when result === 'error' or success === false */
   error?: {
     code?: number;
     type?: string;
@@ -79,7 +87,8 @@ export class ExchangeRateService {
     const baseCurrency = (options.baseCurrency ?? DEFAULT_BASE_CURRENCY).toUpperCase();
     const timeoutMs    = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-    const url = `${API_BASE_URL}?base=${encodeURIComponent(baseCurrency)}`;
+    // open.er-api.com path: /v6/latest/{BASE_CODE}
+    const url = `${API_BASE_URL}/${encodeURIComponent(baseCurrency)}`;
 
     console.log(`${SERVICE_TAG} Fetching latest rates | base=${baseCurrency} timeout=${timeoutMs}ms url=${url}`);
 
@@ -158,16 +167,20 @@ export class ExchangeRateService {
     }
 
     // ── Validate API-level success flag ────────────────────────────────────
-    if (parsed.success === false) {
+    // open.er-api.com uses result:'success'/'error'; legacy exchangerate.host used success:boolean
+    const apiSucceeded =
+      parsed.result === 'success' || parsed.success === true;
+
+    if (!apiSucceeded) {
       const apiError = parsed.error;
-      const info     = apiError?.info ?? 'No additional information';
+      const info     = apiError?.info ?? parsed.result ?? 'No additional information';
       console.error(
-        `${SERVICE_TAG} API reported failure (code=${apiError?.code}, type=${apiError?.type}): ${info}`
+        `${SERVICE_TAG} API reported failure (result=${parsed.result}, code=${apiError?.code}): ${info}`
       );
       return {
         success: false,
         error: 'API_UNAVAILABLE',
-        message: `exchangerate.host API error: ${info}`,
+        message: `Exchange rate API error: ${info}`,
       };
     }
 
@@ -179,8 +192,20 @@ export class ExchangeRateService {
         throw new Error('Rates field is missing or not an object');
       }
 
-      const rateDate = typeof parsed.date === 'string' ? parsed.date : new Date().toISOString().slice(0, 10);
-      const reportedBase = typeof parsed.base === 'string' ? parsed.base : baseCurrency;
+      // open.er-api.com: time_last_update_utc is RFC-2822; extract YYYY-MM-DD
+      let rateDate = new Date().toISOString().slice(0, 10);
+      if (typeof parsed.date === 'string' && parsed.date.length >= 10) {
+        rateDate = parsed.date.slice(0, 10);
+      } else if (typeof parsed.time_last_update_utc === 'string') {
+        // e.g. "Tue, 16 Jun 2026 00:02:31 +0000" → parse to Date → YYYY-MM-DD
+        const d = new Date(parsed.time_last_update_utc);
+        if (!isNaN(d.getTime())) rateDate = d.toISOString().slice(0, 10);
+      }
+
+      const reportedBase =
+        (typeof parsed.base_code === 'string' ? parsed.base_code : null) ||
+        (typeof parsed.base     === 'string' ? parsed.base     : null) ||
+        baseCurrency;
 
       const rates: FetchedCurrencyRate[] = [];
 
