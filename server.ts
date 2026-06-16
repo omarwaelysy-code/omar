@@ -312,7 +312,32 @@ async function startServer() {
       const { default: pool } = await import('./src/lib/postgres.js');
       await pool.query('ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS entry_number VARCHAR(50);');
       console.log('Successfully altered journal_entries');
-    } catch (e) { console.error('Failed to alter', e); }
+      await migrateExchangeRateDirections();
+    } catch (e) { console.error('Failed to alter/migrate', e); }
+
+  async function migrateExchangeRateDirections() {
+    try {
+      const pool = (await import("./src/lib/postgres.js")).default;
+      const checkRes = await pool.query(`
+        SELECT cr.rate, c.code 
+        FROM currency_rates cr
+        JOIN currencies c ON cr.currency_id = c.id
+        WHERE UPPER(c.code) IN ('USD', 'EUR', 'AED', 'GBP', 'SAR')
+        LIMIT 1
+      `);
+      if (checkRes.rows.length > 0) {
+        const rate = Number(checkRes.rows[0].rate);
+        if (rate > 0 && rate < 1.0) {
+          console.log(`⚠️ [Migration] Wrong exchange rate direction detected in DB (${checkRes.rows[0].code} rate = ${rate} < 1.0). Inverting rates...`);
+          await pool.query("UPDATE currency_rates SET rate = 1.0 / rate WHERE rate > 0");
+          await pool.query("UPDATE exchange_rate_history SET exchange_rate = 1.0 / exchange_rate WHERE exchange_rate > 0");
+          console.log("✅ [Migration] Rates inverted successfully.");
+        }
+      }
+    } catch (err: any) {
+      console.error("❌ [Migration] Failed to migrate exchange rate directions:", err.message);
+    }
+  }
     
   async function runScheduledExchangeRateSync() {
     try {

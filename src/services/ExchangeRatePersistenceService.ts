@@ -164,8 +164,13 @@ export class ExchangeRatePersistenceService {
           continue;
         }
 
+        // IMPORTANT ACCOUNTING RULE:
+        // All rates saved must represent: 1 Foreign Currency = X EGP.
+        // Since API returns 1 EGP = Y Foreign Currency, we store the inverse: 1 / Y.
+        const adjustedRate = fetchedRate.rate > 0 ? (1 / fetchedRate.rate) : fetchedRate.rate;
+
         // Keep track of rates successfully matched with local currencies
-        activeRatesSynced.push({ currencyCode: isoCode, rate: fetchedRate.rate });
+        activeRatesSynced.push({ currencyCode: isoCode, rate: adjustedRate });
 
         // ── 2b. Check for existing row (same currency_id + rate_date) ─────
         const { rows: existing } = await client.query<{ id: string }>(
@@ -183,7 +188,7 @@ export class ExchangeRatePersistenceService {
             `UPDATE currency_rates
                 SET rate = $1
               WHERE id   = $2`,
-            [fetchedRate.rate, existing[0].id]
+            [adjustedRate, existing[0].id]
           );
           updated++;
         } else {
@@ -192,7 +197,7 @@ export class ExchangeRatePersistenceService {
           await client.query(
             `INSERT INTO currency_rates (id, currency_id, rate, rate_date, created_at)
              VALUES ($1, $2, $3, $4, NOW())`,
-            [newId, currencyId, fetchedRate.rate, rateDate]
+            [newId, currencyId, adjustedRate, rateDate]
           );
           inserted++;
         }

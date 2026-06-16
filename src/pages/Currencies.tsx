@@ -475,13 +475,22 @@ export default function Currencies() {
                   <div className="bg-zinc-50 rounded-xl p-4 flex items-center justify-between">
                     <div className="flex flex-col">
                       <span className="text-[10px] text-zinc-400 uppercase font-bold">{t('currencies.rate')}</span>
-                      <span className="text-lg font-bold text-zinc-800">
-                        {latestRate ? latestRate.exchange_rate.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '---'}
-                      </span>
+                      {latestRate ? (
+                        <>
+                          <span className="text-sm font-bold text-zinc-800">
+                            1 {curr.code} = {latestRate.exchange_rate.toLocaleString(undefined, { minimumFractionDigits: 4 })} EGP
+                          </span>
+                          <span className="text-[10px] text-zinc-500 font-medium">
+                            1 EGP = {(latestRate.exchange_rate > 0 ? 1 / latestRate.exchange_rate : 0).toLocaleString(undefined, { minimumFractionDigits: 6, maximumFractionDigits: 6 })} {curr.code}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-sm font-bold text-zinc-800">---</span>
+                      )}
                     </div>
-                    <div className="flex flex-col items-end">
+                    <div className="flex flex-col items-end justify-center">
                       <span className="text-[10px] text-zinc-400 font-bold uppercase">{t('currencies.rate_date')}</span>
-                      <span className="text-xs text-zinc-600">
+                      <span className="text-xs text-zinc-600 font-mono">
                         {latestRate ? format(new Date(latestRate.rate_date), 'dd/MM/yyyy') : '---'}
                       </span>
                     </div>
@@ -499,9 +508,14 @@ export default function Currencies() {
                             {language === 'ar' ? 'سعر تلقائي' : 'Live Rate'}
                           </span>
                           {ar ? (
-                            <span className="text-base font-bold text-blue-800">
-                              {ar.rate.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 6 })}
-                            </span>
+                            <>
+                              <span className="text-sm font-bold text-blue-800">
+                                1 {curr.code} = {ar.rate.toLocaleString(undefined, { minimumFractionDigits: 4 })} EGP
+                              </span>
+                              <span className="text-[10px] text-blue-600/80 font-medium">
+                                1 EGP = {(ar.rate > 0 ? 1 / ar.rate : 0).toLocaleString(undefined, { minimumFractionDigits: 6, maximumFractionDigits: 6 })} {curr.code}
+                              </span>
+                            </>
                           ) : (
                             <span className="text-xs italic text-blue-300">
                               {language === 'ar' ? 'لا يوجد سعر صرف' : 'No exchange rate available'}
@@ -509,11 +523,11 @@ export default function Currencies() {
                           )}
                         </div>
                         {ar && (
-                          <div className="flex flex-col items-end">
+                          <div className="flex flex-col items-end justify-center">
                             <span className="text-[10px] text-blue-400 font-bold uppercase">
                               {t('currencies.rate_date')}
                             </span>
-                            <span className="text-xs text-blue-600">
+                            <span className="text-xs text-blue-600 font-mono">
                               {format(new Date(ar.rate_date), 'dd/MM/yyyy')}
                             </span>
                           </div>
@@ -598,8 +612,13 @@ export default function Currencies() {
                       <td className="px-6 py-4 text-center">
                         {latestRate ? (
                           <div className="flex flex-col">
-                            <span className="font-bold text-zinc-800">{latestRate.exchange_rate.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                            <span className="text-[10px] text-zinc-400 font-mono italic">{format(new Date(latestRate.rate_date), 'dd/MM/yyyy')}</span>
+                            <span className="font-bold text-zinc-800">
+                              1 {curr.code} = {latestRate.exchange_rate.toLocaleString(undefined, { minimumFractionDigits: 4 })} EGP
+                            </span>
+                            <span className="text-[10px] text-zinc-400 font-medium">
+                              1 EGP = {(latestRate.exchange_rate > 0 ? 1 / latestRate.exchange_rate : 0).toLocaleString(undefined, { minimumFractionDigits: 6, maximumFractionDigits: 6 })} {curr.code}
+                            </span>
+                            <span className="text-[10px] text-zinc-400 font-mono italic mt-0.5">{format(new Date(latestRate.rate_date), 'dd/MM/yyyy')}</span>
                           </div>
                         ) : (
                           <span className="text-zinc-300">---</span>
@@ -618,9 +637,12 @@ export default function Currencies() {
                           return (
                             <div className="flex flex-col">
                               <span className="font-bold text-blue-800">
-                                {ar.rate.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 6 })}
+                                1 {curr.code} = {ar.rate.toLocaleString(undefined, { minimumFractionDigits: 4 })} EGP
                               </span>
-                              <span className="text-[10px] text-blue-400 font-mono">
+                              <span className="text-[10px] text-blue-500/80 font-medium">
+                                1 EGP = {(ar.rate > 0 ? 1 / ar.rate : 0).toLocaleString(undefined, { minimumFractionDigits: 6, maximumFractionDigits: 6 })} {curr.code}
+                              </span>
+                              <span className="text-[10px] text-blue-400 font-mono mt-0.5">
                                 {format(new Date(ar.rate_date), 'dd/MM/yyyy')}
                               </span>
                             </div>
@@ -936,7 +958,13 @@ export default function Currencies() {
                   className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
                   value={newRate.exchange_rate}
                   onChange={e => setNewRate({ ...newRate, exchange_rate: e.target.value })}
+                  placeholder={language === 'ar' ? `مثال: 50.0 (1 ${selectedCurrency.code} = 50.0 EGP)` : `e.g. 50.0 (1 ${selectedCurrency.code} = 50.0 EGP)`}
                 />
+                <p className="text-[10px] text-zinc-500 font-semibold mt-1.5 leading-relaxed">
+                  {language === 'ar'
+                    ? `* الاتجاه: كم يعادل 1 ${selectedCurrency.name_ar} بالجنيه المصري (مثال: 1 ${selectedCurrency.code} = 50.00 جنيه)`
+                    : `* Direction: How much 1 ${selectedCurrency.code} is in EGP (e.g. 1 ${selectedCurrency.code} = 50.00 EGP)`}
+                </p>
               </div>
               <div>
                 <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{t('currencies.rate_date')}</label>
