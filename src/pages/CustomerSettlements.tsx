@@ -29,7 +29,7 @@ export const CustomerSettlements: React.FC = () => {
   const { user } = useAuth();
   const { showNotification } = useNotification();
   const { t, dir, language } = useLanguage();
-  const { setCurrentPage, setPendingViewDoc } = useNavigation();
+  const { setCurrentPage, setPendingViewDoc, pendingViewDoc } = useNavigation();
 
   // Database states
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -39,6 +39,7 @@ export const CustomerSettlements: React.FC = () => {
   const [allPurchaseReturns, setAllPurchaseReturns] = useState<any[]>([]);
   const [allJournalEntries, setAllJournalEntries] = useState<any[]>([]);
   const [allPurchaseInvoices, setAllPurchaseInvoices] = useState<any[]>([]);
+  const [allPayments, setAllPayments] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -73,6 +74,7 @@ export const CustomerSettlements: React.FC = () => {
       const unsubPR = dbService.subscribe<any>('purchase_returns', user.company_id, setAllPurchaseReturns);
       const unsubJEs = dbService.subscribe<any>('journal_entries', user.company_id, setAllJournalEntries);
       const unsubPI = dbService.subscribe<any>('purchase_invoices', user.company_id, setAllPurchaseInvoices);
+      const unsubPayments = dbService.subscribe<any>('payment_vouchers', user.company_id, setAllPayments);
       const unsubAccounts = dbService.subscribe<any>('accounts', user.company_id, setAccounts);
 
       setLoading(false);
@@ -85,10 +87,22 @@ export const CustomerSettlements: React.FC = () => {
         unsubPR();
         unsubJEs();
         unsubPI();
+        unsubPayments();
         unsubAccounts();
       };
     }
   }, [user]);
+
+  // Handle redirect from other pages (e.g. clicking on settlement reference)
+  useEffect(() => {
+    if (pendingViewDoc && pendingViewDoc.type === 'settlement' && historyList.length > 0) {
+      const found = historyList.find(h => h.settlement_number === pendingViewDoc.idOrNumber);
+      if (found) {
+        setSelectedHistory(found);
+        setPendingViewDoc(null);
+      }
+    }
+  }, [pendingViewDoc, historyList, setPendingViewDoc]);
 
   // Helpers for calculation (Level 2 compatibility)
   const getInvoiceSettlements = (inv: any) => {
@@ -654,35 +668,47 @@ export const CustomerSettlements: React.FC = () => {
 
     let maxSeq = 0;
     
-    // Check Invoices settlements
+    const checkSettlementNum = (num: string) => {
+      if (num && num.startsWith(prefix)) {
+        const parts = num.split('-');
+        if (parts.length >= 4) {
+          const seq = parseInt(parts[parts.length - 1], 10);
+          if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+        }
+      }
+    };
+
+    // 1. Check Invoices settlements (Customer)
     allInvoices.forEach(inv => {
       if (inv.settlements && Array.isArray(inv.settlements)) {
-        inv.settlements.forEach((s: any) => {
-          if (s.settlement_number && s.settlement_number.startsWith(prefix)) {
-            const parts = s.settlement_number.split('-');
-            if (parts.length >= 4) {
-              const seq = parseInt(parts[parts.length - 1], 10);
-              if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
-            }
+        inv.settlements.forEach((s: any) => checkSettlementNum(s.settlement_number));
+      }
+    });
+
+    // 2. Check Vouchers settlements (Customer)
+    allReceipts.forEach(v => {
+      if (v.items && Array.isArray(v.items)) {
+        v.items.forEach(item => {
+          if (item.settlements && Array.isArray(item.settlements)) {
+            item.settlements.forEach((s: any) => checkSettlementNum(s.settlement_number));
           }
         });
       }
     });
 
-    // Check Vouchers settlements
-    allReceipts.forEach(v => {
+    // 3. Check Purchase Invoices settlements (Supplier)
+    allPurchaseInvoices.forEach(inv => {
+      if (inv.settlements && Array.isArray(inv.settlements)) {
+        inv.settlements.forEach((s: any) => checkSettlementNum(s.settlement_number));
+      }
+    });
+
+    // 4. Check Payment Vouchers settlements (Supplier)
+    allPayments.forEach(v => {
       if (v.items && Array.isArray(v.items)) {
         v.items.forEach(item => {
           if (item.settlements && Array.isArray(item.settlements)) {
-            item.settlements.forEach((s: any) => {
-              if (s.settlement_number && s.settlement_number.startsWith(prefix)) {
-                const parts = s.settlement_number.split('-');
-                if (parts.length >= 4) {
-                  const seq = parseInt(parts[parts.length - 1], 10);
-                  if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
-                }
-              }
-            });
+            item.settlements.forEach((s: any) => checkSettlementNum(s.settlement_number));
           }
         });
       }
@@ -694,7 +720,7 @@ export const CustomerSettlements: React.FC = () => {
 
   const autoSettlementNumber = useMemo(() => {
     return generateSettlementSerial(settlementDate);
-  }, [settlementDate, allInvoices, allReceipts]);
+  }, [settlementDate, allInvoices, allReceipts, allPurchaseInvoices, allPayments]);
 
   // Submit Save Settlement
   const handleSaveSettlement = async () => {

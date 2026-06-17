@@ -30,6 +30,12 @@ export const CustomerStatement: React.FC = () => {
   const handleTransactionClick = (type: string, reference: string) => {
     if (!reference || reference === '-') return;
     
+    if (reference.startsWith('SET-')) {
+      setPendingViewDoc({ type: 'settlement', idOrNumber: reference });
+      setCurrentPage('customer_settlements');
+      return;
+    }
+    
     if (type === 'invoice') {
       setPendingViewDoc({ type: 'invoice', idOrNumber: reference });
       setCurrentPage('invoices');

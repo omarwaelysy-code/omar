@@ -30,6 +30,12 @@ export const SupplierStatement: React.FC = () => {
   const handleTransactionClick = (type: string, reference: string) => {
     if (!reference || reference === '-') return;
     
+    if (reference.startsWith('SET-')) {
+      setPendingViewDoc({ type: 'settlement', idOrNumber: reference });
+      setCurrentPage('supplier_settlements');
+      return;
+    }
+    
     if (type === 'purchase_invoice') {
       setPendingViewDoc({ type: 'purchase_invoice', idOrNumber: reference });
       setCurrentPage('purchase_invoices');
