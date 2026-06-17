@@ -298,22 +298,6 @@ export const CustomerSettlements: React.FC = () => {
       return;
     }
 
-    // 2. Fallback logic: check if there's any invoice first (user wants to edit the invoice)
-    const linkedInvoice = h.debitDocs?.find((d: any) => d.page_name === 'invoices' || d.page_name === 'purchase_invoices')
-                       || h.creditDocs?.find((c: any) => c.page_name === 'invoices' || c.page_name === 'purchase_invoices');
-    if (linkedInvoice) {
-      navigateToDoc(linkedInvoice.page_name, linkedInvoice.original_id);
-      return;
-    }
-
-    // Next fallback: check for linked voucher
-    const linkedVoucher = h.creditDocs?.find((c: any) => c.page_name === 'receipts' || c.page_name === 'payment_vouchers')
-                       || h.debitDocs?.find((d: any) => d.page_name === 'receipts' || d.page_name === 'payment_vouchers');
-    if (linkedVoucher) {
-      navigateToDoc(linkedVoucher.page_name, linkedVoucher.original_id);
-      return;
-    }
-
     // Otherwise, open details modal on this page
     setSelectedHistory(h);
   };

@@ -508,7 +508,8 @@ export const PaymentVouchers: React.FC = () => {
         date: targetTx.date,
         original_amount: targetTx.original_amount,
         settlement_number: settlementNum,
-        settlement_date: rowDate
+        settlement_date: rowDate,
+        created_from: 'payment_vouchers'
       };
       if (existingIdx > -1) {
         settlements[existingIdx] = settlementObj;

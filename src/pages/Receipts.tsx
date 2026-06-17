@@ -501,7 +501,8 @@ export const Receipts: React.FC = () => {
         date: targetTx.date,
         original_amount: targetTx.original_amount,
         settlement_number: settlementNum,
-        settlement_date: rowDate
+        settlement_date: rowDate,
+        created_from: 'receipts'
       };
       if (existingIdx > -1) {
         settlements[existingIdx] = settlementObj;
