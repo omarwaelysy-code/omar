@@ -318,7 +318,8 @@ export const PurchaseInvoices: React.FC = () => {
                   number: v.voucher_number || v.number || v.id,
                   page_name: 'receipts',
                   amount: Number(s.settled_amount) || 0,
-                  notes: v.description || v.notes || ''
+                  notes: v.description || v.notes || '',
+                  settlement_number: s.settlement_number || ''
                 });
               }
             });
@@ -341,7 +342,8 @@ export const PurchaseInvoices: React.FC = () => {
                   number: v.voucher_number || v.number || v.id,
                   page_name: 'payment_vouchers',
                   amount: Number(s.settled_amount) || 0,
-                  notes: v.description || v.notes || ''
+                  notes: v.description || v.notes || '',
+                  settlement_number: s.settlement_number || ''
                 });
               }
             });
@@ -3183,6 +3185,7 @@ export const PurchaseInvoices: React.FC = () => {
                               <thead>
                                 <tr className="border-b border-zinc-100 text-zinc-400 text-xs font-bold uppercase tracking-wider">
                                   <th className="pb-2 text-right">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                                  <th className="pb-2 text-right">{language === 'ar' ? 'رقم التسوية' : 'Settlement No.'}</th>
                                   <th className="pb-2 text-right">{language === 'ar' ? 'نوع الحركة' : 'Transaction Type'}</th>
                                   <th className="pb-2 text-right">{language === 'ar' ? 'رقم الحركة / المرجع' : 'Reference / Doc No'}</th>
                                   <th className="pb-2 text-right">{language === 'ar' ? 'الملاحظات' : 'Notes'}</th>
@@ -3193,6 +3196,23 @@ export const PurchaseInvoices: React.FC = () => {
                                 {existingSettlements.map((s: any) => (
                                   <tr key={s.id} className="hover:bg-zinc-50/50 transition-colors">
                                     <td className="py-2.5 font-mono text-xs">{formatDate(s.date)}</td>
+                                    <td className="py-2.5 font-mono text-xs text-indigo-600 font-black">
+                                      {s.settlement_number ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            closeModal();
+                                            setPendingViewDoc({ type: 'settlement', idOrNumber: s.settlement_number });
+                                            setCurrentPage('supplier_settlements');
+                                          }}
+                                          className="hover:underline text-indigo-600 font-mono font-black"
+                                        >
+                                          {s.settlement_number}
+                                        </button>
+                                      ) : (
+                                        '-'
+                                      )}
+                                    </td>
                                     <td className="py-2.5 text-zinc-500 font-semibold">{s.type_label}</td>
                                     <td className="py-2.5 font-mono text-emerald-600 font-black">
                                       <button
@@ -3425,6 +3445,9 @@ export const PurchaseInvoices: React.FC = () => {
                                 {language === 'ar' ? 'التاريخ' : 'Date'}
                               </th>
                               <th className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {language === 'ar' ? 'رقم التسوية' : 'Settlement No.'}
+                              </th>
+                              <th className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
                                 {language === 'ar' ? 'نوع الحركة' : 'Transaction Type'}
                               </th>
                               <th className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
@@ -3453,6 +3476,23 @@ export const PurchaseInvoices: React.FC = () => {
                               return (
                                 <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
                                   <td className="px-4 py-3 font-mono text-xs">{formatDate(s.date)}</td>
+                                  <td className="px-4 py-3 font-mono text-xs text-indigo-600 font-bold">
+                                    {s.settlement_number ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setViewInvoice(null);
+                                          setPendingViewDoc({ type: 'settlement', idOrNumber: s.settlement_number });
+                                          setCurrentPage('supplier_settlements');
+                                        }}
+                                        className="hover:underline text-indigo-600 font-mono font-bold"
+                                      >
+                                        {s.settlement_number}
+                                      </button>
+                                    ) : (
+                                      '-'
+                                    )}
+                                  </td>
                                   <td className="px-4 py-3 text-xs font-bold">{displayTypeLabel}</td>
                                   <td className="px-4 py-3 font-mono text-xs text-emerald-600 font-bold">
                                     <button

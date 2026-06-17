@@ -2439,7 +2439,23 @@ export const Receipts: React.FC = () => {
                                     <td colSpan={4} className="px-4 py-3 border-t border-b border-zinc-100">
                                       <div className="bg-white p-3 rounded-xl border border-zinc-100 shadow-sm space-y-2 text-xs">
                                         <div className="flex justify-between items-center border-b border-zinc-100 pb-2 mb-2 font-bold text-zinc-500">
-                                          <span>تسويات البند (رقم التسوية: {item.settlement_number || '-'} - تاريخ التسوية: {item.settlement_date ? formatDate(item.settlement_date) : ''})</span>
+                                          <span>
+                                            تسويات البند (رقم التسوية: {' '}
+                                            {item.settlement_number && item.settlement_number !== '-' ? (
+                                              <span
+                                                onClick={() => {
+                                                  setPendingViewDoc({ type: 'settlement', idOrNumber: item.settlement_number });
+                                                  setCurrentPage('customer_settlements');
+                                                }}
+                                                className="text-indigo-600 hover:text-indigo-700 hover:underline cursor-pointer font-bold font-mono transition-colors"
+                                              >
+                                                {item.settlement_number}
+                                              </span>
+                                            ) : (
+                                              '-'
+                                            )}
+                                            {' '} - تاريخ التسوية: {item.settlement_date ? formatDate(item.settlement_date) : ''})
+                                          </span>
                                         </div>
                                         <table className="w-full text-right text-[11px]">
                                           <thead>
