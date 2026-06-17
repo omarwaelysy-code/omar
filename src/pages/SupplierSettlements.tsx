@@ -64,6 +64,7 @@ export const SupplierSettlements: React.FC = () => {
 
   // History Detail modal
   const [selectedHistory, setSelectedHistory] = useState<any | null>(null);
+  const [editingSettlementNum, setEditingSettlementNum] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -219,6 +220,7 @@ export const SupplierSettlements: React.FC = () => {
     allPurchaseInvoices.forEach(inv => {
       if (inv.settlements && Array.isArray(inv.settlements)) {
         inv.settlements.forEach((s: any) => {
+          if (editingSettlementNum && s.settlement_number === editingSettlementNum) return;
           if (s.target_id === targetId || (jeRefType === 'opening_balance' && s.target_id === `OPEN-${selectedSupplierId}`)) {
             settledSum += Number(s.settled_amount) || 0;
           }
@@ -232,6 +234,7 @@ export const SupplierSettlements: React.FC = () => {
         v.items.forEach(item => {
           if (item.settlements && Array.isArray(item.settlements)) {
             item.settlements.forEach((s: any) => {
+              if (editingSettlementNum && s.settlement_number === editingSettlementNum) return;
               if (s.target_id === targetId || (jeRefType === 'opening_balance' && s.target_id === `OPEN-${selectedSupplierId}`)) {
                 settledSum += Number(s.settled_amount) || 0;
               }
@@ -243,6 +246,166 @@ export const SupplierSettlements: React.FC = () => {
 
     return settledSum;
   };
+
+  const getJournalEntryNumber = (docId: string, docNumber: string, pageName: string) => {
+    const je = allJournalEntries.find((je: any) => 
+      je.reference_id === docId || 
+      je.reference_number === docNumber
+    );
+    if (!je && pageName === 'journal_entries') {
+      const directJe = allJournalEntries.find((je: any) => je.id === docId || je.entry_number === docNumber);
+      return directJe?.entry_number || '-';
+    }
+    return je?.entry_number || '-';
+  };
+
+  // Build History list
+  const historyList = useMemo(() => {
+    const historyMap = new Map<string, {
+      settlement_number: string;
+      date: string;
+      entity_name: string;
+      entity_id: string;
+      total_amount: number;
+      debitDocs: { number: string; type_label: string; amount: number; page_name: string; original_id: string; date: string; je_number: string }[];
+      creditDocs: { number: string; type_label: string; amount: number; page_name: string; original_id: string; date: string; je_number: string }[];
+      created_from?: string;
+    }>();
+
+    // 1. Scan Purchase Invoices
+    allPurchaseInvoices.forEach(inv => {
+      if (inv.settlements && Array.isArray(inv.settlements)) {
+        inv.settlements.forEach((s: any) => {
+          if (s.settlement_number) {
+            const num = s.settlement_number;
+            let inferredOrigin = s.created_from || '';
+            if (!inferredOrigin) {
+              if (s.originalItemAmount !== undefined && s.originalItemAmount !== null) {
+                inferredOrigin = 'payment_vouchers';
+              } else if (s.entry_number) {
+                inferredOrigin = 'purchase_invoices';
+              } else {
+                inferredOrigin = 'supplier_settlements';
+              }
+            }
+            let entry = historyMap.get(num);
+            if (!entry) {
+              entry = {
+                settlement_number: num,
+                date: s.settlement_date || inv.date,
+                entity_name: inv.supplier_name || '',
+                entity_id: inv.supplier_id || '',
+                total_amount: 0,
+                debitDocs: [],
+                creditDocs: [],
+                created_from: inferredOrigin
+              };
+              historyMap.set(num, entry);
+            } else if (inferredOrigin && !entry.created_from) {
+              entry.created_from = inferredOrigin;
+            }
+            if (!entry.creditDocs.some(c => c.number === inv.invoice_number)) {
+              entry.creditDocs.push({
+                number: inv.invoice_number,
+                type_label: 'فاتورة مشتريات',
+                amount: Number(s.settled_amount) || 0,
+                page_name: 'purchase_invoices',
+                original_id: inv.id,
+                date: inv.date,
+                je_number: getJournalEntryNumber(inv.id, inv.invoice_number, 'purchase_invoices')
+              });
+            }
+            if (!entry.debitDocs.some(d => d.number === s.reference_number)) {
+              const targetOriginalId = (s.target_id || '').split('-')[0];
+              entry.debitDocs.push({
+                number: s.reference_number,
+                type_label: s.type_label || 'تسوية',
+                amount: Number(s.settled_amount) || 0,
+                page_name: s.type || 'payment_vouchers',
+                original_id: targetOriginalId,
+                date: s.date || inv.date,
+                je_number: getJournalEntryNumber(targetOriginalId, s.reference_number, s.type || 'payment_vouchers')
+              });
+            }
+          }
+        });
+      }
+    });
+
+    // 2. Scan Payment Vouchers
+    allPayments.forEach(v => {
+      if (v.items && Array.isArray(v.items)) {
+        v.items.forEach((item: any) => {
+          if (item.settlements && Array.isArray(item.settlements)) {
+            item.settlements.forEach((s: any) => {
+              if (s.settlement_number) {
+                const num = s.settlement_number;
+                let inferredOrigin = s.created_from || '';
+                if (!inferredOrigin) {
+                  if (s.invoiceId) {
+                    inferredOrigin = 'purchase_invoices';
+                  } else if (s.entry_number) {
+                    inferredOrigin = 'payment_vouchers';
+                  } else {
+                    inferredOrigin = 'supplier_settlements';
+                  }
+                }
+                let entry = historyMap.get(num);
+                if (!entry) {
+                  entry = {
+                    settlement_number: num,
+                    date: s.settlement_date || v.date,
+                    entity_name: item.entity_name || v.supplier_name || '',
+                    entity_id: item.entity_id || v.supplier_id || '',
+                    total_amount: 0,
+                    debitDocs: [],
+                    creditDocs: [],
+                    created_from: inferredOrigin
+                  };
+                  historyMap.set(num, entry);
+                } else if (inferredOrigin && !entry.created_from) {
+                  entry.created_from = inferredOrigin;
+                }
+                if (!entry.debitDocs.some(d => d.number === (v.voucher_number || v.number))) {
+                  entry.debitDocs.push({
+                    number: v.voucher_number || v.number || v.id,
+                    type_label: 'سند صرف',
+                    amount: Number(s.settled_amount) || 0,
+                    page_name: 'payment_vouchers',
+                    original_id: v.id,
+                    date: v.date,
+                    je_number: getJournalEntryNumber(v.id, v.voucher_number || v.number, 'payment_vouchers')
+                  });
+                }
+                if (!entry.creditDocs.some(c => c.number === s.reference_number)) {
+                  entry.creditDocs.push({
+                    number: s.reference_number,
+                    type_label: s.type_label || 'تسوية',
+                    amount: Number(s.settled_amount) || 0,
+                    page_name: s.type || 'purchase_invoices',
+                    original_id: s.target_id,
+                    date: s.date || v.date,
+                    je_number: getJournalEntryNumber(s.target_id, s.reference_number, s.type || 'purchase_invoices')
+                  });
+                }
+              }
+            });
+          }
+        });
+      }
+    });
+
+    const list = Array.from(historyMap.values()).map(h => {
+      const total = h.debitDocs.reduce((sum, d) => sum + d.amount, 0);
+      return { ...h, total_amount: total };
+    });
+
+    // Filtering by search term
+    return list.filter(h => 
+      h.settlement_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      h.entity_name.toLowerCase().includes(searchTerm.toLowerCase())
+    ).sort((a, b) => b.settlement_number.localeCompare(a.settlement_number));
+  }, [allPurchaseInvoices, allPayments, searchTerm]);
 
   // Clickable badge navigation to document details
   const navigateToDoc = (pageName: string, docId: string) => {
@@ -298,8 +461,11 @@ export const SupplierSettlements: React.FC = () => {
       return;
     }
 
-    // Otherwise, open details modal on this page
-    setSelectedHistory(h);
+    // Otherwise, open edit form on this page
+    setActiveTab('new');
+    setSelectedSupplierId(h.entity_id);
+    setSettlementDate(h.date.slice(0, 10));
+    setEditingSettlementNum(h.settlement_number);
   };
 
   // Build list of movements when supplier selection changes
@@ -309,6 +475,8 @@ export const SupplierSettlements: React.FC = () => {
       setCreditMovements([]);
       return;
     }
+
+    const currentEditingSettlement = historyList.find(x => x.settlement_number === editingSettlementNum);
 
     // --- DEBIT MOVEMENTS (Payment Vouchers, Purchase Returns, Debit JEs) ---
     const debits: Movement[] = [];
@@ -323,6 +491,7 @@ export const SupplierSettlements: React.FC = () => {
 
             if (item.settlements && Array.isArray(item.settlements)) {
               item.settlements.forEach((s: any) => {
+                if (editingSettlementNum && s.settlement_number === editingSettlementNum) return;
                 totalSettled += Number(s.settled_amount || s.amount || 0);
                 countedInvoiceIds.add(s.target_id);
               });
@@ -332,6 +501,7 @@ export const SupplierSettlements: React.FC = () => {
             allPurchaseInvoices.forEach(inv => {
               if (inv.settlements && Array.isArray(inv.settlements)) {
                 inv.settlements.forEach((s: any) => {
+                  if (editingSettlementNum && s.settlement_number === editingSettlementNum) return;
                   if (s.target_id === `${v.id}-${idx}` && !countedInvoiceIds.has(inv.id)) {
                     totalSettled += Number(s.settled_amount || s.amount || 0);
                   }
@@ -342,7 +512,9 @@ export const SupplierSettlements: React.FC = () => {
             const originalAmount = Number(item.amount) || 0;
             const openAmount = originalAmount - totalSettled;
 
-            if (openAmount > 0.01) {
+            const editMatch = currentEditingSettlement?.debitDocs?.find((d: any) => d.original_id === v.id || d.number === (v.voucher_number || v.number));
+
+            if (openAmount > 0.01 || editMatch) {
               debits.push({
                 id: `${v.id}-${idx}`,
                 original_id: v.id,
@@ -352,10 +524,10 @@ export const SupplierSettlements: React.FC = () => {
                 page_name: 'payment_vouchers',
                 original_amount: originalAmount,
                 open_amount: openAmount,
-                settled_amount: 0,
+                settled_amount: editMatch ? editMatch.amount : 0,
                 notes: v.description || v.notes || '',
                 je_number: v.entry_number || '',
-                selected: false
+                selected: !!editMatch
               });
             }
           }
@@ -370,7 +542,9 @@ export const SupplierSettlements: React.FC = () => {
         const originalAmount = Number(r.total_amount) || 0;
         const openAmount = originalAmount - settled;
 
-        if (openAmount > 0.01) {
+        const editMatch = currentEditingSettlement?.debitDocs?.find((d: any) => d.original_id === r.id || d.number === r.return_number);
+
+        if (openAmount > 0.01 || editMatch) {
           debits.push({
             id: r.id,
             original_id: r.id,
@@ -380,10 +554,10 @@ export const SupplierSettlements: React.FC = () => {
             page_name: 'purchase_returns',
             original_amount: originalAmount,
             open_amount: openAmount,
-            settled_amount: 0,
+            settled_amount: editMatch ? editMatch.amount : 0,
             notes: r.description || r.notes || '',
             je_number: r.entry_number || '',
-            selected: false
+            selected: !!editMatch
           });
         }
       }
@@ -403,7 +577,9 @@ export const SupplierSettlements: React.FC = () => {
           const settled = getSettlementsForTarget(`${je.id}-${idx}`, je.reference_type);
           const openAmount = originalAmount - settled;
 
-          if (openAmount > 0.01) {
+          const editMatch = currentEditingSettlement?.debitDocs?.find((d: any) => d.original_id === je.id || d.number === (je.entry_number || je.id.slice(0, 8)));
+
+          if (openAmount > 0.01 || editMatch) {
             const isDiscount = je.reference_type === 'supplier_discount';
             const isOpBal = je.reference_type === 'opening_balance';
             debits.push({
@@ -415,10 +591,10 @@ export const SupplierSettlements: React.FC = () => {
               page_name: isDiscount ? 'discounts' : 'journal_entries',
               original_amount: originalAmount,
               open_amount: openAmount,
-              settled_amount: 0,
+              settled_amount: editMatch ? editMatch.amount : 0,
               notes: item.description || je.description || '',
               je_number: je.entry_number || je.id.slice(0, 8),
-              selected: false
+              selected: !!editMatch
             });
           }
         }
@@ -432,11 +608,15 @@ export const SupplierSettlements: React.FC = () => {
     allPurchaseInvoices.forEach(inv => {
       if (inv.supplier_id === selectedSupplierId && inv.payment_type !== 'cash') {
         const settlements = getInvoiceSettlements(inv);
-        const settledAmount = settlements.reduce((sum, s) => sum + s.amount, 0);
+        const settledAmount = settlements
+          .filter((s: any) => s.settlement_number !== editingSettlementNum)
+          .reduce((sum, s) => sum + s.amount, 0);
         const originalAmount = Number(inv.total_amount) || 0;
         const openAmount = originalAmount - settledAmount;
 
-        if (openAmount > 0.01) {
+        const editMatch = currentEditingSettlement?.creditDocs?.find((c: any) => c.original_id === inv.id || c.number === inv.invoice_number);
+
+        if (openAmount > 0.01 || editMatch) {
           credits.push({
             id: inv.id,
             original_id: inv.id,
@@ -446,9 +626,9 @@ export const SupplierSettlements: React.FC = () => {
             page_name: 'purchase_invoices',
             original_amount: originalAmount,
             open_amount: openAmount,
-            settled_amount: 0,
+            settled_amount: editMatch ? editMatch.amount : 0,
             notes: inv.description || inv.notes || '',
-            selected: false
+            selected: !!editMatch
           });
         }
       }
@@ -466,7 +646,9 @@ export const SupplierSettlements: React.FC = () => {
           const settled = getSettlementsForTarget(`${je.id}-${idx}`, je.reference_type);
           const openAmount = originalAmount - settled;
 
-          if (openAmount > 0.01) {
+          const editMatch = currentEditingSettlement?.creditDocs?.find((c: any) => c.original_id === je.id || c.number === (je.entry_number || je.id.slice(0, 8)));
+
+          if (openAmount > 0.01 || editMatch) {
             const isDiscount = je.reference_type === 'supplier_discount';
             const isOpBal = je.reference_type === 'opening_balance';
             credits.push({
@@ -478,10 +660,10 @@ export const SupplierSettlements: React.FC = () => {
               page_name: isDiscount ? 'discounts' : 'journal_entries',
               original_amount: originalAmount,
               open_amount: openAmount,
-              settled_amount: 0,
+              settled_amount: editMatch ? editMatch.amount : 0,
               notes: item.description || je.description || '',
               je_number: je.entry_number || je.id.slice(0, 8),
-              selected: false
+              selected: !!editMatch
             });
           }
         }
@@ -490,7 +672,7 @@ export const SupplierSettlements: React.FC = () => {
 
     setDebitMovements(debits.sort((a, b) => b.date.localeCompare(a.date)));
     setCreditMovements(credits.sort((a, b) => b.date.localeCompare(a.date)));
-  }, [selectedSupplierId, allPurchaseInvoices, allPayments, allPurchaseReturns, allJournalEntries, suppliers]);
+  }, [selectedSupplierId, allPurchaseInvoices, allPayments, allPurchaseReturns, allJournalEntries, suppliers, editingSettlementNum, historyList]);
 
   // Apply Advanced Filtering
   const applyFilters = (list: Movement[]) => {
@@ -760,7 +942,40 @@ export const SupplierSettlements: React.FC = () => {
     }
 
     try {
-      const settlementNumber = autoSettlementNumber;
+      const settlementNumber = editingSettlementNum || autoSettlementNumber;
+
+      if (editingSettlementNum) {
+        const deleteSettlementNoPrompt = async (settlementNo: string) => {
+          for (const inv of allPurchaseInvoices) {
+            if (inv.settlements && Array.isArray(inv.settlements)) {
+              const hasMatch = inv.settlements.some((s: any) => s.settlement_number === settlementNo);
+              if (hasMatch) {
+                const updated = inv.settlements.filter((s: any) => s.settlement_number !== settlementNo);
+                await dbService.update('purchase_invoices', inv.id, { ...inv, settlements: updated });
+              }
+            }
+          }
+          for (const v of allPayments) {
+            if (v.items && Array.isArray(v.items)) {
+              let changed = false;
+              const updatedItems = v.items.map((item: any) => {
+                if (item.settlements && Array.isArray(item.settlements)) {
+                  const hasMatch = item.settlements.some((s: any) => s.settlement_number === settlementNo);
+                  if (hasMatch) {
+                    changed = true;
+                    return { ...item, settlements: item.settlements.filter((s: any) => s.settlement_number !== settlementNo) };
+                  }
+                }
+                return item;
+              });
+              if (changed) {
+                await dbService.update('payment_vouchers', v.id, { ...v, items: updatedItems });
+              }
+            }
+          }
+        };
+        await deleteSettlementNoPrompt(editingSettlementNum);
+      }
 
       // Perform FIFO matching
       const debitsToSettle = debitMovements
@@ -887,183 +1102,25 @@ export const SupplierSettlements: React.FC = () => {
       setSelectedSupplierId('');
       setDebitMovements([]);
       setCreditMovements([]);
+      setEditingSettlementNum(null);
     } catch (err: any) {
       console.error(err);
       showNotification('حدث خطأ أثناء حفظ التسوية', 'error');
     }
   };
 
-  const getJournalEntryNumber = (docId: string, docNumber: string, pageName: string) => {
-    const je = allJournalEntries.find((je: any) => 
-      je.reference_id === docId || 
-      je.reference_number === docNumber
-    );
-    if (!je && pageName === 'journal_entries') {
-      const directJe = allJournalEntries.find((je: any) => je.id === docId || je.entry_number === docNumber);
-      return directJe?.entry_number || '-';
-    }
-    return je?.entry_number || '-';
-  };
 
-  // Build History list
-  // Build History list
-  const historyList = useMemo(() => {
-    const historyMap = new Map<string, {
-      settlement_number: string;
-      date: string;
-      entity_name: string;
-      entity_id: string;
-      total_amount: number;
-      debitDocs: { number: string; type_label: string; amount: number; page_name: string; original_id: string; date: string; je_number: string }[];
-      creditDocs: { number: string; type_label: string; amount: number; page_name: string; original_id: string; date: string; je_number: string }[];
-      created_from?: string;
-    }>();
-
-    // 1. Scan Purchase Invoices
-    allPurchaseInvoices.forEach(inv => {
-      if (inv.settlements && Array.isArray(inv.settlements)) {
-        inv.settlements.forEach((s: any) => {
-          if (s.settlement_number) {
-            const num = s.settlement_number;
-            let inferredOrigin = s.created_from || '';
-            if (!inferredOrigin) {
-              if (s.originalItemAmount !== undefined && s.originalItemAmount !== null) {
-                inferredOrigin = 'payment_vouchers';
-              } else if (s.entry_number) {
-                inferredOrigin = 'purchase_invoices';
-              } else {
-                inferredOrigin = 'supplier_settlements';
-              }
-            }
-            let entry = historyMap.get(num);
-            if (!entry) {
-              entry = {
-                settlement_number: num,
-                date: s.settlement_date || inv.date,
-                entity_name: inv.supplier_name || '',
-                entity_id: inv.supplier_id || '',
-                total_amount: 0,
-                debitDocs: [],
-                creditDocs: [],
-                created_from: inferredOrigin
-              };
-              historyMap.set(num, entry);
-            } else if (inferredOrigin && !entry.created_from) {
-              entry.created_from = inferredOrigin;
-            }
-            if (!entry.creditDocs.some(c => c.number === inv.invoice_number)) {
-              entry.creditDocs.push({
-                number: inv.invoice_number,
-                type_label: 'فاتورة مشتريات',
-                amount: Number(s.settled_amount) || 0,
-                page_name: 'purchase_invoices',
-                original_id: inv.id,
-                date: inv.date,
-                je_number: getJournalEntryNumber(inv.id, inv.invoice_number, 'purchase_invoices')
-              });
-            }
-            if (!entry.debitDocs.some(d => d.number === s.reference_number)) {
-              const targetOriginalId = (s.target_id || '').split('-')[0];
-              entry.debitDocs.push({
-                number: s.reference_number,
-                type_label: s.type_label || 'تسوية',
-                amount: Number(s.settled_amount) || 0,
-                page_name: s.type || 'payment_vouchers',
-                original_id: targetOriginalId,
-                date: s.date || inv.date,
-                je_number: getJournalEntryNumber(targetOriginalId, s.reference_number, s.type || 'payment_vouchers')
-              });
-            }
-          }
-        });
-      }
-    });
-
-    // 2. Scan Payment Vouchers
-    allPayments.forEach(v => {
-      if (v.items && Array.isArray(v.items)) {
-        v.items.forEach((item: any) => {
-          if (item.settlements && Array.isArray(item.settlements)) {
-            item.settlements.forEach((s: any) => {
-              if (s.settlement_number) {
-                const num = s.settlement_number;
-                let inferredOrigin = s.created_from || '';
-                if (!inferredOrigin) {
-                  if (s.invoiceId) {
-                    inferredOrigin = 'purchase_invoices';
-                  } else if (s.entry_number) {
-                    inferredOrigin = 'payment_vouchers';
-                  } else {
-                    inferredOrigin = 'supplier_settlements';
-                  }
-                }
-                let entry = historyMap.get(num);
-                if (!entry) {
-                  entry = {
-                    settlement_number: num,
-                    date: s.settlement_date || v.date,
-                    entity_name: item.entity_name || v.supplier_name || '',
-                    entity_id: item.entity_id || v.supplier_id || '',
-                    total_amount: 0,
-                    debitDocs: [],
-                    creditDocs: [],
-                    created_from: inferredOrigin
-                  };
-                  historyMap.set(num, entry);
-                } else if (inferredOrigin && !entry.created_from) {
-                  entry.created_from = inferredOrigin;
-                }
-                if (!entry.debitDocs.some(d => d.number === (v.voucher_number || v.number))) {
-                  entry.debitDocs.push({
-                    number: v.voucher_number || v.number || v.id,
-                    type_label: 'سند صرف',
-                    amount: Number(s.settled_amount) || 0,
-                    page_name: 'payment_vouchers',
-                    original_id: v.id,
-                    date: v.date,
-                    je_number: getJournalEntryNumber(v.id, v.voucher_number || v.number, 'payment_vouchers')
-                  });
-                }
-                if (!entry.creditDocs.some(c => c.number === s.reference_number)) {
-                  entry.creditDocs.push({
-                    number: s.reference_number,
-                    type_label: s.type_label || 'تسوية',
-                    amount: Number(s.settled_amount) || 0,
-                    page_name: s.type || 'purchase_invoices',
-                    original_id: s.target_id,
-                    date: s.date || v.date,
-                    je_number: getJournalEntryNumber(s.target_id, s.reference_number, s.type || 'purchase_invoices')
-                  });
-                }
-              }
-            });
-          }
-        });
-      }
-    });
-
-    const list = Array.from(historyMap.values()).map(h => {
-      const total = h.debitDocs.reduce((sum, d) => sum + d.amount, 0);
-      return { ...h, total_amount: total };
-    });
-
-    // Filtering by search term
-    return list.filter(h => 
-      h.settlement_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      h.entity_name.toLowerCase().includes(searchTerm.toLowerCase())
-    ).sort((a, b) => b.settlement_number.localeCompare(a.settlement_number));
-  }, [allPurchaseInvoices, allPayments, searchTerm]);
 
   // Handle redirect from other pages (e.g. clicking on settlement reference)
   useEffect(() => {
     if (pendingViewDoc && pendingViewDoc.type === 'settlement' && historyList.length > 0) {
       const found = historyList.find(h => h.settlement_number === pendingViewDoc.idOrNumber);
       if (found) {
-        setSelectedHistory(found);
+        handleSettlementNumberClick(found);
         setPendingViewDoc(null);
       }
     }
-  }, [pendingViewDoc, historyList, setPendingViewDoc]);
+  }, [pendingViewDoc, historyList, setPendingViewDoc, handleSettlementNumberClick]);
 
   // Export Settlement to Excel
   const handleExportSettlementExcel = (h: any) => {
@@ -1181,7 +1238,13 @@ export const SupplierSettlements: React.FC = () => {
 
           <div className="flex bg-zinc-100 p-1 rounded-2xl border border-zinc-200/50 shadow-inner w-fit">
             <button
-              onClick={() => setActiveTab('new')}
+              onClick={() => {
+                setActiveTab('new');
+                setEditingSettlementNum(null);
+                setSelectedSupplierId('');
+                setDebitMovements([]);
+                setCreditMovements([]);
+              }}
               className={`p-2 px-6 rounded-xl transition-all font-bold text-sm ${activeTab === 'new' ? 'bg-white text-emerald-600 shadow-sm border border-zinc-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
             >
               تسوية جديدة
@@ -1239,7 +1302,7 @@ export const SupplierSettlements: React.FC = () => {
                     readOnly
                     type="text" 
                     className="w-full px-4 py-3 bg-zinc-100 border border-zinc-200 rounded-2xl font-black text-emerald-600 text-sm outline-none cursor-default"
-                    value={selectedSupplierId ? autoSettlementNumber : '-'}
+                    value={selectedSupplierId ? (editingSettlementNum || autoSettlementNumber) : '-'}
                   />
                 </div>
               </div>
