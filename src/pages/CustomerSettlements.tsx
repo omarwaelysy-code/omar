@@ -253,16 +253,22 @@ export const CustomerSettlements: React.FC = () => {
       docType = 'receipt';
     } else if (pageName === 'payment_vouchers') {
       pageId = 'payment_vouchers';
-      docType = 'payment_vouchers';
-    } else if (pageName === 'journal_entries' || pageName === 'journal') {
+      docType = 'payment_voucher';
+    } else if (pageName === 'journal_entries' || pageName === 'journal' || pageName === 'discounts') {
       pageId = 'journal_entries';
-      docType = 'journal';
+      docType = 'manual';
     } else if (pageName === 'returns') {
       pageId = 'returns';
-      docType = 'returns';
+      docType = 'return';
+    } else if (pageName === 'purchase_returns') {
+      pageId = 'purchase_returns';
+      docType = 'purchase_return';
     } else if (pageName === 'invoices') {
       pageId = 'invoices';
       docType = 'invoice';
+    } else if (pageName === 'purchase_invoices') {
+      pageId = 'purchase_invoices';
+      docType = 'purchase_invoice';
     }
 
     setCurrentPage(pageId);
