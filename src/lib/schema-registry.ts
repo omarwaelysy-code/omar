@@ -47,7 +47,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'payment_method_id', 'payment_method_name', 'description', 'notes', 'source_orders', 'created_by', 'created_at',
     'payment_terms', 'payment_terms_days', 'advance_percentage',
     'settlements', 'settlement_number', 'settlement_date',
-    'operation_id', 'department_id', 'cost_center_id'
+    'operation_id', 'department_id', 'cost_center_id', 'currency_id', 'exchange_rate'
   ],
   invoice_items: [
     'id', 'invoice_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
@@ -85,7 +85,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'payment_method_id', 'payment_method_name', 'description', 'notes', 'source_orders', 'created_at',
     'payment_terms', 'payment_terms_days', 'advance_percentage',
     'settlements', 'settlement_number', 'settlement_date',
-    'operation_id', 'department_id', 'cost_center_id'
+    'operation_id', 'department_id', 'cost_center_id', 'currency_id', 'exchange_rate'
   ],
   purchase_invoice_items: [
     'id', 'invoice_id', 'product_id', 'expense_category_id', 'description', 'quantity', 'unit_price', 'total',

@@ -1,21 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
-import { Invoice, Customer, Product, InvoiceItem, Account, JournalEntry, JournalEntryItem, ActivityLog, Company, Operation, Department, CostCenter } from '../types';
+import { Invoice, Customer, Product, InvoiceItem, Account, JournalEntry, JournalEntryItem, ActivityLog, Company, Operation, Department, CostCenter, Currency, ExchangeRate } from '../types';
 import { 
   Search, Plus, Trash2, X, Eye, Download, Sparkles, Mic, 
   Image as ImageIcon, FileText, Pencil, History, Printer, 
   ChevronLeft, ChevronRight, Maximize2, Minimize2, Hash, 
   Wallet, Calendar, Package, Tag, Layers, Box, Paperclip, 
   Phone, Mail, Lock, LayoutGrid, List, Building2, ChevronDown, 
-  CreditCard, RotateCcw, Save, ExternalLink, CheckCheck, Copy
+  CreditCard, RotateCcw, Save, ExternalLink, CheckCheck, Copy, Coins
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Barcode from 'react-barcode';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
-import { dbService } from '../services/dbService';
+import { dbService, apiRequest } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
@@ -172,8 +172,86 @@ export const Invoices: React.FC = () => {
   const [settings, setSettings] = useState<any>(null);
   const [companyData, setCompanyData] = useState<Company | null>(null);
   const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [companyCurrencies, setCompanyCurrencies] = useState<Currency[]>([]);
+  const [selectedCurrencyId, setSelectedCurrencyId] = useState<string>('');
+  const [exchangeRate, setExchangeRate] = useState<number>(1);
+  const [exchangeRateType, setExchangeRateType] = useState<'manual' | 'auto'>('manual');
   const [view, setView] = useViewPreference('invoices', 'table');
   const [invoiceType, setInvoiceType] = useState<'items' | 'services'>('items');
+
+  const handleCurrencyChange = async (currencyId: string) => {
+    setSelectedCurrencyId(currencyId);
+    if (!currencyId || !user?.company_id || !companyData) {
+      setExchangeRate(1);
+      return;
+    }
+    
+    const currency = companyCurrencies.find(c => c.id === currencyId);
+    if (!currency) {
+      setExchangeRate(1);
+      return;
+    }
+    
+    const baseCurrency = companyData.settings?.currency || 'EGP';
+    if (currency.code.toLowerCase() === baseCurrency.toLowerCase()) {
+      setExchangeRate(1);
+      setExchangeRateType('manual');
+      return;
+    }
+
+    const updateMethod = companyData.settings?.exchange_rate_update_method || 'manual';
+    setExchangeRateType(updateMethod);
+
+    if (updateMethod === 'auto') {
+      try {
+        const latestAutoRates = await apiRequest<Array<{
+          currency_id: string;
+          rate: number | null;
+          rate_date: string | null;
+        }>>(`/currency-rates/latest?company_id=${user.company_id}`);
+        const rateObj = latestAutoRates.find(r => r.currency_id === currencyId);
+        if (rateObj && rateObj.rate !== null) {
+          setExchangeRate(Number(rateObj.rate));
+        } else {
+          // fallback to manual rate
+          const manualRates = await dbService.list<ExchangeRate>('exchange_rates', {
+            currency_id: currencyId,
+            company_id: user.company_id,
+            _limit: 1,
+            _sort: 'rate_date',
+            _order: 'desc'
+          });
+          if (manualRates.length > 0) {
+            setExchangeRate(Number(manualRates[0].exchange_rate));
+          } else {
+            setExchangeRate(1);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching auto rate:', error);
+        setExchangeRate(1);
+      }
+    } else {
+      // manual update method
+      try {
+        const manualRates = await dbService.list<ExchangeRate>('exchange_rates', {
+          currency_id: currencyId,
+          company_id: user.company_id,
+          _limit: 1,
+          _sort: 'rate_date',
+          _order: 'desc'
+        });
+        if (manualRates.length > 0) {
+          setExchangeRate(Number(manualRates[0].exchange_rate));
+        } else {
+          setExchangeRate(1);
+        }
+      } catch (error) {
+        console.error('Error fetching manual rate:', error);
+        setExchangeRate(1);
+      }
+    }
+  };
 
   const isVatEnabled = companyData?.settings?.vat_enabled || companyData?.vat_enabled || false;
 
@@ -233,6 +311,7 @@ export const Invoices: React.FC = () => {
       const unsubPM = dbService.subscribe<any>('payment_methods', user.company_id, setPaymentMethods);
       const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
       const unsubWarehouses = dbService.subscribe<any>('warehouses', user.company_id, setWarehouses);
+      const unsubCurrencies = dbService.subscribe<Currency>('currencies', user.company_id, setCompanyCurrencies);
 
       return () => {
         unsubProducts();
@@ -242,6 +321,7 @@ export const Invoices: React.FC = () => {
         unsubPM();
         unsubAccounts();
         unsubWarehouses();
+        unsubCurrencies();
       };
     }
   }, [user]);
@@ -1376,20 +1456,23 @@ export const Invoices: React.FC = () => {
         due_date: dueDate,
         operation_id: selectedOperationId || null,
         department_id: selectedDepartmentId || null,
-        cost_center_id: selectedCostCenterId || null
+        cost_center_id: selectedCostCenterId || null,
+        currency_id: selectedCurrencyId || null,
+        exchange_rate: Number(exchangeRate) || 1
       };
 
       // Journal items generation
       const journalItems: any[] = [];
       let customerAccountId = customer?.account_id || '';
       let customerAccountName = customer?.account_name || 'حساب العملاء';
+      const rate = Number(exchangeRate) || 1;
 
       journalItems.push({
         account_id: customerAccountId,
         account_name: customerAccountName,
-        debit: total_amount,
+        debit: Number((total_amount * rate).toFixed(2)),
         credit: 0,
-        description: `فاتورة مبيعات رقم ${invoiceNumber}${description ? ` - ${description}` : ''} - ${customer?.name}`,
+        description: `فاتورة مبيعات رقم ${invoiceNumber}${description ? ` - ${description}` : ''} - ${customer?.name}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`,
         customer_id: selectedCustomerId,
         customer_name: customer?.name,
         sub_account_id: selectedCustomerId,
@@ -1402,9 +1485,9 @@ export const Invoices: React.FC = () => {
         journalItems.push({
           account_id: discountAccountId,
           account_name: discountAccount?.name || 'حساب الخصم المسموح به',
-          debit: discount,
+          debit: Number((discount * rate).toFixed(2)),
           credit: 0,
-          description: `خصم مسموح به - فاتورة رقم ${invoiceNumber}${description ? ` - ${description}` : ''}`
+          description: `خصم مسموح به - فاتورة رقم ${invoiceNumber}${description ? ` - ${description}` : ''}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`
         });
       }
 
@@ -1416,8 +1499,8 @@ export const Invoices: React.FC = () => {
           account_id: creditAccountId,
           account_name: creditAccountName,
           debit: 0,
-          credit: item.total,
-          description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoiceNumber}${description ? ` - ${description}` : ''}`
+          credit: Number((item.total * rate).toFixed(2)),
+          description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoiceNumber}${description ? ` - ${description}` : ''}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`
         });
       });
 
@@ -1434,8 +1517,8 @@ export const Invoices: React.FC = () => {
           account_id: vatAccountId,
           account_name: vatAccountName,
           debit: 0,
-          credit: vatTotal,
-          description: `ضريبة القيمة المضافة - فاتورة رقم ${invoiceNumber}${description ? ` - ${description}` : ''}`
+          credit: Number((vatTotal * rate).toFixed(2)),
+          description: `ضريبة القيمة المضافة - فاتورة رقم ${invoiceNumber}${description ? ` - ${description}` : ''}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`
         });
       }
 
@@ -1446,9 +1529,9 @@ export const Invoices: React.FC = () => {
         journalItems.push({
           account_id: cashAccountId,
           account_name: cashAccountName,
-          debit: total_amount,
+          debit: Number((total_amount * rate).toFixed(2)),
           credit: 0,
-          description: `تحصيل فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name}`,
+          description: `تحصيل فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`,
           sub_account_id: paymentMethodId,
           sub_account_type: 'payment_method'
         });
@@ -1456,8 +1539,8 @@ export const Invoices: React.FC = () => {
           account_id: customerAccountId,
           account_name: customerAccountName,
           debit: 0,
-          credit: total_amount,
-          description: `سداد فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name}`,
+          credit: Number((total_amount * rate).toFixed(2)),
+          description: `سداد فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`,
           customer_id: selectedCustomerId,
           customer_name: customer?.name,
           sub_account_id: selectedCustomerId,
@@ -2039,6 +2122,12 @@ export const Invoices: React.FC = () => {
     setFormSettlementDate(newDate);
     setFormSettlements([]);
     setRowSettlementDates({});
+    
+    const baseCurr = companyCurrencies.find(c => c.code.toLowerCase() === (companyData?.settings?.currency || 'egp').toLowerCase());
+    setSelectedCurrencyId(baseCurr?.id || '');
+    setExchangeRate(1);
+    setExchangeRateType('manual');
+    
     setIsModalOpen(true);
     setIsFullScreen(false);
   };
@@ -2097,6 +2186,22 @@ export const Invoices: React.FC = () => {
         });
       }
       setRowSettlementDates(datesDict);
+      
+      setSelectedCurrencyId(fullData.currency_id || '');
+      setExchangeRate(fullData.exchange_rate || 1);
+      
+      const cur = companyCurrencies.find(c => c.id === fullData.currency_id);
+      if (cur) {
+        const baseCurrency = companyData?.settings?.currency || 'EGP';
+        if (cur.code.toLowerCase() === baseCurrency.toLowerCase()) {
+          setExchangeRateType('manual');
+        } else {
+          setExchangeRateType(companyData?.settings?.exchange_rate_update_method || 'manual');
+        }
+      } else {
+        setExchangeRateType('manual');
+      }
+
       isInitialLoad.current = true;
       setIsModalOpen(true);
       setIsFullScreen(false);
@@ -2375,7 +2480,7 @@ export const Invoices: React.FC = () => {
                           })()}
                         </td>
                         <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                          {formatMoney(inv.total_amount)} {t('invoices.currency')}
+                          {formatMoney(inv.total_amount)} {inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || '')}
                         </td>
                         <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                           {inv.entry_number ? (
@@ -2542,7 +2647,7 @@ export const Invoices: React.FC = () => {
                         <div>
                           <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">إجمالي المبلغ</p>
                           <p className="font-black text-2xl tracking-tighter text-emerald-600">
-                            {formatMoney(inv.total_amount)} <span className="text-sm font-bold">{t('invoices.currency')}</span>
+                            {formatMoney(inv.total_amount)} <span className="text-sm font-bold">{inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || '')}</span>
                           </p>
                         </div>
                         <button 
@@ -2601,7 +2706,7 @@ export const Invoices: React.FC = () => {
                       <h4 className="font-bold text-slate-900 text-lg">{inv.customer_name}</h4>
                     </div>
                       <div className={`${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                        <p className="font-bold text-emerald-600 text-lg">{formatMoney(inv.total_amount)} {t('invoices.currency')}</p>
+                        <p className="font-bold text-emerald-600 text-lg">{formatMoney(inv.total_amount)} {inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || '')}</p>
                         <span className="text-xs text-slate-400">{formatDate(inv.date)}</span>
                       </div>
                   </div>
@@ -3057,6 +3162,58 @@ export const Invoices: React.FC = () => {
                                   onChange={(e) => setDueDate(e.target.value)}
                                 />
                               </div>
+                            </>
+                          )}
+
+                          {/* Currency & Exchange Rate Selection */}
+                          {companyData?.settings?.enable_multi_currency && (
+                            <>
+                              <div>
+                                <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5 flex items-center gap-1">
+                                  <Coins size={10} className="text-amber-500" />
+                                  {language === 'ar' ? 'عملة الفاتورة' : 'Invoice Currency'}
+                                </label>
+                                <select 
+                                  className="w-full px-1.5 py-0.5 rounded-md border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer"
+                                  value={selectedCurrencyId}
+                                  onChange={(e) => handleCurrencyChange(e.target.value)}
+                                >
+                                  {companyCurrencies.filter(c => c.is_active).map(curr => (
+                                    <option key={curr.id} value={curr.id}>
+                                      {language === 'ar' ? `${curr.name_ar} (${curr.code})` : `${curr.name_en} (${curr.code})`}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {(() => {
+                                const selectedCurr = companyCurrencies.find(c => c.id === selectedCurrencyId);
+                                const baseCurrency = companyData?.settings?.currency || 'EGP';
+                                const isForeign = selectedCurr && selectedCurr.code.toLowerCase() !== baseCurrency.toLowerCase();
+                                
+                                if (!isForeign) return null;
+
+                                return (
+                                  <div>
+                                    <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">
+                                      {language === 'ar' 
+                                        ? `سعر الصرف (${exchangeRateType === 'auto' ? 'تلقائي' : 'يدوي'})` 
+                                        : `Exchange Rate (${exchangeRateType === 'auto' ? 'Auto' : 'Manual'})`}
+                                    </label>
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      min="0.000001"
+                                      className="w-full px-1.5 py-0.5 rounded-md border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px]"
+                                      value={exchangeRate}
+                                      onChange={(e) => {
+                                        setExchangeRate(Number(e.target.value) || 1);
+                                        setExchangeRateType('manual');
+                                      }}
+                                    />
+                                  </div>
+                                );
+                              })()}
                             </>
                           )}
                         </div>
@@ -4215,6 +4372,19 @@ export const Invoices: React.FC = () => {
                         </span>
                       </p>
                     )}
+                    {viewInvoice.currency_id && (
+                      <p className="text-xs text-slate-500 font-medium mt-1">
+                        {language === 'ar' ? 'العملة:' : 'Currency:'}{' '}
+                        <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50">
+                          {companyCurrencies.find(c => c.id === viewInvoice.currency_id)?.code || viewInvoice.currency_id}
+                        </span>
+                        {viewInvoice.exchange_rate && Number(viewInvoice.exchange_rate) !== 1 && (
+                          <span className="text-zinc-500 text-[10px] ml-2 mr-2 font-bold bg-zinc-50 px-2 py-0.5 rounded border border-zinc-200">
+                            {language === 'ar' ? 'سعر الصرف:' : 'Exchange Rate:'} {viewInvoice.exchange_rate}
+                          </span>
+                        )}
+                      </p>
+                    )}
                   </div>
                   <div className={`flex flex-col ${dir === 'rtl' ? 'items-start' : 'items-end'} justify-center gap-2`}>
                     <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border
@@ -4305,26 +4475,33 @@ export const Invoices: React.FC = () => {
                       ))}
                     </tbody>
                     <tfoot className="bg-slate-50/50 font-bold border-t border-slate-100">
-                      <tr>
-                        <td colSpan={5} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-slate-400 font-bold text-[10px] uppercase tracking-wider`}>{t('invoices.summary_subtotal')}</td>
-                        <td className="px-6 py-3 text-slate-900 text-base">{formatMoney(viewInvoice.subtotal)} {t('invoices.currency')}</td>
-                      </tr>
-                      {Number(viewInvoice.discount_amount || viewInvoice.discount) > 0 && (
-                        <tr>
-                          <td colSpan={5} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-red-400 font-bold text-[10px] uppercase tracking-wider`}>{t('invoices.summary_discount')}</td>
-                          <td className="px-6 py-3 text-red-600 text-base">-{formatMoney(viewInvoice.discount_amount || viewInvoice.discount)} {t('invoices.currency')}</td>
-                        </tr>
-                      )}
-                      {Number(viewInvoice.tax_amount) > 0 && (
-                        <tr>
-                          <td colSpan={5} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-zinc-600 font-bold text-[10px] uppercase tracking-wider`}>{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</td>
-                          <td className="px-6 py-3 text-zinc-750 text-base">+{formatMoney(viewInvoice.tax_amount)} {t('invoices.currency')}</td>
-                        </tr>
-                      )}
-                      <tr className="bg-slate-900 text-white">
-                        <td colSpan={5} className={`px-6 py-5 ${dir === 'rtl' ? 'text-left' : 'text-right'} font-black text-lg uppercase tracking-tight`}>{t('invoices.summary_total')}</td>
-                        <td className="px-6 py-5 text-2xl font-black text-brand-primary">{formatMoney(viewInvoice.total_amount)} {t('invoices.currency')}</td>
-                      </tr>
+                      {(() => {
+                        const currencyCode = viewInvoice.currency_id ? (companyCurrencies.find(c => c.id === viewInvoice.currency_id)?.code || '') : (companyData?.settings?.currency || '');
+                        return (
+                          <>
+                            <tr>
+                              <td colSpan={5} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-slate-400 font-bold text-[10px] uppercase tracking-wider`}>{t('invoices.summary_subtotal')}</td>
+                              <td className="px-6 py-3 text-slate-900 text-base">{formatMoney(viewInvoice.subtotal)} {currencyCode}</td>
+                            </tr>
+                            {Number(viewInvoice.discount_amount || viewInvoice.discount) > 0 && (
+                              <tr>
+                                <td colSpan={5} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-red-400 font-bold text-[10px] uppercase tracking-wider`}>{t('invoices.summary_discount')}</td>
+                                <td className="px-6 py-3 text-red-600 text-base">-{formatMoney(viewInvoice.discount_amount || viewInvoice.discount)} {currencyCode}</td>
+                              </tr>
+                            )}
+                            {Number(viewInvoice.tax_amount) > 0 && (
+                              <tr>
+                                <td colSpan={5} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-zinc-600 font-bold text-[10px] uppercase tracking-wider`}>{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</td>
+                                <td className="px-6 py-3 text-zinc-750 text-base">+{formatMoney(viewInvoice.tax_amount)} {currencyCode}</td>
+                              </tr>
+                            )}
+                            <tr className="bg-slate-900 text-white">
+                              <td colSpan={5} className={`px-6 py-5 ${dir === 'rtl' ? 'text-left' : 'text-right'} font-black text-lg uppercase tracking-tight`}>{t('invoices.summary_total')}</td>
+                              <td className="px-6 py-5 text-2xl font-black text-brand-primary">{formatMoney(viewInvoice.total_amount)} {currencyCode}</td>
+                            </tr>
+                          </>
+                        );
+                      })()}
                     </tfoot>
                   </table>
                 </div>

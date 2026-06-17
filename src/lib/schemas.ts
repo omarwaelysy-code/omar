@@ -72,6 +72,8 @@ export const InvoiceSchema = BaseSchema.extend({
   operation_id: z.string().nullable().optional(),
   department_id: z.string().nullable().optional(),
   cost_center_id: z.string().nullable().optional(),
+  currency_id: z.string().nullable().optional(),
+  exchange_rate: z.coerce.number().default(1),
 });
 
 // Voucher (Receipt/Payment)
