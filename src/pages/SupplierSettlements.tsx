@@ -93,16 +93,7 @@ export const SupplierSettlements: React.FC = () => {
     }
   }, [user]);
 
-  // Handle redirect from other pages (e.g. clicking on settlement reference)
-  useEffect(() => {
-    if (pendingViewDoc && pendingViewDoc.type === 'settlement' && historyList.length > 0) {
-      const found = historyList.find(h => h.settlement_number === pendingViewDoc.idOrNumber);
-      if (found) {
-        setSelectedHistory(found);
-        setPendingViewDoc(null);
-      }
-    }
-  }, [pendingViewDoc, historyList, setPendingViewDoc]);
+
 
   // Helpers for calculation (Level 2 compatibility)
   const getInvoiceSettlements = (inv: any) => {
@@ -1005,6 +996,17 @@ export const SupplierSettlements: React.FC = () => {
       h.entity_name.toLowerCase().includes(searchTerm.toLowerCase())
     ).sort((a, b) => b.settlement_number.localeCompare(a.settlement_number));
   }, [allPurchaseInvoices, allPayments, searchTerm]);
+
+  // Handle redirect from other pages (e.g. clicking on settlement reference)
+  useEffect(() => {
+    if (pendingViewDoc && pendingViewDoc.type === 'settlement' && historyList.length > 0) {
+      const found = historyList.find(h => h.settlement_number === pendingViewDoc.idOrNumber);
+      if (found) {
+        setSelectedHistory(found);
+        setPendingViewDoc(null);
+      }
+    }
+  }, [pendingViewDoc, historyList, setPendingViewDoc]);
 
   // Export Settlement to Excel
   const handleExportSettlementExcel = (h: any) => {
