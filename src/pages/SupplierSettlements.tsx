@@ -275,6 +275,49 @@ export const SupplierSettlements: React.FC = () => {
     setPendingViewDoc({ type: docType, idOrNumber: docId });
   };
 
+  const handleSettlementNumberClick = (h: any) => {
+    // 1. Direct navigation based on created_from if present
+    if (h.created_from === 'invoices' && h.creditDocs?.length > 0) {
+      const inv = h.creditDocs[0];
+      navigateToDoc(inv.page_name, inv.original_id);
+      return;
+    }
+    if (h.created_from === 'purchase_invoices' && h.creditDocs?.length > 0) {
+      const inv = h.creditDocs[0];
+      navigateToDoc(inv.page_name, inv.original_id);
+      return;
+    }
+    if (h.created_from === 'receipts' && h.debitDocs?.length > 0) {
+      const rec = h.debitDocs[0];
+      navigateToDoc(rec.page_name, rec.original_id);
+      return;
+    }
+    if (h.created_from === 'payment_vouchers' && h.debitDocs?.length > 0) {
+      const pay = h.debitDocs[0];
+      navigateToDoc(pay.page_name, pay.original_id);
+      return;
+    }
+
+    // 2. Fallback logic: check if there's any invoice first (user wants to edit the invoice)
+    const linkedInvoice = h.creditDocs?.find((c: any) => c.page_name === 'invoices' || c.page_name === 'purchase_invoices')
+                       || h.debitDocs?.find((d: any) => d.page_name === 'invoices' || d.page_name === 'purchase_invoices');
+    if (linkedInvoice) {
+      navigateToDoc(linkedInvoice.page_name, linkedInvoice.original_id);
+      return;
+    }
+
+    // Next fallback: check for linked voucher
+    const linkedVoucher = h.debitDocs?.find((d: any) => d.page_name === 'receipts' || d.page_name === 'payment_vouchers')
+                       || h.creditDocs?.find((c: any) => c.page_name === 'receipts' || c.page_name === 'payment_vouchers');
+    if (linkedVoucher) {
+      navigateToDoc(linkedVoucher.page_name, linkedVoucher.original_id);
+      return;
+    }
+
+    // Otherwise, open details modal on this page
+    setSelectedHistory(h);
+  };
+
   // Build list of movements when supplier selection changes
   useEffect(() => {
     if (!selectedSupplierId) {
@@ -792,7 +835,8 @@ export const SupplierSettlements: React.FC = () => {
               date: debitTx.date,
               original_amount: debitTx.original_amount,
               settlement_number: settlementNumber,
-              settlement_date: settlementDate
+              settlement_date: settlementDate,
+              created_from: 'supplier_settlements'
             });
           }
         }
@@ -827,7 +871,8 @@ export const SupplierSettlements: React.FC = () => {
               date: creditTx.date,
               original_amount: creditTx.original_amount,
               settlement_number: settlementNumber,
-              settlement_date: settlementDate
+              settlement_date: settlementDate,
+              created_from: 'supplier_settlements'
             });
           }
         }
@@ -877,6 +922,7 @@ export const SupplierSettlements: React.FC = () => {
   };
 
   // Build History list
+  // Build History list
   const historyList = useMemo(() => {
     const historyMap = new Map<string, {
       settlement_number: string;
@@ -886,6 +932,7 @@ export const SupplierSettlements: React.FC = () => {
       total_amount: number;
       debitDocs: { number: string; type_label: string; amount: number; page_name: string; original_id: string; date: string; je_number: string }[];
       creditDocs: { number: string; type_label: string; amount: number; page_name: string; original_id: string; date: string; je_number: string }[];
+      created_from?: string;
     }>();
 
     // 1. Scan Purchase Invoices
@@ -903,9 +950,12 @@ export const SupplierSettlements: React.FC = () => {
                 entity_id: inv.supplier_id || '',
                 total_amount: 0,
                 debitDocs: [],
-                creditDocs: []
+                creditDocs: [],
+                created_from: s.created_from || ''
               };
               historyMap.set(num, entry);
+            } else if (s.created_from && !entry.created_from) {
+              entry.created_from = s.created_from;
             }
             if (!entry.creditDocs.some(c => c.number === inv.invoice_number)) {
               entry.creditDocs.push({
@@ -952,9 +1002,12 @@ export const SupplierSettlements: React.FC = () => {
                     entity_id: item.entity_id || v.supplier_id || '',
                     total_amount: 0,
                     debitDocs: [],
-                    creditDocs: []
+                    creditDocs: [],
+                    created_from: s.created_from || ''
                   };
                   historyMap.set(num, entry);
+                } else if (s.created_from && !entry.created_from) {
+                  entry.created_from = s.created_from;
                 }
                 if (!entry.debitDocs.some(d => d.number === (v.voucher_number || v.number))) {
                   entry.debitDocs.push({
@@ -1680,7 +1733,7 @@ export const SupplierSettlements: React.FC = () => {
                       <tr key={h.settlement_number} className="hover:bg-zinc-50/50 transition-colors group">
                         <td className="px-6 py-4 font-mono font-bold">
                           <span
-                            onClick={() => setSelectedHistory(h)}
+                            onClick={() => handleSettlementNumberClick(h)}
                             className="text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer transition-colors"
                           >
                             {h.settlement_number}

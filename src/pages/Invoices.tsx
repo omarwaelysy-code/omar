@@ -769,7 +769,8 @@ export const Invoices: React.FC = () => {
         date: targetTx.date,
         original_amount: targetTx.original_amount,
         settlement_number: settlementNum,
-        settlement_date: rowDate
+        settlement_date: rowDate,
+        created_from: 'invoices'
       };
 
       if (existingIdx > -1) {
