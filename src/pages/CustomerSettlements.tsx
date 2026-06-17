@@ -924,6 +924,16 @@ export const CustomerSettlements: React.FC = () => {
         inv.settlements.forEach((s: any) => {
           if (s.settlement_number) {
             const num = s.settlement_number;
+            let inferredOrigin = s.created_from || '';
+            if (!inferredOrigin) {
+              if (s.originalItemAmount !== undefined && s.originalItemAmount !== null) {
+                inferredOrigin = 'receipts';
+              } else if (s.entry_number) {
+                inferredOrigin = 'invoices';
+              } else {
+                inferredOrigin = 'customer_settlements';
+              }
+            }
             let entry = historyMap.get(num);
             if (!entry) {
               entry = {
@@ -934,11 +944,11 @@ export const CustomerSettlements: React.FC = () => {
                 total_amount: 0,
                 debitDocs: [],
                 creditDocs: [],
-                created_from: s.created_from || ''
+                created_from: inferredOrigin
               };
               historyMap.set(num, entry);
-            } else if (s.created_from && !entry.created_from) {
-              entry.created_from = s.created_from;
+            } else if (inferredOrigin && !entry.created_from) {
+              entry.created_from = inferredOrigin;
             }
             if (!entry.debitDocs.some(d => d.number === inv.invoice_number)) {
               entry.debitDocs.push({
@@ -976,6 +986,16 @@ export const CustomerSettlements: React.FC = () => {
             item.settlements.forEach((s: any) => {
               if (s.settlement_number) {
                 const num = s.settlement_number;
+                let inferredOrigin = s.created_from || '';
+                if (!inferredOrigin) {
+                  if (s.invoiceId) {
+                    inferredOrigin = 'invoices';
+                  } else if (s.entry_number) {
+                    inferredOrigin = 'receipts';
+                  } else {
+                    inferredOrigin = 'customer_settlements';
+                  }
+                }
                 let entry = historyMap.get(num);
                 if (!entry) {
                   entry = {
@@ -986,11 +1006,11 @@ export const CustomerSettlements: React.FC = () => {
                     total_amount: 0,
                     debitDocs: [],
                     creditDocs: [],
-                    created_from: s.created_from || ''
+                    created_from: inferredOrigin
                   };
                   historyMap.set(num, entry);
-                } else if (s.created_from && !entry.created_from) {
-                  entry.created_from = s.created_from;
+                } else if (inferredOrigin && !entry.created_from) {
+                  entry.created_from = inferredOrigin;
                 }
                 if (!entry.creditDocs.some(c => c.number === (v.voucher_number || v.number))) {
                   entry.creditDocs.push({

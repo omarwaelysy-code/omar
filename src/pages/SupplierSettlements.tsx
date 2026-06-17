@@ -925,6 +925,16 @@ export const SupplierSettlements: React.FC = () => {
         inv.settlements.forEach((s: any) => {
           if (s.settlement_number) {
             const num = s.settlement_number;
+            let inferredOrigin = s.created_from || '';
+            if (!inferredOrigin) {
+              if (s.originalItemAmount !== undefined && s.originalItemAmount !== null) {
+                inferredOrigin = 'payment_vouchers';
+              } else if (s.entry_number) {
+                inferredOrigin = 'purchase_invoices';
+              } else {
+                inferredOrigin = 'supplier_settlements';
+              }
+            }
             let entry = historyMap.get(num);
             if (!entry) {
               entry = {
@@ -935,11 +945,11 @@ export const SupplierSettlements: React.FC = () => {
                 total_amount: 0,
                 debitDocs: [],
                 creditDocs: [],
-                created_from: s.created_from || ''
+                created_from: inferredOrigin
               };
               historyMap.set(num, entry);
-            } else if (s.created_from && !entry.created_from) {
-              entry.created_from = s.created_from;
+            } else if (inferredOrigin && !entry.created_from) {
+              entry.created_from = inferredOrigin;
             }
             if (!entry.creditDocs.some(c => c.number === inv.invoice_number)) {
               entry.creditDocs.push({
@@ -977,6 +987,16 @@ export const SupplierSettlements: React.FC = () => {
             item.settlements.forEach((s: any) => {
               if (s.settlement_number) {
                 const num = s.settlement_number;
+                let inferredOrigin = s.created_from || '';
+                if (!inferredOrigin) {
+                  if (s.invoiceId) {
+                    inferredOrigin = 'purchase_invoices';
+                  } else if (s.entry_number) {
+                    inferredOrigin = 'payment_vouchers';
+                  } else {
+                    inferredOrigin = 'supplier_settlements';
+                  }
+                }
                 let entry = historyMap.get(num);
                 if (!entry) {
                   entry = {
@@ -987,11 +1007,11 @@ export const SupplierSettlements: React.FC = () => {
                     total_amount: 0,
                     debitDocs: [],
                     creditDocs: [],
-                    created_from: s.created_from || ''
+                    created_from: inferredOrigin
                   };
                   historyMap.set(num, entry);
-                } else if (s.created_from && !entry.created_from) {
-                  entry.created_from = s.created_from;
+                } else if (inferredOrigin && !entry.created_from) {
+                  entry.created_from = inferredOrigin;
                 }
                 if (!entry.debitDocs.some(d => d.number === (v.voucher_number || v.number))) {
                   entry.debitDocs.push({
