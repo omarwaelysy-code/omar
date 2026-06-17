@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Customer, Account } from '../types';
-import { Search, Trash2, X, Layers, User, Calendar, RotateCcw, ChevronDown, Check, AlertCircle, Info, ArrowLeftRight, LayoutGrid, SlidersHorizontal, ExternalLink, Download } from 'lucide-react';
+import { Search, Trash2, X, Layers, User, Calendar, RotateCcw, ChevronDown, Check, AlertCircle, Info, ArrowLeftRight, LayoutGrid, SlidersHorizontal, ExternalLink, Download, Edit3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
@@ -1756,35 +1756,38 @@ export const CustomerSettlements: React.FC = () => {
                     <h4 className="font-bold text-red-700 text-sm border-b border-zinc-100 pb-2">المستندات المدينة (الخصم من الحساب)</h4>
                     <div className="space-y-2">
                       {selectedHistory.debitDocs.map((doc: any, i: number) => (
-                        <div key={i} className="flex justify-between items-center p-3 bg-zinc-50 rounded-xl text-xs">
-                          <div>
-                            <button
-                              onClick={() => {
-                                navigateToDoc(doc.page_name, doc.original_id);
-                                setSelectedHistory(null);
-                              }}
-                              className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline flex items-center gap-1 focus:outline-none"
-                            >
-                              <span>{doc.number}</span>
-                              <ExternalLink size={10} className="opacity-40" />
-                            </button>
-                            <span className="text-[10px] text-zinc-400 font-semibold">{doc.type_label}</span>
-                            <div className="text-[10px] text-zinc-500 font-semibold mt-1">
-                              تاريخ المستند: {formatDate(doc.date)} • رقم القيد: <span 
-                                onClick={() => {
-                                  if (doc.je_number && doc.je_number !== '-') {
-                                    setPendingViewDoc({ type: 'journal', idOrNumber: doc.je_number });
-                                    setCurrentPage('journal_entries');
-                                    setSelectedHistory(null);
-                                  }
-                                }}
-                                className={doc.je_number && doc.je_number !== '-' ? "text-indigo-600 hover:underline cursor-pointer font-bold" : ""}
-                              >
-                                {doc.je_number || '-'}
-                              </span>
+                        <div key={i} className="p-3 bg-zinc-50 rounded-xl text-xs space-y-2">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <span className="font-bold text-zinc-700">{doc.number}</span>
+                              <span className="text-[10px] text-zinc-400 font-semibold mr-2">{doc.type_label}</span>
                             </div>
+                            <span className="font-black text-red-500">{formatMoney(doc.amount)} ج.م</span>
                           </div>
-                          <span className="font-black text-red-500">{formatMoney(doc.amount)} ج.م</span>
+                          <div className="text-[10px] text-zinc-500 font-semibold">
+                            تاريخ المستند: {formatDate(doc.date)} • رقم القيد: <span 
+                              onClick={() => {
+                                if (doc.je_number && doc.je_number !== '-') {
+                                  setPendingViewDoc({ type: 'journal', idOrNumber: doc.je_number });
+                                  setCurrentPage('journal_entries');
+                                  setSelectedHistory(null);
+                                }
+                              }}
+                              className={doc.je_number && doc.je_number !== '-' ? "text-indigo-600 hover:underline cursor-pointer font-bold" : ""}
+                            >
+                              {doc.je_number || '-'}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              navigateToDoc(doc.page_name, doc.original_id);
+                              setSelectedHistory(null);
+                            }}
+                            className="w-full mt-1 px-3 py-2 text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-all flex items-center justify-center gap-2"
+                          >
+                            <Edit3 size={12} />
+                            انتقال وتعديل
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -1795,35 +1798,38 @@ export const CustomerSettlements: React.FC = () => {
                     <h4 className="font-bold text-emerald-700 text-sm border-b border-zinc-100 pb-2">المستندات الدائنة (الإيداع / السداد)</h4>
                     <div className="space-y-2">
                       {selectedHistory.creditDocs.map((doc: any, i: number) => (
-                        <div key={i} className="flex justify-between items-center p-3 bg-zinc-50 rounded-xl text-xs">
-                          <div>
-                            <button
-                              onClick={() => {
-                                navigateToDoc(doc.page_name, doc.original_id);
-                                setSelectedHistory(null);
-                              }}
-                              className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline flex items-center gap-1 focus:outline-none"
-                            >
-                              <span>{doc.number}</span>
-                              <ExternalLink size={10} className="opacity-40" />
-                            </button>
-                            <span className="text-[10px] text-zinc-400 font-semibold">{doc.type_label}</span>
-                            <div className="text-[10px] text-zinc-500 font-semibold mt-1">
-                              تاريخ المستند: {formatDate(doc.date)} • رقم القيد: <span 
-                                onClick={() => {
-                                  if (doc.je_number && doc.je_number !== '-') {
-                                    setPendingViewDoc({ type: 'journal', idOrNumber: doc.je_number });
-                                    setCurrentPage('journal_entries');
-                                    setSelectedHistory(null);
-                                  }
-                                }}
-                                className={doc.je_number && doc.je_number !== '-' ? "text-indigo-600 hover:underline cursor-pointer font-bold" : ""}
-                              >
-                                {doc.je_number || '-'}
-                              </span>
+                        <div key={i} className="p-3 bg-zinc-50 rounded-xl text-xs space-y-2">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <span className="font-bold text-zinc-700">{doc.number}</span>
+                              <span className="text-[10px] text-zinc-400 font-semibold mr-2">{doc.type_label}</span>
                             </div>
+                            <span className="font-black text-emerald-500">{formatMoney(doc.amount)} ج.م</span>
                           </div>
-                          <span className="font-black text-emerald-500">{formatMoney(doc.amount)} ج.م</span>
+                          <div className="text-[10px] text-zinc-500 font-semibold">
+                            تاريخ المستند: {formatDate(doc.date)} • رقم القيد: <span 
+                              onClick={() => {
+                                if (doc.je_number && doc.je_number !== '-') {
+                                  setPendingViewDoc({ type: 'journal', idOrNumber: doc.je_number });
+                                  setCurrentPage('journal_entries');
+                                  setSelectedHistory(null);
+                                }
+                              }}
+                              className={doc.je_number && doc.je_number !== '-' ? "text-indigo-600 hover:underline cursor-pointer font-bold" : ""}
+                            >
+                              {doc.je_number || '-'}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              navigateToDoc(doc.page_name, doc.original_id);
+                              setSelectedHistory(null);
+                            }}
+                            className="w-full mt-1 px-3 py-2 text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-all flex items-center justify-center gap-2"
+                          >
+                            <Edit3 size={12} />
+                            انتقال وتعديل
+                          </button>
                         </div>
                       ))}
                     </div>
