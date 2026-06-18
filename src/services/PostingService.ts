@@ -102,6 +102,71 @@ export class PostingService {
       });
     });
 
+    // VAT / Tax credit line (grouped by item product's vat_account_id)
+    const vatGroup: Record<string, { account_id: string; account_name: string; amount: number }> = {};
+    invoice.items?.forEach(item => {
+      const prod = products.find(p => p.id === item.product_id);
+      const vatAccountId = prod?.vat_account_id || '';
+      const vatAccountName = prod?.vat_account_name || 'حساب ضريبة القيمة المضافة';
+      const rateVal = item.vat_rate !== undefined ? item.vat_rate : (prod?.vat_rate || 0);
+      const itemTotal = Number(item.total) || 0;
+      const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
+      
+      if (itemVat > 0) {
+        let finalVatAccountId = vatAccountId;
+        let finalVatAccountName = vatAccountName;
+        
+        if (!finalVatAccountId) {
+          const globalVatAccount = accounts.find(a => 
+            a.name.includes('ضريبة القيمة المضافة') || 
+            a.name.includes('قيمة مضافة') || 
+            a.name.includes('ضريبة مبيعات')
+          );
+          finalVatAccountId = globalVatAccount?.id || '';
+          finalVatAccountName = globalVatAccount?.name || finalVatAccountName;
+        }
+        
+        if (finalVatAccountId) {
+          if (!vatGroup[finalVatAccountId]) {
+            vatGroup[finalVatAccountId] = {
+              account_id: finalVatAccountId,
+              account_name: finalVatAccountName,
+              amount: 0
+            };
+          }
+          vatGroup[finalVatAccountId].amount += itemVat;
+        }
+      }
+    });
+
+    const taxAmount = Number(invoice.tax_amount || invoice.tax || 0);
+    if (Object.keys(vatGroup).length > 0) {
+      Object.values(vatGroup).forEach(vat => {
+        journalItems.push({
+          account_id: vat.account_id,
+          account_name: vat.account_name,
+          debit: 0,
+          credit: vat.amount,
+          description: `ضريبة القيمة المضافة - فاتورة مبيعات رقم ${invoice.invoice_number}`
+        });
+      });
+    } else if (taxAmount > 0) {
+      const vatAccount = accounts.find(a => 
+        a.name.includes('ضريبة القيمة المضافة') || 
+        a.name.includes('قيمة مضافة') || 
+        a.name.includes('ضريبة مبيعات')
+      );
+      const vatAccountId = vatAccount?.id || '';
+      const vatAccountName = vatAccount?.name || 'حساب ضريبة القيمة المضافة';
+      journalItems.push({
+        account_id: vatAccountId,
+        account_name: vatAccountName,
+        debit: 0,
+        credit: taxAmount,
+        description: `ضريبة القيمة المضافة - فاتورة مبيعات رقم ${invoice.invoice_number}`
+      });
+    }
+
     return {
       date: invoice.date,
       reference_number: invoice.invoice_number,
@@ -182,6 +247,71 @@ export class PostingService {
       });
     });
 
+    // VAT / Tax debit line for returns (grouped by item product's vat_account_id)
+    const vatGroup: Record<string, { account_id: string; account_name: string; amount: number }> = {};
+    doc.items?.forEach(item => {
+      const prod = products.find(p => p.id === item.product_id);
+      const vatAccountId = prod?.vat_account_id || '';
+      const vatAccountName = prod?.vat_account_name || 'حساب ضريبة القيمة المضافة';
+      const rateVal = item.vat_rate !== undefined ? item.vat_rate : (prod?.vat_rate || 0);
+      const itemTotal = Number(item.total) || 0;
+      const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
+      
+      if (itemVat > 0) {
+        let finalVatAccountId = vatAccountId;
+        let finalVatAccountName = vatAccountName;
+        
+        if (!finalVatAccountId) {
+          const globalVatAccount = accounts.find(a => 
+            a.name.includes('ضريبة القيمة المضافة') || 
+            a.name.includes('قيمة مضافة') || 
+            a.name.includes('ضريبة مبيعات')
+          );
+          finalVatAccountId = globalVatAccount?.id || '';
+          finalVatAccountName = globalVatAccount?.name || finalVatAccountName;
+        }
+        
+        if (finalVatAccountId) {
+          if (!vatGroup[finalVatAccountId]) {
+            vatGroup[finalVatAccountId] = {
+              account_id: finalVatAccountId,
+              account_name: finalVatAccountName,
+              amount: 0
+            };
+          }
+          vatGroup[finalVatAccountId].amount += itemVat;
+        }
+      }
+    });
+
+    const taxAmountReturn = Number(doc.tax_amount || 0);
+    if (Object.keys(vatGroup).length > 0) {
+      Object.values(vatGroup).forEach(vat => {
+        journalItems.push({
+          account_id: vat.account_id,
+          account_name: vat.account_name,
+          debit: vat.amount,
+          credit: 0,
+          description: `ضريبة القيمة المضافة - مرتجع مبيعات رقم ${doc.return_number || doc.id.slice(-6)}`
+        });
+      });
+    } else if (taxAmountReturn > 0) {
+      const vatAccount = accounts.find(a => 
+        a.name.includes('ضريبة القيمة المضافة') || 
+        a.name.includes('قيمة مضافة') || 
+        a.name.includes('ضريبة مبيعات')
+      );
+      const vatAccountId = vatAccount?.id || '';
+      const vatAccountName = vatAccount?.name || 'حساب ضريبة القيمة المضافة';
+      journalItems.push({
+        account_id: vatAccountId,
+        account_name: vatAccountName,
+        debit: taxAmountReturn,
+        credit: 0,
+        description: `ضريبة القيمة المضافة - مرتجع مبيعات رقم ${doc.return_number || doc.id.slice(-6)}`
+      });
+    }
+
     // Debit Customer Account (Clear customer balance on return)
     let customerAccountId = customer?.account_id || '';
     let customerAccountName = customer?.account_name || 'حساب العملاء';
@@ -261,6 +391,71 @@ export class PostingService {
         description: `مشتريات: ${item.product_name} - فاتورة ${doc.invoice_number}`
       });
     });
+
+    // VAT / Tax debit line (grouped by item product's vat_account_id)
+    const vatGroup: Record<string, { account_id: string; account_name: string; amount: number }> = {};
+    doc.items?.forEach(item => {
+      const prod = products.find(p => p.id === item.product_id);
+      const vatAccountId = prod?.vat_account_id || '';
+      const vatAccountName = prod?.vat_account_name || 'حساب ضريبة القيمة المضافة';
+      const rateVal = item.vat_rate !== undefined ? item.vat_rate : (prod?.vat_rate || 0);
+      const itemTotal = Number(item.total) || 0;
+      const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
+      
+      if (itemVat > 0) {
+        let finalVatAccountId = vatAccountId;
+        let finalVatAccountName = vatAccountName;
+        
+        if (!finalVatAccountId) {
+          const globalVatAccount = accounts.find(a => 
+            a.name.includes('ضريبة القيمة المضافة') || 
+            a.name.includes('قيمة مضافة') || 
+            a.name.includes('ضريبة مدخلات')
+          );
+          finalVatAccountId = globalVatAccount?.id || '';
+          finalVatAccountName = globalVatAccount?.name || finalVatAccountName;
+        }
+        
+        if (finalVatAccountId) {
+          if (!vatGroup[finalVatAccountId]) {
+            vatGroup[finalVatAccountId] = {
+              account_id: finalVatAccountId,
+              account_name: finalVatAccountName,
+              amount: 0
+            };
+          }
+          vatGroup[finalVatAccountId].amount += itemVat;
+        }
+      }
+    });
+
+    const taxAmountPurchase = Number(doc.tax_amount || 0);
+    if (Object.keys(vatGroup).length > 0) {
+      Object.values(vatGroup).forEach(vat => {
+        journalItems.push({
+          account_id: vat.account_id,
+          account_name: vat.account_name,
+          debit: vat.amount,
+          credit: 0,
+          description: `ضريبة القيمة المضافة - فاتورة مشتريات رقم ${doc.invoice_number}`
+        });
+      });
+    } else if (taxAmountPurchase > 0) {
+      const vatAccount = accounts.find(a => 
+        a.name.includes('ضريبة القيمة المضافة') || 
+        a.name.includes('قيمة مضافة') || 
+        a.name.includes('ضريبة مدخلات')
+      );
+      const vatAccountId = vatAccount?.id || '';
+      const vatAccountName = vatAccount?.name || 'حساب ضريبة القيمة المضافة';
+      journalItems.push({
+        account_id: vatAccountId,
+        account_name: vatAccountName,
+        debit: taxAmountPurchase,
+        credit: 0,
+        description: `ضريبة القيمة المضافة - فاتورة مشتريات رقم ${doc.invoice_number}`
+      });
+    }
 
     // Credit Supplier Account (Account Payable)
     let supplierAccountId = supplier?.account_id || '';
@@ -385,6 +580,71 @@ export class PostingService {
         description: `مرتجع مشتريات: ${item.product_name} - رقم ${doc.return_number}`
       });
     });
+
+    // VAT / Tax credit line for purchase returns (grouped by item product's vat_account_id)
+    const vatGroup: Record<string, { account_id: string; account_name: string; amount: number }> = {};
+    doc.items?.forEach(item => {
+      const prod = products.find(p => p.id === item.product_id);
+      const vatAccountId = prod?.vat_account_id || '';
+      const vatAccountName = prod?.vat_account_name || 'حساب ضريبة القيمة المضافة';
+      const rateVal = item.vat_rate !== undefined ? item.vat_rate : (prod?.vat_rate || 0);
+      const itemTotal = Number(item.total) || 0;
+      const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
+      
+      if (itemVat > 0) {
+        let finalVatAccountId = vatAccountId;
+        let finalVatAccountName = vatAccountName;
+        
+        if (!finalVatAccountId) {
+          const globalVatAccount = accounts.find(a => 
+            a.name.includes('ضريبة القيمة المضافة') || 
+            a.name.includes('قيمة مضافة') || 
+            a.name.includes('ضريبة مدخلات')
+          );
+          finalVatAccountId = globalVatAccount?.id || '';
+          finalVatAccountName = globalVatAccount?.name || finalVatAccountName;
+        }
+        
+        if (finalVatAccountId) {
+          if (!vatGroup[finalVatAccountId]) {
+            vatGroup[finalVatAccountId] = {
+              account_id: finalVatAccountId,
+              account_name: finalVatAccountName,
+              amount: 0
+            };
+          }
+          vatGroup[finalVatAccountId].amount += itemVat;
+        }
+      }
+    });
+
+    const taxAmountPurchaseReturn = Number(doc.tax_amount || 0);
+    if (Object.keys(vatGroup).length > 0) {
+      Object.values(vatGroup).forEach(vat => {
+        journalItems.push({
+          account_id: vat.account_id,
+          account_name: vat.account_name,
+          debit: 0,
+          credit: vat.amount,
+          description: `ضريبة القيمة المضافة - مرتجع مشتريات رقم ${doc.return_number || doc.id.slice(-6)}`
+        });
+      });
+    } else if (taxAmountPurchaseReturn > 0) {
+      const vatAccount = accounts.find(a => 
+        a.name.includes('ضريبة القيمة المضافة') || 
+        a.name.includes('قيمة مضافة') || 
+        a.name.includes('ضريبة مدخلات')
+      );
+      const vatAccountId = vatAccount?.id || '';
+      const vatAccountName = vatAccount?.name || 'حساب ضريبة القيمة المضافة';
+      journalItems.push({
+        account_id: vatAccountId,
+        account_name: vatAccountName,
+        debit: 0,
+        credit: taxAmountPurchaseReturn,
+        description: `ضريبة القيمة المضافة - مرتجع مشتريات رقم ${doc.return_number || doc.id.slice(-6)}`
+      });
+    }
 
     return {
       date: doc.date,

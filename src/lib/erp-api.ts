@@ -2794,8 +2794,24 @@ router.post('/journal_entries', authenticateToken, async (req: AuthRequest, res)
 
     await client.query('BEGIN');
     const { items, ...rawEntryData } = req.body;
+
+    let totalDebit = 0;
+    let totalCredit = 0;
+    for (const item of (items || [])) {
+      totalDebit += parseFloat(item.debit || 0);
+      totalCredit += parseFloat(item.credit || 0);
+    }
+    const roundedDebit = Math.round(totalDebit * 100) / 100;
+    const roundedCredit = Math.round(totalCredit * 100) / 100;
+    if (Math.abs(roundedDebit - roundedCredit) >= 0.01) {
+      await client.query('ROLLBACK');
+      return sendError(res, 400, `القيد غير متزن (مجموع المدين لا يساوي مجموع الدائن). مجموع المدين: ${roundedDebit.toFixed(2)}، مجموع الدائن: ${roundedCredit.toFixed(2)}`);
+    }
+
     const entryData = sanitizeData('journal_entries', rawEntryData);
     if (!entryData.company_id) entryData.company_id = companyId;
+    entryData.total_debit = roundedDebit;
+    entryData.total_credit = roundedCredit;
 
     // Duplicate skip removed
 
@@ -2869,7 +2885,23 @@ router.put('/journal_entries/:id', authenticateToken, async (req: AuthRequest, r
 
     await client.query('BEGIN');
     const { items, id: bodyId, ...rawEntryData } = req.body;
+
+    let totalDebit = 0;
+    let totalCredit = 0;
+    for (const item of (items || [])) {
+      totalDebit += parseFloat(item.debit || 0);
+      totalCredit += parseFloat(item.credit || 0);
+    }
+    const roundedDebit = Math.round(totalDebit * 100) / 100;
+    const roundedCredit = Math.round(totalCredit * 100) / 100;
+    if (Math.abs(roundedDebit - roundedCredit) >= 0.01) {
+      await client.query('ROLLBACK');
+      return sendError(res, 400, `القيد غير متزن (مجموع المدين لا يساوي مجموع الدائن). مجموع المدين: ${roundedDebit.toFixed(2)}، مجموع الدائن: ${roundedCredit.toFixed(2)}`);
+    }
+
     const entryData = sanitizeData('journal_entries', rawEntryData);
+    entryData.total_debit = roundedDebit;
+    entryData.total_credit = roundedCredit;
     
     const keys = Object.keys(entryData);
     const setClause = keys.map((key, i) => `"${key}" = $${i + 1}`).join(', ');

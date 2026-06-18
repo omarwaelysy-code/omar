@@ -59,6 +59,7 @@ export const InvoiceSchema = BaseSchema.extend({
   items: z.array(InvoiceItemSchema),
   subtotal: z.coerce.number().default(0),
   discount_amount: z.coerce.number().default(0),
+  tax_amount: z.coerce.number().default(0).optional(),
   total_amount: z.coerce.number().default(0),
   payment_type: z.enum(['cash', 'credit']).default('credit'),
   payment_method_id: z.string().nullable().optional(),

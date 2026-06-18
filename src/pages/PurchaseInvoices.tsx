@@ -1492,6 +1492,7 @@ export const PurchaseInvoices: React.FC = () => {
         date: invoiceData.date, 
         subtotal,
         discount_amount,
+        tax_amount: (invoiceData as any).tax_amount || 0,
         total_amount,
         items: sanitizedItems,
         payment_type: invoiceData.payment_type,
@@ -1532,6 +1533,71 @@ export const PurchaseInvoices: React.FC = () => {
           debit: 0,
           credit: invoiceData.discount,
           description: t('pi.discount_description', { number: invoice_number }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : '')
+        });
+      }
+
+      const tax_amount = Number((data as any).tax_amount || 0);
+      const vatGroup: Record<string, { account_id: string; account_name: string; amount: number }> = {};
+      
+      sanitizedItems.forEach(item => {
+        const prod = products.find(p => p.id === item.product_id);
+        const vatAccountId = prod?.vat_account_id || '';
+        const vatAccountName = prod?.vat_account_name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Account');
+        const rateVal = prod?.vat_rate || 0;
+        const itemTotal = Number(item.total) || 0;
+        const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
+        
+        if (itemVat > 0) {
+          let finalVatAccountId = vatAccountId;
+          let finalVatAccountName = vatAccountName;
+          
+          if (!finalVatAccountId) {
+            const globalVatAccount = accounts.find(a => 
+              a.name.includes('ضريبة القيمة المضافة') || 
+              a.name.includes('قيمة مضافة') || 
+              a.name.includes('ضريبة مدخلات')
+            );
+            finalVatAccountId = globalVatAccount?.id || '';
+            finalVatAccountName = globalVatAccount?.name || finalVatAccountName;
+          }
+          
+          if (finalVatAccountId) {
+            if (!vatGroup[finalVatAccountId]) {
+              vatGroup[finalVatAccountId] = {
+                account_id: finalVatAccountId,
+                account_name: finalVatAccountName,
+                amount: 0
+              };
+            }
+            vatGroup[finalVatAccountId].amount += itemVat;
+          }
+        }
+      });
+
+      if (Object.keys(vatGroup).length > 0) {
+        Object.values(vatGroup).forEach(vat => {
+          journalItems.push({
+            account_id: vat.account_id,
+            account_name: vat.account_name,
+            debit: vat.amount,
+            credit: 0,
+            description: `ضريبة القيمة المضافة - فاتورة مشتريات رقم ${invoice_number}`
+          });
+        });
+      } else if (tax_amount > 0) {
+        const vatAccount = accounts.find(a => 
+          a.name.includes('ضريبة القيمة المضافة') || 
+          a.name.includes('قيمة مضافة') || 
+          a.name.includes('ضريبة مدخلات')
+        );
+        const vatAccountId = vatAccount?.id || '';
+        const vatAccountName = vatAccount?.name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Account');
+        journalItems.push({
+          account_id: vatAccountId,
+          account_name: vatAccountName,
+          debit: tax_amount,
+          credit: 0,
+          description: `ضريبة القيمة المضافة - فاتورة مشتريات رقم ${invoice_number}`
         });
       }
 
