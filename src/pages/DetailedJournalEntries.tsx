@@ -381,7 +381,7 @@ export const DetailedJournalEntries: React.FC = () => {
             {language === 'ar' ? 'إجمالي المدين' : 'Total Debit'}
           </span>
           <span className="text-xl font-bold text-emerald-800 dark:text-emerald-300 mt-1">
-            {formatMoney(summary.total_debit, 'EGP')}
+            {formatMoney(summary.total_debit)} {language === 'ar' ? 'ج.م' : 'EGP'}
           </span>
         </div>
 
@@ -390,7 +390,7 @@ export const DetailedJournalEntries: React.FC = () => {
             {language === 'ar' ? 'إجمالي الدائن' : 'Total Credit'}
           </span>
           <span className="text-xl font-bold text-rose-800 dark:text-rose-300 mt-1">
-            {formatMoney(summary.total_credit, 'EGP')}
+            {formatMoney(summary.total_credit)} {language === 'ar' ? 'ج.م' : 'EGP'}
           </span>
         </div>
       </div>
@@ -604,12 +604,11 @@ export const DetailedJournalEntries: React.FC = () => {
       {!loading && totalRecords > 0 && (
         <div className="print:hidden">
           <PaginationControls
-            currentPage={page}
-            totalPages={Math.ceil(totalRecords / limit)}
-            onPageChange={setPage}
+            page={page}
             limit={limit}
+            total={totalRecords}
+            onPageChange={setPage}
             onLimitChange={(l) => { setLimit(l); setPage(1); }}
-            totalRecords={totalRecords}
           />
         </div>
       )}
