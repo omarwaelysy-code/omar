@@ -139,7 +139,7 @@ export class PostingService {
       }
     });
 
-    const taxAmount = Number(invoice.tax_amount || invoice.tax || 0);
+    const taxAmount = Number(invoice.tax_amount || 0);
     if (Object.keys(vatGroup).length > 0) {
       Object.values(vatGroup).forEach(vat => {
         journalItems.push({
@@ -253,7 +253,7 @@ export class PostingService {
       const prod = products.find(p => p.id === item.product_id);
       const vatAccountId = prod?.vat_account_id || '';
       const vatAccountName = prod?.vat_account_name || 'حساب ضريبة القيمة المضافة';
-      const rateVal = item.vat_rate !== undefined ? item.vat_rate : (prod?.vat_rate || 0);
+      const rateVal = prod?.vat_rate || 0;
       const itemTotal = Number(item.total) || 0;
       const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
       
@@ -284,7 +284,7 @@ export class PostingService {
       }
     });
 
-    const taxAmountReturn = Number(doc.tax_amount || 0);
+    const taxAmountReturn = Number(doc.tax || 0);
     if (Object.keys(vatGroup).length > 0) {
       Object.values(vatGroup).forEach(vat => {
         journalItems.push({
@@ -587,7 +587,7 @@ export class PostingService {
       const prod = products.find(p => p.id === item.product_id);
       const vatAccountId = prod?.vat_account_id || '';
       const vatAccountName = prod?.vat_account_name || 'حساب ضريبة القيمة المضافة';
-      const rateVal = item.vat_rate !== undefined ? item.vat_rate : (prod?.vat_rate || 0);
+      const rateVal = prod?.vat_rate || 0;
       const itemTotal = Number(item.total) || 0;
       const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
       
@@ -618,7 +618,7 @@ export class PostingService {
       }
     });
 
-    const taxAmountPurchaseReturn = Number(doc.tax_amount || 0);
+    const taxAmountPurchaseReturn = Number(doc.tax || 0);
     if (Object.keys(vatGroup).length > 0) {
       Object.values(vatGroup).forEach(vat => {
         journalItems.push({
