@@ -15,9 +15,11 @@ import {
 import { dbService } from '../services/dbService';
 import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export const BackupRestore: React.FC = () => {
   const { user } = useAuth();
+  const { t, dir, language } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'info', message: string } | null>(null);
   const [progress, setProgress] = useState(0);
@@ -62,7 +64,7 @@ export const BackupRestore: React.FC = () => {
   const handleExportJSON = async () => {
     if (!user) return;
     setLoading(true);
-    setStatus({ type: 'info', message: 'جاري تحضير النسخة الاحتياطية على الخادم...' });
+    setStatus({ type: 'info', message: language === 'ar' ? 'جاري تحضير النسخة الاحتياطية على الخادم...' : 'Preparing backup on server...' });
     setProgress(20);
 
     try {
@@ -74,7 +76,7 @@ export const BackupRestore: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error('فشل تصدير النسخة الاحتياطية من الخادم');
+        throw new Error(language === 'ar' ? 'فشل تصدير النسخة الاحتياطية من الخادم' : 'Failed to export backup from server');
       }
 
       setProgress(80);
@@ -93,11 +95,11 @@ export const BackupRestore: React.FC = () => {
       localStorage.setItem(`last_backup_${user.company_id}`, now);
       
       setProgress(100);
-      setStatus({ type: 'success', message: 'تم تصدير النسخة الاحتياطية بنجاح' });
-      await dbService.logActivity(user.id, user.username, user.company_id, 'نسخ احتياطي', 'تصدير نسخة احتياطية كاملة (JSON)', 'backup');
+      setStatus({ type: 'success', message: language === 'ar' ? 'تم تصدير النسخة الاحتياطية بنجاح' : 'Backup exported successfully' });
+      await dbService.logActivity(user.id, user.username, user.company_id, language === 'ar' ? 'نسخ احتياطي' : 'Backup', language === 'ar' ? 'تصدير نسخة احتياطية كاملة (JSON)' : 'Export full backup (JSON)', 'backup');
     } catch (error: any) {
       console.error('Export error:', error);
-      setStatus({ type: 'error', message: error.message || 'فشل تصدير النسخة الاحتياطية' });
+      setStatus({ type: 'error', message: error.message || (language === 'ar' ? 'فشل تصدير النسخة الاحتياطية' : 'Failed to export backup') });
     } finally {
       setLoading(false);
     }
@@ -106,7 +108,7 @@ export const BackupRestore: React.FC = () => {
   const handleExportExcel = async () => {
     if (!user) return;
     setLoading(true);
-    setStatus({ type: 'info', message: 'جاري تحضير ملف Excel على الخادم...' });
+    setStatus({ type: 'info', message: language === 'ar' ? 'جاري تحضير ملف Excel على الخادم...' : 'Preparing Excel file on server...' });
     setProgress(30);
 
     try {
@@ -118,7 +120,7 @@ export const BackupRestore: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error('فشل تصدير ملف Excel من الخادم');
+        throw new Error(language === 'ar' ? 'فشل تصدير ملف Excel من الخادم' : 'Failed to export Excel file from server');
       }
 
       setProgress(70);
@@ -133,11 +135,11 @@ export const BackupRestore: React.FC = () => {
       URL.revokeObjectURL(url);
       
       setProgress(100);
-      setStatus({ type: 'success', message: 'تم تصدير ملف Excel بنجاح' });
-      await dbService.logActivity(user.id, user.username, user.company_id, 'نسخ احتياطي', 'تصدير بيانات إلى Excel', 'backup');
+      setStatus({ type: 'success', message: language === 'ar' ? 'تم تصدير ملف Excel بنجاح' : 'Excel file exported successfully' });
+      await dbService.logActivity(user.id, user.username, user.company_id, language === 'ar' ? 'نسخ احتياطي' : 'Backup', language === 'ar' ? 'تصدير بيانات إلى Excel' : 'Export data to Excel', 'backup');
     } catch (error: any) {
       console.error('Excel export error:', error);
-      setStatus({ type: 'error', message: error.message || 'فشل تصدير ملف Excel' });
+      setStatus({ type: 'error', message: error.message || (language === 'ar' ? 'فشل تصدير ملف Excel' : 'Failed to export Excel file') });
     } finally {
       setLoading(false);
     }
@@ -146,7 +148,7 @@ export const BackupRestore: React.FC = () => {
   const executeImportJSON = async (file: File, mode: 'merge' | 'replace') => {
     if (!user) return;
     setLoading(true);
-    setStatus({ type: 'info', message: 'جاري رفع ومعالجة ملف النسخة الاحتياطية...' });
+    setStatus({ type: 'info', message: language === 'ar' ? 'جاري رفع ومعالجة ملف النسخة الاحتياطية...' : 'Uploading and processing backup file...' });
     setProgress(10);
 
     try {
@@ -166,21 +168,21 @@ export const BackupRestore: React.FC = () => {
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'فشل استعادة البيانات');
+        throw new Error(errorData.error || (language === 'ar' ? 'فشل استعادة البيانات' : 'Failed to restore data'));
       }
 
       setProgress(100);
-      setStatus({ type: 'success', message: 'تم استعادة البيانات بنجاح' });
+      setStatus({ type: 'success', message: language === 'ar' ? 'تم استعادة البيانات بنجاح' : 'Data restored successfully' });
       setSuccessModal({
         show: true,
         message: mode === 'replace' 
-          ? 'تم حذف البيانات القديمة واستبدالها بالنسخة الاحتياطية بنجاح' 
-          : 'تم دمج البيانات المستوردة مع البيانات الحالية بنجاح'
+          ? (language === 'ar' ? 'تم حذف البيانات القديمة واستبدالها بالنسخة الاحتياطية بنجاح' : 'Old data deleted and replaced with backup successfully')
+          : (language === 'ar' ? 'تم دمج البيانات المستوردة مع البيانات الحالية بنجاح' : 'Imported data merged with current data successfully')
       });
-      await dbService.logActivity(user.id, user.username, user.company_id, 'استعادة بيانات', `استعادة نسخة احتياطية (JSON) - وضع: ${mode === 'replace' ? 'استبدال' : 'دمج'}`, 'backup');
+      await dbService.logActivity(user.id, user.username, user.company_id, language === 'ar' ? 'استعادة بيانات' : 'Restore Data', language === 'ar' ? `استعادة نسخة احتياطية (JSON) - وضع: ${mode === 'replace' ? 'استبدال' : 'دمج'}` : `Restore backup (JSON) - Mode: ${mode === 'replace' ? 'Replace' : 'Merge'}`, 'backup');
     } catch (error: any) {
       console.error('Import error:', error);
-      setStatus({ type: 'error', message: error.message || 'فشل استيراد البيانات' });
+      setStatus({ type: 'error', message: error.message || (language === 'ar' ? 'فشل استيراد البيانات' : 'Failed to import data') });
     } finally {
       setLoading(false);
     }
@@ -192,8 +194,8 @@ export const BackupRestore: React.FC = () => {
 
     setConfirmModal({
       show: true,
-      title: 'تأكيد استعادة JSON',
-      message: 'تعمل هذه العملية على استعادة كافة الجداول والبيانات. يرجى اختيار طريقة الاستعادة:',
+      title: language === 'ar' ? 'تأكيد استعادة JSON' : 'Confirm JSON Restore',
+      message: language === 'ar' ? 'تعمل هذه العملية على استعادة كافة الجداول والبيانات. يرجى اختيار طريقة الاستعادة:' : 'This operation restores all tables and data. Please choose the restore method:',
       onConfirm: (mode) => executeImportJSON(file, mode),
       type: 'json'
     });
@@ -204,7 +206,7 @@ export const BackupRestore: React.FC = () => {
   const executeImportExcel = async (file: File, mode: 'merge' | 'replace') => {
     if (!user) return;
     setLoading(true);
-    setStatus({ type: 'info', message: 'جاري رفع ومعالجة ملف Excel...' });
+    setStatus({ type: 'info', message: language === 'ar' ? 'جاري رفع ومعالجة ملف Excel...' : 'Uploading and processing Excel file...' });
     setProgress(10);
 
     try {
@@ -224,21 +226,21 @@ export const BackupRestore: React.FC = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'فشل استيراد ملف Excel');
+        throw new Error(errorData.error || (language === 'ar' ? 'فشل استيراد ملف Excel' : 'Failed to import Excel file'));
       }
 
       setProgress(100);
-      setStatus({ type: 'success', message: 'تم استعادة البيانات من ملف Excel بنجاح' });
+      setStatus({ type: 'success', message: language === 'ar' ? 'تم استعادة البيانات من ملف Excel بنجاح' : 'Data restored from Excel file successfully' });
       setSuccessModal({
         show: true,
         message: mode === 'replace' 
-          ? 'تم حذف البيانات القديمة واستبدالها ببيانات ملف Excel بنجاح' 
-          : 'تم دمج بيانات ملف Excel مع البيانات الحالية بنجاح'
+          ? (language === 'ar' ? 'تم حذف البيانات القديمة واستبدالها ببيانات ملف Excel بنجاح' : 'Old data deleted and replaced with Excel data successfully')
+          : (language === 'ar' ? 'تم دمج بيانات ملف Excel مع البيانات الحالية بنجاح' : 'Excel data merged with current data successfully')
       });
-      await dbService.logActivity(user.id, user.username, user.company_id, 'استعادة بيانات', `استعادة بيانات من Excel - وضع: ${mode === 'replace' ? 'استبدال' : 'دمج'}`, 'backup');
+      await dbService.logActivity(user.id, user.username, user.company_id, language === 'ar' ? 'استعادة بيانات' : 'Restore Data', language === 'ar' ? `استعادة بيانات من Excel - وضع: ${mode === 'replace' ? 'استبدال' : 'دمج'}` : `Restore data from Excel - Mode: ${mode === 'replace' ? 'Replace' : 'Merge'}`, 'backup');
     } catch (error: any) {
       console.error('Excel import error:', error);
-      setStatus({ type: 'error', message: error.message || 'فشل استيراد ملف Excel' });
+      setStatus({ type: 'error', message: error.message || (language === 'ar' ? 'فشل استيراد ملف Excel' : 'Failed to import Excel file') });
     } finally {
       setLoading(false);
     }
@@ -250,8 +252,8 @@ export const BackupRestore: React.FC = () => {
 
     setConfirmModal({
       show: true,
-      title: 'تأكيد استعادة Excel',
-      message: 'يرجى اختيار طريقة الاستعادة المفضلة:',
+      title: language === 'ar' ? 'تأكيد استعادة Excel' : 'Confirm Excel Restore',
+      message: language === 'ar' ? 'يرجى اختيار طريقة الاستعادة المفضلة:' : 'Please choose your preferred restore method:',
       onConfirm: (mode) => executeImportExcel(file, mode),
       type: 'excel'
     });
@@ -264,11 +266,11 @@ export const BackupRestore: React.FC = () => {
     if (!user) return;
     setBackupSchedule(schedule);
     localStorage.setItem(`backup_schedule_${user.company_id}`, schedule);
-    setStatus({ type: 'success', message: 'تم تحديث جدول النسخ الاحتياطي' });
+    setStatus({ type: 'success', message: language === 'ar' ? 'تم تحديث جدول النسخ الاحتياطي' : 'Backup schedule updated' });
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-20" dir="rtl">
+    <div className="max-w-4xl mx-auto space-y-6 pb-20" dir={dir}>
       {/* Header */}
       <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-200">
         <div className="flex items-center gap-4 mb-6">
@@ -276,8 +278,8 @@ export const BackupRestore: React.FC = () => {
             <Database size={28} />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-stone-900">النسخ الاحتياطي والاستعادة</h1>
-            <p className="text-stone-500 font-medium">قم بحماية بياناتك من خلال عمل نسخ احتياطية منتظمة</p>
+            <h1 className="text-2xl font-black text-stone-900">{language === 'ar' ? 'النسخ الاحتياطي والاستعادة' : 'Backup & Restore'}</h1>
+            <p className="text-stone-500 font-medium">{language === 'ar' ? 'قم بحماية بياناتك من خلال عمل نسخ احتياطية منتظمة' : 'Protect your data by creating regular backups'}</p>
           </div>
         </div>
 
@@ -304,7 +306,7 @@ export const BackupRestore: React.FC = () => {
         {loading && (
           <div className="mb-6 space-y-2">
             <div className="flex justify-between text-sm font-bold text-stone-600">
-              <span>جاري المعالجة...</span>
+              <span>{language === 'ar' ? 'جاري المعالجة...' : 'Processing...'}</span>
               <span>{progress}%</span>
             </div>
             <div className="w-full h-3 bg-stone-100 rounded-full overflow-hidden">
@@ -322,7 +324,7 @@ export const BackupRestore: React.FC = () => {
           <div className="space-y-4">
             <h2 className="text-lg font-black text-stone-800 flex items-center gap-2">
               <Download size={20} className="text-emerald-500" />
-              تصدير البيانات
+              {language === 'ar' ? 'تصدير البيانات' : 'Export Data'}
             </h2>
             <div className="grid grid-cols-1 gap-3">
               <button
@@ -335,8 +337,8 @@ export const BackupRestore: React.FC = () => {
                     <FileJson size={24} />
                   </div>
                   <div className="text-right">
-                    <p className="font-black text-stone-900">نسخة احتياطية كاملة</p>
-                    <p className="text-xs text-stone-500">ملف JSON للاستعادة الكاملة</p>
+                    <p className="font-black text-stone-900">{language === 'ar' ? 'نسخة احتياطية كاملة' : 'Full Backup'}</p>
+                    <p className="text-xs text-stone-500">{language === 'ar' ? 'ملف JSON للاستعادة الكاملة' : 'JSON file for full restore'}</p>
                   </div>
                 </div>
                 <Download size={18} className="text-stone-400 group-hover:text-emerald-500" />
@@ -352,8 +354,8 @@ export const BackupRestore: React.FC = () => {
                     <FileSpreadsheet size={24} />
                   </div>
                   <div className="text-right">
-                    <p className="font-black text-stone-900">تصدير إلى Excel</p>
-                    <p className="text-xs text-stone-500">ملف جداول بيانات للمراجعة</p>
+                    <p className="font-black text-stone-900">{language === 'ar' ? 'تصدير إلى Excel' : 'Export to Excel'}</p>
+                    <p className="text-xs text-stone-500">{language === 'ar' ? 'ملف جداول بيانات للمراجعة' : 'Spreadsheet file for review'}</p>
                   </div>
                 </div>
                 <Download size={18} className="text-stone-400 group-hover:text-blue-500" />
@@ -365,7 +367,7 @@ export const BackupRestore: React.FC = () => {
           <div className="space-y-4">
             <h2 className="text-lg font-black text-stone-800 flex items-center gap-2">
               <Upload size={20} className="text-blue-500" />
-              استعادة البيانات
+              {language === 'ar' ? 'استعادة البيانات' : 'Restore Data'}
             </h2>
             <div className="grid grid-cols-1 gap-3">
               <div className="relative">
@@ -382,8 +384,8 @@ export const BackupRestore: React.FC = () => {
                       <FileJson size={24} />
                     </div>
                     <div className="text-right">
-                      <p className="font-black text-stone-900">رفع ملف JSON</p>
-                      <p className="text-xs text-stone-500">استعادة كاملة تشمل الصور والإعدادات</p>
+                      <p className="font-black text-stone-900">{language === 'ar' ? 'رفع ملف JSON' : 'Upload JSON File'}</p>
+                      <p className="text-xs text-stone-500">{language === 'ar' ? 'استعادة كاملة تشمل الصور والإعدادات' : 'Full restore including images and settings'}</p>
                     </div>
                   </div>
                   <Upload size={18} className="text-stone-400 group-hover:text-emerald-500" />
@@ -404,8 +406,8 @@ export const BackupRestore: React.FC = () => {
                       <FileSpreadsheet size={24} />
                     </div>
                     <div className="text-right">
-                      <p className="font-black text-stone-900">رفع ملف Excel</p>
-                      <p className="text-xs text-stone-500">استعادة البيانات من جداول Excel</p>
+                      <p className="font-black text-stone-900">{language === 'ar' ? 'رفع ملف Excel' : 'Upload Excel File'}</p>
+                      <p className="text-xs text-stone-500">{language === 'ar' ? 'استعادة البيانات من جداول Excel' : 'Restore data from Excel sheets'}</p>
                     </div>
                   </div>
                   <Upload size={18} className="text-stone-400 group-hover:text-blue-500" />
@@ -416,7 +418,7 @@ export const BackupRestore: React.FC = () => {
               <div className="flex gap-3">
                 <AlertCircle size={20} className="text-amber-600 shrink-0" />
                 <p className="text-xs text-amber-800 leading-relaxed font-bold">
-                  تنبيه: عملية الاستعادة ستقوم بدمج البيانات. تأكد من أن الملف صحيح وينتمي لنفس الشركة لتجنب تداخل البيانات.
+                  {language === 'ar' ? 'تنبيه: عملية الاستعادة ستقوم بدمج البيانات. تأكد من أن الملف صحيح وينتمي لنفس الشركة لتجنب تداخل البيانات.' : 'Warning: The restore process will merge data. Make sure the file is correct and belongs to the same company to avoid data overlap.'}
                 </p>
               </div>
             </div>
@@ -432,13 +434,13 @@ export const BackupRestore: React.FC = () => {
               <Calendar size={24} />
             </div>
             <div>
-              <h2 className="text-xl font-black text-stone-900">جدولة النسخ الاحتياطي</h2>
-              <p className="text-stone-500 text-sm font-medium">قم بتعيين تذكير دوري لعمل نسخة احتياطية</p>
+              <h2 className="text-xl font-black text-stone-900">{language === 'ar' ? 'جدولة النسخ الاحتياطي' : 'Backup Schedule'}</h2>
+              <p className="text-stone-500 text-sm font-medium">{language === 'ar' ? 'قم بتعيين تذكير دوري لعمل نسخة احتياطية' : 'Set a periodic reminder to make a backup'}</p>
             </div>
           </div>
           {lastBackup && (
             <div className="text-right">
-              <p className="text-xs text-stone-400 font-bold uppercase tracking-wider">آخر نسخة احتياطية</p>
+              <p className="text-xs text-stone-400 font-bold uppercase tracking-wider">{language === 'ar' ? 'آخر نسخة احتياطية' : 'Last Backup'}</p>
               <p className="text-sm font-black text-stone-900">{lastBackup}</p>
             </div>
           )}
@@ -446,10 +448,10 @@ export const BackupRestore: React.FC = () => {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { id: 'none', label: 'بدون جدولة', icon: Shield },
-            { id: 'daily', label: 'يومي', icon: Clock },
-            { id: 'weekly', label: 'أسبوعي', icon: Calendar },
-            { id: 'monthly', label: 'شهري', icon: Calendar }
+            { id: 'none', label: language === 'ar' ? 'بدون جدولة' : 'No Schedule', icon: Shield },
+            { id: 'daily', label: language === 'ar' ? 'يومي' : 'Daily', icon: Clock },
+            { id: 'weekly', label: language === 'ar' ? 'أسبوعي' : 'Weekly', icon: Calendar },
+            { id: 'monthly', label: language === 'ar' ? 'شهري' : 'Monthly', icon: Calendar }
           ].map((item) => (
             <button
               key={item.id}
@@ -474,25 +476,25 @@ export const BackupRestore: React.FC = () => {
           <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center">
             <Shield size={24} className="text-emerald-400" />
           </div>
-          <h2 className="text-xl font-black">أمان البيانات</h2>
+          <h2 className="text-xl font-black">{language === 'ar' ? 'أمان البيانات' : 'Data Security'}</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="space-y-2">
-            <h3 className="font-black text-emerald-400">تشفير كامل</h3>
+            <h3 className="font-black text-emerald-400">{language === 'ar' ? 'تشفير كامل' : 'Full Encryption'}</h3>
             <p className="text-sm text-zinc-400 leading-relaxed font-medium">
-              يتم تخزين بياناتك بشكل آمن ومشفر على خوادم Firestore السحابية مع حماية كاملة.
+              {language === 'ar' ? 'يتم تخزين بياناتك بشكل آمن ومشفر على خوادم Firestore السحابية مع حماية كاملة.' : 'Your data is stored securely and encrypted on Firestore cloud servers with complete protection.'}
             </p>
           </div>
           <div className="space-y-2">
-            <h3 className="font-black text-emerald-400">تحكم مطلق</h3>
+            <h3 className="font-black text-emerald-400">{language === 'ar' ? 'تحكم مطلق' : 'Absolute Control'}</h3>
             <p className="text-sm text-zinc-400 leading-relaxed font-medium">
-              أنت تملك بياناتك بالكامل ويمكنك تصديرها في أي وقت بتنسيقات مفتوحة (JSON/Excel).
+              {language === 'ar' ? 'أنت تملك بياناتك بالكامل ويمكنك تصديرها في أي وقت بتنسيقات مفتوحة (JSON/Excel).' : 'You own your data completely and can export it at any time in open formats (JSON/Excel).'}
             </p>
           </div>
           <div className="space-y-2">
-            <h3 className="font-black text-emerald-400">استعادة سريعة</h3>
+            <h3 className="font-black text-emerald-400">{language === 'ar' ? 'استعادة سريعة' : 'Quick Recovery'}</h3>
             <p className="text-sm text-zinc-400 leading-relaxed font-medium">
-              في حالة حدوث أي خطأ، يمكنك العودة لنقطة سابقة من خلال ملفات النسخ الاحتياطي.
+              {language === 'ar' ? 'في حالة حدوث أي خطأ، يمكنك العودة لنقطة سابقة من خلال ملفات النسخ الاحتياطي.' : 'In case of any error, you can return to a previous point through backup files.'}
             </p>
           </div>
         </div>
@@ -536,8 +538,8 @@ export const BackupRestore: React.FC = () => {
                       {restoreMode === 'merge' && <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full" />}
                     </div>
                     <div className="flex-1 mr-3">
-                      <p className="font-black text-sm">دمج البيانات (Merge)</p>
-                      <p className="text-xs opacity-70">إضافة البيانات الجديدة إلى البيانات الحالية دون حذف</p>
+                      <p className="font-black text-sm">{language === 'ar' ? 'دمج البيانات (Merge)' : 'Merge Data (Merge)'}</p>
+                      <p className="text-xs opacity-70">{language === 'ar' ? 'إضافة البيانات الجديدة إلى البيانات الحالية دون حذف' : 'Add new data to current data without deleting'}</p>
                     </div>
                   </div>
                 </button>
@@ -557,8 +559,8 @@ export const BackupRestore: React.FC = () => {
                       {restoreMode === 'replace' && <div className="w-2.5 h-2.5 bg-red-500 rounded-full" />}
                     </div>
                     <div className="flex-1 mr-3">
-                      <p className="font-black text-sm">استبدال البيانات (Replace)</p>
-                      <p className="text-xs opacity-70">حذف كافة البيانات الحالية واستبدالها بالنسخة الاحتياطية</p>
+                      <p className="font-black text-sm">{language === 'ar' ? 'استبدال البيانات (Replace)' : 'Replace Data (Replace)'}</p>
+                      <p className="text-xs opacity-70">{language === 'ar' ? 'حذف كافة البيانات الحالية واستبدالها بالنسخة الاحتياطية' : 'Delete all current data and replace it with backup'}</p>
                     </div>
                   </div>
                 </button>
@@ -578,13 +580,13 @@ export const BackupRestore: React.FC = () => {
                         : 'bg-blue-500 shadow-blue-500/20 hover:bg-blue-600'
                   }`}
                 >
-                  تأكيد الاستعادة
+                  {language === 'ar' ? 'تأكيد الاستعادة' : 'Confirm Restore'}
                 </button>
                 <button
                   onClick={() => setConfirmModal(prev => ({ ...prev, show: false }))}
                   className="flex-1 py-4 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-2xl font-black transition-all active:scale-95"
                 >
-                  إلغاء
+                  {language === 'ar' ? 'إلغاء' : 'Cancel'}
                 </button>
               </div>
             </motion.div>
@@ -605,7 +607,7 @@ export const BackupRestore: React.FC = () => {
               <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
                 <CheckCircle2 size={40} />
               </div>
-              <h3 className="text-2xl font-black text-stone-900 mb-4">تمت العملية بنجاح</h3>
+              <h3 className="text-2xl font-black text-stone-900 mb-4">{language === 'ar' ? 'تمت العملية بنجاح' : 'Success'}</h3>
               <p className="text-stone-600 font-bold mb-8 leading-relaxed">
                 {successModal.message}
               </p>
@@ -613,7 +615,7 @@ export const BackupRestore: React.FC = () => {
                 onClick={() => setSuccessModal({ show: false, message: '' })}
                 className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
               >
-                حسناً
+                {language === 'ar' ? 'حسناً' : 'OK'}
               </button>
             </motion.div>
           </div>

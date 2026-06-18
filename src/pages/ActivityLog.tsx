@@ -4,9 +4,11 @@ import { ActivityLog } from '../types';
 import { Search, Clock, User, Activity, Filter, RefreshCw, Layers, ShieldCheck, ExternalLink, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { formatDateTime } from '../utils/formatUtils';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export const ActivityLogPage: React.FC = () => {
   const { user } = useAuth();
+  const { t, dir, language } = useLanguage();
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -71,14 +73,14 @@ export const ActivityLogPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-10">
+    <div className="space-y-6 animate-in fade-in duration-500 pb-10" dir={dir}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <ShieldCheck className="text-emerald-600" size={24} />
-            <h2 className="text-3xl font-black tracking-tight text-zinc-900 serif italic">سجل التدقيق المركزي</h2>
+            <h2 className="text-3xl font-black tracking-tight text-zinc-900 serif italic">{language === 'ar' ? 'سجل التدقيق المركزي' : 'Central Audit Log'}</h2>
           </div>
-          <p className="text-zinc-500">مراقبة كافة حركات المستخدمين والعمليات على مستوى النظام بالكامل.</p>
+          <p className="text-zinc-500">{language === 'ar' ? 'مراقبة كافة حركات المستخدمين والعمليات على مستوى النظام بالكامل.' : 'Monitor all user activities and operations system-wide.'}</p>
         </div>
         <button 
           onClick={fetchLogs}
@@ -86,7 +88,7 @@ export const ActivityLogPage: React.FC = () => {
           className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-2xl hover:bg-emerald-700 transition-all font-bold shadow-lg shadow-emerald-200 disabled:opacity-50"
         >
           <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-          تحديث السجلات
+          {language === 'ar' ? 'تحديث السجلات' : 'Refresh Logs'}
         </button>
       </div>
 
@@ -97,7 +99,7 @@ export const ActivityLogPage: React.FC = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={20} />
             <input 
               type="text" 
-              placeholder="البحث بالمستخدم، الإجراء، أو التفاصيل..."
+              placeholder={language === 'ar' ? 'البحث بالمستخدم، الإجراء، أو التفاصيل...' : 'Search by user, action, or details...'}
               className="w-full pl-10 pr-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
@@ -111,7 +113,7 @@ export const ActivityLogPage: React.FC = () => {
                 onChange={(e) => { setModuleFilter(e.target.value); setPage(1); }}
                 className="bg-transparent text-sm font-bold flex-1 outline-none appearance-none"
               >
-                <option value="all">كل الوجهات</option>
+                <option value="all">{language === 'ar' ? 'كل الوجهات' : 'All Modules'}</option>
                 {modules.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
@@ -122,7 +124,7 @@ export const ActivityLogPage: React.FC = () => {
                 onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
                 className="bg-transparent text-sm font-bold flex-1 outline-none appearance-none"
               >
-                <option value="all">كل الإجراءات</option>
+                <option value="all">{language === 'ar' ? 'كل الإجراءات' : 'All Actions'}</option>
                 {actions.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </div>
@@ -136,12 +138,12 @@ export const ActivityLogPage: React.FC = () => {
             <thead>
               <tr className="bg-zinc-50/50 border-b border-zinc-100">
                 <th className="px-6 py-5 text-sm font-black text-zinc-600 uppercase tracking-widest text-center w-20">#</th>
-                <th className="px-6 py-5 text-sm font-black text-zinc-600 uppercase tracking-widest">المستخدم</th>
-                <th className="px-6 py-5 text-sm font-black text-zinc-600 uppercase tracking-widest">القسم/الوجهة</th>
-                <th className="px-6 py-5 text-sm font-black text-zinc-600 uppercase tracking-widest">الإجراء</th>
-                <th className="px-6 py-5 text-sm font-black text-zinc-600 uppercase tracking-widest">التفاصيل</th>
-                <th className="px-6 py-5 text-sm font-black text-zinc-600 uppercase tracking-widest text-center">عنوان IP</th>
-                <th className="px-6 py-5 text-sm font-black text-zinc-600 uppercase tracking-widest">التوقيت</th>
+                <th className="px-6 py-5 text-sm font-black text-zinc-600 uppercase tracking-widest">{language === 'ar' ? 'المستخدم' : 'User'}</th>
+                <th className="px-6 py-5 text-sm font-black text-zinc-600 uppercase tracking-widest">{language === 'ar' ? 'القسم/الوجهة' : 'Module/Destination'}</th>
+                <th className="px-6 py-5 text-sm font-black text-zinc-600 uppercase tracking-widest">{language === 'ar' ? 'الإجراء' : 'Action'}</th>
+                <th className="px-6 py-5 text-sm font-black text-zinc-600 uppercase tracking-widest">{language === 'ar' ? 'التفاصيل' : 'Details'}</th>
+                <th className="px-6 py-5 text-sm font-black text-zinc-600 uppercase tracking-widest text-center">{language === 'ar' ? 'عنوان IP' : 'IP Address'}</th>
+                <th className="px-6 py-5 text-sm font-black text-zinc-600 uppercase tracking-widest">{language === 'ar' ? 'التوقيت' : 'Timestamp'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-50">
@@ -156,7 +158,7 @@ export const ActivityLogPage: React.FC = () => {
                   <td colSpan={7} className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center gap-3 text-zinc-400 italic">
                       <Search size={48} className="opacity-20" />
-                      <span>لا توجد سجلات مطابقة للبحث أو الفلترة</span>
+                      <span>{language === 'ar' ? 'لا توجد سجلات مطابقة للبحث أو الفلترة' : 'No logs matching your search or filters'}</span>
                     </div>
                   </td>
                 </tr>
@@ -229,7 +231,11 @@ export const ActivityLogPage: React.FC = () => {
         {totalPages > 1 && (
           <div className="p-6 bg-zinc-50/50 border-t border-zinc-100 flex items-center justify-between">
             <div className="text-sm text-zinc-500 font-medium">
-              عرض <span className="font-black text-zinc-900">{paginatedLogs.length}</span> من أصل <span className="font-black text-zinc-900">{filteredLogs.length}</span> سجل
+              {language === 'ar' ? (
+                <>عرض <span className="font-black text-zinc-900">{paginatedLogs.length}</span> من أصل <span className="font-black text-zinc-900">{filteredLogs.length}</span> سجل</>
+              ) : (
+                <>Showing <span className="font-black text-zinc-900">{paginatedLogs.length}</span> of <span className="font-black text-zinc-900">{filteredLogs.length}</span> logs</>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <button 
@@ -237,7 +243,7 @@ export const ActivityLogPage: React.FC = () => {
                 disabled={page === 1}
                 className="p-2 bg-white border border-zinc-200 rounded-xl hover:bg-zinc-50 disabled:opacity-30 disabled:pointer-events-none transition-all"
               >
-                <ChevronRight size={20} />
+                {language === 'ar' ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
               </button>
               <div className="flex items-center gap-1">
                 {[...Array(totalPages)].map((_, i) => (
@@ -259,7 +265,7 @@ export const ActivityLogPage: React.FC = () => {
                 disabled={page === totalPages}
                 className="p-2 bg-white border border-zinc-200 rounded-xl hover:bg-zinc-50 disabled:opacity-30 disabled:pointer-events-none transition-all"
               >
-                <ChevronLeft size={20} />
+                {language === 'ar' ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
               </button>
             </div>
           </div>
