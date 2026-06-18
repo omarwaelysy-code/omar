@@ -42,6 +42,8 @@ interface DetailedLine {
   cost_center_name: string | null;
   cost_center_code: string | null;
   product_names: string | null;
+  parent_account_name?: string | null;
+  account_type_name?: string | null;
 }
 
 export const DetailedJournalEntries: React.FC = () => {
