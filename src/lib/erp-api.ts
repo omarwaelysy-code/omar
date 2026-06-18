@@ -1011,10 +1011,33 @@ router.get('/detailed-journal-entries', authenticateToken, async (req: AuthReque
         jel.description as line_description,
         jel.account_id,
         jel.account_name,
-        jel.customer_id,
-        jel.supplier_id,
-        jel.customer_name,
-        jel.supplier_name,
+        
+        -- Get customer/supplier from current line or any line in the same entry (opposite party)
+        COALESCE(jel.customer_name, (
+          SELECT customer_name 
+          FROM journal_entry_lines 
+          WHERE journal_entry_id = je.id AND customer_name IS NOT NULL AND customer_name != '' 
+          LIMIT 1
+        )) as customer_name,
+        COALESCE(jel.supplier_name, (
+          SELECT supplier_name 
+          FROM journal_entry_lines 
+          WHERE journal_entry_id = je.id AND supplier_name IS NOT NULL AND supplier_name != '' 
+          LIMIT 1
+        )) as supplier_name,
+        COALESCE(jel.customer_id, (
+          SELECT customer_id 
+          FROM journal_entry_lines 
+          WHERE journal_entry_id = je.id AND customer_id IS NOT NULL 
+          LIMIT 1
+        )) as customer_id,
+        COALESCE(jel.supplier_id, (
+          SELECT supplier_id 
+          FROM journal_entry_lines 
+          WHERE journal_entry_id = je.id AND supplier_id IS NOT NULL 
+          LIMIT 1
+        )) as supplier_id,
+        
         jel.sub_account_id,
         jel.sub_account_type,
         je.id as journal_entry_id,
@@ -1024,6 +1047,10 @@ router.get('/detailed-journal-entries', authenticateToken, async (req: AuthReque
         je.reference_type,
         je.reference_number,
         je.reference_id,
+        
+        -- Account Type & Parent Account details
+        act.name as account_type_name,
+        parent_acc.name as parent_account_name,
         
         -- Currency & Foreign Currency details if available
         COALESCE(inv.currency_id, pinv.currency_id) as currency_id,
@@ -1059,6 +1086,9 @@ router.get('/detailed-journal-entries', authenticateToken, async (req: AuthReque
         END as product_names
       FROM journal_entry_lines jel
       JOIN journal_entries je ON jel.journal_entry_id = je.id
+      LEFT JOIN accounts acc ON jel.account_id = acc.id
+      LEFT JOIN accounts parent_acc ON acc.parent_id = parent_acc.id
+      LEFT JOIN account_types act ON acc.type_id = act.id
       LEFT JOIN invoices inv ON je.reference_type = 'invoice' AND je.reference_id = inv.id
       LEFT JOIN purchase_invoices pinv ON je.reference_type = 'purchase_invoice' AND je.reference_id = pinv.id
       LEFT JOIN currencies cur ON cur.id = COALESCE(inv.currency_id, pinv.currency_id)
