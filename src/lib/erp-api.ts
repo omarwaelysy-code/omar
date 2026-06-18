@@ -1122,7 +1122,7 @@ modules.forEach(moduleName => {
 
           let summary = {};
           if (moduleName === 'invoices' || moduleName === 'purchase_invoices') {
-             const sumRes = await pool.query(`SELECT sum(total_amount) as sum1, sum(discount_amount) as sum2 FROM (${sql}) t`, values);
+             const sumRes = await pool.query(`SELECT sum("total_amount" * COALESCE("exchange_rate", 1)) as sum1, sum("discount_amount" * COALESCE("exchange_rate", 1)) as sum2 FROM (${sql}) t`, values);
              summary = { total_amount: Number(sumRes.rows[0].sum1 || 0), total_discount: Number(sumRes.rows[0].sum2 || 0) };
           } else if (moduleName === 'returns' || moduleName === 'purchase_returns') {
              const sumRes = await pool.query(`SELECT sum(total_amount) as sum1 FROM (${sql}) t`, values);

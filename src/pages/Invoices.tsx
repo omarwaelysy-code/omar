@@ -2240,7 +2240,8 @@ export const Invoices: React.FC = () => {
     setFormSettlements([]);
     setRowSettlementDates({});
     
-    const baseCurr = companyCurrencies.find(c => c.code.toLowerCase() === (companyData?.settings?.currency || 'egp').toLowerCase());
+    const baseCode = (companyData?.settings?.currency || companyData?.currency || 'egp').toLowerCase();
+    const baseCurr = companyCurrencies.find(c => c.code.toLowerCase() === baseCode);
     setSelectedCurrencyId(baseCurr?.id || '');
     setExchangeRate(1);
     setExchangeRateType('manual');
@@ -2433,9 +2434,9 @@ export const Invoices: React.FC = () => {
               <p className="text-slate-500">{t('invoices.subtitle')}</p>
               {(serverSummary.total_amount !== undefined) && (
                 <div className="mt-2 flex items-center gap-4 text-sm">
-                  <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">إجمالي الفواتير: {formatMoney(serverSummary.total_amount)} {t('invoices.currency')}</span>
-                  <span className="bg-red-50 text-red-700 px-3 py-1 rounded-full border border-red-100 font-bold">إجمالي الخصومات: {formatMoney(serverSummary.total_discount || 0)} {t('invoices.currency')}</span>
-                  <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100 font-bold">الصافي: {formatMoney((serverSummary.total_amount || 0) - (serverSummary.total_discount || 0))} {t('invoices.currency')}</span>
+                  <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">إجمالي الفواتير: {formatMoney(serverSummary.total_amount)} {companyData?.settings?.currency || companyData?.currency || 'EGP'}</span>
+                  <span className="bg-red-50 text-red-700 px-3 py-1 rounded-full border border-red-100 font-bold">إجمالي الخصومات: {formatMoney(serverSummary.total_discount || 0)} {companyData?.settings?.currency || companyData?.currency || 'EGP'}</span>
+                  <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100 font-bold">الصافي: {formatMoney((serverSummary.total_amount || 0) - (serverSummary.total_discount || 0))} {companyData?.settings?.currency || companyData?.currency || 'EGP'}</span>
                 </div>
               )}
             </div>
