@@ -175,7 +175,7 @@ export const SupplierBalances: React.FC = () => {
     fetchData();
   }, [user, startDate, endDate]);
 
-  const { language } = useLanguage();
+  const { t, dir, language } = useLanguage();
 
   const exportExcel = () => {
     if (suppliers.length === 0) return;
@@ -213,7 +213,7 @@ export const SupplierBalances: React.FC = () => {
       });
     } catch (e) {
       console.error(e);
-      showNotification('حدث خطأ أثناء تصدير PDF', 'error');
+      showNotification(language === 'ar' ? 'حدث خطأ أثناء تصدير PDF' : 'An error occurred while exporting PDF', 'error');
     }
   };
 
@@ -228,7 +228,7 @@ export const SupplierBalances: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
         <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-zinc-500 font-medium italic animate-pulse">جاري تحميل أرصدة الموردين...</p>
+        <p className="text-zinc-500 font-medium italic animate-pulse">{language === 'ar' ? 'جاري تحميل أرصدة الموردين...' : 'Loading supplier balances...'}</p>
       </div>
     );
   }
@@ -241,24 +241,24 @@ export const SupplierBalances: React.FC = () => {
           onClick={fetchData}
           className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200"
         >
-          إعادة المحاولة
+          {language === 'ar' ? 'إعادة المحاولة' : 'Retry'}
         </button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">أرصدة الموردين التفصيلية</h2>
-          <p className="text-zinc-500">ملخص مديونياتنا لكافة الموردين مع تفاصيل الحركات.</p>
+          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('nav.supplier_balances')}</h2>
+          <p className="text-zinc-500">{language === 'ar' ? 'ملخص مديونياتنا لكافة الموردين مع تفاصيل الحركات.' : 'Summary of all our supplier balances with transaction details.'}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button 
             onClick={fetchData}
             className="p-3 bg-white border border-zinc-200 text-zinc-600 rounded-2xl hover:bg-zinc-50 hover:text-emerald-600 transition-all hover:scale-105 active:scale-95 shadow-sm"
-            title="تحديث البيانات"
+            title={language === 'ar' ? 'تحديث البيانات' : 'Refresh Data'}
           >
             <RefreshCcw size={20} className={loading ? 'animate-spin' : ''} />
           </button>
@@ -268,7 +268,7 @@ export const SupplierBalances: React.FC = () => {
             className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95 disabled:opacity-50"
           >
             <FileSpreadsheet size={20} />
-            تصدير Excel
+            {language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
           </button>
           <button 
             onClick={exportReport}
@@ -276,7 +276,7 @@ export const SupplierBalances: React.FC = () => {
             className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-50"
           >
             <Download size={20} />
-            تصدير PDF
+            {language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
           </button>
         </div>
       </div>
@@ -284,11 +284,11 @@ export const SupplierBalances: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-zinc-900 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full -mr-16 -mt-16 group-hover:bg-white/10 transition-colors" />
-          <p className="text-zinc-400 text-sm font-bold uppercase tracking-widest mb-1">إجمالي المديونيات للموردين</p>
+          <p className="text-zinc-400 text-sm font-bold uppercase tracking-widest mb-1">{language === 'ar' ? 'إجمالي المديونيات للموردين' : 'Total Supplier Balances'}</p>
           <h3 className="text-3xl font-bold">{formatNumber(Math.abs(totalOutstanding))}</h3>
           <div className="mt-4 flex items-center gap-2 text-red-400 text-sm">
             <ArrowDownLeft size={16} />
-            <span>مستحقات للموردين علينا</span>
+            <span>{language === 'ar' ? 'مستحقات للموردين علينا' : 'Supplier Payables'}</span>
           </div>
         </div>
       </div>
@@ -298,7 +298,7 @@ export const SupplierBalances: React.FC = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={20} />
           <input 
             type="text" 
-            placeholder="البحث باسم المورد أو الكود..."
+            placeholder={language === 'ar' ? 'البحث باسم المورد أو الكود...' : 'Search by supplier name or code...'}
             className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -307,7 +307,7 @@ export const SupplierBalances: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-zinc-100">
           <div>
-            <label className="block text-sm font-bold text-zinc-700 mb-1">من تاريخ</label>
+            <label className="block text-sm font-bold text-zinc-700 mb-1">{language === 'ar' ? 'من تاريخ' : 'From Date'}</label>
             <div className="relative">
               <Calendar className="absolute left-3 top-3 text-zinc-400" size={18} />
               <input 
@@ -319,7 +319,7 @@ export const SupplierBalances: React.FC = () => {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-bold text-zinc-700 mb-1">إلى تاريخ</label>
+            <label className="block text-sm font-bold text-zinc-700 mb-1">{language === 'ar' ? 'إلى تاريخ' : 'To Date'}</label>
             <div className="relative">
               <Calendar className="absolute left-3 top-3 text-zinc-400" size={18} />
               <input 
@@ -333,7 +333,7 @@ export const SupplierBalances: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 pt-2">
-          <span className="text-xs font-bold text-zinc-400 ml-2">الفترات السريعة:</span>
+          <span className="text-xs font-bold text-zinc-400 ml-2">{language === 'ar' ? 'الفترات السريعة:' : 'Quick Periods:'}</span>
           <button 
             type="button"
             onClick={() => applyPreset('last_month')}
@@ -343,7 +343,7 @@ export const SupplierBalances: React.FC = () => {
                 : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
             }`}
           >
-            آخر الشهر الماضي
+            {language === 'ar' ? 'آخر الشهر الماضي' : 'Last Month'}
           </button>
           <button 
             type="button"
@@ -354,7 +354,7 @@ export const SupplierBalances: React.FC = () => {
                 : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
             }`}
           >
-            آخر العام الماضي
+            {language === 'ar' ? 'آخر العام الماضي' : 'Last Year'}
           </button>
           <button 
             type="button"
@@ -365,14 +365,14 @@ export const SupplierBalances: React.FC = () => {
                 : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
             }`}
           >
-            العام الحالي
+            {language === 'ar' ? 'العام الحالي' : 'Current Year'}
           </button>
           <button 
             type="button"
             onClick={() => applyPreset('last_quarter')}
             className="px-4 py-1.5 rounded-xl text-xs font-bold bg-zinc-100 text-zinc-600 hover:bg-zinc-200 transition-all hover:scale-105"
           >
-            آخر ربع سنة
+            {language === 'ar' ? 'آخر ربع سنة' : 'Last Quarter'}
           </button>
           <button 
             type="button"
@@ -381,15 +381,15 @@ export const SupplierBalances: React.FC = () => {
               !startDate && !endDate ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
             }`}
           >
-            كل الفترات
+            {language === 'ar' ? 'كل الفترات' : 'All Periods'}
           </button>
         </div>
       </div>
 
       <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden" ref={reportRef}>
         <div className="p-6 bg-zinc-50 border-b border-zinc-100 hidden print:block">
-          <h3 className="text-xl font-bold text-zinc-900">تقرير أرصدة الموردين التفصيلي</h3>
-          <p className="text-sm text-zinc-500">تاريخ التقرير: {formatDate(new Date())}</p>
+          <h3 className="text-xl font-bold text-zinc-900">{language === 'ar' ? 'تقرير أرصدة الموردين التفصيلي' : 'Detailed Supplier Balances Report'}</h3>
+          <p className="text-sm text-zinc-500">{language === 'ar' ? 'تاريخ التقرير:' : 'Report Date:'} {formatDate(new Date())}</p>
         </div>
 
         {/* Desktop Table View */}
@@ -397,15 +397,15 @@ export const SupplierBalances: React.FC = () => {
           <table className="w-full text-right border-collapse">
             <thead>
               <tr className="bg-zinc-50/50 border-b border-zinc-100">
-                <th className="px-4 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">كود</th>
-                <th className="px-4 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">الاسم</th>
-                <th className="px-4 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">رصيد أول</th>
-                <th className="px-4 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">مشتريات (+)</th>
-                <th className="px-4 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">مرتجع (-)</th>
-                <th className="px-4 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">خصم (-)</th>
-                <th className="px-4 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">سداد (-)</th>
-                <th className="px-4 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">قيود (+/-)</th>
-                <th className="px-4 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">الرصيد الحالي</th>
+                <th className="px-4 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">{language === 'ar' ? 'كود' : 'Code'}</th>
+                <th className="px-4 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">{language === 'ar' ? 'الاسم' : 'Name'}</th>
+                <th className="px-4 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">{language === 'ar' ? 'رصيد أول' : 'Opening Bal'}</th>
+                <th className="px-4 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">{language === 'ar' ? 'مشتريات (+)' : 'Purchases (+)'}</th>
+                <th className="px-4 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">{language === 'ar' ? 'مرتجع (-)' : 'Returns (-)'}</th>
+                <th className="px-4 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">{language === 'ar' ? 'خصم (-)' : 'Discount (-)'}</th>
+                <th className="px-4 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">{language === 'ar' ? 'سداد (-)' : 'Payments (-)'}</th>
+                <th className="px-4 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">{language === 'ar' ? 'قيود (+/-)' : 'Journal (+/-)'}</th>
+                <th className="px-4 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">{language === 'ar' ? 'الرصيد الحالي' : 'Current Bal'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-50">
@@ -417,7 +417,7 @@ export const SupplierBalances: React.FC = () => {
                 ))
               ) : filteredSuppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-zinc-400 italic">لا توجد بيانات متاحة</td>
+                  <td colSpan={8} className="px-6 py-12 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد بيانات متاحة' : 'No data available'}</td>
                 </tr>
               ) : filteredSuppliers.map(supplier => (
                 <tr key={supplier.id} className="hover:bg-zinc-50/50 transition-colors group">
@@ -450,7 +450,7 @@ export const SupplierBalances: React.FC = () => {
             {!loading && filteredSuppliers.length > 0 && (
               <tfoot className="bg-zinc-900 text-white font-bold">
                 <tr>
-                  <td colSpan={2} className="px-4 py-4 text-left">الإجمالي:</td>
+                  <td colSpan={2} className="px-4 py-4 text-left">{language === 'ar' ? 'الإجمالي:' : 'Total:'}</td>
                   <td className="px-4 py-4">{formatNumber(Math.abs(filteredSuppliers.reduce((sum, s) => sum + (Number(s.openingBalance) || 0), 0)))}</td>
                   <td className="px-4 py-4">{formatNumber(Math.abs(filteredSuppliers.reduce((sum, s) => sum + (Number(s.totalInvoices) || 0), 0)))}</td>
                   <td className="px-4 py-4">{formatNumber(Math.abs(filteredSuppliers.reduce((sum, s) => sum + (Number(s.totalReturns) || 0), 0)))}</td>
@@ -475,7 +475,7 @@ export const SupplierBalances: React.FC = () => {
               </div>
             ))
           ) : filteredSuppliers.length === 0 ? (
-            <div className="px-6 py-12 text-center text-zinc-400 italic">لا توجد بيانات متاحة</div>
+            <div className="px-6 py-12 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد بيانات متاحة' : 'No data available'}</div>
           ) : filteredSuppliers.map(supplier => (
             <div key={supplier.id} className="p-4 space-y-3 active:bg-zinc-50 transition-colors">
               <div className="flex items-center justify-between">
@@ -490,28 +490,28 @@ export const SupplierBalances: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-2 text-[10px]">
                 <div className="flex justify-between border-b border-zinc-50 pb-1">
-                  <span className="text-zinc-400">رصيد أول:</span>
+                  <span className="text-zinc-400">{language === 'ar' ? 'رصيد أول:' : 'Opening Bal:'}</span>
                   <span className="font-medium">{formatNumber(supplier.openingBalance)}</span>
                 </div>
                 <div className="flex justify-between border-b border-zinc-50 pb-1">
-                  <span className="text-zinc-400">مشتريات (+):</span>
+                  <span className="text-zinc-400">{language === 'ar' ? 'مشتريات (+):' : 'Purchases (+):'}</span>
                   <span className="text-emerald-600 font-medium">{formatNumber(supplier.totalInvoices)}</span>
                 </div>
                 <div className="flex justify-between border-b border-zinc-50 pb-1">
-                  <span className="text-zinc-400">مرتجع (-):</span>
+                  <span className="text-zinc-400">{language === 'ar' ? 'مرتجع (-):' : 'Returns (-):'}</span>
                   <span className="text-emerald-600 font-medium">{formatNumber(supplier.totalReturns)}</span>
                 </div>
                 <div className="flex justify-between border-b border-zinc-50 pb-1">
-                  <span className="text-zinc-400">سداد (-):</span>
+                  <span className="text-zinc-400">{language === 'ar' ? 'سداد (-):' : 'Payments (-):'}</span>
                   <span className="text-blue-600 font-medium">{formatNumber(supplier.totalVouchers)}</span>
                 </div>
                 <div className="flex justify-between border-b border-zinc-50 pb-1">
-                  <span className="text-zinc-400">قيود (+/-):</span>
+                  <span className="text-zinc-400">{language === 'ar' ? 'قيود (+/-):' : 'Journal (+/-):'}</span>
                   <span className="text-zinc-600 font-medium">{formatNumber(supplier.manualJournalImpact)}</span>
                 </div>
               </div>
               <div className="flex items-center justify-between pt-2 border-t border-zinc-100">
-                <span className="text-xs font-bold text-zinc-500 uppercase">الرصيد الحالي</span>
+                <span className="text-xs font-bold text-zinc-500 uppercase">{language === 'ar' ? 'الرصيد الحالي' : 'Current Bal'}</span>
                 <span className={`font-bold ${supplier.currentBalance > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                   {formatBalance(supplier.currentBalance)}
                 </span>

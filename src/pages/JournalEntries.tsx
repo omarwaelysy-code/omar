@@ -232,7 +232,7 @@ export const JournalEntries: React.FC = () => {
           {serverSummary.total_debit !== undefined && (
             <div className="mt-2 flex items-center gap-4 text-sm">
                <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
-                 إجمالي الحركات: {formatMoney(serverSummary.total_debit)} ج.م
+                 {language === 'ar' ? 'إجمالي الحركات:' : 'Total Transactions:'} {formatMoney(serverSummary.total_debit)} {t('common.currency')}
                </span>
             </div>
           )}

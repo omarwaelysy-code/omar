@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
 import { Account, Customer, Supplier, JournalEntry, JournalEntryItem } from '../types';
 import { Plus, Trash2, Save, AlertCircle, CheckCircle2, ArrowRightLeft, User, Truck } from 'lucide-react';
@@ -10,6 +11,7 @@ import { formatNumber } from '../utils/formatUtils';
 export const CreateJournalEntry: React.FC = () => {
   const { user } = useAuth();
   const { showNotification } = useNotification();
+  const { t, dir, language } = useLanguage();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSupplier] = useState<Supplier[]>([]);
@@ -193,7 +195,7 @@ export const CreateJournalEntry: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500" dir="rtl">
+    <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">إضافة قيد يومية</h2>
@@ -369,7 +371,7 @@ export const CreateJournalEntry: React.FC = () => {
             ) : (
               <Save size={20} />
             )}
-            حفظ قيد اليومية
+            {language === 'ar' ? 'حفظ قيد اليومية' : 'Save Journal Entry'}
           </button>
         </div>
       </form>

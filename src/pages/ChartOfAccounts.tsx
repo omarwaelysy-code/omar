@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Account, AccountType } from '../types';
 import { dbService } from '../services/dbService';
@@ -45,6 +46,7 @@ const TreeItem: React.FC<TreeItemProps> = ({ label, icon: Icon, children, level,
 
 export const ChartOfAccounts: React.FC = () => {
   const { user } = useAuth();
+  const { t, dir, language } = useLanguage();
   const { setCurrentPage, setPendingAccountTypeEditId } = useNavigation();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [types, setTypes] = useState<AccountType[]>([]);
@@ -216,7 +218,7 @@ export const ChartOfAccounts: React.FC = () => {
                             setCurrentPage('account_types');
                           }}
                           className="p-1 text-zinc-400 hover:text-emerald-600 rounded hover:bg-zinc-200 opacity-0 group-hover/type:opacity-100 transition-opacity"
-                          title="تعديل نوع الحساب"
+                          title={language === 'ar' ? 'تعديل نوع الحساب' : 'Edit Account Type'}
                         >
                           <Edit2 size={12} />
                         </button>

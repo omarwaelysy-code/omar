@@ -112,7 +112,7 @@ export const SupplierStatement: React.FC = () => {
               je.items?.forEach((item: any) => {
                 const matchesEntity = item.supplier_id === savedSupId || item.sub_account_id === savedSupId;
                 if (matchesEntity && isSupplierAccount(item.account_id, supplier, accounts)) {
-                  let notes = item.description || je.description || 'قيد مالي';
+                  let notes = item.description || je.description || (language === 'ar' ? 'قيد مالي' : 'Journal Entry');
                   let mappedType = je.reference_type || 'manual';
                   if (mappedType === 'payment') mappedType = 'payment_voucher';
 
@@ -156,7 +156,7 @@ export const SupplierStatement: React.FC = () => {
             });
 
             const supplierOpBal = Number(supplier?.opening_balance || 0);
-            const hasOpeningBalanceInItems = allItems.some(item => item.type === 'opening_balance' || item.notes.includes('رصيد افتتاحي'));
+            const hasOpeningBalanceInItems = allItems.some(item => item.type === 'opening_balance' || item.notes.includes(language === 'ar' ? 'رصيد افتتاحي' : 'Opening Balance'));
             const manualOpBal = hasOpeningBalanceInItems ? 0 : supplierOpBal;
             let balanceBefore = 0;
             
@@ -207,7 +207,6 @@ export const SupplierStatement: React.FC = () => {
         dbService.list<any>('accounts', user.company_id)
       ]);
 
-      // Create maps for efficient lookups
       const invoicesMap = invoices.reduce((acc, inv) => {
         acc[inv.invoice_number] = inv;
         return acc;
@@ -226,14 +225,11 @@ export const SupplierStatement: React.FC = () => {
 
       const allItems: StatementItem[] = [];
 
-      // Add all journal entries related to this supplier's account
       journalEntries.forEach((je: any) => {
         je.items?.forEach((item: any) => {
-          // Only count lines that have the supplier_id AND match the supplier's ledger account
-          // This prevents double entries if supplier_id was accidentally set on both sides of a transaction
           const matchesEntity = item.supplier_id === selectedSupplierId || item.sub_account_id === selectedSupplierId;
           if (matchesEntity && isSupplierAccount(item.account_id, supplier, accounts)) {
-            let notes = item.description || je.description || 'قيد مالي';
+            let notes = item.description || je.description || (language === 'ar' ? 'قيد مالي' : 'Journal Entry');
             let mappedType = je.reference_type || 'manual';
             if (mappedType === 'payment') mappedType = 'payment_voucher';
 
@@ -262,22 +258,19 @@ export const SupplierStatement: React.FC = () => {
         });
       });
 
-      // Sort by date and then by ID to ensure consistent order
       allItems.sort((a, b) => {
         const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
         if (dateDiff !== 0) return dateDiff;
         return a.id.localeCompare(b.id);
       });
 
-      // Filter by date range
       const filteredItems = allItems.filter(item => {
         const itemDateStr = (item.date || '').slice(0, 10);
         return (!startDate || itemDateStr >= startDate) && (!endDate || itemDateStr <= endDate);
       });
 
-      // Calculate balance forward
       const supplierOpBal = Number(supplier?.opening_balance || 0);
-      const hasOpeningBalanceInItems = allItems.some(item => item.type === 'opening_balance' || item.notes.includes('رصيد افتتاحي'));
+      const hasOpeningBalanceInItems = allItems.some(item => item.type === 'opening_balance' || item.notes.includes(language === 'ar' ? 'رصيد افتتاحي' : 'Opening Balance'));
       
       const manualOpBal = hasOpeningBalanceInItems ? 0 : supplierOpBal;
       let balanceBefore = 0;
@@ -310,7 +303,6 @@ export const SupplierStatement: React.FC = () => {
 
   const formatBalance = (balance: number) => {
     if (balance === 0) return '0';
-    // For suppliers, Credit is positive (+)
     return balance > 0 ? `+${formatNumber(balance)}` : formatNumber(balance);
   };
 
@@ -330,7 +322,7 @@ export const SupplierStatement: React.FC = () => {
     
     exportToExcel(data, { 
       filename: `statement_${supplier?.name}_${new Date().toISOString().slice(0,10)}`,
-      sheetName: "Statement"
+      sheetName: language === 'ar' ? 'كشف الحساب' : 'Statement'
     });
   };
 
@@ -341,7 +333,7 @@ export const SupplierStatement: React.FC = () => {
       await exportToPDF(reportRef.current, {
         filename: `statement_${supplier?.name}_${new Date().toISOString().slice(0,10)}.pdf`,
         orientation: 'landscape',
-        reportTitle: `كشف حساب مورد - ${supplier?.name}`
+        reportTitle: `${language === 'ar' ? 'كشف حساب مورد' : 'Supplier Account Statement'} - ${supplier?.name}`
       });
     } catch (e) {
       console.error(e);
@@ -349,18 +341,18 @@ export const SupplierStatement: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">كشف حساب مورد</h2>
-          <p className="text-zinc-500">عرض الحركات المالية والارصدة لكل مورد.</p>
+          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('nav.supplier_statement')}</h2>
+          <p className="text-zinc-500">{language === 'ar' ? 'عرض الحركات المالية والارصدة لكل مورد.' : 'View financial transactions and balances for each supplier.'}</p>
         </div>
       </div>
 
       <div className="bg-white p-6 rounded-3xl border border-zinc-100 shadow-sm space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div className="md:col-span-1">
-            <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">المورد</label>
+            <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('discounts.column_supplier')}</label>
             <div className="relative">
               <User className="absolute left-3 top-3 text-zinc-400" size={18} />
               <select 
@@ -368,7 +360,7 @@ export const SupplierStatement: React.FC = () => {
                 value={selectedSupplierId}
                 onChange={(e) => setSelectedSupplierId(e.target.value)}
               >
-                <option value="">اختر المورد...</option>
+                <option value="">{t('settlements.select_supplier')}</option>
                 {suppliers.map(supplier => (
                   <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
                 ))}
@@ -376,7 +368,7 @@ export const SupplierStatement: React.FC = () => {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">من تاريخ</label>
+            <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{language === 'ar' ? 'من تاريخ' : 'From Date'}</label>
             <div className="relative">
               <Calendar className="absolute left-3 top-3 text-zinc-400" size={18} />
               <input 
@@ -388,7 +380,7 @@ export const SupplierStatement: React.FC = () => {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">إلى تاريخ</label>
+            <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{language === 'ar' ? 'إلى تاريخ' : 'To Date'}</label>
             <div className="relative">
               <Calendar className="absolute left-3 top-3 text-zinc-400" size={18} />
               <input 
@@ -405,13 +397,13 @@ export const SupplierStatement: React.FC = () => {
               disabled={loading || !selectedSupplierId}
               className="flex-grow flex items-center justify-center gap-2 px-6 py-2 bg-zinc-900 text-white rounded-xl hover:bg-zinc-800 transition-all disabled:opacity-50 h-[42px] font-bold text-sm"
             >
-              {loading ? 'جاري التحميل...' : 'عرض التقرير'}
+              {loading ? t('common.loading') : (language === 'ar' ? 'عرض التقرير' : 'View Report')}
             </button>
             <button 
               onClick={fetchStatement}
               disabled={loading || !selectedSupplierId}
               className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 hover:text-emerald-600 transition-all active:scale-95 shadow-sm disabled:opacity-50 h-[42px] flex items-center justify-center"
-              title="تحديث البيانات"
+              title={language === 'ar' ? 'تحديث البيانات' : 'Refresh Data'}
             >
               <RefreshCcw size={20} className={loading ? 'animate-spin' : ''} />
             </button>
@@ -426,23 +418,23 @@ export const SupplierStatement: React.FC = () => {
                 className="flex items-center gap-2 px-4 py-2 text-blue-600 border border-blue-200 rounded-xl hover:bg-blue-50 transition-all"
               >
                 <Download size={18} />
-                تصدير Excel
+                {language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
               </button>
               <button 
                 onClick={handleExportPDF}
                 className="flex items-center gap-2 px-4 py-2 text-emerald-600 border border-emerald-200 rounded-xl hover:bg-emerald-50 transition-all"
               >
                 <Download size={18} />
-                تصدير PDF
+                {language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
               </button>
             </div>
 
             <div ref={reportRef} className="bg-white p-8 border border-zinc-100 rounded-2xl">
               <div className="text-center mb-8 border-b border-zinc-100 pb-6">
-                <h3 className="text-2xl font-bold text-zinc-900 mb-2">كشف حساب مورد</h3>
+                <h3 className="text-2xl font-bold text-zinc-900 mb-2">{language === 'ar' ? 'كشف حساب مورد' : 'Supplier Account Statement'}</h3>
                 <div className="flex justify-center gap-8 text-sm text-zinc-500">
-                  <p>المورد: <span className="font-bold text-zinc-900">{suppliers.find(s => s.id === selectedSupplierId)?.name}</span></p>
-                  <p>الفترة: <span className="font-bold text-zinc-900">{startDate || 'البداية'}</span> إلى <span className="font-bold text-zinc-900">{endDate}</span></p>
+                  <p>{language === 'ar' ? 'المورد:' : 'Supplier:'} <span className="font-bold text-zinc-900">{suppliers.find(s => s.id === selectedSupplierId)?.name}</span></p>
+                  <p>{language === 'ar' ? 'الفترة:' : 'Period:'} <span className="font-bold text-zinc-900">{startDate || (language === 'ar' ? 'البداية' : 'Start')}</span> {language === 'ar' ? 'إلى' : 'to'} <span className="font-bold text-zinc-900">{endDate}</span></p>
                 </div>
               </div>
 
@@ -465,10 +457,10 @@ export const SupplierStatement: React.FC = () => {
                     {(startBalance !== 0 || startDate) && (
                       <tr className="border-b border-zinc-50 bg-zinc-50/30">
                         <td className="px-4 py-3 text-sm font-mono">{startDate || '-'}</td>
-                        <td className="px-4 py-3 text-sm"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600">رصيد</span></td>
+                        <td className="px-4 py-3 text-sm"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600">{language === 'ar' ? 'رصيد' : 'Bal'}</span></td>
                         <td className="px-4 py-3 text-sm font-mono">-</td>
                         <td className="px-4 py-3 text-sm font-mono">-</td>
-                        <td className="px-4 py-3 text-sm">{startDate ? 'رصيد منقول' : 'رصيد افتتاحي'}</td>
+                        <td className="px-4 py-3 text-sm">{startDate ? (language === 'ar' ? 'رصيد منقول' : 'Balance Forward') : (language === 'ar' ? 'رصيد افتتاحي' : 'Opening Balance')}</td>
                         <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance > 0 ? formatNumber(startBalance) : '-'}</td>
                         <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance < 0 ? formatNumber(Math.abs(startBalance)) : '-'}</td>
                         <td className="px-4 py-3 text-sm font-bold text-zinc-900">{formatBalance(startBalance)}</td>
@@ -489,12 +481,12 @@ export const SupplierStatement: React.FC = () => {
                               'bg-zinc-100 text-zinc-600'
                             }`}
                           >
-                            {item.type === 'purchase_invoice' ? (item.debit > 0 ? 'سداد نقدي' : 'فاتورة مشتريات') :
-                             item.type === 'payment_voucher' ? 'سند صرف' :
-                             item.type === 'purchase_return' ? 'مرتجع مشتريات' :
-                             item.type === 'manual' ? 'قيد يدوي' :
-                             item.type === 'opening_balance' ? 'رصيد أول' :
-                             item.type === 'discount' ? 'خصم' : 'قيد يومية'}
+                            {item.type === 'purchase_invoice' ? (item.debit > 0 ? (language === 'ar' ? 'سداد نقدي' : 'Cash Payment') : (language === 'ar' ? 'فاتورة مشتريات' : 'Purchase Invoice')) :
+                             item.type === 'payment_voucher' ? (language === 'ar' ? 'سند صرف' : 'Payment Voucher') :
+                             item.type === 'purchase_return' ? (language === 'ar' ? 'مرتجع مشتريات' : 'Purchase Return') :
+                             item.type === 'manual' ? (language === 'ar' ? 'قيد يدوي' : 'Manual Entry') :
+                             item.type === 'opening_balance' ? (language === 'ar' ? 'رصيد أول' : 'Opening Balance') :
+                             item.type === 'discount' ? (language === 'ar' ? 'خصم' : 'Discount') : (language === 'ar' ? 'قيد يومية' : 'Journal Entry')}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm font-mono">
@@ -526,13 +518,13 @@ export const SupplierStatement: React.FC = () => {
                     ))}
                     {statement.length === 0 && (
                       <tr>
-                        <td colSpan={8} className="px-4 py-8 text-center text-zinc-400 italic">لا توجد حركات في هذه الفترة</td>
+                        <td colSpan={8} className="px-4 py-8 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد حركات في هذه الفترة' : 'No transactions in this period'}</td>
                       </tr>
                     )}
                   </tbody>
                   <tfoot>
                     <tr className="bg-zinc-900 text-white font-bold">
-                      <td colSpan={5} className="px-4 py-3 text-left">الرصيد الختامي</td>
+                      <td colSpan={5} className="px-4 py-3 text-left">{language === 'ar' ? 'الرصيد الختامي' : 'Ending Balance'}</td>
                       <td className="px-4 py-3">{formatNumber(statement.reduce((sum, e) => sum + (Number(e.debit) || 0), 0) + (startBalance < 0 ? Math.abs(startBalance) : 0))}</td>
                       <td className="px-4 py-3">{formatNumber(statement.reduce((sum, e) => sum + (Number(e.credit) || 0), 0) + (startBalance > 0 ? startBalance : 0))}</td>
                       <td className="px-4 py-3">{formatBalance(statement.length > 0 ? (statement[statement.length - 1].balance || 0) : startBalance)}</td>
@@ -547,7 +539,7 @@ export const SupplierStatement: React.FC = () => {
         {!loading && statement.length === 0 && startBalance === 0 && selectedSupplierId && (
           <div className="text-center py-12 bg-zinc-50 rounded-2xl border border-dashed border-zinc-200">
             <FileText className="mx-auto text-zinc-300 mb-4" size={48} />
-            <p className="text-zinc-500">لا توجد حركات مالية لهذا المورد في الفترة المحددة.</p>
+            <p className="text-zinc-500">{language === 'ar' ? 'لا توجد حركات مالية لهذا المورد في الفترة المحددة.' : 'No financial transactions for this supplier in the specified period.'}</p>
           </div>
         )}
       </div>
