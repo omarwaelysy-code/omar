@@ -2811,7 +2811,7 @@ export const Invoices: React.FC = () => {
                           onClick={() => handleSort('status')}
                         >
                           <div className="flex items-center gap-1">
-                            <span>حالة الدفع</span>
+                            <span>{language === 'ar' ? 'حالة الدفع' : 'Payment Status'}</span>
                             <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                               {sortBy === 'status' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
@@ -2829,7 +2829,7 @@ export const Invoices: React.FC = () => {
                           onClick={() => handleSort('currency')}
                         >
                           <div className="flex items-center gap-1">
-                            <span>العملة</span>
+                            <span>{language === 'ar' ? 'العملة' : 'Currency'}</span>
                             <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                               {sortBy === 'currency' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
@@ -2847,7 +2847,7 @@ export const Invoices: React.FC = () => {
                           onClick={() => handleSort('foreign_amount')}
                         >
                           <div className="flex items-center gap-1">
-                            <span>المبلغ بالعملة الأجنبية</span>
+                            <span>{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</span>
                             <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                               {sortBy === 'foreign_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
@@ -2865,7 +2865,7 @@ export const Invoices: React.FC = () => {
                           onClick={() => handleSort('remaining_foreign')}
                         >
                           <div className="flex items-center gap-1">
-                            <span>الباقي بالعملة الأجنبية</span>
+                            <span>{language === 'ar' ? 'الباقي بالعملة الأجنبية' : 'Remaining (FC)'}</span>
                             <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                               {sortBy === 'remaining_foreign' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
@@ -2883,7 +2883,7 @@ export const Invoices: React.FC = () => {
                           onClick={() => handleSort('subtotal')}
                         >
                           <div className="flex items-center gap-1">
-                            <span>قبل الضريبة</span>
+                            <span>{language === 'ar' ? 'قبل الضريبة' : 'Before Tax'}</span>
                             <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                               {sortBy === 'subtotal' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
@@ -2901,7 +2901,7 @@ export const Invoices: React.FC = () => {
                           onClick={() => handleSort('tax_amount')}
                         >
                           <div className="flex items-center gap-1">
-                            <span>الضريبة</span>
+                            <span>{language === 'ar' ? 'الضريبة' : 'Tax'}</span>
                             <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                               {sortBy === 'tax_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
@@ -2919,7 +2919,7 @@ export const Invoices: React.FC = () => {
                           onClick={() => handleSort('base_amount')}
                         >
                           <div className="flex items-center gap-1">
-                            <span>القيمة المعادلة بالعملة المحلية</span>
+                            <span>{language === 'ar' ? 'القيمة المعادلة بالعملة المحلية' : 'Equivalent Local Amount'}</span>
                             <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                               {sortBy === 'base_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
@@ -2937,7 +2937,7 @@ export const Invoices: React.FC = () => {
                           onClick={() => handleSort('remaining')}
                         >
                           <div className="flex items-center gap-1">
-                            <span>الباقي من الفاتورة</span>
+                            <span>{language === 'ar' ? 'الباقي من الفاتورة' : 'Remaining Balance'}</span>
                             <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                               {sortBy === 'remaining' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>

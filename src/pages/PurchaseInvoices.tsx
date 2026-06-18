@@ -2060,12 +2060,12 @@ export const PurchaseInvoices: React.FC = () => {
               </span>
               {serverSummary.total_discount !== undefined && (
                 <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
-                   إجمالي الخصومات: {formatMoney(serverSummary.total_discount)} {t('common.currency')}
+                   {t('reports.total_discounts')}: {formatMoney(serverSummary.total_discount)} {t('common.currency')}
                 </span>
               )}
               {serverSummary.total_discount !== undefined && (
                 <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100 font-bold">
-                   الصافي: {formatMoney(serverSummary.total_amount - serverSummary.total_discount)} {t('common.currency')}
+                   {t('common.net')}: {formatMoney(serverSummary.total_amount - serverSummary.total_discount)} {t('common.currency')}
                 </span>
               )}
             </div>

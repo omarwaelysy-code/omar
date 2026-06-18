@@ -111,7 +111,7 @@ export const SupplierSettlements: React.FC = () => {
                 voucherSettlements.push({
                   id: `${v.id}-${s.target_id}`,
                   date: v.date,
-                  type_label: 'سند صرف',
+                  type_label: language === 'ar' ? 'سند صرف' : 'Payment Voucher',
                   number: v.voucher_number || v.number || v.id,
                   page_name: 'payment_vouchers',
                   amount: Number(s.settled_amount) || 0,
@@ -136,7 +136,7 @@ export const SupplierSettlements: React.FC = () => {
         returnSettlements.push({
           id: r.id,
           date: r.date,
-          type_label: 'مرتجع مشتريات',
+          type_label: language === 'ar' ? 'مرتجع مشتريات' : 'Purchase Return',
           number: r.return_number || r.id,
           page_name: 'purchase_returns',
           amount: Number(r.total_amount) || 0,
@@ -167,7 +167,7 @@ export const SupplierSettlements: React.FC = () => {
             jeSettlements.push({
               id: `${je.id}-${idx}`,
               date: je.date,
-              type_label: 'قيد يومية',
+              type_label: language === 'ar' ? 'قيد يومية' : 'Journal Entry',
               number: je.entry_number || je.id.slice(0, 8),
               page_name: 'journal_entries',
               amount: Number(item.debit),
@@ -200,7 +200,7 @@ export const SupplierSettlements: React.FC = () => {
           invoiceSideSettlements.push({
             id: `${inv.id}-${s.target_id}`,
             date: s.settlement_date || s.date || inv.date,
-            type_label: s.type_label || 'تسوية',
+            type_label: s.type_label || (language === 'ar' ? 'تسوية' : 'Settlement'),
             number: s.settlement_number || s.reference_number || s.target_id,
             page_name: s.type || 'payment_vouchers',
             amount: Number(s.settled_amount || s.amount) || 0,
@@ -307,7 +307,7 @@ export const SupplierSettlements: React.FC = () => {
             if (!entry.creditDocs.some(c => c.number === inv.invoice_number)) {
               entry.creditDocs.push({
                 number: inv.invoice_number,
-                type_label: 'فاتورة مشتريات',
+                type_label: language === 'ar' ? 'فاتورة مشتريات' : 'Purchase Invoice',
                 amount: Number(s.settled_amount) || 0,
                 page_name: 'purchase_invoices',
                 original_id: inv.id,
@@ -586,7 +586,7 @@ export const SupplierSettlements: React.FC = () => {
               id: `${je.id}-${idx}`,
               original_id: je.id,
               date: je.date,
-              type_label: isOpBal ? 'قيد رصيد أول' : (isDiscount ? 'خصم مكتسب' : 'قيد يومية (مدين)'),
+              type_label: language === 'ar' ? (isOpBal ? 'قيد رصيد أول' : (isDiscount ? 'خصم مكتسب' : 'قيد يومية (مدين)')) : (isOpBal ? 'Opening Balance JE' : (isDiscount ? 'Earned Discount' : 'Journal Entry (Debit)')),
               number: je.entry_number || je.id.slice(0, 8),
               page_name: isDiscount ? 'discounts' : 'journal_entries',
               original_amount: originalAmount,
@@ -655,7 +655,7 @@ export const SupplierSettlements: React.FC = () => {
               id: `${je.id}-${idx}`,
               original_id: je.id,
               date: je.date,
-              type_label: isOpBal ? 'قيد رصيد أول' : (isDiscount ? 'خصم مكتسب' : 'قيد يومية (دائن)'),
+              type_label: language === 'ar' ? (isOpBal ? 'قيد رصيد أول' : (isDiscount ? 'خصم مكتسب' : 'قيد يومية (دائن)')) : (isOpBal ? 'Opening Balance JE' : (isDiscount ? 'Earned Discount' : 'Journal Entry (Credit)')),
               number: je.entry_number || je.id.slice(0, 8),
               page_name: isDiscount ? 'discounts' : 'journal_entries',
               original_amount: originalAmount,
@@ -933,11 +933,11 @@ export const SupplierSettlements: React.FC = () => {
     if (!user) return;
     if (!selectedSupplierId) return;
     if (totalSettledDebit <= 0) {
-      showNotification('المبلغ المسوى يجب أن يكون أكبر من الصفر', 'error');
+      showNotification(language === 'ar' ? 'المبلغ المسوى يجب أن يكون أكبر من الصفر' : 'Settled amount must be greater than zero', 'error');
       return;
     }
     if (Math.abs(totalSettledDebit - totalSettledCredit) > 0.01) {
-      showNotification('الحركات غير متوازنة، يرجى ضبط الفروقات قبل الحفظ', 'error');
+      showNotification(language === 'ar' ? 'الحركات غير متوازنة، يرجى ضبط الفروقات قبل الحفظ' : 'Movements are unbalanced, please adjust differences before saving', 'error');
       return;
     }
 
@@ -1085,7 +1085,7 @@ export const SupplierSettlements: React.FC = () => {
         await dbService.update('payment_vouchers', id, v);
       }
 
-      showNotification('تم حفظ التسوية بنجاح وتوزيع الأرصدة', 'success');
+      showNotification(language === 'ar' ? 'تم حفظ التسوية بنجاح وتوزيع الأرصدة' : 'Settlement saved and balances distributed successfully', 'success');
 
       // Log activity
       const sup = suppliers.find(s => s.id === selectedSupplierId);
@@ -1105,7 +1105,7 @@ export const SupplierSettlements: React.FC = () => {
       setEditingSettlementNum(null);
     } catch (err: any) {
       console.error(err);
-      showNotification('حدث خطأ أثناء حفظ التسوية', 'error');
+      showNotification(t('settlements.toast_error'), 'error');
     }
   };
 
@@ -1163,7 +1163,7 @@ export const SupplierSettlements: React.FC = () => {
   // Rollback Settlement
   const handleDeleteSettlement = async (settlementNumber: string, supplierName: string) => {
     if (!user) return;
-    if (!window.confirm(`هل أنت متأكد من إلغاء وحذف التسوية رقم ${settlementNumber}؟`)) return;
+    if (!window.confirm(language === 'ar' ? `هل أنت متأكد من إلغاء وحذف التسوية رقم ${settlementNumber}؟` : `Are you sure you want to cancel and delete settlement No. ${settlementNumber}?`)) return;
 
     try {
       // 1. Update Purchase Invoices
@@ -1198,7 +1198,7 @@ export const SupplierSettlements: React.FC = () => {
         }
       }
 
-      showNotification('تم حذف التسوية واستعادة الأرصدة المستحقة', 'success');
+      showNotification(t('settlements.delete_success'), 'success');
 
       // Log activity
       dbService.logActivity(
@@ -1211,17 +1211,17 @@ export const SupplierSettlements: React.FC = () => {
       );
     } catch (err: any) {
       console.error(err);
-      showNotification('حدث خطأ أثناء حذف التسوية', 'error');
+      showNotification(t('settlements.delete_error'), 'error');
     }
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
       {/* Title block */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">تسويات الموردين</h2>
-          <p className="text-zinc-500 text-sm">إجراء تسويات حرّة ومباشرة للمورد لربط الحركات المدينة بالدائنة بالتزامن الكامل.</p>
+          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('settlements.supplier_title')}</h2>
+          <p className="text-zinc-500 text-sm">{t('settlements.supplier_subtitle')}</p>
         </div>
         
         {/* Tab Switcher & Layout Toggle */}
@@ -1232,7 +1232,7 @@ export const SupplierSettlements: React.FC = () => {
               className="flex items-center gap-2 px-4 py-2 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 transition-all rounded-xl font-bold text-xs shadow-sm"
             >
               <LayoutGrid size={16} className="text-emerald-600" />
-              <span>{layoutMode === 'split' ? 'عرض الجدول الموحد' : 'عرض الجداول المنفصلة'}</span>
+              <span>{layoutMode === 'split' ? (language === 'ar' ? 'عرض الجدول الموحد' : 'Unified Grid View') : (language === 'ar' ? 'عرض الجداول المنفصلة' : 'Split Tables View')}</span>
             </button>
           )}
 
@@ -1247,13 +1247,13 @@ export const SupplierSettlements: React.FC = () => {
               }}
               className={`p-2 px-6 rounded-xl transition-all font-bold text-sm ${activeTab === 'new' ? 'bg-white text-emerald-600 shadow-sm border border-zinc-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
             >
-              تسوية جديدة
+              {t('settlements.new_settlement')}
             </button>
             <button
               onClick={() => setActiveTab('history')}
               className={`p-2 px-6 rounded-xl transition-all font-bold text-sm ${activeTab === 'history' ? 'bg-white text-emerald-600 shadow-sm border border-zinc-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
             >
-              سجل التسويات
+              {t('settlements.settlement_history')}
             </button>
           </div>
         </div>
@@ -1265,7 +1265,7 @@ export const SupplierSettlements: React.FC = () => {
           <div className="bg-white p-5 rounded-3xl border border-zinc-200 shadow-sm space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
               <div>
-                <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">المورد</label>
+                <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('discounts.column_supplier')}</label>
                 <div className="relative group">
                   <Truck className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                   <select 
@@ -1274,7 +1274,7 @@ export const SupplierSettlements: React.FC = () => {
                     value={selectedSupplierId}
                     onChange={(e) => setSelectedSupplierId(e.target.value)}
                   >
-                    <option value="">اختر المورد...</option>
+                    <option value="">{t('settlements.select_supplier')}</option>
                     {suppliers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
                   </select>
                   <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
@@ -1282,7 +1282,7 @@ export const SupplierSettlements: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">تاريخ التسوية</label>
+                <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('settlements.date')}</label>
                 <div className="relative group">
                   <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                   <input 
@@ -1296,7 +1296,7 @@ export const SupplierSettlements: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">رقم التسوية التلقائي</label>
+                <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('settlements.auto_number')}</label>
                 <div className="relative group">
                   <input 
                     readOnly
@@ -1314,7 +1314,7 @@ export const SupplierSettlements: React.FC = () => {
                     className={`flex items-center justify-center gap-2 w-full py-3 border rounded-2xl font-bold text-xs transition-all shadow-sm ${showFilters ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'}`}
                   >
                     <SlidersHorizontal size={16} />
-                    <span>تصفية وبحث متقدم</span>
+                    <span>{language === 'ar' ? 'تصفية وبحث متقدم' : 'Advanced Filters & Search'}</span>
                   </button>
                 </div>
               )}
@@ -1333,18 +1333,18 @@ export const SupplierSettlements: React.FC = () => {
                     {/* Bulk numbers search */}
                     <div>
                       <div className="flex items-center justify-between mb-2 px-1">
-                        <label className="block text-[10px] font-bold text-zinc-400 uppercase">البحث المتعدد</label>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase">{language === "ar" ? "البحث المتعدد" : "Multi Search"}</label>
                         <select
                           className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border-0 rounded-lg outline-none py-0.5 px-2 cursor-pointer"
                           value={filterSearchType}
                           onChange={(e) => setFilterSearchType(e.target.value)}
                         >
-                          <option value="number">رقم المستند</option>
-                          <option value="je_number">رقم القيد</option>
-                          <option value="date">التاريخ (YYYY-MM-DD)</option>
-                          <option value="original_amount">المبلغ الأصلي</option>
-                          <option value="open_amount">المبلغ المتبقي</option>
-                          <option value="notes">ملاحظات / وصف</option>
+                          <option value="number">{language === "ar" ? "رقم المستند" : "Doc Number"}</option>
+                          <option value="je_number">{language === "ar" ? "رقم القيد" : "JE Number"}</option>
+                          <option value="date">{language === "ar" ? "التاريخ (YYYY-MM-DD)" : "Date (YYYY-MM-DD)"}</option>
+                          <option value="original_amount">{language === "ar" ? "المبلغ الأصلي" : "Original Amount"}</option>
+                          <option value="open_amount">{language === "ar" ? "المبلغ المتبقي" : "Remaining Amount"}</option>
+                          <option value="notes">{language === "ar" ? "ملاحظات / وصف" : "Notes / Description"}</option>
                         </select>
                       </div>
                       <textarea
@@ -1355,7 +1355,7 @@ export const SupplierSettlements: React.FC = () => {
                           filterSearchType === 'je_number' ? 'JV-2026-0001\nJV-2026-0002' :
                           filterSearchType === 'date' ? '2026-06-01\n2026-06-05' :
                           filterSearchType === 'original_amount' ? '1500\n3400.50' :
-                          filterSearchType === 'open_amount' ? '500\n1000' : 'وصف أو ملاحظة القيد'
+                          filterSearchType === 'open_amount' ? '500\n1000' : (language === 'ar' ? 'وصف أو ملاحظة القيد' : 'JE notes or description')
                         }
                         value={filterDocNumbers}
                         onChange={(e) => setFilterDocNumbers(e.target.value)}
@@ -1364,10 +1364,10 @@ export const SupplierSettlements: React.FC = () => {
 
                     {/* Date range search */}
                     <div className="space-y-4">
-                      <label className="block text-[10px] font-bold text-zinc-400 mb-1 px-1 uppercase">البحث بنطاق تاريخى</label>
+                      <label className="block text-[10px] font-bold text-zinc-400 mb-1 px-1 uppercase">{language === "ar" ? "البحث بنطاق تاريخى" : "Search by Date Range"}</label>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="block text-[9px] font-bold text-zinc-400 mb-1">من تاريخ</label>
+                          <label className="block text-[9px] font-bold text-zinc-400 mb-1">{language === "ar" ? "من تاريخ" : "From Date"}</label>
                           <input
                             type="date"
                             className="w-full p-1.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs"
@@ -1376,7 +1376,7 @@ export const SupplierSettlements: React.FC = () => {
                           />
                         </div>
                         <div>
-                          <label className="block text-[9px] font-bold text-zinc-400 mb-1">إلى تاريخ</label>
+                          <label className="block text-[9px] font-bold text-zinc-400 mb-1">{language === "ar" ? "إلى تاريخ" : "To Date"}</label>
                           <input
                             type="date"
                             className="w-full p-1.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs"
@@ -1389,14 +1389,14 @@ export const SupplierSettlements: React.FC = () => {
 
                     {/* Filter by Type */}
                     <div>
-                      <label className="block text-[10px] font-bold text-zinc-400 mb-2 px-1 uppercase">تصفية حسب نوع المستند</label>
+                      <label className="block text-[10px] font-bold text-zinc-400 mb-2 px-1 uppercase">{language === "ar" ? "تصفية حسب نوع المستند" : "Filter by Doc Type"}</label>
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         {[
-                          { key: 'purchase_invoices', label: 'فواتير مشتريات' },
-                          { key: 'payment_vouchers', label: 'سندات صرف' },
-                          { key: 'purchase_returns', label: 'مرتجعات' },
-                          { key: 'journal_entries', label: 'قيود يومية' },
-                          { key: 'discounts', label: 'الخصومات' }
+                          { key: 'purchase_invoices', label: language === 'ar' ? 'فواتير مشتريات' : 'Purchase Invoices' },
+                          { key: 'payment_vouchers', label: language === 'ar' ? 'سندات صرف' : 'Payment Vouchers' },
+                          { key: 'purchase_returns', label: language === 'ar' ? 'مرتجعات' : 'Returns' },
+                          { key: 'journal_entries', label: language === 'ar' ? 'قيود يومية' : 'Journal Entries' },
+                          { key: 'discounts', label: language === 'ar' ? 'الخصومات' : 'Discounts' }
                         ].map(type => (
                           <label key={type.key} className="flex items-center gap-2 p-2 bg-zinc-50 hover:bg-zinc-100 rounded-xl cursor-pointer select-none border border-transparent hover:border-zinc-200/50">
                             <input
@@ -1422,7 +1422,7 @@ export const SupplierSettlements: React.FC = () => {
                         }}
                         className="mt-4 text-[10px] font-bold text-red-500 hover:text-red-600 underline text-right block ml-auto"
                       >
-                        إعادة تعيين كافة المرشحات
+                        {language === 'ar' ? 'إعادة تعيين كافة المرشحات' : 'Reset All Filters'}
                       </button>
                     </div>
                   </div>
@@ -1441,10 +1441,10 @@ export const SupplierSettlements: React.FC = () => {
                     <div className="p-3 bg-red-50/60 border-b border-red-100 flex items-center justify-between">
                       <span className="font-bold text-red-700 text-xs flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                        الجانب المدين (دفعات / مرتجعات / إعفاءات)
+                        {language === 'ar' ? 'الجانب المدين (دفعات / مرتجعات / إعفاءات)' : 'Debit Side (Payments / Returns / Allowances)'}
                       </span>
                       <span className="bg-red-100 text-red-800 text-[10px] px-2.5 py-0.5 rounded-full font-bold">
-                        إجمالي المسوى: {formatMoney(totalSettledDebit)} ج.م
+                        {language === 'ar' ? 'إجمالي المسوى:' : 'Total Settled:'} {formatMoney(totalSettledDebit)} {t('common.currency')}
                       </span>
                     </div>
 
@@ -1460,21 +1460,21 @@ export const SupplierSettlements: React.FC = () => {
                                   checked={isAllDebitSelected}
                                   onChange={(e) => handleSelectAllDebits(e.target.checked)}
                                 />
-                                <span>تحديد</span>
+                                <span>{language === 'ar' ? 'تحديد' : 'Select'}</span>
                               </div>
                             </th>
-                            <th className="p-1.5 border border-zinc-200">نوع الحركة</th>
-                            <th className="p-1.5 border border-zinc-200">رقم المستند</th>
-                            <th className="p-1.5 border border-zinc-200">التاريخ</th>
-                            <th className="p-1.5 border border-zinc-200 text-left">المبلغ</th>
-                            <th className="p-1.5 border border-zinc-200 text-left">المتبقي</th>
-                            <th className="p-1.5 border border-zinc-200 w-28 text-left">المبلغ المسوى</th>
+                            <th className="p-1.5 border border-zinc-200">{language === 'ar' ? 'نوع الحركة' : 'Doc Type'}</th>
+                            <th className="p-1.5 border border-zinc-200">{language === 'ar' ? 'رقم المستند' : 'Doc No.'}</th>
+                            <th className="p-1.5 border border-zinc-200">{t('settlements.movement_date')}</th>
+                            <th className="p-1.5 border border-zinc-200 text-left">{t('settlements.movement_amount')}</th>
+                            <th className="p-1.5 border border-zinc-200 text-left">{t('settlements.movement_remaining')}</th>
+                            <th className="p-1.5 border border-zinc-200 w-28 text-left">{t('settlements.movement_settle_amount')}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-200">
                           {processedDebitMovements.length === 0 ? (
                             <tr>
-                              <td colSpan={7} className="p-6 text-center text-zinc-400 italic">لا توجد حركات مدينة تطابق البحث</td>
+                              <td colSpan={7} className="p-6 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد حركات مدينة تطابق البحث' : 'No debit movements match search'}</td>
                             </tr>
                           ) : (
                             processedDebitMovements.map(m => (
@@ -1523,10 +1523,10 @@ export const SupplierSettlements: React.FC = () => {
                     <div className="p-3 bg-emerald-50/60 border-b border-emerald-100 flex items-center justify-between">
                       <span className="font-bold text-emerald-700 text-xs flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        الجانب الدائن (المستندات المطلوبة / فواتير المشتريات)
+                        {language === 'ar' ? 'الجانب الدائن (المستندات المطلوبة / فواتير المشتريات)' : 'Credit Side (Required Documents / Purchase Invoices)'}
                       </span>
                       <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2.5 py-0.5 rounded-full font-bold">
-                        إجمالي المسوى: {formatMoney(totalSettledCredit)} ج.م
+                        {language === 'ar' ? 'إجمالي المسوى:' : 'Total Settled:'} {formatMoney(totalSettledCredit)} {t('common.currency')}
                       </span>
                     </div>
 
@@ -1556,7 +1556,7 @@ export const SupplierSettlements: React.FC = () => {
                         <tbody className="divide-y divide-zinc-200">
                           {processedCreditMovements.length === 0 ? (
                             <tr>
-                              <td colSpan={7} className="p-6 text-center text-zinc-400 italic">لا توجد حركات دائنة تطابق البحث</td>
+                              <td colSpan={7} className="p-6 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد حركات دائنة تطابق البحث' : 'No credit movements match search'}</td>
                             </tr>
                           ) : (
                             processedCreditMovements.map(m => (
@@ -1606,14 +1606,14 @@ export const SupplierSettlements: React.FC = () => {
                   <div className="p-3 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between">
                     <span className="font-bold text-zinc-700 text-xs flex items-center gap-2">
                       <SlidersHorizontal size={16} className="text-emerald-600" />
-                      عرض الجدول الموحد المحاسبي (Excel Grid)
+                      {language === 'ar' ? 'عرض الجدول الموحد المحاسبي (Excel Grid)' : 'Show Accounting Unified Grid (Excel Grid)'}
                     </span>
                     <div className="flex items-center gap-3 text-xs">
                       <span className="bg-red-50 text-red-700 px-2 py-0.5 rounded border border-red-100 font-bold">
-                        مدين: {formatMoney(totalSettledDebit)}
+                        {language === 'ar' ? 'مدين:' : 'Debit:'} {formatMoney(totalSettledDebit)}
                       </span>
                       <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-100 font-bold">
-                        دائن: {formatMoney(totalSettledCredit)}
+                        {language === 'ar' ? 'دائن:' : 'Credit:'} {formatMoney(totalSettledCredit)}
                       </span>
                     </div>
                   </div>
@@ -1630,26 +1630,26 @@ export const SupplierSettlements: React.FC = () => {
                                 checked={isAllUnifiedSelected}
                                 onChange={(e) => handleSelectAllUnified(e.target.checked)}
                               />
-                              <span>تحديد الكل</span>
+                              <span>{language === 'ar' ? 'تحديد الكل' : 'Select All'}</span>
                             </div>
                           </th>
-                          <th className="p-2 border border-zinc-200" rowSpan={2}>التاريخ</th>
-                          <th className="p-2 border border-zinc-200" rowSpan={2}>نوع الحركة</th>
-                          <th className="p-2 border border-zinc-200" rowSpan={2}>رقم المستند</th>
-                          <th className="p-1 border border-zinc-200 text-center bg-red-50/50 text-red-700 font-bold" colSpan={2}>الحركات المدينة (Debit)</th>
-                          <th className="p-1 border border-zinc-200 text-center bg-emerald-50/50 text-emerald-700 font-bold" colSpan={2}>الحركات الدائنة (Credit)</th>
+                          <th className="p-2 border border-zinc-200" rowSpan={2}>{t('settlements.movement_date')}</th>
+                          <th className="p-2 border border-zinc-200" rowSpan={2}>{language === 'ar' ? 'نوع الحركة' : 'Doc Type'}</th>
+                          <th className="p-2 border border-zinc-200" rowSpan={2}>{language === 'ar' ? 'رقم المستند' : 'Doc No.'}</th>
+                          <th className="p-1 border border-zinc-200 text-center bg-red-50/50 text-red-700 font-bold" colSpan={2}>{language === 'ar' ? 'الحركات المدينة (Debit)' : 'Debit Movements (Debit)'}</th>
+                          <th className="p-1 border border-zinc-200 text-center bg-emerald-50/50 text-emerald-700 font-bold" colSpan={2}>{language === 'ar' ? 'الحركات الدائنة (Credit)' : 'Credit Movements (Credit)'}</th>
                         </tr>
                         <tr className="bg-zinc-100 text-zinc-500 text-[9px] uppercase">
-                          <th className="p-1.5 border border-zinc-200 text-left w-24 bg-red-50/30">المتبقي</th>
-                          <th className="p-1.5 border border-zinc-200 text-left w-32 bg-red-50/30">المسوى</th>
-                          <th className="p-1.5 border border-zinc-200 text-left w-24 bg-emerald-50/30">المتبقي</th>
-                          <th className="p-1.5 border border-zinc-200 text-left w-32 bg-emerald-50/30">المسوى</th>
+                          <th className="p-1.5 border border-zinc-200 text-left w-24 bg-red-50/30">{language === 'ar' ? 'المتبقي' : 'Remaining'}</th>
+                          <th className="p-1.5 border border-zinc-200 text-left w-32 bg-red-50/30">{language === 'ar' ? 'المسوى' : 'Settled'}</th>
+                          <th className="p-1.5 border border-zinc-200 text-left w-24 bg-emerald-50/30">{language === 'ar' ? 'المتبقي' : 'Remaining'}</th>
+                          <th className="p-1.5 border border-zinc-200 text-left w-32 bg-emerald-50/30">{language === 'ar' ? 'المسوى' : 'Settled'}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-zinc-200">
                         {unifiedMovements.length === 0 ? (
                           <tr>
-                            <td colSpan={8} className="p-8 text-center text-zinc-400 italic">لا توجد حركات تطابق خيارات التصفية والبحث</td>
+                            <td colSpan={8} className="p-8 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد حركات تطابق خيارات التصفية والبحث' : 'No movements match selected search filters'}</td>
                           </tr>
                         ) : (
                           unifiedMovements.map(m => (
@@ -1726,19 +1726,19 @@ export const SupplierSettlements: React.FC = () => {
               <div className="bg-slate-900 p-6 rounded-3xl text-white flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl">
                 <div className="flex flex-wrap items-center gap-6">
                   <div className="space-y-1">
-                    <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">إجمالي المدين المسوى</span>
-                    <p className="text-xl font-black text-red-400">{formatMoney(totalSettledDebit)} ج.م</p>
+                    <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{language === 'ar' ? 'إجمالي المدين المسوى' : 'Total Settled Debit'}</span>
+                    <p className="text-xl font-black text-red-400">{formatMoney(totalSettledDebit)} {t('common.currency')}</p>
                   </div>
                   <div className="w-px h-10 bg-zinc-800 hidden md:block" />
                   <div className="space-y-1">
-                    <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">إجمالي الدائن المسوى</span>
-                    <p className="text-xl font-black text-emerald-400">{formatMoney(totalSettledCredit)} ج.م</p>
+                    <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{language === 'ar' ? 'إجمالي الدائن المسوى' : 'Total Settled Credit'}</span>
+                    <p className="text-xl font-black text-emerald-400">{formatMoney(totalSettledCredit)} {t('common.currency')}</p>
                   </div>
                   <div className="w-px h-10 bg-zinc-800 hidden md:block" />
                   <div className="space-y-1">
-                    <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">الفرق</span>
+                    <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{language === 'ar' ? 'الفرق' : 'Difference'}</span>
                     <p className={`text-xl font-black ${difference === 0 ? 'text-emerald-400' : 'text-yellow-400'}`}>
-                      {formatMoney(difference)} ج.م
+                      {formatMoney(difference)} {t('common.currency')}
                     </p>
                   </div>
                 </div>
@@ -1750,7 +1750,7 @@ export const SupplierSettlements: React.FC = () => {
                     className="w-full md:w-auto px-8 py-3 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     <Check size={20} />
-                    تثبيت وحفظ التسوية
+                    {language === 'ar' ? 'تثبيت وحفظ التسوية' : 'Commit & Save Settlement'}
                   </button>
                 </div>
               </div>
@@ -1758,7 +1758,7 @@ export const SupplierSettlements: React.FC = () => {
           ) : (
             <div className="bg-white rounded-3xl border border-zinc-200 p-12 text-center text-zinc-400 shadow-sm flex flex-col items-center gap-4">
               <Info size={48} className="text-zinc-300" />
-              <p className="font-bold">يرجى اختيار المورد لعرض الحركات المعلقة وبدء التسوية</p>
+              <p className="font-bold">{t('settlements.prompt_select_supplier')}</p>
             </div>
           )}
         </div>
@@ -1771,7 +1771,7 @@ export const SupplierSettlements: React.FC = () => {
                 <Search className="absolute left-3 top-3 text-zinc-400" size={18} />
                 <input
                   type="text"
-                  placeholder="البحث برقم التسوية أو المورد..."
+                  placeholder={language === 'ar' ? 'البحث برقم التسوية أو المورد...' : 'Search by settlement number or supplier...'}
                   className="w-full pl-10 pr-4 py-2 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all text-sm font-semibold"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -1783,17 +1783,17 @@ export const SupplierSettlements: React.FC = () => {
               <table className="w-full text-right text-sm">
                 <thead>
                   <tr className="bg-zinc-50/50 text-zinc-500 text-xs font-bold uppercase tracking-wider">
-                    <th className="px-6 py-4">رقم التسوية</th>
-                    <th className="px-6 py-4">التاريخ</th>
-                    <th className="px-6 py-4">المورد</th>
-                    <th className="px-6 py-4 text-left">المبلغ الإجمالي المسوى</th>
-                    <th className="px-6 py-4 text-left">الإجراءات</th>
+                    <th className="px-6 py-4">{t('settlements.history_number')}</th>
+                    <th className="px-6 py-4">{t('settlements.movement_date')}</th>
+                    <th className="px-6 py-4">{t('discounts.column_supplier')}</th>
+                    <th className="px-6 py-4 text-left">{t('settlements.history_amount')}</th>
+                    <th className="px-6 py-4 text-left">{t('settlements.history_actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-50">
                   {historyList.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 italic">لا توجد تسويات مسجلة</td>
+                      <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 italic">{t('settlements.history_no_data')}</td>
                     </tr>
                   ) : (
                     historyList.map(h => (
@@ -1808,14 +1808,14 @@ export const SupplierSettlements: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 text-zinc-500 font-semibold">{formatDate(h.date)}</td>
                         <td className="px-6 py-4 font-bold text-zinc-700">{h.entity_name}</td>
-                        <td className="px-6 py-4 text-left font-black text-emerald-600">{formatMoney(h.total_amount)} ج.م</td>
+                        <td className="px-6 py-4 text-left font-black text-emerald-600">{formatMoney(h.total_amount)} {t('common.currency')}</td>
                         <td className="px-6 py-4 text-left">
                           <div className="flex items-center justify-end gap-2 transition-all">
                             <button
                               onClick={() => setSelectedHistory(h)}
                               className="px-3 py-1 text-xs font-bold bg-zinc-100 text-zinc-600 rounded-lg hover:bg-zinc-200 transition-all"
                             >
-                              عرض التفاصيل
+                              {language === 'ar' ? 'عرض التفاصيل' : 'View Details'}
                             </button>
                             <button
                               onClick={() => handleDeleteSettlement(h.settlement_number, h.entity_name)}
@@ -1849,16 +1849,16 @@ export const SupplierSettlements: React.FC = () => {
               <div className="p-6 border-b border-zinc-100 bg-zinc-50 flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-3">
-                    <span>تفاصيل التسوية: {selectedHistory.settlement_number}</span>
+                    <span>{language === 'ar' ? 'تفاصيل التسوية:' : 'Settlement Details:'} {selectedHistory.settlement_number}</span>
                     <button
                       onClick={() => handleExportSettlementExcel(selectedHistory)}
                       className="px-3 py-1 text-xs font-bold bg-white text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-all flex items-center gap-1 shadow-sm"
                     >
                       <Download size={12} />
-                      تصدير Excel
+                      {language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
                     </button>
                   </h3>
-                  <p className="text-xs text-zinc-400 font-bold mt-1">تاريخ التسوية: {formatDate(selectedHistory.date)} • المورد: {selectedHistory.entity_name}</p>
+                  <p className="text-xs text-zinc-400 font-bold mt-1">{language === 'ar' ? 'تاريخ التسوية:' : 'Settlement Date:'} {formatDate(selectedHistory.date)} • {language === 'ar' ? 'المورد:' : 'Supplier:'} {selectedHistory.entity_name}</p>
                 </div>
                 <button
                   onClick={() => setSelectedHistory(null)}
@@ -1872,7 +1872,7 @@ export const SupplierSettlements: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Debits Linked */}
                   <div className="space-y-3">
-                    <h4 className="font-bold text-red-700 text-sm border-b border-zinc-100 pb-2">المستندات المدينة (دفعات / مرتجعات / إعفاءات)</h4>
+                    <h4 className="font-bold text-red-700 text-sm border-b border-zinc-100 pb-2">{language === 'ar' ? 'المستندات المدينة (دفعات / مرتجعات / إعفاءات)' : 'Debit Documents (Payments / Returns / Allowances)'}</h4>
                     <div className="space-y-2">
                       {selectedHistory.debitDocs.map((doc: any, i: number) => (
                         <div key={i} className="p-3 bg-zinc-50 rounded-xl text-xs space-y-2">
@@ -1881,10 +1881,10 @@ export const SupplierSettlements: React.FC = () => {
                               <span className="font-bold text-zinc-700">{doc.number}</span>
                               <span className="text-[10px] text-zinc-400 font-semibold mr-2">{doc.type_label}</span>
                             </div>
-                            <span className="font-black text-red-500">{formatMoney(doc.amount)} ج.م</span>
+                            <span className="font-black text-red-500">{formatMoney(doc.amount)} {t('common.currency')}</span>
                           </div>
                           <div className="text-[10px] text-zinc-500 font-semibold">
-                            تاريخ المستند: {formatDate(doc.date)} • رقم القيد: <span 
+                            {language === 'ar' ? 'تاريخ المستند:' : 'Doc Date:'} {formatDate(doc.date)} • {language === 'ar' ? 'رقم القيد:' : 'JE No.:'} <span 
                               onClick={() => {
                                 if (doc.je_number && doc.je_number !== '-') {
                                   setPendingViewDoc({ type: 'journal', idOrNumber: doc.je_number });
@@ -1905,7 +1905,7 @@ export const SupplierSettlements: React.FC = () => {
                             className="w-full mt-1 px-3 py-2 text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-all flex items-center justify-center gap-2"
                           >
                             <Edit3 size={12} />
-                            انتقال وتعديل
+                            {language === 'ar' ? 'انتقال وتعديل' : 'Go to Edit'}
                           </button>
                         </div>
                       ))}
@@ -1914,7 +1914,7 @@ export const SupplierSettlements: React.FC = () => {
 
                   {/* Credits Linked */}
                   <div className="space-y-3">
-                    <h4 className="font-bold text-emerald-700 text-sm border-b border-zinc-100 pb-2">المستندات الدائنة (الطلب المالي / فواتير المشتريات)</h4>
+                    <h4 className="font-bold text-emerald-700 text-sm border-b border-zinc-100 pb-2">{language === 'ar' ? 'المستندات الدائنة (الطلب المالي / فواتير المشتريات)' : 'Credit Documents (Financial Requests / Purchase Invoices)'}</h4>
                     <div className="space-y-2">
                       {selectedHistory.creditDocs.map((doc: any, i: number) => (
                         <div key={i} className="p-3 bg-zinc-50 rounded-xl text-xs space-y-2">
@@ -1923,7 +1923,7 @@ export const SupplierSettlements: React.FC = () => {
                               <span className="font-bold text-zinc-700">{doc.number}</span>
                               <span className="text-[10px] text-zinc-400 font-semibold mr-2">{doc.type_label}</span>
                             </div>
-                            <span className="font-black text-emerald-500">{formatMoney(doc.amount)} ج.م</span>
+                            <span className="font-black text-emerald-500">{formatMoney(doc.amount)} {t('common.currency')}</span>
                           </div>
                           <div className="text-[10px] text-zinc-500 font-semibold">
                             تاريخ المستند: {formatDate(doc.date)} • رقم القيد: <span 
@@ -1956,8 +1956,8 @@ export const SupplierSettlements: React.FC = () => {
                 </div>
 
                 <div className="p-4 bg-slate-900 text-white rounded-2xl flex justify-between items-center font-bold">
-                  <span className="text-zinc-400 text-xs">الإجمالي الكلي المسوى</span>
-                  <span className="text-xl text-emerald-400">{formatMoney(selectedHistory.total_amount)} ج.م</span>
+                  <span className="text-zinc-400 text-xs">{language === 'ar' ? 'الإجمالي الكلي المسوى' : 'Total Settled Amount'}</span>
+                  <span className="text-xl text-emerald-400">{formatMoney(selectedHistory.total_amount)} {t('common.currency')}</span>
                 </div>
               </div>
             </motion.div>

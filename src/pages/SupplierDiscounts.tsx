@@ -262,10 +262,10 @@ export const SupplierDiscounts: React.FC = () => {
         opening_balance_date: new Date().toISOString().slice(0, 10),
         account_id: ''
       });
-      showNotification('تم إضافة المورد بنجاح');
+      showNotification(t('common.save_success'));
     } catch (e) {
       console.error(e);
-      showNotification('حدث خطأ أثناء إضافة المورد', 'error');
+      showNotification(t('common.error'), 'error');
     }
   };
 
@@ -353,7 +353,7 @@ export const SupplierDiscounts: React.FC = () => {
           journalEntryData,
           JournalEntrySchema
         );
-        showNotification('تم تحديث الخصم بنجاح', 'success');
+        showNotification(t('discounts.toast_success'), 'success');
       } else {
         await TransactionManager.saveWithAccounting(
           'supplier_discounts',
@@ -370,7 +370,7 @@ export const SupplierDiscounts: React.FC = () => {
 
     } catch (e: any) {
       console.error('Save failed:', e);
-      showNotification(e.message || 'حدث خطأ أثناء حفظ البيانات', 'error');
+      showNotification(e.message || t('discounts.toast_error'), 'error');
     }
   };
 
@@ -402,17 +402,17 @@ export const SupplierDiscounts: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
       {!isModalOpen ? (
         <>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">خصم الموردين</h2>
-          <p className="text-zinc-500">إدارة الخصومات المكتسبة من الموردين.</p>
+          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('discounts.supplier_title')}</h2>
+          <p className="text-zinc-500">{t('discounts.supplier_subtitle')}</p>
           {serverSummary.total_amount !== undefined && (
             <div className="mt-2 flex items-center gap-4 text-sm">
                <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
-                 إجمالي الخصومات: {formatMoney(serverSummary.total_amount)} ج.م
+                 {t('discounts.total_discounts')}: {formatMoney(serverSummary.total_amount)} {t('common.currency')}
                </span>
             </div>
           )}
@@ -423,7 +423,7 @@ export const SupplierDiscounts: React.FC = () => {
             className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-zinc-200 text-zinc-700 rounded-2xl font-bold hover:bg-zinc-50 transition-all shadow-sm"
           >
             <History size={20} />
-            سجل النشاط
+            {t('common.activity_log')}
           </button>
           <button 
             onClick={() => setIsModalOpen(true)}
@@ -441,7 +441,7 @@ export const SupplierDiscounts: React.FC = () => {
             <Search className="absolute left-3 top-3 text-zinc-400" size={18} />
             <input
               type="text"
-              placeholder="البحث عن خصومات..."
+              placeholder={t('discounts.search_placeholder')}
               className="w-full pl-10 pr-4 py-2 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-amber-500 transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -454,7 +454,7 @@ export const SupplierDiscounts: React.FC = () => {
               title="عرض الجدول"
             >
               <List size={18} />
-              <span className="hidden md:inline">مسرد</span>
+              <span className="hidden md:inline">{t('discounts.tab_single')}</span>
             </button>
             <button
               onClick={() => setView('card')}
@@ -462,7 +462,7 @@ export const SupplierDiscounts: React.FC = () => {
               title="عرض الكروت"
             >
               <LayoutGrid size={18} />
-              <span className="hidden md:inline">بطاقات</span>
+              <span className="hidden md:inline">{t('discounts.tab_cards')}</span>
             </button>
           </div>
         </div>
@@ -496,8 +496,8 @@ export const SupplierDiscounts: React.FC = () => {
                       </span>
                     </div>
                   </th>
-                  <th className="px-6 py-4 font-bold">ملاحظات</th>
-                  <th className="px-6 py-4 font-bold text-left">الإجراءات</th>
+                  <th className="px-6 py-4 font-bold">{t('discounts.column_notes')}</th>
+                  <th className="px-6 py-4 font-bold text-left">{t('discounts.column_actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-50">
@@ -729,12 +729,12 @@ export const SupplierDiscounts: React.FC = () => {
                   <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
                     <div className="absolute top-4 right-4 flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-100">
                       <Tag className="w-4 h-4" />
-                      <span className="text-xs font-bold">بيانات الخصم</span>
+                      <span className="text-xs font-bold">{t('discounts.add_new_title')}</span>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">رقم الخصم</label>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('discounts.discount_number')}</label>
                         <div className="relative">
                           <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <input 
@@ -747,7 +747,7 @@ export const SupplierDiscounts: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase">المورد</label>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase">{t('discounts.column_supplier')}</label>
                         <div className="relative group">
                           <Truck className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <select 
@@ -762,7 +762,7 @@ export const SupplierDiscounts: React.FC = () => {
                               }
                             }}
                           >
-                            <option value="">اختر المورد...</option>
+                            <option value="">{t('common.select_supplier')}</option>
                             {suppliers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
                             <option value="new" className="font-bold text-amber-600">+ إضافة مورد جديد...</option>
                           </select>
@@ -771,7 +771,7 @@ export const SupplierDiscounts: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">تاريخ الخصم</label>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('discounts.date_label')}</label>
                         <div className="relative group">
                           <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <input 
@@ -785,7 +785,7 @@ export const SupplierDiscounts: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase">قيمة الخصم</label>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase">{t('discounts.amount_label')}</label>
                         <div className="relative group">
                           <Wallet className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <input 
@@ -801,7 +801,7 @@ export const SupplierDiscounts: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">الحساب المالي (الخصم)</label>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('discount_settings.supplier_discount_label')}</label>
                         <div className="relative group">
                           <BookOpen className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <select 
@@ -810,7 +810,7 @@ export const SupplierDiscounts: React.FC = () => {
                             value={discountData.account_id}
                             onChange={(e) => setDiscountData({...discountData, account_id: e.target.value})}
                           >
-                            <option value="">اختر الحساب...</option>
+                            <option value="">{t('discount_settings.select_account')}</option>
                             {accounts.map(a => <option key={a.id} value={a.id}>{a.name} ({a.code})</option>)}
                           </select>
                           <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
@@ -819,11 +819,11 @@ export const SupplierDiscounts: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">ملاحظات</label>
+                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('discounts.column_notes')}</label>
                       <textarea 
                         rows={3}
                         className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-3xl focus:ring-2 focus:ring-amber-500 outline-none transition-all resize-none font-bold text-sm text-zinc-800"
-                        placeholder="سبب الخصم أو أي ملاحظات إضافية..."
+                        placeholder={t('discounts.notes_placeholder')}
                         value={discountData.notes}
                         onChange={(e) => setDiscountData({...discountData, notes: e.target.value})}
                       />
@@ -848,7 +848,7 @@ export const SupplierDiscounts: React.FC = () => {
                   className="flex-1 py-4 rounded-2xl bg-amber-600 text-white font-black hover:bg-amber-700 transition-all flex items-center justify-center gap-3 shadow-xl shadow-amber-600/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Save size={20} />
-                  {editingDiscount ? 'حفظ التعديلات' : 'حفظ الخصم'}
+                  {editingDiscount ? t('common.save') : t('discounts.save_button')}
                 </button>
               </div>
             </form>
@@ -983,8 +983,8 @@ export const SupplierDiscounts: React.FC = () => {
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 animate-in zoom-in-95 duration-200">
-            <h3 className="text-xl font-bold text-zinc-900 mb-4">تأكيد الحذف</h3>
-            <p className="text-zinc-500 mb-6">هل أنت متأكد من رغبتك في حذف هذا الخصم؟ لا يمكن التراجع عن هذا الإجراء.</p>
+            <h3 className="text-xl font-bold text-zinc-900 mb-4">{t('common.delete_confirm_title')}</h3>
+            <p className="text-zinc-500 mb-6">{t('discounts.delete_confirm')}</p>
             <div className="flex gap-4">
               <button 
                 onClick={() => {
