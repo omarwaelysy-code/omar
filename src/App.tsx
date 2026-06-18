@@ -45,6 +45,7 @@ import { AccountTypes } from './pages/AccountTypes';
 import { Accounts } from './pages/Accounts';
 import { ChartOfAccounts } from './pages/ChartOfAccounts';
 import { JournalEntries } from './pages/JournalEntries';
+import { DetailedJournalEntries } from './pages/DetailedJournalEntries';
 import { CreateJournalEntry } from './pages/CreateJournalEntry';
 import { GeneralLedger } from './pages/GeneralLedger';
 import { TrialBalance } from './pages/TrialBalance';
@@ -205,6 +206,7 @@ export default function App() {
       case 'accounts': return <Accounts />;
       case 'chart_of_accounts': return <ChartOfAccounts />;
       case 'journal_entries': return <JournalEntries />;
+      case 'detailed_journal_entries': return <DetailedJournalEntries />;
       case 'create_journal_entry': return <CreateJournalEntry />;
       case 'general_ledger_report': return <GeneralLedger />;
       case 'trial_balance': return <TrialBalance />;

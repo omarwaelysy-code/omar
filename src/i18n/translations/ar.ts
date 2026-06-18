@@ -35,6 +35,7 @@ export const ar = {
   'nav.chart_of_accounts': 'شجرة الحسابات',
   'nav.create_journal_entry': 'إضافة قيد يومية',
   'nav.journal_entries': 'قيود اليومية',
+  'nav.detailed_journal_entries': 'قيود يومية تفصيلية',
   'nav.general_ledger_report': 'حساب الأستاذ',
   'nav.trial_balance': 'ميزان المراجعة',
   'nav.income_statement': 'قائمة الدخل',

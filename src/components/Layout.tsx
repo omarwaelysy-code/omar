@@ -6,6 +6,7 @@ import {
   Users as UsersIcon, 
   Package, 
   FileText, 
+  FileSpreadsheet,
   Receipt, 
   Settings, 
   LogOut,
@@ -283,7 +284,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           ...(company?.settings?.enable_multi_currency || isSuperAdmin ? [{ id: 'currencies', label: t('nav.currencies'), icon: Coins }] : []),
           { id: 'chart_of_accounts', label: t('nav.chart_of_accounts'), icon: PieChart },
           { id: 'create_journal_entry', label: t('nav.create_journal_entry'), icon: Plus },
-          { id: 'journal_entries', label: t('nav.journal_entries'), icon: FileText }
+          { id: 'journal_entries', label: t('nav.journal_entries'), icon: FileText },
+          { id: 'detailed_journal_entries', label: t('nav.detailed_journal_entries') || 'قيود يومية تفصيلية', icon: FileSpreadsheet }
         ]
       },
       {

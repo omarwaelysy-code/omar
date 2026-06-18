@@ -989,6 +989,154 @@ router.get('/utils/next-sequence/:moduleName', authenticateToken, async (req: an
   }
 });
 
+router.get('/detailed-journal-entries', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const isSuperAdmin = req.user?.role === 'super_admin';
+    const companyId = isSuperAdmin ? req.query.company_id : (req.query.company_id || req.user?.company_id);
+    
+    if (!companyId) return res.status(400).json({ error: 'company_id is required' });
+
+    const page = parseInt(req.query._page as string, 10) || 1;
+    const limit = parseInt(req.query._limit as string, 10) || 50;
+    const offset = (page - 1) * limit;
+    const search = (req.query._search as string) || '';
+    const dateFrom = req.query.date_from as string;
+    const dateTo = req.query.date_to as string;
+
+    let sql = `
+      SELECT 
+        jel.id as line_id,
+        jel.debit,
+        jel.credit,
+        jel.description as line_description,
+        jel.account_id,
+        jel.account_name,
+        jel.customer_id,
+        jel.supplier_id,
+        jel.customer_name,
+        jel.supplier_name,
+        jel.sub_account_id,
+        jel.sub_account_type,
+        je.id as journal_entry_id,
+        je.entry_number,
+        je.date,
+        je.description as entry_description,
+        je.reference_type,
+        je.reference_number,
+        je.reference_id,
+        
+        -- Currency & Foreign Currency details if available
+        COALESCE(inv.currency_id, pinv.currency_id) as currency_id,
+        cur.code as currency_code,
+        cur.symbol as currency_symbol,
+        COALESCE(inv.exchange_rate, pinv.exchange_rate) as exchange_rate,
+        CASE 
+          WHEN COALESCE(inv.exchange_rate, pinv.exchange_rate, 1) > 0 THEN 
+            (jel.debit + jel.credit) / COALESCE(inv.exchange_rate, pinv.exchange_rate, 1)
+          ELSE NULL
+        END as foreign_amount,
+        
+        -- Operation, Department, Cost Center
+        COALESCE(inv.operation_id, pinv.operation_id) as operation_id,
+        op.operation_number as operation_number,
+        COALESCE(inv.department_id, pinv.department_id) as department_id,
+        dept.name as department_name,
+        COALESCE(inv.cost_center_id, pinv.cost_center_id) as cost_center_id,
+        cc.name as cost_center_name,
+        cc.code as cost_center_code,
+        
+        -- Product/Item names list
+        CASE 
+          WHEN je.reference_type = 'invoice' THEN 
+            (SELECT string_agg(product_name, ', ') FROM invoice_items WHERE invoice_id = je.reference_id)
+          WHEN je.reference_type = 'purchase_invoice' THEN 
+            (SELECT string_agg(COALESCE(product_name, category_name), ', ') FROM purchase_invoice_items WHERE invoice_id = je.reference_id)
+          WHEN je.reference_type = 'return' THEN 
+            (SELECT string_agg(product_name, ', ') FROM return_items WHERE return_id = je.reference_id)
+          WHEN je.reference_type = 'purchase_return' THEN 
+            (SELECT string_agg(product_name, ', ') FROM purchase_return_items WHERE return_id = je.reference_id)
+          ELSE NULL
+        END as product_names
+      FROM journal_entry_lines jel
+      JOIN journal_entries je ON jel.journal_entry_id = je.id
+      LEFT JOIN invoices inv ON je.reference_type = 'invoice' AND je.reference_id = inv.id
+      LEFT JOIN purchase_invoices pinv ON je.reference_type = 'purchase_invoice' AND je.reference_id = pinv.id
+      LEFT JOIN currencies cur ON cur.id = COALESCE(inv.currency_id, pinv.currency_id)
+      LEFT JOIN operations op ON op.id = COALESCE(inv.operation_id, pinv.operation_id)
+      LEFT JOIN departments dept ON dept.id = COALESCE(inv.department_id, pinv.department_id)
+      LEFT JOIN cost_centers cc ON cc.id = COALESCE(inv.cost_center_id, pinv.cost_center_id)
+    `;
+
+    const values: any[] = [];
+    const conditions: string[] = [];
+    let paramIndex = 1;
+
+    // Filter by company
+    conditions.push(`je.company_id = $${paramIndex++}`);
+    values.push(companyId);
+
+    // Filter by date
+    if (dateFrom) {
+      conditions.push(`je.date >= $${paramIndex++}`);
+      values.push(dateFrom);
+    }
+    if (dateTo) {
+      conditions.push(`je.date <= $${paramIndex++}`);
+      values.push(dateTo);
+    }
+
+    // Filter by search term
+    if (search) {
+      conditions.push(`(
+        je.entry_number ILIKE $${paramIndex} OR
+        jel.account_name ILIKE $${paramIndex} OR
+        jel.description ILIKE $${paramIndex} OR
+        je.description ILIKE $${paramIndex} OR
+        jel.customer_name ILIKE $${paramIndex} OR
+        jel.supplier_name ILIKE $${paramIndex} OR
+        je.reference_number ILIKE $${paramIndex} OR
+        je.reference_type ILIKE $${paramIndex}
+      )`);
+      values.push(`%${search}%`);
+      paramIndex++;
+    }
+
+    if (conditions.length > 0) {
+      sql += ` WHERE ${conditions.join(' AND ')}`;
+    }
+
+    // Get count
+    const countSql = `SELECT count(*) as total FROM (${sql}) t`;
+    const countRes = await pool.query(countSql, values);
+    const total = parseInt(countRes.rows[0].total, 10);
+
+    // Get summary (Total Debit / Credit)
+    const sumSql = `SELECT sum(debit) as total_debit, sum(credit) as total_credit FROM (${sql}) t`;
+    const sumRes = await pool.query(sumSql, values);
+    const summary = {
+      total_debit: Number(sumRes.rows[0].total_debit || 0),
+      total_credit: Number(sumRes.rows[0].total_credit || 0)
+    };
+
+    // Sort: Date DESC, Entry Number DESC, Line ID ASC (to keep lines within an entry grouped and ordered)
+    sql += ` ORDER BY je.date DESC, je.entry_number DESC, jel.id ASC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
+    values.push(limit, offset);
+
+    const queryResult = await pool.query(sql, values);
+    
+    res.json({
+      data: queryResult.rows,
+      total,
+      summary,
+      page,
+      limit
+    });
+  } catch (error: any) {
+    console.error('Error fetching detailed journal entries:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 modules.forEach(moduleName => {
   const hyphenName = moduleName.replace(/_/g, '-');
   const routeNames = [moduleName];
