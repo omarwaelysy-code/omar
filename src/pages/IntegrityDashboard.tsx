@@ -159,14 +159,14 @@ export const IntegrityDashboard: React.FC = () => {
     setIsChecking(false);
   };
 
-  if (isLoading) return <div className="p-8">Loading integrity data...</div>;
+  if (isLoading) return <div className="p-8">{t('integrity.loading')}</div>;
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-black text-zinc-900">{t('integrity.title') || 'Accounting Integrity Dashboard'}</h1>
-          <p className="text-zinc-500 font-medium">{t('integrity.subtitle') || 'Monitor systems health and data consistency'}</p>
+          <h1 className="text-3xl font-black text-zinc-900">{t('integrity.title')}</h1>
+          <p className="text-zinc-500 font-medium">{t('integrity.subtitle')}</p>
         </div>
         <button 
           onClick={runFullCheck}
@@ -174,26 +174,26 @@ export const IntegrityDashboard: React.FC = () => {
           className="bg-zinc-900 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-zinc-800 transition-all disabled:opacity-50"
         >
           <RefreshCw size={20} className={isChecking ? 'animate-spin' : ''} />
-          {isChecking ? 'Scanning...' : 'Run Integrity Scan'}
+          {isChecking ? t('integrity.scanning') : t('integrity.run_scan')}
         </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <button onClick={handleSeed} disabled={isSeeding} className="p-4 bg-zinc-100 hover:bg-zinc-200 rounded-2xl font-bold transition-all">
-          Seed Scenario
+          {t('integrity.seed_scenario')}
         </button>
         <button onClick={handleRepostAll} disabled={isReposting} className="p-4 bg-emerald-600 text-white hover:bg-emerald-700 rounded-2xl font-bold transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
           {isReposting ? <RefreshCw className="animate-spin" size={20} /> : <Database size={20} />}
-          Repledge All (Sync Ledger)
+          {t('integrity.repledge_all')}
         </button>
         <button onClick={handleLoadTest} disabled={isTesting} className="p-4 bg-zinc-100 hover:bg-zinc-200 rounded-2xl font-bold transition-all text-emerald-600">
-          Run Load Test
+          {t('integrity.run_load_test')}
         </button>
         <button onClick={handleCreateSnapshot} className="p-4 bg-zinc-100 hover:bg-zinc-200 rounded-2xl font-bold transition-all text-emerald-600 font-sans">
-          Create Snapshot
+          {t('integrity.create_snapshot')}
         </button>
         <div className="p-4 bg-zinc-900 text-white rounded-2xl font-bold flex items-center justify-center">
-          Enterprise Mode: ACTIVE
+          {t('integrity.enterprise_mode_active')}
         </div>
       </div>
 
@@ -209,13 +209,13 @@ export const IntegrityDashboard: React.FC = () => {
               <Activity size={24} />
             </div>
             <div>
-              <p className="text-sm font-black text-zinc-400 uppercase tracking-widest">Global Entry Balance</p>
-              <h3 className="text-xl font-black text-zinc-900">{globalBalance.isBalanced ? 'Stable' : 'Unbalanced'}</h3>
+              <p className="text-sm font-black text-zinc-400 uppercase tracking-widest">{t('integrity.global_entry_balance')}</p>
+              <h3 className="text-xl font-black text-zinc-900">{globalBalance.isBalanced ? t('integrity.stable') : t('integrity.unbalanced')}</h3>
             </div>
           </div>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-zinc-500">Difference:</span>
+              <span className="text-zinc-500">{t('integrity.difference')}</span>
               <span className={`font-black ${globalBalance.isBalanced ? 'text-emerald-600' : 'text-emerald-600'}`}>
                 {formatNumber(globalBalance.difference)}
               </span>
@@ -235,11 +235,11 @@ export const IntegrityDashboard: React.FC = () => {
               <ShieldAlert size={24} />
             </div>
             <div>
-              <p className="text-sm font-black text-zinc-400 uppercase tracking-widest">A = L + E Check</p>
-              <h3 className="text-xl font-black text-zinc-900">{balanceSheet.isBalanced ? 'Correct' : 'Failed'}</h3>
+              <p className="text-sm font-black text-zinc-400 uppercase tracking-widest">{t('integrity.ale_check')}</p>
+              <h3 className="text-xl font-black text-zinc-900">{balanceSheet.isBalanced ? t('integrity.correct') : t('integrity.failed')}</h3>
             </div>
           </div>
-          <p className="text-sm text-zinc-500 font-medium">Assets must equal Liabilities + Equity.</p>
+          <p className="text-sm text-zinc-500 font-medium">{t('integrity.ale_description')}</p>
         </motion.div>
 
         {/* Database Health */}
@@ -254,11 +254,11 @@ export const IntegrityDashboard: React.FC = () => {
               <Database size={24} />
             </div>
             <div>
-              <p className="text-sm font-black text-zinc-400 uppercase tracking-widest">Total Volume</p>
-              <h3 className="text-xl font-black text-zinc-900">{entries.length} Entries</h3>
+              <p className="text-sm font-black text-zinc-400 uppercase tracking-widest">{t('integrity.total_volume')}</p>
+              <h3 className="text-xl font-black text-zinc-900">{t('integrity.entries_count', { count: entries.length })}</h3>
             </div>
           </div>
-          <p className="text-sm text-zinc-500 font-medium">Database status: Connected & Active</p>
+          <p className="text-sm text-zinc-500 font-medium">{t('integrity.db_status')}</p>
         </motion.div>
       </div>
 
@@ -266,7 +266,7 @@ export const IntegrityDashboard: React.FC = () => {
         <div className="p-8 border-b border-zinc-100">
           <h3 className="text-xl font-black text-zinc-900 flex items-center gap-2">
             <AlertCircle className="text-emerald-500" />
-            Detected Anomalies
+            {t('integrity.detected_anomalies')}
           </h3>
         </div>
         <div className="divide-y divide-zinc-100">
@@ -275,11 +275,11 @@ export const IntegrityDashboard: React.FC = () => {
               <div className="flex items-center gap-4">
                 <div className="w-2 h-2 rounded-full bg-emerald-500" />
                 <div>
-                  <p className="font-bold text-zinc-900">Unbalanced Journal Entry</p>
+                  <p className="font-bold text-zinc-900">{t('integrity.unbalanced_journal_entry')}</p>
                   <p className="text-sm text-zinc-500">{err}</p>
                 </div>
               </div>
-              <span className="text-xs font-black px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full uppercase">Critical</span>
+              <span className="text-xs font-black px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full uppercase">{t('integrity.critical')}</span>
             </div>
           ))}
           {balanceSheet.diagnostics.missingAccountType.map((err, i) => (
@@ -287,11 +287,11 @@ export const IntegrityDashboard: React.FC = () => {
               <div className="flex items-center gap-4">
                 <div className="w-2 h-2 rounded-full bg-emerald-500" />
                 <div>
-                  <p className="font-bold text-zinc-900">Account Missing Type</p>
+                  <p className="font-bold text-zinc-900">{t('integrity.account_missing_type')}</p>
                   <p className="text-sm text-zinc-500 text-emerald-600 font-bold">{err}</p>
                 </div>
               </div>
-              <span className="text-xs font-black px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full uppercase">Critical</span>
+              <span className="text-xs font-black px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full uppercase">{t('integrity.critical')}</span>
             </div>
           ))}
           {balanceSheet.diagnostics.orphanedAccounts.map((err, i) => (
@@ -299,11 +299,11 @@ export const IntegrityDashboard: React.FC = () => {
               <div className="flex items-center gap-4">
                 <div className="w-2 h-2 rounded-full bg-amber-500" />
                 <div>
-                  <p className="font-bold text-zinc-900">Orphaned Account (No Statement Type)</p>
+                  <p className="font-bold text-zinc-900">{t('integrity.orphaned_account')}</p>
                   <p className="text-sm text-zinc-500">{err}</p>
                 </div>
               </div>
-              <span className="text-xs font-black px-3 py-1 bg-amber-100 text-amber-700 rounded-full uppercase">Warning</span>
+              <span className="text-xs font-black px-3 py-1 bg-amber-100 text-amber-700 rounded-full uppercase">{t('integrity.warning')}</span>
             </div>
           ))}
           {balanceSheet.diagnostics.unbalancedEntries.length === 0 && 
@@ -313,8 +313,8 @@ export const IntegrityDashboard: React.FC = () => {
               <div className="bg-emerald-100 text-emerald-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle size={32} />
               </div>
-              <p className="text-zinc-900 font-black text-xl">Perfect Health</p>
-              <p className="text-zinc-500 font-medium">No accounting anomalies detected in currently loaded data.</p>
+              <p className="text-zinc-900 font-black text-xl">{t('integrity.perfect_health')}</p>
+              <p className="text-zinc-500 font-medium">{t('integrity.no_anomalies_detected')}</p>
             </div>
           )}
         </div>
