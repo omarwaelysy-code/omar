@@ -326,6 +326,24 @@ export const Invoices: React.FC = () => {
   };
 
   const isVatEnabled = companyData?.settings?.vat_enabled || companyData?.vat_enabled || false;
+  const isMultiCurrencyEnabled = companyData?.settings?.enable_multi_currency || (companyData as any)?.enable_multi_currency || false;
+
+  useEffect(() => {
+    if (user?.id) {
+      const saved = localStorage.getItem(`invoices_visible_columns_${user.id}`);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setVisibleColumns(prev => ({
+            ...prev,
+            ...parsed
+          }));
+        } catch (e) {
+          console.error('Failed to parse saved visible columns', e);
+        }
+      }
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (user) {
@@ -2191,11 +2209,11 @@ export const Invoices: React.FC = () => {
     if (visibleColumns.description) keyMap['formatted_description'] = 'وصف الفاتورة';
     if (visibleColumns.payment_type) keyMap['formatted_payment_type'] = 'طريقة الدفع';
     if (visibleColumns.status) keyMap['formatted_status'] = 'حالة الدفع';
-    if (visibleColumns.currency) keyMap['formatted_currency'] = 'العملة';
-    if (visibleColumns.foreign_amount) keyMap['formatted_foreign_amount'] = 'صافي القيمة بالعملة الأجنبية';
-    if (visibleColumns.remaining_foreign) keyMap['formatted_remaining_foreign'] = 'الباقي بالعملة الأجنبية';
-    if (visibleColumns.subtotal) keyMap['formatted_subtotal'] = 'قبل الضريبة';
-    if (visibleColumns.tax_amount) keyMap['formatted_tax_amount'] = 'الضريبة';
+    if (visibleColumns.currency && isMultiCurrencyEnabled) keyMap['formatted_currency'] = 'العملة';
+    if (visibleColumns.foreign_amount && isMultiCurrencyEnabled) keyMap['formatted_foreign_amount'] = 'صافي القيمة بالعملة الأجنبية';
+    if (visibleColumns.remaining_foreign && isMultiCurrencyEnabled) keyMap['formatted_remaining_foreign'] = 'الباقي بالعملة الأجنبية';
+    if (visibleColumns.subtotal && isVatEnabled) keyMap['formatted_subtotal'] = 'قبل الضريبة';
+    if (visibleColumns.tax_amount && isVatEnabled) keyMap['formatted_tax_amount'] = 'الضريبة';
     if (visibleColumns.base_amount) keyMap['formatted_base_amount'] = 'القيمة المعادلة بالعملة المحلية';
     if (visibleColumns.remaining) keyMap['formatted_remaining'] = 'الباقي من الفاتورة';
     if (visibleColumns.entry_number) keyMap['formatted_entry_number'] = 'رقم القيد';
@@ -2565,7 +2583,15 @@ export const Invoices: React.FC = () => {
                       <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest pb-1 border-b border-slate-100">
                         {language === 'ar' ? 'تخصيص الأعمدة' : 'Customize Columns'}
                       </div>
-                      {Object.keys(visibleColumns).map((colKey) => {
+                      {Object.keys(visibleColumns).filter(colKey => {
+                        if (colKey === 'currency' || colKey === 'foreign_amount' || colKey === 'remaining_foreign') {
+                          return isMultiCurrencyEnabled;
+                        }
+                        if (colKey === 'subtotal' || colKey === 'tax_amount') {
+                          return isVatEnabled;
+                        }
+                        return true;
+                      }).map((colKey) => {
                         const labels: Record<string, string> = {
                           invoice_number: language === 'ar' ? 'رقم الفاتورة' : 'Invoice Number',
                           customer_name: language === 'ar' ? 'العميل' : 'Customer',
@@ -2589,10 +2615,15 @@ export const Invoices: React.FC = () => {
                               type="checkbox"
                               checked={visibleColumns[colKey]}
                               onChange={() => {
-                                setVisibleColumns(prev => ({
-                                  ...prev,
-                                  [colKey]: !prev[colKey]
-                                }));
+                                const newVal = !visibleColumns[colKey];
+                                const updated = {
+                                  ...visibleColumns,
+                                  [colKey]: newVal
+                                };
+                                setVisibleColumns(updated);
+                                if (user?.id) {
+                                  localStorage.setItem(`invoices_visible_columns_${user.id}`, JSON.stringify(updated));
+                                }
                               }}
                               className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5"
                             />
@@ -2719,7 +2750,7 @@ export const Invoices: React.FC = () => {
                           />
                         </th>
                       )}
-                      {visibleColumns.currency && (
+                      {visibleColumns.currency && isMultiCurrencyEnabled && (
                         <th 
                           style={{ width: columnWidths.currency, minWidth: columnWidths.currency }} 
                           className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
@@ -2737,7 +2768,7 @@ export const Invoices: React.FC = () => {
                           />
                         </th>
                       )}
-                      {visibleColumns.foreign_amount && (
+                      {visibleColumns.foreign_amount && isMultiCurrencyEnabled && (
                         <th 
                           style={{ width: columnWidths.foreign_amount, minWidth: columnWidths.foreign_amount }} 
                           className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
@@ -2755,7 +2786,7 @@ export const Invoices: React.FC = () => {
                           />
                         </th>
                       )}
-                      {visibleColumns.remaining_foreign && (
+                      {visibleColumns.remaining_foreign && isMultiCurrencyEnabled && (
                         <th 
                           style={{ width: columnWidths.remaining_foreign, minWidth: columnWidths.remaining_foreign }} 
                           className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
@@ -2773,7 +2804,7 @@ export const Invoices: React.FC = () => {
                           />
                         </th>
                       )}
-                      {visibleColumns.subtotal && (
+                      {visibleColumns.subtotal && isVatEnabled && (
                         <th 
                           style={{ width: columnWidths.subtotal, minWidth: columnWidths.subtotal }} 
                           className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
@@ -2791,7 +2822,7 @@ export const Invoices: React.FC = () => {
                           />
                         </th>
                       )}
-                      {visibleColumns.tax_amount && (
+                      {visibleColumns.tax_amount && isVatEnabled && (
                         <th 
                           style={{ width: columnWidths.tax_amount, minWidth: columnWidths.tax_amount }} 
                           className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
@@ -2870,7 +2901,15 @@ export const Invoices: React.FC = () => {
                     {loading ? (
                       Array.from({ length: 5 }).map((_, rowIndex) => (
                         <tr key={rowIndex} className="animate-pulse">
-                          {Object.keys(visibleColumns).map((colKey) => {
+                          {Object.keys(visibleColumns).filter(colKey => {
+                            if (colKey === 'currency' || colKey === 'foreign_amount' || colKey === 'remaining_foreign') {
+                              return isMultiCurrencyEnabled;
+                            }
+                            if (colKey === 'subtotal' || colKey === 'tax_amount') {
+                              return isVatEnabled;
+                            }
+                            return true;
+                          }).map((colKey) => {
                             if (!visibleColumns[colKey]) return null;
                             return (
                               <td key={colKey} className="px-6 py-0.5">
@@ -2885,7 +2924,12 @@ export const Invoices: React.FC = () => {
                       ))
                     ) : filteredInvoices.length === 0 ? (
                       <tr>
-                        <td colSpan={Object.keys(visibleColumns).filter(k => visibleColumns[k]).length + 1} className="px-6 py-12 text-center text-slate-500 italic font-medium">{t('common.no_data')}</td>
+                        <td colSpan={Object.keys(visibleColumns).filter(k => {
+                          if (!visibleColumns[k]) return false;
+                          if (k === 'currency' || k === 'foreign_amount' || k === 'remaining_foreign') return isMultiCurrencyEnabled;
+                          if (k === 'subtotal' || k === 'tax_amount') return isVatEnabled;
+                          return true;
+                        }).length + 1} className="px-6 py-12 text-center text-slate-500 italic font-medium">{t('common.no_data')}</td>
                       </tr>
                     ) : (
                       filteredInvoices.map((inv) => (
@@ -2951,12 +2995,12 @@ export const Invoices: React.FC = () => {
                               })()}
                             </td>
                           )}
-                          {visibleColumns.currency && (
+                          {visibleColumns.currency && isMultiCurrencyEnabled && (
                             <td style={{ width: columnWidths.currency, minWidth: columnWidths.currency }} className={`px-6 py-0.5 font-bold text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP')}
                             </td>
                           )}
-                          {visibleColumns.foreign_amount && (
+                          {visibleColumns.foreign_amount && isMultiCurrencyEnabled && (
                             <td style={{ width: columnWidths.foreign_amount, minWidth: columnWidths.foreign_amount }} className={`px-6 py-0.5 font-bold text-slate-700 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {(() => {
                                 const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
@@ -2966,7 +3010,7 @@ export const Invoices: React.FC = () => {
                               })()}
                             </td>
                           )}
-                          {visibleColumns.remaining_foreign && (
+                          {visibleColumns.remaining_foreign && isMultiCurrencyEnabled && (
                             <td style={{ width: columnWidths.remaining_foreign, minWidth: columnWidths.remaining_foreign }} className={`px-6 py-0.5 font-bold text-slate-700 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {(() => {
                                 const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
@@ -2983,12 +3027,12 @@ export const Invoices: React.FC = () => {
                               })()}
                             </td>
                           )}
-                          {visibleColumns.subtotal && (
+                          {visibleColumns.subtotal && isVatEnabled && (
                             <td style={{ width: columnWidths.subtotal, minWidth: columnWidths.subtotal }} className={`px-6 py-0.5 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {formatMoney(inv.subtotal * (Number(inv.exchange_rate) || 1))}
                             </td>
                           )}
-                          {visibleColumns.tax_amount && (
+                          {visibleColumns.tax_amount && isVatEnabled && (
                             <td style={{ width: columnWidths.tax_amount, minWidth: columnWidths.tax_amount }} className={`px-6 py-0.5 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {formatMoney(inv.tax_amount * (Number(inv.exchange_rate) || 1))}
                             </td>
