@@ -13,21 +13,37 @@ export class ScenarioTestingService {
     const tm = new TransactionManager();
 
     try {
-      // Ensure default account types exist first
+      // Ensure default account types exist first, checking by classification to avoid missing types
       let accountTypes = await dbService.list<any>('account_types', companyId);
-      if (accountTypes.length === 0) {
-        const types = [
-          { name: 'الأصول', code: '1', classification: 'asset', statement_type: 'balance_sheet' },
-          { name: 'الالتزامات', code: '2', classification: 'liability', statement_type: 'balance_sheet' },
-          { name: 'حقوق الملكية', code: '3', classification: 'equity', statement_type: 'balance_sheet' },
-          { name: 'الإيرادات', code: '4', classification: 'revenue', statement_type: 'income_statement' },
-          { name: 'المصروفات', code: '5', classification: 'expense', statement_type: 'income_statement' },
-        ];
-        for (const t of types) {
-          await dbService.add('account_types', { ...t, company_id: companyId });
+      
+      const ensureAccountType = async (name: string, code: string, classification: string, statementType: string) => {
+        let type = accountTypes.find((t: any) => t.classification === classification || t.name === name);
+        if (!type) {
+          const id = await dbService.add('account_types', {
+            name,
+            code,
+            classification,
+            statement_type: statementType,
+            company_id: companyId
+          });
+          type = {
+            id,
+            name,
+            code,
+            classification,
+            statement_type: statementType,
+            company_id: companyId
+          };
+          accountTypes.push(type);
         }
-        accountTypes = await dbService.list<any>('account_types', companyId);
-      }
+        return type;
+      };
+
+      await ensureAccountType('الأصول', '1', 'asset', 'balance_sheet');
+      await ensureAccountType('الالتزامات', '2', 'liability', 'balance_sheet');
+      await ensureAccountType('حقوق الملكية', '3', 'equity', 'balance_sheet');
+      await ensureAccountType('الإيرادات', '4', 'revenue', 'income_statement');
+      await ensureAccountType('المصروفات', '5', 'expense', 'income_statement');
 
       const getTypeId = (cls: string) => accountTypes.find((t: any) => t.classification === cls)?.id || '';
       
@@ -64,20 +80,20 @@ export class ScenarioTestingService {
 
       // Ensure key accounts exist
       const bankAcc = await ensureAccount('حساب البنك', '1102', 'asset');
-      await ensureAccount('المبيعات', '4101', 'revenue');
-      await ensureAccount('مخزون البضاعة', '1301', 'asset');
-      await ensureAccount('حساب العملاء', '1201', 'asset');
-      await ensureAccount('حساب الموردين', '2101', 'liability');
+      const salesAcc = await ensureAccount('المبيعات', '4101', 'revenue');
+      const inventoryAcc = await ensureAccount('مخزون البضاعة', '1301', 'asset');
+      const customersAcc = await ensureAccount('حساب العملاء', '1201', 'asset');
+      const suppliersAcc = await ensureAccount('حساب الموردين', '2101', 'liability');
       const equityAcc = await ensureAccount('رأس المال', '3101', 'equity');
 
-      // Find key accounts
-      const bank = accounts.find(a => a.name.includes('بنك') || a.name.includes('Bank') || a.name.includes('الخزينة'));
-      const sales = accounts.find(a => a.name.includes('مبيعات') || a.name.includes('Sales'));
-      const inventory = accounts.find(a => a.name.includes('مخزون') || a.name.includes('Inventory'));
-      const customers = accounts.find(a => a.name.includes('عملاء') || a.name.includes('Customers'));
+      // Find key accounts with robust fallback
+      const bank = bankAcc || accounts.find(a => a.name.includes('بنك') || a.name.includes('Bank') || a.name.includes('الخزينة'));
+      const sales = salesAcc || accounts.find(a => a.name.includes('مبيعات') || a.name.includes('Sales'));
+      const inventory = inventoryAcc || accounts.find(a => a.name.includes('مخزون') || a.name.includes('Inventory'));
+      const customers = customersAcc || accounts.find(a => a.name.includes('عملاء') || a.name.includes('Customers'));
 
-      if (!bank || !sales || !inventory || !customers) {
-        throw new Error('Test Company must have Bank, Sales, Inventory, and Customers accounts.');
+      if (!bank || !sales || !inventory || !customers || !equityAcc) {
+        throw new Error('Test Company must have Bank, Sales, Inventory, Customers, and Equity accounts.');
       }
 
       // 2. Initial Capital Injection
@@ -93,7 +109,7 @@ export class ScenarioTestingService {
           created_by: userId,
           items: [
             { account_id: bank.id, debit: 100000, credit: 0 },
-            { account_id: equityAcc?.id || 'equity_capital_id', debit: 0, credit: 100000 }
+            { account_id: equityAcc.id, debit: 0, credit: 100000 }
           ]
         },
         schema: JournalEntrySchema

@@ -1090,7 +1090,7 @@ export const ar = {
   'integrity.failed': 'غير متطابقة',
   'integrity.ale_description': 'يجب أن يتساوى مجموع الأصول مع مجموع الالتزامات وحقوق الملكية.',
   'integrity.total_volume': 'الحجم الإجمالي للبيانات',
-  'integrity.entries_count': '{{count}} قيود',
+  'integrity.entries_count': '{count} قيود',
   'integrity.db_status': 'حالة قاعدة البيانات: متصلة ونشطة',
   'integrity.detected_anomalies': 'المشاكل والعيوب المكتشفة',
   'integrity.unbalanced_journal_entry': 'قيد يومية غير متزن',

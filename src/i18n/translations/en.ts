@@ -1090,7 +1090,7 @@ export const en = {
   'integrity.failed': 'Failed',
   'integrity.ale_description': 'Assets must equal Liabilities + Equity.',
   'integrity.total_volume': 'Total Volume',
-  'integrity.entries_count': '{{count}} Entries',
+  'integrity.entries_count': '{count} Entries',
   'integrity.db_status': 'Database status: Connected & Active',
   'integrity.detected_anomalies': 'Detected Anomalies',
   'integrity.unbalanced_journal_entry': 'Unbalanced Journal Entry',
