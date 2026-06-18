@@ -108,8 +108,8 @@ export function CostCenters() {
           >
             <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 mb-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`} dir={dir}>
               <div>
-                <h1 className="text-2xl font-bold text-zinc-900">مراكز التكلفة</h1>
-                <p className="text-zinc-500">توزيع المصروفات والميزانيات على مراكز التكلفة</p>
+                <h1 className="text-2xl font-bold text-zinc-900">{t('cost_centers.title') || 'مراكز التكلفة'}</h1>
+                <p className="text-zinc-500">{t('cost_centers.subtitle') || 'توزيع المصروفات والميزانيات على مراكز التكلفة'}</p>
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex bg-zinc-100 p-1.5 rounded-2xl gap-1">
@@ -146,7 +146,7 @@ export function CostCenters() {
                   className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
                 >
                   <Plus size={20} />
-                  <span>إضافة مركز تكلفة</span>
+                  <span>{t('cost_centers.add') || 'إضافة مركز تكلفة'}</span>
                 </button>
               </div>
             </div>
@@ -156,16 +156,16 @@ export function CostCenters() {
                 <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
               </div>
             ) : view === 'table' ? (
-              <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm" dir="rtl">
-                <table className="w-full text-right border-collapse">
+              <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm" dir={dir}>
+                <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'} border-collapse`}>
                   <thead>
                     <tr className="bg-zinc-50 border-b border-zinc-200">
-                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">كود المركز</th>
-                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">الاسم</th>
-                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">الإدارة</th>
-                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">الميزانية</th>
-                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">الحالة</th>
-                      <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-left">الإجراءات</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('cost_centers.code') || 'كود المركز'}</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('cost_centers.name') || 'الاسم'}</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('cost_centers.department') || 'الإدارة'}</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('cost_centers.budget') || 'الميزانية'}</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('common.status') || 'الحالة'}</th>
+                      <th className={`px-6 py-4 text-sm font-bold text-zinc-700 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.actions') || 'الإجراءات'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100 font-medium text-zinc-700">
@@ -194,7 +194,7 @@ export function CostCenters() {
                           {cc.name}
                         </td>
                         <td className="px-6 py-4 text-zinc-500">
-                          {departments.find(d => d.id === cc.department_id)?.name || 'غير محدد'}
+                          {departments.find(d => d.id === cc.department_id)?.name || (language === 'ar' ? 'عام' : 'General')}
                         </td>
                         <td className="px-6 py-4 text-emerald-700 font-bold">
                           {formatCurrency(cc.budget, cc.currency)}
@@ -245,7 +245,7 @@ export function CostCenters() {
                 </table>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pr-1">
+              <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pr-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`} dir={dir}>
                 {costCenters.map((cc) => (
                   <motion.div
                     key={cc.id}
@@ -304,7 +304,7 @@ export function CostCenters() {
                       </div>
                     </div>
 
-                    <div className="text-right" dir="rtl">
+                    <div className={`${dir === 'rtl' ? 'text-right' : 'text-left'}`} dir={dir}>
                       <div className="text-[10px] font-mono text-amber-600 font-bold mb-1">{cc.code}</div>
                       <h3 className="font-bold text-lg text-zinc-900 mb-1">{cc.name}</h3>
                       
@@ -312,15 +312,15 @@ export function CostCenters() {
                         <div className="flex items-center justify-between text-xs text-zinc-500">
                           <span className="flex items-center gap-1">
                             <Landmark size={14} />
-                            الإدارة المرتبطة
+                            {t('cost_centers.department') || 'الإدارة المرتبطة'}
                           </span>
                           <span className="font-medium text-zinc-900">
-                            {departments.find(d => d.id === cc.department_id)?.name || 'عام'}
+                            {departments.find(d => d.id === cc.department_id)?.name || (language === 'ar' ? 'عام' : 'General')}
                           </span>
                         </div>
                         
                         <div className="bg-zinc-50 p-3 rounded-2xl">
-                          <div className="text-[10px] text-zinc-400 mb-1">الميزانية المعتمدة</div>
+                          <div className="text-[10px] text-zinc-400 mb-1">{t('cost_centers.budget') || 'الميزانية المعتمدة'}</div>
                           <div className="flex items-center gap-1 text-emerald-700 font-bold">
                             <DollarSign size={14} />
                             {formatCurrency(cc.budget, cc.currency)}
@@ -328,9 +328,9 @@ export function CostCenters() {
                         </div>
 
                         <div className="flex items-center justify-between text-xs">
-                          <span>الحالة</span>
+                          <span>{t('common.status') || 'الحالة'}</span>
                           <span className={`px-2 py-0.5 rounded-full font-bold ${cc.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-zinc-100 text-zinc-500'}`}>
-                            {cc.is_active ? 'نشط' : 'معطل'}
+                            {cc.is_active ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'معطل' : 'Inactive')}
                           </span>
                         </div>
                       </div>
@@ -351,7 +351,7 @@ export function CostCenters() {
             <div className="bg-white flex-1 rounded-3xl shadow-xl shadow-slate-200/40 flex flex-col overflow-hidden border border-slate-100 transition-all duration-500">
               <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-slate-50/50">
                 <h2 className="text-xl font-bold text-zinc-900">
-                  {editingCC ? 'تعديل مركز التكلفة' : 'إضافة مركز تكلفة جديد'}
+                  {editingCC ? (t('cost_centers.edit') || 'تعديل مركز التكلفة') : (t('cost_centers.add_new') || 'إضافة مركز تكلفة جديد')}
                 </h2>
                 <button
                   type="button"
@@ -362,10 +362,10 @@ export function CostCenters() {
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-6">
-                <form onSubmit={handleSubmit} className="space-y-6 text-right" dir="rtl">
+                <form onSubmit={handleSubmit} className={`space-y-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`} dir={dir}>
                   <div className="grid grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-semibold text-zinc-700 mb-2">كود المركز</label>
+                      <label className="block text-sm font-semibold text-zinc-700 mb-2">{t('cost_centers.code') || 'كود المركز'}</label>
                       <input
                         type="text"
                         required
@@ -376,7 +376,7 @@ export function CostCenters() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-zinc-700 mb-2">اسم المركز</label>
+                      <label className="block text-sm font-semibold text-zinc-700 mb-2">{t('cost_centers.name') || 'اسم المركز'}</label>
                       <input
                         type="text"
                         required
@@ -389,7 +389,7 @@ export function CostCenters() {
 
                   <div className="grid grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-semibold text-zinc-700 mb-2">الميزانية</label>
+                      <label className="block text-sm font-semibold text-zinc-700 mb-2">{t('cost_centers.budget') || 'الميزانية'}</label>
                       <input
                         type="number"
                         value={formData.budget}
@@ -398,7 +398,7 @@ export function CostCenters() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-zinc-700 mb-2">العملة</label>
+                      <label className="block text-sm font-semibold text-zinc-700 mb-2">{language === 'ar' ? 'العملة' : 'Currency'}</label>
                       <select
                         value={formData.currency}
                         onChange={e => setFormData({ ...formData, currency: e.target.value })}
@@ -413,13 +413,13 @@ export function CostCenters() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-zinc-700 mb-2">الإدارة المسؤولة</label>
+                    <label className="block text-sm font-semibold text-zinc-700 mb-2">{t('cost_centers.department') || 'الإدارة المسؤولة'}</label>
                     <select
                       value={formData.department_id || ''}
                       onChange={e => setFormData({ ...formData, department_id: e.target.value || null })}
                       className="w-full p-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold"
                     >
-                      <option value="">عام (لكافة الإدارات)</option>
+                      <option value="">{language === 'ar' ? 'عام (لكافة الإدارات)' : 'General (All Departments)'}</option>
                       {departments.map(dept => (
                         <option key={dept.id} value={dept.id}>{dept.name}</option>
                       ))}
@@ -427,7 +427,7 @@ export function CostCenters() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-zinc-700 mb-2">الوصف</label>
+                    <label className="block text-sm font-semibold text-zinc-700 mb-2">{t('common.description') || 'الوصف'}</label>
                     <textarea
                       value={formData.description}
                       onChange={e => setFormData({ ...formData, description: e.target.value })}
@@ -444,7 +444,7 @@ export function CostCenters() {
                         onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
                         className="w-5 h-5 rounded-lg border-zinc-300 text-emerald-600 focus:ring-emerald-500 transition-all"
                       />
-                      <span className="text-zinc-700 font-bold">نشط</span>
+                      <span className="text-zinc-700 font-bold">{t('common.active') || (language === 'ar' ? 'نشط' : 'Active')}</span>
                     </label>
                   </div>
 
@@ -460,7 +460,7 @@ export function CostCenters() {
                       onClick={() => setIsModalOpen(false)}
                       className="flex-1 bg-zinc-100 text-zinc-600 h-12 rounded-2xl font-bold hover:bg-zinc-200 transition-colors"
                     >
-                      إلغاء
+                      {t('common.cancel')}
                     </button>
                   </div>
                 </form>

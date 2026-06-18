@@ -348,14 +348,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       },
       {
         id: 'flexible_operations',
-        label: 'نظام العمليات',
+        label: t('nav.flexible_operations') || 'نظام العمليات',
         icon: Layers,
         subItems: [
-          { id: 'operations', label: 'العمليات', icon: List },
-          { id: 'departments', label: 'الإدارات والهيكل', icon: Building2 },
-          { id: 'cost_centers', label: 'مراكز التكلفة', icon: PieChart },
-          { id: 'operation_categories', label: 'تصنيفات العمليات', icon: Folder },
-          { id: 'operation_fields', label: 'حقول البيانات', icon: Settings },
+          { id: 'operations', label: t('nav.operations') || 'العمليات', icon: List },
+          { id: 'departments', label: t('nav.departments') || 'الإدارات والهيكل', icon: Building2 },
+          { id: 'cost_centers', label: t('nav.cost_centers') || 'مراكز التكلفة', icon: PieChart },
+          { id: 'operation_categories', label: t('nav.operation_categories') || 'تصنيفات العمليات', icon: Folder },
+          { id: 'operation_fields', label: t('nav.operation_fields') || 'حقول البيانات', icon: Settings },
         ]
       },
       { 
@@ -558,10 +558,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       )}
 
       {/* Desktop Top Navigation */}
-      <header className="hidden md:flex sticky top-0 z-[150] bg-white border-b border-slate-200 h-16 items-center px-8 shadow-sm">
-        <div className={`flex items-center gap-4 ${dir === 'rtl' ? 'ml-6' : 'mr-6'}`}>
+      <header className="hidden md:flex sticky top-0 z-[150] bg-white border-b border-slate-200 h-16 items-center px-4 xl:px-8 shadow-sm">
+        <div className={`flex items-center gap-2 xl:gap-4 ${dir === 'rtl' ? 'ml-2 xl:ml-6' : 'mr-2 xl:mr-6'}`}>
           {company?.logo_url ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 xl:gap-3">
               <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 p-1 flex items-center justify-center">
                 <img 
                   src={company.logo_url} 
@@ -570,7 +570,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                   referrerPolicy="no-referrer"
                 />
               </div>
-              <span className="font-black text-slate-900 tracking-tight text-lg truncate max-w-[200px]">{company.name}</span>
+              <span className="font-black text-slate-900 tracking-tight text-sm xl:text-lg truncate max-w-[80px] xl:max-w-[200px]">{company.name}</span>
             </div>
           ) : (
             <Logo variant="full" className="h-8" />
@@ -588,7 +588,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 <div key={item.id} className="relative group px-0.5">
                   <button
                     className={`
-                      flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all font-semibold text-sm
+                      flex items-center gap-1.5 xl:gap-2 px-1.5 xl:px-3 py-1.5 rounded-lg transition-all font-semibold text-xs xl:text-sm
                       ${isActive ? 'bg-brand-primary/10 text-brand-primary' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                     `}
                   >
@@ -640,7 +640,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 key={item.id}
                 onClick={() => handleNavClick(item.id, item.label, item.path)}
                 className={`
-                  flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all font-semibold text-sm
+                  flex items-center gap-1.5 xl:gap-2 px-1.5 xl:px-3 py-1.5 rounded-lg transition-all font-semibold text-xs xl:text-sm
                   ${currentPage === item.id ? 'bg-brand-primary text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                 `}
               >
@@ -651,7 +651,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           })}
         </nav>
 
-        <div className={`flex items-center gap-3 ${dir === 'rtl' ? 'mr-auto' : 'ml-auto'}`}>
+        <div className={`flex items-center gap-1.5 xl:gap-3 ${dir === 'rtl' ? 'mr-auto' : 'ml-auto'}`}>
           <button 
             onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
             className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-all group flex items-center gap-2"
@@ -683,7 +683,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all border border-slate-200 shadow-sm"
               >
                 <Building2 size={16} className="text-emerald-600" />
-                <span className="text-xs font-bold text-slate-600 truncate max-w-[120px]">
+                <span className="text-xs font-bold text-slate-600 truncate max-w-[60px] xl:max-w-[120px]">
                   {user?.company_name || t('common.switch_company')}
                 </span>
                 <ChevronDown size={14} className={`text-slate-400 transition-transform ${isCompanyMenuOpen ? 'rotate-180' : ''}`} />
@@ -737,7 +737,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           )}
 
           <div className="flex items-center gap-3">
-            <div className={dir === 'rtl' ? 'text-left' : 'text-right'}>
+            <div className={`hidden xl:block ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
               <p className="font-bold text-sm text-slate-800 leading-none">{user?.username}</p>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
                 {isSuperAdmin ? t('common.role_super_admin') : isCompanyAdmin ? t('common.role_company_admin') : t('common.role_user')}

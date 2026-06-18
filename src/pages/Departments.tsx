@@ -95,8 +95,8 @@ export function Departments() {
           >
             <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 mb-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`} dir={dir}>
               <div>
-                <h1 className="text-2xl font-bold text-zinc-900">إدارة الإدارات</h1>
-                <p className="text-zinc-500">الهيكل التنظيمي للشركة والإدارات المختلفة</p>
+                <h1 className="text-2xl font-bold text-zinc-900">{t('departments.title') || 'إدارة الإدارات'}</h1>
+                <p className="text-zinc-500">{t('departments.subtitle') || 'الهيكل التنظيمي للشركة والإدارات المختلفة'}</p>
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex bg-zinc-100 p-1.5 rounded-2xl gap-1">
@@ -132,7 +132,7 @@ export function Departments() {
                   className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
                 >
                   <Plus size={20} />
-                  <span>إضافة إدارة</span>
+                  <span>{t('departments.add') || 'إضافة إدارة'}</span>
                 </button>
               </div>
             </div>
@@ -142,16 +142,16 @@ export function Departments() {
                 <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
               </div>
             ) : view === 'table' ? (
-              <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm" dir="rtl">
-                <table className="w-full text-right border-collapse">
+              <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm" dir={dir}>
+                <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'} border-collapse`}>
                   <thead>
                     <tr className="bg-zinc-50 border-b border-zinc-200">
-                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">كود الإدارة</th>
-                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">اسم الإدارة</th>
-                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">مدير الإدارة</th>
-                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">إدارة عليا</th>
-                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">الحالة</th>
-                      <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-left">الإجراءات</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('departments.code') || 'كود الإدارة'}</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('departments.name') || 'اسم الإدارة'}</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('departments.manager') || 'مدير الإدارة'}</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('departments.parent') || 'إدارة عليا'}</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('common.status') || 'الحالة'}</th>
+                      <th className={`px-6 py-4 text-sm font-bold text-zinc-700 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.actions') || 'الإجراءات'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100 font-medium text-zinc-700">
@@ -286,7 +286,7 @@ export function Departments() {
                       </div>
                     </div>
 
-                    <div className="text-right" dir="rtl">
+                    <div className={`${dir === 'rtl' ? 'text-right' : 'text-left'}`} dir={dir}>
                       <div className="text-[10px] font-mono text-emerald-600 font-bold mb-1">{dept.code}</div>
                       <h3 className="font-bold text-lg text-zinc-900 mb-1">{dept.name}</h3>
                       {dept.description && (
@@ -297,15 +297,15 @@ export function Departments() {
                         <div className="flex items-center justify-between text-xs text-zinc-500">
                           <span className="flex items-center gap-1">
                             <Users size={14} />
-                            مدير الإدارة
+                            {t('departments.manager') || 'مدير الإدارة'}
                           </span>
                           <span className="font-medium text-zinc-900">
-                            {managerUsers.find(u => u.id === dept.manager_user_id)?.name || 'غير محدد'}
+                            {managerUsers.find(u => u.id === dept.manager_user_id)?.name || (language === 'ar' ? 'غير محدد' : 'Unspecified')}
                           </span>
                         </div>
                         {dept.parent_id && (
                           <div className="flex items-center justify-between text-xs text-zinc-500">
-                            <span>إدارة عليا</span>
+                            <span>{t('departments.parent') || 'إدارة عليا'}</span>
                             <span className="flex items-center gap-1 text-emerald-700 font-medium">
                               {departments.find(d => d.id === dept.parent_id)?.name}
                               <ChevronRight size={14} className="rotate-180" />
@@ -313,9 +313,9 @@ export function Departments() {
                           </div>
                         )}
                         <div className="flex items-center justify-between text-xs">
-                          <span>الحالة</span>
+                          <span>{t('common.status') || 'الحالة'}</span>
                           <span className={`px-2 py-0.5 rounded-full font-bold ${dept.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-zinc-100 text-zinc-500'}`}>
-                            {dept.is_active ? 'نشط' : 'معطل'}
+                            {dept.is_active ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'معطل' : 'Inactive')}
                           </span>
                         </div>
                       </div>
@@ -336,7 +336,7 @@ export function Departments() {
             <div className="bg-white flex-1 rounded-3xl shadow-xl shadow-slate-200/40 flex flex-col overflow-hidden border border-slate-100 transition-all duration-500">
               <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-slate-50/50">
                 <h2 className="text-xl font-bold text-zinc-900">
-                  {editingDept ? 'تعديل الإدارة' : 'إضافة إدارة جديدة'}
+                  {editingDept ? (t('departments.edit') || 'تعديل الإدارة') : (t('departments.add_new') || 'إضافة إدارة جديدة')}
                 </h2>
                 <button
                   type="button"
@@ -347,10 +347,10 @@ export function Departments() {
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-6">
-                <form onSubmit={handleSubmit} className="space-y-6 text-right" dir="rtl">
+                <form onSubmit={handleSubmit} className={`space-y-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`} dir={dir}>
                   <div className="grid grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-semibold text-zinc-700 mb-2">كود الإدارة</label>
+                      <label className="block text-sm font-semibold text-zinc-700 mb-2">{t('departments.code') || 'كود الإدارة'}</label>
                       <input
                         type="text"
                         required
@@ -361,7 +361,7 @@ export function Departments() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-zinc-700 mb-2">اسم الإدارة</label>
+                      <label className="block text-sm font-semibold text-zinc-700 mb-2">{t('departments.name') || 'اسم الإدارة'}</label>
                       <input
                         type="text"
                         required
@@ -373,13 +373,13 @@ export function Departments() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-zinc-700 mb-2">مدير الإدارة</label>
+                    <label className="block text-sm font-semibold text-zinc-700 mb-2">{t('departments.manager') || 'مدير الإدارة'}</label>
                     <select
                       value={formData.manager_user_id || ''}
                       onChange={e => setFormData({ ...formData, manager_user_id: e.target.value || null })}
                       className="w-full p-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold"
                     >
-                      <option value="">اختر مديراً للمدير</option>
+                      <option value="">{language === 'ar' ? 'اختر مديراً للمدير' : 'Select a manager'}</option>
                       {managerUsers.map(user => (
                         <option key={user.id} value={user.id}>{user.name}</option>
                       ))}
@@ -387,13 +387,13 @@ export function Departments() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-zinc-700 mb-2">الإدارة العليا (Parent)</label>
+                    <label className="block text-sm font-semibold text-zinc-700 mb-2">{t('departments.parent') || 'إدارة عليا'}</label>
                     <select
                       value={formData.parent_id || ''}
                       onChange={e => setFormData({ ...formData, parent_id: e.target.value || null })}
                       className="w-full p-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all"
                     >
-                      <option value="">لا يوجد (إدارة رئيسية)</option>
+                      <option value="">{language === 'ar' ? 'لا يوجد (إدارة رئيسية)' : 'None (Root Department)'}</option>
                       {departments.filter(d => d.id !== editingDept?.id).map(dept => (
                         <option key={dept.id} value={dept.id}>{dept.name}</option>
                       ))}
@@ -401,7 +401,7 @@ export function Departments() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-zinc-700 mb-2">الوصف</label>
+                    <label className="block text-sm font-semibold text-zinc-700 mb-2">{t('common.description') || 'الوصف'}</label>
                     <textarea
                       value={formData.description}
                       onChange={e => setFormData({ ...formData, description: e.target.value })}
@@ -418,7 +418,7 @@ export function Departments() {
                         onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
                         className="w-5 h-5 rounded-lg border-zinc-300 text-emerald-600 focus:ring-emerald-500 transition-all"
                       />
-                      <span className="text-zinc-700 font-bold">نشطة</span>
+                      <span className="text-zinc-700 font-bold">{t('common.active') || (language === 'ar' ? 'نشطة' : 'Active')}</span>
                     </label>
                   </div>
 
@@ -434,7 +434,7 @@ export function Departments() {
                       onClick={() => setIsModalOpen(false)}
                       className="flex-1 bg-zinc-100 text-zinc-600 h-12 rounded-2xl font-bold hover:bg-zinc-200 transition-colors"
                     >
-                      إلغاء
+                      {t('common.cancel')}
                     </button>
                   </div>
                 </form>

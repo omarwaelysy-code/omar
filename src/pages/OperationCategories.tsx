@@ -12,7 +12,7 @@ import { toast } from 'react-hot-toast';
 import { OperationCategory } from '../types';
 
 export function OperationCategories() {
-  const { t } = useLanguage();
+  const { t, dir, language } = useLanguage();
   const { user } = useAuth();
   const [categories, setCategories] = useState<OperationCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -271,7 +271,7 @@ export function OperationCategories() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto h-full flex flex-col overflow-hidden animate-in fade-in duration-500" dir="rtl">
+    <div className="p-6 max-w-6xl mx-auto h-full flex flex-col overflow-hidden animate-in fade-in duration-500" dir={dir}>
       <AnimatePresence mode="wait">
         {!isModalOpen ? (
           <motion.div
@@ -287,8 +287,8 @@ export function OperationCategories() {
                   <Layers size={28} />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-black text-slate-900 tracking-tighter">تصنيفات العمليات</h1>
-                  <p className="text-slate-500 font-medium">الهيكل التنظيمي للخدمات والعمليات الفنية</p>
+                  <h1 className="text-3xl font-black text-slate-900 tracking-tighter">{t('operation_categories.title') || 'تصنيفات العمليات'}</h1>
+                  <p className="text-slate-500 font-medium">{t('operation_categories.subtitle') || 'الهيكل التنظيمي للخدمات والعمليات الفنية'}</p>
                 </div>
               </div>
               
@@ -296,7 +296,7 @@ export function OperationCategories() {
                 <button 
                   onClick={fetchCategories}
                   className="p-3 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-2xl transition-all"
-                  title="تحديث"
+                  title={language === 'ar' ? 'تحديث' : 'Refresh'}
                 >
                   <RefreshCcw size={20} className={loading ? 'animate-spin' : ''} />
                 </button>
@@ -308,19 +308,19 @@ export function OperationCategories() {
                   className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 font-bold active:scale-95"
                 >
                   <Plus size={20} />
-                  <span>إضافة تصنيف والدي</span>
+                  <span>{t('operation_categories.add_root') || 'إضافة تصنيف رئيسي'}</span>
                 </button>
               </div>
             </div>
 
             {/* Toolbar */}
-            <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row items-center gap-4 shrink-0">
+            <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row items-center gap-4 shrink-0" dir={dir}>
               <div className="relative flex-1 w-full">
-                <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <Search className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 text-slate-400`} size={18} />
                 <input 
                   type="text" 
-                  placeholder="بحث في التصنيفات أو الأكواد..."
-                  className="w-full pr-11 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none transition-all font-bold text-slate-900 placeholder:text-slate-400"
+                  placeholder={t('operation_categories.search_placeholder') || 'بحث في التصنيفات أو الأكواد...'}
+                  className={`w-full ${dir === 'rtl' ? 'pr-11 pl-4' : 'pl-11 pr-4'} py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none transition-all font-bold text-slate-900 placeholder:text-slate-400`}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -330,13 +330,13 @@ export function OperationCategories() {
                   onClick={expandAll}
                   className="flex-1 md:flex-none px-6 py-3 text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 rounded-2xl border border-slate-100 transition-all active:bg-slate-100"
                 >
-                  توسيع الكل
+                  {language === 'ar' ? 'توسيع الكل' : 'Expand All'}
                 </button>
                 <button 
                   onClick={collapseAll}
                   className="flex-1 md:flex-none px-6 py-3 text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 rounded-2xl border border-slate-100 transition-all active:bg-slate-100"
                 >
-                  طي الكل
+                  {language === 'ar' ? 'طي الكل' : 'Collapse All'}
                 </button>
               </div>
             </div>
@@ -345,18 +345,18 @@ export function OperationCategories() {
               {loading ? (
                 <div className="flex flex-col items-center justify-center py-20">
                   <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-                  <p className="text-slate-500 font-bold">جاري تحميل الهيكل التنظيمي...</p>
+                  <p className="text-slate-500 font-bold">{language === 'ar' ? 'جاري تحميل الهيكل التنظيمي...' : 'Loading structure...'}</p>
                 </div>
               ) : categories.length === 0 ? (
                 <div className="text-center py-24 bg-white border-2 border-dashed border-slate-200 rounded-[3rem]">
                   <div className="w-24 h-24 bg-slate-50 text-slate-200 rounded-full flex items-center justify-center mx-auto mb-6">
                     <Layers size={48} />
                   </div>
-                  <h3 className="text-2xl font-black text-slate-900">لا يوجد هيكل حالياً</h3>
-                  <p className="text-slate-400 max-w-sm mx-auto mt-3 font-medium px-4">ابدأ ببناء الشجرة التنظيمية لعملياتك وخدماتك لتنظيم بياناتك المحاسبية والفنية.</p>
+                  <h3 className="text-2xl font-black text-slate-900">{language === 'ar' ? 'لا يوجد هيكل حالياً' : 'No structure found'}</h3>
+                  <p className="text-slate-400 max-w-sm mx-auto mt-3 font-medium px-4">{language === 'ar' ? 'ابدأ ببناء الشجرة التنظيمية لعملياتك وخدماتك لتنظيم بياناتك المحاسبية والفنية.' : 'Start building the categories tree to organize your services and operations.'}</p>
                 </div>
               ) : (
-                <div className="max-w-4xl mx-auto text-right">
+                <div className={`max-w-4xl mx-auto ${dir === 'rtl' ? 'text-right' : 'text-left'}`} dir={dir}>
                   {renderTreeNode()}
                 </div>
               )}
@@ -377,24 +377,24 @@ export function OperationCategories() {
                     {editingCategory ? <Edit2 size={20} /> : <Plus size={20} />}
                   </div>
                   <h2 className="text-2xl font-black text-slate-900">
-                    {editingCategory ? 'تعديل التصنيف' : 'إضافة تصنيف جديد'}
+                    {editingCategory ? (language === 'ar' ? 'تعديل التصنيف' : 'Edit Category') : (language === 'ar' ? 'إضافة تصنيف جديد' : 'Add New Category')}
                   </h2>
                 </div>
                 <button 
                   onClick={() => setIsModalOpen(false)}
-                  className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-slate-950"
+                  className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-slate-955"
                 >
                   <X size={20} />
                 </button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-10">
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className={`space-y-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`} dir={dir}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1">
                         <Folder size={14} />
-                        اسم التصنيف
+                        {language === 'ar' ? 'اسم التصنيف' : 'Category Name'}
                       </label>
                       <input
                         type="text"
@@ -402,13 +402,13 @@ export function OperationCategories() {
                         value={formData.name}
                         onChange={e => setFormData({ ...formData, name: e.target.value })}
                         className="premium-input font-bold"
-                        placeholder="مثل: خدمات الشحن"
+                        placeholder={language === 'ar' ? 'مثل: خدمات الشحن' : 'e.g. Shipping Services'}
                       />
                     </div>
                     <div className="space-y-2">
                       <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1">
                         <Hash size={14} />
-                        الكود المرجعي
+                        {language === 'ar' ? 'الكود المرجعي' : 'Reference Code'}
                       </label>
                       <input
                         type="text"
@@ -423,19 +423,19 @@ export function OperationCategories() {
                   <div className="space-y-2">
                     <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1">
                       <ListTree size={14} />
-                      التصنيف الأب
+                      {language === 'ar' ? 'التصنيف الأب' : 'Parent Category'}
                     </label>
                     <select
                       value={formData.parent_id || ''}
                       onChange={e => setFormData({ ...formData, parent_id: e.target.value || null })}
-                      className="premium-input font-bold text-right appearance-none"
+                      className="premium-input font-bold appearance-none"
                     >
-                      <option value="">بدون (تصنيف والدي - Level 0)</option>
+                      <option value="">{language === 'ar' ? 'بدون (تصنيف والدي - Level 0)' : 'None (Root Category - Level 0)'}</option>
                       {categories
                         .filter(c => c.id !== editingCategory?.id && !c.is_final)
                         .map(cat => (
                           <option key={cat.id} value={cat.id}>
-                            {'—'.repeat(cat.level || 0)} {cat.name} ({cat.code || 'بدون كود'})
+                            {'—'.repeat(cat.level || 0)} {cat.name} ({cat.code || (language === 'ar' ? 'بدون كود' : 'No Code')})
                           </option>
                         ))}
                     </select>
@@ -446,9 +446,9 @@ export function OperationCategories() {
                       <div className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-emerald-600 shadow-sm group-hover:scale-110 transition-transform">
                         <CheckCircle2 size={20} />
                       </div>
-                      <div className="text-right">
-                        <h4 className="font-bold text-slate-900 text-sm">مستوى نهائي (Final Level)</h4>
-                        <p className="text-slate-500 text-[10px] font-medium leading-tight">تفعيل هذا الخيار يمنع إضافة أي تصنيفات فرعية تحت هذا العنصر.</p>
+                      <div className={dir === 'rtl' ? 'text-right' : 'text-left'}>
+                        <h4 className="font-bold text-slate-900 text-sm">{language === 'ar' ? 'مستوى نهائي (Final Level)' : 'Final Level'}</h4>
+                        <p className="text-slate-500 text-[10px] font-medium leading-tight">{language === 'ar' ? 'تفعيل هذا الخيار يمنع إضافة أي تصنيفات فرعية تحت هذا العنصر.' : 'Activating this option prevents adding any sub-categories under this item.'}</p>
                       </div>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -462,14 +462,14 @@ export function OperationCategories() {
                     </label>
                   </div>
 
-                  <div className="space-y-2 text-right">
+                  <div className={`space-y-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                     <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1">
                       <Info size={14} />
-                      المستوى المطبق آلياً
+                      {language === 'ar' ? 'المستوى المطبق آلياً' : 'Level Applied Automatically'}
                     </label>
                     <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between">
-                      <span className="font-bold text-slate-900 text-sm">المستوى: {currentLevel}</span>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">الأب: {getParentName(formData.parent_id)}</span>
+                      <span className="font-bold text-slate-900 text-sm">{language === 'ar' ? `المستوى: ${currentLevel}` : `Level: ${currentLevel}`}</span>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{language === 'ar' ? `الأب: ${getParentName(formData.parent_id)}` : `Parent: ${getParentName(formData.parent_id)}`}</span>
                     </div>
                   </div>
 
@@ -478,14 +478,14 @@ export function OperationCategories() {
                       type="submit"
                       className="flex-1 bg-emerald-600 text-white h-12 rounded-2xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
                     >
-                      حفظ التعديلات
+                      {t('common.save')}
                     </button>
                     <button
                       type="button"
                       onClick={() => setIsModalOpen(false)}
                       className="flex-1 bg-zinc-100 text-zinc-600 h-12 rounded-2xl font-bold hover:bg-zinc-200 transition-colors"
                     >
-                      إلغاء
+                      {t('common.cancel')}
                     </button>
                   </div>
                 </form>

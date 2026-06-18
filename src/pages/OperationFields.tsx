@@ -154,8 +154,8 @@ export function OperationFields() {
           >
             <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 mb-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`} dir={dir}>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">تعريف حقول العمليات</h1>
-                <p className="text-slate-500 font-medium">إدارة الحقول الديناميكية للنظام المرن</p>
+                <h1 className="text-2xl font-bold text-slate-900">{t('operation_fields.title') || 'تعريف حقول العمليات'}</h1>
+                <p className="text-slate-500 font-medium">{language === 'ar' ? 'إدارة الحقول الديناميكية للنظام المرن' : 'Manage dynamic fields of the operations system'}</p>
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex bg-zinc-100 p-1.5 rounded-2xl gap-1">
@@ -197,7 +197,7 @@ export function OperationFields() {
                   className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 animate-none"
                 >
                   <Plus size={20} />
-                  <span className="font-bold">إضافة تعريف حقل</span>
+                  <span className="font-bold">{t('operation_fields.add') || 'إضافة تعريف حقل'}</span>
                 </button>
               </div>
             </div>
@@ -207,7 +207,7 @@ export function OperationFields() {
                 <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
               </div>
             ) : view === 'card' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pr-1 text-right" dir="rtl">
+              <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pr-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`} dir={dir}>
                 {fields.sort((a,b) => (a.sort_order || 0) - (b.sort_order || 0)).map((field) => (
                   <motion.div
                     key={field.id}
@@ -329,15 +329,15 @@ export function OperationFields() {
                 ))}
               </div>
             ) : (
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-y-auto pr-1 text-right shadow-sm" dir="rtl" style={{ maxHeight: 'calc(100vh - 250px)' }}>
-                <table className="w-full">
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-y-auto pr-1 shadow-sm" dir={dir} style={{ maxHeight: 'calc(100vh - 250px)' }}>
+                <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                   <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-[5]">
                     <tr>
-                      <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider">كود/اسم</th>
-                      <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider">العنوان</th>
-                      <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider">النوع/الوحدة</th>
-                      <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider text-center">مطلوب</th>
-                      <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider mr-auto text-left">الإجراءات</th>
+                      <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider">{language === 'ar' ? 'كود/اسم' : 'Code/Name'}</th>
+                      <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider">{language === 'ar' ? 'العنوان' : 'Label'}</th>
+                      <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider">{language === 'ar' ? 'النوع/الوحدة' : 'Type/Unit'}</th>
+                      <th className="px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider text-center">{language === 'ar' ? 'مطلوب' : 'Required'}</th>
+                      <th className={`px-6 py-4 font-bold text-slate-500 text-xs uppercase tracking-wider mr-auto ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.actions') || 'الإجراءات'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -457,7 +457,7 @@ export function OperationFields() {
             <div className="bg-white flex-1 rounded-3xl shadow-xl shadow-slate-200/40 flex flex-col overflow-hidden border border-slate-100 transition-all duration-500">
               <div className="p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
                 <h2 className="text-xl font-bold text-slate-900">
-                  {editingField ? 'تعديل تعريف الحقل' : 'إضافة حقل جديد للنظام'}
+                  {editingField ? (language === 'ar' ? 'تعديل تعريف الحقل' : 'Edit Field Definition') : (language === 'ar' ? 'إضافة حقل جديد للنظام' : 'Add New Field to System')}
                 </h2>
                 <button 
                   onClick={() => setIsModalOpen(false)}
@@ -468,10 +468,10 @@ export function OperationFields() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-6">
-                <form id="fieldForm" onSubmit={handleSubmit} className="space-y-8 text-right" dir="rtl">
+                <form id="fieldForm" onSubmit={handleSubmit} className={`space-y-8 ${dir === 'rtl' ? 'text-right' : 'text-left'}`} dir={dir}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-1">
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">كود الحقل (Unique Code)</label>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{language === 'ar' ? 'كود الحقل (Unique Code)' : 'Field Code (Unique Code)'}</label>
                       <input
                         type="text"
                         required
@@ -482,7 +482,7 @@ export function OperationFields() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">الاسم لغرض البرمجة (Slug)</label>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{language === 'ar' ? 'الاسم لغرض البرمجة (Slug)' : 'Field Slug (for API)'}</label>
                       <input
                         type="text"
                         required
@@ -495,21 +495,21 @@ export function OperationFields() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">التسمية العربية (Label)</label>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{language === 'ar' ? 'العنوان / التسمية (Label)' : 'Field Label'}</label>
                     <input
                       type="text"
                       required
                       value={formData.label}
                       onChange={e => setFormData({ ...formData, label: e.target.value })}
                       className="premium-input font-bold"
-                      placeholder="مثال: المساحة الإجمالية"
+                      placeholder={language === 'ar' ? 'مثال: المساحة الإجمالية' : 'e.g. Total Area'}
                     />
                   </div>
 
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">نوع البيانات المتقدم</label>
-                      <span className="text-[10px] bg-brand-primary/10 text-brand-primary px-2 py-0.5 rounded-full font-bold">إلزامي</span>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{language === 'ar' ? 'نوع البيانات المتقدم' : 'Advanced Data Type'}</label>
+                      <span className="text-[10px] bg-brand-primary/10 text-brand-primary px-2 py-0.5 rounded-full font-bold">{language === 'ar' ? 'إلزامي' : 'Required'}</span>
                     </div>
                     
                     <div className="border border-slate-200 rounded-2xl overflow-hidden focus-within:ring-4 focus-within:ring-brand-primary/5 transition-all bg-white shadow-sm">
@@ -662,7 +662,7 @@ export function OperationFields() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">الترتيب (Sort Order)</label>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{language === 'ar' ? 'الترتيب (Sort Order)' : 'Sort Order'}</label>
                       <input
                         type="number"
                         value={formData.sort_order}
@@ -678,26 +678,26 @@ export function OperationFields() {
                       animate={{ opacity: 1, y: 0 }}
                       className="space-y-1"
                     >
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">خيارات القائمة (مفصولة بفاصلة)</label>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{language === 'ar' ? 'خيارات القائمة (مفصولة بفاصلة)' : 'Dropdown Options (comma separated)'}</label>
                       <input
                         type="text"
                         required
                         value={formData.options}
                         onChange={e => setFormData({ ...formData, options: e.target.value })}
                         className="premium-input font-bold"
-                        placeholder="خيار 1, خيار 2, ..."
+                        placeholder={language === 'ar' ? 'خيار 1, خيار 2, ...' : 'Option 1, Option 2, ...'}
                       />
                     </motion.div>
                   )}
 
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">وصف الحقل / تعليمات المستخدم</label>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{language === 'ar' ? 'وصف الحقل / تعليمات المستخدم' : 'Field Description / User Instructions'}</label>
                     <textarea
                       value={formData.description}
                       onChange={e => setFormData({ ...formData, description: e.target.value })}
                       rows={3}
                       className="premium-input min-h-[100px] resize-none text-sm"
-                      placeholder="اشرح للموظف كيف يستخدم هذا الحقل..."
+                      placeholder={language === 'ar' ? 'اشرح للموظف كيف يستخدم هذا الحقل...' : 'Explain to employee how to use this field...'}
                     />
                   </div>
 
@@ -705,15 +705,15 @@ export function OperationFields() {
                     <label className="flex items-center gap-4 cursor-pointer">
                       <div className="relative">
                         <input
-                          type="checkbox"
+                           type="checkbox"
                           checked={formData.is_required}
                           onChange={e => setFormData({ ...formData, is_required: e.target.checked })}
                           className="w-6 h-6 rounded-lg border-slate-300 text-emerald-500 focus:ring-emerald-500 transition-all cursor-pointer"
                         />
                       </div>
-                      <div className="flex-1">
-                        <span className="text-slate-900 font-bold block text-sm tracking-tight">إلزام المستخدم بالإدخال (Required)</span>
-                        <span className="text-[10px] text-slate-400 font-medium">لن يسمح النظام بحفظ العملية بدون تعبئة هذا الحقل</span>
+                      <div className={`flex-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        <span className="text-slate-900 font-bold block text-sm tracking-tight">{language === 'ar' ? 'إلزام المستخدم بالإدخال (Required)' : 'Make Field Required'}</span>
+                        <span className="text-[10px] text-slate-400 font-medium">{language === 'ar' ? 'لن يسمح النظام بحفظ العملية بدون تعبئة هذا الحقل' : 'The system will not allow saving the operation without filling this field.'}</span>
                       </div>
                     </label>
                   </div>
@@ -730,7 +730,7 @@ export function OperationFields() {
                       onClick={() => setIsModalOpen(false)}
                       className="flex-1 bg-zinc-100 text-zinc-600 h-12 rounded-2xl font-bold hover:bg-zinc-200 transition-colors"
                     >
-                      إلغاء
+                      {t('common.cancel')}
                     </button>
                   </div>
                 </form>

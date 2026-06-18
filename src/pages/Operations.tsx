@@ -432,8 +432,8 @@ export const Operations: React.FC = () => {
                     <p className="font-black uppercase tracking-widest text-sm">No operations found</p>
                   </div>
                 ) : view === 'table' ? (
-                  <div className="overflow-x-auto text-right p-6" dir="rtl">
-                    <table className="w-full text-right border-collapse">
+                  <div className={`overflow-x-auto ${dir === 'rtl' ? 'text-right' : 'text-left'} p-6`} dir={dir}>
+                    <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'} border-collapse`}>
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200">
                           <th className="px-6 py-4 text-sm font-bold text-slate-500">{t('operations.number') || 'كود العملية'}</th>
