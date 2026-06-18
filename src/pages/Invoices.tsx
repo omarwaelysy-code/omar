@@ -1574,11 +1574,7 @@ export const Invoices: React.FC = () => {
         operation_id: selectedOperationId || null,
         department_id: selectedDepartmentId || null,
         cost_center_id: selectedCostCenterId || null,
-        currency_id: selectedCurrencyId || (() => {
-          const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
-          const baseCurr = companyCurrencies.find(c => c.code.toLowerCase() === baseCode);
-          return baseCurr?.id || null;
-        })(),
+        currency_id: selectedCurrencyId || null,
         exchange_rate: Number(exchangeRate) || 1
       };
 
@@ -2244,10 +2240,7 @@ export const Invoices: React.FC = () => {
     setFormSettlements([]);
     setRowSettlementDates({});
     
-    const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
-    const baseCurr = companyCurrencies.find(c => c.code.toLowerCase() === baseCode);
-    const firstActiveCurr = companyCurrencies.find(c => c.is_active);
-    setSelectedCurrencyId(baseCurr?.id || firstActiveCurr?.id || '');
+    setSelectedCurrencyId('');
     setExchangeRate(1);
     setExchangeRateType('manual');
     
@@ -2310,13 +2303,10 @@ export const Invoices: React.FC = () => {
       }
       setRowSettlementDates(datesDict);
       
-      const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
-      const baseCurr = companyCurrencies.find(c => c.code.toLowerCase() === baseCode);
-      const effectiveCurrencyId = fullData.currency_id || baseCurr?.id || '';
-      setSelectedCurrencyId(effectiveCurrencyId);
+      setSelectedCurrencyId(fullData.currency_id || '');
       setExchangeRate(fullData.exchange_rate || 1);
       
-      const cur = companyCurrencies.find(c => c.id === effectiveCurrencyId);
+      const cur = companyCurrencies.find(c => c.id === (fullData.currency_id || ''));
       if (cur) {
         const baseCurrency = companyData?.settings?.currency || 'EGP';
         if (cur.code.toLowerCase() === baseCurrency.toLowerCase()) {
@@ -2431,6 +2421,9 @@ export const Invoices: React.FC = () => {
       </div>
     );
   }
+
+  const selectedCurr = companyCurrencies.find(c => c.id === selectedCurrencyId);
+  const currentInvoiceCurrencyCode = (selectedCurr?.code || companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase();
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
@@ -3406,7 +3399,7 @@ export const Invoices: React.FC = () => {
                                   items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) + 
                                   (isVatEnabled ? items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0) : 0) - 
                                   discount
-                                )} {companyData?.settings?.currency || ''}
+                                )} {currentInvoiceCurrencyCode}
                               </span>
                             </div>
                           </div>
@@ -3599,7 +3592,19 @@ export const Invoices: React.FC = () => {
                                   value={selectedCurrencyId}
                                   onChange={(e) => handleCurrencyChange(e.target.value)}
                                 >
-                                  {companyCurrencies.filter(c => c.is_active || c.id === selectedCurrencyId).map(curr => (
+                                  {(() => {
+                                    const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
+                                    const baseCurrInList = companyCurrencies.find(c => c.code.toLowerCase() === baseCode);
+                                    const baseCurrencyName = baseCurrInList 
+                                      ? (language === 'ar' ? baseCurrInList.name_ar : baseCurrInList.name_en) 
+                                      : (language === 'ar' ? 'العملة الأساسية' : 'Base Currency');
+                                    return (
+                                      <option value="">
+                                        {`${baseCurrencyName} (${(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()})`}
+                                      </option>
+                                    );
+                                  })()}
+                                  {companyCurrencies.filter(c => (c.is_active || c.id === selectedCurrencyId) && c.code.toLowerCase() !== (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase()).map(curr => (
                                     <option key={curr.id} value={curr.id}>
                                       {language === 'ar' ? `${curr.name_ar} (${curr.code})` : `${curr.name_en} (${curr.code})`}
                                     </option>
@@ -4301,11 +4306,11 @@ export const Invoices: React.FC = () => {
                             <div className="flex flex-wrap items-center gap-4 text-xs font-bold font-mono">
                               <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 text-xs font-sans">
                                 <span>{language === 'ar' ? 'إجمالي المسوى:' : 'Total Settled:'}</span>
-                                <span>{formatMoney(formSettlements.reduce((sum, s) => sum + Number(s.settled_amount), 0))} {companyData?.settings?.currency || ''}</span>
+                                <span>{formatMoney(formSettlements.reduce((sum, s) => sum + Number(s.settled_amount), 0))} {currentInvoiceCurrencyCode}</span>
                               </div>
                               <div className="flex items-center gap-2 bg-slate-50 text-slate-700 px-3 py-1 rounded-full border border-slate-200 text-xs font-sans">
                                 <span>{language === 'ar' ? 'الفرق:' : 'Difference:'}</span>
-                                <span>{formatMoney(Math.max(0, invoiceGrandTotal - formSettlements.reduce((sum, s) => sum + Number(s.settled_amount), 0)))} {companyData?.settings?.currency || ''}</span>
+                                <span>{formatMoney(Math.max(0, invoiceGrandTotal - formSettlements.reduce((sum, s) => sum + Number(s.settled_amount), 0)))} {currentInvoiceCurrencyCode}</span>
                               </div>
                             </div>
                           </div>
