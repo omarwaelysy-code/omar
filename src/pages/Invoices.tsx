@@ -1413,16 +1413,18 @@ export const Invoices: React.FC = () => {
   const addItem = (productId: string) => {
     const product = products.find(p => p.id === productId);
     if (!product) return;
+    const rate = Number(exchangeRate) || 1;
+    const foreignPrice = Number((product.sale_price / rate).toFixed(4));
     setItems(prev => [...prev, {
       product_id: product.id,
       product_name: product.name,
       product_code: product.code,
       product_image_url: product.image_url,
       quantity: 1,
-      unit_price: product.sale_price,
+      unit_price: foreignPrice,
       vat_rate: product.vat_rate || 0,
-      vat_amount: product.sale_price * ((product.vat_rate || 0) / 100),
-      total: product.sale_price,
+      vat_amount: foreignPrice * ((product.vat_rate || 0) / 100),
+      total: foreignPrice,
       barcode: product.barcode || '',
       image_url: product.image_url || '',
       operation_id: selectedOperationId || null,
@@ -1460,11 +1462,13 @@ export const Invoices: React.FC = () => {
       if (field === 'product_id') {
         const product = products.find(p => p.id === value);
         if (product) {
+          const rate = Number(exchangeRate) || 1;
+          const foreignPrice = Number((product.sale_price / rate).toFixed(4));
           item.product_name = product.name;
           item.product_image_url = product.image_url;
-          item.unit_price = product.sale_price;
+          item.unit_price = foreignPrice;
           item.vat_rate = product.vat_rate || 0;
-          item.total = (item.quantity || 0) * (item.unit_price || 0);
+          item.total = (item.quantity || 0) * foreignPrice;
           item.vat_amount = item.total * ((product.vat_rate || 0) / 100);
           item.barcode = product.barcode || '';
           item.image_url = product.image_url || '';
