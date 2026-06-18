@@ -65,12 +65,96 @@ interface LayoutProps {
 
 import { useNavigation } from '../contexts/NavigationContext';
 
+const getTabIcon = (id: string) => {
+  const iconProps = { size: 16 };
+  switch (id) {
+    case 'super_admin_dashboard': return <Shield {...iconProps} />;
+    case 'dashboard': return <LayoutDashboard {...iconProps} />;
+    case 'customers':
+    case 'employees':
+    case 'users':
+      return <UsersIcon {...iconProps} />;
+    case 'suppliers': return <Truck {...iconProps} />;
+    case 'expenses': return <Wallet {...iconProps} />;
+    case 'payment_methods':
+    case 'payment_vouchers':
+      return <CreditCard {...iconProps} />;
+    case 'discount_settings':
+    case 'operation_fields':
+      return <Settings {...iconProps} />;
+    case 'products': return <Package {...iconProps} />;
+    case 'item_groups':
+    case 'operation_categories':
+      return <Folder {...iconProps} />;
+    case 'warehouses': return <Home {...iconProps} />;
+    case 'warehouse_transfers':
+    case 'cash_transfers':
+      return <ArrowLeftRight {...iconProps} />;
+    case 'opening_stock_balances': return <ListPlus {...iconProps} />;
+    case 'stock_adjustments': return <Sliders {...iconProps} />;
+    case 'invoices': return <ArrowUpFromLine {...iconProps} />;
+    case 'sales_orders':
+    case 'purchase_orders':
+    case 'journal_entries':
+    case 'customer_statement':
+    case 'supplier_statement':
+      return <FileText {...iconProps} />;
+    case 'returns':
+    case 'purchase_returns':
+      return <RotateCcw {...iconProps} />;
+    case 'customer_discounts':
+    case 'supplier_discounts':
+      return <Tags {...iconProps} />;
+    case 'customer_settlements':
+    case 'supplier_settlements':
+    case 'flexible_operations':
+      return <Layers {...iconProps} />;
+    case 'purchase_invoices': return <ArrowDownToLine {...iconProps} />;
+    case 'receipts': return <Receipt {...iconProps} />;
+    case 'operations': return <List {...iconProps} />;
+    case 'departments':
+    case 'company_settings':
+    case 'companies':
+      return <Building2 {...iconProps} />;
+    case 'cost_centers':
+    case 'account_types':
+    case 'chart_of_accounts':
+      return <PieChart {...iconProps} />;
+    case 'accounts':
+    case 'general_ledger_report':
+      return <BookOpen {...iconProps} />;
+    case 'currencies': return <Coins {...iconProps} />;
+    case 'create_journal_entry': return <Plus {...iconProps} />;
+    case 'detailed_journal_entries': return <FileSpreadsheet {...iconProps} />;
+    case 'stock_card_report':
+    case 'general_stock_movements_report':
+    case 'activity_log':
+      return <History {...iconProps} />;
+    case 'stock_balances_report':
+    case 'customer_balances':
+    case 'sales_report':
+    case 'supplier_balances':
+    case 'cash_report':
+    case 'cash_balances':
+    case 'expenses_report':
+    case 'trial_balance':
+    case 'income_statement':
+      return <BarChart3 {...iconProps} />;
+    case 'balance_sheet': return <Shield {...iconProps} />;
+    case 'integrity_dashboard':
+    case 'system_check':
+      return <ShieldCheck {...iconProps} />;
+    case 'backup_restore': return <Database {...iconProps} />;
+    default: return <Folder {...iconProps} />;
+  }
+};
+
 export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPage }) => {
   const { language, setLanguage, t, dir } = useLanguage();
   const { logout, user, userMemberships, switchCompany, isSuperAdmin, isCompanyAdmin, isManager, isStandardUser, hasPermission } = useAuth();
   const { unreadCount, setIsCenterOpen, addPersistentNotification, showNotification } = useNotification();
   const { openTabs, activeTabId, openTab, closeTab, setActiveTab } = useNavigation();
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isCompanyMenuOpen, setIsCompanyMenuOpen] = React.useState(false);
   const [expandedMenus, setExpandedMenus] = React.useState<string[]>(['sales']);
@@ -682,7 +766,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             ${isSidebarCollapsed ? 'w-16' : 'w-64'}
           `}
         >
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+          <div className={`p-4 border-b border-slate-100 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
             {!isSidebarCollapsed && (
               <motion.h2 
                 initial={{ opacity: 0 }}
@@ -697,9 +781,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             )}
             <button 
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="p-1.5 hover:bg-slate-50 rounded text-slate-400 transition-all"
+              className={`
+                p-2 rounded-xl transition-all duration-200 shadow-sm border border-slate-200/80
+                ${isSidebarCollapsed 
+                  ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:scale-105 active:scale-95 shadow-emerald-500/5' 
+                  : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700 hover:scale-105 active:scale-95'}
+              `}
+              title={isSidebarCollapsed 
+                ? (language === 'ar' ? 'توسيع القائمة' : 'Expand menu') 
+                : (language === 'ar' ? 'طي القائمة' : 'Collapse menu')
+              }
             >
-              {isSidebarCollapsed ? <Menu size={16} /> : <X size={16} />}
+              {isSidebarCollapsed ? <Menu size={18} /> : <X size={18} />}
             </button>
           </div>
           
@@ -740,7 +833,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                   </>
                 ) : (
                   <div className={`w-9 h-9 rounded-xl ${activeTabId === tab.id ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20' : 'bg-white border border-slate-200 text-slate-400 group-hover:border-slate-300'} flex items-center justify-center font-black text-xs transition-all`}>
-                    {tab.label[0]}
+                    {getTabIcon(tab.id)}
                   </div>
                 )}
                 
