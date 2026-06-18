@@ -1574,7 +1574,11 @@ export const Invoices: React.FC = () => {
         operation_id: selectedOperationId || null,
         department_id: selectedDepartmentId || null,
         cost_center_id: selectedCostCenterId || null,
-        currency_id: selectedCurrencyId || null,
+        currency_id: selectedCurrencyId || (() => {
+          const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
+          const baseCurr = companyCurrencies.find(c => c.code.toLowerCase() === baseCode);
+          return baseCurr?.id || null;
+        })(),
         exchange_rate: Number(exchangeRate) || 1
       };
 
@@ -2240,9 +2244,10 @@ export const Invoices: React.FC = () => {
     setFormSettlements([]);
     setRowSettlementDates({});
     
-    const baseCode = (companyData?.settings?.currency || companyData?.currency || 'egp').toLowerCase();
+    const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
     const baseCurr = companyCurrencies.find(c => c.code.toLowerCase() === baseCode);
-    setSelectedCurrencyId(baseCurr?.id || '');
+    const firstActiveCurr = companyCurrencies.find(c => c.is_active);
+    setSelectedCurrencyId(baseCurr?.id || firstActiveCurr?.id || '');
     setExchangeRate(1);
     setExchangeRateType('manual');
     
@@ -2305,10 +2310,13 @@ export const Invoices: React.FC = () => {
       }
       setRowSettlementDates(datesDict);
       
-      setSelectedCurrencyId(fullData.currency_id || '');
+      const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
+      const baseCurr = companyCurrencies.find(c => c.code.toLowerCase() === baseCode);
+      const effectiveCurrencyId = fullData.currency_id || baseCurr?.id || '';
+      setSelectedCurrencyId(effectiveCurrencyId);
       setExchangeRate(fullData.exchange_rate || 1);
       
-      const cur = companyCurrencies.find(c => c.id === fullData.currency_id);
+      const cur = companyCurrencies.find(c => c.id === effectiveCurrencyId);
       if (cur) {
         const baseCurrency = companyData?.settings?.currency || 'EGP';
         if (cur.code.toLowerCase() === baseCurrency.toLowerCase()) {
@@ -2434,9 +2442,9 @@ export const Invoices: React.FC = () => {
               <p className="text-slate-500">{t('invoices.subtitle')}</p>
               {(serverSummary.total_amount !== undefined) && (
                 <div className="mt-2 flex items-center gap-4 text-sm">
-                  <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">إجمالي الفواتير: {formatMoney(serverSummary.total_amount)} {companyData?.settings?.currency || companyData?.currency || 'EGP'}</span>
-                  <span className="bg-red-50 text-red-700 px-3 py-1 rounded-full border border-red-100 font-bold">إجمالي الخصومات: {formatMoney(serverSummary.total_discount || 0)} {companyData?.settings?.currency || companyData?.currency || 'EGP'}</span>
-                  <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100 font-bold">الصافي: {formatMoney((serverSummary.total_amount || 0) - (serverSummary.total_discount || 0))} {companyData?.settings?.currency || companyData?.currency || 'EGP'}</span>
+                  <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">إجمالي الفواتير: {formatMoney(serverSummary.total_amount)} {(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
+                  <span className="bg-red-50 text-red-700 px-3 py-1 rounded-full border border-red-100 font-bold">إجمالي الخصومات: {formatMoney(serverSummary.total_discount || 0)} {(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
+                  <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100 font-bold">الصافي: {formatMoney((serverSummary.total_amount || 0) - (serverSummary.total_discount || 0))} {(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
                 </div>
               )}
             </div>
@@ -3591,7 +3599,7 @@ export const Invoices: React.FC = () => {
                                   value={selectedCurrencyId}
                                   onChange={(e) => handleCurrencyChange(e.target.value)}
                                 >
-                                  {companyCurrencies.filter(c => c.is_active).map(curr => (
+                                  {companyCurrencies.filter(c => c.is_active || c.id === selectedCurrencyId).map(curr => (
                                     <option key={curr.id} value={curr.id}>
                                       {language === 'ar' ? `${curr.name_ar} (${curr.code})` : `${curr.name_en} (${curr.code})`}
                                     </option>
