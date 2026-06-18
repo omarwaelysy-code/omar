@@ -384,7 +384,7 @@ export const PurchaseReturns: React.FC = () => {
         account_id: '',
         counter_account_id: ''
       });
-      showNotification('تم إضافة المورد بنجاح');
+      showNotification(t('common.save_success'), 'success');
     } catch (e) {
       console.error(e);
       showNotification('حدث خطأ أثناء إضافة المورد', 'error');
@@ -413,7 +413,7 @@ export const PurchaseReturns: React.FC = () => {
         min_stock: 0,
         unit: 'قطعة'
       });
-      showNotification('تم إضافة الصنف بنجاح');
+      showNotification(t('common.save_success'), 'success');
     } catch (e) {
       console.error(e);
       showNotification('حدث خطأ أثناء إضافة الصنف', 'error');
@@ -438,7 +438,7 @@ export const PurchaseReturns: React.FC = () => {
         account_number: '',
         opening_balance: 0
       });
-      showNotification('تم إضافة طريقة الدفع بنجاح');
+      showNotification(t('common.save_success'), 'success');
     } catch (e) {
       console.error(e);
       showNotification('حدث خطأ أثناء إضافة طريقة الدفع', 'error');
@@ -451,7 +451,7 @@ export const PurchaseReturns: React.FC = () => {
 
     const validItems = items.filter(item => item.product_id);
     if (!returnData.supplier_id || validItems.length === 0) {
-      showNotification('يرجى اختيار المورد وإضافة أصناف مكتملة للمرتجع', 'error');
+      showNotification(language === 'ar' ? 'يرجى اختيار المورد وإضافة أصناف مكتملة للمرتجع' : 'Please select supplier and add complete items to return', 'error');
       return;
     }
 
@@ -461,7 +461,7 @@ export const PurchaseReturns: React.FC = () => {
     });
 
     if (hasPhysicalProduct && !returnData.warehouse_id) {
-      showNotification('يرجى اختيار المخزن', 'error');
+      showNotification(language === 'ar' ? 'يرجى اختيار المخزن' : 'Please select warehouse', 'error');
       return;
     }
 
@@ -592,7 +592,7 @@ export const PurchaseReturns: React.FC = () => {
         );
       }
 
-      showNotification(editingReturn ? 'تم تحديث مرتجع المشتريات بنجاح' : 'تم حفظ مرتجع المشتريات بنجاح', 'success');
+      showNotification(language === 'ar' ? (editingReturn ? 'تم تحديث مرتجع المشتريات بنجاح' : 'تم حفظ مرتجع المشتريات بنجاح') : (editingReturn ? 'Purchase return updated successfully' : 'Purchase return saved successfully'), 'success');
       closeModal();
       setEditingReturn(null);
 
@@ -602,7 +602,7 @@ export const PurchaseReturns: React.FC = () => {
 
     } catch (e: any) {
       console.error('Save failed:', e);
-      showNotification(e.message || 'حدث خطأ أثناء حفظ مرتجع المشتريات', 'error');
+      showNotification(e.message || (language === 'ar' ? 'حدث خطأ أثناء حفظ مرتجع المشتريات' : 'An error occurred while saving purchase return'), 'error');
     }
   };
 
@@ -613,7 +613,7 @@ export const PurchaseReturns: React.FC = () => {
       'date': 'التاريخ',
       'total_amount': 'المبلغ الإجمالي'
     });
-    exportToExcel(formattedData, { filename: 'PurchaseReturns_Report', sheetName: 'مرتجع مشتريات' });
+    exportToExcel(formattedData, { filename: 'PurchaseReturns_Report', sheetName: language === 'ar' ? 'مرتجع مشتريات' : 'Purchase Returns' });
   };
 
   const handleExportPDF = async () => {
@@ -621,7 +621,7 @@ export const PurchaseReturns: React.FC = () => {
       await exportToPDFUtil(tableRef.current, { 
         filename: 'PurchaseReturns_Report', 
         orientation: 'landscape',
-        reportTitle: 'قائمة مرتجعات المشتريات'
+        reportTitle: language === 'ar' ? 'قائمة مرتجعات المشتريات' : 'Purchase Returns List'
       });
     }
   };
@@ -670,7 +670,7 @@ export const PurchaseReturns: React.FC = () => {
       console.log('[EDIT] Form updated with purchase return:', fullData.id);
     } catch (error: any) {
       console.error('[EDIT] Error loading purchase return:', error);
-      showNotification('فشل تحميل بيانات المرتجع', 'error');
+      showNotification(language === 'ar' ? 'فشل تحميل بيانات المرتجع' : 'Failed to load return details', 'error');
     }
   };
 
@@ -778,17 +778,17 @@ export const PurchaseReturns: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
       {!isModalOpen ? (
         <>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">مرتجع المشتريات</h2>
-          <p className="text-zinc-500">إدارة الأصناف المرتجعة للموردين.</p>
+          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('nav.purchase_returns')}</h2>
+          <p className="text-zinc-500">{language === 'ar' ? 'إدارة الأصناف المرتجعة للموردين.' : 'Manage product returns to suppliers.'}</p>
           {serverSummary.total_amount !== undefined && (
             <div className="mt-2 flex items-center gap-4 text-sm">
                <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
-                 إجمالي المرتجعات: {formatMoney(serverSummary.total_amount)} ج.م
+                 {language === 'ar' ? 'إجمالي المرتجعات:' : 'Total Returns:'} {formatMoney(serverSummary.total_amount)} {t('common.currency')}
                </span>
             </div>
           )}
@@ -822,7 +822,7 @@ export const PurchaseReturns: React.FC = () => {
             <Search className="absolute left-3 top-3 text-zinc-400" size={18} />
             <input
               type="text"
-              placeholder="البحث عن مرتجعات..."
+              placeholder={language === 'ar' ? 'البحث عن مرتجعات...' : 'Search returns...'}
               className="w-full pl-10 pr-4 py-2 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-red-500 transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -892,15 +892,15 @@ export const PurchaseReturns: React.FC = () => {
                     </div>
                   </th>
                   <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    {language === 'ar' ? 'رقم القيد' : 'Journal Entry'}
+                    language === 'ar' ? 'رقم القيد' : 'Journal Entry'
                   </th>
-                  <th className="px-6 py-4 font-bold text-left">الإجراءات</th>
+                  <th className="px-6 py-4 font-bold text-left">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-50">
                 {filteredReturns.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 italic">لا توجد مرتجعات مشتريات حالياً</td>
+                    <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد مرتجعات مشتريات حالياً' : 'No purchase returns currently'}</td>
                   </tr>
                 ) : filteredReturns.map((ret) => (
                   <tr 
@@ -915,10 +915,10 @@ export const PurchaseReturns: React.FC = () => {
                     <td className="px-6 py-4 text-zinc-500">{formatDate(ret.date)}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${ret.payment_type === 'cash' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
-                        {ret.payment_type === 'cash' ? 'نقدي' : 'آجل'}
+                        ret.payment_type === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') : (language === 'ar' ? 'آجل' : 'Credit')
                       </span>
                     </td>
-                    <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(ret.total_amount)} ج.م</td>
+                    <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(ret.total_amount)} {t('common.currency')}</td>
                     <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                       {ret.entry_number ? (
                         <button
@@ -1216,7 +1216,7 @@ export const PurchaseReturns: React.FC = () => {
                 </div>
               )}
               <h3 className="text-xl md:text-2xl font-black text-zinc-900 tracking-tight">
-                {editingReturn ? 'تعديل مرتجع مشتريات' : 'إضافة مرتجع مشتريات'}
+                editingReturn ? (language === 'ar' ? 'تعديل مرتجع مشتريات' : 'Edit Purchase Return') : (language === 'ar' ? 'إضافة مرتجع مشتريات' : 'Add Purchase Return')
               </h3>
             </div>
           </div>
@@ -1261,12 +1261,12 @@ export const PurchaseReturns: React.FC = () => {
                   <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
                     <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
                       <FileText className="w-4 h-4" />
-                      <span className="text-xs font-bold">البيانات الأساسية</span>
+                      <span className="text-xs font-bold">{language === 'ar' ? 'البيانات الأساسية' : 'Basic Data'}</span>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">تاريخ المرتجع</label>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'تاريخ المرتجع' : 'Return Date'}</label>
                         <div className="relative">
                           <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <input 
@@ -1280,7 +1280,7 @@ export const PurchaseReturns: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">المورد</label>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('discounts.column_supplier')}</label>
                         <div className="relative group">
                           <User className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <select 
@@ -1295,9 +1295,9 @@ export const PurchaseReturns: React.FC = () => {
                               }
                             }}
                           >
-                            <option value="">اختر المورد...</option>
+                            <option value="">{t('settlements.select_supplier')}</option>
                             {suppliers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
-                            <option value="new" className="font-bold text-emerald-600">+ إضافة مورد جديد...</option>
+                            <option value="new" className="font-bold text-emerald-600">+ {language === 'ar' ? 'إضافة مورد جديد...' : 'Add New Supplier...'}</option>
                           </select>
                           <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                         </div>
@@ -1321,7 +1321,7 @@ export const PurchaseReturns: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">رقم المرتجع</label>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'رقم المرتجع' : 'Return No.'}</label>
                         <div className="relative">
                           <RotateCcw className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <input 
@@ -1364,7 +1364,7 @@ export const PurchaseReturns: React.FC = () => {
                         className={`flex-1 py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-3 border ${returnData.payment_type === 'cash' ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg scale-[1.02]' : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'}`}
                       >
                         <Wallet size={18} />
-                        {language === 'ar' ? 'نقدي' : 'Cash'}
+                        language === 'ar' ? 'نقدي' : 'Cash'
                       </button>
                       <button 
                         type="button"
@@ -1372,7 +1372,7 @@ export const PurchaseReturns: React.FC = () => {
                         className={`flex-1 py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-3 border ${returnData.payment_type === 'credit' ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg scale-[1.02]' : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'}`}
                       >
                         <CreditCard size={18} />
-                        {language === 'ar' ? 'آجل' : 'Credit'}
+                        language === 'ar' ? 'آجل' : 'Credit'
                       </button>
                     </div>
 
@@ -1399,7 +1399,7 @@ export const PurchaseReturns: React.FC = () => {
                                   }
                                 }}
                               >
-                                <option value="">{language === 'ar' ? 'اختر الطريقة...' : 'Select Method...'}</option>
+                                <option value="">language === 'ar' ? 'اختر الطريقة...' : 'Select Method...'</option>
                                 {paymentMethods.map(m => (
                                   <option key={m.id} value={m.id}>{m.name}</option>
                                 ))}
@@ -1413,11 +1413,11 @@ export const PurchaseReturns: React.FC = () => {
                     )}
 
                     <div>
-                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">ملاحظات</label>
+                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('common.notes')}</label>
                       <textarea 
                         rows={2}
                         className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none text-sm font-bold text-zinc-800"
-                        placeholder="سبب الارتجاع أو أي ملاحظات..."
+                        placeholder={language === 'ar' ? 'سبب الارتجاع أو أي ملاحظات...' : 'Reason for return or notes...'}
                         value={returnData.notes}
                         onChange={(e) => setReturnData({...returnData, notes: e.target.value})}
                       />
@@ -1428,7 +1428,7 @@ export const PurchaseReturns: React.FC = () => {
                   <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
                     <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
                       <Package className="w-4 h-4" />
-                      <span className="text-xs font-bold">الأصناف المرتجعة</span>
+                      <span className="text-xs font-bold">{language === 'ar' ? 'الأصناف المرتجعة' : 'Returned Items'}</span>
                     </div>
 
                     <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
@@ -1440,7 +1440,7 @@ export const PurchaseReturns: React.FC = () => {
                           }}
                           className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-bold border border-emerald-100 hover:bg-emerald-100 transition-all"
                         >
-                          + إضافة صنف جديد
+                          {language === 'ar' ? '+ إضافة صنف جديد' : '+ Add New Product'}
                         </button>
                         <button
                           type="button"
@@ -1572,7 +1572,7 @@ export const PurchaseReturns: React.FC = () => {
                   className="flex-1 py-4 rounded-2xl bg-emerald-600 text-white font-black hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 shadow-xl shadow-emerald-600/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Save size={20} />
-                  {editingReturn ? 'حفظ التعديلات' : 'حفظ المرتجع'}
+                  {editingReturn ? t('common.save') : (language === 'ar' ? 'حفظ المرتجع' : 'Save Return')}
                 </button>
               </div>
             </form>

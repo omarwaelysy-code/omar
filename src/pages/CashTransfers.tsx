@@ -62,7 +62,7 @@ export const CashTransfers: React.FC = () => {
   const [previewJournalEntry, setPreviewJournalEntry] = useState<JournalEntry | null>(null);
   const [previewActivityLog, setPreviewActivityLog] = useState<Partial<ActivityLog> | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const { language, dir } = useLanguage();
+  const { t, language, dir } = useLanguage();
 
   const closeModal = () => {
     setIsModalOpen(false);
@@ -229,12 +229,12 @@ export const CashTransfers: React.FC = () => {
     if (!user) return;
 
     if (formData.from_payment_method_id === formData.to_payment_method_id) {
-      showNotification('لا يمكن التحويل لنفس الخزينة', 'error');
+      showNotification(language === 'ar' ? 'لا يمكن التحويل لنفس الخزينة' : 'Cannot transfer to the same safe', 'error');
       return;
     }
 
     if (formData.amount <= 0) {
-      showNotification('يرجى إدخال مبلغ صحيح', 'error');
+      showNotification(language === 'ar' ? 'يرجى إدخال مبلغ صحيح' : 'Please enter a valid amount', 'error');
       return;
     }
 
@@ -243,7 +243,7 @@ export const CashTransfers: React.FC = () => {
       const toPM = paymentMethods.find(pm => pm.id === formData.to_payment_method_id);
 
       if (!fromPM || !toPM) {
-        showNotification('يرجى اختيار الخزائن بشكل صحيح', 'error');
+        showNotification(language === 'ar' ? 'يرجى اختيار الخزائن بشكل صحيح' : 'Please select safes correctly', 'error');
         return;
       }
 
@@ -324,7 +324,7 @@ export const CashTransfers: React.FC = () => {
         description: '',
         transfer_number: ''
       });
-      showNotification(editingTransfer ? 'تم تحديث التحويل بنجاح' : 'تم إضافة التحويل بنجاح', 'success');
+      showNotification(language === 'ar' ? (editingTransfer ? 'تم تحديث التحويل بنجاح' : 'تم إضافة التحويل بنجاح') : (editingTransfer ? 'Transfer updated successfully' : 'Transfer added successfully'), 'success');
 
       if (!editingTransfer) {
         dbService.logActivity(
@@ -338,7 +338,7 @@ export const CashTransfers: React.FC = () => {
       }
     } catch (e: any) {
       console.error('Save failed:', e);
-      showNotification(e.message || 'حدث خطأ أثناء حفظ التحويل', 'error');
+      showNotification(e.message || (language === 'ar' ? 'حدث خطأ أثناء حفظ التحويل' : 'An error occurred while saving transfer'), 'error');
     }
   };
 
@@ -350,10 +350,10 @@ export const CashTransfers: React.FC = () => {
       await dbService.logActivity(user.id, user.username, user.company_id, 'حذف تحويل نقدية', `حذف عملية تحويل نقدية رقم ${transferToDelete}`, ['cash_transfers', 'journal_entries']);
       setIsDeleteModalOpen(false);
       setTransferToDelete(null);
-      showNotification('تم حذف التحويل بنجاح');
+      showNotification(language === 'ar' ? 'تم حذف التحويل بنجاح' : 'Transfer deleted successfully', 'success');
     } catch (e) {
       console.error(e);
-      showNotification('حدث خطأ أثناء حذف التحويل', 'error');
+      showNotification(language === 'ar' ? 'حدث خطأ أثناء حذف التحويل' : 'An error occurred while deleting transfer', 'error');
     }
   };
 
@@ -415,10 +415,10 @@ export const CashTransfers: React.FC = () => {
         counter_account_id: '',
         details: ''
       });
-      showNotification('تم إضافة الخزينة بنجاح');
+      showNotification(language === 'ar' ? 'تم إضافة الخزينة بنجاح' : 'Safe added successfully', 'success');
     } catch (e) {
       console.error(e);
-      showNotification('حدث خطأ أثناء إضافة الخزينة', 'error');
+      showNotification(language === 'ar' ? 'حدث خطأ أثناء إضافة الخزينة' : 'An error occurred while adding safe', 'error');
     }
   };
 
@@ -441,7 +441,7 @@ export const CashTransfers: React.FC = () => {
       'description': 'الوصف'
     };
     const formattedData = formatDataForExcel(filteredTransfers, headers);
-    exportToExcel(formattedData, { filename: 'Cash_Transfers', sheetName: 'تحويلات النقدية' });
+    exportToExcel(formattedData, { filename: 'Cash_Transfers', sheetName: language === 'ar' ? 'تحويلات النقدية' : 'Cash Transfers' });
   };
 
   const handleExportPDF = async () => {
@@ -449,7 +449,7 @@ export const CashTransfers: React.FC = () => {
       await exportToPDFUtil(tableRef.current, { 
         filename: 'Cash_Transfers', 
         orientation: 'landscape',
-        reportTitle: 'تقرير تحويلات النقدية'
+        reportTitle: language === 'ar' ? 'تقرير تحويلات النقدية' : 'Cash Transfers Report'
       });
     }
   };
@@ -457,19 +457,19 @@ export const CashTransfers: React.FC = () => {
   if (loading) return <div className="flex items-center justify-center h-full">جاري التحميل...</div>;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-zinc-100">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
             <ArrowLeftRight size={28} />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-zinc-900 tracking-tight">التحويل بين الخزائن</h2>
-            <p className="text-zinc-500 font-medium">إدارة عمليات تحويل النقدية بين الخزائن والحسابات البنكية</p>
+            <h2 className="text-2xl font-black text-zinc-900 tracking-tight">{language === 'ar' ? 'التحويل بين الخزائن' : 'Cash Safe Transfers'}</h2>
+            <p className="text-zinc-500 font-medium">{language === 'ar' ? 'إدارة عمليات تحويل النقدية بين الخزائن والحسابات البنكية' : 'Manage cash transfers between safes and bank accounts'}</p>
             {serverSummary.total_amount !== undefined && (
               <div className="mt-2 flex items-center gap-4 text-sm">
                 <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
-                  إجمالي المحول: {formatMoney(serverSummary.total_amount)} ج.م
+                  {language === 'ar' ? 'إجمالي المحول:' : 'Total Transferred:'} {formatMoney(serverSummary.total_amount)} {t('common.currency')}
                 </span>
               </div>
             )}
@@ -496,7 +496,7 @@ export const CashTransfers: React.FC = () => {
             className="flex items-center gap-2 px-6 py-3 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
           >
             <Plus size={20} />
-            <span>تحويل جديد</span>
+            <span>{language === 'ar' ? 'تحويل جديد' : 'New Transfer'}</span>
           </button>
         </div>
       </div>
@@ -507,7 +507,7 @@ export const CashTransfers: React.FC = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={20} />
             <input 
               type="text" 
-              placeholder="بحث في التحويلات..." 
+              placeholder={language === 'ar' ? 'بحث في التحويلات...' : 'Search transfers...'} 
               className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -576,9 +576,9 @@ export const CashTransfers: React.FC = () => {
                       </span>
                     </div>
                   </th>
-                  <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100">رقم القيد</th>
-                  <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100">الوصف</th>
-                  <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100">الإجراءات</th>
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100">{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</th>
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100">{t('common.description')}</th>
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700 uppercase tracking-tighter border-b border-zinc-100">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-50">
@@ -622,7 +622,7 @@ export const CashTransfers: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-emerald-600 font-black">{formatNumber(transfer.amount)} ج.م</span>
+                      <span className="text-emerald-600 font-black">{formatNumber(transfer.amount)} {t('common.currency')}</span>
                     </td>
                     <td className="px-6 py-4">
                       {transfer.entry_number ? (
@@ -776,11 +776,11 @@ export const CashTransfers: React.FC = () => {
                     
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 justify-between">
-                        <span className="text-xs text-zinc-400">من خزينة:</span>
+                        <span className="text-xs text-zinc-400">{language === 'ar' ? 'من خزينة:' : 'From Safe:'}</span>
                         <span className="text-xs font-semibold text-zinc-700 bg-zinc-100 rounded-lg px-2 py-1">{transfer.from_payment_method_name}</span>
                       </div>
                       <div className="flex items-center gap-2 justify-between">
-                        <span className="text-xs text-zinc-400 font-bold text-emerald-600">إلى خزينة:</span>
+                        <span className="text-xs text-zinc-400 font-bold text-emerald-600">{language === 'ar' ? 'إلى خزينة:' : 'To Safe:'}</span>
                         <span className="text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg px-2 py-1">{transfer.to_payment_method_name}</span>
                       </div>
                     </div>
@@ -791,7 +791,7 @@ export const CashTransfers: React.FC = () => {
                   </div>
                   
                   <div className="mt-4 pt-4 border-t border-zinc-100 flex items-center justify-between">
-                    <span className="text-zinc-500 text-xs font-bold">المبلغ المحول</span>
+                    <span className="text-zinc-500 text-xs font-bold">{language === 'ar' ? 'المبلغ المحول' : 'Transferred Amount'}</span>
                     <span className="font-black text-emerald-600 text-lg">
                       {formatNumber(transfer.amount)} ج.م
                     </span>
@@ -831,7 +831,7 @@ export const CashTransfers: React.FC = () => {
                   } border`}
                 >
                   <History size={18} />
-                  <span>قيد اليومية \\ سجل التعديلات</span>
+                  <span>language === 'ar' ? 'قيد اليومية \\ سجل التعديلات' : 'Journal Entry \\ Activity Log'</span>
                 </button>
               </div>
 
@@ -845,7 +845,7 @@ export const CashTransfers: React.FC = () => {
                       disabled={transfers.findIndex(t => t.id === editingTransfer.id) === 0}
                     >
                       <ChevronRight size={16} />
-                      السابق
+                      {language === 'ar' ? 'السابق' : 'Prev'}
                     </button>
                     <button 
                       type="button"
@@ -853,7 +853,7 @@ export const CashTransfers: React.FC = () => {
                       className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
                       disabled={transfers.findIndex(t => t.id === editingTransfer.id) === transfers.length - 1}
                     >
-                      التالي
+                      {language === 'ar' ? 'التالي' : 'Next'}
                       <ChevronLeft size={16} />
                     </button>
                   </div>
@@ -885,7 +885,7 @@ export const CashTransfers: React.FC = () => {
                   >
                     <div className="h-full bg-white border-l border-zinc-100 flex flex-col">
                       <div className="p-4 border-b border-zinc-100 flex items-center justify-between lg:hidden">
-                        <h3 className="font-bold text-zinc-900 italic">سجل النشاط والقيد</h3>
+                        <h3 className="font-bold text-zinc-900 italic">{language === 'ar' ? 'سجل النشاط والقيد' : 'Activity & Journal Log'}</h3>
                         <button onClick={() => setShowSidePanel(false)} className="p-2 text-zinc-400 hover:text-zinc-600">
                           <X size={20} />
                         </button>
@@ -927,12 +927,12 @@ export const CashTransfers: React.FC = () => {
                     <section className="bg-white p-6 md:p-8 rounded-[2rem] border border-zinc-100 shadow-sm space-y-6 relative pt-12 overflow-hidden">
                       <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
                         <Calendar className="w-4 h-4" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">التفاصيل الأساسية</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest">{language === 'ar' ? 'التفاصيل الأساسية' : 'Basic Details'}</span>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                          <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2">رقم التحويل</label>
+                          <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2">{language === 'ar' ? 'رقم التحويل' : 'Transfer No.'}</label>
                           <div className="relative group">
                             <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-emerald-500 pointer-events-none transition-colors`} />
                             <input 
@@ -945,7 +945,7 @@ export const CashTransfers: React.FC = () => {
                         </div>
 
                         <div className="space-y-2">
-                          <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2">تاريخ التحويل</label>
+                          <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2">{language === 'ar' ? 'تاريخ التحويل' : 'Transfer Date'}</label>
                           <div className="relative group">
                             <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none group-focus-within:text-emerald-500 transition-colors`} />
                             <input 
@@ -974,7 +974,7 @@ export const CashTransfers: React.FC = () => {
                         )}
 
                         <div className="space-y-2">
-                          <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2">المبلغ</label>
+                          <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2">{t('common.amount')}</label>
                           <div className="relative group">
                             <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none group-focus-within:text-emerald-500 transition-colors`} />
                             <input 
@@ -1001,13 +1001,13 @@ export const CashTransfers: React.FC = () => {
                       </div>
 
                       <div className="space-y-2">
-                        <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2">ملاحظات / وصف</label>
+                        <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2">{t('common.notes')}</label>
                         <div className="relative group">
                           <FileText className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none group-focus-within:text-emerald-500 transition-colors`} />
                           <textarea 
                             className="w-full ps-12 pe-4 py-3 bg-zinc-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white focus:border-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm min-h-[100px] resize-none"
                             rows={3}
-                            placeholder="وصف إضافي لعملية التحويل..."
+                            placeholder={language === 'ar' ? 'وصف إضافي لعملية التحويل...' : 'Additional description for the transfer...'}
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                           />
@@ -1020,19 +1020,19 @@ export const CashTransfers: React.FC = () => {
                       <section className="bg-white p-6 md:p-8 rounded-[2rem] border border-zinc-100 shadow-sm space-y-6 relative pt-12 overflow-hidden">
                         <div className="absolute top-4 right-4 flex items-center gap-2 text-red-600 bg-red-50 px-3 py-1 rounded-full border border-red-100">
                           <Wallet className="w-4 h-4" />
-                          <span className="text-[10px] font-black uppercase tracking-widest">من خزينة (المصدر)</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest">{language === 'ar' ? 'من خزينة (المصدر)' : 'From Safe (Source)'}</span>
                         </div>
                         
                         <div className="space-y-2">
                           <div className="flex items-center justify-between mb-2">
-                            <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2 italic font-serif tracking-widest uppercase mb-1">اختر المصدر</label>
+                            <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2 italic font-serif tracking-widest uppercase mb-1">{language === 'ar' ? 'اختر المصدر' : 'Select Source'}</label>
                             <button 
                               type="button"
                               onClick={() => setIsPaymentMethodModalOpen(true)}
                               className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg transition-colors"
                             >
                               <Plus size={14} />
-                              إضافة خزينة
+                              {language === 'ar' ? 'إضافة خزينة' : 'Add Safe'}
                             </button>
                           </div>
                           <div className="relative group">
@@ -1043,7 +1043,7 @@ export const CashTransfers: React.FC = () => {
                               value={formData.from_payment_method_id}
                               onChange={(e) => setFormData({ ...formData, from_payment_method_id: e.target.value })}
                             >
-                              <option value="">اختر الخزينة المصدر...</option>
+                              <option value="">{language === 'ar' ? 'اختر الخزينة المصدر...' : 'Select Source Safe...'}</option>
                               {paymentMethods.map(pm => (
                                 <option key={pm.id} value={pm.id}>{pm.name}</option>
                               ))}
@@ -1056,11 +1056,11 @@ export const CashTransfers: React.FC = () => {
                       <section className="bg-white p-6 md:p-8 rounded-[2rem] border border-zinc-100 shadow-sm space-y-6 relative pt-12 overflow-hidden">
                         <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
                           <Wallet className="w-4 h-4" />
-                          <span className="text-[10px] font-black uppercase tracking-widest tracking-widest uppercase mb-1">إلى خزينة (الوجهة)</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest tracking-widest uppercase mb-1">{language === 'ar' ? 'إلى خزينة (الوجهة)' : 'To Safe (Destination)'}</span>
                         </div>
                         
                         <div className="space-y-2">
-                          <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2 italic font-serif tracking-widest uppercase mb-1 px-2 italic font-serif tracking-widest uppercase mb-1 tracking-widest uppercase mb-1 px-2 italic font-serif tracking-widest uppercase mb-1">اختر الوجهة</label>
+                          <label className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2 italic font-serif tracking-widest uppercase mb-1 px-2 italic font-serif tracking-widest uppercase mb-1 tracking-widest uppercase mb-1 px-2 italic font-serif tracking-widest uppercase mb-1">{language === 'ar' ? 'اختر الوجهة' : 'Select Destination'}</label>
                           <div className="relative group text-emerald-600">
                             <Wallet className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none group-focus-within:text-emerald-500 transition-colors`} />
                             <select
@@ -1069,7 +1069,7 @@ export const CashTransfers: React.FC = () => {
                               value={formData.to_payment_method_id}
                               onChange={(e) => setFormData({ ...formData, to_payment_method_id: e.target.value })}
                             >
-                              <option value="">اختر الخزينة الوجهة...</option>
+                              <option value="">{language === 'ar' ? 'اختر الخزينة الوجهة...' : 'Select Destination Safe...'}</option>
                               {paymentMethods.map(pm => (
                                 <option key={pm.id} value={pm.id}>{pm.name}</option>
                               ))}
@@ -1088,7 +1088,7 @@ export const CashTransfers: React.FC = () => {
                       onClick={closeModal}
                       className="flex-1 py-4 bg-white text-zinc-600 rounded-[1.5rem] font-bold border border-zinc-200 hover:bg-zinc-100 transition-all active:scale-95 shadow-lg shadow-black/5"
                     >
-                      إلغاء التعديل
+                      {t('common.cancel')}
                     </button>
                     <button 
                       type="submit"
@@ -1096,7 +1096,7 @@ export const CashTransfers: React.FC = () => {
                       className="flex-[2] py-4 bg-emerald-500 text-white rounded-[1.5rem] font-black uppercase tracking-wider hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-500/30 active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 disabled:grayscale"
                     >
                       <Save className="w-6 h-6 animate-pulse" />
-                      <span>{editingTransfer ? 'حفظ التعديلات' : 'إبرام التحويل'}</span>
+                      <span>{editingTransfer ? t('common.save') : (language === 'ar' ? 'إبرام التحويل' : 'Execute Transfer')}</span>
                     </button>
                   </div>
                 </form>
@@ -1119,14 +1119,14 @@ export const CashTransfers: React.FC = () => {
               <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Trash2 size={40} />
               </div>
-              <h3 className="text-xl font-bold text-zinc-900 mb-2">حذف التحويل؟</h3>
-              <p className="text-zinc-500 mb-8 font-medium">هل أنت متأكد من حذف هذه العملية؟ سيتم حذف القيد المحاسبي المرتبط بها أيضاً.</p>
+              <h3 className="text-xl font-bold text-zinc-900 mb-2">{language === 'ar' ? 'حذف التحويل؟' : 'Delete Transfer?'}</h3>
+              <p className="text-zinc-500 mb-8 font-medium">{language === 'ar' ? 'هل أنت متأكد من حذف هذه العملية؟ سيتم حذف القيد المحاسبي المرتبط بها أيضاً.' : 'Are you sure you want to delete this transfer? The associated journal entry will also be deleted.'}</p>
               <div className="flex gap-3">
                 <button 
                   onClick={handleDelete}
                   className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all active:scale-95"
                 >
-                  نعم، احذف
+                  {language === 'ar' ? 'نعم، احذف' : 'Yes, Delete'}
                 </button>
                 <button 
                   onClick={() => setIsDeleteModalOpen(false)}
@@ -1151,7 +1151,7 @@ export const CashTransfers: React.FC = () => {
               className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-6xl md:rounded-3xl shadow-2xl overflow-hidden flex flex-col"
             >
               <div className="p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10">
-                <h3 className="text-xl font-bold text-zinc-900">إضافة خزينة جديدة</h3>
+                <h3 className="text-xl font-bold text-zinc-900">{language === 'ar' ? 'إضافة خزينة جديدة' : 'Add New Safe'}</h3>
                 <button onClick={() => setIsPaymentMethodModalOpen(false)} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-xl transition-all"><X size={24} /></button>
               </div>
               
@@ -1159,7 +1159,7 @@ export const CashTransfers: React.FC = () => {
                 <form onSubmit={handlePaymentMethodSubmit} className="p-8 space-y-6 flex-1 overflow-y-auto">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <label className="block text-sm font-bold text-zinc-700 uppercase tracking-tighter">كود الخزينة</label>
+                      <label className="block text-sm font-bold text-zinc-700 uppercase tracking-tighter">{language === 'ar' ? 'كود الخزينة' : 'Safe Code'}</label>
                       <div className="relative">
                         <Hash className="absolute left-3 top-3 text-zinc-400" size={18} />
                         <input
@@ -1172,7 +1172,7 @@ export const CashTransfers: React.FC = () => {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="block text-sm font-bold text-zinc-700 uppercase tracking-tighter">اسم الخزينة</label>
+                      <label className="block text-sm font-bold text-zinc-700 uppercase tracking-tighter">{language === 'ar' ? 'اسم الخزينة' : 'Safe Name'}</label>
                       <div className="relative">
                         <Wallet className="absolute left-3 top-3 text-zinc-400" size={18} />
                         <input
@@ -1188,7 +1188,7 @@ export const CashTransfers: React.FC = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <label className="block text-sm font-bold text-zinc-700 uppercase tracking-tighter">النوع</label>
+                      <label className="block text-sm font-bold text-zinc-700 uppercase tracking-tighter">{language === 'ar' ? 'النوع' : 'Type'}</label>
                       <div className="relative">
                         <Layers className="absolute left-3 top-3 text-zinc-400" size={18} />
                         <select
@@ -1196,21 +1196,21 @@ export const CashTransfers: React.FC = () => {
                           value={paymentMethodFormData.type}
                           onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, type: e.target.value as any })}
                         >
-                          <option value="cash">نقدي (خزينة)</option>
-                          <option value="bank">بنكي</option>
-                          <option value="wallet">محفظة إلكترونية</option>
+                          <option value="cash">{language === 'ar' ? 'نقدي (خزينة)' : 'Cash Safe'}</option>
+                          <option value="bank">{language === 'ar' ? 'بنكي' : 'Bank Account'}</option>
+                          <option value="wallet">{language === 'ar' ? 'محفظة إلكترونية' : 'Electronic Wallet'}</option>
                         </select>
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="block text-sm font-bold text-zinc-700 uppercase tracking-tighter">الحساب المحاسبي</label>
+                      <label className="block text-sm font-bold text-zinc-700 uppercase tracking-tighter">{language === 'ar' ? 'الحساب المحاسبي' : 'Ledger Account'}</label>
                       <select
                         required
                         className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold"
                         value={paymentMethodFormData.account_id}
                         onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, account_id: e.target.value })}
                       >
-                        <option value="">اختر الحساب...</option>
+                        <option value="">{language === 'ar' ? 'اختر الحساب...' : 'Select Account...'}</option>
                         {accounts.map(account => (
                           <option key={account.id} value={account.id}>
                             {account.code} - {account.name}
@@ -1222,7 +1222,7 @@ export const CashTransfers: React.FC = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <label className="block text-sm font-bold text-zinc-700 uppercase tracking-tighter">الرصيد الافتتاحي</label>
+                      <label className="block text-sm font-bold text-zinc-700 uppercase tracking-tighter">{language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}</label>
                       <div className="relative">
                         <Wallet className="absolute left-3 top-3 text-zinc-400" size={18} />
                         <input 
@@ -1234,7 +1234,7 @@ export const CashTransfers: React.FC = () => {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="block text-sm font-bold text-zinc-700 uppercase tracking-tighter">تاريخ الرصيد</label>
+                      <label className="block text-sm font-bold text-zinc-700 uppercase tracking-tighter">{language === 'ar' ? 'تاريخ الرصيد' : 'Opening Date'}</label>
                       <div className="relative">
                         <Calendar className="absolute left-3 top-3 text-zinc-400" size={18} />
                         <input 
@@ -1250,14 +1250,14 @@ export const CashTransfers: React.FC = () => {
                   {paymentMethodFormData.opening_balance !== 0 && (
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <label className="block text-sm font-bold text-zinc-700 uppercase tracking-tighter">حساب الطرف الآخر (للرصيد الافتتاحي)</label>
+                        <label className="block text-sm font-bold text-zinc-700 uppercase tracking-tighter">{language === 'ar' ? 'حساب الطرف الآخر (للرصيد الافتتاحي)' : 'Counter Account (Opening)'}</label>
                         <select
                           required
                           className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all border-emerald-200 bg-emerald-50/30 font-bold"
                           value={paymentMethodFormData.counter_account_id}
                           onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, counter_account_id: e.target.value })}
                         >
-                          <option value="">اختر حساب الطرف الآخر...</option>
+                          <option value="">{language === 'ar' ? 'اختر حساب الطرف الآخر...' : 'Select Counter Account...'}</option>
                           {accounts.map(account => (
                             <option key={account.id} value={account.id}>
                               {account.code} - {account.name}
@@ -1267,7 +1267,7 @@ export const CashTransfers: React.FC = () => {
                       </div>
                       {paymentMethodFormData.counter_account_id && paymentMethodFormData.account_id && (
                         <JournalEntryPreview 
-                          title="معاينة قيد الرصيد الافتتاحي"
+                          title={language === 'ar' ? 'معاينة قيد الرصيد الافتتاحي' : 'Preview Opening Balance JE'}
                           items={[
                             {
                               account_name: accounts.find(a => a.id === paymentMethodFormData.account_id)?.name || 'حساب طريقة الدفع',

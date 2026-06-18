@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { AccountType } from '../types';
@@ -11,6 +12,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 
 export const AccountTypes: React.FC = () => {
   const { user } = useAuth();
+  const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
   const { pendingAccountTypeEditId, setPendingAccountTypeEditId } = useNavigation();
   const [view, setView] = useViewPreference('account_types', 'card');
@@ -70,7 +72,7 @@ export const AccountTypes: React.FC = () => {
           });
         } else {
           // Multiple items: show notification and maybe handle later, but for now we can add them directly
-          if (window.confirm(`تم العثور على ${result.types.length} أنواع حسابات. هل تريد إضافتها جميعاً؟`)) {
+          if (window.confirm(language === 'ar' ? `تم العثور على ${result.types.length} أنواع حسابات. هل تريد إضافتها جميعاً؟` : `Found ${result.types.length} account types. Do you want to add them all?`)) {
             for (const item of result.types) {
               await dbService.add('account_types', {
                 code: item.code || '',
@@ -81,16 +83,16 @@ export const AccountTypes: React.FC = () => {
                 is_active: true
               });
             }
-            showNotification(`تم إضافة ${result.types.length} أنواع حسابات بنجاح`, 'success');
+            showNotification(language === 'ar' ? `تم إضافة ${result.types.length} أنواع حسابات بنجاح` : `Successfully added ${result.types.length} account types`, 'success');
             closeModal();
           }
         }
-        showNotification('تم تحليل البيانات بنجاح', 'success');
+        showNotification(language === 'ar' ? 'تم تحليل البيانات بنجاح' : 'Data analyzed successfully', 'success');
         setAiText('');
       }
     } catch (error) {
       console.error(error);
-      showNotification('فشل تحليل البيانات بالذكاء الاصطناعي', 'error');
+      showNotification(language === 'ar' ? 'فشل تحليل البيانات بالذكاء الاصطناعي' : 'AI data analysis failed', 'error');
     } finally {
       setIsAiParsing(false);
     }
@@ -118,16 +120,16 @@ export const AccountTypes: React.FC = () => {
           'account_types',
           fieldsToTrack
         );
-        showNotification('تم تحديث نوع الحساب بنجاح');
+        showNotification(language === 'ar' ? 'تم تحديث نوع الحساب بنجاح' : 'Account type updated successfully', 'success');
       } else {
         const id = await dbService.add('account_types', { ...formData, company_id: user.company_id });
-        await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة نوع حساب', `إضافة نوع حساب جديد: ${formData.name}`, 'account_types', id);
-        showNotification('تم إضافة نوع الحساب بنجاح');
+        await dbService.logActivity(user.id, user.username, user.company_id, language === 'ar' ? 'إضافة نوع حساب' : 'Add Account Type', `إضافة نوع حساب جديد: ${formData.name}`, 'account_types', id);
+        showNotification(language === 'ar' ? 'تم إضافة نوع الحساب بنجاح' : 'Account type added successfully', 'success');
       }
       closeModal();
     } catch (e) {
       console.error(e);
-      showNotification('حدث خطأ أثناء الحفظ', 'error');
+      showNotification(language === 'ar' ? 'حدث خطأ أثناء الحفظ' : 'An error occurred while saving', 'error');
     }
   };
 
@@ -144,10 +146,10 @@ export const AccountTypes: React.FC = () => {
       await dbService.logActivity(user.id, user.username, user.company_id, 'حذف نوع حساب', `حذف نوع الحساب: ${type?.name}`, 'account_types', typeToDelete);
       setIsDeleteModalOpen(false);
       setTypeToDelete(null);
-      showNotification('تم حذف نوع الحساب بنجاح');
+      showNotification(language === 'ar' ? 'تم حذف نوع الحساب بنجاح' : 'Account type deleted successfully', 'success');
     } catch (e) {
       console.error(e);
-      showNotification('حدث خطأ أثناء الحذف', 'error');
+      showNotification(language === 'ar' ? 'حدث خطأ أثناء الحذف' : 'An error occurred while deleting', 'error');
     }
   };
 
@@ -186,11 +188,11 @@ export const AccountTypes: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">أنواع الحسابات</h2>
-          <p className="text-zinc-500 text-sm">تعريف أنواع الحسابات وتصنيفها (ميزانية / قائمة دخل).</p>
+          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('nav.account_types')}</h2>
+          <p className="text-zinc-500 text-sm">{language === 'ar' ? 'تعريف أنواع الحسابات وتصنيفها (ميزانية / قائمة دخل).' : 'Define account types and their classifications (Balance Sheet / Income Statement).'}</p>
         </div>
         <div className="flex items-center gap-2">
           <button 
@@ -199,7 +201,7 @@ export const AccountTypes: React.FC = () => {
               setIsActivityLogOpen(true);
             }}
             className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-zinc-600 border border-zinc-200 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95"
-            title="سجل النشاط"
+            title="{t('common.activity_log')}"
           >
             <History size={20} />
             <span className="hidden md:inline">سجل النشاط</span>
@@ -219,7 +221,7 @@ export const AccountTypes: React.FC = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={20} />
           <input 
             type="text" 
-            placeholder="البحث باسم النوع أو الكود..."
+            placeholder={language === 'ar' ? 'البحث باسم النوع أو الكود...' : 'Search by type name or code...'}
             className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -252,11 +254,11 @@ export const AccountTypes: React.FC = () => {
             <table className="w-full text-right border-collapse">
               <thead>
                 <tr className="bg-zinc-50 border-b border-zinc-200">
-                  <th className="px-6 py-4 text-sm font-bold text-zinc-700">الكود</th>
-                  <th className="px-6 py-4 text-sm font-bold text-zinc-700">الاسم</th>
-                  <th className="px-6 py-4 text-sm font-bold text-zinc-700">نوع القائمة</th>
-                  <th className="px-6 py-4 text-sm font-bold text-zinc-700">التصنيف الرئيسي</th>
-                  <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-left">الإجراءات</th>
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700">{language === 'ar' ? 'الكود' : 'Code'}</th>
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700">{language === 'ar' ? 'الاسم' : 'Name'}</th>
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700">{language === 'ar' ? 'نوع القائمة' : 'Statement Type'}</th>
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700">{language === 'ar' ? 'التصنيف الرئيسي' : 'Main Classification'}</th>
+                  <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-left">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 font-medium text-zinc-700">
@@ -277,20 +279,20 @@ export const AccountTypes: React.FC = () => {
                         <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                           type.statement_type === 'balance_sheet' ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50'
                         }`}>
-                          {type.statement_type === 'balance_sheet' ? 'الميزانية' : 'قائمة الدخل'}
+                          {type.statement_type === 'balance_sheet' ? (language === 'ar' ? 'الميزانية' : 'Balance Sheet') : (language === 'ar' ? 'قائمة الدخل' : 'Income Statement')}
                         </span>
                         <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${type.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                          {type.is_active !== false ? 'نشط' : 'غير نشط'}
+                          {type.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
                         </span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-zinc-500">
-                      {type.classification === 'asset' ? 'أصل' : 
-                       type.classification === 'liability' ? 'التزام' :
-                       type.classification === 'equity' ? 'حقوق ملكية' :
-                       type.classification === 'liability_equity' ? 'التزام/حقوق ملكية' :
-                       type.classification === 'revenue' ? 'إيراد' :
-                       type.classification === 'cost' ? 'تكلفة' : 'مصروف'}
+                      {type.classification === 'asset' ? (language === 'ar' ? 'أصل' : 'Asset') : 
+                       type.classification === 'liability' ? (language === 'ar' ? 'التزام' : 'Liability') :
+                       type.classification === 'equity' ? (language === 'ar' ? 'حقوق ملكية' : 'Equity') :
+                       type.classification === 'liability_equity' ? (language === 'ar' ? 'التزام/حقوق ملكية' : 'Liability/Equity') :
+                       type.classification === 'revenue' ? (language === 'ar' ? 'إيراد' : 'Revenue') :
+                       type.classification === 'cost' ? (language === 'ar' ? 'تكلفة' : 'Cost') : (language === 'ar' ? 'مصروف' : 'Expense')}
                     </td>
                     <td className="px-6 py-4 text-left">
                       <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
@@ -389,7 +391,7 @@ export const AccountTypes: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full h-full md:h-auto md:max-w-lg md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
             <div className="p-6 border-b border-zinc-50 flex items-center justify-between bg-zinc-50/50">
-              <h3 className="text-xl font-bold text-zinc-900">{editingType ? 'تعديل نوع حساب' : 'إضافة نوع حساب جديد'}</h3>
+              <h3 className="text-xl font-bold text-zinc-900">{editingType ? (language === 'ar' ? 'تعديل نوع حساب' : 'Edit Account Type') : (language === 'ar' ? 'إضافة نوع حساب جديد' : 'Add New Account Type')}</h3>
               <button onClick={closeModal} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-full transition-all">
                 <X size={24} />
               </button>
@@ -398,12 +400,12 @@ export const AccountTypes: React.FC = () => {
             <div className="p-6 bg-emerald-50/50 border-b border-emerald-100">
               <div className="flex items-center gap-2 mb-3 text-emerald-700 font-bold text-sm">
                 <Sparkles size={18} />
-                <span>الإدخال الذكي (AI)</span>
+                <span>{language === 'ar' ? 'الإدخال الذكي (AI)' : 'Smart Input (AI)'}</span>
               </div>
               <div className="flex gap-2">
                 <input 
                   type="text"
-                  placeholder="مثال: أصول متداولة تابعة للميزانية بكود 11"
+                  placeholder={language === 'ar' ? 'مثال: أصول متداولة تابعة للميزانية بكود 11' : 'e.g. Current Assets under Balance Sheet with code 11'}
                   className="flex-1 px-4 py-2 bg-white border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
                   value={aiText}
                   onChange={(e) => setAiText(e.target.value)}
@@ -414,7 +416,7 @@ export const AccountTypes: React.FC = () => {
                   disabled={isAiParsing || !aiText.trim()}
                   className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 disabled:opacity-50 transition-all flex items-center gap-2"
                 >
-                  {isAiParsing ? 'جاري التحليل...' : 'تحليل'}
+                  {isAiParsing ? (language === 'ar' ? 'جاري التحليل...' : 'Analyzing...') : (language === 'ar' ? 'تحليل' : 'Analyze')}
                 </button>
               </div>
             </div>
@@ -422,35 +424,35 @@ export const AccountTypes: React.FC = () => {
             <form onSubmit={handleSubmit} className="p-8 space-y-5 flex-1 overflow-y-auto">
               <div className="space-y-5">
                 <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">كود النوع</label>
+                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{language === 'ar' ? 'كود النوع' : 'Type Code'}</label>
                   <div className="relative">
                     <Hash className="absolute left-3 top-3 text-zinc-400" size={18} />
                     <input 
                       required
                       type="text" 
                       className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                      placeholder="مثال: 11، 21، 31"
+                      placeholder={language === 'ar' ? 'مثال: 11، 21، 31' : 'e.g. 11, 21, 31'}
                       value={formData.code}
                       onChange={(e) => setFormData({...formData, code: e.target.value})}
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">اسم النوع</label>
+                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{language === 'ar' ? 'اسم النوع' : 'Type Name'}</label>
                   <div className="relative">
                     <FileText className="absolute left-3 top-3 text-zinc-400" size={18} />
                     <input 
                       required
                       type="text" 
                       className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                      placeholder="مثال: أصول متداولة، خصوم طويلة الأجل"
+                      placeholder={language === 'ar' ? 'مثال: أصول متداولة، خصوم طويلة الأجل' : 'e.g. Current Assets, Long-term liabilities'}
                       value={formData.name}
                       onChange={(e) => setFormData({...formData, name: e.target.value})}
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">تابع لـ</label>
+                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{language === 'ar' ? 'تابع لـ' : 'Statement'}</label>
                   <select 
                     required
                     className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
@@ -464,12 +466,12 @@ export const AccountTypes: React.FC = () => {
                       });
                     }}
                   >
-                    <option value="balance_sheet">الميزانية العمومية</option>
-                    <option value="income_statement">قائمة الدخل</option>
+                    <option value="balance_sheet">{language === 'ar' ? 'الميزانية العمومية' : 'Balance Sheet'}</option>
+                    <option value="income_statement">{language === 'ar' ? 'قائمة الدخل' : 'Income Statement'}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">التصنيف</label>
+                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{language === 'ar' ? 'التصنيف' : 'Classification'}</label>
                   <select 
                     required
                     className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
@@ -478,16 +480,16 @@ export const AccountTypes: React.FC = () => {
                   >
                     {formData.statement_type === 'balance_sheet' ? (
                       <>
-                        <option value="asset">أصل</option>
-                        <option value="liability">التزام (خصوم)</option>
-                        <option value="equity">حقوق ملكية</option>
-                        <option value="liability_equity">التزام / حقوق ملكية (مشترك)</option>
+                        <option value="asset">{language === 'ar' ? 'أصل' : 'Asset'}</option>
+                        <option value="liability">{language === 'ar' ? 'التزام (خصوم)' : 'Liability'}</option>
+                        <option value="equity">{language === 'ar' ? 'حقوق ملكية' : 'Equity'}</option>
+                        <option value="liability_equity">{language === 'ar' ? 'التزام / حقوق ملكية (مشترك)' : 'Liability/Equity (Joint)'}</option>
                       </>
                     ) : (
                       <>
-                        <option value="revenue">إيراد</option>
-                        <option value="cost">تكلفة</option>
-                        <option value="expense">مصروف</option>
+                        <option value="revenue">{language === 'ar' ? 'إيراد' : 'Revenue'}</option>
+                        <option value="cost">{language === 'ar' ? 'تكلفة' : 'Cost'}</option>
+                        <option value="expense">{language === 'ar' ? 'مصروف' : 'Expense'}</option>
                       </>
                     )}
                   </select>
@@ -496,8 +498,8 @@ export const AccountTypes: React.FC = () => {
               {/* Active / Inactive Status Toggle */}
               <div className="pt-4 pb-4 border-t border-slate-100 flex items-center justify-between">
                 <div>
-                  <h4 className="text-sm font-bold text-zinc-900 leading-none mb-1">حالة النشاط</h4>
-                  <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">تحديد ما إذا كان نوع الحساب نشطاً في النظام أم لا</p>
+                  <h4 className="text-sm font-bold text-zinc-900 leading-none mb-1">{language === 'ar' ? 'حالة النشاط' : 'Activity Status'}</h4>
+                  <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{language === 'ar' ? 'تحديد ما إذا كان نوع الحساب نشطاً في النظام أم لا' : 'Specify whether the account type is active in the system or not'}</p>
                 </div>
                 <button
                   type="button"
@@ -514,7 +516,7 @@ export const AccountTypes: React.FC = () => {
                   type="submit"
                   className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
                 >
-                  {editingType ? 'تحديث البيانات' : 'حفظ النوع'}
+                  {editingType ? (language === 'ar' ? 'تحديث البيانات' : 'Update Details') : (language === 'ar' ? 'حفظ النوع' : 'Save Type')}
                 </button>
                 <button 
                   type="button"
@@ -532,8 +534,8 @@ export const AccountTypes: React.FC = () => {
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 animate-in zoom-in-95 duration-200">
-            <h3 className="text-xl font-bold text-zinc-900 mb-4">تأكيد الحذف</h3>
-            <p className="text-zinc-500 mb-6">هل أنت متأكد من رغبتك في حذف نوع الحساب هذا؟ لا يمكن التراجع عن هذا الإجراء.</p>
+            <h3 className="text-xl font-bold text-zinc-900 mb-4">{language === 'ar' ? 'تأكيد الحذف' : 'Confirm Delete'}</h3>
+            <p className="text-zinc-500 mb-6">{language === 'ar' ? 'هل أنت متأكد من رغبتك في حذف نوع الحساب هذا؟ لا يمكن التراجع عن هذا الإجراء.' : 'Are you sure you want to delete this account type? This action cannot be undone.'}</p>
             <div className="flex gap-4">
               <button 
                 onClick={() => {

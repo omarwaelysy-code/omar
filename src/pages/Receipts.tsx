@@ -769,7 +769,7 @@ export const Receipts: React.FC = () => {
         account_id: '',
         counter_account_id: ''
       });
-      showNotification('تم إضافة العميل بنجاح');
+      showNotification(t('common.save_success'), 'success');
     } catch (e) {
       console.error(e);
       showNotification('حدث خطأ أثناء إضافة العميل', 'error');
@@ -835,7 +835,7 @@ export const Receipts: React.FC = () => {
         counter_account_id: '',
         details: ''
       });
-      showNotification('تم إضافة طريقة الدفع بنجاح');
+      showNotification(t('common.save_success'), 'success');
     } catch (e) {
       console.error(e);
       showNotification('حدث خطأ أثناء إضافة طريقة الدفع', 'error');
@@ -848,12 +848,12 @@ export const Receipts: React.FC = () => {
 
     const finalAmount = voucherData.items.reduce((sum, item) => sum + item.amount, 0);
     if (finalAmount <= 0) {
-      showNotification('يرجى إدخال مبلغ صحيح', 'error');
+      showNotification(language === 'ar' ? 'يرجى إدخال مبلغ صحيح' : 'Please enter a valid amount', 'error');
       return;
     }
 
     if (!voucherData.payment_method_id) {
-      showNotification('يرجى اختيار طريقة القبض', 'error');
+      showNotification(language === 'ar' ? 'يرجى اختيار طريقة القبض' : 'Please select payment method', 'error');
       return;
     }
 
@@ -864,7 +864,7 @@ export const Receipts: React.FC = () => {
         const uniqueSettlements = getUniqueSettlementsForVoucherItem(item, i);
         const totalSettled = uniqueSettlements.reduce((sum: number, s: any) => sum + s.settled_amount, 0);
         if (totalSettled > item.amount) {
-          showNotification('التسوية أكبر من المبلغ الإجمالي', 'error');
+          showNotification(language === 'ar' ? 'التسوية أكبر من المبلغ الإجمالي' : 'Settlement is larger than total amount', 'error');
           return;
         }
       }
@@ -1152,7 +1152,7 @@ export const Receipts: React.FC = () => {
         }
       }
 
-      showNotification(editingReceipt ? 'تم تحديث سند القبض بنجاح' : 'تم إضافة سند القبض بنجاح', 'success');
+      showNotification(language === 'ar' ? (editingReceipt ? 'تم تحديث سند القبض بنجاح' : 'تم إضافة سند القبض بنجاح') : (editingReceipt ? 'Receipt voucher updated successfully' : 'Receipt voucher saved successfully'), 'success');
       closeModal();
 
       if (!editingReceipt) {
@@ -1161,7 +1161,7 @@ export const Receipts: React.FC = () => {
 
     } catch (e: any) {
       console.error('Save failed:', e);
-      showNotification(e.message || 'حدث خطأ أثناء حفظ السند', 'error');
+      showNotification(e.message || (language === 'ar' ? 'حدث خطأ أثناء حفظ السند' : 'An error occurred while saving voucher'), 'error');
     }
   };
 
@@ -1334,7 +1334,7 @@ export const Receipts: React.FC = () => {
       console.log('[EDIT] Form updated with receipt:', fullData.id);
     } catch (error: any) {
       console.error('[EDIT] Error loading receipt:', error);
-      showNotification('فشل تحميل بيانات سند القبض', 'error');
+      showNotification(language === 'ar' ? 'فشل تحميل بيانات سند القبض' : 'Failed to load voucher details', 'error');
     }
   };
 
@@ -1524,7 +1524,7 @@ export const Receipts: React.FC = () => {
                       </span>
                     </div>
                   </th>
-                  <th className="px-6 py-4 font-bold">العميل</th>
+                  <th className="px-6 py-4 font-bold">{t('discounts.column_customer')}</th>
                   <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('date')}>
                     <div className="flex items-center gap-1">
                       التاريخ
@@ -1533,7 +1533,7 @@ export const Receipts: React.FC = () => {
                       </span>
                     </div>
                   </th>
-                  <th className="px-6 py-4 font-bold">طريقة السداد</th>
+                  <th className="px-6 py-4 font-bold">{language === 'ar' ? 'طريقة السداد' : 'Payment Method'}</th>
                   <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('amount')}>
                     <div className="flex items-center gap-1">
                       المبلغ
@@ -1630,7 +1630,7 @@ export const Receipts: React.FC = () => {
                 ))}
                 {filteredReceipts.length === 0 && !loading && (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-zinc-500 italic">لا توجد سندات قبض.</td>
+                    <td colSpan={6} className="px-6 py-12 text-center text-zinc-500 italic">{language === 'ar' ? 'لا توجد سندات قبض.' : 'No receipt vouchers.'}</td>
                   </tr>
                 )}
               </tbody>
@@ -1779,7 +1779,7 @@ export const Receipts: React.FC = () => {
                 </div>
               )}
               <h3 className="text-xl md:text-2xl font-black text-zinc-900 tracking-tight">
-                {editingReceipt ? 'تعديل سند قبض' : 'إضافة سند قبض'}
+                editingReceipt ? t('receipts.edit') : t('receipts.add')
               </h3>
             </div>
           </div>
@@ -1868,12 +1868,12 @@ export const Receipts: React.FC = () => {
                   <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
                     <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
                       <FileText className="w-4 h-4" />
-                      <span className="text-xs font-bold">البيانات الأساسية</span>
+                      <span className="text-xs font-bold">{language === 'ar' ? 'البيانات الأساسية' : 'Basic Info'}</span>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">رقم السند</label>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'رقم السند' : 'Voucher No.'}</label>
                         <div className="relative">
                           <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <input 
@@ -1886,12 +1886,12 @@ export const Receipts: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">مرجع يدوي / آخر</label>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'مرجع يدوي / آخر' : 'Manual / Other Ref'}</label>
                         <div className="relative group">
                           <FileText className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <input 
                             type="text" 
-                            placeholder="ادخل رقم المرجع اليدوي..."
+                            placeholder={language === 'ar' ? 'ادخل رقم المرجع اليدوي...' : 'Enter manual reference...'}
                             className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
                             value={voucherData.manual_reference}
                             onChange={(e) => setVoucherData({...voucherData, manual_reference: e.target.value})}
@@ -1900,7 +1900,7 @@ export const Receipts: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">تاريخ السند</label>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'تاريخ السند' : 'Voucher Date'}</label>
                         <div className="relative">
                           <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <input 
@@ -1930,7 +1930,7 @@ export const Receipts: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">طريقة القبض (إلى خزينة/بنك)</label>
+                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'طريقة القبض (إلى خزينة/بنك)' : 'Payment Method (To Safe/Bank)'}</label>
                       <div className="relative group">
                         <CreditCard className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                         <select 
@@ -1945,9 +1945,9 @@ export const Receipts: React.FC = () => {
                             }
                           }}
                         >
-                          <option value="">اختر طريقة القبض...</option>
+                          <option value="">{language === 'ar' ? 'اختر طريقة القبض...' : 'Select payment method...'}</option>
                           {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
-                          <option value="new_payment_method" className="font-bold text-emerald-600">+ إضافة طريقة دفع جديدة...</option>
+                          <option value="new_payment_method" className="font-bold text-emerald-600">+ {language === 'ar' ? 'إضافة طريقة دفع جديدة...' : 'Add New Payment Method...'}</option>
                         </select>
                         <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                       </div>
@@ -1958,12 +1958,12 @@ export const Receipts: React.FC = () => {
                   <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
                     <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
                       <Layers className="w-4 h-4" />
-                      <span className="text-xs font-bold">بنود القبض</span>
+                      <span className="text-xs font-bold">{language === 'ar' ? 'بنود القبض' : 'Receipt Items'}</span>
                     </div>
 
                     <div className="space-y-4">
                       <div className="flex items-center justify-between border-b border-zinc-100 pb-2">
-                        <h4 className="font-bold text-zinc-900 italic tracking-tight uppercase text-sm">تفاصيل البنود</h4>
+                        <h4 className="font-bold text-zinc-900 italic tracking-tight uppercase text-sm">{language === 'ar' ? 'تفاصيل البنود' : 'Item Details'}</h4>
                         <button 
                           type="button"
                           onClick={() => setVoucherData({
@@ -1973,7 +1973,7 @@ export const Receipts: React.FC = () => {
                           className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-black border border-emerald-100 hover:bg-emerald-100 transition-all shadow-sm"
                         >
                           <Plus size={16} />
-                          <span>إضافة بند قبض جديد</span>
+                          <span>{language === 'ar' ? 'إضافة بند قبض جديد' : 'Add New Item'}</span>
                         </button>
                       </div>
                       
@@ -1981,10 +1981,10 @@ export const Receipts: React.FC = () => {
                         <table className="w-full">
                           <thead>
                             <tr className={`text-zinc-500 text-[10px] uppercase font-black tracking-widest ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              <th className="px-2 py-3 w-32 tracking-tighter">النوع</th>
-                              <th className="px-2 py-3 tracking-tighter">المقبوض منه / الحساب</th>
-                              <th className="px-2 py-3 w-32 tracking-tighter uppercase tracking-widest">المبلغ</th>
-                              <th className="px-2 py-3 tracking-tighter uppercase tracking-widest">الوصف</th>
+                              <th className="px-2 py-3 w-32 tracking-tighter">{language === 'ar' ? 'النوع' : 'Type'}</th>
+                              <th className="px-2 py-3 tracking-tighter">{language === 'ar' ? 'المقبوض منه / الحساب' : 'Received From / Account'}</th>
+                              <th className="px-2 py-3 w-32 tracking-tighter uppercase tracking-widest">{t('common.amount')}</th>
+                              <th className="px-2 py-3 tracking-tighter uppercase tracking-widest">{t('common.description')}</th>
                               <th className="px-2 py-3 w-10"></th>
                             </tr>
                           </thead>
@@ -2005,10 +2005,10 @@ export const Receipts: React.FC = () => {
                                         setVoucherData({...voucherData, items: newItems});
                                       }}
                                     >
-                                      <option value="customer">عميل</option>
-                                      <option value="supplier">مورد</option>
-                                      <option value="expense">مصروف</option>
-                                      <option value="account">حساب عام</option>
+                                      <option value="customer">{t('discounts.column_customer')}</option>
+                                      <option value="supplier">{t('discounts.column_supplier')}</option>
+                                      <option value="expense">{language === 'ar' ? 'مصروف' : 'Expense'}</option>
+                                      <option value="account">{language === 'ar' ? 'حساب عام' : 'General Ledger'}</option>
                                     </select>
                                     <ChevronDown size={12} className="absolute right-3 top-4 text-zinc-400 pointer-events-none" />
                                   </td>
@@ -2025,7 +2025,7 @@ export const Receipts: React.FC = () => {
                                         setVoucherData({...voucherData, items: newItems});
                                       }}
                                     >
-                                      <option value="">اختر...</option>
+                                      <option value="">{language === 'ar' ? 'اختر...' : 'Select...'}</option>
                                       {item.type === 'customer' && customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                       {item.type === 'supplier' && suppliers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
                                       {item.type === 'expense' && categories.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
@@ -2043,7 +2043,7 @@ export const Receipts: React.FC = () => {
                                         }}
                                         required
                                       >
-                                        <option value="">اختر الحساب الفرعي...</option>
+                                        <option value="">{language === 'ar' ? 'اختر الحساب الفرعي...' : 'Select Sub-account...'}</option>
                                         {subAccounts.map(sa => (
                                           <option key={sa.id} value={sa.id}>{sa.label}</option>
                                         ))}
@@ -2066,7 +2066,7 @@ export const Receipts: React.FC = () => {
                                   <td className="px-1 py-1">
                                     <input 
                                       type="text" 
-                                      placeholder="بيان تفصيلي..."
+                                      placeholder={language === 'ar' ? 'بيان تفصيلي...' : 'Detailed statement...'}
                                       className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] font-bold outline-none"
                                       value={item.description}
                                       onChange={(e) => {
@@ -2106,13 +2106,13 @@ export const Receipts: React.FC = () => {
                                           {/* Header info */}
                                           <div className="flex flex-wrap items-center gap-6 text-xs border-b border-zinc-100 pb-3">
                                             <div className="flex items-center gap-2">
-                                              <span className="font-bold text-zinc-400">رقم التسوية:</span>
+                                              <span className="font-bold text-zinc-400">{language === 'ar' ? 'رقم التسوية:' : 'Settlement No.:'}</span>
                                               <span className="font-mono bg-zinc-100 px-2.5 py-1 rounded-lg text-zinc-600 font-bold border border-zinc-200">
                                                 {item.settlement_number || '-'}
                                               </span>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                              <span className="font-bold text-zinc-400">تاريخ التسوية:</span>
+                                              <span className="font-bold text-zinc-400">{language === 'ar' ? 'تاريخ التسوية:' : 'Settlement Date:'}</span>
                                               <input
                                                 type="date"
                                                 className="px-2.5 py-1 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500"
@@ -2133,13 +2133,13 @@ export const Receipts: React.FC = () => {
                                               return (
                                                 <div className="flex flex-wrap items-center gap-4 text-xs font-bold">
                                                   <div className="flex items-center gap-1.5">
-                                                    <span className="text-zinc-400">إجمالي المسوى:</span>
-                                                    <span className="text-emerald-600 font-mono font-black bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">{formatNumber(totalSettled)} ج.م</span>
+                                                    <span className="text-zinc-400">{language === 'ar' ? 'إجمالي المسوى:' : 'Total Settled:'}</span>
+                                                    <span className="text-emerald-600 font-mono font-black bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">{formatNumber(totalSettled)} {t('common.currency')}</span>
                                                   </div>
                                                   <div className="flex items-center gap-1.5">
-                                                    <span className="text-zinc-400">الفرق:</span>
+                                                    <span className="text-zinc-400">{language === 'ar' ? 'الفرق:' : 'Difference:'}</span>
                                                     <span className={`font-mono font-black px-2.5 py-1 rounded-lg border ${difference === 0 ? 'text-zinc-600 bg-zinc-50 border-zinc-200' : difference > 0 ? 'text-blue-600 bg-blue-50 border-blue-100' : 'text-red-600 bg-red-50 border-red-100'}`}>
-                                                      {formatNumber(difference)} ج.م
+                                                      {formatNumber(difference)} {t('common.currency')}
                                                     </span>
                                                   </div>
                                                 </div>
@@ -2150,19 +2150,19 @@ export const Receipts: React.FC = () => {
                                           {/* Transactions Table */}
                                           {openTransactions.length === 0 ? (
                                             <div className="text-center py-4 text-xs font-bold text-zinc-400">
-                                              لا توجد حركات غير مسواة لهذا {item.type === 'customer' ? 'العميل' : 'المورد'}
+                                              {language === 'ar' ? `لا توجد حركات غير مسواة لهذا ${item.type === 'customer' ? 'العميل' : 'المورد'}` : `No unsettled movements for this ${item.type === 'customer' ? 'customer' : 'supplier'}`}
                                             </div>
                                           ) : (
                                             <div className="overflow-x-auto">
                                               <table className="w-full text-right text-xs">
                                                 <thead>
                                                   <tr className="text-zinc-400 font-bold border-b border-zinc-100 pb-2">
-                                                    <th className="pb-2 text-right">رقم القيد</th>
-                                                    <th className="pb-2 text-right">نوع الحركة</th>
-                                                    <th className="pb-2 text-right">رقم الحركة</th>
-                                                    <th className="pb-2 text-right">التاريخ</th>
-                                                    <th className="pb-2 text-center w-36">رقم التسوية</th>
-                                                    <th className="pb-2 text-center w-36">تاريخ التسوية</th>
+                                                    <th className="pb-2 text-right">{language === 'ar' ? 'رقم القيد' : 'JE No.'}</th>
+                                                    <th className="pb-2 text-right">{language === 'ar' ? 'نوع الحركة' : 'Doc Type'}</th>
+                                                    <th className="pb-2 text-right">{language === 'ar' ? 'رقم الحركة' : 'Doc No.'}</th>
+                                                    <th className="pb-2 text-right">{t('common.date')}</th>
+                                                    <th className="pb-2 text-center w-36">{language === 'ar' ? 'رقم التسوية' : 'Settlement No.'}</th>
+                                                    <th className="pb-2 text-center w-36">{language === 'ar' ? 'تاريخ التسوية' : 'Settlement Date'}</th>
                                                     <th className="pb-2 text-right">المبلغ الأصلي</th>
                                                     <th className="pb-2 text-right">المبلغ المفتوح</th>
                                                     <th className="pb-2 text-center w-24">تسوية كاملة</th>
@@ -2928,7 +2928,7 @@ export const Receipts: React.FC = () => {
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 animate-in zoom-in-95 duration-200">
             <h3 className="text-xl font-bold text-zinc-900 mb-4">تأكيد الحذف</h3>
-            <p className="text-zinc-500 mb-6">هل أنت متأكد من رغبتك في حذف هذا السند؟ لا يمكن التراجع عن هذا الإجراء.</p>
+            <p className="text-zinc-500 mb-6">{language === 'ar' ? 'هل أنت متأكد من رغبتك في حذف هذا السند؟ لا يمكن التراجع عن هذا الإجراء.' : 'Are you sure you want to delete this voucher? This action cannot be undone.'}</p>
             <div className="flex gap-4">
               <button 
                 onClick={() => {

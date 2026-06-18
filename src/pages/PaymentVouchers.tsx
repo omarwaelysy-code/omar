@@ -801,7 +801,7 @@ export const PaymentVouchers: React.FC = () => {
         account_id: '',
         counter_account_id: ''
       });
-      showNotification('تم إضافة المورد بنجاح');
+      showNotification(t('common.save_success'), 'success');
     } catch (e) {
       console.error(e);
       showNotification('حدث خطأ أثناء إضافة المورد', 'error');
@@ -827,7 +827,7 @@ export const PaymentVouchers: React.FC = () => {
         name: '',
         description: ''
       });
-      showNotification('تم إضافة بند المصروف بنجاح');
+      showNotification(t('common.save_success'), 'success');
     } catch (e) {
       console.error(e);
       showNotification('حدث خطأ أثناء إضافة بند المصروف', 'error');
@@ -893,7 +893,7 @@ export const PaymentVouchers: React.FC = () => {
         counter_account_id: '',
         details: ''
       });
-      showNotification('تم إضافة طريقة الدفع بنجاح');
+      showNotification(t('common.save_success'), 'success');
     } catch (e) {
       console.error(e);
       showNotification('حدث خطأ أثناء إضافة طريقة الدفع', 'error');
@@ -909,12 +909,12 @@ export const PaymentVouchers: React.FC = () => {
       : voucherData.amount;
 
     if (finalAmount <= 0) {
-      showNotification('يرجى إدخال مبلغ صحيح', 'error');
+      showNotification(language === 'ar' ? 'يرجى إدخال مبلغ صحيح' : 'Please enter a valid amount', 'error');
       return;
     }
 
     if (!voucherData.payment_method_id) {
-      showNotification('يرجى اختيار طريقة الصرف', 'error');
+      showNotification(language === 'ar' ? 'يرجى اختيار طريقة الصرف' : 'Please select payment method', 'error');
       return;
     }
 
@@ -925,7 +925,7 @@ export const PaymentVouchers: React.FC = () => {
         const uniqueSettlements = getUniqueSettlementsForVoucherItem(item, i);
         const totalSettled = uniqueSettlements.reduce((sum: number, s: any) => sum + s.settled_amount, 0);
         if (totalSettled > item.amount) {
-          showNotification('التسوية أكبر من المبلغ الإجمالي', 'error');
+          showNotification(language === 'ar' ? 'التسوية أكبر من المبلغ الإجمالي' : 'Settlement is larger than total amount', 'error');
           return;
         }
       }
@@ -1217,7 +1217,7 @@ export const PaymentVouchers: React.FC = () => {
         }
       }
 
-      showNotification(editingVoucher ? 'تم تعديل سند الصرف بنجاح' : 'تم حفظ سند الصرف بنجاح', 'success');
+      showNotification(language === 'ar' ? (editingVoucher ? 'تم تعديل سند الصرف بنجاح' : 'تم حفظ سند الصرف بنجاح') : (editingVoucher ? 'Payment voucher updated successfully' : 'Payment voucher saved successfully'), 'success');
       setVoucherData({
         internal_reference: '',
         manual_reference: '',
@@ -1240,7 +1240,7 @@ export const PaymentVouchers: React.FC = () => {
 
     } catch (e: any) {
       console.error('Save failed:', e);
-      showNotification(e.message || 'حدث خطأ أثناء حفظ السند', 'error');
+      showNotification(e.message || (language === 'ar' ? 'حدث خطأ أثناء حفظ السند' : 'An error occurred while saving voucher'), 'error');
     }
   };
 
@@ -1547,7 +1547,7 @@ export const PaymentVouchers: React.FC = () => {
       console.log('[EDIT] Form updated with payment voucher:', fullData.id);
     } catch (error: any) {
       console.error('[EDIT] Error loading payment voucher:', error);
-      showNotification('فشل تحميل بيانات السند', 'error');
+      showNotification(language === 'ar' ? 'فشل تحميل بيانات السند' : 'Failed to load voucher details', 'error');
     }
   };
 
@@ -1616,7 +1616,7 @@ export const PaymentVouchers: React.FC = () => {
           {serverSummary.total_amount !== undefined && (
             <div className="mt-2 flex items-center gap-4 text-sm">
                <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
-                 إجمالي المدفوعات: {formatMoney(serverSummary.total_amount)} ج.م
+                 {language === 'ar' ? 'إجمالي المدفوعات:' : 'Total Paid:'} {formatMoney(serverSummary.total_amount)} {t('common.currency')}
                </span>
             </div>
           )}
@@ -1681,7 +1681,7 @@ export const PaymentVouchers: React.FC = () => {
                 <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
                   <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('voucher_number')}>
                     <div className="flex items-center gap-1">
-                      رقم السند / المرجع
+                      {language === 'ar' ? 'رقم السند / المرجع' : 'Voucher No. / Ref'}
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                         {sortBy === 'voucher_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                       </span>
@@ -1689,22 +1689,22 @@ export const PaymentVouchers: React.FC = () => {
                   </th>
                   <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('voucher_type')}>
                     <div className="flex items-center gap-1">
-                      النوع
+                      {language === 'ar' ? 'النوع' : 'Type'}
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                         {sortBy === 'voucher_type' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                       </span>
                     </div>
                   </th>
-                  <th className="px-6 py-4 font-bold">المستفيد / الفئة</th>
+                  <th className="px-6 py-4 font-bold">{language === 'ar' ? 'المستفيد / الفئة' : 'Beneficiary / Class'}</th>
                   <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('date')}>
                     <div className="flex items-center gap-1">
-                      التاريخ
+                      {t('common.date')}
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                         {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                       </span>
                     </div>
                   </th>
-                  <th className="px-6 py-4 font-bold">الوصف</th>
+                  <th className="px-6 py-4 font-bold">{t('common.description')}</th>
                   <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('amount')}>
                     <div className="flex items-center gap-1">
                       المبلغ
@@ -1720,7 +1720,7 @@ export const PaymentVouchers: React.FC = () => {
               <tbody className="divide-y divide-zinc-50">
                 {filteredVouchers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-zinc-400 italic">لا توجد سندات صرف حالياً</td>
+                    <td colSpan={6} className="px-6 py-12 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد سندات صرف حالياً' : 'No payment vouchers currently'}</td>
                   </tr>
                 ) : filteredVouchers.map((voucher) => (
                   <tr 
@@ -2001,7 +2001,7 @@ export const PaymentVouchers: React.FC = () => {
                 </div>
               )}
               <h3 className="text-xl md:text-2xl font-black text-zinc-900 tracking-tight">
-                {editingVoucher ? 'تعديل سند صرف' : 'إضافة سند صرف'}
+                editingVoucher ? t('payments.edit') : t('payments.add')
               </h3>
             </div>
           </div>
@@ -2063,12 +2063,12 @@ export const PaymentVouchers: React.FC = () => {
                   <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
                     <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
                       <FileText className="w-4 h-4" />
-                      <span className="text-xs font-bold">البيانات الأساسية</span>
+                      <span className="text-xs font-bold">{language === 'ar' ? 'البيانات الأساسية' : 'Basic Info'}</span>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">مرجع البرنامج</label>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'مرجع البرنامج' : 'System Ref'}</label>
                         <div className="relative">
                           <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <input 
@@ -2081,12 +2081,12 @@ export const PaymentVouchers: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercaseTracking tracking-tighter uppercase mb-2 px-2 uppercase">مرجع يدوي / آخر</label>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercaseTracking tracking-tighter uppercase mb-2 px-2 uppercase">{language === 'ar' ? 'مرجع يدوي / آخر' : 'Manual / Other Ref'}</label>
                         <div className="relative group">
                           <FileText className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <input 
                             type="text" 
-                            placeholder="ادخل رقم المرجع اليدوي..."
+                            placeholder={language === 'ar' ? 'ادخل رقم المرجع اليدوي...' : 'Enter manual reference...'}
                             className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
                             value={voucherData.manual_reference}
                             onChange={(e) => setVoucherData({...voucherData, manual_reference: e.target.value})}
@@ -2095,7 +2095,7 @@ export const PaymentVouchers: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">تاريخ السند</label>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'تاريخ السند' : 'Voucher Date'}</label>
                         <div className="relative">
                           <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <input 
@@ -2125,7 +2125,7 @@ export const PaymentVouchers: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase">طريقة الصرف (من خزينة/بنك)</label>
+                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase">{language === 'ar' ? 'طريقة الصرف (من خزينة/بنك)' : 'Payment Method (From Safe/Bank)'}</label>
                       <div className="relative group">
                         <CreditCard className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                         <select 
@@ -2140,9 +2140,9 @@ export const PaymentVouchers: React.FC = () => {
                             }
                           }}
                         >
-                          <option value="">اختر الطريقة...</option>
+                          <option value="">{t('discount_settings.select_account')}</option>
                           {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
-                          <option value="new_payment_method" className="font-bold text-emerald-600">+ إضافة طريقة دفع جديدة...</option>
+                          <option value="new_payment_method" className="font-bold text-emerald-600">+ {language === 'ar' ? 'إضافة طريقة دفع جديدة...' : 'Add New Payment Method...'}</option>
                         </select>
                         <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                       </div>
@@ -2153,12 +2153,12 @@ export const PaymentVouchers: React.FC = () => {
                   <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
                     <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
                       <Layers className="w-4 h-4" />
-                      <span className="text-xs font-bold">بنود الصرف</span>
+                      <span className="text-xs font-bold">{language === 'ar' ? 'بنود الصرف' : 'Payment Items'}</span>
                     </div>
 
                     <div className="space-y-4">
                       <div className="flex items-center justify-between border-b border-zinc-100 pb-2">
-                        <h4 className="font-bold text-zinc-900 italic tracking-tight uppercase text-sm">تفاصيل البنود</h4>
+                        <h4 className="font-bold text-zinc-900 italic tracking-tight uppercase text-sm">{language === 'ar' ? 'تفاصيل البنود' : 'Item Details'}</h4>
                         <button 
                           type="button"
                           onClick={() => setVoucherData({
@@ -2168,7 +2168,7 @@ export const PaymentVouchers: React.FC = () => {
                           className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-black border border-emerald-100 hover:bg-emerald-100 transition-all shadow-sm"
                         >
                           <Plus size={16} />
-                          <span>إضافة بند صرف جديد</span>
+                          <span>{language === 'ar' ? 'إضافة بند صرف جديد' : 'Add New Item'}</span>
                         </button>
                       </div>
                       
@@ -2176,10 +2176,10 @@ export const PaymentVouchers: React.FC = () => {
                         <table className="w-full">
                           <thead>
                             <tr className={`text-zinc-500 text-[10px] uppercase font-black tracking-widest ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              <th className="px-2 py-3 w-32 tracking-tighter">النوع</th>
-                              <th className="px-2 py-3 tracking-tighter">المستفيد / الحساب</th>
-                              <th className="px-2 py-3 w-32 tracking-tighter uppercase tracking-widest">المبلغ</th>
-                              <th className="px-2 py-3 tracking-tighter uppercase tracking-widest">الوصف</th>
+                              <th className="px-2 py-3 w-32 tracking-tighter">{language === 'ar' ? 'النوع' : 'Type'}</th>
+                              <th className="px-2 py-3 tracking-tighter">{language === 'ar' ? 'المستفيد / الحساب' : 'Beneficiary / Account'}</th>
+                              <th className="px-2 py-3 w-32 tracking-tighter uppercase tracking-widest">{t('common.amount')}</th>
+                              <th className="px-2 py-3 tracking-tighter uppercase tracking-widest">{t('common.description')}</th>
                               <th className="px-2 py-3 w-10"></th>
                             </tr>
                           </thead>
@@ -2200,10 +2200,10 @@ export const PaymentVouchers: React.FC = () => {
                                         setVoucherData({...voucherData, items: newItems});
                                       }}
                                     >
-                                      <option value="supplier">مورد</option>
-                                      <option value="customer">عميل</option>
+                                      <option value="supplier">{t('discounts.column_supplier')}</option>
+                                      <option value="customer">{t('discounts.column_customer')}</option>
                                       <option value="expense">بند مصروف</option>
-                                      <option value="account">حساب عام</option>
+                                      <option value="account">{language === 'ar' ? 'حساب عام' : 'General Ledger'}</option>
                                     </select>
                                     <ChevronDown size={12} className="absolute right-3 top-4 text-zinc-400 pointer-events-none" />
                                   </td>
@@ -2220,7 +2220,7 @@ export const PaymentVouchers: React.FC = () => {
                                         setVoucherData({...voucherData, items: newItems});
                                       }}
                                     >
-                                      <option value="">اختر...</option>
+                                      <option value="">{language === 'ar' ? 'اختر...' : 'Select...'}</option>
                                       {item.type === 'supplier' && suppliers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
                                       {item.type === 'customer' && customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                       {item.type === 'expense' && categories.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
@@ -2238,7 +2238,7 @@ export const PaymentVouchers: React.FC = () => {
                                         }}
                                         required
                                       >
-                                        <option value="">اختر الحساب الفرعي...</option>
+                                        <option value="">{language === 'ar' ? 'اختر الحساب الفرعي...' : 'Select Sub-account...'}</option>
                                         {subAccounts.map(sa => (
                                           <option key={sa.id} value={sa.id}>{sa.label}</option>
                                         ))}
@@ -2261,7 +2261,7 @@ export const PaymentVouchers: React.FC = () => {
                                   <td className="px-1 py-1">
                                     <input 
                                       type="text" 
-                                      placeholder="بيان تفصيلي..."
+                                      placeholder={language === 'ar' ? 'بيان تفصيلي...' : 'Detailed statement...'}
                                       className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] font-bold outline-none"
                                       value={item.description}
                                       onChange={(e) => {
@@ -3158,7 +3158,7 @@ export const PaymentVouchers: React.FC = () => {
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 animate-in zoom-in-95 duration-200">
             <h3 className="text-xl font-bold text-zinc-900 mb-4">تأكيد الحذف</h3>
-            <p className="text-zinc-500 mb-6">هل أنت متأكد من رغبتك في حذف هذا السند؟ لا يمكن التراجع عن هذا الإجراء.</p>
+            <p className="text-zinc-500 mb-6">{language === 'ar' ? 'هل أنت متأكد من رغبتك في حذف هذا السند؟ لا يمكن التراجع عن هذا الإجراء.' : 'Are you sure you want to delete this voucher? This action cannot be undone.'}</p>
             <div className="flex gap-4">
               <button 
                 onClick={() => {
