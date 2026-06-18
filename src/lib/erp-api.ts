@@ -1135,8 +1135,33 @@ modules.forEach(moduleName => {
              summary = { total_debit: Number(sumRes.rows[0].sum1 || 0), total_credit: Number(sumRes.rows[0].sum2 || 0) };
           }
 
-          let finalSort = `"${sortBy}" ${sortOrder.toUpperCase()}`;
-          if (sortBy === 'date' || sortBy === 'operation_date') finalSort += `, id DESC`;
+          let sortField = `"${sortBy}"`;
+          if (moduleName === 'invoices' || moduleName === 'purchase_invoices') {
+            if (sortBy === 'currency') {
+              sortField = `"currency_id"`;
+            } else if (sortBy === 'foreign_amount') {
+              sortField = `"total_amount"`;
+            } else if (sortBy === 'base_amount') {
+              sortField = `("total_amount" * COALESCE("exchange_rate", 1))`;
+            } else if (sortBy === 'remaining') {
+              sortField = `"total_amount"`;
+            }
+          }
+
+          let finalSort = `${sortField} ${sortOrder.toUpperCase()}`;
+          if (moduleName === 'invoices' || moduleName === 'purchase_invoices') {
+            if (sortBy === 'date' || sortBy === 'operation_date') {
+              finalSort += `, "invoice_number" ${sortOrder.toUpperCase()}`;
+            } else if (sortBy === 'invoice_number') {
+              finalSort += `, "date" DESC`;
+            } else {
+              finalSort += `, "date" DESC, "invoice_number" DESC`;
+            }
+          } else {
+            if (sortBy === 'date' || sortBy === 'operation_date') {
+              finalSort += `, id DESC`;
+            }
+          }
           
           sql += ` ORDER BY ${finalSort} LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
           values.push(limit, offset);

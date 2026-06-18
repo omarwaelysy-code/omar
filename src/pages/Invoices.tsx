@@ -178,6 +178,47 @@ export const Invoices: React.FC = () => {
   const [exchangeRateType, setExchangeRateType] = useState<'manual' | 'auto'>('manual');
   const [view, setView] = useViewPreference('invoices', 'table');
   const [invoiceType, setInvoiceType] = useState<'items' | 'services'>('items');
+  const [isColumnSelectorOpen, setIsColumnSelectorOpen] = useState(false);
+  const columnSelectorRef = useRef<HTMLDivElement>(null);
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
+    invoice_number: true,
+    customer_name: true,
+    date: true,
+    description: true,
+    payment_type: true,
+    status: true,
+    currency: true,
+    foreign_amount: true,
+    base_amount: true,
+    remaining: true,
+    entry_number: true,
+  });
+
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
+    invoice_number: 140,
+    customer_name: 180,
+    date: 110,
+    description: 150,
+    payment_type: 100,
+    status: 100,
+    currency: 80,
+    foreign_amount: 120,
+    base_amount: 150,
+    remaining: 120,
+    entry_number: 150,
+  });
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (columnSelectorRef.current && !columnSelectorRef.current.contains(event.target as Node)) {
+        setIsColumnSelectorOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const handleCurrencyChange = async (currencyId: string) => {
     setSelectedCurrencyId(currencyId);
@@ -253,6 +294,31 @@ export const Invoices: React.FC = () => {
     }
   };
 
+  const handleResizeStart = (e: React.MouseEvent, columnKey: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startWidth = columnWidths[columnKey] || 100;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const widthChange = dir === 'rtl' ? -deltaX : deltaX;
+      const newWidth = Math.max(50, startWidth + widthChange);
+      setColumnWidths((prev) => ({
+        ...prev,
+        [columnKey]: newWidth,
+      }));
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
   const isVatEnabled = companyData?.settings?.vat_enabled || companyData?.vat_enabled || false;
 
   useEffect(() => {
@@ -268,8 +334,8 @@ export const Invoices: React.FC = () => {
         setInvoices(result.data);
         setTotalRecords(result.total);
         setServerSummary(result.summary);
+        setLoading(false);
       });
-      const unsubCustomers = dbService.subscribe<Customer>('customers', user.company_id, setCustomers);
       
       const fetchSettings = async () => {
         const docs = await dbService.getDocsByFilter<any>('settings', user.company_id, [
@@ -293,37 +359,88 @@ export const Invoices: React.FC = () => {
 
       fetchSettings();
       loadCompanyData();
-      setLoading(false);
       return () => {
         unsubInvoices();
-        unsubCustomers();
       };
     }
   }, [user, page, limit, sortBy, sortOrder, searchTerm]);
 
-  // Subscribe to static dropdown catalogs once on component mount
+  // Fetch static dropdown catalogs once on mount and listen for db-refresh changes
   useEffect(() => {
-    if (user) {
-      const unsubProducts = dbService.subscribe<Product>('products', user.company_id, setProducts);
-      const unsubOps = dbService.subscribe<Operation>('operations', user.company_id, setOperations);
-      const unsubDepts = dbService.subscribe<Department>('departments', user.company_id, setDepartments);
-      const unsubCC = dbService.subscribe<CostCenter>('cost_centers', user.company_id, setCostCenters);
-      const unsubPM = dbService.subscribe<any>('payment_methods', user.company_id, setPaymentMethods);
-      const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
-      const unsubWarehouses = dbService.subscribe<any>('warehouses', user.company_id, setWarehouses);
-      const unsubCurrencies = dbService.subscribe<Currency>('currencies', user.company_id, setCompanyCurrencies);
+    if (!user) return;
 
-      return () => {
-        unsubProducts();
-        unsubOps();
-        unsubDepts();
-        unsubCC();
-        unsubPM();
-        unsubAccounts();
-        unsubWarehouses();
-        unsubCurrencies();
-      };
-    }
+    const loadCatalogs = async () => {
+      try {
+        const [prodData, opsData, deptsData, ccData, pmData, accountsData, whData, currData, custData] = await Promise.all([
+          dbService.list<Product>('products', user.company_id),
+          dbService.list<Operation>('operations', user.company_id),
+          dbService.list<Department>('departments', user.company_id),
+          dbService.list<CostCenter>('cost_centers', user.company_id),
+          dbService.list<any>('payment_methods', user.company_id),
+          dbService.list<Account>('accounts', user.company_id),
+          dbService.list<any>('warehouses', user.company_id),
+          dbService.list<Currency>('currencies', user.company_id),
+          dbService.list<Customer>('customers', user.company_id)
+        ]);
+
+        setProducts(prodData);
+        setOperations(opsData);
+        setDepartments(deptsData);
+        setCostCenters(ccData);
+        setPaymentMethods(pmData);
+        setAccounts(accountsData);
+        setWarehouses(whData);
+        setCompanyCurrencies(currData);
+        setCustomers(custData);
+      } catch (err) {
+        console.error('Error loading dropdown catalogs:', err);
+      }
+    };
+
+    loadCatalogs();
+
+    const handleDbRefresh = async (e: any) => {
+      const collection = e.detail?.collection;
+      if (!collection) return;
+
+      try {
+        if (collection === 'products') {
+          const data = await dbService.list<Product>('products', user.company_id);
+          setProducts(data);
+        } else if (collection === 'operations') {
+          const data = await dbService.list<Operation>('operations', user.company_id);
+          setOperations(data);
+        } else if (collection === 'departments') {
+          const data = await dbService.list<Department>('departments', user.company_id);
+          setDepartments(data);
+        } else if (collection === 'cost_centers') {
+          const data = await dbService.list<CostCenter>('cost_centers', user.company_id);
+          setCostCenters(data);
+        } else if (collection === 'payment_methods') {
+          const data = await dbService.list<any>('payment_methods', user.company_id);
+          setPaymentMethods(data);
+        } else if (collection === 'accounts') {
+          const data = await dbService.list<Account>('accounts', user.company_id);
+          setAccounts(data);
+        } else if (collection === 'warehouses') {
+          const data = await dbService.list<any>('warehouses', user.company_id);
+          setWarehouses(data);
+        } else if (collection === 'currencies') {
+          const data = await dbService.list<Currency>('currencies', user.company_id);
+          setCompanyCurrencies(data);
+        } else if (collection === 'customers') {
+          const data = await dbService.list<Customer>('customers', user.company_id);
+          setCustomers(data);
+        }
+      } catch (err) {
+        console.error(`Error refreshing collection ${collection}:`, err);
+      }
+    };
+
+    window.addEventListener('db-refresh', handleDbRefresh as EventListener);
+    return () => {
+      window.removeEventListener('db-refresh', handleDbRefresh as EventListener);
+    };
   }, [user]);
 
   // Load transaction and settlements data once (non-polling) when modal is opened or document is viewed
@@ -2375,91 +2492,537 @@ export const Invoices: React.FC = () => {
                   <LayoutGrid size={18} />
                 </button>
               </div>
+
+              {/* Column Selection Dropdown */}
+              {view === 'table' && (
+                <div className="relative" ref={columnSelectorRef}>
+                  <button
+                    onClick={() => setIsColumnSelectorOpen(!isColumnSelectorOpen)}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow-sm active:scale-95"
+                  >
+                    <Eye size={14} className="text-slate-400" />
+                    <span>{language === 'ar' ? 'أعمدة الجدول' : 'Table Columns'}</span>
+                    <ChevronDown size={14} className="text-slate-400" />
+                  </button>
+                  
+                  {isColumnSelectorOpen && (
+                    <div className="absolute top-full mt-1.5 right-0 bg-white border border-slate-200 rounded-xl shadow-xl p-3 z-50 min-w-[220px] max-h-[300px] overflow-y-auto space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest pb-1 border-b border-slate-100">
+                        {language === 'ar' ? 'تخصيص الأعمدة' : 'Customize Columns'}
+                      </div>
+                      {Object.keys(visibleColumns).map((colKey) => {
+                        const labels: Record<string, string> = {
+                          invoice_number: language === 'ar' ? 'رقم الفاتورة' : 'Invoice Number',
+                          customer_name: language === 'ar' ? 'العميل' : 'Customer',
+                          date: language === 'ar' ? 'التاريخ' : 'Date',
+                          description: language === 'ar' ? 'وصف الفاتورة' : 'Description',
+                          payment_type: language === 'ar' ? 'طريقة الدفع' : 'Payment Type',
+                          status: language === 'ar' ? 'حالة الدفع' : 'Payment Status',
+                          currency: language === 'ar' ? 'العملة' : 'Currency',
+                          foreign_amount: language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Currency Amount',
+                          base_amount: language === 'ar' ? 'القيمة المعادلة بالعملة المحلية' : 'Equivalent Local Amount',
+                          remaining: language === 'ar' ? 'الباقي من الفاتورة' : 'Remaining Balance',
+                          entry_number: language === 'ar' ? 'رقم القيد' : 'Entry Number',
+                        };
+
+                        return (
+                          <label key={colKey} className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer hover:bg-slate-50 p-1.5 rounded-lg transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={visibleColumns[colKey]}
+                              onChange={() => {
+                                setVisibleColumns(prev => ({
+                                  ...prev,
+                                  [colKey]: !prev[colKey]
+                                }));
+                              }}
+                              className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5"
+                            />
+                            <span>{labels[colKey] || colKey}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {view === 'table' ? (
               <div ref={tableRef} id="invoices-list-table" className="overflow-x-auto hidden md:block">
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-slate-50/50 text-slate-500 text-[10px] uppercase tracking-widest font-bold">
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group`} onClick={() => handleSort('invoice_number')}>
-                        <div className="flex items-center gap-1">
-                          {t('invoices.column_number')}
-                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                            {sortBy === 'invoice_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                          </span>
-                        </div>
-                      </th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group`} onClick={() => handleSort('customer_name')}>
-                        <div className="flex items-center gap-1">
-                          {t('invoices.column_customer')}
-                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                            {sortBy === 'customer_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                          </span>
-                        </div>
-                      </th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group`} onClick={() => handleSort('date')}>
-                        <div className="flex items-center gap-1">
-                          {t('invoices.column_date')}
-                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                            {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                          </span>
-                        </div>
-                      </th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>وصف الفاتورة</th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group`} onClick={() => handleSort('payment_type')}>
-                        <div className="flex items-center gap-1">
-                          {t('invoices.form_payment_type')}
-                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                            {sortBy === 'payment_type' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                          </span>
-                        </div>
-                      </th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>حالة الدفع</th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group`} onClick={() => handleSort('total_amount')}>
-                        <div className="flex items-center gap-1">
-                          {t('invoices.column_amount')}
-                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                            {sortBy === 'total_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                          </span>
-                        </div>
-                      </th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</th>
+                    <tr className="bg-slate-50/50 text-slate-500 text-[10px] uppercase tracking-widest font-bold border-b border-slate-100">
+                      {visibleColumns.invoice_number && (
+                        <th 
+                          style={{ width: columnWidths.invoice_number, minWidth: columnWidths.invoice_number }} 
+                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('invoice_number')}
+                        >
+                          <div className="flex items-center gap-1">
+                            {t('invoices.column_number')}
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'invoice_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          <div
+                            onMouseDown={(e) => handleResizeStart(e, 'invoice_number')}
+                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
+                          />
+                        </th>
+                      )}
+                      {visibleColumns.customer_name && (
+                        <th 
+                          style={{ width: columnWidths.customer_name, minWidth: columnWidths.customer_name }} 
+                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('customer_name')}
+                        >
+                          <div className="flex items-center gap-1">
+                            {t('invoices.column_customer')}
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'customer_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          <div
+                            onMouseDown={(e) => handleResizeStart(e, 'customer_name')}
+                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
+                          />
+                        </th>
+                      )}
+                      {visibleColumns.date && (
+                        <th 
+                          style={{ width: columnWidths.date, minWidth: columnWidths.date }} 
+                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('date')}
+                        >
+                          <div className="flex items-center gap-1">
+                            {t('invoices.column_date')}
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          <div
+                            onMouseDown={(e) => handleResizeStart(e, 'date')}
+                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
+                          />
+                        </th>
+                      )}
+                      {visibleColumns.description && (
+                        <th 
+                          style={{ width: columnWidths.description, minWidth: columnWidths.description }} 
+                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('description')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>وصف الفاتورة</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'description' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          <div
+                            onMouseDown={(e) => handleResizeStart(e, 'description')}
+                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
+                          />
+                        </th>
+                      )}
+                      {visibleColumns.payment_type && (
+                        <th 
+                          style={{ width: columnWidths.payment_type, minWidth: columnWidths.payment_type }} 
+                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('payment_type')}
+                        >
+                          <div className="flex items-center gap-1">
+                            {t('invoices.form_payment_type')}
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'payment_type' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          <div
+                            onMouseDown={(e) => handleResizeStart(e, 'payment_type')}
+                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
+                          />
+                        </th>
+                      )}
+                      {visibleColumns.status && (
+                        <th 
+                          style={{ width: columnWidths.status, minWidth: columnWidths.status }} 
+                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('status')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>حالة الدفع</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'status' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          <div
+                            onMouseDown={(e) => handleResizeStart(e, 'status')}
+                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
+                          />
+                        </th>
+                      )}
+                      {visibleColumns.currency && (
+                        <th 
+                          style={{ width: columnWidths.currency, minWidth: columnWidths.currency }} 
+                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('currency')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>العملة</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'currency' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          <div
+                            onMouseDown={(e) => handleResizeStart(e, 'currency')}
+                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
+                          />
+                        </th>
+                      )}
+                      {visibleColumns.foreign_amount && (
+                        <th 
+                          style={{ width: columnWidths.foreign_amount, minWidth: columnWidths.foreign_amount }} 
+                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('foreign_amount')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>المبلغ بالعملة الأجنبية</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'foreign_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          <div
+                            onMouseDown={(e) => handleResizeStart(e, 'foreign_amount')}
+                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
+                          />
+                        </th>
+                      )}
+                      {visibleColumns.base_amount && (
+                        <th 
+                          style={{ width: columnWidths.base_amount, minWidth: columnWidths.base_amount }} 
+                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('base_amount')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>القيمة المعادلة بالعملة المحلية</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'base_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          <div
+                            onMouseDown={(e) => handleResizeStart(e, 'base_amount')}
+                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
+                          />
+                        </th>
+                      )}
+                      {visibleColumns.remaining && (
+                        <th 
+                          style={{ width: columnWidths.remaining, minWidth: columnWidths.remaining }} 
+                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('remaining')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>الباقي من الفاتورة</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'remaining' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          <div
+                            onMouseDown={(e) => handleResizeStart(e, 'remaining')}
+                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
+                          />
+                        </th>
+                      )}
+                      {visibleColumns.entry_number && (
+                        <th 
+                          style={{ width: columnWidths.entry_number, minWidth: columnWidths.entry_number }} 
+                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('entry_number')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'entry_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          <div
+                            onMouseDown={(e) => handleResizeStart(e, 'entry_number')}
+                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
+                          />
+                        </th>
+                      )}
                       <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredInvoices.map((inv) => (
-                      <tr 
-                        key={inv.id} 
-                        className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
-                        onClick={() => canEdit && openEditModal(inv)}
-                      >
-                        <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                          <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100">{inv.invoice_number}</span>
-                        </td>
-                        <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                          <div>{inv.customer_name}</div>
-                          {inv.source_orders && (
-                            <div className="text-[10px] text-emerald-600 font-bold mt-0.5 font-mono">
-                              {language === 'ar' ? 'أوامر بيع: ' : 'Orders: '}{inv.source_orders}
-                            </div>
+                    {loading ? (
+                      Array.from({ length: 5 }).map((_, rowIndex) => (
+                        <tr key={rowIndex} className="animate-pulse">
+                          {Object.keys(visibleColumns).map((colKey) => {
+                            if (!visibleColumns[colKey]) return null;
+                            return (
+                              <td key={colKey} className="px-6 py-4">
+                                <div className="h-4 bg-slate-100 rounded w-2/3"></div>
+                              </td>
+                            );
+                          })}
+                          <td className="px-6 py-4">
+                            <div className="h-4 bg-slate-100 rounded w-12 ml-auto"></div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : filteredInvoices.length === 0 ? (
+                      <tr>
+                        <td colSpan={Object.keys(visibleColumns).filter(k => visibleColumns[k]).length + 1} className="px-6 py-12 text-center text-slate-500 italic font-medium">{t('common.no_data')}</td>
+                      </tr>
+                    ) : (
+                      filteredInvoices.map((inv) => (
+                        <tr 
+                          key={inv.id} 
+                          className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
+                          onClick={() => canEdit && openEditModal(inv)}
+                        >
+                          {visibleColumns.invoice_number && (
+                            <td style={{ width: columnWidths.invoice_number, minWidth: columnWidths.invoice_number }} className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>
+                              <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100">{inv.invoice_number}</span>
+                            </td>
                           )}
-                        </td>
-                        <td className={`px-6 py-4 text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(inv.date)}</td>
-                        <td className={`px-6 py-4 text-slate-500 max-w-[200px] truncate ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={inv.description}>
-                          {inv.description || '-'}
-                        </td>
-                        <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                            inv.payment_type === 'cash' 
-                              ? 'bg-emerald-100 text-emerald-700' 
-                              : 'bg-amber-100 text-amber-700'
-                          }`}>
-                            {inv.payment_type === 'cash' ? 'نقدي' : 'آجل'}
-                          </span>
-                        </td>
-                        <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                          {visibleColumns.customer_name && (
+                            <td style={{ width: columnWidths.customer_name, minWidth: columnWidths.customer_name }} className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>
+                              <div>{inv.customer_name}</div>
+                              {inv.source_orders && (
+                                <div className="text-[10px] text-emerald-600 font-bold mt-0.5 font-mono">
+                                  {language === 'ar' ? 'أوامر بيع: ' : 'Orders: '}{inv.source_orders}
+                                </div>
+                              )}
+                            </td>
+                          )}
+                          {visibleColumns.date && (
+                            <td style={{ width: columnWidths.date, minWidth: columnWidths.date }} className={`px-6 py-4 text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(inv.date)}</td>
+                          )}
+                          {visibleColumns.description && (
+                            <td style={{ width: columnWidths.description, minWidth: columnWidths.description }} className={`px-6 py-4 text-slate-500 max-w-[200px] truncate ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={inv.description}>
+                              {inv.description || '-'}
+                            </td>
+                          )}
+                          {visibleColumns.payment_type && (
+                            <td style={{ width: columnWidths.payment_type, minWidth: columnWidths.payment_type }} className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                inv.payment_type === 'cash' 
+                                  ? 'bg-emerald-100 text-emerald-700' 
+                                  : 'bg-amber-100 text-amber-700'
+                              }`}>
+                                {inv.payment_type === 'cash' ? 'نقدي' : 'آجل'}
+                              </span>
+                            </td>
+                          )}
+                          {visibleColumns.status && (
+                            <td style={{ width: columnWidths.status, minWidth: columnWidths.status }} className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {(() => {
+                                const status = getPaymentStatus(inv);
+                                const statusLabels = {
+                                  paid: language === 'ar' ? 'مدفوعة' : 'Paid',
+                                  partial: language === 'ar' ? 'مدفوعة جزئياً' : 'Partially Paid',
+                                  unpaid: language === 'ar' ? 'غير مدفوعة' : 'Unpaid'
+                                };
+                                const statusClasses = {
+                                  paid: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                                  partial: 'bg-blue-100 text-blue-800 border-blue-200',
+                                  unpaid: 'bg-red-100 text-red-800 border-red-200'
+                                };
+                                return (
+                                  <span className={`px-3 py-1 rounded-full text-[10px] font-bold border ${statusClasses[status]}`}>
+                                    {statusLabels[status]}
+                                  </span>
+                                );
+                              })()}
+                            </td>
+                          )}
+                          {visibleColumns.currency && (
+                            <td style={{ width: columnWidths.currency, minWidth: columnWidths.currency }} className={`px-6 py-4 font-bold text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP')}
+                            </td>
+                          )}
+                          {visibleColumns.foreign_amount && (
+                            <td style={{ width: columnWidths.foreign_amount, minWidth: columnWidths.foreign_amount }} className={`px-6 py-4 font-bold text-slate-700 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {formatMoney(inv.total_amount)}
+                            </td>
+                          )}
+                          {visibleColumns.base_amount && (
+                            <td style={{ width: columnWidths.base_amount, minWidth: columnWidths.base_amount }} className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {formatMoney(inv.total_amount * (Number(inv.exchange_rate) || 1))} {companyData?.settings?.currency || 'EGP'}
+                            </td>
+                          )}
+                          {visibleColumns.remaining && (
+                            <td style={{ width: columnWidths.remaining, minWidth: columnWidths.remaining }} className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {(() => {
+                                const settlements = (allReceipts.length > 0 || allPayments.length > 0 || entries.length > 0) ? getInvoiceSettlements(inv) : (inv.settlements || []);
+                                const totalSettled = settlements.reduce((sum: number, s: any) => sum + (Number(s.settled_amount || s.amount) || 0), 0);
+                                const remaining = inv.payment_type === 'cash' ? 0 : Math.max(0, inv.total_amount - totalSettled);
+                                const currencySymbol = inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP');
+                                
+                                if (remaining <= 0) return <span className="text-emerald-600">0.00</span>;
+                                return <span className="text-red-600">{formatMoney(remaining)} {currencySymbol}</span>;
+                              })()}
+                            </td>
+                          )}
+                          {visibleColumns.entry_number && (
+                            <td style={{ width: columnWidths.entry_number, minWidth: columnWidths.entry_number }} className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {inv.entry_number ? (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPendingViewDoc({ type: 'journal', idOrNumber: inv.entry_number! });
+                                    setCurrentPage('journal_entries');
+                                  }}
+                                  className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-100/50 transition-all active:scale-95"
+                                >
+                                  {inv.entry_number}
+                                </button>
+                              ) : (
+                                <span className="text-slate-400 font-mono text-xs">-</span>
+                              )}
+                            </td>
+                          )}
+                          <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                            <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActivityLogDocumentId(inv.id);
+                                  setIsActivityLogOpen(true);
+                                }}
+                                className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
+                                title={t('common.activity_log')}
+                              >
+                                <History size={18} />
+                              </button>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewInvoice(inv);
+                                }}
+                                className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
+                                title={t('common.view')}
+                              >
+                                <Eye size={18} />
+                              </button>
+                              {canEdit && (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openEditModal(inv);
+                                  }}
+                                  className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
+                                  title={t('common.edit')}
+                                >
+                                  <Pencil size={18} />
+                                </button>
+                              )}
+                              {canDelete && (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDelete(inv.id);
+                                  }}
+                                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
+                                  title={t('common.delete')}
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {loading ? (
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="p-6 bg-slate-50/50 rounded-3xl border border-slate-100 animate-pulse space-y-4">
+                      <div className="flex justify-between items-center">
+                        <div className="h-5 bg-slate-100 rounded w-1/3"></div>
+                        <div className="h-5 bg-slate-100 rounded w-1/4"></div>
+                      </div>
+                      <div className="h-4 bg-slate-100 rounded w-2/3"></div>
+                      <div className="flex justify-between items-center pt-2">
+                        <div className="h-4 bg-slate-100 rounded w-1/4"></div>
+                        <div className="h-4 bg-slate-100 rounded w-1/4"></div>
+                      </div>
+                    </div>
+                  ))
+                ) : filteredInvoices.length === 0 ? (
+                  <div className="col-span-full p-12 text-center text-slate-500 font-bold italic">{t('common.no_data')}</div>
+                ) : (
+                  filteredInvoices.map((inv) => (
+                    <div 
+                      key={inv.id} 
+                      onClick={() => canEdit && openEditModal(inv)}
+                      className="p-6 bg-slate-50/50 rounded-3xl border border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden cursor-pointer"
+                    >
+                      <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewInvoice(inv);
+                          }}
+                          className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        {canEdit && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditModal(inv);
+                            }}
+                            className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(inv.id);
+                            }}
+                            className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex justify-between items-start">
+                        <div className="flex flex-col gap-1">
+                          <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
+                          <h4 className="font-bold text-slate-900 group-hover:text-emerald-700 transition-colors text-xl mt-1 tracking-tight">{inv.customer_name}</h4>
+                        </div>
+                        {inv.entry_number && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPendingViewDoc({ type: 'journal', idOrNumber: inv.entry_number! });
+                              setCurrentPage('journal_entries');
+                            }}
+                            className="font-mono text-[9px] bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100/50 transition-all active:scale-95 z-10"
+                          >
+                            {inv.entry_number}
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200/50 mt-4">
+                        <div className="space-y-1">
+                          <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">التاريخ</p>
+                          <p className="text-slate-900 font-bold text-sm tracking-tight">{formatDate(inv.date)}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">الحالة</p>
                           {(() => {
                             const status = getPaymentStatus(inv);
                             const statusLabels = {
@@ -2468,274 +3031,123 @@ export const Invoices: React.FC = () => {
                               unpaid: language === 'ar' ? 'غير مدفوعة' : 'Unpaid'
                             };
                             const statusClasses = {
-                              paid: 'bg-emerald-100 text-emerald-805 text-emerald-800 border-emerald-200',
-                              partial: 'bg-blue-100 text-blue-805 text-blue-800 border-blue-200',
-                              unpaid: 'bg-red-100 text-red-805 text-red-800 border-red-200'
+                              paid: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                              partial: 'bg-blue-100 text-blue-800 border-blue-200',
+                              unpaid: 'bg-red-100 text-red-800 border-red-200'
                             };
                             return (
-                              <span className={`px-3 py-1 rounded-full text-[10px] font-bold border ${statusClasses[status]}`}>
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[8px] font-bold border ${statusClasses[status]}`}>
                                 {statusLabels[status]}
                               </span>
                             );
                           })()}
-                        </td>
-                        <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                          {formatMoney(inv.total_amount)} {inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || '')}
-                        </td>
-                        <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                          {inv.entry_number ? (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setPendingViewDoc({ type: 'journal', idOrNumber: inv.entry_number! });
-                                setCurrentPage('journal_entries');
-                              }}
-                              className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-100/50 transition-all active:scale-95"
-                            >
-                              {inv.entry_number}
-                            </button>
-                          ) : (
-                            <span className="text-slate-400 font-mono text-xs">-</span>
-                          )}
-                        </td>
-                        <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                          <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActivityLogDocumentId(inv.id);
-                                setIsActivityLogOpen(true);
-                              }}
-                              className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
-                              title={t('common.activity_log')}
-                            >
-                              <History size={18} />
-                            </button>
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewInvoice(inv);
-                              }}
-                              className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
-                              title={t('common.view')}
-                            >
-                              <Eye size={18} />
-                            </button>
-                            {canEdit && (
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openEditModal(inv);
-                                }}
-                                className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
-                                title={t('common.edit')}
-                              >
-                                <Pencil size={18} />
-                              </button>
-                            )}
-                            {canDelete && (
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDelete(inv.id);
-                                }}
-                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
-                                title={t('common.delete')}
-                              >
-                                <Trash2 size={18} />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredInvoices.length === 0 && !loading && (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-slate-500 italic font-medium">{t('common.no_data')}</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredInvoices.map((inv) => (
-                  <div 
-                    key={inv.id} 
-                    onClick={() => canEdit && openEditModal(inv)}
-                    className="p-6 bg-slate-50/50 rounded-3xl border border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden cursor-pointer"
-                  >
-                    <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleViewInvoice(inv);
-                        }}
-                        className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
-                      >
-                        <Eye size={16} />
-                      </button>
-                      {canEdit && (
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditModal(inv);
-                          }}
-                          className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
-                        >
-                          <Pencil size={16} />
-                        </button>
-                      )}
-                      {canDelete && (
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(inv.id);
-                          }}
-                          className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="flex justify-between items-start">
-                      <div className="flex flex-col gap-1">
-                        <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
-                        <h4 className="font-bold text-slate-900 group-hover:text-emerald-700 transition-colors text-xl mt-1 tracking-tight">{inv.customer_name}</h4>
-                      </div>
-                      {inv.entry_number && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPendingViewDoc({ type: 'journal', idOrNumber: inv.entry_number! });
-                            setCurrentPage('journal_entries');
-                          }}
-                          className="font-mono text-[9px] bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100/50 transition-all active:scale-95 z-10"
-                        >
-                          {inv.entry_number}
-                        </button>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200/50 mt-4">
-                      <div className="space-y-1">
-                        <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">التاريخ</p>
-                        <p className="text-slate-900 font-bold text-sm tracking-tight">{formatDate(inv.date)}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">الحالة</p>
-                        {(() => {
-                          const status = getPaymentStatus(inv);
-                          const statusLabels = {
-                            paid: language === 'ar' ? 'مدفوعة' : 'Paid',
-                            partial: language === 'ar' ? 'مدفوعة جزئياً' : 'Partially Paid',
-                            unpaid: language === 'ar' ? 'غير مدفوعة' : 'Unpaid'
-                          };
-                          const statusClasses = {
-                            paid: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-                            partial: 'bg-blue-100 text-blue-800 border-blue-200',
-                            unpaid: 'bg-red-100 text-red-800 border-red-200'
-                          };
-                          return (
-                            <span className={`inline-block px-2 py-0.5 rounded-full text-[8px] font-bold border ${statusClasses[status]}`}>
-                              {statusLabels[status]}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                      <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-slate-200/50 flex justify-between items-end">
-                        <div>
-                          <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">إجمالي المبلغ</p>
-                          <p className="font-black text-2xl tracking-tighter text-emerald-600">
-                            {formatMoney(inv.total_amount)} <span className="text-sm font-bold">{inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || '')}</span>
-                          </p>
                         </div>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActivityLogDocumentId(inv.id);
-                            setIsActivityLogOpen(true);
-                          }}
-                          className="p-2 text-slate-400 hover:text-emerald-500 bg-white border border-slate-100 rounded-xl transition-all"
-                          title={t('common.activity_log')}
-                        >
-                          <History size={16} />
-                        </button>
+                        <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-slate-200/50 flex justify-between items-end">
+                          <div>
+                            <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">صافي القيمة</p>
+                            <p className="font-black text-2xl tracking-tighter text-emerald-600">
+                              {formatMoney(inv.total_amount)} <span className="text-sm font-bold">{inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || '')}</span>
+                            </p>
+                          </div>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActivityLogDocumentId(inv.id);
+                              setIsActivityLogOpen(true);
+                            }}
+                            className="p-2 text-slate-400 hover:text-emerald-500 bg-white border border-slate-100 rounded-xl transition-all"
+                            title={t('common.activity_log')}
+                          >
+                            <History size={16} />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-                {filteredInvoices.length === 0 && !loading && (
-                  <div className="col-span-full p-12 text-center text-slate-500 font-bold italic">{t('common.no_data')}</div>
+                  ))
                 )}
               </div>
             )}
 
             {/* Mobile List View */}
             <div className="md:hidden divide-y divide-slate-100">
-              {filteredInvoices.map((inv) => (
-                <div 
-                  key={inv.id} 
-                  onClick={() => canEdit && openEditModal(inv)}
-                  className="p-4 space-y-4 cursor-pointer hover:bg-slate-50 transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-[10px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
-                        {inv.entry_number && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setPendingViewDoc({ type: 'journal', idOrNumber: inv.entry_number! });
-                              setCurrentPage('journal_entries');
-                            }}
-                            className="font-mono text-[9px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100/50"
-                          >
-                            {inv.entry_number}
-                          </button>
-                        )}
-                        <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider ${
-                          inv.payment_type === 'cash' 
-                            ? 'bg-emerald-100 text-emerald-700' 
-                            : 'bg-amber-100 text-amber-700'
-                        }`}>
-                          {inv.payment_type === 'cash' ? 'نقدي' : 'آجل'}
-                        </span>
-                      </div>
-                      <h4 className="font-bold text-slate-900 text-lg">{inv.customer_name}</h4>
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="p-4 space-y-3 animate-pulse">
+                    <div className="flex justify-between items-center">
+                      <div className="h-4 bg-slate-100 rounded w-1/4"></div>
+                      <div className="h-4 bg-slate-100 rounded w-1/4"></div>
                     </div>
+                    <div className="h-5 bg-slate-100 rounded w-1/2"></div>
+                    <div className="h-4 bg-slate-100 rounded w-1/3"></div>
+                  </div>
+                ))
+              ) : filteredInvoices.length === 0 ? (
+                <div className="p-12 text-center text-slate-500 font-bold italic">{t('common.no_data')}</div>
+              ) : (
+                filteredInvoices.map((inv) => (
+                  <div 
+                    key={inv.id} 
+                    onClick={() => canEdit && openEditModal(inv)}
+                    className="p-4 space-y-4 cursor-pointer hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[10px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
+                          {inv.entry_number && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPendingViewDoc({ type: 'journal', idOrNumber: inv.entry_number! });
+                                  setCurrentPage('journal_entries');
+                              }}
+                              className="font-mono text-[9px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100/50"
+                            >
+                              {inv.entry_number}
+                            </button>
+                          )}
+                          <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider ${
+                            inv.payment_type === 'cash' 
+                              ? 'bg-emerald-100 text-emerald-700' 
+                              : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            {inv.payment_type === 'cash' ? 'نقدي' : 'آجل'}
+                          </span>
+                        </div>
+                        <h4 className="font-bold text-slate-900 text-lg">{inv.customer_name}</h4>
+                      </div>
                       <div className={`${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                         <p className="font-bold text-emerald-600 text-lg">{formatMoney(inv.total_amount)} {inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || '')}</p>
                         <span className="text-xs text-slate-400">{formatDate(inv.date)}</span>
                       </div>
-                  </div>
-                  <div className="flex items-center gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
-                    <button 
-                      onClick={() => handleViewInvoice(inv)}
-                      className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-600 rounded-2xl text-sm font-bold border border-slate-100 active:scale-95 transition-transform"
-                    >
-                      <Eye size={18} /> عرض
-                    </button>
-                    {canEdit && (
+                    </div>
+                    <div className="flex items-center gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
                       <button 
-                        onClick={() => openEditModal(inv)}
-                        className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-50 text-blue-600 rounded-2xl text-sm font-bold border border-blue-100 active:scale-95 transition-transform"
+                        onClick={() => handleViewInvoice(inv)}
+                        className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-600 rounded-2xl text-sm font-bold border border-slate-100 active:scale-95 transition-transform"
                       >
-                        <Pencil size={18} /> تعديل
+                        <Eye size={18} /> عرض
                       </button>
-                    )}
-                    {canDelete && (
-                      <button 
-                        onClick={() => handleDelete(inv.id)}
-                        className="p-3 bg-red-50 text-red-600 rounded-2xl border border-red-100 active:scale-95 transition-transform"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    )}
+                      {canEdit && (
+                        <button 
+                          onClick={() => openEditModal(inv)}
+                          className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-50 text-blue-600 rounded-2xl text-sm font-bold border border-blue-100 active:scale-95 transition-transform"
+                        >
+                          <Pencil size={18} /> تعديل
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button 
+                          onClick={() => handleDelete(inv.id)}
+                          className="p-3 bg-red-50 text-red-600 rounded-2xl border border-red-100 active:scale-95 transition-transform"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
             <PaginationControls 
