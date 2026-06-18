@@ -328,6 +328,46 @@ export const Invoices: React.FC = () => {
   const isVatEnabled = companyData?.settings?.vat_enabled || companyData?.vat_enabled || false;
   const isMultiCurrencyEnabled = companyData?.settings?.enable_multi_currency || (companyData as any)?.enable_multi_currency || false;
 
+  const prevExchangeRateRef = useRef<number>(1);
+  const isInitializingRef = useRef<boolean>(true);
+
+  // Initialize refs when modal opens
+  useEffect(() => {
+    if (isModalOpen) {
+      isInitializingRef.current = true;
+      prevExchangeRateRef.current = exchangeRate || 1;
+    }
+  }, [isModalOpen]);
+
+  // Recalculate item prices when exchange rate changes dynamically
+  useEffect(() => {
+    if (isModalOpen) {
+      if (isInitializingRef.current) {
+        isInitializingRef.current = false;
+        prevExchangeRateRef.current = exchangeRate || 1;
+        return;
+      }
+
+      const prevRate = prevExchangeRateRef.current;
+      if (prevRate !== exchangeRate && exchangeRate > 0 && prevRate > 0) {
+        setItems(prevItems => prevItems.map(item => {
+          const currentPrice = Number(item.unit_price) || 0;
+          const newPrice = Number((currentPrice * (prevRate / exchangeRate)).toFixed(4));
+          const vatRate = Number(item.vat_rate) || 0;
+          const total = Number(((item.quantity || 0) * newPrice).toFixed(4));
+          const vatAmount = Number((total * (vatRate / 100)).toFixed(4));
+          return {
+            ...item,
+            unit_price: newPrice,
+            total: total,
+            vat_amount: vatAmount
+          };
+        }));
+      }
+      prevExchangeRateRef.current = exchangeRate;
+    }
+  }, [exchangeRate, isModalOpen]);
+
   useEffect(() => {
     if (user?.id) {
       const saved = localStorage.getItem(`invoices_visible_columns_${user.id}`);
