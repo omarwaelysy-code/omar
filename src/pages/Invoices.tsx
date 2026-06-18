@@ -300,7 +300,7 @@ export const Invoices: React.FC = () => {
     }
   };
 
-  const handleResizeStart = (e: React.MouseEvent, columnKey: string) => {
+  const handleResizeStart = (e: React.MouseEvent, columnKey: string, side: 'left' | 'right') => {
     e.preventDefault();
     e.stopPropagation();
     const startX = e.clientX;
@@ -308,7 +308,11 @@ export const Invoices: React.FC = () => {
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const deltaX = moveEvent.clientX - startX;
-      const widthChange = dir === 'rtl' ? -deltaX : deltaX;
+      let widthChange = side === 'left' ? -deltaX : deltaX;
+      if (dir === 'rtl') {
+        widthChange = -widthChange;
+      }
+      
       const newWidth = Math.max(50, startWidth + widthChange);
       setColumnWidths((prev) => ({
         ...prev,
@@ -323,6 +327,29 @@ export const Invoices: React.FC = () => {
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const renderResizeHandles = (columnKey: string) => {
+    return (
+      <>
+        {/* Left resize handle */}
+        <div
+          onMouseDown={(e) => handleResizeStart(e, columnKey, 'left')}
+          className="absolute top-0 left-0 bottom-0 w-3 cursor-col-resize group/resize z-10 flex items-center justify-center -ml-1.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="w-[2px] h-4 bg-slate-200 group-hover/resize:bg-emerald-500 group-hover/resize:h-full transition-all duration-150" />
+        </div>
+        {/* Right resize handle */}
+        <div
+          onMouseDown={(e) => handleResizeStart(e, columnKey, 'right')}
+          className="absolute top-0 right-0 bottom-0 w-3 cursor-col-resize group/resize z-10 flex items-center justify-center -mr-1.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="w-[2px] h-4 bg-slate-200 group-hover/resize:bg-emerald-500 group-hover/resize:h-full transition-all duration-150" />
+        </div>
+      </>
+    );
   };
 
   const isVatEnabled = companyData?.settings?.vat_enabled || companyData?.vat_enabled || false;
@@ -2734,6 +2761,15 @@ export const Invoices: React.FC = () => {
               )}
             </div>
 
+            <PaginationControls 
+              page={page} 
+              limit={limit} 
+              total={totalRecords} 
+              onPageChange={setPage} 
+              onLimitChange={setLimit} 
+              className="border-b border-slate-100"
+            />
+
             {view === 'table' ? (
               <div ref={tableRef} id="invoices-list-table" className="overflow-x-auto hidden md:block">
                 <table className="w-full">
@@ -2751,10 +2787,7 @@ export const Invoices: React.FC = () => {
                               {sortBy === 'invoice_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
                           </div>
-                          <div
-                            onMouseDown={(e) => handleResizeStart(e, 'invoice_number')}
-                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
-                          />
+                          {renderResizeHandles('invoice_number')}
                         </th>
                       )}
                       {visibleColumns.customer_name && (
@@ -2769,10 +2802,7 @@ export const Invoices: React.FC = () => {
                               {sortBy === 'customer_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
                           </div>
-                          <div
-                            onMouseDown={(e) => handleResizeStart(e, 'customer_name')}
-                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
-                          />
+                          {renderResizeHandles('customer_name')}
                         </th>
                       )}
                       {visibleColumns.date && (
@@ -2787,10 +2817,7 @@ export const Invoices: React.FC = () => {
                               {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
                           </div>
-                          <div
-                            onMouseDown={(e) => handleResizeStart(e, 'date')}
-                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
-                          />
+                          {renderResizeHandles('date')}
                         </th>
                       )}
                       {visibleColumns.description && (
@@ -2805,10 +2832,7 @@ export const Invoices: React.FC = () => {
                               {sortBy === 'description' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
                           </div>
-                          <div
-                            onMouseDown={(e) => handleResizeStart(e, 'description')}
-                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
-                          />
+                          {renderResizeHandles('description')}
                         </th>
                       )}
                       {visibleColumns.payment_type && (
@@ -2823,10 +2847,7 @@ export const Invoices: React.FC = () => {
                               {sortBy === 'payment_type' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
                           </div>
-                          <div
-                            onMouseDown={(e) => handleResizeStart(e, 'payment_type')}
-                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
-                          />
+                          {renderResizeHandles('payment_type')}
                         </th>
                       )}
                       {visibleColumns.status && (
@@ -2841,10 +2862,7 @@ export const Invoices: React.FC = () => {
                               {sortBy === 'status' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
                           </div>
-                          <div
-                            onMouseDown={(e) => handleResizeStart(e, 'status')}
-                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
-                          />
+                          {renderResizeHandles('status')}
                         </th>
                       )}
                       {visibleColumns.currency && isMultiCurrencyEnabled && (
@@ -2859,10 +2877,7 @@ export const Invoices: React.FC = () => {
                               {sortBy === 'currency' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
                           </div>
-                          <div
-                            onMouseDown={(e) => handleResizeStart(e, 'currency')}
-                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
-                          />
+                          {renderResizeHandles('currency')}
                         </th>
                       )}
                       {visibleColumns.foreign_amount && isMultiCurrencyEnabled && (
@@ -2877,10 +2892,7 @@ export const Invoices: React.FC = () => {
                               {sortBy === 'foreign_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
                           </div>
-                          <div
-                            onMouseDown={(e) => handleResizeStart(e, 'foreign_amount')}
-                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
-                          />
+                          {renderResizeHandles('foreign_amount')}
                         </th>
                       )}
                       {visibleColumns.remaining_foreign && isMultiCurrencyEnabled && (
@@ -2895,10 +2907,7 @@ export const Invoices: React.FC = () => {
                               {sortBy === 'remaining_foreign' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
                           </div>
-                          <div
-                            onMouseDown={(e) => handleResizeStart(e, 'remaining_foreign')}
-                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
-                          />
+                          {renderResizeHandles('remaining_foreign')}
                         </th>
                       )}
                       {visibleColumns.subtotal && isVatEnabled && (
@@ -2913,10 +2922,7 @@ export const Invoices: React.FC = () => {
                               {sortBy === 'subtotal' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
                           </div>
-                          <div
-                            onMouseDown={(e) => handleResizeStart(e, 'subtotal')}
-                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
-                          />
+                          {renderResizeHandles('subtotal')}
                         </th>
                       )}
                       {visibleColumns.tax_amount && isVatEnabled && (
@@ -2931,10 +2937,7 @@ export const Invoices: React.FC = () => {
                               {sortBy === 'tax_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
                           </div>
-                          <div
-                            onMouseDown={(e) => handleResizeStart(e, 'tax_amount')}
-                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
-                          />
+                          {renderResizeHandles('tax_amount')}
                         </th>
                       )}
                       {visibleColumns.base_amount && (
@@ -2949,10 +2952,7 @@ export const Invoices: React.FC = () => {
                               {sortBy === 'base_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
                           </div>
-                          <div
-                            onMouseDown={(e) => handleResizeStart(e, 'base_amount')}
-                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
-                          />
+                          {renderResizeHandles('base_amount')}
                         </th>
                       )}
                       {visibleColumns.remaining && (
@@ -2967,10 +2967,7 @@ export const Invoices: React.FC = () => {
                               {sortBy === 'remaining' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
                           </div>
-                          <div
-                            onMouseDown={(e) => handleResizeStart(e, 'remaining')}
-                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
-                          />
+                          {renderResizeHandles('remaining')}
                         </th>
                       )}
                       {visibleColumns.entry_number && (
@@ -2985,10 +2982,7 @@ export const Invoices: React.FC = () => {
                               {sortBy === 'entry_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
                           </div>
-                          <div
-                            onMouseDown={(e) => handleResizeStart(e, 'entry_number')}
-                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
-                          />
+                          {renderResizeHandles('entry_number')}
                         </th>
                       )}
                       <th className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
@@ -3435,14 +3429,6 @@ export const Invoices: React.FC = () => {
                 ))
               )}
             </div>
-
-            <PaginationControls 
-              page={page} 
-              limit={limit} 
-              total={totalRecords} 
-              onPageChange={setPage} 
-              onLimitChange={setLimit} 
-            />
           </div>
         </>
       ) : (
