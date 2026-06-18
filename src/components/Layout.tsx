@@ -797,51 +797,54 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           </div>
           
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1 custom-scrollbar overflow-x-hidden bg-slate-50/30">
-            {openTabs.map((tab) => (
-              <div 
-                key={tab.id}
-                className={`
-                  group relative flex items-center gap-2 px-3 py-2.5 rounded-xl transition-all cursor-pointer border
-                  ${activeTabId === tab.id 
-                    ? 'bg-white text-emerald-600 shadow-sm border-emerald-100 ring-4 ring-emerald-500/5' 
-                    : 'text-slate-500 hover:bg-white hover:text-slate-700 border-transparent hover:border-slate-100 hover:shadow-sm'}
-                  ${isSidebarCollapsed ? 'justify-center mx-1' : 'mx-1'}
-                `}
-                onClick={() => setActiveTab(tab.id)}
-                title={isSidebarCollapsed ? tab.label : ''}
-              >
-                {!isSidebarCollapsed ? (
-                  <>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-bold truncate ${activeTabId === tab.id ? 'text-emerald-700' : 'text-slate-600 group-hover:text-slate-900'}`}>{tab.label}</p>
+            {openTabs.map((tab) => {
+              const displayLabel = t('nav.' + tab.id) !== 'nav.' + tab.id ? t('nav.' + tab.id) : tab.label;
+              return (
+                <div 
+                  key={tab.id}
+                  className={`
+                    group relative flex items-center gap-2 px-3 py-2.5 rounded-xl transition-all cursor-pointer border
+                    ${activeTabId === tab.id 
+                      ? 'bg-white text-emerald-600 shadow-sm border-emerald-100 ring-4 ring-emerald-500/5' 
+                      : 'text-slate-500 hover:bg-white hover:text-slate-700 border-transparent hover:border-slate-100 hover:shadow-sm'}
+                    ${isSidebarCollapsed ? 'justify-center mx-1' : 'mx-1'}
+                  `}
+                  onClick={() => setActiveTab(tab.id)}
+                  title={isSidebarCollapsed ? displayLabel : ''}
+                >
+                  {!isSidebarCollapsed ? (
+                    <>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-bold truncate ${activeTabId === tab.id ? 'text-emerald-700' : 'text-slate-600 group-hover:text-slate-900'}`}>{displayLabel}</p>
+                      </div>
+                      
+                      {tab.id !== 'dashboard' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            closeTab(tab.id);
+                          }}
+                          className={`
+                            p-1 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100
+                            ${activeTabId === tab.id ? 'opacity-40 hover:opacity-100' : ''}
+                          `}
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <div className={`w-9 h-9 rounded-xl ${activeTabId === tab.id ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20' : 'bg-white border border-slate-200 text-slate-400 group-hover:border-slate-300'} flex items-center justify-center font-black text-xs transition-all`}>
+                      {getTabIcon(tab.id)}
                     </div>
-                    
-                    {tab.id !== 'dashboard' && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          closeTab(tab.id);
-                        }}
-                        className={`
-                          p-1 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100
-                          ${activeTabId === tab.id ? 'opacity-40 hover:opacity-100' : ''}
-                        `}
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  <div className={`w-9 h-9 rounded-xl ${activeTabId === tab.id ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20' : 'bg-white border border-slate-200 text-slate-400 group-hover:border-slate-300'} flex items-center justify-center font-black text-xs transition-all`}>
-                    {getTabIcon(tab.id)}
-                  </div>
-                )}
-                
-                {activeTabId === tab.id && !isSidebarCollapsed && (
-                  <div className={`absolute ${dir === 'rtl' ? '-right-1' : '-left-1'} top-3 bottom-3 w-1 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]`} />
-                )}
-              </div>
-            ))}
+                  )}
+                  
+                  {activeTabId === tab.id && !isSidebarCollapsed && (
+                    <div className={`absolute ${dir === 'rtl' ? '-right-1' : '-left-1'} top-3 bottom-3 w-1 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]`} />
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {!isSidebarCollapsed && (
@@ -905,30 +908,33 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
           {/* Mobile Tabs Bar */}
           <div className="md:hidden flex overflow-x-auto bg-white border-b border-slate-100 p-2 gap-2 custom-scrollbar">
-            {openTabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`
-                  flex items-center gap-2 px-4 py-1.5 rounded-full whitespace-nowrap text-xs font-semibold transition-all
-                  ${activeTabId === tab.id 
-                    ? 'bg-brand-primary text-white shadow-sm' 
-                    : 'bg-slate-50 text-slate-500'}
-                `}
-              >
-                <span>{tab.label}</span>
-                {tab.id !== 'dashboard' && (
-                  <X 
-                    size={10} 
-                    className="opacity-60" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      closeTab(tab.id);
-                    }}
-                  />
-                )}
-              </button>
-            ))}
+            {openTabs.map((tab) => {
+              const displayLabel = t('nav.' + tab.id) !== 'nav.' + tab.id ? t('nav.' + tab.id) : tab.label;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`
+                    flex items-center gap-2 px-4 py-1.5 rounded-full whitespace-nowrap text-xs font-semibold transition-all
+                    ${activeTabId === tab.id 
+                      ? 'bg-brand-primary text-white shadow-sm' 
+                      : 'bg-slate-50 text-slate-500'}
+                  `}
+                >
+                  <span>{displayLabel}</span>
+                  {tab.id !== 'dashboard' && (
+                    <X 
+                      size={10} 
+                      className="opacity-60" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        closeTab(tab.id);
+                      }}
+                    />
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           <div 

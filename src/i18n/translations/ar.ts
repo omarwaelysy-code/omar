@@ -129,6 +129,8 @@ export const ar = {
   'common.company': 'الشركة',
   'common.switch_company': 'تبديل الشركة',
   'common.open_screens': 'الشاشات المفتوحة',
+  'common.items_per_page': 'عناصر الصفحة',
+  'common.total_results': 'إجمالي النتائج',
   'common.switch_screens_hint': 'يمكنك التبديل بين الشاشات دون فقدان البيانات',
   'common.app_name': 'Obrain ERP',
   'common.change_password': 'تغيير كلمة المرور',
@@ -484,6 +486,9 @@ export const ar = {
   // Products
   'products.title': 'الأصناف والمخزون',
   'products.subtitle': 'إدارة الأصناف والمخزون والأسعار.',
+  'products.recalculate': 'إعادة الحساب',
+  'products.recalculate_success': 'تم إعادة حساب التكلفة للمخزون بنجاح',
+  'products.recalculate_error': 'حدث خطأ أثناء إعادة الحساب',
   'products.add': 'إضافة صنف جديد',
   'products.edit': 'تعديل بيانات الصنف',
   'products.search_placeholder': 'بحث بالاسم أو الكود...',

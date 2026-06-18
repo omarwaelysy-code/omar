@@ -128,6 +128,8 @@ export const en = {
   'common.company': 'Company',
   'common.switch_company': 'Switch Company',
   'common.open_screens': 'Open Screens',
+  'common.items_per_page': 'Items per page',
+  'common.total_results': 'Total results',
   'common.switch_screens_hint': 'You can switch between screens without losing data',
   'common.app_name': 'Obrain ERP',
   'common.change_password': 'Change Password',
@@ -483,6 +485,9 @@ export const en = {
   // Products
   'products.title': 'Products & Inventory',
   'products.subtitle': 'Manage products, inventory, and prices.',
+  'products.recalculate': 'Recalculate Balances',
+  'products.recalculate_success': 'Inventory cost recalculated successfully',
+  'products.recalculate_error': 'An error occurred during recalculation',
   'products.add': 'Add New Product',
   'products.edit': 'Edit Product Details',
   'products.search_placeholder': 'Search by name or code...',

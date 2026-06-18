@@ -550,20 +550,20 @@ export const Products: React.FC = () => {
                         });
                         const data = await req.json().catch(() => ({}));
                         if (!req.ok) {
-                           toast.error(data.details || data.error || "حدث خطأ أثناء إعادة الحساب");
+                           toast.error(data.details || data.error || t('products.recalculate_error'));
                            return;
                         }
-                        toast.success("تم إعادة حساب التكلفة للمخزون بنجاح");
+                        toast.success(t('products.recalculate_success'));
                         window.location.reload();
                       } catch (e: any) {
-                         toast.error(e.message || "حدث خطأ أثناء الاتصال بالخادم");
+                         toast.error(e.message || t('common.server_error'));
                       }
                     }
                   }} 
                   className="px-6 h-14 bg-white text-orange-500 border border-orange-100 rounded-2xl flex items-center justify-center shadow-sm hover:text-white hover:bg-orange-500 transition-all active:scale-95 font-bold gap-2 text-sm"
                 >
                   <RefreshCw size={20} />
-                  <span>إعادة الحساب</span>
+                  <span>{t('products.recalculate')}</span>
                 </button>
                 <ExportButtons onExportExcel={handleExportExcel} onExportPDF={handleExportPDF} />
                 {canCreate && (

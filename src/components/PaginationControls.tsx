@@ -18,7 +18,7 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({ page, li
     <div className={`p-4 border-t border-slate-200 flex items-center justify-between bg-white text-sm`}>
       <div className="flex items-center gap-4">
         <label className="flex items-center gap-2 text-slate-600 font-medium">
-          عناصر الصفحة:
+          {t('common.items_per_page')}:
           <input 
             type="number" 
             min="1" 
@@ -29,7 +29,7 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({ page, li
           />
         </label>
         <span className="text-slate-500">
-          إجمالي النتائج: <strong className="text-slate-800">{total}</strong>
+          {t('common.total_results')}: <strong className="text-slate-800">{total}</strong>
         </span>
       </div>
 
