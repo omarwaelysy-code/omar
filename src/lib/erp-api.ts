@@ -1143,7 +1143,7 @@ modules.forEach(moduleName => {
               sortField = `"total_amount"`;
             } else if (sortBy === 'base_amount') {
               sortField = `("total_amount" * COALESCE("exchange_rate", 1))`;
-            } else if (sortBy === 'remaining') {
+            } else if (sortBy === 'remaining' || sortBy === 'remaining_foreign') {
               sortField = `"total_amount"`;
             }
           }

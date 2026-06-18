@@ -189,6 +189,7 @@ export const Invoices: React.FC = () => {
     status: true,
     currency: true,
     foreign_amount: true,
+    remaining_foreign: true,
     base_amount: true,
     remaining: true,
     entry_number: true,
@@ -203,6 +204,7 @@ export const Invoices: React.FC = () => {
     status: 100,
     currency: 80,
     foreign_amount: 120,
+    remaining_foreign: 120,
     base_amount: 150,
     remaining: 120,
     entry_number: 150,
@@ -2522,6 +2524,7 @@ export const Invoices: React.FC = () => {
                           status: language === 'ar' ? 'حالة الدفع' : 'Payment Status',
                           currency: language === 'ar' ? 'العملة' : 'Currency',
                           foreign_amount: language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Currency Amount',
+                          remaining_foreign: language === 'ar' ? 'الباقي بالعملة الأجنبية' : 'Remaining in Foreign Currency',
                           base_amount: language === 'ar' ? 'القيمة المعادلة بالعملة المحلية' : 'Equivalent Local Amount',
                           remaining: language === 'ar' ? 'الباقي من الفاتورة' : 'Remaining Balance',
                           entry_number: language === 'ar' ? 'رقم القيد' : 'Entry Number',
@@ -2558,7 +2561,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.invoice_number && (
                         <th 
                           style={{ width: columnWidths.invoice_number, minWidth: columnWidths.invoice_number }} 
-                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          className={`px-6 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
                           onClick={() => handleSort('invoice_number')}
                         >
                           <div className="flex items-center gap-1">
@@ -2576,7 +2579,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.customer_name && (
                         <th 
                           style={{ width: columnWidths.customer_name, minWidth: columnWidths.customer_name }} 
-                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          className={`px-6 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
                           onClick={() => handleSort('customer_name')}
                         >
                           <div className="flex items-center gap-1">
@@ -2594,7 +2597,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.date && (
                         <th 
                           style={{ width: columnWidths.date, minWidth: columnWidths.date }} 
-                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          className={`px-6 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
                           onClick={() => handleSort('date')}
                         >
                           <div className="flex items-center gap-1">
@@ -2612,7 +2615,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.description && (
                         <th 
                           style={{ width: columnWidths.description, minWidth: columnWidths.description }} 
-                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          className={`px-6 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
                           onClick={() => handleSort('description')}
                         >
                           <div className="flex items-center gap-1">
@@ -2630,7 +2633,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.payment_type && (
                         <th 
                           style={{ width: columnWidths.payment_type, minWidth: columnWidths.payment_type }} 
-                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          className={`px-6 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
                           onClick={() => handleSort('payment_type')}
                         >
                           <div className="flex items-center gap-1">
@@ -2648,7 +2651,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.status && (
                         <th 
                           style={{ width: columnWidths.status, minWidth: columnWidths.status }} 
-                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          className={`px-6 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
                           onClick={() => handleSort('status')}
                         >
                           <div className="flex items-center gap-1">
@@ -2666,7 +2669,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.currency && (
                         <th 
                           style={{ width: columnWidths.currency, minWidth: columnWidths.currency }} 
-                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          className={`px-6 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
                           onClick={() => handleSort('currency')}
                         >
                           <div className="flex items-center gap-1">
@@ -2684,7 +2687,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.foreign_amount && (
                         <th 
                           style={{ width: columnWidths.foreign_amount, minWidth: columnWidths.foreign_amount }} 
-                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          className={`px-6 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
                           onClick={() => handleSort('foreign_amount')}
                         >
                           <div className="flex items-center gap-1">
@@ -2699,10 +2702,28 @@ export const Invoices: React.FC = () => {
                           />
                         </th>
                       )}
+                      {visibleColumns.remaining_foreign && (
+                        <th 
+                          style={{ width: columnWidths.remaining_foreign, minWidth: columnWidths.remaining_foreign }} 
+                          className={`px-6 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('remaining_foreign')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>الباقي بالعملة الأجنبية</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'remaining_foreign' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          <div
+                            onMouseDown={(e) => handleResizeStart(e, 'remaining_foreign')}
+                            className="absolute top-0 right-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-500/50 transition-colors z-10"
+                          />
+                        </th>
+                      )}
                       {visibleColumns.base_amount && (
                         <th 
                           style={{ width: columnWidths.base_amount, minWidth: columnWidths.base_amount }} 
-                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          className={`px-6 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
                           onClick={() => handleSort('base_amount')}
                         >
                           <div className="flex items-center gap-1">
@@ -2720,7 +2741,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.remaining && (
                         <th 
                           style={{ width: columnWidths.remaining, minWidth: columnWidths.remaining }} 
-                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          className={`px-6 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
                           onClick={() => handleSort('remaining')}
                         >
                           <div className="flex items-center gap-1">
@@ -2738,7 +2759,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.entry_number && (
                         <th 
                           style={{ width: columnWidths.entry_number, minWidth: columnWidths.entry_number }} 
-                          className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          className={`px-6 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
                           onClick={() => handleSort('entry_number')}
                         >
                           <div className="flex items-center gap-1">
@@ -2753,7 +2774,7 @@ export const Invoices: React.FC = () => {
                           />
                         </th>
                       )}
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
+                      <th className={`px-6 py-1.5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -2763,12 +2784,12 @@ export const Invoices: React.FC = () => {
                           {Object.keys(visibleColumns).map((colKey) => {
                             if (!visibleColumns[colKey]) return null;
                             return (
-                              <td key={colKey} className="px-6 py-4">
+                              <td key={colKey} className="px-6 py-1.5">
                                 <div className="h-4 bg-slate-100 rounded w-2/3"></div>
                               </td>
                             );
                           })}
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-1.5">
                             <div className="h-4 bg-slate-100 rounded w-12 ml-auto"></div>
                           </td>
                         </tr>
@@ -2782,55 +2803,56 @@ export const Invoices: React.FC = () => {
                         <tr 
                           key={inv.id} 
                           className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
-                          onClick={() => canEdit && openEditModal(inv)}
+                          onClick={() => handleViewInvoice(inv)}
                         >
                           {visibleColumns.invoice_number && (
-                            <td style={{ width: columnWidths.invoice_number, minWidth: columnWidths.invoice_number }} className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>
-                              <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100">{inv.invoice_number}</span>
+                            <td style={{ width: columnWidths.invoice_number, minWidth: columnWidths.invoice_number }} className={`px-6 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>
+                              <span className="font-mono font-bold text-slate-900 bg-slate-100 border border-slate-250/50 px-2 py-0.5 rounded-lg text-xs select-all shadow-sm">
+                                {inv.invoice_number}
+                              </span>
                             </td>
                           )}
                           {visibleColumns.customer_name && (
-                            <td style={{ width: columnWidths.customer_name, minWidth: columnWidths.customer_name }} className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>
-                              <div>{inv.customer_name}</div>
-                              {inv.source_orders && (
-                                <div className="text-[10px] text-emerald-600 font-bold mt-0.5 font-mono">
-                                  {language === 'ar' ? 'أوامر بيع: ' : 'Orders: '}{inv.source_orders}
-                                </div>
-                              )}
+                            <td style={{ width: columnWidths.customer_name, minWidth: columnWidths.customer_name }} className={`px-6 py-1.5 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>
+                              {inv.customer_name}
                             </td>
                           )}
                           {visibleColumns.date && (
-                            <td style={{ width: columnWidths.date, minWidth: columnWidths.date }} className={`px-6 py-4 text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(inv.date)}</td>
+                            <td style={{ width: columnWidths.date, minWidth: columnWidths.date }} className={`px-6 py-1.5 text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(inv.date)}</td>
                           )}
                           {visibleColumns.description && (
-                            <td style={{ width: columnWidths.description, minWidth: columnWidths.description }} className={`px-6 py-4 text-slate-500 max-w-[200px] truncate ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={inv.description}>
+                            <td style={{ width: columnWidths.description, minWidth: columnWidths.description }} className={`px-6 py-1.5 text-slate-500 max-w-[200px] truncate ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={inv.description}>
                               {inv.description || '-'}
                             </td>
                           )}
                           {visibleColumns.payment_type && (
-                            <td style={{ width: columnWidths.payment_type, minWidth: columnWidths.payment_type }} className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                inv.payment_type === 'cash' 
-                                  ? 'bg-emerald-100 text-emerald-700' 
-                                  : 'bg-amber-100 text-amber-700'
-                              }`}>
-                                {inv.payment_type === 'cash' ? 'نقدي' : 'آجل'}
-                              </span>
+                            <td style={{ width: columnWidths.payment_type, minWidth: columnWidths.payment_type }} className={`px-6 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {inv.payment_type === 'cash' ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100/50">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                  نقدية
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100/50">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                  آجل
+                                </span>
+                              )}
                             </td>
                           )}
                           {visibleColumns.status && (
-                            <td style={{ width: columnWidths.status, minWidth: columnWidths.status }} className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <td style={{ width: columnWidths.status, minWidth: columnWidths.status }} className={`px-6 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {(() => {
                                 const status = getPaymentStatus(inv);
                                 const statusLabels = {
-                                  paid: language === 'ar' ? 'مدفوعة' : 'Paid',
-                                  partial: language === 'ar' ? 'مدفوعة جزئياً' : 'Partially Paid',
-                                  unpaid: language === 'ar' ? 'غير مدفوعة' : 'Unpaid'
+                                  paid: 'مدفوعة',
+                                  partial: 'مدفوعة جزئياً',
+                                  unpaid: 'غير مدفوعة',
                                 };
                                 const statusClasses = {
-                                  paid: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-                                  partial: 'bg-blue-100 text-blue-800 border-blue-200',
-                                  unpaid: 'bg-red-100 text-red-800 border-red-200'
+                                  paid: 'bg-emerald-50 text-emerald-700 border-emerald-100/50',
+                                  partial: 'bg-amber-50 text-amber-700 border-amber-100/50',
+                                  unpaid: 'bg-red-50 text-red-700 border-red-100/50',
                                 };
                                 return (
                                   <span className={`px-3 py-1 rounded-full text-[10px] font-bold border ${statusClasses[status]}`}>
@@ -2841,35 +2863,57 @@ export const Invoices: React.FC = () => {
                             </td>
                           )}
                           {visibleColumns.currency && (
-                            <td style={{ width: columnWidths.currency, minWidth: columnWidths.currency }} className={`px-6 py-4 font-bold text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <td style={{ width: columnWidths.currency, minWidth: columnWidths.currency }} className={`px-6 py-1.5 font-bold text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP')}
                             </td>
                           )}
                           {visibleColumns.foreign_amount && (
-                            <td style={{ width: columnWidths.foreign_amount, minWidth: columnWidths.foreign_amount }} className={`px-6 py-4 font-bold text-slate-700 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              {formatMoney(inv.total_amount)}
+                            <td style={{ width: columnWidths.foreign_amount, minWidth: columnWidths.foreign_amount }} className={`px-6 py-1.5 font-bold text-slate-700 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {(() => {
+                                const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
+                                const currencyCode = inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP');
+                                const isForeign = currencyCode.toLowerCase() !== baseCode;
+                                return isForeign ? formatMoney(inv.total_amount) : '-';
+                              })()}
+                            </td>
+                          )}
+                          {visibleColumns.remaining_foreign && (
+                            <td style={{ width: columnWidths.remaining_foreign, minWidth: columnWidths.remaining_foreign }} className={`px-6 py-1.5 font-bold text-slate-700 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {(() => {
+                                const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
+                                const currencyCode = inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP');
+                                const isForeign = currencyCode.toLowerCase() !== baseCode;
+                                if (!isForeign) return '-';
+
+                                const settlements = (allReceipts.length > 0 || allPayments.length > 0 || entries.length > 0) ? getInvoiceSettlements(inv) : (inv.settlements || []);
+                                const totalSettled = settlements.reduce((sum: number, s: any) => sum + (Number(s.settled_amount || s.amount) || 0), 0);
+                                const remaining = inv.payment_type === 'cash' ? 0 : Math.max(0, inv.total_amount - totalSettled);
+                                
+                                if (remaining <= 0) return <span className="text-emerald-600">0.00</span>;
+                                return <span className="text-red-600">{formatMoney(remaining)}</span>;
+                              })()}
                             </td>
                           )}
                           {visibleColumns.base_amount && (
-                            <td style={{ width: columnWidths.base_amount, minWidth: columnWidths.base_amount }} className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              {formatMoney(inv.total_amount * (Number(inv.exchange_rate) || 1))} {companyData?.settings?.currency || 'EGP'}
+                            <td style={{ width: columnWidths.base_amount, minWidth: columnWidths.base_amount }} className={`px-6 py-1.5 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {formatMoney(inv.total_amount * (Number(inv.exchange_rate) || 1))}
                             </td>
                           )}
                           {visibleColumns.remaining && (
-                            <td style={{ width: columnWidths.remaining, minWidth: columnWidths.remaining }} className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <td style={{ width: columnWidths.remaining, minWidth: columnWidths.remaining }} className={`px-6 py-1.5 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {(() => {
                                 const settlements = (allReceipts.length > 0 || allPayments.length > 0 || entries.length > 0) ? getInvoiceSettlements(inv) : (inv.settlements || []);
                                 const totalSettled = settlements.reduce((sum: number, s: any) => sum + (Number(s.settled_amount || s.amount) || 0), 0);
                                 const remaining = inv.payment_type === 'cash' ? 0 : Math.max(0, inv.total_amount - totalSettled);
-                                const currencySymbol = inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP');
+                                const remainingLocal = remaining * (Number(inv.exchange_rate) || 1);
                                 
-                                if (remaining <= 0) return <span className="text-emerald-600">0.00</span>;
-                                return <span className="text-red-600">{formatMoney(remaining)} {currencySymbol}</span>;
+                                if (remainingLocal <= 0) return <span className="text-emerald-600">0.00</span>;
+                                return <span className="text-red-600">{formatMoney(remainingLocal)}</span>;
                               })()}
                             </td>
                           )}
                           {visibleColumns.entry_number && (
-                            <td style={{ width: columnWidths.entry_number, minWidth: columnWidths.entry_number }} className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <td style={{ width: columnWidths.entry_number, minWidth: columnWidths.entry_number }} className={`px-6 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {inv.entry_number ? (
                                 <button
                                   onClick={(e) => {
@@ -2886,7 +2930,7 @@ export const Invoices: React.FC = () => {
                               )}
                             </td>
                           )}
-                          <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                          <td className={`px-6 py-1.5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                             <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
                               <button 
                                 onClick={(e) => {
