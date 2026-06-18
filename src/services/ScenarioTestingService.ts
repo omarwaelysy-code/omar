@@ -108,8 +108,8 @@ export class ScenarioTestingService {
           company_id: companyId,
           created_by: userId,
           items: [
-            { account_id: bank.id, debit: 100000, credit: 0 },
-            { account_id: equityAcc.id, debit: 0, credit: 100000 }
+            { account_id: bank.id, account_name: bank.name, debit: 100000, credit: 0 },
+            { account_id: equityAcc.id, account_name: equityAcc.name, debit: 0, credit: 100000 }
           ]
         },
         schema: JournalEntrySchema
