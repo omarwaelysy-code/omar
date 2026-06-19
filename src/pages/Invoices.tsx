@@ -1724,6 +1724,180 @@ export const Invoices: React.FC = () => {
 
       const total_amount = Number(subtotal + vatTotal - discount_amount) || 0;
 
+      // Calculate changes if editing
+      const changes: any[] = [];
+      const detailsList: string[] = [];
+
+      if (editingInvoice) {
+        // 1. Date
+        if (editingInvoice.date !== date) {
+          const oldDateFormatted = formatDate(editingInvoice.date);
+          const newDateFormatted = formatDate(date);
+          changes.push({
+            field: language === 'ar' ? 'التاريخ' : 'Date',
+            old_value: oldDateFormatted,
+            new_value: newDateFormatted
+          });
+          detailsList.push(language === 'ar' ? `تغيير التاريخ من ${oldDateFormatted} إلى ${newDateFormatted}` : `Date changed from ${oldDateFormatted} to ${newDateFormatted}`);
+        }
+
+        // 2. Customer
+        if (editingInvoice.customer_id !== selectedCustomerId) {
+          const oldCustomer = customers.find(c => c.id === editingInvoice.customer_id)?.name || editingInvoice.customer_name || editingInvoice.customer_id;
+          const newCustomer = customers.find(c => c.id === selectedCustomerId)?.name || selectedCustomerId;
+          changes.push({
+            field: language === 'ar' ? 'العميل' : 'Customer',
+            old_value: oldCustomer,
+            new_value: newCustomer
+          });
+          detailsList.push(language === 'ar' ? `تغيير العميل من ${oldCustomer} إلى ${newCustomer}` : `Customer changed from ${oldCustomer} to ${newCustomer}`);
+        }
+
+        // 3. Currency
+        const oldCurrencyId = editingInvoice.currency_id || '';
+        const newCurrencyId = selectedCurrencyId || '';
+        if (oldCurrencyId !== newCurrencyId) {
+          const oldCurr = companyCurrencies.find(c => c.id === oldCurrencyId)?.code || oldCurrencyId || 'EGP';
+          const newCurr = companyCurrencies.find(c => c.id === newCurrencyId)?.code || newCurrencyId || 'EGP';
+          changes.push({
+            field: language === 'ar' ? 'العملة' : 'Currency',
+            old_value: oldCurr,
+            new_value: newCurr
+          });
+          detailsList.push(language === 'ar' ? `تغيير العملة من ${oldCurr} إلى ${newCurr}` : `Currency changed from ${oldCurr} to ${newCurr}`);
+        }
+
+        // 4. Exchange Rate
+        const oldRate = Number(editingInvoice.exchange_rate) || 1;
+        const newRate = Number(exchangeRate) || 1;
+        if (oldRate !== newRate) {
+          changes.push({
+            field: language === 'ar' ? 'سعر الصرف' : 'Exchange Rate',
+            old_value: oldRate,
+            new_value: newRate
+          });
+          detailsList.push(language === 'ar' ? `تغيير سعر الصرف من ${oldRate} إلى ${newRate}` : `Exchange rate changed from ${oldRate} to ${newRate}`);
+        }
+
+        // 5. Discount
+        const oldDiscount = Number(editingInvoice.discount_amount || editingInvoice.discount) || 0;
+        const newDiscount = Number(discount_amount) || 0;
+        if (oldDiscount !== newDiscount) {
+          changes.push({
+            field: language === 'ar' ? 'الخصم' : 'Discount',
+            old_value: oldDiscount,
+            new_value: newDiscount
+          });
+          detailsList.push(language === 'ar' ? `تغيير الخصم من ${oldDiscount} إلى ${newDiscount}` : `Discount changed from ${oldDiscount} to ${newDiscount}`);
+        }
+
+        // 6. Tax
+        const oldTax = Number(editingInvoice.tax_amount) || 0;
+        const newTax = Number(vatTotal) || 0;
+        if (oldTax !== newTax) {
+          changes.push({
+            field: language === 'ar' ? 'الضريبة' : 'Tax',
+            old_value: oldTax,
+            new_value: newTax
+          });
+          detailsList.push(language === 'ar' ? `تغيير قيمة الضريبة من ${oldTax} إلى ${newTax}` : `Tax amount changed from ${oldTax} to ${newTax}`);
+        }
+
+        // 7. Total Amount
+        const oldTotal = Number(editingInvoice.total_amount) || 0;
+        const newTotal = Number(total_amount) || 0;
+        if (oldTotal !== newTotal) {
+          changes.push({
+            field: language === 'ar' ? 'إجمالي الفاتورة' : 'Total Amount',
+            old_value: oldTotal,
+            new_value: newTotal
+          });
+          detailsList.push(language === 'ar' ? `تغيير الإجمالي من ${oldTotal} إلى ${newTotal}` : `Total amount changed from ${oldTotal} to ${newTotal}`);
+        }
+
+        // 8. Description
+        const oldDesc = editingInvoice.description || '';
+        const newDesc = description || '';
+        if (oldDesc !== newDesc) {
+          changes.push({
+            field: language === 'ar' ? 'الوصف' : 'Description',
+            old_value: oldDesc || (language === 'ar' ? 'فارغ' : 'Empty'),
+            new_value: newDesc || (language === 'ar' ? 'فارغ' : 'Empty')
+          });
+          detailsList.push(language === 'ar' ? `تعديل وصف الفاتورة` : `Description updated`);
+        }
+
+        // 9. Items Diff
+        const oldItems = editingInvoice.items || [];
+        const newItems = sanitizedItems;
+
+        // Check for deleted items
+        oldItems.forEach(oldItem => {
+          const stillExists = newItems.some(newItem => newItem.product_id === oldItem.product_id);
+          if (!stillExists) {
+            changes.push({
+              field: language === 'ar' ? 'حذف صنف' : 'Delete Product',
+              old_value: `${oldItem.product_name} (${oldItem.quantity} × ${oldItem.unit_price})`,
+              new_value: language === 'ar' ? 'تم الحذف' : 'Deleted'
+            });
+            detailsList.push(language === 'ar' ? `حذف الصنف: ${oldItem.product_name}` : `Deleted product: ${oldItem.product_name}`);
+          }
+        });
+
+        // Check for added items
+        newItems.forEach(newItem => {
+          const wasPresent = oldItems.some(oldItem => oldItem.product_id === newItem.product_id);
+          if (!wasPresent) {
+            changes.push({
+              field: language === 'ar' ? 'إضافة صنف' : 'Add Product',
+              old_value: language === 'ar' ? 'جديد' : 'New',
+              new_value: `${newItem.product_name} (${newItem.quantity} × ${newItem.unit_price})`
+            });
+            detailsList.push(language === 'ar' ? `إضافة صنف جديد: ${newItem.product_name}` : `Added new product: ${newItem.product_name}`);
+          }
+        });
+
+        // Check for modified items
+        newItems.forEach(newItem => {
+          const oldItem = oldItems.find(oi => oi.product_id === newItem.product_id);
+          if (oldItem) {
+            const qtyChanged = Number(oldItem.quantity) !== Number(newItem.quantity);
+            const priceChanged = Number(oldItem.unit_price) !== Number(newItem.unit_price);
+            const opChanged = oldItem.operation_id !== newItem.operation_id;
+            const ccChanged = oldItem.cost_center_id !== newItem.cost_center_id;
+            const deptChanged = oldItem.department_id !== newItem.department_id;
+
+            if (qtyChanged || priceChanged || opChanged || ccChanged || deptChanged) {
+              const diffParts: string[] = [];
+              if (qtyChanged) diffParts.push(language === 'ar' ? `الكمية من ${oldItem.quantity} إلى ${newItem.quantity}` : `Qty from ${oldItem.quantity} to ${newItem.quantity}`);
+              if (priceChanged) diffParts.push(language === 'ar' ? `السعر من ${oldItem.unit_price} إلى ${newItem.unit_price}` : `Price from ${oldItem.unit_price} to ${newItem.unit_price}`);
+              if (opChanged) {
+                const oldOp = operations.find(o => o.id === oldItem.operation_id)?.operation_number || '-';
+                const newOp = operations.find(o => o.id === newItem.operation_id)?.operation_number || '-';
+                diffParts.push(language === 'ar' ? `العملية من ${oldOp} إلى ${newOp}` : `Operation from ${oldOp} to ${newOp}`);
+              }
+              if (ccChanged) {
+                const oldCc = costCenters.find(c => c.id === oldItem.cost_center_id)?.name || '-';
+                const newCc = costCenters.find(c => c.id === newItem.cost_center_id)?.name || '-';
+                diffParts.push(language === 'ar' ? `مركز التكلفة من ${oldCc} إلى ${newCc}` : `Cost center from ${oldCc} to ${newCc}`);
+              }
+              if (deptChanged) {
+                const oldDept = departments.find(d => d.id === oldItem.department_id)?.name || '-';
+                const newDept = departments.find(d => d.id === newItem.department_id)?.name || '-';
+                diffParts.push(language === 'ar' ? `الإدارة من ${oldDept} إلى ${newDept}` : `Department from ${oldDept} to ${newDept}`);
+              }
+              
+              changes.push({
+                field: (language === 'ar' ? 'تعديل صنف: ' : 'Edit Product: ') + newItem.product_name,
+                old_value: `${language === 'ar' ? 'الكمية:' : 'Qty:'} ${oldItem.quantity}، ${language === 'ar' ? 'السعر:' : 'Price:'} ${oldItem.unit_price}`,
+                new_value: `${language === 'ar' ? 'الكمية:' : 'Qty:'} ${newItem.quantity}، ${language === 'ar' ? 'السعر:' : 'Price:'} ${newItem.unit_price} (${diffParts.join('، ')})`
+              });
+              detailsList.push(language === 'ar' ? `تعديل تفاصيل الصنف: ${newItem.product_name}` : `Updated details of product: ${newItem.product_name}`);
+            }
+          }
+        });
+      }
+
       // Over-settlement validation
       const totalSettled = formSettlements.reduce((sum, s) => sum + Number(s.settled_amount), 0);
       if (totalSettled > total_amount) {
@@ -2136,6 +2310,22 @@ export const Invoices: React.FC = () => {
       if (!editingInvoice) {
         // Activity log in background
         dbService.logActivity(user.id, user.username, user.company_id, t('invoices.log_add'), t('invoices.log_add_msg', { number: invoiceNumber }), 'invoices');
+      } else {
+        // Log details of changes for editing invoice
+        if (changes.length > 0) {
+          const logAction = language === 'ar' ? 'تعديل فاتورة' : 'Update Invoice';
+          const logDetails = detailsList.join(' | ');
+          dbService.logActivity(
+            user.id,
+            user.username,
+            user.company_id,
+            logAction,
+            logDetails || `تعديل الفاتورة رقم ${invoiceNumber}`,
+            'invoices',
+            editingInvoice.id,
+            changes
+          );
+        }
       }
 
     } catch (e: any) {
@@ -5126,6 +5316,7 @@ export const Invoices: React.FC = () => {
                                 layout="bottom"
                                 currencyCode={currencyCode}
                                 exchangeRate={exchangeRateVal}
+                                previewItems={items}
                               />
                             );
                           })()}

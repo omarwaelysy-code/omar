@@ -112,16 +112,10 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
           header.appendChild(dateContainer);
           wrapper.appendChild(header);
 
-          // Move the cloned element into the wrapper
-          const elementParent = clonedElement.parentElement;
-          if (elementParent) {
-            elementParent.replaceChild(wrapper, clonedElement);
-            wrapper.appendChild(clonedElement);
-          } else {
-            clonedDoc.body.innerHTML = '';
-            clonedDoc.body.appendChild(wrapper);
-            wrapper.appendChild(clonedElement);
-          }
+          // Clear everything in the cloned document body and mount only the wrapped element
+          clonedDoc.body.innerHTML = '';
+          clonedDoc.body.appendChild(wrapper);
+          wrapper.appendChild(clonedElement);
 
           // Apply professional table styling
           clonedElement.style.width = '100%';

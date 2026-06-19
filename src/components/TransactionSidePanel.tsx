@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { ActivityLog, JournalEntry } from '../types';
 import { dbService } from '../services/dbService';
-import { Clock, Activity, History, FileText, ChevronDown, ChevronUp, ArrowRightLeft } from 'lucide-react';
+import { Clock, Activity, History, FileText, ChevronDown, ChevronUp, ArrowRightLeft, FileSpreadsheet } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatNumber } from '../utils/formatUtils';
 import { useLanguage } from '../contexts/LanguageContext';
+import { exportToExcel } from '../utils/excelUtils';
 
 interface TransactionSidePanelProps {
   documentId?: string;
@@ -15,6 +16,7 @@ interface TransactionSidePanelProps {
   layout?: 'side' | 'bottom';
   currencyCode?: string;
   exchangeRate?: number;
+  previewItems?: any[];
 }
 
 export const TransactionSidePanel: React.FC<TransactionSidePanelProps> = ({ 
@@ -24,7 +26,8 @@ export const TransactionSidePanel: React.FC<TransactionSidePanelProps> = ({
   previewActivityLog,
   layout = 'side',
   currencyCode,
-  exchangeRate
+  exchangeRate,
+  previewItems
 }) => {
   const { user } = useAuth();
   const { language, dir } = useLanguage();
@@ -32,6 +35,50 @@ export const TransactionSidePanel: React.FC<TransactionSidePanelProps> = ({
   const [journalEntry, setJournalEntry] = useState<JournalEntry | null>(null);
   const [loading, setLoading] = useState(false);
   const [isJournalOpen, setIsJournalOpen] = useState(false);
+
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [costCenters, setCostCenters] = useState<any[]>([]);
+  const [operations, setOperations] = useState<any[]>([]);
+  const [documentItems, setDocumentItems] = useState<any[]>([]);
+  const [invoiceDoc, setInvoiceDoc] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      const loadMetadata = async () => {
+        try {
+          const depts = await dbService.list<any>('departments', user.company_id);
+          setDepartments(depts);
+          const ccs = await dbService.list<any>('cost_centers', user.company_id);
+          setCostCenters(ccs);
+          const ops = await dbService.list<any>('operations', user.company_id);
+          setOperations(ops);
+        } catch (e) {
+          console.error('Error loading metadata for TransactionSidePanel:', e);
+        }
+      };
+      loadMetadata();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user && documentId && (category === 'invoices' || category === 'purchase_invoices')) {
+      const fetchInvoice = async () => {
+        try {
+          const inv = await dbService.get<any>(category, documentId);
+          if (inv) {
+            setInvoiceDoc(inv);
+            setDocumentItems(inv.items || []);
+          }
+        } catch (e) {
+          console.error('Error fetching document for side panel:', e);
+        }
+      };
+      fetchInvoice();
+    } else {
+      setInvoiceDoc(null);
+      setDocumentItems([]);
+    }
+  }, [user, documentId, category]);
 
   useEffect(() => {
     if (user && documentId) {
@@ -71,6 +118,106 @@ export const TransactionSidePanel: React.FC<TransactionSidePanelProps> = ({
   const displayJournal = previewJournalEntry || journalEntry;
   const displayLogs = logs;
 
+  const activeItems = (previewItems && previewItems.length > 0) ? previewItems : documentItems;
+
+  const getLineMetadata = (item: any) => {
+    const matchedItem = item.product_name 
+      ? activeItems.find((ai: any) => ai.product_name === item.product_name) 
+      : null;
+
+    const opId = matchedItem?.operation_id || invoiceDoc?.operation_id;
+    const ccId = matchedItem?.cost_center_id || invoiceDoc?.cost_center_id;
+    const deptId = matchedItem?.department_id || invoiceDoc?.department_id;
+
+    const op = operations.find((o: any) => o.id === opId);
+    const cc = costCenters.find((c: any) => c.id === ccId);
+    const dept = departments.find((d: any) => d.id === deptId);
+
+    return {
+      operation: op ? op.operation_number : '-',
+      costCenter: cc ? cc.name : '-',
+      department: dept ? dept.name : '-'
+    };
+  };
+
+  const handleExportJournalExcel = () => {
+    if (!displayJournal) return;
+    
+    const rate = Number(exchangeRate) || 1;
+    const isPreview = displayJournal.id === 'preview';
+
+    const rows = displayJournal.items.map(item => {
+      const localDebit = isPreview ? (item.debit * rate) : item.debit;
+      const localCredit = isPreview ? (item.credit * rate) : item.credit;
+      const metadata = getLineMetadata(item);
+      const foreignValue = isPreview 
+        ? (item.debit || item.credit) 
+        : (rate > 1 ? (item.debit || item.credit) / rate : (item.debit || item.credit));
+
+      return {
+        date: displayJournal.date ? new Date(displayJournal.date).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US') : '-',
+        invoice_number: displayJournal.reference_number || '-',
+        entry_number: displayJournal.entry_number || (language === 'ar' ? 'مسودة' : 'Draft'),
+        debit: localDebit > 0 ? localDebit : 0,
+        credit: localCredit > 0 ? localCredit : 0,
+        account_code: item.account_code || '-',
+        account_name: item.account_name,
+        product_name: item.product_name || '-',
+        operation: metadata.operation,
+        cost_center: metadata.costCenter,
+        department: metadata.department,
+        description: item.description || displayJournal.description || '-',
+        currency: currencyCode || 'EGP',
+        foreign_value: foreignValue
+      };
+    });
+
+    const keyMap = language === 'ar' ? {
+      date: 'التاريخ',
+      invoice_number: 'رقم الفاتورة',
+      entry_number: 'رقم القيد',
+      debit: 'المدين',
+      credit: 'الدائن',
+      account_code: 'كود الحساب',
+      account_name: 'الحساب الرئيسي',
+      product_name: 'الصنف / المنتج',
+      operation: 'العملية',
+      cost_center: 'مركز تكلفة',
+      department: 'الإدارة',
+      description: 'البيان / الوصف',
+      currency: 'العملة',
+      foreign_value: 'قيمة العملة الأجنبية'
+    } : {
+      date: 'Date',
+      invoice_number: 'Invoice Number',
+      entry_number: 'JE Number',
+      debit: 'Debit',
+      credit: 'Credit',
+      account_code: 'Account Code',
+      account_name: 'Main Account',
+      product_name: 'Product/Item',
+      operation: 'Operation',
+      cost_center: 'Cost Center',
+      department: 'Department',
+      description: 'Description',
+      currency: 'Currency',
+      foreign_value: 'Foreign Value'
+    };
+
+    const formattedData = rows.map(r => {
+      const formatted: Record<string, any> = {};
+      Object.entries(keyMap).forEach(([key, label]) => {
+        formatted[label] = (r as any)[key];
+      });
+      return formatted;
+    });
+
+    exportToExcel(formattedData, { 
+      filename: `JournalEntry_${displayJournal.entry_number || 'Draft'}`, 
+      sheetName: language === 'ar' ? 'تفاصيل القيد' : 'Journal Entry' 
+    });
+  };
+
   // BOTTOM LAYOUT
   if (layout === 'bottom') {
     const isPreview = displayJournal?.id === 'preview';
@@ -108,8 +255,18 @@ export const TransactionSidePanel: React.FC<TransactionSidePanelProps> = ({
                   )}
                 </h4>
               </div>
-              <div className="text-[10px] text-zinc-400 font-bold font-mono">
-                {displayJournal.date && `${language === 'ar' ? 'التاريخ:' : 'Date:'} ${new Date(displayJournal.date).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US')}`}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleExportJournalExcel}
+                  className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-250 rounded-lg hover:bg-emerald-100 hover:text-emerald-800 active:scale-95 transition-all shadow-sm"
+                >
+                  <FileSpreadsheet size={12} />
+                  {language === 'ar' ? 'تصدير إكسيل' : 'Excel Export'}
+                </button>
+                <div className="text-[10px] text-zinc-400 font-bold font-mono">
+                  {displayJournal.date && `${language === 'ar' ? 'التاريخ:' : 'Date:'} ${new Date(displayJournal.date).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US')}`}
+                </div>
               </div>
             </div>
 
@@ -344,11 +501,21 @@ export const TransactionSidePanel: React.FC<TransactionSidePanelProps> = ({
                   className="overflow-hidden border-t border-zinc-100"
                 >
                   <div className="p-4 space-y-4 bg-zinc-50/30">
-                    <div className="flex justify-between text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
+                    <div className="flex justify-between items-center text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
                       <span>{language === 'ar' ? 'الحساب' : 'Account'}</span>
-                      <div className="flex gap-6">
-                        <span className="w-14 text-left">{language === 'ar' ? 'مدين' : 'Debit'}</span>
-                        <span className="w-14 text-left">{language === 'ar' ? 'دائن' : 'Credit'}</span>
+                      <div className="flex items-center gap-4">
+                        <button
+                          type="button"
+                          onClick={handleExportJournalExcel}
+                          className="flex items-center gap-1 px-2 py-0.5 text-[9px] font-bold text-emerald-700 bg-white border border-emerald-200 rounded hover:bg-emerald-50 active:scale-95 transition-all shadow-sm"
+                        >
+                          <FileSpreadsheet size={10} />
+                          {language === 'ar' ? 'تصدير إكسيل' : 'Excel Export'}
+                        </button>
+                        <div className="flex gap-6">
+                          <span className="w-14 text-left">{language === 'ar' ? 'مدين' : 'Debit'}</span>
+                          <span className="w-14 text-left">{language === 'ar' ? 'دائن' : 'Credit'}</span>
+                        </div>
                       </div>
                     </div>
                     <div className="space-y-3">
