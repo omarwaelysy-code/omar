@@ -7,7 +7,7 @@ import {
   Image as ImageIcon, FileText, Pencil, History, Printer, 
   ChevronLeft, ChevronRight, Maximize2, Minimize2, Hash, 
   Wallet, Calendar, Package, Tag, Layers, Box, Paperclip, 
-  Phone, Mail, Lock, LayoutGrid, List, Building2, ChevronDown, 
+  Phone, Mail, Lock, LayoutGrid, List, Building2, ChevronDown, ChevronUp,
   CreditCard, RotateCcw, Save, ExternalLink, CheckCheck, Copy, Coins
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
