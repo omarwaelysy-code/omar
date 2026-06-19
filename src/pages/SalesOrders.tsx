@@ -611,7 +611,7 @@ export const SalesOrders: React.FC = () => {
   };
 
   const calculateSubtotal = () => {
-    return items.reduce((sum, item) => sum + (item.total || 0), 0);
+    return items.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
   };
 
   const calculateTotal = () => {
