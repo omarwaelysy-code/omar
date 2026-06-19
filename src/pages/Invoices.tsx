@@ -1501,7 +1501,7 @@ export const Invoices: React.FC = () => {
         }
 
         // 5. Debit COGS & Credit Inventory (for physical products)
-        if (product.type !== 'service' && !product.is_service) {
+        if (product.type !== 'service') {
           const itemCost = Number((item.quantity * (product.cost_price || 0)).toFixed(2));
           if (itemCost > 0) {
             // Debit: COGS Account
@@ -1880,7 +1880,7 @@ export const Invoices: React.FC = () => {
         }
 
         // 5. Debit COGS & Credit Inventory (for physical products)
-        if (product.type !== 'service' && !product.is_service) {
+        if (product.type !== 'service') {
           const itemCost = Number(product.cost_price) || 0;
           const totalCost = Number((item.quantity * itemCost).toFixed(2));
 
