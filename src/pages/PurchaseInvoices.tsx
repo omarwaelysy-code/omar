@@ -2,19 +2,21 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Company, Supplier, Product, PaymentMethod, ExpenseCategory, Account, JournalEntry, JournalEntryItem } from '../types';
+import { Company, Supplier, Product, PaymentMethod, ExpenseCategory, Account, JournalEntry, JournalEntryItem, Operation, Department, CostCenter, Currency, ExchangeRate } from '../types';
 import { 
   Search, Plus, Trash2, X, ShoppingCart, User, CreditCard, 
   Calendar, Hash, Package, Save, FileText, Pencil, Download, 
   Eye, History, Printer, ArrowRight, ArrowLeft, Minimize2, 
   Maximize2, Phone, Mail, MapPin, Wallet, Layers, Paperclip, 
-  Tag, Box, LayoutGrid, List, Receipt, ChevronDown, ChevronLeft, ChevronRight
+  Tag, Box, LayoutGrid, List, Receipt, ChevronDown, ChevronLeft, ChevronRight,
+  Coins, CheckCheck, ExternalLink, RotateCcw, ChevronUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Barcode from 'react-barcode';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
-import { dbService } from '../services/dbService';
+import { dbService, apiRequest } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
@@ -43,6 +45,7 @@ export const PurchaseInvoices: React.FC = () => {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [companyData, setCompanyData] = useState<Company | null>(null);
+  const isVatEnabled = companyData?.settings?.vat_enabled || companyData?.vat_enabled || false;
   const [settings, setSettings] = useState<any>(null);
   const [purchaseInvoices, setPurchaseInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,8 +59,26 @@ export const PurchaseInvoices: React.FC = () => {
   const [isExpenseCategoryModalOpen, setIsExpenseCategoryModalOpen] = useState(false);
   const [isPaymentMethodModalOpen, setIsPaymentMethodModalOpen] = useState(false);
   const [showSidePanel, setShowSidePanel] = useState(false);
+  const [isPanelExpanded, setIsPanelExpanded] = useState(false);
   const [previewJournalEntry, setPreviewJournalEntry] = useState<any | null>(null);
   const [previewActivityLog, setPreviewActivityLog] = useState<any | null>(null);
+  
+  const [selectedOperationId, setSelectedOperationId] = useState<string>('');
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
+  const [selectedCostCenterId, setSelectedCostCenterId] = useState<string>('');
+  const [selectedCurrencyId, setSelectedCurrencyId] = useState<string>('');
+  const [exchangeRate, setExchangeRate] = useState<number>(1);
+  const [exchangeRateType, setExchangeRateType] = useState<'auto' | 'manual'>('auto');
+  const [description, setDescription] = useState<string>('');
+  
+  const [operations, setOperations] = useState<Operation[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
+  const [companyCurrencies, setCompanyCurrencies] = useState<Currency[]>([]);
+  const [activeSearch, setActiveSearch] = useState<{ index: number; type: 'operation' | 'department' | 'cost_center'; query: string } | null>(null);
+  const [popoverRect, setPopoverRect] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [focusedPriceIndex, setFocusedPriceIndex] = useState<number | null>(null);
+  const [tempPriceValue, setTempPriceValue] = useState<string>('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
@@ -230,6 +251,10 @@ export const PurchaseInvoices: React.FC = () => {
       const unsubPR = dbService.subscribe<any>('purchase_returns', user.company_id, setAllPurchaseReturns);
       const unsubAllInvoices = dbService.subscribe<any>('invoices', user.company_id, setAllInvoices);
       const unsubAllPurchaseInvoices = dbService.subscribe<any>('purchase_invoices', user.company_id, setAllPurchaseInvoices);
+      const unsubOps = dbService.subscribe<Operation>('operations', user.company_id, setOperations);
+      const unsubDepts = dbService.subscribe<Department>('departments', user.company_id, setDepartments);
+      const unsubCC = dbService.subscribe<CostCenter>('cost_centers', user.company_id, setCostCenters);
+      const unsubCurrencies = dbService.subscribe<Currency>('currencies', user.company_id, setCompanyCurrencies);
 
       return () => {
         unsubProducts();
@@ -244,6 +269,10 @@ export const PurchaseInvoices: React.FC = () => {
         unsubPR();
         unsubAllInvoices();
         unsubAllPurchaseInvoices();
+        unsubOps();
+        unsubDepts();
+        unsubCC();
+        unsubCurrencies();
       };
     }
   }, [user, isModalOpen, viewInvoice, editingInvoice]);
@@ -1100,8 +1129,108 @@ export const PurchaseInvoices: React.FC = () => {
     generatePreview();
   }, [isModalOpen, items, invoiceData, user, suppliers, products, categories, paymentMethods, accounts, editingInvoice, settings]);
 
+  const currentInvoiceCurrencyCode = selectedCurrencyId 
+    ? companyCurrencies.find(c => c.id === selectedCurrencyId)?.code || 'EGP'
+    : companyData?.settings?.currency || 'EGP';
+
+  const handleCurrencyChange = async (currencyId: string) => {
+    setSelectedCurrencyId(currencyId);
+    if (!currencyId || !user?.company_id || !companyData) {
+      setExchangeRate(1);
+      return;
+    }
+    
+    const currency = companyCurrencies.find(c => c.id === currencyId);
+    if (!currency) {
+      setExchangeRate(1);
+      return;
+    }
+    
+    const baseCurrency = companyData.settings?.currency || 'EGP';
+    if (currency.code.toLowerCase() === baseCurrency.toLowerCase()) {
+      setExchangeRate(1);
+      setExchangeRateType('manual');
+      return;
+    }
+
+    const updateMethod = companyData.settings?.exchange_rate_update_method || 'manual';
+    setExchangeRateType(updateMethod);
+
+    if (updateMethod === 'auto') {
+      try {
+        const latestAutoRates = await apiRequest<Array<{
+          currency_id: string;
+          rate: number | null;
+          rate_date: string | null;
+        }>>(`/currency-rates/latest?company_id=${user.company_id}`);
+        const rateObj = latestAutoRates.find(r => r.currency_id === currencyId);
+        if (rateObj && rateObj.rate !== null) {
+          setExchangeRate(Number(rateObj.rate));
+        } else {
+          // fallback to manual rate
+          const manualRates = await dbService.list<ExchangeRate>('exchange_rates', {
+            currency_id: currencyId,
+            company_id: user.company_id,
+            _limit: 1,
+            _sort: 'rate_date',
+            _order: 'desc'
+          });
+          if (manualRates.length > 0) {
+            setExchangeRate(Number(manualRates[0].exchange_rate));
+          } else {
+            setExchangeRate(1);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching auto rate:', error);
+        setExchangeRate(1);
+      }
+    } else {
+      // manual update method
+      try {
+        const manualRates = await dbService.list<ExchangeRate>('exchange_rates', {
+          currency_id: currencyId,
+          company_id: user.company_id,
+          _limit: 1,
+          _sort: 'rate_date',
+          _order: 'desc'
+        });
+        if (manualRates.length > 0) {
+          setExchangeRate(Number(manualRates[0].exchange_rate));
+        } else {
+          setExchangeRate(1);
+        }
+      } catch (error) {
+        console.error('Error fetching manual rate:', error);
+        setExchangeRate(1);
+      }
+    }
+  };
+
+  const applyOperationToAllItems = () => {
+    setItems(prev => prev.map(item => ({ ...item, operation_id: selectedOperationId || null })));
+  };
+
+  const applyDepartmentToAllItems = () => {
+    setItems(prev => prev.map(item => ({ ...item, department_id: selectedDepartmentId || null })));
+  };
+
+  const applyCostCenterToAllItems = () => {
+    setItems(prev => prev.map(item => ({ ...item, cost_center_id: selectedCostCenterId || null })));
+  };
+
   const addItem = () => {
-    setItems(prev => [...prev, { quantity: 1, cost_price: 0, total: 0 }]);
+    setItems(prev => [...prev, { 
+      quantity: 1, 
+      cost_price: 0, 
+      total: 0,
+      barcode: '',
+      operation_id: selectedOperationId || null,
+      department_id: selectedDepartmentId || null,
+      cost_center_id: selectedCostCenterId || null,
+      vat_rate: 0,
+      vat_amount: 0
+    }]);
   };
 
   const removeItem = (index: number) => {
@@ -1120,6 +1249,8 @@ export const PurchaseInvoices: React.FC = () => {
           newItems[index].product_name = product.name;
           (newItems[index] as any).product_code = product.code;
           (newItems[index] as any).product_image_url = product.image_url;
+          (newItems[index] as any).barcode = product.barcode || '';
+          (newItems[index] as any).vat_rate = product.vat_rate || 0;
         }
       } else if (field === 'expense_category_id' && invoiceData.purchase_type === 'expenses') {
         const category = categories.find(c => c.id === value);
@@ -1128,7 +1259,12 @@ export const PurchaseInvoices: React.FC = () => {
         }
       }
       
-      newItems[index].total = (newItems[index].quantity || 0) * (newItems[index].cost_price || 0);
+      const qty = Number(newItems[index].quantity) || 0;
+      const price = Number(newItems[index].cost_price || (newItems[index] as any).unit_price || 0);
+      const vatRate = Number((newItems[index] as any).vat_rate) || 0;
+      newItems[index].total = Number((qty * price).toFixed(4));
+      (newItems[index] as any).vat_amount = Number((newItems[index].total * (vatRate / 100)).toFixed(4));
+      
       return newItems;
     });
   };
@@ -1459,9 +1595,20 @@ export const PurchaseInvoices: React.FC = () => {
       
       const subtotal = Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.cost_price || 0)), 0)) || 0;
       const discount_amount = Number(invoiceData.discount) || 0;
-      const total_amount = Number(subtotal - discount_amount) || 0;
+      
+      const vatTotal = isVatEnabled
+        ? Number(validItems.reduce((sum, item) => {
+            const itemTotal = Number(item.quantity || 0) * Number(item.cost_price || 0);
+            const rateVal = Number((item as any).vat_rate) || 0;
+            return sum + (itemTotal * (rateVal / 100));
+          }, 0).toFixed(2))
+        : 0;
 
-      // Over-settlement validation
+      const total_amount = Number(subtotal + vatTotal - discount_amount) || 0;
+
+      const changes: any[] = [];
+      const detailsList: string[] = [];
+
       const totalSettled = formSettlements.reduce((sum, s) => sum + Number(s.settled_amount), 0);
       if (totalSettled > total_amount) {
         showNotification('التسوية أكبر من المبلغ الإجمالي', 'error');
@@ -1477,8 +1624,175 @@ export const PurchaseInvoices: React.FC = () => {
         category_name: item.category_name || '',
         quantity: Number(item.quantity) || 0,
         unit_price: Number(item.cost_price) || 0,
-        total: Number((Number(item.quantity) || 0) * (Number(item.cost_price) || 0)) || 0
+        total: Number((Number(item.quantity) || 0) * (Number(item.cost_price) || 0)) || 0,
+        barcode: (item as any).barcode || '',
+        operation_id: (item as any).operation_id || null,
+        department_id: (item as any).department_id || null,
+        cost_center_id: (item as any).cost_center_id || null,
+        vat_rate: Number((item as any).vat_rate) || 0,
+        vat_amount: Number((item as any).vat_amount) || 0
       }));
+
+      if (editingInvoice) {
+        if (editingInvoice.date !== invoiceData.date) {
+          const oldDateFormatted = formatDate(editingInvoice.date);
+          const newDateFormatted = formatDate(invoiceData.date);
+          changes.push({
+            field: language === 'ar' ? 'التاريخ' : 'Date',
+            old_value: oldDateFormatted,
+            new_value: newDateFormatted
+          });
+          detailsList.push(language === 'ar' ? `تغيير التاريخ من ${oldDateFormatted} إلى ${newDateFormatted}` : `Date changed from ${oldDateFormatted} to ${newDateFormatted}`);
+        }
+
+        if (editingInvoice.supplier_id !== invoiceData.supplier_id) {
+          const oldSupplier = suppliers.find(s => s.id === editingInvoice.supplier_id)?.name || editingInvoice.supplier_name || editingInvoice.supplier_id;
+          const newSupplier = suppliers.find(s => s.id === invoiceData.supplier_id)?.name || invoiceData.supplier_id;
+          changes.push({
+            field: language === 'ar' ? 'المورد' : 'Supplier',
+            old_value: oldSupplier,
+            new_value: newSupplier
+          });
+          detailsList.push(language === 'ar' ? `تغيير المورد من ${oldSupplier} إلى ${newSupplier}` : `Supplier changed from ${oldSupplier} to ${newSupplier}`);
+        }
+
+        const oldCurrencyId = editingInvoice.currency_id || '';
+        const newCurrencyId = selectedCurrencyId || '';
+        if (oldCurrencyId !== newCurrencyId) {
+          const oldCurr = companyCurrencies.find(c => c.id === oldCurrencyId)?.code || oldCurrencyId || 'EGP';
+          const newCurr = companyCurrencies.find(c => c.id === newCurrencyId)?.code || newCurrencyId || 'EGP';
+          changes.push({
+            field: language === 'ar' ? 'العملة' : 'Currency',
+            old_value: oldCurr,
+            new_value: newCurr
+          });
+          detailsList.push(language === 'ar' ? `تغيير العملة من ${oldCurr} إلى ${newCurr}` : `Currency changed from ${oldCurr} to ${newCurr}`);
+        }
+
+        const oldRate = Number(editingInvoice.exchange_rate) || 1;
+        const newRate = Number(exchangeRate) || 1;
+        if (oldRate !== newRate) {
+          changes.push({
+            field: language === 'ar' ? 'سعر الصرف' : 'Exchange Rate',
+            old_value: oldRate,
+            new_value: newRate
+          });
+          detailsList.push(language === 'ar' ? `تغيير سعر الصرف من ${oldRate} إلى ${newRate}` : `Exchange rate changed from ${oldRate} to ${newRate}`);
+        }
+
+        const oldDiscount = Number(editingInvoice.discount_amount || editingInvoice.discount) || 0;
+        const newDiscount = Number(discount_amount) || 0;
+        if (oldDiscount !== newDiscount) {
+          changes.push({
+            field: language === 'ar' ? 'الخصم' : 'Discount',
+            old_value: oldDiscount,
+            new_value: newDiscount
+          });
+          detailsList.push(language === 'ar' ? `تغيير الخصم من ${oldDiscount} إلى ${newDiscount}` : `Discount changed from ${oldDiscount} to ${newDiscount}`);
+        }
+
+        const oldTax = Number(editingInvoice.tax_amount) || 0;
+        const newTax = Number(vatTotal) || 0;
+        if (oldTax !== newTax) {
+          changes.push({
+            field: language === 'ar' ? 'الضريبة' : 'Tax',
+            old_value: oldTax,
+            new_value: newTax
+          });
+          detailsList.push(language === 'ar' ? `تغيير قيمة الضريبة من ${oldTax} إلى ${newTax}` : `Tax amount changed from ${oldTax} to ${newTax}`);
+        }
+
+        const oldTotal = Number(editingInvoice.total_amount) || 0;
+        const newTotal = Number(total_amount) || 0;
+        if (oldTotal !== newTotal) {
+          changes.push({
+            field: language === 'ar' ? 'إجمالي الفاتورة' : 'Total Amount',
+            old_value: oldTotal,
+            new_value: newTotal
+          });
+          detailsList.push(language === 'ar' ? `تغيير الإجمالي من ${oldTotal} إلى ${newTotal}` : `Total amount changed from ${oldTotal} to ${newTotal}`);
+        }
+
+        const oldDesc = editingInvoice.description || '';
+        const newDesc = description || '';
+        if (oldDesc !== newDesc) {
+          changes.push({
+            field: language === 'ar' ? 'الوصف' : 'Description',
+            old_value: oldDesc || (language === 'ar' ? 'فارغ' : 'Empty'),
+            new_value: newDesc || (language === 'ar' ? 'فارغ' : 'Empty')
+          });
+          detailsList.push(language === 'ar' ? `تعديل وصف الفاتورة` : `Description updated`);
+        }
+
+        const oldItems = editingInvoice.items || [];
+        const newItems = sanitizedItems;
+        oldItems.forEach(oldItem => {
+          const idField = oldItem.product_id ? 'product_id' : 'expense_category_id';
+          const nameField = oldItem.product_id ? 'product_name' : 'category_name';
+          const stillExists = newItems.some(newItem => newItem[idField] === oldItem[idField]);
+          if (!stillExists) {
+            changes.push({
+              field: language === 'ar' ? 'حذف صنف' : 'Delete Item',
+              old_value: `${oldItem[nameField]} (${oldItem.quantity} × ${oldItem.unit_price})`,
+              new_value: language === 'ar' ? 'تم الحذف' : 'Deleted'
+            });
+            detailsList.push(language === 'ar' ? `حذف الصنف: ${oldItem[nameField]}` : `Deleted item: ${oldItem[nameField]}`);
+          }
+        });
+        newItems.forEach(newItem => {
+          const idField = newItem.product_id ? 'product_id' : 'expense_category_id';
+          const nameField = newItem.product_id ? 'product_name' : 'category_name';
+          const wasPresent = oldItems.some(oldItem => oldItem[idField] === newItem[idField]);
+          if (!wasPresent) {
+            changes.push({
+              field: language === 'ar' ? 'إضافة صنف' : 'Add Item',
+              old_value: language === 'ar' ? 'جديد' : 'New',
+              new_value: `${newItem[nameField]} (${newItem.quantity} × ${newItem.unit_price})`
+            });
+            detailsList.push(language === 'ar' ? `إضافة صنف جديد: ${newItem[nameField]}` : `Added new item: ${newItem[nameField]}`);
+          }
+        });
+        newItems.forEach(newItem => {
+          const idField = newItem.product_id ? 'product_id' : 'expense_category_id';
+          const nameField = newItem.product_id ? 'product_name' : 'category_name';
+          const oldItem = oldItems.find(oi => oi[idField] === newItem[idField]);
+          if (oldItem) {
+            const qtyChanged = Number(oldItem.quantity) !== Number(newItem.quantity);
+            const priceChanged = Number(oldItem.unit_price) !== Number(newItem.unit_price);
+            const opChanged = oldItem.operation_id !== newItem.operation_id;
+            const ccChanged = oldItem.cost_center_id !== newItem.cost_center_id;
+            const deptChanged = oldItem.department_id !== newItem.department_id;
+
+            if (qtyChanged || priceChanged || opChanged || ccChanged || deptChanged) {
+              const diffParts: string[] = [];
+              if (qtyChanged) diffParts.push(language === 'ar' ? `الكمية من ${oldItem.quantity} إلى ${newItem.quantity}` : `Qty from ${oldItem.quantity} to ${newItem.quantity}`);
+              if (priceChanged) diffParts.push(language === 'ar' ? `السعر من ${oldItem.unit_price} إلى ${newItem.unit_price}` : `Price from ${oldItem.unit_price} to ${newItem.unit_price}`);
+              if (opChanged) {
+                const oldOp = operations.find(o => o.id === oldItem.operation_id)?.operation_number || '-';
+                const newOp = operations.find(o => o.id === newItem.operation_id)?.operation_number || '-';
+                diffParts.push(language === 'ar' ? `العملية من ${oldOp} إلى ${newOp}` : `Operation from ${oldOp} to ${newOp}`);
+              }
+              if (ccChanged) {
+                const oldCc = costCenters.find(c => c.id === oldItem.cost_center_id)?.name || '-';
+                const newCc = costCenters.find(c => c.id === newItem.cost_center_id)?.name || '-';
+                diffParts.push(language === 'ar' ? `مركز التكلفة من ${oldCc} إلى ${newCc}` : `Cost center from ${oldCc} to ${newCc}`);
+              }
+              if (deptChanged) {
+                const oldDept = departments.find(d => d.id === oldItem.department_id)?.name || '-';
+                const newDept = departments.find(d => d.id === newItem.department_id)?.name || '-';
+                diffParts.push(language === 'ar' ? `الإدارة من ${oldDept} إلى ${newDept}` : `Department from ${oldDept} to ${newDept}`);
+              }
+              
+              changes.push({
+                field: (language === 'ar' ? 'تعديل صنف: ' : 'Edit Item: ') + newItem[nameField],
+                old_value: `${language === 'ar' ? 'الكمية:' : 'Qty:'} ${oldItem.quantity}، ${language === 'ar' ? 'السعر:' : 'Price:'} ${oldItem.unit_price}`,
+                new_value: `${language === 'ar' ? 'الكمية:' : 'Qty:'} ${newItem.quantity}، ${language === 'ar' ? 'السعر:' : 'Price:'} ${newItem.unit_price} (${diffParts.join('، ')})`
+              });
+              detailsList.push(language === 'ar' ? `تعديل تفاصيل الصنف: ${newItem[nameField]}` : `Updated details of item: ${newItem[nameField]}`);
+            }
+          }
+        });
+      }
 
       const data = {
         settlement_number: null,
@@ -1492,7 +1806,7 @@ export const PurchaseInvoices: React.FC = () => {
         date: invoiceData.date, 
         subtotal,
         discount_amount,
-        tax_amount: (invoiceData as any).tax_amount || 0,
+        tax_amount: vatTotal,
         total_amount,
         items: sanitizedItems,
         payment_type: invoiceData.payment_type,
@@ -1504,11 +1818,17 @@ export const PurchaseInvoices: React.FC = () => {
         payment_terms: paymentTerms,
         payment_terms_days: paymentTermsDays,
         advance_percentage: advancePercentage,
-        due_date: dueDate
+        due_date: dueDate,
+        operation_id: selectedOperationId || null,
+        department_id: selectedDepartmentId || null,
+        cost_center_id: selectedCostCenterId || null,
+        currency_id: selectedCurrencyId || null,
+        exchange_rate: Number(exchangeRate) || 1,
+        description: description
       };
 
-      // Journal items generation
       const journalItems: any[] = [];
+      const rate = Number(exchangeRate) || 1;
       let supplierAccountId = supplier?.account_id || '';
       let supplierAccountName = supplier?.account_name || 'حساب الموردين';
 
@@ -1516,7 +1836,7 @@ export const PurchaseInvoices: React.FC = () => {
         account_id: supplierAccountId,
         account_name: supplierAccountName,
         debit: 0,
-        credit: total_amount,
+        credit: Number((total_amount * rate).toFixed(2)),
         description: t('pi.invoice_description', { number: invoice_number, supplier: supplier?.name }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : ''),
         supplier_id: invoiceData.supplier_id,
         supplier_name: supplier?.name,
@@ -1531,19 +1851,18 @@ export const PurchaseInvoices: React.FC = () => {
           account_id: discountAccountId,
           account_name: discountAccount?.name || t('pi.discount_account_default'),
           debit: 0,
-          credit: invoiceData.discount,
+          credit: Number((invoiceData.discount * rate).toFixed(2)),
           description: t('pi.discount_description', { number: invoice_number }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : '')
         });
       }
 
-      const tax_amount = Number((data as any).tax_amount || 0);
       const vatGroup: Record<string, { account_id: string; account_name: string; amount: number }> = {};
       
       sanitizedItems.forEach(item => {
         const prod = products.find(p => p.id === item.product_id);
         const vatAccountId = prod?.vat_account_id || '';
         const vatAccountName = prod?.vat_account_name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Account');
-        const rateVal = prod?.vat_rate || 0;
+        const rateVal = Number(item.vat_rate) || 0;
         const itemTotal = Number(item.total) || 0;
         const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
         
@@ -1579,12 +1898,12 @@ export const PurchaseInvoices: React.FC = () => {
           journalItems.push({
             account_id: vat.account_id,
             account_name: vat.account_name,
-            debit: vat.amount,
+            debit: Number((vat.amount * rate).toFixed(2)),
             credit: 0,
             description: `ضريبة القيمة المضافة - فاتورة مشتريات رقم ${invoice_number}`
           });
         });
-      } else if (tax_amount > 0) {
+      } else if (vatTotal > 0) {
         const vatAccount = accounts.find(a => 
           a.name.includes('ضريبة القيمة المضافة') || 
           a.name.includes('قيمة مضافة') || 
@@ -1595,7 +1914,7 @@ export const PurchaseInvoices: React.FC = () => {
         journalItems.push({
           account_id: vatAccountId,
           account_name: vatAccountName,
-          debit: tax_amount,
+          debit: Number((vatTotal * rate).toFixed(2)),
           credit: 0,
           description: `ضريبة القيمة المضافة - فاتورة مشتريات رقم ${invoice_number}`
         });
@@ -1623,7 +1942,7 @@ export const PurchaseInvoices: React.FC = () => {
         journalItems.push({
           account_id: debitAccountId,
           account_name: debitAccountName,
-          debit: Number(item.total) || 0,
+          debit: Number((Number(item.total) * rate).toFixed(2)) || 0,
           credit: 0,
           description: t('pi.purchase_description', { name: item.product_name || item.category_name, number: invoice_number }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : '')
         });
@@ -1636,8 +1955,8 @@ export const PurchaseInvoices: React.FC = () => {
         journalItems.push({
           account_id: cashAccountId,
           account_name: cashAccountName,
-          debit: 0,
-          credit: total_amount,
+          debit: Number((total_amount * rate).toFixed(2)),
+          credit: 0,
           description: t('pi.payment_description', { number: invoice_number, supplier: supplier?.name }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : ''),
           sub_account_id: invoiceData.payment_method_id,
           sub_account_type: 'payment_method'
@@ -1645,7 +1964,7 @@ export const PurchaseInvoices: React.FC = () => {
         journalItems.push({
           account_id: supplierAccountId,
           account_name: supplierAccountName,
-          debit: total_amount,
+          debit: Number((total_amount * rate).toFixed(2)),
           credit: 0,
           description: t('pi.settlement_description', { number: invoice_number, supplier: supplier?.name }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : ''),
           supplier_id: invoiceData.supplier_id,
@@ -1691,16 +2010,13 @@ export const PurchaseInvoices: React.FC = () => {
         );
       }
 
-      // === TWO-WAY SYNC: Update receipt/payment vouchers with invoice-side settlements ===
       const savedInvoiceId = editingInvoice ? editingInvoice.id : (await dbService.list<any>('purchase_invoices', { company_id: user.company_id, invoice_number: invoice_number }))?.[0]?.id;
       
       if (savedInvoiceId && formSettlements.length > 0) {
         try {
-          // Group settlements by voucher (original_id)
           const voucherUpdates = new Map<string, { collection: string; settlements: any[] }>();
           
           for (const settlement of formSettlements) {
-            // target_id format: "${voucherId}-${idx}" 
             const targetId = settlement.target_id || '';
             const parts = targetId.split('-');
             if (parts.length < 2) continue;
@@ -1710,7 +2026,6 @@ export const PurchaseInvoices: React.FC = () => {
             
             if (isNaN(itemIdx)) continue;
             
-            // Determine collection based on settlement type
             const collection = settlement.type === 'receipts' ? 'receipt_vouchers' : 
                               settlement.type === 'payment_vouchers' ? 'payment_vouchers' : null;
             if (!collection) continue;
@@ -1726,7 +2041,6 @@ export const PurchaseInvoices: React.FC = () => {
             });
           }
           
-          // Update each voucher
           for (const [key, { collection, settlements }] of voucherUpdates) {
             const voucherId = key.split(':')[1];
             try {
@@ -1743,12 +2057,10 @@ export const PurchaseInvoices: React.FC = () => {
                 const item = { ...updatedItems[itemIdx] };
                 const existingSettlements = [...(item.settlements || [])];
                 
-                // Find existing settlement for this invoice
                 const existingIdx = existingSettlements.findIndex(
                   (es: any) => es.target_id === savedInvoiceId
                 );
                 
-                // Build the settlement object for the voucher side
                 const voucherSideSettlement = {
                   target_id: savedInvoiceId,
                   settled_amount: Number(s.settled_amount) || 0,
@@ -1784,7 +2096,6 @@ export const PurchaseInvoices: React.FC = () => {
         }
       }
       
-      // Handle removed settlements (when editing) - remove from vouchers
       if (editingInvoice && editingInvoice.settlements) {
         const oldSettlements = editingInvoice.settlements || [];
         const newTargetIds = new Set(formSettlements.map((s: any) => s.target_id));
@@ -1830,8 +2141,27 @@ export const PurchaseInvoices: React.FC = () => {
       showNotification(editingInvoice ? t('pi.edit_success') : t('pi.add_success'), 'success');
       closeModal();
 
-      if (!editingInvoice) {
-        dbService.logActivity(user.id, user.username, user.company_id, t('pi.log_add'), t('pi.log_add_activity', { number: invoice_number }), 'purchase_invoices');
+      if (editingInvoice) {
+        const logDetails = detailsList.join(' | ');
+        await dbService.logActivity(
+          user.id,
+          user.username,
+          user.company_id,
+          language === 'ar' ? 'تعديل فاتورة مشتريات' : 'Edit Purchase Invoice',
+          language === 'ar' ? `تعديل فاتورة مشتريات رقم ${invoice_number}: ${logDetails}` : `Updated Purchase Invoice #${invoice_number}: ${logDetails}`,
+          'purchase_invoices',
+          editingInvoice.id,
+          changes
+        );
+      } else {
+        await dbService.logActivity(
+          user.id,
+          user.username,
+          user.company_id,
+          t('pi.log_add'),
+          t('pi.log_add_activity', { number: invoice_number }),
+          'purchase_invoices'
+        );
       }
 
     } catch (e: any) {
@@ -1884,6 +2214,13 @@ export const PurchaseInvoices: React.FC = () => {
           discount: fullData.discount || 0,
           purchase_type: fullData.items?.[0]?.product_id ? 'items' : 'expenses'
         });
+        setSelectedOperationId(fullData.operation_id || '');
+        setSelectedDepartmentId(fullData.department_id || '');
+        setSelectedCostCenterId(fullData.cost_center_id || '');
+        setSelectedCurrencyId(fullData.currency_id || '');
+        setExchangeRate(fullData.exchange_rate || 1);
+        setExchangeRateType(fullData.exchange_rate_type || 'auto');
+        setDescription(fullData.description || '');
         setItems((fullData.items || []).map((item: any) => ({
           product_id: item.product_id?.toString(),
           expense_category_id: item.expense_category_id?.toString(),
@@ -1891,7 +2228,13 @@ export const PurchaseInvoices: React.FC = () => {
           category_name: item.category_name,
           quantity: item.quantity,
           cost_price: item.unit_price || item.cost_price || 0,
-          total: item.total
+          total: item.total,
+          barcode: item.barcode || '',
+          operation_id: item.operation_id || null,
+          department_id: item.department_id || null,
+          cost_center_id: item.cost_center_id || null,
+          vat_rate: item.vat_rate || 0,
+          vat_amount: item.vat_amount || 0
         })));
         setPaymentTerms(fullData.payment_terms || 'due_on_receipt');
         setPaymentTermsDays(fullData.payment_terms_days || 0);
@@ -1941,6 +2284,13 @@ export const PurchaseInvoices: React.FC = () => {
       setDueDate(newDate);
       const num = await generateInvoiceNumber(newDate);
       setInvoiceNumber(num);
+      setSelectedOperationId('');
+      setSelectedDepartmentId('');
+      setSelectedCostCenterId('');
+      setSelectedCurrencyId('');
+      setExchangeRate(1);
+      setExchangeRateType('auto');
+      setDescription('');
       isInitialLoad.current = true;
     }
     setIsModalOpen(true);
@@ -2038,6 +2388,14 @@ export const PurchaseInvoices: React.FC = () => {
     setRowSettlementDates({});
     setSelectedOrderIds([]);
     setPendingOrders([]);
+    setSelectedOperationId('');
+    setSelectedDepartmentId('');
+    setSelectedCostCenterId('');
+    setSelectedCurrencyId('');
+    setExchangeRate(1);
+    setExchangeRateType('auto');
+    setDescription('');
+    setActiveSearch(null);
   };
 
   const filteredInvoices = purchaseInvoices.filter(i => 
@@ -2925,45 +3283,39 @@ export const PurchaseInvoices: React.FC = () => {
                           </button>
                         </div>
 
-                        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                          <table className={`w-full ${t('dir') === 'rtl' ? 'text-right' : 'text-left'} border-collapse text-sm`}>
+                        <div className="overflow-x-auto rounded-xl border border-zinc-200 overflow-hidden shadow-sm">
+                          <table className="w-full text-sm text-right border-collapse table-fixed min-w-[1250px]">
                             <thead>
-                              <tr className="bg-slate-50 border-b border-slate-200">
-                                <th className="px-3 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest w-16 text-center">{t('common.image')}</th>
-                                <th className="px-3 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">{invoiceData.purchase_type === 'items' ? t('pi.item') : t('pi.expense_item')}</th>
-                                <th className="px-3 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest w-24 text-center">{t('pi.quantity')}</th>
-                                <th className="px-3 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest w-32 text-center">{t('pi.price')}</th>
-                                <th className={`px-3 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest w-32 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'}`}>{t('pi.total')}</th>
-                                <th className="px-3 py-4 w-12"></th>
+                              <tr className="bg-zinc-100 border-b border-zinc-200 text-zinc-700 text-xs font-bold">
+                                <th className="p-2 border-r border-zinc-200 text-right w-80 min-w-[320px]">{invoiceData.purchase_type === 'items' ? t('pi.item') : t('pi.expense_item')}</th>
+                                <th className="p-2 border-r border-zinc-200 text-center w-12">{t('common.image')}</th>
+                                <th className="p-2 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'باركود' : 'Barcode'}</th>
+                                <th className="p-2 border-r border-zinc-200 text-center w-28">{language === 'ar' ? 'رقم العملية' : 'Operation No'}</th>
+                                <th className="p-2 border-r border-zinc-200 text-center w-28">{language === 'ar' ? 'الإدارة' : 'Department'}</th>
+                                <th className="p-2 border-r border-zinc-200 text-center w-28">{language === 'ar' ? 'مركز التكلفة' : 'Cost Center'}</th>
+                                <th className="p-2 border-r border-zinc-200 text-center w-16">{t('pi.quantity')}</th>
+                                <th className="p-2 border-r border-zinc-200 text-center w-24">{t('pi.price')}</th>
+                                {isVatEnabled && (
+                                  <th className="p-2 border-r border-zinc-200 text-center w-14">ض ق م %</th>
+                                )}
+                                <th className="p-2 border-r border-zinc-200 text-center w-24">{t('pi.total')}</th>
+                                <th className="p-2 w-10"></th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 italic">
+                            <tbody className="divide-y divide-zinc-100">
                               {items.length === 0 ? (
                                 <tr>
-                                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400 italic font-medium">{t('pi.no_items_added')}</td>
+                                  <td colSpan={isVatEnabled ? 11 : 10} className="px-6 py-12 text-center text-slate-400 italic font-medium">{t('pi.no_items_added')}</td>
                                 </tr>
                               ) : items.map((item, index) => (
-                                <tr key={index} className="hover:bg-slate-50/50 transition-colors group">
-                                  <td className="px-3 py-3 text-center">
-                                    {invoiceData.purchase_type === 'items' && (item as any).product_image_url ? (
-                                      <img 
-                                        src={(item as any).product_image_url} 
-                                        alt="Product" 
-                                        className="w-10 h-10 object-cover rounded-lg mx-auto border border-slate-200 shadow-sm"
-                                        referrerPolicy="no-referrer"
-                                      />
-                                    ) : (
-                                      <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center mx-auto border border-slate-200">
-                                        <Box size={16} className="text-slate-300" />
-                                      </div>
-                                    )}
-                                  </td>
-                                  <td className="px-3 py-3">
+                                <tr key={index} className="group hover:bg-zinc-50 transition-colors">
+                                  {/* Item Name Dropdown */}
+                                  <td className="p-0.5 border-b border-r border-zinc-200 w-80 min-w-[320px]">
                                     <div className="relative">
                                       {invoiceData.purchase_type === 'items' ? (
                                         <select 
                                           required
-                                          className={`w-full ps-3 pe-8 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-800 appearance-none text-xs ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
+                                          className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-2 py-1 outline-none font-bold text-zinc-800 appearance-none transition-all text-xs"
                                           value={item.product_id || ''}
                                           onChange={(e) => {
                                             if (e.target.value === 'new_product') {
@@ -2980,7 +3332,7 @@ export const PurchaseInvoices: React.FC = () => {
                                       ) : (
                                         <select 
                                           required
-                                          className={`w-full ps-3 pe-8 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-800 appearance-none text-xs ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}
+                                          className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-2 py-1 outline-none font-bold text-zinc-800 appearance-none transition-all text-xs"
                                           value={item.expense_category_id || ''}
                                           onChange={(e) => {
                                             if (e.target.value === 'new_expense_category') {
@@ -2995,37 +3347,281 @@ export const PurchaseInvoices: React.FC = () => {
                                           <option value="new_expense_category" className="font-bold text-emerald-600">+ {t('expense_categories.add_new')}</option>
                                         </select>
                                       )}
-                                      <ChevronDown className="absolute end-2 top-2.5 w-3 h-3 text-slate-400 pointer-events-none" />
+                                      <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-2' : 'right-2'} top-2 w-3.5 h-3.5 text-zinc-400 pointer-events-none`} />
                                     </div>
                                   </td>
-                                  <td className="px-3 py-3">
+
+                                  {/* Image */}
+                                  <td className="p-0.5 border-b border-r border-zinc-200 w-12 text-center">
+                                    <div className="flex justify-center items-center">
+                                      {invoiceData.purchase_type === 'items' && (item as any).product_image_url ? (
+                                        <div className="relative group w-8 h-8">
+                                          <img src={(item as any).product_image_url} alt="" className="w-full h-full object-cover rounded shadow-sm" referrerPolicy="no-referrer" />
+                                          <button 
+                                            type="button"
+                                            onClick={() => updateItem(index, 'product_image_url', '')}
+                                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                          >
+                                            <X size={8} />
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center mx-auto border border-slate-200">
+                                          <Box size={14} className="text-slate-300" />
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  {/* Barcode */}
+                                  <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center">
+                                    <div className="flex flex-col items-center gap-0.5">
+                                      <input 
+                                        type="text" 
+                                        placeholder={language === 'ar' ? 'الباركود...' : 'Barcode...'}
+                                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-2 py-1 text-center font-bold text-xs text-zinc-800 outline-none transition-all font-mono"
+                                        value={(item as any).barcode || ''}
+                                        onChange={(e) => updateItem(index, 'barcode', e.target.value)}
+                                      />
+                                      {(item as any).barcode && (
+                                        <div className="bg-white p-0.5 rounded border border-zinc-100 shadow-sm scale-90">
+                                          <Barcode 
+                                            value={(item as any).barcode} 
+                                            width={0.5} 
+                                            height={10} 
+                                            fontSize={4}
+                                            margin={0}
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  {/* Operation */}
+                                  <td className="p-0.5 border-b border-r border-zinc-200 w-28 text-center">
+                                    <div className="flex items-center gap-1 w-full relative">
+                                      <div className="relative flex-1">
+                                        <input 
+                                          type="text" 
+                                          placeholder={language === 'ar' ? 'ابحث...' : 'Search...'}
+                                          className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-2 py-1 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
+                                          value={
+                                            activeSearch && activeSearch.index === index && activeSearch.type === 'operation'
+                                              ? activeSearch.query
+                                              : (operations.find(op => op.id === (item as any).operation_id)?.operation_number || '')
+                                          }
+                                          onChange={(e) => {
+                                            setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
+                                          }}
+                                          onFocus={(e) => {
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            const dropdownWidth = 420;
+                                            let left = rect.left;
+                                            if (dir === 'rtl') {
+                                              left = rect.left + rect.width - dropdownWidth;
+                                            }
+                                            left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
+                                            setActiveSearch({
+                                              index,
+                                              type: 'operation',
+                                              query: operations.find(op => op.id === (item as any).operation_id)?.operation_number || ''
+                                            });
+                                            setPopoverRect({
+                                              top: rect.bottom,
+                                              left: left,
+                                              width: dropdownWidth
+                                            });
+                                          }}
+                                        />
+                                        {(item as any).operation_id && (
+                                          <button
+                                            type="button"
+                                            onClick={() => updateItem(index, 'operation_id', '')}
+                                            className={`absolute ${dir === 'rtl' ? 'left-1' : 'right-1'} inset-y-0 flex items-center px-1 text-zinc-400 hover:text-red-505`}
+                                          >
+                                            <X size={10} />
+                                          </button>
+                                        )}
+                                      </div>
+                                      {(item as any).operation_id && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setIsModalOpen(false);
+                                            setPendingViewDoc({ type: 'operation', idOrNumber: (item as any).operation_id! });
+                                            setCurrentPage('operations');
+                                          }}
+                                          className="p-0.5 hover:bg-zinc-100 rounded text-zinc-400 hover:text-emerald-600 transition-colors flex-shrink-0"
+                                          title={language === 'ar' ? 'انتقال إلى العملية' : 'Go to operation'}
+                                        >
+                                          <ExternalLink size={12} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  {/* Department */}
+                                  <td className="p-0.5 border-b border-r border-zinc-200 w-28 text-center">
+                                    <div className="flex items-center gap-1 w-full relative">
+                                      <div className="relative flex-1">
+                                        <input 
+                                          type="text" 
+                                          placeholder={language === 'ar' ? 'ابحث...' : 'Search...'}
+                                          className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-2 py-1 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
+                                          value={
+                                            activeSearch && activeSearch.index === index && activeSearch.type === 'department'
+                                              ? activeSearch.query
+                                              : (departments.find(d => d.id === (item as any).department_id)?.name || '')
+                                          }
+                                          onChange={(e) => {
+                                            setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
+                                          }}
+                                          onFocus={(e) => {
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            const dropdownWidth = 350;
+                                            let left = rect.left;
+                                            if (dir === 'rtl') {
+                                              left = rect.left + rect.width - dropdownWidth;
+                                            }
+                                            left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
+                                            setActiveSearch({
+                                              index,
+                                              type: 'department',
+                                              query: departments.find(d => d.id === (item as any).department_id)?.name || ''
+                                            });
+                                            setPopoverRect({
+                                              top: rect.bottom,
+                                              left: left,
+                                              width: dropdownWidth
+                                            });
+                                          }}
+                                        />
+                                        {(item as any).department_id && (
+                                          <button
+                                            type="button"
+                                            onClick={() => updateItem(index, 'department_id', '')}
+                                            className={`absolute ${dir === 'rtl' ? 'left-1' : 'right-1'} inset-y-0 flex items-center px-1 text-zinc-400 hover:text-red-550`}
+                                          >
+                                            <X size={10} />
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  {/* Cost Center */}
+                                  <td className="p-0.5 border-b border-r border-zinc-200 w-28 text-center">
+                                    <div className="flex items-center gap-1 w-full relative">
+                                      <div className="relative flex-1">
+                                        <input 
+                                          type="text" 
+                                          placeholder={language === 'ar' ? 'ابحث...' : 'Search...'}
+                                          className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-2 py-1 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
+                                          value={
+                                            activeSearch && activeSearch.index === index && activeSearch.type === 'cost_center'
+                                              ? activeSearch.query
+                                              : (costCenters.find(cc => cc.id === (item as any).cost_center_id)?.name || '')
+                                          }
+                                          onChange={(e) => {
+                                            setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
+                                          }}
+                                          onFocus={(e) => {
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            const dropdownWidth = 350;
+                                            let left = rect.left;
+                                            if (dir === 'rtl') {
+                                              left = rect.left + rect.width - dropdownWidth;
+                                            }
+                                            left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
+                                            setActiveSearch({
+                                              index,
+                                              type: 'cost_center',
+                                              query: costCenters.find(cc => cc.id === (item as any).cost_center_id)?.name || ''
+                                            });
+                                            setPopoverRect({
+                                              top: rect.bottom,
+                                              left: left,
+                                              width: dropdownWidth
+                                            });
+                                          }}
+                                        />
+                                        {(item as any).cost_center_id && (
+                                          <button
+                                            type="button"
+                                            onClick={() => updateItem(index, 'cost_center_id', '')}
+                                            className={`absolute ${dir === 'rtl' ? 'left-1' : 'right-1'} inset-y-0 flex items-center px-1 text-zinc-400 hover:text-red-500`}
+                                          >
+                                            <X size={10} />
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  {/* Quantity */}
+                                  <td className="p-0.5 border-b border-r border-zinc-200 w-16">
                                     <input 
                                       required
                                       type="number" 
                                       step="any"
-                                      className="w-full bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 px-3 py-2 text-xs outline-none text-center font-bold text-slate-800 transition-all border-dashed"
-                                      value={item.quantity}
-                                      onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
+                                      className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-2 py-1 text-center font-black text-zinc-900 outline-none transition-all text-xs"
+                                      value={item.quantity !== undefined && item.quantity !== null ? Number(item.quantity) : ''}
+                                      onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
                                     />
                                   </td>
-                                  <td className="px-3 py-3">
+
+                                  {/* Price */}
+                                  <td className="p-0.5 border-b border-r border-zinc-200 w-24">
                                     <input 
                                       required
-                                      type="number" 
-                                      step="any"
-                                      className="w-full bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 px-3 py-2 text-xs outline-none text-center font-bold text-slate-800 transition-all border-dashed"
-                                      value={item.cost_price}
-                                      onChange={(e) => updateItem(index, 'cost_price', Number(e.target.value))}
+                                      type="text" 
+                                      className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-2 py-1 text-center font-bold text-zinc-800 outline-none transition-all text-xs font-mono"
+                                      value={focusedPriceIndex === index ? tempPriceValue : formatMoney(item.cost_price)}
+                                      onFocus={() => {
+                                        setFocusedPriceIndex(index);
+                                        setTempPriceValue(item.cost_price ? String(item.cost_price) : '');
+                                      }}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (/^\d*\.?\d*$/.test(val)) {
+                                          setTempPriceValue(val);
+                                          updateItem(index, 'cost_price', parseFloat(val) || 0);
+                                        }
+                                      }}
+                                      onBlur={() => {
+                                        setFocusedPriceIndex(null);
+                                      }}
                                     />
                                   </td>
-                                  <td className={`px-3 py-3 font-bold text-slate-900 text-xs ${t('dir') === 'rtl' ? 'text-left' : 'text-right'}`}>
-                                    {formatNumber(item.total || 0)}
+
+                                  {/* VAT % */}
+                                  {isVatEnabled && (
+                                    <td className="p-0.5 border-b border-r border-zinc-200 w-14">
+                                      <div className="flex items-center justify-center gap-0.5">
+                                        <input 
+                                          type="number" 
+                                          min={0}
+                                          max={100}
+                                          className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs"
+                                          value={(item as any).vat_rate !== undefined && (item as any).vat_rate !== null ? Number((item as any).vat_rate) : 0}
+                                          onChange={(e) => updateItem(index, 'vat_rate', parseFloat(e.target.value) || 0)}
+                                        />
+                                        <span className="text-sm text-zinc-900 font-black">%</span>
+                                      </div>
+                                    </td>
+                                  )}
+
+                                  {/* Total */}
+                                  <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-emerald-600 text-xs">
+                                    {formatMoney(item.total || 0)}
                                   </td>
-                                  <td className="px-3 py-3 text-center">
+
+                                  {/* Delete button */}
+                                  <td className="p-0.5 border-b border-zinc-200 w-10 text-center">
                                     <button 
                                       type="button"
                                       onClick={() => removeItem(index)}
-                                      className="p-1.5 text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                      className="p-1 text-zinc-300 hover:text-red-500 transition-colors"
                                     >
                                       <Trash2 size={14} />
                                     </button>
@@ -3322,6 +3918,117 @@ export const PurchaseInvoices: React.FC = () => {
                       </button>
                     </div>
                   </form>
+
+                  {/* Floating Autocomplete Popover */}
+                  {activeSearch && popoverRect && (
+                    <div 
+                      className="fixed z-[100] bg-white border border-zinc-200 rounded-2xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto"
+                      style={{
+                        top: `${popoverRect.top + window.scrollY}px`,
+                        left: `${popoverRect.left + window.scrollX}px`,
+                        width: `${popoverRect.width}px`
+                      }}
+                    >
+                      {activeSearch.type === 'operation' && (() => {
+                        const q = activeSearch.query.toLowerCase().trim();
+                        const filtered = operations.filter(op => 
+                          op.operation_number?.toLowerCase().includes(q) || 
+                          op.description?.toLowerCase().includes(q)
+                        );
+                        return (
+                          <div className="divide-y divide-zinc-100">
+                            {filtered.map(op => (
+                              <button
+                                key={op.id}
+                                type="button"
+                                onClick={() => {
+                                  if (activeSearch.index === -1) {
+                                    setSelectedOperationId(op.id);
+                                  } else {
+                                    updateItem(activeSearch.index, 'operation_id', op.id);
+                                  }
+                                  setActiveSearch(null);
+                                }}
+                                className="w-full px-4 py-2.5 text-right hover:bg-zinc-50 transition-colors flex items-center justify-between text-xs font-bold"
+                              >
+                                <span className="text-zinc-900">{op.operation_number}</span>
+                                <span className="text-zinc-400 font-normal truncate max-w-[200px]">{op.description || '-'}</span>
+                              </button>
+                            ))}
+                            {filtered.length === 0 && (
+                              <div className="p-4 text-center text-zinc-400 italic text-xs">{t('common.no_results')}</div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      {activeSearch.type === 'department' && (() => {
+                        const q = activeSearch.query.toLowerCase().trim();
+                        const filtered = departments.filter(d => 
+                          d.name.toLowerCase().includes(q) || 
+                          d.code?.toLowerCase().includes(q)
+                        );
+                        return (
+                          <div className="divide-y divide-zinc-100">
+                            {filtered.map(d => (
+                              <button
+                                key={d.id}
+                                type="button"
+                                onClick={() => {
+                                  if (activeSearch.index === -1) {
+                                    setSelectedDepartmentId(d.id);
+                                  } else {
+                                    updateItem(activeSearch.index, 'department_id', d.id);
+                                  }
+                                  setActiveSearch(null);
+                                }}
+                                className="w-full px-4 py-2.5 text-right hover:bg-zinc-50 transition-colors flex items-center justify-between text-xs font-bold"
+                              >
+                                <span className="text-zinc-900">{d.name}</span>
+                                <span className="text-zinc-400 font-normal font-mono">{d.code || '-'}</span>
+                              </button>
+                            ))}
+                            {filtered.length === 0 && (
+                              <div className="p-4 text-center text-zinc-400 italic text-xs">{t('common.no_results')}</div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      {activeSearch.type === 'cost_center' && (() => {
+                        const q = activeSearch.query.toLowerCase().trim();
+                        const filtered = costCenters.filter(cc => 
+                          cc.name.toLowerCase().includes(q) || 
+                          cc.code?.toLowerCase().includes(q)
+                        );
+                        return (
+                          <div className="divide-y divide-zinc-100">
+                            {filtered.map(cc => (
+                              <button
+                                key={cc.id}
+                                type="button"
+                                onClick={() => {
+                                  if (activeSearch.index === -1) {
+                                    setSelectedCostCenterId(cc.id);
+                                  } else {
+                                    updateItem(activeSearch.index, 'cost_center_id', cc.id);
+                                  }
+                                  setActiveSearch(null);
+                                }}
+                                className="w-full px-4 py-2.5 text-right hover:bg-zinc-50 transition-colors flex items-center justify-between text-xs font-bold"
+                              >
+                                <span className="text-zinc-900">{cc.name}</span>
+                                <span className="text-zinc-400 font-normal font-mono">{cc.code || '-'}</span>
+                              </button>
+                            ))}
+                            {filtered.length === 0 && (
+                              <div className="p-4 text-center text-zinc-400 italic text-xs">{t('common.no_results')}</div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

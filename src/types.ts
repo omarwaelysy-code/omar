@@ -469,6 +469,9 @@ export interface Return {
   items?: ReturnItem[];
   company_id: string;
   entry_number?: string;
+  operation_id?: string | null;
+  department_id?: string | null;
+  cost_center_id?: string | null;
 }
 
 export interface PurchaseReturn {
@@ -504,6 +507,14 @@ export interface ReturnItem {
   unit_price: number;
   price?: number; // Keep price for backward compatibility if needed
   total: number;
+  barcode?: string;
+  image_url?: string;
+  operation_id?: string | null;
+  department_id?: string | null;
+  cost_center_id?: string | null;
+  description?: string;
+  vat_rate?: number;
+  vat_amount?: number;
 }
 
 export interface CustomerDiscount {
@@ -646,6 +657,9 @@ export interface JournalEntryItem {
   supplier_name?: string;
   sub_account_id?: string;
   sub_account_type?: 'customer' | 'supplier' | 'payment_method' | 'expense' | 'other';
+  operation_id?: string | null;
+  department_id?: string | null;
+  cost_center_id?: string | null;
 }
 
 export interface TrialBalanceItem {
@@ -742,6 +756,12 @@ export interface SalesOrder {
   company_id: string;
   created_by?: string;
   created_at?: string;
+  currency_id?: string | null;
+  exchange_rate?: number;
+  exchange_rate_type?: 'auto' | 'manual';
+  operation_id?: string | null;
+  cost_center_id?: string | null;
+  department_id?: string | null;
 }
 
 export interface SalesOrderItem {
@@ -756,6 +776,10 @@ export interface SalesOrderItem {
   total: number;
   barcode?: string;
   image_url?: string;
+  operation_id?: string | null;
+  cost_center_id?: string | null;
+  department_id?: string | null;
+  description?: string | null;
 }
 
 export interface PurchaseOrder {
@@ -779,6 +803,12 @@ export interface PurchaseOrder {
   company_id: string;
   created_by?: string;
   created_at?: string;
+  currency_id?: string | null;
+  exchange_rate?: number;
+  exchange_rate_type?: 'auto' | 'manual';
+  operation_id?: string | null;
+  cost_center_id?: string | null;
+  department_id?: string | null;
 }
 
 export interface PurchaseOrderItem {
@@ -793,6 +823,10 @@ export interface PurchaseOrderItem {
   total: number;
   barcode?: string;
   image_url?: string;
+  operation_id?: string | null;
+  cost_center_id?: string | null;
+  department_id?: string | null;
+  description?: string | null;
 }
 
 export interface EmployeeDocument {

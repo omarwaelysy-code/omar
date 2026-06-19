@@ -2,14 +2,21 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Supplier, Product, PaymentMethod, JournalEntry, JournalEntryItem, Account, Company } from '../types';
-import { Search, Plus, Trash2, X, RotateCcw, User, CreditCard, Calendar, Hash, Package, Save, Eye, Download, History, Printer, Edit, Phone, Mail, MapPin, Wallet, Box, Maximize2, Minimize2, ChevronRight, ChevronLeft, FileText, Layers, ChevronDown, LayoutGrid, List } from 'lucide-react';
+import { Supplier, Product, PaymentMethod, JournalEntry, JournalEntryItem, Account, Company, Operation, Department, CostCenter, Currency, ExchangeRate } from '../types';
+import { 
+  Search, Plus, Trash2, X, RotateCcw, User, CreditCard, Calendar, Hash, Package, 
+  Save, Eye, Download, History, Printer, Edit, Phone, Mail, MapPin, Wallet, Box, 
+  Maximize2, Minimize2, ChevronRight, ChevronLeft, FileText, Layers, ChevronDown, 
+  LayoutGrid, List, CheckCheck, Coins, ImageIcon, ExternalLink, ChevronUp, Copy
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Barcode from 'react-barcode';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
-import { dbService } from '../services/dbService';
+import { dbService, apiRequest } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
+import { InlineActivityLog } from '../components/InlineActivityLog';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { ExportButtons } from '../components/ExportButtons';
 import { TransactionManager } from '../services/TransactionManager';
@@ -25,96 +32,117 @@ export const PurchaseReturns: React.FC = () => {
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
   const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
+
+  // Catalogs
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [purchaseReturns, setPurchaseReturns] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [operations, setOperations] = useState<Operation[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
+  const [companyCurrencies, setCompanyCurrencies] = useState<Currency[]>([]);
+
+  // Multi-Currency & Exchange Rate
+  const [selectedCurrencyId, setSelectedCurrencyId] = useState<string>('');
+  const [exchangeRate, setExchangeRate] = useState<number>(1);
+  const [exchangeRateType, setExchangeRateType] = useState<'manual' | 'auto'>('manual');
+
+  // UI state
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewReturn, setViewReturn] = useState<any | null>(null);
   const [view, setView] = useState<'table' | 'card'>('table');
+  const [showAiInput, setShowAiInput] = useState(false);
 
   const [editingReturn, setEditingReturn] = useState<any | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [returnToDelete, setReturnToDelete] = useState<string | null>(null);
+  
   const returnRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const handleSort = (field: string) => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
-    } else {
-      setSortBy(field);
-      setSortOrder('DESC');
-    }
-    setPage(1);
-  };
-  
+
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
   const [sortBy, setSortBy] = useState('date');
   const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
   const [totalRecords, setTotalRecords] = useState(0);
   const [serverSummary, setServerSummary] = useState<any>({});
-  const [maxSeqGenerated, setMaxSeqGenerated] = useState<number>(0);
   const [returnNumber, setReturnNumber] = useState('');
   const [company, setCompany] = useState<Company | null>(null);
 
-  useEffect(() => {
-    const fetchCompany = async () => {
-      if (user?.company_id) {
-        const companyData = await dbService.get<Company>('companies', user.company_id);
-        setCompany(companyData);
-      }
-    };
-    fetchCompany();
-  }, [user?.company_id]);
+  // Form State
+  const [returnData, setReturnData] = useState({
+    supplier_id: '',
+    warehouse_id: '',
+    date: new Date().toISOString().slice(0, 10),
+    payment_type: 'credit' as 'credit' | 'cash',
+    payment_method_id: '',
+    notes: ''
+  });
+  const [items, setItems] = useState<any[]>([]);
+  const [discount, setDiscount] = useState<number>(0);
+  const [description, setDescription] = useState<string>('');
 
-  const generateReturnNumber = async (selectedDate: string) => {
-    return await dbService.getNextSequence('purchase_returns', selectedDate);
-  };
+  // Floating popover lookup search states
+  const [activeSearch, setActiveSearch] = useState<{
+    index: number;
+    type: 'operation' | 'department' | 'cost_center';
+    query: string;
+  } | null>(null);
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setEditingReturn(null);
-    setReturnData({
-      supplier_id: '',
-      warehouse_id: '',
-      date: new Date().toISOString().slice(0, 10),
-      payment_type: 'credit',
-      payment_method_id: '',
-      notes: ''
-    });
-    setItems([{ product_id: '', quantity: 1, cost_price: 0 }]);
-  };
+  const [popoverRect, setPopoverRect] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
 
-  const handlePrevReturn = () => {
-    if (!editingReturn) return;
-    const currentIndex = purchaseReturns.findIndex(r => r.id === editingReturn.id);
-    if (currentIndex > 0) {
-      const prev = purchaseReturns[currentIndex - 1];
-      handleEdit(prev);
-    }
-  };
+  const [selectedOperationId, setSelectedOperationId] = useState<string>('');
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
+  const [selectedCostCenterId, setSelectedCostCenterId] = useState<string>('');
 
-  const handleNextReturn = () => {
-    if (!editingReturn) return;
-    const currentIndex = purchaseReturns.findIndex(r => r.id === editingReturn.id);
-    if (currentIndex < purchaseReturns.length - 1) {
-      const next = purchaseReturns[currentIndex + 1];
-      handleEdit(next);
-    }
-  };
-  
+  const [focusedPriceIndex, setFocusedPriceIndex] = useState<number | null>(null);
+  const [tempPriceValue, setTempPriceValue] = useState<string>('');
+
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isPaymentMethodModalOpen, setIsPaymentMethodModalOpen] = useState(false);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [showSidePanel, setShowSidePanel] = useState(false);
+  const [isPanelExpanded, setIsPanelExpanded] = useState(false);
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
+  
   const [previewJournalEntry, setPreviewJournalEntry] = useState<JournalEntry | null>(null);
   const [previewActivityLog, setPreviewActivityLog] = useState<Partial<ActivityLog> | null>(null);
+
+  // States and effect for offscreen PDF generation
+  const [pdfReturn, setPdfReturn] = useState<any | null>(null);
+  const pdfReturnRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (pdfReturn && pdfReturnRef.current) {
+      const generatePDF = async () => {
+        try {
+          await exportToPDFUtil(pdfReturnRef.current!, {
+            filename: `${pdfReturn.return_number}.pdf`,
+            margin: 10,
+            orientation: 'portrait',
+            reportTitle: `مرتجع مشتريات رقم: ${pdfReturn.return_number}`
+          });
+        } catch (e) {
+          console.error('PDF Export Error:', e);
+          showNotification('حدث خطأ أثناء تصدير PDF', 'error');
+        } finally {
+          setPdfReturn(null);
+        }
+      };
+      const timer = setTimeout(generatePDF, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [pdfReturn]);
 
   const [supplierFormData, setSupplierFormData] = useState({
     name: '',
@@ -145,18 +173,72 @@ export const PurchaseReturns: React.FC = () => {
     opening_balance: 0
   });
 
-  const [returnData, setReturnData] = useState({
-    supplier_id: '',
-    warehouse_id: '',
-    date: new Date().toISOString().slice(0, 10),
-    payment_type: 'credit' as 'credit' | 'cash',
-    payment_method_id: '',
-    notes: ''
-  });
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(field);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
 
-  const [items, setItems] = useState<{ product_id: string; quantity: number; cost_price: number }[]>([]);
-  const [warehouses, setWarehouses] = useState<any[]>([]);
+  useEffect(() => {
+    const fetchCompany = async () => {
+      if (user?.company_id) {
+        const companyData = await dbService.get<Company>('companies', user.company_id);
+        setCompany(companyData);
+      }
+    };
+    fetchCompany();
+  }, [user?.company_id]);
 
+  const generateReturnNumber = async (selectedDate: string) => {
+    return await dbService.getNextSequence('purchase_returns', selectedDate);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingReturn(null);
+    setReturnData({
+      supplier_id: '',
+      warehouse_id: '',
+      date: new Date().toISOString().slice(0, 10),
+      payment_type: 'credit',
+      payment_method_id: '',
+      notes: ''
+    });
+    setItems([]);
+    setSelectedOperationId('');
+    setSelectedDepartmentId('');
+    setSelectedCostCenterId('');
+    setSelectedCurrencyId('');
+    setExchangeRate(1);
+    setExchangeRateType('manual');
+    setDescription('');
+    setDiscount(0);
+    setShowAiInput(false);
+  };
+
+  const handlePrevReturn = () => {
+    if (!editingReturn) return;
+    const currentIndex = purchaseReturns.findIndex(r => r.id === editingReturn.id);
+    if (currentIndex > 0) {
+      const prev = purchaseReturns[currentIndex - 1];
+      handleEdit(prev);
+    }
+  };
+
+  const handleNextReturn = () => {
+    if (!editingReturn) return;
+    const currentIndex = purchaseReturns.findIndex(r => r.id === editingReturn.id);
+    if (currentIndex < purchaseReturns.length - 1) {
+      const next = purchaseReturns[currentIndex + 1];
+      handleEdit(next);
+    }
+  };
+
+  // Subscriptions
   useEffect(() => {
     if (user) {
       const unsubPR = dbService.subscribePaginated('purchase_returns', {
@@ -176,6 +258,10 @@ export const PurchaseReturns: React.FC = () => {
       const unsubPM = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setPaymentMethods);
       const unsubAccounts = dbService.subscribe<any>('accounts', user.company_id, setAccounts);
       const unsubWarehouses = dbService.subscribe<any>('warehouses', user.company_id, setWarehouses);
+      const unsubOps = dbService.subscribe<Operation>('operations', user.company_id, setOperations);
+      const unsubDepts = dbService.subscribe<Department>('departments', user.company_id, setDepartments);
+      const unsubCC = dbService.subscribe<CostCenter>('cost_centers', user.company_id, setCostCenters);
+      const unsubCurrencies = dbService.subscribe<Currency>('currencies', user.company_id, setCompanyCurrencies);
       
       setLoading(false);
       return () => {
@@ -185,9 +271,134 @@ export const PurchaseReturns: React.FC = () => {
         unsubPM();
         unsubAccounts();
         unsubWarehouses();
+        unsubOps();
+        unsubDepts();
+        unsubCC();
+        unsubCurrencies();
       };
     }
   }, [user, page, limit, sortBy, sortOrder, searchTerm]);
+
+  const isVatEnabled = company?.settings?.vat_enabled || company?.vat_enabled || false;
+  const isMultiCurrencyEnabled = company?.settings?.enable_multi_currency || (company as any)?.enable_multi_currency || false;
+
+  const prevExchangeRateRef = useRef<number>(1);
+  const isInitializingRef = useRef<boolean>(true);
+
+  // Initialize refs when modal opens
+  useEffect(() => {
+    if (isModalOpen) {
+      isInitializingRef.current = true;
+      prevExchangeRateRef.current = exchangeRate || 1;
+    }
+  }, [isModalOpen]);
+
+  // Recalculate item prices when exchange rate changes dynamically
+  useEffect(() => {
+    if (isModalOpen) {
+      if (isInitializingRef.current) {
+        isInitializingRef.current = false;
+        prevExchangeRateRef.current = exchangeRate || 1;
+        return;
+      }
+
+      const prevRate = prevExchangeRateRef.current;
+      if (prevRate !== exchangeRate && exchangeRate > 0 && prevRate > 0) {
+        setItems(prevItems => prevItems.map(item => {
+          const currentPrice = Number(item.unit_price) || 0;
+          const newPrice = Number((currentPrice * (prevRate / exchangeRate)).toFixed(4));
+          const vatRate = Number(item.vat_rate) || 0;
+          const total = Number(((item.quantity || 0) * newPrice).toFixed(4));
+          const vatAmount = Number((total * (vatRate / 100)).toFixed(4));
+          return {
+            ...item,
+            unit_price: newPrice,
+            total: total,
+            vat_amount: vatAmount
+          };
+        }));
+      }
+      prevExchangeRateRef.current = exchangeRate;
+    }
+  }, [exchangeRate, isModalOpen]);
+
+  // Currency Handler
+  const handleCurrencyChange = async (currencyId: string) => {
+    setSelectedCurrencyId(currencyId);
+    if (!currencyId || !user?.company_id || !company) {
+      setExchangeRate(1);
+      return;
+    }
+    
+    const currency = companyCurrencies.find(c => c.id === currencyId);
+    if (!currency) {
+      setExchangeRate(1);
+      return;
+    }
+    
+    const baseCurrency = company?.settings?.currency || 'EGP';
+    if (currency.code.toLowerCase() === baseCurrency.toLowerCase()) {
+      setExchangeRate(1);
+      setExchangeRateType('manual');
+      return;
+    }
+
+    const updateMethod = company?.settings?.exchange_rate_update_method || 'manual';
+    setExchangeRateType(updateMethod);
+
+    if (updateMethod === 'auto') {
+      try {
+        const latestAutoRates = await apiRequest<Array<{
+          currency_id: string;
+          rate: number | null;
+          rate_date: string | null;
+        }>>(`/currency-rates/latest?company_id=${user.company_id}`);
+        const rateObj = latestAutoRates.find(r => r.currency_id === currencyId);
+        if (rateObj && rateObj.rate !== null) {
+          setExchangeRate(Number(rateObj.rate));
+        } else {
+          // fallback to manual rate
+          const manualRates = await dbService.list<ExchangeRate>('exchange_rates', {
+            currency_id: currencyId,
+            company_id: user.company_id,
+            _limit: 1,
+            _sort: 'rate_date',
+            _order: 'desc'
+          });
+          if (manualRates.length > 0) {
+            setExchangeRate(Number(manualRates[0].exchange_rate));
+          } else {
+            setExchangeRate(1);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching auto rate:', error);
+        setExchangeRate(1);
+      }
+    } else {
+      // manual update method
+      try {
+        const manualRates = await dbService.list<ExchangeRate>('exchange_rates', {
+          currency_id: currencyId,
+          company_id: user.company_id,
+          _limit: 1,
+          _sort: 'rate_date',
+          _order: 'desc'
+        });
+        if (manualRates.length > 0) {
+          setExchangeRate(Number(manualRates[0].exchange_rate));
+        } else {
+          setExchangeRate(1);
+        }
+      } catch (error) {
+        console.error('Error fetching manual rate:', error);
+        setExchangeRate(1);
+      }
+    }
+  };
+
+  const selectedCurr = companyCurrencies.find(c => c.id === selectedCurrencyId);
+  const currentInvoiceCurrencyCode = (selectedCurr?.code || company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase();
 
   // Real-time Preview Logic
   useEffect(() => {
@@ -206,7 +417,12 @@ export const PurchaseReturns: React.FC = () => {
     }
 
     const generatePreview = () => {
-      const total_amount = (items || []).reduce((sum, item) => sum + (item.quantity * item.cost_price), 0);
+      const subtotal = (items || []).reduce((sum, item) => sum + ((item.quantity || 0) * (item.unit_price || 0)), 0);
+      const vatTotal = isVatEnabled
+        ? Number((items || []).reduce((sum, item) => sum + (Number(item.vat_amount) || 0), 0).toFixed(2))
+        : 0;
+      const total_amount = Number(subtotal + vatTotal - discount) || 0;
+
       if (total_amount <= 0) {
         setPreviewJournalEntry(null);
         setPreviewActivityLog(null);
@@ -263,12 +479,16 @@ export const PurchaseReturns: React.FC = () => {
           creditAccountName = product?.cost_account_name || 'حساب المشتريات';
         }
 
+        const itemTotal = (Number(item.quantity) || 0) * (Number(item.unit_price) || 0);
         journalItems.push({
           account_id: creditAccountId,
           account_name: creditAccountName,
           debit: 0,
-          credit: item.quantity * item.cost_price,
-          description: `مرتجع مشتريات صنف: ${product?.name || '...'} - مرتجع ${return_number}`
+          credit: itemTotal,
+          description: `مرتجع مشتريات صنف: ${product?.name || '...'} - مرتجع ${return_number}`,
+          operation_id: item.operation_id || null,
+          department_id: item.department_id || null,
+          cost_center_id: item.cost_center_id || null
         });
       });
 
@@ -289,10 +509,28 @@ export const PurchaseReturns: React.FC = () => {
     };
 
     generatePreview();
-  }, [isModalOpen, items, returnData.supplier_id, returnData.date, user, suppliers, products, accounts]);
+  }, [isModalOpen, items, returnData.supplier_id, returnData.date, returnData.payment_type, returnData.payment_method_id, discount, user, suppliers, products, accounts]);
 
-  const addItem = () => {
-    setItems(prev => [...prev, { product_id: '', quantity: 1, cost_price: 0 }]);
+  const addEmptyRow = () => {
+    setItems((prev) => [
+      ...prev,
+      {
+        product_id: '',
+        product_name: '',
+        product_code: '',
+        product_image_url: '',
+        barcode: '',
+        image_url: '',
+        quantity: 1,
+        unit_price: 0,
+        total: 0,
+        vat_rate: 0,
+        vat_amount: 0,
+        operation_id: selectedOperationId || null,
+        department_id: selectedDepartmentId || null,
+        cost_center_id: selectedCostCenterId || null,
+      },
+    ]);
   };
 
   const removeItem = (index: number) => {
@@ -302,22 +540,76 @@ export const PurchaseReturns: React.FC = () => {
   const updateItem = (index: number, field: string, value: any) => {
     setItems(prev => {
       const newItems = [...prev];
-      (newItems[index] as any)[field] = value;
+      const item = { ...newItems[index] };
+      
       if (field === 'product_id') {
-        const product = products.find(p => p.id === value);
-        if (product) {
-          newItems[index].cost_price = product.cost_price;
-          (newItems[index] as any).product_name = product.name;
-          (newItems[index] as any).product_code = product.code;
-          (newItems[index] as any).product_image_url = product.image_url;
+        const prod = products.find(p => p.id === value);
+        if (prod) {
+          item.product_id = prod.id;
+          item.product_name = prod.name;
+          item.product_code = prod.code;
+          item.product_image_url = prod.image_url || '';
+          item.barcode = prod.barcode || '';
+          item.image_url = prod.image_url || '';
+          
+          // Cost price based on currency exchange rate
+          const baseCurrency = company?.settings?.currency || 'EGP';
+          const selectedCurr = companyCurrencies.find(c => c.id === selectedCurrencyId);
+          const isForeign = selectedCurr && selectedCurr.code.toLowerCase() !== baseCurrency.toLowerCase();
+          
+          let price = prod.cost_price || 0;
+          if (isForeign && exchangeRate > 0) {
+            price = Number((price / exchangeRate).toFixed(4));
+          }
+          item.unit_price = price;
+          item.quantity = item.quantity || 1;
+          item.vat_rate = prod.vat_rate || 0;
+          item.total = Number((item.quantity * item.unit_price).toFixed(4));
+          item.vat_amount = isVatEnabled ? Number((item.total * (item.vat_rate / 100)).toFixed(4)) : 0;
+        } else {
+          item.product_id = '';
+          item.product_name = '';
+          item.product_code = '';
+          item.product_image_url = '';
+          item.barcode = '';
+          item.image_url = '';
+          item.unit_price = 0;
+          item.vat_rate = 0;
+          item.vat_amount = 0;
+          item.total = 0;
+        }
+      } else {
+        (item as any)[field] = value;
+        if (field === 'quantity' || field === 'unit_price' || field === 'vat_rate') {
+          const qty = Number(item.quantity) || 0;
+          const price = Number(item.unit_price) || 0;
+          const vat_rate = Number(item.vat_rate) || 0;
+          item.total = Number((qty * price).toFixed(4));
+          item.vat_amount = isVatEnabled ? Number((item.total * (vat_rate / 100)).toFixed(4)) : 0;
         }
       }
+      
+      newItems[index] = item;
       return newItems;
     });
   };
 
-  const calculateTotal = () => {
-    return items.reduce((sum, item) => sum + (item.quantity * item.cost_price), 0);
+  const applyOperationToAllItems = () => {
+    if (!selectedOperationId) return;
+    setItems(prev => prev.map(item => ({ ...item, operation_id: selectedOperationId })));
+    showNotification(language === 'ar' ? 'تم تطبيق العملية على كافة الأصناف' : 'Operation applied to all items', 'success');
+  };
+
+  const applyDepartmentToAllItems = () => {
+    if (!selectedDepartmentId) return;
+    setItems(prev => prev.map(item => ({ ...item, department_id: selectedDepartmentId })));
+    showNotification(language === 'ar' ? 'تم تطبيق الإدارة على كافة الأصناف' : 'Department applied to all items', 'success');
+  };
+
+  const applyCostCenterToAllItems = () => {
+    if (!selectedCostCenterId) return;
+    setItems(prev => prev.map(item => ({ ...item, cost_center_id: selectedCostCenterId })));
+    showNotification(language === 'ar' ? 'تم تطبيق مركز التكلفة على كافة الأصناف' : 'Cost center applied to all items', 'success');
   };
 
   const handleSupplierSubmit = async (e: React.FormEvent) => {
@@ -334,7 +626,6 @@ export const PurchaseReturns: React.FC = () => {
       };
       const supplierId = await dbService.add('suppliers', newSupplier);
 
-      // Create Journal Entry for Opening Balance if it's not zero
       if (supplierFormData.opening_balance !== 0 && supplierFormData.account_id && supplierFormData.counter_account_id) {
         const counterAccount = accounts.find(a => a.id === supplierFormData.counter_account_id);
         const journalItems: JournalEntryItem[] = [
@@ -401,7 +692,16 @@ export const PurchaseReturns: React.FC = () => {
       });
       await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة صنف', `إضافة صنف جديد من مرتجع المشتريات: ${productFormData.name}`, ['products', 'purchase_returns']);
       
-      setItems([...items, { product_id: productId, quantity: 1, cost_price: productFormData.cost_price }]);
+      setItems([...items, {
+        product_id: productId,
+        product_name: productFormData.name,
+        product_code: productFormData.code,
+        quantity: 1,
+        unit_price: productFormData.cost_price,
+        total: productFormData.cost_price,
+        vat_rate: 0,
+        vat_amount: 0
+      }]);
       setIsProductModalOpen(false);
       setProductFormData({
         name: '',
@@ -470,18 +770,214 @@ export const PurchaseReturns: React.FC = () => {
       const paymentMethod = paymentMethods.find(pm => pm.id === returnData.payment_method_id);
       const return_number = editingReturn ? editingReturn.return_number : returnNumber;
       
-      const total_amount = Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.cost_price || 0)), 0)) || 0;
+      const subtotal = Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)), 0)) || 0;
+      const discount_amount = Number(discount) || 0;
 
       const sanitizedItems = validItems.map(item => {
         const product = products.find(p => p.id === item.product_id);
+        const rate = item.vat_rate !== undefined ? item.vat_rate : (product?.vat_rate || 0);
+        const total = Number((Number(item.quantity) || 0) * (Number(item.unit_price) || 0)) || 0;
+        const vat_amount = isVatEnabled ? Number((total * (rate / 100)).toFixed(2)) : 0;
         return {
           product_id: item.product_id,
-          product_name: product?.name || '',
+          product_name: product?.name || item.product_name || '',
+          product_code: product?.code || item.product_code || '',
+          product_image_url: product?.image_url || item.product_image_url || '',
+          barcode: product?.barcode || item.barcode || '',
+          image_url: product?.image_url || item.image_url || '',
           quantity: Number(item.quantity) || 0,
-          unit_price: Number(item.cost_price) || 0,
-          total: Number(Number(item.quantity || 0) * Number(item.cost_price || 0)) || 0
+          unit_price: Number(item.unit_price) || 0,
+          total: total,
+          vat_rate: rate,
+          vat_amount: vat_amount,
+          operation_id: item.operation_id || null,
+          department_id: item.department_id || null,
+          cost_center_id: item.cost_center_id || null,
         };
       });
+
+      const vatTotal = isVatEnabled
+        ? Number(sanitizedItems.reduce((sum, item) => sum + (Number(item.vat_amount) || 0), 0).toFixed(2))
+        : 0;
+
+      const total_amount = Number(subtotal + vatTotal - discount_amount) || 0;
+
+      // Diff calculation
+      const changes: any[] = [];
+      const detailsList: string[] = [];
+
+      if (editingReturn) {
+        if (editingReturn.date !== returnData.date) {
+          const oldD = formatDate(editingReturn.date);
+          const newD = formatDate(returnData.date);
+          changes.push({ field: language === 'ar' ? 'التاريخ' : 'Date', old_value: oldD, new_value: newD });
+          detailsList.push(language === 'ar' ? `تغيير التاريخ من ${oldD} إلى ${newD}` : `Date changed from ${oldD} to ${newD}`);
+        }
+        if (editingReturn.supplier_id !== returnData.supplier_id) {
+          const oldS = suppliers.find(s => s.id === editingReturn.supplier_id)?.name || editingReturn.supplier_name;
+          const newS = suppliers.find(s => s.id === returnData.supplier_id)?.name;
+          changes.push({ field: language === 'ar' ? 'المورد' : 'Supplier', old_value: oldS, new_value: newS });
+          detailsList.push(language === 'ar' ? `تغيير المورد من ${oldS} إلى ${newS}` : `Supplier changed from ${oldS} to ${newS}`);
+        }
+        if (editingReturn.warehouse_id !== returnData.warehouse_id) {
+          const oldW = warehouses.find(w => w.id === editingReturn.warehouse_id)?.name || '-';
+          const newW = warehouses.find(w => w.id === returnData.warehouse_id)?.name || '-';
+          changes.push({ field: language === 'ar' ? 'المخزن' : 'Warehouse', old_value: oldW, new_value: newW });
+          detailsList.push(language === 'ar' ? `تغيير المخزن من ${oldW} إلى ${newW}` : `Warehouse changed from ${oldW} to ${newW}`);
+        }
+        if (Number(editingReturn.discount_amount || editingReturn.discount || 0) !== discount_amount) {
+          const oldDisc = Number(editingReturn.discount_amount || editingReturn.discount || 0);
+          changes.push({ field: language === 'ar' ? 'الخصم' : 'Discount', old_value: oldDisc, new_value: discount_amount });
+          detailsList.push(language === 'ar' ? `تغيير الخصم من ${oldDisc} إلى ${discount_amount}` : `Discount changed from ${oldDisc} to ${discount_amount}`);
+        }
+        if (Number(editingReturn.total_amount || 0) !== total_amount) {
+          const oldTot = Number(editingReturn.total_amount || 0);
+          changes.push({ field: language === 'ar' ? 'إجمالي المرتجع' : 'Total Amount', old_value: oldTot, new_value: total_amount });
+          detailsList.push(language === 'ar' ? `تغيير الإجمالي من ${oldTot} إلى ${total_amount}` : `Total changed from ${oldTot} to ${total_amount}`);
+        }
+
+        // Currency
+        const oldCurrencyId = editingReturn.currency_id || '';
+        const newCurrencyId = selectedCurrencyId || '';
+        if (oldCurrencyId !== newCurrencyId) {
+          const oldCurr = companyCurrencies.find(c => c.id === oldCurrencyId)?.code || oldCurrencyId || 'EGP';
+          const newCurr = companyCurrencies.find(c => c.id === newCurrencyId)?.code || newCurrencyId || 'EGP';
+          changes.push({
+            field: language === 'ar' ? 'العملة' : 'Currency',
+            old_value: oldCurr,
+            new_value: newCurr
+          });
+          detailsList.push(language === 'ar' ? `تغيير العملة من ${oldCurr} إلى ${newCurr}` : `Currency changed from ${oldCurr} to ${newCurr}`);
+        }
+
+        // Exchange Rate
+        const oldRate = Number(editingReturn.exchange_rate) || 1;
+        const newRate = Number(exchangeRate) || 1;
+        if (oldRate !== newRate) {
+          changes.push({
+            field: language === 'ar' ? 'سعر الصرف' : 'Exchange Rate',
+            old_value: oldRate,
+            new_value: newRate
+          });
+          detailsList.push(language === 'ar' ? `تغيير سعر الصرف من ${oldRate} إلى ${newRate}` : `Exchange rate changed from ${oldRate} to ${newRate}`);
+        }
+
+        // Tax
+        const oldTax = Number(editingReturn.tax_amount) || 0;
+        const newTax = Number(vatTotal) || 0;
+        if (oldTax !== newTax) {
+          changes.push({
+            field: language === 'ar' ? 'الضريبة' : 'Tax',
+            old_value: oldTax,
+            new_value: newTax
+          });
+          detailsList.push(language === 'ar' ? `تغيير قيمة الضريبة من ${oldTax} إلى ${newTax}` : `Tax amount changed from ${oldTax} to ${newTax}`);
+        }
+
+        // Description
+        const oldDesc = editingReturn.description || '';
+        const newDesc = description || '';
+        if (oldDesc !== newDesc) {
+          changes.push({
+            field: language === 'ar' ? 'الوصف' : 'Description',
+            old_value: oldDesc || (language === 'ar' ? 'فارغ' : 'Empty'),
+            new_value: newDesc || (language === 'ar' ? 'فارغ' : 'Empty')
+          });
+          detailsList.push(language === 'ar' ? `تعديل وصف المرتجع` : `Description updated`);
+        }
+
+        // Payment Type
+        if (editingReturn.payment_type !== returnData.payment_type) {
+          const oldPT = editingReturn.payment_type === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') : (language === 'ar' ? 'آجل' : 'Credit');
+          const newPT = returnData.payment_type === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') : (language === 'ar' ? 'آجل' : 'Credit');
+          changes.push({
+            field: language === 'ar' ? 'نوع الدفع' : 'Payment Type',
+            old_value: oldPT,
+            new_value: newPT
+          });
+          detailsList.push(language === 'ar' ? `تغيير طريقة الدفع من ${oldPT} إلى ${newPT}` : `Payment type changed from ${oldPT} to ${newPT}`);
+        }
+
+        // Payment Method
+        const oldPMId = editingReturn.payment_method_id || '';
+        const newPMId = returnData.payment_type === 'cash' ? (returnData.payment_method_id || '') : '';
+        if (oldPMId !== newPMId) {
+          const oldPMName = paymentMethods.find(pm => pm.id === oldPMId)?.name || oldPMId || '-';
+          const newPMName = paymentMethods.find(pm => pm.id === newPMId)?.name || newPMId || '-';
+          changes.push({
+            field: language === 'ar' ? 'طريقة الدفع' : 'Payment Method',
+            old_value: oldPMName,
+            new_value: newPMName
+          });
+          detailsList.push(language === 'ar' ? `تغيير طريقة السداد النقدي من ${oldPMName} إلى ${newPMName}` : `Payment method changed from ${oldPMName} to ${newPMName}`);
+        }
+        
+        // Items Diff
+        const oldItems = editingReturn.items || [];
+        const newItems = sanitizedItems;
+
+        oldItems.forEach((oldItem: any) => {
+          const stillExists = newItems.some(newItem => newItem.product_id === oldItem.product_id);
+          if (!stillExists) {
+            changes.push({
+              field: language === 'ar' ? 'حذف صنف' : 'Delete Product',
+              old_value: `${oldItem.product_name} (${oldItem.quantity} × ${oldItem.unit_price || oldItem.price})`,
+              new_value: language === 'ar' ? 'تم الحذف' : 'Deleted'
+            });
+            detailsList.push(language === 'ar' ? `حذف الصنف: ${oldItem.product_name}` : `Deleted product: ${oldItem.product_name}`);
+          }
+        });
+
+        newItems.forEach(newItem => {
+          const wasPresent = oldItems.some((oldItem: any) => oldItem.product_id === newItem.product_id);
+          if (!wasPresent) {
+            changes.push({
+              field: language === 'ar' ? 'إضافة صنف' : 'Add Product',
+              old_value: language === 'ar' ? 'جديد' : 'New',
+              new_value: `${newItem.product_name} (${newItem.quantity} × ${newItem.unit_price})`
+            });
+            detailsList.push(language === 'ar' ? `إضافة صنف جديد: ${newItem.product_name}` : `Added new product: ${newItem.product_name}`);
+          }
+        });
+
+        newItems.forEach(newItem => {
+          const oldItem = oldItems.find((oi: any) => oi.product_id === newItem.product_id);
+          if (oldItem) {
+            const qtyChanged = Number(oldItem.quantity) !== Number(newItem.quantity);
+            const priceChanged = Number(oldItem.unit_price || oldItem.price) !== Number(newItem.unit_price);
+            const opChanged = oldItem.operation_id !== newItem.operation_id;
+            const ccChanged = oldItem.cost_center_id !== newItem.cost_center_id;
+            const deptChanged = oldItem.department_id !== newItem.department_id;
+
+            if (qtyChanged || priceChanged || opChanged || ccChanged || deptChanged) {
+              const diffParts: string[] = [];
+              if (qtyChanged) diffParts.push(language === 'ar' ? `الكمية من ${oldItem.quantity} إلى ${newItem.quantity}` : `Qty from ${oldItem.quantity} to ${newItem.quantity}`);
+              if (priceChanged) diffParts.push(language === 'ar' ? `السعر من ${oldItem.unit_price || oldItem.price} إلى ${newItem.unit_price}` : `Price from ${oldItem.unit_price || oldItem.price} to ${newItem.unit_price}`);
+              if (opChanged) {
+                const oldOp = operations.find(o => o.id === oldItem.operation_id)?.operation_number || '-';
+                const newOp = operations.find(o => o.id === newItem.operation_id)?.operation_number || '-';
+                diffParts.push(language === 'ar' ? `العملية من ${oldOp} إلى ${newOp}` : `Operation from ${oldOp} to ${newOp}`);
+              }
+              if (ccChanged) {
+                const oldCc = costCenters.find(c => c.id === oldItem.cost_center_id)?.name || '-';
+                const newCc = costCenters.find(c => c.id === newItem.cost_center_id)?.name || '-';
+                diffParts.push(language === 'ar' ? `مركز التكلفة من ${oldCc} إلى ${newCc}` : `Cost center from ${oldCc} to ${newCc}`);
+              }
+              if (deptChanged) {
+                const oldDept = departments.find(d => d.id === oldItem.department_id)?.name || '-';
+                const newDept = departments.find(d => d.id === newItem.department_id)?.name || '-';
+                diffParts.push(language === 'ar' ? `الإدارة من ${oldDept} إلى ${newDept}` : `Department from ${oldDept} to ${newDept}`);
+              }
+              changes.push({
+                field: (language === 'ar' ? 'تعديل صنف: ' : 'Edit Product: ') + newItem.product_name,
+                old_value: `${language === 'ar' ? 'الكمية:' : 'Qty:'} ${oldItem.quantity}، ${language === 'ar' ? 'السعر:' : 'Price:'} ${oldItem.unit_price || oldItem.price}`,
+                new_value: `${language === 'ar' ? 'الكمية:' : 'Qty:'} ${newItem.quantity}، ${language === 'ar' ? 'السعر:' : 'Price:'} ${newItem.unit_price} (${diffParts.join('، ')})`
+              });
+              detailsList.push(language === 'ar' ? `تعديل تفاصيل الصنف: ${newItem.product_name}` : `Updated details of product: ${newItem.product_name}`);
+            }
+          }
+        });
+      }
 
       const data = {
         return_number,
@@ -490,15 +986,29 @@ export const PurchaseReturns: React.FC = () => {
         warehouse_id: returnData.warehouse_id || null,
         date: returnData.date, 
         items: sanitizedItems,
+        subtotal,
+        discount: discount_amount,
+        discount_amount,
+        tax_amount: vatTotal,
         total_amount,
         payment_type: returnData.payment_type,
         payment_method_id: returnData.payment_type === 'cash' ? (returnData.payment_method_id || null) : null,
         payment_method_name: returnData.payment_type === 'cash' ? (paymentMethod?.name || '') : null,
         company_id: user.company_id,
-        created_at: new Date().toISOString(),
-        created_by: user.id
+        operation_id: selectedOperationId || null,
+        department_id: selectedDepartmentId || null,
+        cost_center_id: selectedCostCenterId || null,
+        currency_id: selectedCurrencyId || null,
+        exchange_rate: Number(exchangeRate) || 1,
+        description: description || null,
+        notes: returnData.notes || null,
+        created_at: editingReturn ? editingReturn.created_at : new Date().toISOString(),
+        created_by: editingReturn ? editingReturn.created_by : user.id,
+        updated_at: editingReturn ? new Date().toISOString() : undefined,
+        updated_by: editingReturn ? user.id : undefined,
       };
 
+      const rate = Number(exchangeRate) || 1;
       const journalItems: any[] = [];
       let supplierAccountId = supplier?.account_id || '';
       let supplierAccountName = supplier?.account_name || 'حساب الموردين';
@@ -506,7 +1016,7 @@ export const PurchaseReturns: React.FC = () => {
       journalItems.push({
         account_id: supplierAccountId,
         account_name: supplierAccountName,
-        debit: total_amount,
+        debit: Number((total_amount * rate).toFixed(2)),
         credit: 0,
         description: `مرتجع مشتريات رقم ${return_number} - ${supplier?.name}`,
         supplier_id: returnData.supplier_id,
@@ -529,8 +1039,11 @@ export const PurchaseReturns: React.FC = () => {
           account_id: creditAccountId,
           account_name: creditAccountName,
           debit: 0,
-          credit: Number(Number(item.quantity || 0) * Number(item.unit_price || 0)) || 0,
-          description: `مرتجع مشتريات صنف: ${item.product_name} - مرتجع ${return_number}`
+          credit: Number((Number(item.quantity || 0) * Number(item.unit_price || 0) * rate).toFixed(2)) || 0,
+          description: `مرتجع مشتريات صنف: ${item.product_name} - مرتجع ${return_number}`,
+          operation_id: item.operation_id || null,
+          department_id: item.department_id || null,
+          cost_center_id: item.cost_center_id || null
         });
       });
 
@@ -541,7 +1054,7 @@ export const PurchaseReturns: React.FC = () => {
         journalItems.push({
           account_id: cashAccountId,
           account_name: cashAccountName,
-          debit: total_amount,
+          debit: Number((total_amount * rate).toFixed(2)),
           credit: 0,
           description: `استلام نقدية مقابل مرتجع مشتريات رقم ${return_number} - ${supplier?.name}`
         });
@@ -549,7 +1062,7 @@ export const PurchaseReturns: React.FC = () => {
           account_id: supplierAccountId,
           account_name: supplierAccountName,
           debit: 0,
-          credit: total_amount,
+          credit: Number((total_amount * rate).toFixed(2)),
           description: `تسوية نقدية لمرتجع مشتريات رقم ${return_number} - ${supplier?.name}`,
           supplier_id: returnData.supplier_id,
           supplier_name: supplier?.name
@@ -592,14 +1105,35 @@ export const PurchaseReturns: React.FC = () => {
         );
       }
 
-      showNotification(language === 'ar' ? (editingReturn ? 'تم تحديث مرتجع المشتريات بنجاح' : 'تم حفظ مرتجع المشتريات بنجاح') : (editingReturn ? 'Purchase return updated successfully' : 'Purchase return saved successfully'), 'success');
-      closeModal();
-      setEditingReturn(null);
-
-      if (!editingReturn) {
-        dbService.logActivity(user.id, user.username, user.company_id, 'إضافة مرتجع مشتريات', `إضافة مرتجع مشتريات جديد رقم: ${return_number}`, 'purchase_returns');
+      // Log activity
+      if (editingReturn) {
+        if (changes.length > 0) {
+          const logAction = language === 'ar' ? 'تعديل مرتجع مشتريات' : 'Update Purchase Return';
+          const logDetails = detailsList.join(' | ');
+          await dbService.logActivity(
+            user.id,
+            user.username,
+            user.company_id,
+            logAction,
+            logDetails || `تعديل المرتجع رقم ${return_number}`,
+            'purchase_returns',
+            editingReturn.id,
+            changes
+          );
+        }
+      } else {
+        await dbService.logActivity(
+          user.id, 
+          user.username, 
+          user.company_id, 
+          'إضافة مرتجع مشتريات', 
+          `إضافة مرتجع مشتريات جديد رقم: ${return_number}`, 
+          'purchase_returns'
+        );
       }
 
+      showNotification(language === 'ar' ? (editingReturn ? 'تم تحديث مرتجع المشتريات بنجاح' : 'تم حفظ مرتجع المشتريات بنجاح') : (editingReturn ? 'Purchase return updated successfully' : 'Purchase return saved successfully'), 'success');
+      closeModal();
     } catch (e: any) {
       console.error('Save failed:', e);
       showNotification(e.message || (language === 'ar' ? 'حدث خطأ أثناء حفظ مرتجع المشتريات' : 'An error occurred while saving purchase return'), 'error');
@@ -636,7 +1170,32 @@ export const PurchaseReturns: React.FC = () => {
       payment_method_id: '',
       notes: ''
     });
-    setItems([{ product_id: '', quantity: 1, cost_price: 0 }]);
+    setItems([
+      {
+        product_id: '',
+        product_name: '',
+        product_code: '',
+        product_image_url: '',
+        barcode: '',
+        image_url: '',
+        quantity: 1,
+        unit_price: 0,
+        total: 0,
+        vat_rate: 0,
+        vat_amount: 0,
+        operation_id: '',
+        department_id: '',
+        cost_center_id: ''
+      }
+    ]);
+    setSelectedOperationId('');
+    setSelectedDepartmentId('');
+    setSelectedCostCenterId('');
+    setSelectedCurrencyId('');
+    setExchangeRate(1);
+    setExchangeRateType('manual');
+    setDescription('');
+    setDiscount(0);
     const num = await generateReturnNumber(newDate);
     setReturnNumber(num);
     setEditingReturn(null);
@@ -661,10 +1220,30 @@ export const PurchaseReturns: React.FC = () => {
         payment_method_id: fullData.payment_method_id || '',
         notes: fullData.notes || ''
       });
+      
+      setSelectedOperationId(fullData.operation_id || '');
+      setSelectedDepartmentId(fullData.department_id || '');
+      setSelectedCostCenterId(fullData.cost_center_id || '');
+      setSelectedCurrencyId(fullData.currency_id || '');
+      setExchangeRate(fullData.exchange_rate || 1);
+      setDescription(fullData.description || '');
+      setDiscount(fullData.discount_amount || fullData.discount || 0);
+
       setItems((fullData.items || []).map((item: any) => ({
         product_id: item.product_id,
+        product_name: item.product_name || '',
+        product_code: item.product_code || '',
+        product_image_url: item.product_image_url || item.image_url || '',
+        barcode: item.barcode || '',
+        image_url: item.image_url || '',
         quantity: item.quantity,
-        cost_price: item.unit_price || item.price || 0
+        unit_price: item.unit_price || item.price || 0,
+        total: item.total || (item.quantity * (item.unit_price || item.price || 0)),
+        vat_rate: item.vat_rate || 0,
+        vat_amount: item.vat_amount || 0,
+        operation_id: item.operation_id || null,
+        department_id: item.department_id || null,
+        cost_center_id: item.cost_center_id || null
       })));
       setIsModalOpen(true);
       console.log('[EDIT] Form updated with purchase return:', fullData.id);
@@ -714,10 +1293,7 @@ export const PurchaseReturns: React.FC = () => {
     if (!returnToDelete || !user) return;
     try {
       const ret = purchaseReturns.find(r => r.id === returnToDelete);
-      
-      // Delete associated journal entry
       await dbService.deleteJournalEntryByReference(returnToDelete, user.company_id);
-      
       await dbService.delete('purchase_returns', returnToDelete);
       await dbService.logActivity(user.id, user.username, user.company_id, 'حذف مرتجع مشتريات', `حذف مرتجع مشتريات رقم: ${ret?.return_number}`, 'purchase_returns');
       showNotification(t('common.delete_success'), 'success');
@@ -737,20 +1313,63 @@ export const PurchaseReturns: React.FC = () => {
   };
 
   const exportToPDF = async (ret: any) => {
-    if (!returnRef.current) return;
+    if (!ret) return;
     
-    const element = returnRef.current;
-    try {
-      await exportToPDFUtil(element, {
-        filename: `${ret.return_number}.pdf`,
-        margin: 10,
-        orientation: 'portrait',
-        reportTitle: `مرتجع مشتريات رقم: ${ret.return_number}`
-      });
-    } catch (e) {
-      console.error('PDF Export Error:', e);
-      showNotification('حدث خطأ أثناء تصدير PDF', 'error');
+    // If the view modal is currently open for this return, use its ref
+    if (viewReturn && viewReturn.id === ret.id && returnRef.current) {
+      try {
+        await exportToPDFUtil(returnRef.current, {
+          filename: `${ret.return_number}.pdf`,
+          margin: 10,
+          orientation: 'portrait',
+          reportTitle: `مرتجع مشتريات رقم: ${ret.return_number}`
+        });
+      } catch (e) {
+        console.error('PDF Export Error:', e);
+        showNotification('حدث خطأ أثناء تصدير PDF', 'error');
+      }
+      return;
     }
+
+    // Otherwise, trigger the offscreen container
+    setPdfReturn(ret);
+  };
+
+  const handlePrint = () => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @media print {
+        body * {
+          visibility: hidden !important;
+        }
+        #purchase-return-capture-area, #purchase-return-capture-area * {
+          visibility: visible !important;
+        }
+        #purchase-return-capture-area {
+          position: absolute !important;
+          left: 0 !important;
+          top: 0 !important;
+          width: 100% !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          box-shadow: none !important;
+          border: none !important;
+        }
+        .no-print {
+          display: none !important;
+        }
+        img {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        svg {
+          max-width: 100% !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+    window.print();
+    setTimeout(() => document.head.removeChild(style), 1000);
   };
 
   const filteredReturns = purchaseReturns.filter(r => 
@@ -767,10 +1386,25 @@ export const PurchaseReturns: React.FC = () => {
     if (data.items) {
       const newItems = data.items.map((item: any) => {
         const product = products.find(p => p.name.toLowerCase().includes(item.productName.toLowerCase()));
+        const price = item.price || product?.cost_price || 0;
+        const total = (item.quantity || 1) * price;
+        const vatRate = product?.vat_rate || 0;
+        const vatAmount = isVatEnabled ? (total * vatRate) / 100 : 0;
         return {
           product_id: product?.id || '',
+          product_name: product?.name || '',
+          product_code: product?.code || '',
+          product_image_url: product?.image_url || '',
+          barcode: product?.barcode || '',
+          image_url: product?.image_url || '',
           quantity: item.quantity || 1,
-          cost_price: item.price || product?.cost_price || 0
+          unit_price: price,
+          total: total,
+          vat_rate: vatRate,
+          vat_amount: vatAmount,
+          operation_id: selectedOperationId || null,
+          department_id: selectedDepartmentId || null,
+          cost_center_id: selectedCostCenterId || null,
         };
       });
       setItems(newItems);
@@ -782,257 +1416,314 @@ export const PurchaseReturns: React.FC = () => {
       {!isModalOpen ? (
         <>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('nav.purchase_returns')}</h2>
-          <p className="text-zinc-500">{language === 'ar' ? 'إدارة الأصناف المرتجعة للموردين.' : 'Manage product returns to suppliers.'}</p>
-          {serverSummary.total_amount !== undefined && (
-            <div className="mt-2 flex items-center gap-4 text-sm">
-               <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
-                 {language === 'ar' ? 'إجمالي المرتجعات:' : 'Total Returns:'} {formatMoney(serverSummary.total_amount)} {t('common.currency')}
-               </span>
-            </div>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button 
-            onClick={() => setIsActivityLogOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-zinc-600 border border-zinc-200 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm"
-            title="سجل النشاط"
-          >
-            <History size={20} />
-            <span className="hidden md:inline">سجل النشاط</span>
-          </button>
-          <ExportButtons 
-            onExportExcel={handleExportExcel} 
-            onExportPDF={handleExportPDF} 
-          />
-          <button 
-            onClick={openModal}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
-          >
-            <Plus size={20} />
-            إضافة مرتجع
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-zinc-50 flex items-center justify-between gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-3 text-zinc-400" size={18} />
-            <input
-              type="text"
-              placeholder={language === 'ar' ? 'البحث عن مرتجعات...' : 'Search returns...'}
-              className="w-full pl-10 pr-4 py-2 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-red-500 transition-all"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/50 shadow-inner">
-            <button
-              onClick={() => setView('table')}
-              className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
-              title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
-            >
-              <List size={18} />
-            </button>
-            <button
-              onClick={() => setView('card')}
-              className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
-              title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
-            >
-              <LayoutGrid size={18} />
-            </button>
-          </div>
-        </div>
-
-        {view === 'table' ? (
-          <div ref={tableRef} id="purchase-returns-list-table" className="hidden md:block overflow-x-auto">
-            <table className="w-full text-right">
-              <thead>
-                <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('return_number')}>
-                    <div className="flex items-center gap-1">
-                      رقم المرتجع
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        {sortBy === 'return_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                      </span>
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('supplier_name')}>
-                    <div className="flex items-center gap-1">
-                      المورد
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        {sortBy === 'supplier_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                      </span>
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('date')}>
-                    <div className="flex items-center gap-1">
-                      التاريخ
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                      </span>
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('payment_type')}>
-                    <div className="flex items-center gap-1">
-                      النوع
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        {sortBy === 'payment_type' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                      </span>
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('total_amount')}>
-                    <div className="flex items-center gap-1">
-                      المبلغ
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        {sortBy === 'total_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                      </span>
-                    </div>
-                  </th>
-                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    language === 'ar' ? 'رقم القيد' : 'Journal Entry'
-                  </th>
-                  <th className="px-6 py-4 font-bold text-left">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-50">
-                {filteredReturns.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد مرتجعات مشتريات حالياً' : 'No purchase returns currently'}</td>
-                  </tr>
-                ) : filteredReturns.map((ret) => (
-                  <tr 
-                    key={ret.id} 
-                    className="hover:bg-zinc-50/50 transition-colors group cursor-pointer"
-                    onClick={() => handleEdit(ret)}
-                  >
-                    <td className="px-6 py-4">
-                      <span className="font-mono text-xs bg-red-50 px-2 py-1 rounded text-red-700 font-bold">{ret.return_number}</span>
-                    </td>
-                    <td className="px-6 py-4 font-bold text-zinc-900">{ret.supplier_name}</td>
-                    <td className="px-6 py-4 text-zinc-500">{formatDate(ret.date)}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${ret.payment_type === 'cash' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
-                        ret.payment_type === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') : (language === 'ar' ? 'آجل' : 'Credit')
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(ret.total_amount)} {t('common.currency')}</td>
-                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                      {ret.entry_number ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPendingViewDoc({ type: 'journal', idOrNumber: ret.entry_number! });
-                            setCurrentPage('journal_entries');
-                          }}
-                          className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-100/50 transition-all active:scale-95 animate-in fade-in"
-                        >
-                          {ret.entry_number}
-                        </button>
-                      ) : (
-                        <span className="text-zinc-400 font-mono text-xs">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-left">
-                      <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActivityLogDocumentId(ret.id);
-                            setIsActivityLogOpen(true);
-                          }}
-                          className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all no-pdf"
-                          title="سجل النشاط"
-                        >
-                          <History size={18} />
-                        </button>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleViewReturn(ret.id);
-                          }}
-                          className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all no-pdf"
-                        >
-                          <Eye size={18} />
-                        </button>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEdit(ret);
-                          }}
-                          className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all no-pdf"
-                          title="تعديل"
-                        >
-                          <Edit size={18} />
-                        </button>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            exportToPDF(ret);
-                          }}
-                          className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all no-pdf"
-                        >
-                          <Download size={18} />
-                        </button>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(ret.id);
-                          }}
-                          className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all no-pdf"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
-          </div>
-        ) : (
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredReturns.map((ret) => (
-              <div 
-                key={ret.id} 
-                onClick={() => handleEdit(ret)}
-                className="p-6 bg-zinc-50/50 rounded-3xl border border-zinc-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden cursor-pointer flex flex-col justify-between"
-              >
-                <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleViewReturn(ret.id);
-                    }}
-                    className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
-                  >
-                    <Eye size={16} />
-                  </button>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEdit(ret);
-                    }}
-                    className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
-                  >
-                    <Edit size={16} />
-                  </button>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(ret.id);
-                    }}
-                    className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+            <div>
+              <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('nav.purchase_returns')}</h2>
+              <p className="text-zinc-505">{language === 'ar' ? 'إدارة الأصناف المرتجعة للموردين.' : 'Manage product returns to suppliers.'}</p>
+              {serverSummary.total_amount !== undefined && (
+                <div className="mt-2 flex items-center gap-4 text-sm">
+                   <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
+                     {language === 'ar' ? 'إجمالي المرتجعات:' : 'Total Returns:'} {formatMoney(serverSummary.total_amount)} {t('common.currency')}
+                   </span>
                 </div>
-                
-                <div className="flex flex-col h-full justify-between">
-                  <div className="space-y-3">
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button 
+                onClick={() => setIsActivityLogOpen(true)}
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-zinc-600 border border-zinc-200 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm"
+                title="سجل النشاط"
+              >
+                <History size={20} />
+                <span className="hidden md:inline">سجل النشاط</span>
+              </button>
+              <ExportButtons 
+                onExportExcel={handleExportExcel} 
+                onExportPDF={handleExportPDF} 
+              />
+              <button 
+                onClick={openModal}
+                className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
+              >
+                <Plus size={20} />
+                إضافة مرتجع
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-zinc-50 flex items-center justify-between gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-3 text-zinc-400" size={18} />
+                <input
+                  type="text"
+                  placeholder={language === 'ar' ? 'البحث عن مرتجعات...' : 'Search returns...'}
+                  className="w-full pl-10 pr-4 py-2 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-550 transition-all"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/50 shadow-inner">
+                <button
+                  onClick={() => setView('table')}
+                  className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+                  title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
+                >
+                  <List size={18} />
+                </button>
+                <button
+                  onClick={() => setView('card')}
+                  className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+                  title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
+                >
+                  <LayoutGrid size={18} />
+                </button>
+              </div>
+            </div>
+
+            {view === 'table' ? (
+              <div ref={tableRef} id="purchase-returns-list-table" className="hidden md:block overflow-x-auto">
+                <table className="w-full text-right">
+                  <thead>
+                    <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
+                      <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('return_number')}>
+                        <div className="flex items-center gap-1">
+                          رقم المرتجع
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            {sortBy === 'return_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                      <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('supplier_name')}>
+                        <div className="flex items-center gap-1">
+                          المورد
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            {sortBy === 'supplier_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                      <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('date')}>
+                        <div className="flex items-center gap-1">
+                          التاريخ
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                      <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('payment_type')}>
+                        <div className="flex items-center gap-1">
+                          النوع
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            {sortBy === 'payment_type' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                      <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('total_amount')}>
+                        <div className="flex items-center gap-1">
+                          المبلغ
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            {sortBy === 'total_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                      <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {language === 'ar' ? 'رقم القيد' : 'Journal Entry'}
+                      </th>
+                      <th className="px-6 py-4 font-bold text-left">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-50">
+                    {filteredReturns.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-12 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد مرتجعات مشتريات حالياً' : 'No purchase returns currently'}</td>
+                      </tr>
+                    ) : (
+                      filteredReturns.map((ret) => (
+                        <tr 
+                          key={ret.id} 
+                          className="hover:bg-zinc-50/50 transition-colors group cursor-pointer"
+                          onClick={() => handleEdit(ret)}
+                        >
+                          <td className="px-6 py-4">
+                            <span className="font-mono text-xs bg-red-50 px-2 py-1 rounded text-red-700 font-bold">{ret.return_number}</span>
+                          </td>
+                          <td className="px-6 py-4 font-bold text-zinc-900">{ret.supplier_name}</td>
+                          <td className="px-6 py-4 text-zinc-500">{formatDate(ret.date)}</td>
+                          <td className="px-6 py-4">
+                            <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
+                              {ret.payment_type === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') : (language === 'ar' ? 'آجل' : 'Credit')}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(ret.total_amount)} {t('common.currency')}</td>
+                          <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            {ret.entry_number ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPendingViewDoc({ type: 'journal', idOrNumber: ret.entry_number! });
+                                  setCurrentPage('journal_entries');
+                                }}
+                                className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-100/50 transition-all active:scale-95 animate-in fade-in"
+                              >
+                                {ret.entry_number}
+                              </button>
+                            ) : (
+                              <span className="text-zinc-400 font-mono text-xs">-</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-left">
+                            <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActivityLogDocumentId(ret.id);
+                                  setIsActivityLogOpen(true);
+                                }}
+                                className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all no-pdf"
+                                title="سجل النشاط"
+                              >
+                                <History size={18} />
+                              </button>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewReturn(ret.id);
+                                }}
+                                className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all no-pdf"
+                              >
+                                <Eye size={18} />
+                              </button>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEdit(ret);
+                                }}
+                                className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all no-pdf"
+                                title="تعديل"
+                              >
+                                <Edit size={18} />
+                              </button>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  exportToPDF(ret);
+                                }}
+                                className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all no-pdf"
+                              >
+                                <Download size={18} />
+                              </button>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(ret.id);
+                                }}
+                                className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all no-pdf"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+                <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
+              </div>
+            ) : (
+              <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredReturns.map((ret) => (
+                  <div 
+                    key={ret.id} 
+                    onClick={() => handleEdit(ret)}
+                    className="p-6 bg-zinc-50/50 rounded-3xl border border-zinc-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden cursor-pointer flex flex-col justify-between"
+                  >
+                    <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewReturn(ret.id);
+                        }}
+                        className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
+                      >
+                        <Eye size={16} />
+                      </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(ret);
+                        }}
+                        className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(ret.id);
+                        }}
+                        className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                    
+                    <div className="flex flex-col h-full justify-between">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs bg-red-50 px-2 py-1 rounded text-red-700 font-bold">{ret.return_number}</span>
+                            {ret.entry_number && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPendingViewDoc({ type: 'journal', idOrNumber: ret.entry_number! });
+                                  setCurrentPage('journal_entries');
+                                }}
+                                className="font-mono text-[9px] bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100/50 transition-all active:scale-95 z-10"
+                              >
+                                {ret.entry_number}
+                              </button>
+                            )}
+                          </div>
+                          <span className="text-xs text-zinc-400 font-medium">{formatDate(ret.date)}</span>
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-zinc-900 group-hover:text-emerald-600 transition-colors">{ret.supplier_name}</h4>
+                          <p className="text-xs text-zinc-400 mt-1">
+                            {ret.payment_type === 'cash' ? 'نقدي' : 'آجل'}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-4 pt-4 border-t border-zinc-100 flex items-center justify-between">
+                        <span className="text-zinc-500 text-xs font-bold">إجمالي المرتجع</span>
+                        <span className="font-black text-emerald-600 text-lg">
+                          {formatNumber(ret.total_amount)} ج.م
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {filteredReturns.length === 0 && !loading && (
+                  <div className="col-span-full py-12 text-center text-zinc-500 italic">لا توجد مرتجعات مشتريات حالياً</div>
+                )}
+                <div className="col-span-full">
+                  <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
+                </div>
+              </div>
+            )}
+
+            {/* Mobile Card View */}
+            <div className="md:hidden divide-y divide-zinc-100">
+              {filteredReturns.length === 0 ? (
+                <div className="px-6 py-12 text-center text-zinc-400 italic">لا توجد مرتجعات مشتريات حالياً</div>
+              ) : (
+                filteredReturns.map((ret) => (
+                  <div 
+                    key={ret.id} 
+                    onClick={() => handleEdit(ret)}
+                    className="p-4 space-y-3 hover:bg-zinc-50 transition-colors cursor-pointer"
+                  >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs bg-red-50 px-2 py-1 rounded text-red-700 font-bold">{ret.return_number}</span>
@@ -1043,525 +1734,1188 @@ export const PurchaseReturns: React.FC = () => {
                               setPendingViewDoc({ type: 'journal', idOrNumber: ret.entry_number! });
                               setCurrentPage('journal_entries');
                             }}
-                            className="font-mono text-[9px] bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100/50 transition-all active:scale-95 z-10"
+                            className="font-mono text-[9px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100/50"
                           >
                             {ret.entry_number}
                           </button>
                         )}
                       </div>
-                      <span className="text-xs text-zinc-400 font-medium">{formatDate(ret.date)}</span>
+                      <span className="text-xs text-zinc-500 flex items-center gap-1">
+                        <Calendar size={12} />
+                        {formatDate(ret.date)}
+                      </span>
                     </div>
-                    <div>
-                      <h4 className="font-bold text-zinc-900 group-hover:text-emerald-600 transition-colors">{ret.supplier_name}</h4>
-                      <p className="text-xs text-zinc-400 mt-1">
-                        {ret.payment_type === 'cash' ? 'نقدي' : 'آجل'}
-                      </p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-zinc-100 text-zinc-650 flex items-center justify-center">
+                          <User size={14} />
+                        </div>
+                        <span className="font-bold text-zinc-900">{ret.supplier_name}</span>
+                      </div>
+                      <span className="font-bold text-red-650">{formatNumber(ret.total_amount)} ج.م</span>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
+                      <button 
+                        onClick={() => {
+                          setActivityLogDocumentId(ret.id);
+                          setIsActivityLogOpen(true);
+                        }}
+                        className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all"
+                        title="سجل النشاط"
+                      >
+                        <History size={16} />
+                      </button>
+                      <button 
+                        onClick={() => handleViewReturn(ret.id)}
+                        className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
+                        title="عرض"
+                      >
+                        <Eye size={16} />
+                      </button>
+                      <button 
+                        onClick={() => handleEdit(ret)}
+                        className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
+                        title="تعديل"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(ret.id)}
+                        className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        title="حذف"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   </div>
-                  
-                  <div className="mt-4 pt-4 border-t border-zinc-100 flex items-center justify-between">
-                    <span className="text-zinc-500 text-xs font-bold">إجمالي المرتجع</span>
-                    <span className="font-black text-emerald-600 text-lg">
-                      {formatNumber(ret.total_amount)} ج.م
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {filteredReturns.length === 0 && !loading && (
-              <div className="col-span-full py-12 text-center text-zinc-500 italic">لا توجد مرتجعات مشتريات حالياً</div>
-            )}
-            <div className="col-span-full">
-              <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
+                ))
+              )}
             </div>
           </div>
-        )}
-
-        {/* Mobile Card View */}
-        <div className="md:hidden divide-y divide-zinc-100">
-          {filteredReturns.length === 0 ? (
-            <div className="px-6 py-12 text-center text-zinc-400 italic">لا توجد مرتجعات مشتريات حالياً</div>
-          ) : (
-            filteredReturns.map((ret) => (
-              <div 
-                key={ret.id} 
-                onClick={() => handleEdit(ret)}
-                className="p-4 space-y-3 hover:bg-zinc-50 transition-colors cursor-pointer"
+        </>
+      ) : (
+        <div className="bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
+          {/* Form Header */}
+          <div className="flex items-center justify-between p-2 md:p-3 border-b border-zinc-200 bg-zinc-50/50 backdrop-blur-md sticky top-0 z-[70] flex-row-reverse">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button 
+                type="button"
+                onClick={closeModal}
+                className="flex items-center gap-1 px-2 py-0.5 hover:bg-white rounded-xl transition-all text-zinc-650 text-[11px] font-black border border-transparent hover:border-zinc-200"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs bg-red-50 px-2 py-1 rounded text-red-700 font-bold">{ret.return_number}</span>
-                    {ret.entry_number && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPendingViewDoc({ type: 'journal', idOrNumber: ret.entry_number! });
-                          setCurrentPage('journal_entries');
-                        }}
-                        className="font-mono text-[9px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100/50"
-                      >
-                        {ret.entry_number}
-                      </button>
-                    )}
-                  </div>
-                  <span className="text-xs text-zinc-500 flex items-center gap-1">
-                    <Calendar size={12} />
-                    {formatDate(ret.date)}
+                {dir === 'rtl' ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+                <span>{language === 'ar' ? 'العودة للقائمة' : 'Return to List'}</span>
+              </button>
+              {editingReturn && (
+                <button 
+                  type="button"
+                  onClick={async () => {
+                    const newNum = await generateReturnNumber(returnData.date);
+                    setReturnNumber(newNum);
+                    setEditingReturn(null);
+                    showNotification(language === 'ar' ? 'تم نسخ المرتجع كجديد' : 'Return copied as new template', 'success');
+                  }} 
+                  className="flex items-center gap-1 px-2 py-0.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
+                >
+                  <Copy size={11} />
+                  <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+                </button>
+              )}
+            </div>
+            
+            <div className="flex items-center gap-1.5">
+              <button 
+                type="button"
+                onClick={closeModal}
+                className="w-20 py-1 rounded-lg bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-all flex items-center gap-1 justify-center active:scale-95 border border-zinc-200 shadow-sm text-[11px] whitespace-nowrap font-sans"
+              >
+                <RotateCcw size={12} />
+                <span>{language === 'ar' ? 'إلغاء' : 'Cancel'}</span>
+              </button>
+              <button 
+                type="submit"
+                form="purchase-return-form"
+                onClick={handleSubmit}
+                className="w-20 py-1 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-1 justify-center active:scale-95 shadow-sm text-[11px] whitespace-nowrap font-sans"
+              >
+                <Save size={12} />
+                <span>{language === 'ar' ? 'حفظ' : 'Save'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Left side (end in RTL) Document Info: Title, Return No, Linked Journal */}
+          <div className="p-4 md:p-6 border-b border-zinc-100 bg-white flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex flex-col gap-1 items-start">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h3 className="text-sm md:text-base font-black text-zinc-900 tracking-tight leading-none font-sans">
+                    {editingReturn ? (language === 'ar' ? 'تعديل مرتجع مشتريات' : 'Edit Purchase Return') : (language === 'ar' ? 'إنشاء مرتجع مشتريات جديد' : 'Create New Purchase Return')}
+                  </h3>
+                  <span className="text-[11px] font-mono font-black text-zinc-800 bg-zinc-100 border border-zinc-200 px-1.5 py-0.5 rounded-lg select-all shadow-sm">
+                    {returnNumber}
                   </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-zinc-100 text-zinc-600 flex items-center justify-center">
-                      <User size={14} />
-                    </div>
-                    <span className="font-bold text-zinc-900">{ret.supplier_name}</span>
+
+                {editingReturn?.entry_number ? (
+                  <div className="flex items-center gap-1 text-emerald-750 text-[10px] font-bold font-mono leading-none mt-0.5">
+                    <span className="text-emerald-500 font-sans font-bold">{language === 'ar' ? 'القيد المرتبط:' : 'Linked JE:'}</span>
+                    <span className="bg-emerald-50 px-1 py-0.5 rounded border border-emerald-100/50 font-black">{editingReturn.entry_number}</span>
                   </div>
-                  <span className="font-bold text-red-600">{formatNumber(ret.total_amount)} ج.م</span>
-                </div>
-                <div className="flex items-center justify-end gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
-                  <button 
-                    onClick={() => {
-                      setActivityLogDocumentId(ret.id);
-                      setIsActivityLogOpen(true);
-                    }}
-                    className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all"
-                    title="سجل النشاط"
-                  >
-                    <History size={16} />
-                  </button>
-                  <button 
-                    onClick={() => handleViewReturn(ret.id)}
-                    className="flex-1 flex items-center justify-center gap-2 py-2 text-emerald-600 bg-emerald-50 rounded-xl font-bold text-sm"
-                  >
-                    <Eye size={16} />
-                    عرض
-                  </button>
-                  <button 
-                    onClick={() => handleEdit(ret)}
-                    className="flex-1 flex items-center justify-center gap-2 py-2 text-blue-600 bg-blue-50 rounded-xl font-bold text-sm"
-                  >
-                    <Edit size={16} />
-                    تعديل
-                  </button>
-                  <button 
-                    onClick={() => exportToPDF(ret)}
-                    className="flex-1 flex items-center justify-center gap-2 py-2 text-blue-600 bg-blue-50 rounded-xl font-bold text-sm"
-                  >
-                    <Download size={16} />
-                    PDF
-                  </button>
-                  <button 
-                    onClick={() => handleDelete(ret.id)}
-                    className="p-2 text-red-600 bg-red-50 rounded-xl"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
+                ) : (
+                  <div className="text-[9px] font-bold text-zinc-400 mt-0.5">
+                    {language === 'ar' ? 'القيد المرتبط: لا يوجد قيد مرتبط بعد' : 'Linked JE: No journal entry linked yet'}
+                  </div>
+                )}
               </div>
-            ))
-          )}
-        </div>
-      </div>
-    </>
-  ) : (
-    <div className="bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
-          {/* Header Block */}
-          <div className="p-4 md:p-6 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[90]">
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={closeModal}
-                className="p-3 hover:bg-zinc-100 rounded-2xl transition-all text-zinc-400 hover:text-zinc-900 group"
-              >
-                <div className="flex items-center gap-2">
-                  <RotateCcw className={`w-5 h-5 transition-transform group-hover:-rotate-45`} />
-                  <span className="text-sm font-bold">{t('common.back')}</span>
-                </div>
-              </button>
-              <div className="w-px h-6 bg-zinc-200 mx-2" />
-              <button
-                type="button"
-                onClick={() => setShowSidePanel(!showSidePanel)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
-                  showSidePanel 
-                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-sm' 
-                    : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200 border-transparent'
-                } border`}
-              >
-                <History size={18} />
-                <span>{language === 'ar' ? 'قيد اليومية \\ سجل التعديلات' : 'Journal Entry / Activity Log'}</span>
-              </button>
             </div>
 
-            <div className="flex items-center gap-4">
-              {editingReturn && (
-                <div className="hidden lg:flex items-center gap-2 bg-zinc-100 p-1.5 rounded-2xl">
-                  <button 
-                    type="button"
-                    onClick={handlePrevReturn}
-                    className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
-                    disabled={purchaseReturns.findIndex(r => r.id === editingReturn.id) === 0}
-                  >
-                    {dir === 'rtl' ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-                    {language === 'ar' ? 'السابق' : 'Prev'}
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={handleNextReturn}
-                    className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
-                    disabled={purchaseReturns.findIndex(r => r.id === editingReturn.id) === purchaseReturns.length - 1}
-                  >
-                    {language === 'ar' ? 'التالي' : 'Next'}
-                    {dir === 'rtl' ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-                  </button>
-                </div>
-              )}
-              <h3 className="text-xl md:text-2xl font-black text-zinc-900 tracking-tight">
-                editingReturn ? (language === 'ar' ? 'تعديل مرتجع مشتريات' : 'Edit Purchase Return') : (language === 'ar' ? 'إضافة مرتجع مشتريات' : 'Add Purchase Return')
-              </h3>
-            </div>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full relative">
-            {/* Side Panel for Activity Log and Journal Entry */}
-            <AnimatePresence>
-              {showSidePanel && (
-                <motion.div 
-                  initial={{ x: '-100%' }}
-                  animate={{ x: 0 }}
-                  exit={{ x: '-100%' }}
-                  transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                  className="absolute inset-y-0 left-0 z-[80] w-full lg:w-96 shadow-2xl lg:shadow-none lg:relative lg:inset-auto"
+            {editingReturn && (
+              <div className="flex items-center gap-2 bg-zinc-100 p-1 rounded-xl">
+                <button 
+                  type="button"
+                  onClick={handlePrevReturn}
+                  className="flex items-center gap-1 px-3 py-1 hover:bg-white rounded-lg transition-all text-zinc-650 disabled:opacity-30 text-xs font-black"
+                  disabled={purchaseReturns.findIndex(r => r.id === editingReturn.id) === 0}
                 >
-                  <div className="h-full bg-white border-r border-zinc-100 flex flex-col">
-                    <div className="p-4 border-b border-zinc-100 flex items-center justify-between lg:hidden">
-                      <h3 className="font-bold text-zinc-900">{t('common.activity_log')}</h3>
-                      <button onClick={() => setShowSidePanel(false)} className="p-2 text-zinc-400 hover:text-zinc-600">
-                        <X size={20} />
-                      </button>
+                  {dir === 'rtl' ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+                  {language === 'ar' ? 'السابق' : 'Prev'}
+                </button>
+                <button 
+                  type="button"
+                  onClick={handleNextReturn}
+                  className="flex items-center gap-1 px-3 py-1 hover:bg-white rounded-lg transition-all text-zinc-650 disabled:opacity-30 text-xs font-black"
+                  disabled={purchaseReturns.findIndex(r => r.id === editingReturn.id) === purchaseReturns.length - 1}
+                >
+                  {language === 'ar' ? 'التالي' : 'Next'}
+                  {dir === 'rtl' ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+                </button>
+              </div>
+            )}
+          </div>
+
+          
+          <div className="flex-1 overflow-y-auto flex flex-col h-full relative">
+            <AnimatePresence>
+              {showAiInput && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="bg-zinc-50 border-b border-zinc-150 p-4 sticky top-[73px] z-[80] shadow-md flex flex-col gap-3"
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2 text-indigo-600 font-bold">
+                      <Plus size={20} className="animate-pulse" />
+                      <span className="text-sm font-black">{language === 'ar' ? 'الإنشاء الذكي بالذكاء الاصطناعي' : 'Smart AI Creation'}</span>
                     </div>
-                    <div className="flex-1 overflow-hidden">
-                      <TransactionSidePanel 
-                        documentId={editingReturn?.id || ''}
-                        category="purchase_returns" 
-                        previewJournalEntry={previewJournalEntry}
-                        previewActivityLog={previewActivityLog}
-                      />
-                    </div>
+                    <button onClick={() => setShowAiInput(false)} className="p-2 text-zinc-400 hover:text-zinc-650 rounded-lg hover:bg-zinc-100 transition-all">
+                      <X size={20} />
+                    </button>
                   </div>
+                  <SmartAIInput 
+                    onDataExtracted={applyAiData}
+                    transactionType="purchase_return"
+                  />
                 </motion.div>
               )}
             </AnimatePresence>
 
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32 md:pb-8">
-              <SmartAIInput transactionType="purchase_return" onDataExtracted={applyAiData} />
-              
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-3 space-y-6">
-                  {/* Card 1: Basic Info */}
-                  <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                    <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
-                      <FileText className="w-4 h-4" />
-                      <span className="text-xs font-bold">{language === 'ar' ? 'البيانات الأساسية' : 'Basic Data'}</span>
+            {/* Floating button on the side to toggle AI Smart Creation */}
+            <button
+              type="button"
+              onClick={() => setShowAiInput(!showAiInput)}
+              className={`absolute ${dir === 'rtl' ? 'left-0 rounded-r-xl border-l-0' : 'right-0 rounded-l-xl border-r-0'} top-1/4 z-[60] flex items-center gap-2 px-2 py-3 bg-indigo-600 text-white font-black text-[10px] shadow-lg hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all [writing-mode:vertical-lr] border border-indigo-500 ${showAiInput ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+              style={{ direction: 'ltr' }}
+            >
+              <Plus size={12} className="animate-bounce mb-1" />
+              <span>{language === 'ar' ? 'الإنشاء الذكي بالذكاء الاصطناعي' : 'Smart AI Creation'}</span>
+            </button>
+
+            <form id="purchase-return-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 pb-32">
+              {/* Upper Layout: Combined Totals Summary and Metadata Form into a single card */}
+              <section className="bg-white p-3 rounded-2xl border border-zinc-200 shadow-sm grid grid-cols-1 lg:grid-cols-4 gap-4 items-stretch">
+                
+                {/* Left: Summary Column */}
+                <div className="flex flex-col justify-center space-y-1.5 p-1">
+                  <div className="flex items-center gap-1.5 mb-1 text-emerald-650">
+                    <Layers className="w-4 h-4" />
+                    <h2 className="font-semibold text-zinc-900 text-xs">{language === 'ar' ? 'ملخص المرتجع' : 'Return Summary'}</h2>
+                  </div>
+
+                  <div className="bg-zinc-50 rounded-xl p-3 border border-zinc-100 space-y-1.5">
+                    <div className="flex justify-between items-center text-zinc-650 text-xs">
+                      <span className="font-medium">{language === 'ar' ? 'الإجمالي قبل الخصم' : 'Subtotal'}</span>
+                      <span className="font-bold">
+                        {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}
+                      </span>
                     </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                      <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'تاريخ المرتجع' : 'Return Date'}</label>
-                        <div className="relative">
-                          <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
-                          <input 
-                            required
-                            type="date"
-                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
-                            value={returnData.date}
-                            onChange={(e) => setReturnData({...returnData, date: e.target.value})}
-                          />
-                        </div>
+                    <div className="flex justify-between items-center text-emerald-650 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium">{language === 'ar' ? 'الخصم' : 'Discount'}</span>
+                        <input 
+                          type="number" 
+                          className="w-16 bg-white border border-zinc-200 rounded-lg px-2 py-0.5 text-center font-bold text-emerald-605 focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
+                          value={discount}
+                          onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                        />
                       </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('discounts.column_supplier')}</label>
-                        <div className="relative group">
-                          <User className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
-                          <select 
-                            required
-                            className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
-                            value={returnData.supplier_id}
-                            onChange={(e) => {
-                              if (e.target.value === 'new') {
-                                setIsSupplierModalOpen(true);
-                              } else {
-                                setReturnData({...returnData, supplier_id: e.target.value});
-                              }
-                            }}
-                          >
-                            <option value="">{t('settlements.select_supplier')}</option>
-                            {suppliers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
-                            <option value="new" className="font-bold text-emerald-600">+ {language === 'ar' ? 'إضافة مورد جديد...' : 'Add New Supplier...'}</option>
-                          </select>
-                          <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
-                        </div>
+                      <span className="font-bold">-{formatMoney(discount)}</span>
+                    </div>
+                    {isVatEnabled && (
+                      <div className="flex justify-between items-center text-zinc-650 text-xs pt-1 border-t border-dashed border-zinc-200">
+                        <span className="font-medium">{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</span>
+                        <span className="font-bold">
+                          +{formatMoney(items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0))}
+                        </span>
                       </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
-                        <div className="relative group">
-                          <Box className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
-                          <select 
-                            required
-                            className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
-                            value={returnData.warehouse_id}
-                            onChange={(e) => setReturnData({...returnData, warehouse_id: e.target.value})}
-                          >
-                            <option value="">{language === 'ar' ? 'اختر المخزن...' : 'Select Warehouse...'}</option>
-                            {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                          </select>
-                          <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
-                        </div>
+                    )}
+                    <div className="flex justify-between items-center text-emerald-650 text-xs pt-1.5 border-t border-zinc-200">
+                      <span className="font-black text-sm">{language === 'ar' ? 'الصافي النهائي' : 'Net Total'}</span>
+                      <div className="flex flex-col items-end">
+                        <span className="font-black text-lg tracking-tighter">
+                          {formatMoney(
+                            items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) + 
+                            (isVatEnabled ? items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0) : 0) - 
+                            discount
+                          )} {currentInvoiceCurrencyCode}
+                        </span>
                       </div>
+                    </div>
+                  </div>
+                </div>
 
+                {/* Right: Metadata Panel */}
+                <div className="lg:col-span-3 space-y-3 relative lg:border-s lg:border-zinc-200 lg:ps-4 flex flex-col justify-between">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {/* Date */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-400 mb-1 px-1 uppercase">{language === 'ar' ? 'التاريخ' : 'Date'}</label>
+                      <input
+                        required
+                        type="date"
+                        className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 outline-none font-bold text-zinc-800 text-xs"
+                        value={returnData.date}
+                        onChange={(e) => setReturnData({...returnData, date: e.target.value})}
+                      />
+                    </div>
+
+                    {/* Supplier */}
+                    <div className="col-span-1 md:col-span-2">
+                      <label className="block text-[10px] font-bold text-zinc-400 mb-1 px-1 uppercase">{language === 'ar' ? 'المورد' : 'Supplier'}</label>
+                      <select 
+                        required
+                        className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 outline-none font-bold text-zinc-800 text-xs cursor-pointer"
+                        value={returnData.supplier_id}
+                        onChange={(e) => {
+                          if (e.target.value === 'new_supplier') {
+                            setIsSupplierModalOpen(true);
+                          } else {
+                            setReturnData({...returnData, supplier_id: e.target.value});
+                          }
+                        }}
+                      >
+                        <option value="">{language === 'ar' ? 'اختر مورد...' : 'Select Supplier...'}</option>
+                        {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        <option value="new_supplier" className="font-bold text-emerald-600 italic">+ {language === 'ar' ? 'إضافة مورد جديد' : 'Add Supplier'}</option>
+                      </select>
+                    </div>
+
+                    {/* Warehouse */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-400 mb-1 px-1 uppercase">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
+                      <select 
+                        required
+                        className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 outline-none font-bold text-zinc-800 text-xs cursor-pointer"
+                        value={returnData.warehouse_id}
+                        onChange={(e) => setReturnData({...returnData, warehouse_id: e.target.value})}
+                      >
+                        <option value="">{language === 'ar' ? 'اختر المخزن' : 'Select Warehouse'}</option>
+                        {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                      </select>
+                    </div>
+
+                    {/* Return Number */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-400 mb-1 px-1 uppercase">{language === 'ar' ? 'رقم المرتجع' : 'Return No.'}</label>
+                      <input 
+                        readOnly
+                        type="text"
+                        className="w-full px-3 py-1.5 bg-zinc-150 border border-zinc-200 rounded-xl font-bold text-zinc-700 text-xs outline-none"
+                        value={returnNumber}
+                      />
+                    </div>
+
+                    {/* Payment Type */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-400 mb-1 px-1 uppercase">{language === 'ar' ? 'طريقة الدفع' : 'Payment Type'}</label>
+                      <select 
+                        className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 outline-none font-bold text-zinc-800 text-xs cursor-pointer"
+                        value={returnData.payment_type}
+                        onChange={(e) => setReturnData({...returnData, payment_type: e.target.value as 'cash' | 'credit'})}
+                      >
+                        <option value="credit">{language === 'ar' ? 'آجل' : 'Credit'}</option>
+                        <option value="cash">{language === 'ar' ? 'نقدي' : 'Cash'}</option>
+                      </select>
+                    </div>
+
+                    {/* Payment Method */}
+                    {returnData.payment_type === 'cash' ? (
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'رقم المرتجع' : 'Return No.'}</label>
-                        <div className="relative">
-                          <RotateCcw className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
-                          <input 
-                            readOnly
-                            type="text"
-                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl font-bold text-zinc-800 text-sm outline-none`}
-                            value={returnNumber}
-                          />
-                        </div>
+                        <label className="block text-[10px] font-bold text-zinc-400 mb-1 px-1 uppercase">{language === 'ar' ? 'طريقة استرداد المبلغ' : 'Refund Method'}</label>
+                        <select 
+                          required
+                          className="w-full px-3 py-1.5 rounded-xl border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 outline-none font-bold text-zinc-800 text-xs cursor-pointer"
+                          value={returnData.payment_method_id}
+                          onChange={(e) => {
+                            if (e.target.value === 'new_payment_method') {
+                              setIsPaymentMethodModalOpen(true);
+                            } else {
+                              setReturnData({...returnData, payment_method_id: e.target.value});
+                            }
+                          }}
+                        >
+                          <option value="">{language === 'ar' ? 'اختر الطريقة...' : 'Select Method...'}</option>
+                          {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
+                          <option value="new_payment_method" className="font-bold text-emerald-600 italic">+ {language === 'ar' ? 'إضافة طريقة' : 'Add Method'}</option>
+                        </select>
                       </div>
+                    ) : null}
 
-                      {editingReturn?.entry_number && (
+                    {/* Currency & Exchange Rate */}
+                    {isMultiCurrencyEnabled && (
+                      <>
                         <div>
-                          <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'رقم القيد المرتبط' : 'Linked Journal Entry'}</label>
-                          <div className="relative">
-                            <Layers className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-emerald-500 pointer-events-none`} />
-                            <input 
-                              readOnly
-                              type="text"
-                              className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-emerald-50 border border-emerald-200 rounded-2xl outline-none transition-all font-bold text-emerald-800 text-sm`}
-                              value={editingReturn.entry_number}
-                            />
-                          </div>
+                          <label className="block text-[10px] font-bold text-zinc-400 mb-1 px-1 uppercase flex items-center gap-1">
+                            <Coins size={12} className="text-amber-500" />
+                            {language === 'ar' ? 'عملة المعاملة' : 'Transaction Currency'}
+                          </label>
+                          <select 
+                            className="w-full px-3 py-1.5 rounded-xl border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 outline-none font-bold text-zinc-800 text-xs cursor-pointer"
+                            value={selectedCurrencyId}
+                            onChange={(e) => handleCurrencyChange(e.target.value)}
+                          >
+                            {(() => {
+                              const baseCode = (company?.settings?.currency || (company as any)?.currency || 'egp').toLowerCase();
+                              const baseCurrInList = companyCurrencies.find(c => c.code.toLowerCase() === baseCode);
+                              const baseCurrencyName = baseCurrInList 
+                                ? (language === 'ar' ? baseCurrInList.name_ar : baseCurrInList.name_en) 
+                                : (language === 'ar' ? 'العملة الأساسية' : 'Base Currency');
+                              return (
+                                <option value="">
+                                  {`${baseCurrencyName} (${(company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase()})`}
+                                </option>
+                              );
+                            })()}
+                            {companyCurrencies.filter(c => (c.is_active || c.id === selectedCurrencyId) && c.code.toLowerCase() !== (company?.settings?.currency || (company as any)?.currency || 'egp').toLowerCase()).map(curr => (
+                              <option key={curr.id} value={curr.id}>
+                                {language === 'ar' ? `${curr.name_ar} (${curr.code})` : `${curr.name_en} (${curr.code})`}
+                              </option>
+                            ))}
+                          </select>
                         </div>
-                      )}
-                    </div>
-                  </section>
 
-                  {/* Card 2: Payment settings */}
-                  <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                    <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50/50 px-3 py-1 rounded-full border border-emerald-100">
-                      <Wallet className="w-4 h-4" />
-                      <span className="text-xs font-bold">{language === 'ar' ? 'إعدادات الدفع' : 'Payment Settings'}</span>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6">
-                      <button 
-                        type="button"
-                        onClick={() => setReturnData({ ...returnData, payment_type: 'cash' })}
-                        className={`flex-1 py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-3 border ${returnData.payment_type === 'cash' ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg scale-[1.02]' : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'}`}
-                      >
-                        <Wallet size={18} />
-                        language === 'ar' ? 'نقدي' : 'Cash'
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => setReturnData({ ...returnData, payment_type: 'credit' })}
-                        className={`flex-1 py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-3 border ${returnData.payment_type === 'credit' ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg scale-[1.02]' : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'}`}
-                      >
-                        <CreditCard size={18} />
-                        language === 'ar' ? 'آجل' : 'Credit'
-                      </button>
-                    </div>
+                        {(() => {
+                          const selectedCurr = companyCurrencies.find(c => c.id === selectedCurrencyId);
+                          const baseCurrency = company?.settings?.currency || 'EGP';
+                          const isForeign = selectedCurr && selectedCurr.code.toLowerCase() !== baseCurrency.toLowerCase();
+                          
+                          if (!isForeign) return null;
 
-                    {returnData.payment_type === 'cash' && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 10 }} 
-                        animate={{ opacity: 1, y: 0 }} 
-                        className="space-y-6 pt-6 border-t border-zinc-100"
-                      >
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div>
-                            <label className="block text-sm font-medium text-zinc-700 mb-2">{language === 'ar' ? 'طريقة استرداد المبلغ' : 'Refund Method'}</label>
-                            <div className="relative group">
-                              <CreditCard className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 w-4 h-4 text-zinc-400 transition-colors`} />
-                              <select 
+                          return (
+                            <div>
+                              <label className="block text-[10px] font-bold text-zinc-400 mb-1 px-1 uppercase">
+                                {language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}
+                              </label>
+                              <input
                                 required
-                                className={`w-full ${dir === 'rtl' ? 'pr-10' : 'pl-10'} py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm`}
-                                value={returnData.payment_method_id}
+                                type="number"
+                                step="any"
+                                min={0.0001}
+                                className="w-full px-3 py-1.5 rounded-xl border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 outline-none font-bold text-zinc-850 text-xs"
+                                value={exchangeRate}
+                                onChange={(e) => setExchangeRate(parseFloat(e.target.value) || 1)}
+                              />
+                            </div>
+                          );
+                        })()}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Operation, Department, Cost Center apply to all row */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2 pt-2 border-t border-zinc-100">
+                    {/* Operation */}
+                    <div>
+                      <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'رقم عملية عام' : 'Global Operation'}</label>
+                      <div className="flex items-center gap-1">
+                        <div className="relative flex-1">
+                          <input 
+                            type="text" 
+                            placeholder={language === 'ar' ? 'ابحث عن عملية...' : 'Search operation...'}
+                            className="w-full px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 outline-none font-bold text-zinc-800 text-[11px]"
+                            value={
+                              activeSearch && activeSearch.index === -1 && activeSearch.type === 'operation'
+                                ? activeSearch.query
+                                : (operations.find(op => op.id === selectedOperationId)?.operation_number || '')
+                            }
+                            onChange={(e) => {
+                              setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
+                            }}
+                            onFocus={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const dropdownWidth = 420;
+                              let left = rect.left;
+                              if (dir === 'rtl') {
+                                left = rect.left + rect.width - dropdownWidth;
+                              }
+                              left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
+                              setActiveSearch({
+                                index: -1,
+                                type: 'operation',
+                                query: operations.find(op => op.id === selectedOperationId)?.operation_number || ''
+                              });
+                              setPopoverRect({
+                                top: rect.bottom,
+                                left: left,
+                                width: dropdownWidth
+                              });
+                            }}
+                          />
+                          {selectedOperationId && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedOperationId('')}
+                              className={`absolute ${dir === 'rtl' ? 'left-1.5' : 'right-1.5'} inset-y-0 flex items-center px-1 text-zinc-400 hover:text-red-500`}
+                            >
+                              <X size={10} />
+                            </button>
+                          )}
+                        </div>
+                        {selectedOperationId && (
+                          <button
+                            type="button"
+                            onClick={() => applyOperationToAllItems()}
+                            className="p-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded text-emerald-600 transition-colors flex-shrink-0"
+                            title={language === 'ar' ? 'تطبيق على كافة الأصناف' : 'Apply to all items'}
+                          >
+                            <CheckCheck size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Department */}
+                    <div>
+                      <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'الإدارة' : 'Department'}</label>
+                      <div className="flex items-center gap-1">
+                        <div className="relative flex-1">
+                          <input 
+                            type="text" 
+                            placeholder={language === 'ar' ? 'ابحث عن إدارة...' : 'Search department...'}
+                            className="w-full px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 outline-none font-bold text-zinc-800 text-[11px]"
+                            value={
+                              activeSearch && activeSearch.index === -1 && activeSearch.type === 'department'
+                                ? activeSearch.query
+                                : (departments.find(d => d.id === selectedDepartmentId)?.name || '')
+                            }
+                            onChange={(e) => {
+                              setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
+                            }}
+                            onFocus={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const dropdownWidth = 350;
+                              let left = rect.left;
+                              if (dir === 'rtl') {
+                                left = rect.left + rect.width - dropdownWidth;
+                              }
+                              left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
+                              setActiveSearch({
+                                index: -1,
+                                type: 'department',
+                                query: departments.find(d => d.id === selectedDepartmentId)?.name || ''
+                              });
+                              setPopoverRect({
+                                top: rect.bottom,
+                                left: left,
+                                width: dropdownWidth
+                              });
+                            }}
+                          />
+                          {selectedDepartmentId && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedDepartmentId('')}
+                              className={`absolute ${dir === 'rtl' ? 'left-1.5' : 'right-1.5'} inset-y-0 flex items-center px-1 text-zinc-400 hover:text-red-500`}
+                            >
+                              <X size={10} />
+                            </button>
+                          )}
+                        </div>
+                        {selectedDepartmentId && (
+                          <button
+                            type="button"
+                            onClick={() => applyDepartmentToAllItems()}
+                            className="p-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded text-emerald-600 transition-colors flex-shrink-0"
+                            title={language === 'ar' ? 'تطبيق على كافة الأصناف' : 'Apply to all items'}
+                          >
+                            <CheckCheck size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Cost Center */}
+                    <div>
+                      <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'مركز التكلفة' : 'Cost Center'}</label>
+                      <div className="flex items-center gap-1">
+                        <div className="relative flex-1">
+                          <input 
+                            type="text" 
+                            placeholder={language === 'ar' ? 'ابحث عن مركز...' : 'Search cost center...'}
+                            className="w-full px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 outline-none font-bold text-zinc-800 text-[11px]"
+                            value={
+                              activeSearch && activeSearch.index === -1 && activeSearch.type === 'cost_center'
+                                ? activeSearch.query
+                                : (costCenters.find(cc => cc.id === selectedCostCenterId)?.name || '')
+                            }
+                            onChange={(e) => {
+                              setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
+                            }}
+                            onFocus={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const dropdownWidth = 350;
+                              let left = rect.left;
+                              if (dir === 'rtl') {
+                                left = rect.left + rect.width - dropdownWidth;
+                              }
+                              left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
+                              setActiveSearch({
+                                index: -1,
+                                type: 'cost_center',
+                                query: costCenters.find(cc => cc.id === selectedCostCenterId)?.name || ''
+                              });
+                              setPopoverRect({
+                                top: rect.bottom,
+                                left: left,
+                                width: dropdownWidth
+                              });
+                            }}
+                          />
+                          {selectedCostCenterId && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCostCenterId('')}
+                              className={`absolute ${dir === 'rtl' ? 'left-1.5' : 'right-1.5'} inset-y-0 flex items-center px-1 text-zinc-400 hover:text-red-500`}
+                            >
+                              <X size={10} />
+                            </button>
+                          )}
+                        </div>
+                        {selectedCostCenterId && (
+                          <button
+                            type="button"
+                            onClick={() => applyCostCenterToAllItems()}
+                            className="p-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded text-emerald-600 transition-colors flex-shrink-0"
+                            title={language === 'ar' ? 'تطبيق على كافة الأصناف' : 'Apply to all items'}
+                          >
+                            <CheckCheck size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Subject / Description */}
+                  <div className="pt-2 border-t border-zinc-100 mt-2">
+                    <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'موضوع المرتجع' : 'Return Subject'}</label>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-1 rounded-lg bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 outline-none font-bold text-zinc-800 text-[11px] placeholder:text-zinc-300 font-sans"
+                      placeholder={language === 'ar' ? 'أدخل وصفاً عاماً يظهر في أعلى المرتجع...' : 'Enter a general description...'}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* Items Section */}
+              <section className="bg-white p-3 rounded-2xl border border-zinc-200 shadow-sm space-y-2">
+                <div className="flex flex-row items-center justify-between gap-1.5 mb-1">
+                  <div className="flex items-center gap-1.5 text-emerald-600">
+                    <Package className="w-4 h-4" />
+                    <h2 className="font-semibold text-zinc-900 text-xs">{language === 'ar' ? 'الأصناف المرتجعة' : 'Returned Items'}</h2>
+                  </div>
+
+                  <button 
+                    type="button"
+                    onClick={() => addEmptyRow()}
+                    className="px-3 py-1 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-sm text-xs"
+                  >
+                    <Plus size={12} />
+                    إضافة صف جديد
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-zinc-200 overflow-hidden">
+                  <table className="w-full text-sm text-right border-collapse table-fixed min-w-[1150px]">
+                    <thead>
+                      <tr className="bg-zinc-100 border-b border-zinc-200 text-zinc-700 text-xs font-bold">
+                        <th className="p-2 border-r border-zinc-200 text-right w-80 min-w-[320px]">اسم الصنف</th>
+                        <th className="p-2 border-r border-zinc-200 text-center w-12">صورة</th>
+                        <th className="p-2 border-r border-zinc-200 text-center w-24">باركود</th>
+                        <th className="p-2 border-r border-zinc-200 text-center w-28">رقم عملية</th>
+                        <th className="p-2 border-r border-zinc-200 text-center w-28">الإدارة</th>
+                        <th className="p-2 border-r border-zinc-200 text-center w-28">مركز التكلفة</th>
+                        <th className="p-2 border-r border-zinc-200 text-center w-16">الكمية</th>
+                        <th className="p-2 border-r border-zinc-200 text-center w-24">السعر</th>
+                        {isVatEnabled && (
+                          <th className="p-2 border-r border-zinc-200 text-center w-14">ض ق م %</th>
+                        )}
+                        <th className="p-2 border-r border-zinc-200 text-center w-24">الإجمالي</th>
+                        <th className="p-2 w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100">
+                      {items.map((item, index) => (
+                        <tr key={index} className="group hover:bg-zinc-50 transition-colors">
+                          <td className="p-0.5 border-b border-r border-zinc-200 w-80 min-w-[320px]">
+                            <div className="relative">
+                              <select 
+                                className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-2 py-1 outline-none font-bold text-zinc-800 appearance-none transition-all text-xs"
+                                value={item.product_id}
                                 onChange={(e) => {
-                                  if (e.target.value === 'new') {
-                                    setIsPaymentMethodModalOpen(true);
+                                  if (e.target.value === 'new_product') {
+                                    setIsProductModalOpen(true);
                                   } else {
-                                    setReturnData({...returnData, payment_method_id: e.target.value});
+                                    updateItem(index, 'product_id', e.target.value);
                                   }
                                 }}
                               >
-                                <option value="">language === 'ar' ? 'اختر الطريقة...' : 'Select Method...'</option>
-                                {paymentMethods.map(m => (
-                                  <option key={m.id} value={m.id}>{m.name}</option>
-                                ))}
-                                <option value="new" className="font-bold text-emerald-600">+ {language === 'ar' ? 'إضافة طريقة دفع...' : 'Add Payment Method...'}</option>
+                                <option value="">اختر الصنف...</option>
+                                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                <option value="new_product" className="font-bold text-emerald-600 italic">+ إضافة صنف</option>
                               </select>
-                              <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                              <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-2' : 'right-2'} top-2 w-3.5 h-3.5 text-zinc-400 pointer-events-none`} />
                             </div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-
-                    <div>
-                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('common.notes')}</label>
-                      <textarea 
-                        rows={2}
-                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none text-sm font-bold text-zinc-800"
-                        placeholder={language === 'ar' ? 'سبب الارتجاع أو أي ملاحظات...' : 'Reason for return or notes...'}
-                        value={returnData.notes}
-                        onChange={(e) => setReturnData({...returnData, notes: e.target.value})}
-                      />
-                    </div>
-                  </section>
-
-                  {/* Card 3: Items */}
-                  <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                    <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
-                      <Package className="w-4 h-4" />
-                      <span className="text-xs font-bold">{language === 'ar' ? 'الأصناف المرتجعة' : 'Returned Items'}</span>
-                    </div>
-
-                    <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsProductModalOpen(true);
-                          }}
-                          className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-bold border border-emerald-100 hover:bg-emerald-100 transition-all"
-                        >
-                          {language === 'ar' ? '+ إضافة صنف جديد' : '+ Add New Product'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={addItem}
-                          className="px-4 py-2 bg-zinc-100 text-zinc-600 rounded-xl text-xs font-bold hover:bg-zinc-200 transition-all"
-                        >
-                          <Plus size={14} className="inline-block me-1" />
-                          إضافة صف جديد
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="overflow-x-auto rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
-                      <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'} text-sm`}>
-                        <thead className="bg-zinc-50 text-zinc-400 uppercase text-[10px] font-black tracking-widest border-b border-zinc-100">
-                          <tr>
-                            <th className="px-6 py-4 w-12 text-center">صورة</th>
-                            <th className="px-6 py-4">الصنف</th>
-                            <th className="px-6 py-4 w-28 text-center">الكمية</th>
-                            <th className="px-6 py-4 w-32 text-center">سعر التكلفة</th>
-                            <th className={`px-6 py-4 w-32 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>الإجمالي</th>
-                            <th className="px-6 py-4 w-10"></th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-zinc-50">
-                          {items.map((item, index) => (
-                            <tr key={index} className="hover:bg-zinc-50/50 transition-colors group">
-                              <td className="px-6 py-3 text-center">
-                                {(item as any).product_image_url ? (
-                                  <img 
-                                    src={(item as any).product_image_url} 
-                                    alt="Product" 
-                                    className="w-10 h-10 object-cover rounded-xl mx-auto border border-zinc-100 shadow-sm"
-                                    referrerPolicy="no-referrer"
-                                  />
-                                ) : (
-                                  <div className="w-10 h-10 bg-zinc-50 rounded-xl flex items-center justify-center mx-auto border border-zinc-100">
-                                    <Box size={16} className="text-zinc-300" />
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-6 py-3">
-                                <div className="relative">
-                                  <select 
-                                    className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2.5 outline-none font-bold text-zinc-800 appearance-none text-xs focus:ring-2 focus:ring-emerald-500 transition-all"
-                                    value={item.product_id}
-                                    onChange={(e) => {
-                                      if (e.target.value === 'new_product') {
-                                        setIsProductModalOpen(true);
-                                      } else {
-                                        updateItem(index, 'product_id', e.target.value);
-                                      }
-                                    }}
+                          </td>
+                          <td className="p-0.5 border-b border-r border-zinc-200 w-12 text-center">
+                            <div className="flex justify-center items-center">
+                              {item.image_url || item.product_image_url ? (
+                                <div className="relative group w-8 h-8">
+                                  <img src={item.image_url || item.product_image_url} alt="" className="w-full h-full object-cover rounded shadow-sm" referrerPolicy="no-referrer" />
+                                  <button 
+                                    onClick={() => updateItem(index, 'image_url', '')}
+                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                                   >
-                                    <option value="">اختر الصنف...</option>
-                                    {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}
-                                    <option value="new_product" className="font-bold text-emerald-600">+ إضافة صنف جديد</option>
-                                  </select>
-                                  <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                                    <X size={8} />
+                                  </button>
                                 </div>
-                              </td>
-                              <td className="px-6 py-3">
+                              ) : (
+                                <label className="cursor-pointer p-1 bg-zinc-50 border border-zinc-200 border-dashed rounded hover:bg-zinc-100 transition-colors inline-block">
+                                  <ImageIcon size={14} className="text-zinc-400" />
+                                  <input 
+                                    type="file" 
+                                    className="hidden" 
+                                    accept="image/*" 
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                        const reader = new FileReader();
+                                        reader.onloadend = () => updateItem(index, 'image_url', reader.result as string);
+                                        reader.readAsDataURL(file);
+                                      }
+                                    }} 
+                                  />
+                                </label>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center">
+                            <div className="flex flex-col items-center gap-0.5">
+                              <input 
+                                type="text" 
+                                placeholder={language === 'ar' ? 'الباركود...' : 'Barcode...'}
+                                className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-2 py-1 text-center font-bold text-xs text-zinc-800 outline-none transition-all font-mono"
+                                value={item.barcode || ''}
+                                onChange={(e) => updateItem(index, 'barcode', e.target.value)}
+                              />
+                              {item.barcode && (
+                                <div className="bg-white p-0.5 rounded border border-zinc-100 shadow-sm scale-90">
+                                  <Barcode 
+                                    value={item.barcode} 
+                                    width={0.5} 
+                                    height={10} 
+                                    fontSize={4}
+                                    margin={0}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          
+                          {/* Operation */}
+                          <td className="p-0.5 border-b border-r border-zinc-200 w-28 text-center">
+                            <div className="flex items-center gap-1 w-full relative">
+                              <div className="relative flex-1">
                                 <input 
-                                  type="number"
-                                  step="any"
-                                  className="w-full bg-zinc-50 border border-transparent focus:bg-white focus:ring-2 focus:ring-emerald-500 rounded-xl px-4 py-2.5 text-xs outline-none text-center font-bold text-zinc-800 transition-all"
-                                  value={item.quantity}
-                                  onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
+                                  type="text" 
+                                  placeholder={language === 'ar' ? 'ابحث...' : 'Search...'}
+                                  className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-2 py-1 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
+                                  value={
+                                    activeSearch && activeSearch.index === index && activeSearch.type === 'operation'
+                                      ? activeSearch.query
+                                      : (operations.find(op => op.id === item.operation_id)?.operation_number || '')
+                                  }
+                                  onChange={(e) => {
+                                    setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
+                                  }}
+                                  onFocus={(e) => {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const dropdownWidth = 420;
+                                    let left = rect.left;
+                                    if (dir === 'rtl') {
+                                      left = rect.left + rect.width - dropdownWidth;
+                                    }
+                                    left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
+                                    setActiveSearch({
+                                      index,
+                                      type: 'operation',
+                                      query: operations.find(op => op.id === item.operation_id)?.operation_number || ''
+                                    });
+                                    setPopoverRect({
+                                      top: rect.bottom,
+                                      left: left,
+                                      width: dropdownWidth
+                                    });
+                                  }}
                                 />
-                              </td>
-                              <td className="px-6 py-3">
-                                <input 
-                                  type="number"
-                                  step="any"
-                                  className="w-full bg-zinc-50 border border-transparent focus:bg-white focus:ring-2 focus:ring-emerald-500 rounded-xl px-4 py-2.5 text-xs outline-none text-center font-bold text-zinc-800 transition-all"
-                                  value={item.cost_price}
-                                  onChange={(e) => updateItem(index, 'cost_price', Number(e.target.value))}
-                                />
-                              </td>
-                              <td className={`px-6 py-3 font-bold text-zinc-900 text-sm ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                                {formatNumber(item.quantity * item.cost_price)}
-                              </td>
-                              <td className="px-6 py-3 text-center">
-                                <button 
+                                {item.operation_id && (
+                                  <button
+                                    type="button"
+                                    onClick={() => updateItem(index, 'operation_id', '')}
+                                    className={`absolute ${dir === 'rtl' ? 'left-1' : 'right-1'} inset-y-0 flex items-center px-1 text-zinc-400 hover:text-red-500`}
+                                  >
+                                    <X size={10} />
+                                  </button>
+                                )}
+                              </div>
+                              {item.operation_id && (
+                                <button
                                   type="button"
-                                  onClick={() => removeItem(index)}
-                                  className="p-2 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                                  onClick={() => {
+                                    setIsModalOpen(false);
+                                    setPendingViewDoc({ type: 'operation', idOrNumber: item.operation_id! });
+                                    setCurrentPage('operations');
+                                  }}
+                                  className="p-0.5 hover:bg-zinc-100 rounded text-zinc-400 hover:text-emerald-600 transition-colors flex-shrink-0"
+                                  title={language === 'ar' ? 'انتقال إلى العملية' : 'Go to operation'}
                                 >
-                                  <Trash2 size={16} />
+                                  <ExternalLink size={12} />
                                 </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                              )}
+                            </div>
+                          </td>
 
-                    {/* Summary Section */}
-                    <div className="mt-8 flex justify-end">
-                      <div className="bg-zinc-900 text-white rounded-3xl p-8 min-w-[300px] space-y-4 shadow-xl">
-                        <div className="flex justify-between items-center text-zinc-400 text-xs font-bold uppercase tracking-widest">
-                          <span>إجمالي المرتجع</span>
-                        </div>
-                        <div className="flex justify-between items-baseline gap-4">
-                          <span className="text-4xl font-black tracking-tighter text-emerald-400">
-                            {formatNumber(calculateTotal())}
-                          </span>
-                          <span className="font-bold text-zinc-400">ج.م</span>
-                        </div>
-                      </div>
-                    </div>
-                  </section>
+                          {/* Department */}
+                          <td className="p-0.5 border-b border-r border-zinc-200 w-28 text-center">
+                            <div className="flex items-center gap-1 w-full relative">
+                              <div className="relative flex-1">
+                                <input 
+                                  type="text" 
+                                  placeholder={language === 'ar' ? 'ابحث...' : 'Search...'}
+                                  className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-2 py-1 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
+                                  value={
+                                    activeSearch && activeSearch.index === index && activeSearch.type === 'department'
+                                      ? activeSearch.query
+                                      : (departments.find(d => d.id === item.department_id)?.name || '')
+                                  }
+                                  onChange={(e) => {
+                                    setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
+                                  }}
+                                  onFocus={(e) => {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const dropdownWidth = 350;
+                                    let left = rect.left;
+                                    if (dir === 'rtl') {
+                                      left = rect.left + rect.width - dropdownWidth;
+                                    }
+                                    left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
+                                    setActiveSearch({
+                                      index,
+                                      type: 'department',
+                                      query: departments.find(d => d.id === item.department_id)?.name || ''
+                                    });
+                                    setPopoverRect({
+                                      top: rect.bottom,
+                                      left: left,
+                                      width: dropdownWidth
+                                    });
+                                  }}
+                                />
+                                {item.department_id && (
+                                  <button
+                                    type="button"
+                                    onClick={() => updateItem(index, 'department_id', '')}
+                                    className={`absolute ${dir === 'rtl' ? 'left-1' : 'right-1'} inset-y-0 flex items-center px-1 text-zinc-400 hover:text-red-500`}
+                                  >
+                                    <X size={10} />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Cost Center */}
+                          <td className="p-0.5 border-b border-r border-zinc-200 w-28 text-center">
+                            <div className="flex items-center gap-1 w-full relative">
+                              <div className="relative flex-1">
+                                <input 
+                                  type="text" 
+                                  placeholder={language === 'ar' ? 'ابحث...' : 'Search...'}
+                                  className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-2 py-1 text-right font-bold text-xs text-zinc-800 outline-none transition-all"
+                                  value={
+                                    activeSearch && activeSearch.index === index && activeSearch.type === 'cost_center'
+                                      ? activeSearch.query
+                                      : (costCenters.find(cc => cc.id === item.cost_center_id)?.name || '')
+                                  }
+                                  onChange={(e) => {
+                                    setActiveSearch(prev => prev ? { ...prev, query: e.target.value } : null);
+                                  }}
+                                  onFocus={(e) => {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const dropdownWidth = 350;
+                                    let left = rect.left;
+                                    if (dir === 'rtl') {
+                                      left = rect.left + rect.width - dropdownWidth;
+                                    }
+                                    left = Math.max(10, Math.min(window.innerWidth - dropdownWidth - 10, left));
+                                    setActiveSearch({
+                                      index,
+                                      type: 'cost_center',
+                                      query: costCenters.find(cc => cc.id === item.cost_center_id)?.name || ''
+                                    });
+                                    setPopoverRect({
+                                      top: rect.bottom,
+                                      left: left,
+                                      width: dropdownWidth
+                                    });
+                                  }}
+                                />
+                                {item.cost_center_id && (
+                                  <button
+                                    type="button"
+                                    onClick={() => updateItem(index, 'cost_center_id', '')}
+                                    className={`absolute ${dir === 'rtl' ? 'left-1' : 'right-1'} inset-y-0 flex items-center px-1 text-zinc-400 hover:text-red-500`}
+                                  >
+                                    <X size={10} />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="p-0.5 border-b border-r border-zinc-200 w-16">
+                            <input 
+                              type="number" 
+                              className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-2 py-1 text-center font-black text-zinc-900 outline-none transition-all text-xs"
+                              value={item.quantity !== undefined && item.quantity !== null ? Number(item.quantity) : ''}
+                              onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                            />
+                          </td>
+                          <td className="p-0.5 border-b border-r border-zinc-200 w-24">
+                            <input 
+                              type="text" 
+                              className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-2 py-1 text-center font-bold text-zinc-800 outline-none transition-all text-xs font-mono"
+                              value={focusedPriceIndex === index ? tempPriceValue : formatMoney(item.unit_price)}
+                              onFocus={() => {
+                                setFocusedPriceIndex(index);
+                                setTempPriceValue(item.unit_price ? String(item.unit_price) : '');
+                              }}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (/^\d*\.?\d*$/.test(val)) {
+                                  setTempPriceValue(val);
+                                  updateItem(index, 'unit_price', parseFloat(val) || 0);
+                                }
+                              }}
+                              onBlur={() => {
+                                setFocusedPriceIndex(null);
+                              }}
+                            />
+                          </td>
+                          {isVatEnabled && (
+                            <td className="p-0.5 border-b border-r border-zinc-200 w-14">
+                              <div className="flex items-center justify-center gap-0.5">
+                                <input 
+                                  type="number" 
+                                  min={0}
+                                  max={100}
+                                  className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs"
+                                  value={item.vat_rate !== undefined && item.vat_rate !== null ? Number(item.vat_rate) : 0}
+                                  onChange={(e) => updateItem(index, 'vat_rate', parseFloat(e.target.value) || 0)}
+                                />
+                                <span className="text-sm text-zinc-900 font-black">%</span>
+                              </div>
+                            </td>
+                          )}
+                          <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-emerald-600 text-xs">
+                            {formatMoney(item.total)}
+                          </td>
+                          <td className="p-0.5 border-b border-zinc-200 w-10 text-center">
+                            <button 
+                              type="button"
+                              onClick={() => removeItem(index)}
+                              className="p-1 text-zinc-300 hover:text-red-505 transition-colors"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {items.length === 0 && (
+                        <tr>
+                          <td colSpan={isVatEnabled ? 11 : 10} className="px-3 py-6 text-center text-zinc-400 italic text-xs">
+                            لا توجد أصناف حالياً
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
+              </section>
+
+              {/* Floating Autocomplete Popover */}
+              {activeSearch && popoverRect && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-[100]" 
+                    onClick={() => setActiveSearch(null)} 
+                  />
+                  <div 
+                    className="fixed z-[110] bg-white rounded-xl border border-zinc-200 shadow-2xl overflow-y-auto text-xs text-right scrollbar-thin scrollbar-thumb-zinc-300"
+                    style={{
+                      top: popoverRect.top,
+                      left: popoverRect.left,
+                      width: popoverRect.width,
+                      maxHeight: '260px',
+                    }}
+                  >
+                    {activeSearch.type === 'operation' && (() => {
+                      const filtered = operations.filter(op => {
+                        const q = activeSearch.query.toLowerCase().trim();
+                        if (!q) return true;
+                        return (
+                          (op.operation_number || '').toLowerCase().includes(q) ||
+                          (op.customer_name || '').toLowerCase().includes(q) ||
+                          (op.description || '').toLowerCase().includes(q)
+                        );
+                      });
+                      return (
+                        <table className="w-full text-right border-collapse">
+                          <thead>
+                            <tr className="bg-zinc-100 border-b border-zinc-200 text-zinc-650 font-bold text-[10px] sticky top-0 z-10">
+                              <th className="p-2 text-right">رقم العملية</th>
+                              <th className="p-2 text-right">العميل</th>
+                              <th className="p-2 text-right">التفاصيل</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-100">
+                            {filtered.map(op => (
+                              <tr 
+                                key={op.id} 
+                                onClick={() => {
+                                  if (activeSearch.index === -1) {
+                                    setSelectedOperationId(op.id);
+                                    if (op.department_id) setSelectedDepartmentId(op.department_id);
+                                    if (op.cost_center_id) setSelectedCostCenterId(op.cost_center_id);
+                                  } else {
+                                    updateItem(activeSearch.index, 'operation_id', op.id);
+                                  }
+                                  setActiveSearch(null);
+                                }}
+                                className="hover:bg-emerald-50 cursor-pointer transition-colors"
+                              >
+                                <td className="p-2 font-bold text-zinc-900">{op.operation_number || 'N/A'}</td>
+                                <td className="p-2 text-zinc-600 font-bold">{op.customer_name || '-'}</td>
+                                <td className="p-2 text-zinc-500 truncate max-w-[120px]">{op.description || '-'}</td>
+                              </tr>
+                            ))}
+                            {filtered.length === 0 && (
+                              <tr>
+                                <td colSpan={3} className="p-4 text-center text-zinc-400 italic">لا توجد نتائج</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      );
+                    })()}
+
+                    {activeSearch.type === 'department' && (() => {
+                      const filtered = departments.filter(d => {
+                        const q = activeSearch.query.toLowerCase().trim();
+                        if (!q) return true;
+                        return (
+                          (d.code || '').toLowerCase().includes(q) ||
+                          (d.name || '').toLowerCase().includes(q) ||
+                          (d.description || '').toLowerCase().includes(q)
+                        );
+                      });
+                      return (
+                        <table className="w-full text-right border-collapse">
+                          <thead>
+                            <tr className="bg-zinc-100 border-b border-zinc-200 text-zinc-650 font-bold text-[10px] sticky top-0 z-10">
+                              <th className="p-2 text-right">الكود</th>
+                              <th className="p-2 text-right">الاسم</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-100">
+                            {filtered.map(d => (
+                              <tr 
+                                key={d.id} 
+                                onClick={() => {
+                                  if (activeSearch.index === -1) {
+                                    setSelectedDepartmentId(d.id);
+                                  } else {
+                                    updateItem(activeSearch.index, 'department_id', d.id);
+                                  }
+                                  setActiveSearch(null);
+                                }}
+                                className="hover:bg-emerald-50 cursor-pointer transition-colors"
+                              >
+                                <td className="p-2 font-mono text-zinc-900 font-bold">{d.code || '-'}</td>
+                                <td className="p-2 text-zinc-600 font-bold">{d.name}</td>
+                              </tr>
+                            ))}
+                            {filtered.length === 0 && (
+                              <tr>
+                                <td colSpan={2} className="p-4 text-center text-zinc-400 italic">لا توجد نتائج</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      );
+                    })()}
+
+                    {activeSearch.type === 'cost_center' && (() => {
+                      const filtered = costCenters.filter(cc => {
+                        const q = activeSearch.query.toLowerCase().trim();
+                        if (!q) return true;
+                        return (
+                          (cc.code || '').toLowerCase().includes(q) ||
+                          (cc.name || '').toLowerCase().includes(q) ||
+                          (cc.description || '').toLowerCase().includes(q)
+                        );
+                      });
+                      return (
+                        <table className="w-full text-right border-collapse">
+                          <thead>
+                            <tr className="bg-zinc-100 border-b border-zinc-200 text-zinc-650 font-bold text-[10px] sticky top-0 z-10">
+                              <th className="p-2 text-right">الكود</th>
+                              <th className="p-2 text-right">الاسم</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-100">
+                            {filtered.map(cc => (
+                              <tr 
+                                key={cc.id} 
+                                onClick={() => {
+                                  if (activeSearch.index === -1) {
+                                    setSelectedCostCenterId(cc.id);
+                                  } else {
+                                    updateItem(activeSearch.index, 'cost_center_id', cc.id);
+                                  }
+                                  setActiveSearch(null);
+                                }}
+                                className="hover:bg-emerald-50 cursor-pointer transition-colors"
+                              >
+                                <td className="p-2 font-mono text-zinc-900 font-bold">{cc.code || '-'}</td>
+                                <td className="p-2 text-zinc-600 font-bold">{cc.name}</td>
+                              </tr>
+                            ))}
+                            {filtered.length === 0 && (
+                              <tr>
+                                <td colSpan={2} className="p-4 text-center text-zinc-400 italic">لا توجد نتائج</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      );
+                    })()}
+                  </div>
+                </>
+              )}
+
+              {/* Inline Bottom Panel for Activity Log and Journal Entry */}
+              {showSidePanel && (
+                <div className="mt-6 border border-zinc-200 rounded-2xl overflow-hidden bg-white shadow-sm flex flex-col w-full">
+                  <div 
+                    onClick={() => setIsPanelExpanded(!isPanelExpanded)}
+                    className="p-3 border-b border-zinc-150 flex items-center justify-between bg-zinc-55 cursor-pointer select-none"
+                  >
+                    <div className="flex items-center gap-3">
+                      <button 
+                        type="button"
+                        className="w-7 h-7 rounded-full bg-slate-200/70 flex items-center justify-center transition-all shadow-sm"
+                      >
+                        {isPanelExpanded ? <ChevronDown size={16} className="text-slate-650" /> : <ChevronUp size={16} className="text-slate-655" />}
+                      </button>
+                      <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                        <History size={16} className="text-emerald-600 animate-pulse" />
+                        <span>{language === 'ar' ? 'سجل التعديلات والقيد' : 'Activity Log & Journal'}</span>
+                      </h3>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={(e) => { e.stopPropagation(); setShowSidePanel(false); }} 
+                      className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 rounded-lg transition-all"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isPanelExpanded ? 'max-h-[1200px] border-t border-zinc-200' : 'max-h-0'}`}>
+                    {(() => {
+                      const activeCurrency = companyCurrencies.find(c => c.id === (editingReturn?.currency_id || selectedCurrencyId));
+                      const currencyCode = activeCurrency ? activeCurrency.code : (company?.settings?.currency || (company as any)?.currency || 'EGP');
+                      const exchangeRateVal = editingReturn ? (editingReturn.exchange_rate || 1) : (Number(exchangeRate) || 1);
+                      
+                      return (
+                        <TransactionSidePanel 
+                          documentId={editingReturn?.id || ''} 
+                          category="purchase_returns" 
+                          previewJournalEntry={previewJournalEntry}
+                          previewActivityLog={previewActivityLog}
+                          layout="bottom"
+                          currencyCode={currencyCode}
+                          exchangeRate={exchangeRateVal}
+                          previewItems={items}
+                        />
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+
+              {!showSidePanel && (
+                <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-start">
+                  <button 
+                    type="button"
+                    onClick={() => { setShowSidePanel(true); setIsPanelExpanded(true); }}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-55"
+                  >
+                    <History size={14} />
+                    <span>{language === 'ar' ? 'عرض سجل التعديلات والقيد' : 'Show Activity Log & Journal'}</span>
+                  </button>
+                </div>
+              )}
 
               {/* Form Footer */}
               <div className="p-4 md:p-6 border-t border-slate-100 bg-white/80 backdrop-blur-md sticky bottom-0 z-[70] flex items-center justify-between gap-4 mt-auto">
                 <button 
                   type="button"
                   onClick={closeModal}
-                  className="flex-1 max-w-[200px] py-4 rounded-2xl bg-zinc-100 text-zinc-600 font-black hover:bg-zinc-200 transition-all flex items-center justify-center gap-3 active:scale-95"
+                  className="flex-1 max-w-[200px] py-4 rounded-2xl bg-zinc-100 text-zinc-650 font-black hover:bg-zinc-200 transition-all flex items-center justify-center gap-3 active:scale-95"
                 >
                   <RotateCcw size={20} />
                   {t('common.cancel')}
@@ -1579,36 +2933,37 @@ export const PurchaseReturns: React.FC = () => {
           </div>
         </div>
       )}
+
       {/* View Return Modal */}
       {viewReturn && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
-          <div ref={returnRef} id="purchase-return-capture-area" className="bg-white w-full max-w-2xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 min-h-screen md:min-h-0 my-auto" style={{ backgroundColor: '#ffffff', color: '#18181b' }}>
-            <div className="p-6 border-b border-zinc-50 flex items-center justify-between bg-zinc-50/50 sticky top-0 z-10" style={{ backgroundColor: '#f4f4f5' }}>
+          <div className="bg-white w-full max-w-6xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 min-h-screen md:min-h-0 my-auto flex flex-col md:max-h-[90vh] border border-zinc-200">
+            <div className="p-6 border-b border-zinc-105 flex items-center justify-between bg-zinc-55 sticky top-0 z-10">
               <div className="flex items-center gap-2">
-                <h3 className="text-xl font-bold text-zinc-900" style={{ color: '#18181b' }}>تفاصيل مرتجع المشتريات: {viewReturn.return_number}</h3>
+                <h3 className="text-xl font-bold text-zinc-900">تفاصيل مرتجع المشتريات: {viewReturn.return_number}</h3>
                 <button 
                   onClick={() => {
                     setActivityLogDocumentId(viewReturn.id);
                     setIsActivityLogOpen(true);
                   }}
-                  className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all"
+                  className="p-2 text-zinc-505 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all"
                   title="سجل النشاط"
                 >
                   <History size={20} />
                 </button>
               </div>
-              <button onClick={() => setViewReturn(null)} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-full transition-all">
+              <button onClick={() => setViewReturn(null)} className="text-zinc-400 hover:text-zinc-650 p-2 hover:bg-zinc-100 rounded-full transition-all">
                 <X size={24} />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full">
               {/* Side Panel for Activity Log and Journal Entry */}
-              <TransactionSidePanel 
-                documentId={viewReturn.id} 
-                category="purchase_returns" 
-              />
+              <div className="hidden lg:block w-80 border-r border-slate-100 bg-slate-50/30">
+                <InlineActivityLog category="purchase_returns" documentId={viewReturn.id} />
+              </div>
 
-              <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8">
+              {/* Printable container Isolated */}
+              <div ref={returnRef} id="purchase-return-capture-area" className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 bg-white" style={{ backgroundColor: '#ffffff', color: '#18181b' }}>
                 <CompanyInvoiceHeader 
                   company={company} 
                   documentNumber={viewReturn.return_number}
@@ -1621,12 +2976,12 @@ export const PurchaseReturns: React.FC = () => {
                     <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1" style={{ color: '#71717a' }}>المورد</p>
                     <p className="text-lg font-bold text-zinc-900" style={{ color: '#18181b' }}>{viewReturn.supplier_name}</p>
                     {viewReturn.warehouse_id && (
-                      <p className="text-xs text-slate-500 font-medium mt-1">
+                      <p className="text-xs text-slate-505 font-medium mt-1">
                         {language === 'ar' ? 'المخزن:' : 'Warehouse:'} <span className="text-emerald-600 font-bold">{warehouses.find((w: any) => w.id?.toString() === viewReturn.warehouse_id?.toString())?.name || viewReturn.warehouse_id}</span>
                       </p>
                     )}
                     {viewReturn.entry_number && (
-                      <p className="text-xs text-slate-500 font-medium mt-1">
+                      <p className="text-xs text-slate-505 font-medium mt-1">
                         {language === 'ar' ? 'رقم القيد:' : 'Journal Entry:'} <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1634,10 +2989,23 @@ export const PurchaseReturns: React.FC = () => {
                             setPendingViewDoc({ type: 'journal', idOrNumber: viewReturn.entry_number! });
                             setCurrentPage('journal_entries');
                           }}
-                          className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50"
+                          className="text-emerald-650 hover:text-emerald-700 hover:underline font-mono font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50"
                         >
                           {viewReturn.entry_number}
                         </button>
+                      </p>
+                    )}
+                    {viewReturn.currency_id && (
+                      <p className="text-xs text-slate-505 font-medium mt-1">
+                        {language === 'ar' ? 'العملة:' : 'Currency:'}{' '}
+                        <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50 font-mono">
+                          {companyCurrencies.find(c => c.id === viewReturn.currency_id)?.code || viewReturn.currency_id}
+                        </span>
+                        {viewReturn.exchange_rate && Number(viewReturn.exchange_rate) !== 1 && (
+                          <span className="text-zinc-505 text-[10px] ml-2 mr-2 font-bold bg-zinc-50 px-2 py-0.5 rounded border border-zinc-200">
+                            {language === 'ar' ? 'سعر الصرف:' : 'Exchange Rate:'} {viewReturn.exchange_rate}
+                          </span>
+                        )}
                       </p>
                     )}
                   </div>
@@ -1659,24 +3027,34 @@ export const PurchaseReturns: React.FC = () => {
                   )}
                 </div>
 
+                {viewReturn.description && (
+                  <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
+                    <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1">الوصف</p>
+                    <p className="text-zinc-700 whitespace-pre-wrap">{viewReturn.description}</p>
+                  </div>
+                )}
+
                 <div className="border border-zinc-100 rounded-2xl overflow-hidden" style={{ borderColor: '#f4f4f5' }}>
                   <table className="w-full text-right text-sm border-collapse">
                     <thead className="bg-zinc-50 text-zinc-500 uppercase text-[10px] font-bold tracking-wider" style={{ backgroundColor: '#fafafa' }}>
                       <tr>
-                        <th className="px-6 py-3 w-16 text-center" style={{ color: '#71717a' }}>صورة</th>
-                        <th className="px-6 py-3" style={{ color: '#71717a' }}>الصنف</th>
-                        <th className="px-6 py-3" style={{ color: '#71717a' }}>الكمية</th>
-                        <th className="px-6 py-3 hidden md:table-cell" style={{ color: '#71717a' }}>السعر</th>
-                        <th className="px-6 py-3" style={{ color: '#71717a' }}>الإجمالي</th>
+                        <th className="px-4 py-3 w-16 text-center" style={{ color: '#71717a' }}>صورة</th>
+                        <th className="px-4 py-3" style={{ color: '#71717a' }}>الصنف</th>
+                        <th className="px-4 py-3 text-center" style={{ color: '#71717a' }}>العملية</th>
+                        <th className="px-4 py-3 text-center" style={{ color: '#71717a' }}>الإدارة</th>
+                        <th className="px-4 py-3 text-center" style={{ color: '#71717a' }}>مركز التكلفة</th>
+                        <th className="px-4 py-3 text-center" style={{ color: '#71717a' }}>الكمية</th>
+                        <th className="px-4 py-3 hidden md:table-cell" style={{ color: '#71717a' }}>السعر</th>
+                        <th className="px-4 py-3" style={{ color: '#71717a' }}>الإجمالي</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-50" style={{ borderColor: '#fafafa' }}>
                       {viewReturn.items?.map((item: any, idx: number) => (
                         <tr key={idx}>
-                          <td className="px-6 py-4 text-center">
-                            {item.product_image_url ? (
+                          <td className="px-4 py-4 text-center">
+                            {item.product_image_url || item.image_url ? (
                               <img 
-                                src={item.product_image_url} 
+                                src={item.product_image_url || item.image_url} 
                                 alt={item.product_name} 
                                 className="w-10 h-10 object-cover rounded-lg mx-auto border border-[#f4f4f5]"
                                 referrerPolicy="no-referrer"
@@ -1687,38 +3065,74 @@ export const PurchaseReturns: React.FC = () => {
                               </div>
                             )}
                           </td>
-                          <td className="px-6 py-4 font-bold text-zinc-900" style={{ color: '#18181b' }}>{item.product_name}</td>
-                          <td className="px-6 py-4 text-zinc-500" style={{ color: '#71717a' }}>{item.quantity}</td>
-                          <td className="px-6 py-4 text-zinc-500 hidden md:table-cell" style={{ color: '#71717a' }}>{formatNumber(item.price)}</td>
-                          <td className="px-6 py-4 font-bold text-zinc-900" style={{ color: '#18181b' }}>{formatNumber(item.total)}</td>
+                          <td className="px-4 py-4 font-bold text-zinc-900" style={{ color: '#18181b' }}>{item.product_name}</td>
+                          <td className="px-4 py-4 text-center text-zinc-500 font-mono text-xs">{operations.find(o => o.id === item.operation_id)?.operation_number || '-'}</td>
+                          <td className="px-4 py-4 text-center text-zinc-500 text-xs">{departments.find(d => d.id === item.department_id)?.name || '-'}</td>
+                          <td className="px-4 py-4 text-center text-zinc-500 text-xs">{costCenters.find(c => c.id === item.cost_center_id)?.name || '-'}</td>
+                          <td className="px-4 py-4 text-center text-zinc-550" style={{ color: '#71717a' }}>{item.quantity}</td>
+                          <td className="px-4 py-4 text-zinc-505 hidden md:table-cell" style={{ color: '#71717a' }}>{formatNumber(item.unit_price || item.price)}</td>
+                          <td className="px-4 py-4 font-bold text-zinc-900" style={{ color: '#18181b' }}>{formatNumber(item.total)}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot className="bg-slate-50/50 font-bold border-t border-slate-100">
-                      <tr className="bg-slate-900 text-white font-bold">
-                        <td colSpan={4} className="px-6 py-5 text-right font-black text-lg uppercase tracking-tight">الإجمالي الكلي</td>
-                        <td className="px-6 py-5 text-2xl font-black text-emerald-400">{formatNumber(viewReturn.total_amount)} ج.م</td>
-                      </tr>
+                      {(() => {
+                        const currencyCode = viewReturn.currency_id ? (companyCurrencies.find(c => c.id === viewReturn.currency_id)?.code || '') : (company?.settings?.currency || '');
+                        return (
+                          <>
+                            <tr>
+                              <td colSpan={7} className={`px-6 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-slate-400 font-bold text-[10px] uppercase tracking-wider`}>الإجمالي قبل الخصم</td>
+                              <td className="px-6 py-2 text-slate-900 text-base">{formatMoney(viewReturn.subtotal || viewReturn.items?.reduce((sum: number, i: any) => sum + (Number(i.total) || 0), 0) || 0)} {currencyCode}</td>
+                            </tr>
+                            {Number(viewReturn.discount_amount || viewReturn.discount || 0) > 0 && (
+                              <tr>
+                                <td colSpan={7} className={`px-6 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-red-400 font-bold text-[10px] uppercase tracking-wider`}>الخصم</td>
+                                <td className="px-6 py-2 text-red-650 text-base">-{formatMoney(viewReturn.discount_amount || viewReturn.discount)} {currencyCode}</td>
+                              </tr>
+                            )}
+                            {Number(viewReturn.tax_amount || 0) > 0 && (
+                              <tr>
+                                <td colSpan={7} className={`px-6 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-zinc-650 font-bold text-[10px] uppercase tracking-wider`}>ضريبة القيمة المضافة</td>
+                                <td className="px-6 py-2 text-zinc-700 text-base">+{formatMoney(viewReturn.tax_amount)} {currencyCode}</td>
+                              </tr>
+                            )}
+                            <tr className="bg-slate-900 text-white font-bold">
+                              <td colSpan={7} className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'} font-black text-lg uppercase tracking-tight`}>الصافي الإجمالي</td>
+                              <td className="px-6 py-4 text-2xl font-black text-emerald-400">{formatNumber(viewReturn.total_amount)} {currencyCode}</td>
+                            </tr>
+                          </>
+                        );
+                      })()}
                     </tfoot>
                   </table>
                 </div>
-
-                <div className="flex flex-col md:flex-row gap-3 pt-4 sticky bottom-0 bg-white p-4 md:p-0">
-                  <button 
-                    onClick={() => exportToPDF(viewReturn)}
-                    className="flex-1 py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all flex items-center justify-center gap-2"
-                  >
-                    <Download size={20} />
-                    تحميل PDF
-                  </button>
-                  <button 
-                    onClick={() => setViewReturn(null)}
-                    className="flex-1 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all"
-                  >
-                    إغلاق
-                  </button>
-                </div>
               </div>
+            </div>
+
+            {/* Modal footer / actions (outside returnRef print container) */}
+            <div className="p-4 md:p-6 border-t border-zinc-150 flex items-center justify-between bg-zinc-50/50">
+              <div className="flex gap-2">
+                <button 
+                  onClick={handlePrint}
+                  className="flex items-center gap-2 px-6 py-3 bg-white text-zinc-700 border border-zinc-200 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm text-xs"
+                >
+                  <Printer size={18} />
+                  {language === 'ar' ? 'طباعة' : 'Print'}
+                </button>
+                <button 
+                  onClick={() => exportToPDF(viewReturn)}
+                  className="flex items-center gap-2 px-6 py-3 bg-white text-zinc-700 border border-zinc-200 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm text-xs"
+                >
+                  <Download size={18} />
+                  {language === 'ar' ? 'تحميل PDF' : 'Download PDF'}
+                </button>
+              </div>
+              <button 
+                onClick={() => setViewReturn(null)}
+                className="px-8 py-3 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all active:scale-95 shadow-lg shadow-zinc-200 text-xs"
+              >
+                {language === 'ar' ? 'إغلاق' : 'Close'}
+              </button>
             </div>
           </div>
         </div>
@@ -1730,7 +3144,7 @@ export const PurchaseReturns: React.FC = () => {
           <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-4xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
             <div className="p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10">
               <h3 className="text-lg md:text-xl font-bold text-zinc-900">إضافة مورد جديد</h3>
-              <button onClick={() => setIsSupplierModalOpen(false)} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-xl transition-all"><X size={24} /></button>
+              <button onClick={() => setIsSupplierModalOpen(false)} className="text-zinc-400 hover:text-zinc-650 p-2 hover:bg-zinc-100 rounded-xl transition-all"><X size={24} /></button>
             </div>
             
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
@@ -1798,7 +3212,7 @@ export const PurchaseReturns: React.FC = () => {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">تاريخ الرصيد</label>
+                      <label className="block text-sm font-bold text-zinc-705 mb-1 uppercase tracking-tighter">تاريخ الرصيد</label>
                       <div className="relative">
                         <Calendar className="absolute left-3 top-3 text-zinc-400" size={18} />
                         <input 
@@ -1811,7 +3225,7 @@ export const PurchaseReturns: React.FC = () => {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">الحساب المحاسبي</label>
+                    <label className="block text-sm font-bold text-zinc-705 mb-1 uppercase tracking-tighter">الحساب المحاسبي</label>
                     <select
                       required
                       className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
@@ -1828,7 +3242,7 @@ export const PurchaseReturns: React.FC = () => {
                   </div>
                   {supplierFormData.opening_balance !== 0 && (
                     <div className="animate-in slide-in-from-top-2 duration-200">
-                      <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">حساب مقابل رصيد أول المدة</label>
+                      <label className="block text-sm font-bold text-zinc-705 mb-1 uppercase tracking-tighter">حساب مقابل رصيد أول المدة</label>
                       <select
                         required
                         className="w-full px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
@@ -1842,7 +3256,7 @@ export const PurchaseReturns: React.FC = () => {
                           </option>
                         ))}
                       </select>
-                      <p className="text-[10px] text-emerald-600 mt-1 font-medium">يستخدم هذا الحساب لإنشاء قيد رصيد أول المدة (مثلاً: رأس المال أو الأرباح المرحلة)</p>
+                      <p className="text-[10px] text-emerald-650 mt-1 font-medium font-sans">يستخدم هذا الحساب لإنشاء قيد رصيد أول المدة (مثلاً: رأس المال أو الأرباح المرحلة)</p>
                     </div>
                   )}
                 </div>
@@ -1856,7 +3270,7 @@ export const PurchaseReturns: React.FC = () => {
                   <button 
                     type="button"
                     onClick={() => setIsSupplierModalOpen(false)}
-                    className="px-8 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all active:scale-95"
+                    className="px-8 py-4 bg-zinc-100 text-zinc-650 rounded-2xl font-bold hover:bg-zinc-200 transition-all active:scale-95"
                   >
                     إلغاء
                   </button>
@@ -1873,13 +3287,13 @@ export const PurchaseReturns: React.FC = () => {
           <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-2xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
             <div className="p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between bg-white z-10">
               <h3 className="text-lg md:text-xl font-bold text-zinc-900">إضافة صنف جديد</h3>
-              <button onClick={() => setIsProductModalOpen(false)} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-xl transition-all"><X size={24} /></button>
+              <button onClick={() => setIsProductModalOpen(false)} className="text-zinc-400 hover:text-zinc-650 p-2 hover:bg-zinc-100 rounded-xl transition-all"><X size={24} /></button>
             </div>
             <form onSubmit={handleProductSubmit} className="flex-1 flex flex-col overflow-hidden">
               <div className="p-4 md:p-6 space-y-4 flex-1 overflow-y-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">اسم الصنف</label>
+                    <label className="block text-sm font-bold text-zinc-705 mb-1 uppercase tracking-tighter">اسم الصنف</label>
                     <input
                       required
                       type="text"
@@ -1889,27 +3303,27 @@ export const PurchaseReturns: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">الكود (SKU)</label>
+                    <label className="block text-sm font-bold text-zinc-705 mb-1 uppercase tracking-tighter">الكود (SKU)</label>
                     <input
                       type="text"
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-550 outline-none transition-all"
                       value={productFormData.code}
                       onChange={(e) => setProductFormData({ ...productFormData, code: e.target.value })}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">التصنيف</label>
+                    <label className="block text-sm font-bold text-zinc-705 mb-1 uppercase tracking-tighter">التصنيف</label>
                     <input
                       type="text"
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-550 outline-none transition-all"
                       value={productFormData.category}
                       onChange={(e) => setProductFormData({ ...productFormData, category: e.target.value })}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">الوحدة</label>
+                    <label className="block text-sm font-bold text-zinc-705 mb-1 uppercase tracking-tighter">الوحدة</label>
                     <select
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-550 outline-none transition-all cursor-pointer"
                       value={productFormData.unit}
                       onChange={(e) => setProductFormData({ ...productFormData, unit: e.target.value })}
                     >
@@ -1922,7 +3336,7 @@ export const PurchaseReturns: React.FC = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">سعر الشراء</label>
+                    <label className="block text-sm font-bold text-zinc-705 mb-1 uppercase tracking-tighter">سعر الشراء</label>
                     <input
                       required
                       type="number"
@@ -1932,7 +3346,7 @@ export const PurchaseReturns: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">سعر البيع</label>
+                    <label className="block text-sm font-bold text-zinc-705 mb-1 uppercase tracking-tighter">سعر البيع</label>
                     <input
                       required
                       type="number"
@@ -1942,7 +3356,7 @@ export const PurchaseReturns: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">الكمية الحالية</label>
+                    <label className="block text-sm font-bold text-zinc-705 mb-1 uppercase tracking-tighter">الكمية الحالية</label>
                     <input
                       type="number"
                       className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
@@ -1951,7 +3365,7 @@ export const PurchaseReturns: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">حد الطلب</label>
+                    <label className="block text-sm font-bold text-zinc-705 mb-1 uppercase tracking-tighter">حد الطلب</label>
                     <input
                       type="number"
                       className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
@@ -1987,23 +3401,23 @@ export const PurchaseReturns: React.FC = () => {
           <div className="bg-white w-full h-full md:h-auto md:max-w-md md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
             <div className="p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10">
               <h3 className="text-lg md:text-xl font-bold text-zinc-900">إضافة طريقة دفع جديدة</h3>
-              <button onClick={() => setIsPaymentMethodModalOpen(false)} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-xl transition-all"><X size={24} /></button>
+              <button onClick={() => setIsPaymentMethodModalOpen(false)} className="text-zinc-400 hover:text-zinc-650 p-2 hover:bg-zinc-100 rounded-xl transition-all"><X size={24} /></button>
             </div>
             <form onSubmit={handlePaymentMethodSubmit} className="p-4 md:p-6 space-y-4 flex-1 overflow-y-auto pb-32 md:pb-6">
               <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">اسم الطريقة (خزينة/بنك)</label>
+                <label className="block text-sm font-bold text-zinc-705 mb-1 uppercase tracking-tighter">اسم الطريقة (خزينة/بنك)</label>
                 <input
                   required
                   type="text"
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-555 outline-none transition-all"
                   value={paymentMethodFormData.name}
                   onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, name: e.target.value })}
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">النوع</label>
+                <label className="block text-sm font-bold text-zinc-705 mb-1 uppercase tracking-tighter">النوع</label>
                 <select
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-555 outline-none transition-all cursor-pointer"
                   value={paymentMethodFormData.type}
                   onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, type: e.target.value as 'cash' | 'bank' })}
                 >
@@ -2012,19 +3426,19 @@ export const PurchaseReturns: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">رقم الحساب (اختياري)</label>
+                <label className="block text-sm font-bold text-zinc-705 mb-1 uppercase tracking-tighter">رقم الحساب (اختياري)</label>
                 <input
                   type="text"
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-555 outline-none transition-all"
                   value={paymentMethodFormData.account_number}
                   onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, account_number: e.target.value })}
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">رصيد أول</label>
+                <label className="block text-sm font-bold text-zinc-705 mb-1 uppercase tracking-tighter">رصيد أول</label>
                 <input
                   type="number"
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-555 outline-none transition-all"
                   value={paymentMethodFormData.opening_balance}
                   onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, opening_balance: Number(e.target.value) })}
                 />
@@ -2032,7 +3446,7 @@ export const PurchaseReturns: React.FC = () => {
               <div className="pt-4 pb-8 md:pb-0">
                 <button 
                   type="submit"
-                  className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+                  className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-650 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
                 >
                   حفظ طريقة الدفع
                 </button>
@@ -2045,16 +3459,16 @@ export const PurchaseReturns: React.FC = () => {
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-md rounded-3xl shadow-2xl p-6 animate-in zoom-in-95 duration-200">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 animate-in zoom-in-95 duration-200">
             <h3 className="text-xl font-bold text-zinc-900 mb-4">تأكيد الحذف</h3>
-            <p className="text-zinc-500 mb-6">هل أنت متأكد من رغبتك في حذف هذا المرتجع؟ لا يمكن التراجع عن هذا الإجراء.</p>
+            <p className="text-zinc-505 mb-6">هل أنت متأكد من رغبتك في حذف هذا المرتجع؟ لا يمكن التراجع عن هذا الإجراء.</p>
             <div className="flex gap-4">
               <button 
                 onClick={() => {
                   setIsDeleteModalOpen(false);
                   setReturnToDelete(null);
                 }}
-                className="flex-1 py-3 bg-zinc-100 text-zinc-600 rounded-xl font-bold hover:bg-zinc-200 transition-all"
+                className="flex-1 py-3 bg-zinc-100 text-zinc-650 rounded-xl font-bold hover:bg-zinc-200 transition-all"
               >
                 إلغاء
               </button>
@@ -2064,6 +3478,147 @@ export const PurchaseReturns: React.FC = () => {
               >
                 حذف
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Offscreen PDF printable container Isolated */}
+      {pdfReturn && (
+        <div className="absolute left-[-9999px] top-[-9999px] w-[1024px] bg-white text-right" style={{ direction: 'rtl' }}>
+          <div ref={pdfReturnRef} id="purchase-return-pdf-capture" className="p-8 space-y-8 bg-white" style={{ backgroundColor: '#ffffff', color: '#18181b' }}>
+            <CompanyInvoiceHeader 
+              company={company} 
+              documentNumber={pdfReturn.return_number}
+              documentDate={formatDate(pdfReturn.date)}
+              title="مرتجع مشتريات"
+            />
+
+            <div className="grid grid-cols-2 gap-8">
+              <div>
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1" style={{ color: '#71717a' }}>المورد</p>
+                <p className="text-lg font-bold text-zinc-900" style={{ color: '#18181b' }}>{pdfReturn.supplier_name}</p>
+                {pdfReturn.warehouse_id && (
+                  <p className="text-xs text-slate-505 font-medium mt-1">
+                    {language === 'ar' ? 'المخزن:' : 'Warehouse:'} <span className="text-emerald-600 font-bold">{warehouses.find((w: any) => w.id?.toString() === pdfReturn.warehouse_id?.toString())?.name || pdfReturn.warehouse_id}</span>
+                  </p>
+                )}
+                {pdfReturn.entry_number && (
+                  <p className="text-xs text-slate-505 font-medium mt-1">
+                    {language === 'ar' ? 'رقم القيد:' : 'Journal Entry:'} <span className="text-emerald-700 font-mono font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50">{pdfReturn.entry_number}</span>
+                  </p>
+                )}
+                {pdfReturn.currency_id && (
+                  <p className="text-xs text-slate-505 font-medium mt-1">
+                    {language === 'ar' ? 'العملة:' : 'Currency:'}{' '}
+                    <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50 font-mono">
+                      {companyCurrencies.find(c => c.id === pdfReturn.currency_id)?.code || pdfReturn.currency_id}
+                    </span>
+                    {pdfReturn.exchange_rate && Number(pdfReturn.exchange_rate) !== 1 && (
+                      <span className="text-zinc-505 text-[10px] ml-2 mr-2 font-bold bg-zinc-50 px-2 py-0.5 rounded border border-zinc-200">
+                        {language === 'ar' ? 'سعر الصرف:' : 'Exchange Rate:'} {pdfReturn.exchange_rate}
+                      </span>
+                    )}
+                  </p>
+                )}
+              </div>
+              <div className="text-left">
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1" style={{ color: '#71717a' }}>التاريخ</p>
+                <p className="text-lg font-bold text-zinc-900" style={{ color: '#18181b' }}>{formatDate(pdfReturn.date)}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-8">
+              <div>
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1" style={{ color: '#71717a' }}>نوع المرتجع</p>
+                <p className="text-lg font-bold text-zinc-900" style={{ color: '#18181b' }}>{pdfReturn.payment_type === 'cash' ? 'نقدي' : 'آجل'}</p>
+              </div>
+              {pdfReturn.payment_type === 'cash' && (
+                <div className="text-left">
+                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1" style={{ color: '#71717a' }}>طريقة الدفع</p>
+                  <p className="text-lg font-bold text-zinc-900" style={{ color: '#18181b' }}>{pdfReturn.payment_method_name}</p>
+                </div>
+              )}
+            </div>
+
+            {pdfReturn.description && (
+              <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
+                <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1">الوصف</p>
+                <p className="text-zinc-700 whitespace-pre-wrap">{pdfReturn.description}</p>
+              </div>
+            )}
+
+            <div className="border border-zinc-100 rounded-2xl overflow-hidden" style={{ borderColor: '#f4f4f5' }}>
+              <table className="w-full text-right text-sm border-collapse">
+                <thead className="bg-zinc-55 text-zinc-500 uppercase text-[10px] font-bold tracking-wider" style={{ backgroundColor: '#fafafa' }}>
+                  <tr>
+                    <th className="px-4 py-3 w-16 text-center" style={{ color: '#71717a' }}>صورة</th>
+                    <th className="px-4 py-3" style={{ color: '#71717a' }}>الصنف</th>
+                    <th className="px-4 py-3 text-center" style={{ color: '#71717a' }}>العملية</th>
+                    <th className="px-4 py-3 text-center" style={{ color: '#71717a' }}>الإدارة</th>
+                    <th className="px-4 py-3 text-center" style={{ color: '#71717a' }}>مركز التكلفة</th>
+                    <th className="px-4 py-3 text-center" style={{ color: '#71717a' }}>الكمية</th>
+                    <th className="px-4 py-3 text-right" style={{ color: '#71717a' }}>السعر</th>
+                    <th className="px-4 py-3" style={{ color: '#71717a' }}>الإجمالي</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-50" style={{ borderColor: '#fafafa' }}>
+                  {pdfReturn.items?.map((item: any, idx: number) => (
+                    <tr key={idx}>
+                      <td className="px-4 py-4 text-center">
+                        {item.product_image_url || item.image_url ? (
+                          <img 
+                            src={item.product_image_url || item.image_url} 
+                            alt={item.product_name} 
+                            className="w-10 h-10 object-cover rounded-lg mx-auto border border-[#f4f4f5]"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 bg-[#fafafa] rounded-lg flex items-center justify-center mx-auto border border-[#f4f4f5]">
+                            <Box size={16} className="text-[#a1a1aa]" />
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 font-bold text-zinc-900" style={{ color: '#18181b' }}>{item.product_name}</td>
+                      <td className="px-4 py-4 text-center text-zinc-550 font-mono text-xs">{operations.find(o => o.id === item.operation_id)?.operation_number || '-'}</td>
+                      <td className="px-4 py-4 text-center text-zinc-550 text-xs">{departments.find(d => d.id === item.department_id)?.name || '-'}</td>
+                      <td className="px-4 py-4 text-center text-zinc-550 text-xs">{costCenters.find(c => c.id === item.cost_center_id)?.name || '-'}</td>
+                      <td className="px-4 py-4 text-center text-zinc-550" style={{ color: '#71717a' }}>{item.quantity}</td>
+                      <td className="px-4 py-4 text-zinc-505 text-right" style={{ color: '#71717a' }}>{formatNumber(item.unit_price || item.price)}</td>
+                      <td className="px-4 py-4 font-bold text-zinc-900 text-right" style={{ color: '#18181b' }}>{formatNumber(item.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-slate-50/50 font-bold border-t border-slate-100">
+                  {(() => {
+                    const currencyCode = pdfReturn.currency_id ? (companyCurrencies.find(c => c.id === pdfReturn.currency_id)?.code || '') : (company?.settings?.currency || '');
+                    return (
+                      <>
+                        <tr>
+                          <td colSpan={7} className={`px-6 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-slate-400 font-bold text-[10px] uppercase tracking-wider`}>الإجمالي قبل الخصم</td>
+                          <td className="px-6 py-2 text-slate-900 text-base">{formatMoney(pdfReturn.subtotal || pdfReturn.items?.reduce((sum: number, i: any) => sum + (Number(i.total) || 0), 0) || 0)} {currencyCode}</td>
+                        </tr>
+                        {Number(pdfReturn.discount_amount || pdfReturn.discount || 0) > 0 && (
+                          <tr>
+                            <td colSpan={7} className={`px-6 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-red-400 font-bold text-[10px] uppercase tracking-wider`}>الخصم</td>
+                            <td className="px-6 py-2 text-red-650 text-base">-{formatMoney(pdfReturn.discount_amount || pdfReturn.discount)} {currencyCode}</td>
+                          </tr>
+                        )}
+                        {Number(pdfReturn.tax_amount || 0) > 0 && (
+                          <tr>
+                            <td colSpan={7} className={`px-6 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-zinc-650 font-bold text-[10px] uppercase tracking-wider`}>ضريبة القيمة المضافة</td>
+                            <td className="px-6 py-2 text-zinc-700 text-base">+{formatMoney(pdfReturn.tax_amount)} {currencyCode}</td>
+                          </tr>
+                        )}
+                        <tr className="bg-slate-900 text-white font-bold">
+                          <td colSpan={7} className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'} font-black text-lg uppercase tracking-tight`}>الصافي الإجمالي</td>
+                          <td className="px-6 py-4 text-2xl font-black text-emerald-400">{formatNumber(pdfReturn.total_amount)} {currencyCode}</td>
+                        </tr>
+                      </>
+                    );
+                  })()}
+                </tfoot>
+              </table>
             </div>
           </div>
         </div>

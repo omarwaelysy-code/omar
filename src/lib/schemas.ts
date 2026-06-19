@@ -47,6 +47,10 @@ export const InvoiceItemSchema = z.object({
   total: z.coerce.number().default(0),
   barcode: z.string().optional().nullable(),
   image_url: z.string().optional().nullable(),
+  operation_id: z.string().optional().nullable(),
+  department_id: z.string().optional().nullable(),
+  cost_center_id: z.string().optional().nullable(),
+  description: z.string().optional().nullable(),
 });
 
 export const InvoiceSchema = BaseSchema.extend({
@@ -127,6 +131,14 @@ export const ReturnSchema = BaseSchema.extend({
   payment_method_name: z.string().nullable().optional(),
   description: z.string().optional(),
   notes: z.string().optional(),
+  settlements: z.array(z.any()).optional().nullable(),
+  settlement_number: z.string().optional().nullable(),
+  settlement_date: z.string().optional().nullable(),
+  operation_id: z.string().nullable().optional(),
+  department_id: z.string().nullable().optional(),
+  cost_center_id: z.string().nullable().optional(),
+  currency_id: z.string().nullable().optional(),
+  exchange_rate: z.coerce.number().default(1),
 });
 
 // Purchase Invoice Schema (if distinct, currently using InvoiceSchema)
