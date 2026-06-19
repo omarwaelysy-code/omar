@@ -2304,18 +2304,15 @@ export const Invoices: React.FC = () => {
         }
       }
 
-      closeModal();
-      showNotification(editingInvoice ? t('invoices.invoice_updated') : t('invoices.invoice_saved'), 'success');
-      
       if (!editingInvoice) {
         // Activity log in background
-        dbService.logActivity(user.id, user.username, user.company_id, t('invoices.log_add'), t('invoices.log_add_msg', { number: invoiceNumber }), 'invoices');
+        await dbService.logActivity(user.id, user.username, user.company_id, t('invoices.log_add'), t('invoices.log_add_msg', { number: invoiceNumber }), 'invoices');
       } else {
         // Log details of changes for editing invoice
         if (changes.length > 0) {
           const logAction = language === 'ar' ? 'تعديل فاتورة' : 'Update Invoice';
           const logDetails = detailsList.join(' | ');
-          dbService.logActivity(
+          await dbService.logActivity(
             user.id,
             user.username,
             user.company_id,
@@ -2327,6 +2324,9 @@ export const Invoices: React.FC = () => {
           );
         }
       }
+
+      closeModal();
+      showNotification(editingInvoice ? t('invoices.invoice_updated') : t('invoices.invoice_saved'), 'success');
 
     } catch (e: any) {
       console.error('Save failed:', e);

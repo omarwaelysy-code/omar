@@ -849,9 +849,18 @@ function sanitizeData(table: string, data: any) {
         // but Postgres will fail if type mismatch.
       }
 
-      // Automatically stringify for JSONB columns
-      if (jsonbFields.includes(key) && value !== null && typeof value !== 'string') {
-        sanitized[key] = JSON.stringify(value);
+      // Automatically stringify for JSONB columns, making sure plain strings are wrapped in double quotes to be valid JSON
+      if (jsonbFields.includes(key) && value !== null) {
+        if (typeof value === 'string') {
+          try {
+            JSON.parse(value);
+            sanitized[key] = value;
+          } catch (e) {
+            sanitized[key] = JSON.stringify(value);
+          }
+        } else {
+          sanitized[key] = JSON.stringify(value);
+        }
       }
       else {
         sanitized[key] = value;
