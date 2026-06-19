@@ -362,91 +362,94 @@ export const TransactionSidePanel: React.FC<TransactionSidePanelProps> = ({
             </h4>
           </div>
 
-          {/* Preview Activity Log */}
-          {!documentId && previewActivityLog && (
-            <div className="relative pr-6 mb-4 group last:mb-0">
-              <div className="absolute right-0.5 top-1.5 w-2.5 h-2.5 rounded-full bg-white border-2 border-amber-500 z-10 shadow-sm animate-pulse" />
-              <div className="absolute right-[5px] top-4 bottom-0 w-0.5 bg-zinc-150" />
-              
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-400">
-                  <Clock size={10} />
-                  <span>{language === 'ar' ? 'الآن' : 'Now'}</span>
-                  <span className="mx-1">•</span>
-                  <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[9px]">{language === 'ar' ? 'معاينة' : 'Preview'}</span>
-                </div>
-                <div className="bg-amber-50/30 rounded-xl p-3 border border-amber-100/50 shadow-sm">
-                  <div className="flex items-center gap-2 text-[11px] font-bold text-zinc-800 mb-1">
-                    <span>{previewActivityLog.action}</span>
+          {/* Logs scrollable container */}
+          <div className="max-h-[350px] overflow-y-auto pr-2 pl-1 custom-scrollbar space-y-4">
+            {/* Preview Activity Log */}
+            {!documentId && previewActivityLog && (
+              <div className="relative pr-6 group">
+                <div className="absolute right-0.5 top-1.5 w-2.5 h-2.5 rounded-full bg-white border-2 border-amber-500 z-10 shadow-sm animate-pulse" />
+                <div className="absolute right-[5px] top-4 bottom-0 w-0.5 bg-zinc-150" />
+                
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-400">
+                    <Clock size={10} />
+                    <span>{language === 'ar' ? 'الآن' : 'Now'}</span>
+                    <span className="mx-1">•</span>
+                    <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[9px]">{language === 'ar' ? 'معاينة' : 'Preview'}</span>
                   </div>
-                  <p className="text-[10px] text-zinc-500 leading-relaxed">
-                    {previewActivityLog.details}
-                  </p>
+                  <div className="bg-amber-50/30 rounded-xl p-3 border border-amber-100/50 shadow-sm">
+                    <div className="flex items-center gap-2 text-[11px] font-bold text-zinc-800 mb-1">
+                      <span>{previewActivityLog.action}</span>
+                    </div>
+                    <p className="text-[10px] text-zinc-500 leading-relaxed">
+                      {previewActivityLog.details}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Logs List */}
-          {loading ? (
-            <div className="space-y-3">
-              {[1, 2].map(i => (
-                <div key={i} className="animate-pulse flex gap-3 pr-6">
-                  <div className="w-2 h-2 rounded-full bg-zinc-200 mt-1.5" />
-                  <div className="flex-1 space-y-1.5">
-                    <div className="h-1.5 bg-zinc-200 rounded w-1/4" />
-                    <div className="h-12 bg-zinc-100 rounded-xl" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : displayLogs.length === 0 && !previewActivityLog ? (
-            <div className="flex flex-col items-center justify-center py-6 text-zinc-400 space-y-2 bg-white rounded-xl border border-dashed border-zinc-200">
-              <Activity size={18} className="opacity-20 text-zinc-500" />
-              <p className="text-[10px] font-medium italic">{language === 'ar' ? 'لا توجد تعديلات مسجلة بعد' : 'No changes recorded yet'}</p>
-            </div>
-          ) : (
-            <div className="relative space-y-4 before:absolute before:inset-y-0 before:right-2 before:w-0.5 before:bg-zinc-150">
-              {displayLogs.map((log) => (
-                <div key={log.id} className="relative pr-6 group">
-                  <div className="absolute right-0.5 top-1.5 w-2.5 h-2.5 rounded-full bg-white border-2 border-emerald-500 z-10 shadow-sm group-hover:scale-110 transition-transform" />
-                  
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-400">
-                      <Clock size={10} />
-                      <span>{new Date(log.created_at).toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}</span>
-                      <span className="mx-1">•</span>
-                      <span className="text-zinc-550">{log.username}</span>
+            {/* Logs List */}
+            {loading ? (
+              <div className="space-y-3">
+                {[1, 2].map(i => (
+                  <div key={i} className="animate-pulse flex gap-3 pr-6">
+                    <div className="w-2 h-2 rounded-full bg-zinc-200 mt-1.5" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-1.5 bg-zinc-200 rounded w-1/4" />
+                      <div className="h-12 bg-zinc-100 rounded-xl" />
                     </div>
-
-                    <div className="bg-white rounded-xl p-3 border border-zinc-150 shadow-sm group-hover:shadow-md group-hover:border-emerald-100 transition-all">
-                      <div className="flex items-center gap-2 text-[11px] font-bold text-zinc-800 mb-1">
-                        <span>{log.action}</span>
+                  </div>
+                ))}
+              </div>
+            ) : displayLogs.length === 0 && !previewActivityLog ? (
+              <div className="flex flex-col items-center justify-center py-6 text-zinc-400 space-y-2 bg-white rounded-xl border border-dashed border-zinc-200">
+                <Activity size={18} className="opacity-20 text-zinc-500" />
+                <p className="text-[10px] font-medium italic">{language === 'ar' ? 'لا توجد تعديلات مسجلة بعد' : 'No changes recorded yet'}</p>
+              </div>
+            ) : (
+              <div className="relative space-y-4 before:absolute before:inset-y-0 before:right-2 before:w-0.5 before:bg-zinc-150">
+                {displayLogs.map((log) => (
+                  <div key={log.id} className="relative pr-6 group">
+                    <div className="absolute right-0.5 top-1.5 w-2.5 h-2.5 rounded-full bg-white border-2 border-emerald-500 z-10 shadow-sm group-hover:scale-110 transition-transform" />
+                    
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-400">
+                        <Clock size={10} />
+                        <span>{new Date(log.created_at).toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="mx-1">•</span>
+                        <span className="text-zinc-550">{log.username}</span>
                       </div>
-                      <p className="text-[10px] text-zinc-550 leading-relaxed">
-                        {log.details}
-                      </p>
 
-                      {log.changes && log.changes.length > 0 && (
-                        <div className="mt-2 pt-2 border-t border-zinc-100 space-y-1.5">
-                          {log.changes.map((change, idx) => (
-                            <div key={idx} className="text-[10px] flex flex-col gap-0.5">
-                              <span className="font-bold text-zinc-400">{change.field}:</span>
-                              <div className="flex items-center gap-2 flex-wrap bg-zinc-50 p-1.5 rounded-lg">
-                                <span className="text-red-400 line-through opacity-60">{String(change.old_value || (language === 'ar' ? 'فارغ' : 'Empty'))}</span>
-                                <span className="text-zinc-300">←</span>
-                                <span className="text-emerald-600 font-bold">{String(change.new_value || (language === 'ar' ? 'فارغ' : 'Empty'))}</span>
-                              </div>
-                            </div>
-                          ))}
+                      <div className="bg-white rounded-xl p-3 border border-zinc-150 shadow-sm group-hover:shadow-md group-hover:border-emerald-100 transition-all">
+                        <div className="flex items-center gap-2 text-[11px] font-bold text-zinc-800 mb-1">
+                          <span>{log.action}</span>
                         </div>
-                      )}
+                        <p className="text-[10px] text-zinc-550 leading-relaxed">
+                          {log.details}
+                        </p>
+
+                        {log.changes && log.changes.length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-zinc-100 space-y-1.5">
+                            {log.changes.map((change, idx) => (
+                              <div key={idx} className="text-[10px] flex flex-col gap-0.5">
+                                <span className="font-bold text-zinc-400">{change.field}:</span>
+                                <div className="flex items-center gap-2 flex-wrap bg-zinc-50 p-1.5 rounded-lg">
+                                  <span className="text-red-400 line-through opacity-60">{String(change.old_value || (language === 'ar' ? 'فارغ' : 'Empty'))}</span>
+                                  <span className="text-zinc-300">←</span>
+                                  <span className="text-emerald-600 font-bold">{String(change.new_value || (language === 'ar' ? 'فارغ' : 'Empty'))}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
