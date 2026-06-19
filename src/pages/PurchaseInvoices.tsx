@@ -182,8 +182,16 @@ export const PurchaseInvoices: React.FC = () => {
     expense_category_id?: string;
     product_name?: string;
     category_name?: string;
+    product_code?: string;
+    product_image_url?: string;
+    barcode?: string;
+    operation_id?: string | null;
+    department_id?: string | null;
+    cost_center_id?: string | null;
     quantity: number; 
     cost_price: number;
+    vat_rate?: number;
+    vat_amount?: number;
     total: number;
   }[]>([]);
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
@@ -3086,7 +3094,7 @@ export const PurchaseInvoices: React.FC = () => {
                             <select 
                               className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer"
                               value={invoiceData.payment_type}
-                              onChange={(e) => setInvoiceData({...invoiceData, payment_type: e.target.value})}
+                              onChange={(e) => setInvoiceData({...invoiceData, payment_type: e.target.value as 'cash' | 'credit'})}
                             >
                               <option value="cash">{t('pi.cash')}</option>
                               <option value="credit">{t('pi.credit')}</option>
