@@ -635,6 +635,8 @@ export interface JournalEntry {
 export interface JournalEntryItem {
   account_id: string;
   account_name: string;
+  account_code?: string;
+  product_name?: string;
   debit: number;
   credit: number;
   description?: string;

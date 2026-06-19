@@ -69,6 +69,7 @@ async function startServer() {
       'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "sub_account_id" VARCHAR(36)',
       'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "sub_account_type" VARCHAR(50)',
       'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "company_id" VARCHAR(36)',
+      'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "product_name" VARCHAR(255)',
 
       // Vouchers
       'ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "description" TEXT',

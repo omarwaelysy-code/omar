@@ -1469,7 +1469,7 @@ modules.forEach(moduleName => {
     if (itemsTable) {
       if (module === 'journal_entries') {
         const { rows } = await pool.query(`
-          SELECT jel.*, COALESCE(jel.account_name, acc.name) AS account_name
+          SELECT jel.*, COALESCE(jel.account_name, acc.name) AS account_name, acc.code AS account_code
           FROM "journal_entry_lines" jel
           LEFT JOIN "accounts" acc ON acc.id = jel.account_id
           WHERE jel."journal_entry_id" = ANY($1)
@@ -1540,7 +1540,7 @@ modules.forEach(moduleName => {
     if (itemsTable) {
       if (module === 'journal_entries') {
         const { rows } = await pool.query(`
-          SELECT jel.*, COALESCE(jel.account_name, acc.name) AS account_name
+          SELECT jel.*, COALESCE(jel.account_name, acc.name) AS account_name, acc.code AS account_code
           FROM "journal_entry_lines" jel
           LEFT JOIN "accounts" acc ON acc.id = jel.account_id
           WHERE jel."journal_entry_id" = $1

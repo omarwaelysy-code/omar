@@ -88,6 +88,7 @@ export const Invoices: React.FC = () => {
   const isInitialLoad = useRef(true);
   const [isAiParsing, setIsAiParsing] = useState(false);
   const [showSidePanel, setShowSidePanel] = useState(false);
+  const [isPanelExpanded, setIsPanelExpanded] = useState(false);
   const [showAiInput, setShowAiInput] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -1398,9 +1399,13 @@ export const Invoices: React.FC = () => {
         debitAccountName = customer?.account_name || 'حساب العملاء';
       }
 
+      const debitAcc = accounts.find(a => a.id === debitAccountId);
+      const debitAccountCode = debitAcc?.code || '';
+
       journalItems.push({
         account_id: debitAccountId,
         account_name: debitAccountName,
+        account_code: debitAccountCode,
         debit: Number(total_amount) || 0,
         credit: 0,
         description: `فاتورة مبيعات رقم ${invoice_number} - ${customer?.name || '...'}`,
@@ -1415,6 +1420,7 @@ export const Invoices: React.FC = () => {
         journalItems.push({
           account_id: discountAccountId,
           account_name: discountAccount?.name || 'حساب الخصم المسموح به',
+          account_code: discountAccount?.code || '',
           debit: Number(discount) || 0,
           credit: 0,
           description: `خصم مسموح به - فاتورة رقم ${invoice_number}`
@@ -1426,10 +1432,14 @@ export const Invoices: React.FC = () => {
         const product = products.find(p => p.id === item.product_id);
         let creditAccountId = product?.revenue_account_id || '';
         let creditAccountName = product?.revenue_account_name || 'حساب المبيعات';
+        const creditAcc = accounts.find(a => a.id === creditAccountId);
+        const creditAccountCode = creditAcc?.code || '';
 
         journalItems.push({
           account_id: creditAccountId,
           account_name: creditAccountName,
+          account_code: creditAccountCode,
+          product_name: item.product_name,
           debit: 0,
           credit: Number(item.total) || 0,
           description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoice_number}`
@@ -1449,6 +1459,7 @@ export const Invoices: React.FC = () => {
         journalItems.push({
           account_id: vatAccountId,
           account_name: vatAccountName,
+          account_code: vatAccount?.code || '',
           debit: 0,
           credit: Number(vatTotal) || 0,
           description: `ضريبة القيمة المضافة - فاتورة رقم ${invoice_number}`
@@ -1677,11 +1688,14 @@ export const Invoices: React.FC = () => {
       const journalItems: any[] = [];
       let customerAccountId = customer?.account_id || '';
       let customerAccountName = customer?.account_name || 'حساب العملاء';
+      const custAcc = accounts.find(a => a.id === customerAccountId);
+      const customerAccountCode = custAcc?.code || '';
       const rate = Number(exchangeRate) || 1;
 
       journalItems.push({
         account_id: customerAccountId,
         account_name: customerAccountName,
+        account_code: customerAccountCode,
         debit: Number((total_amount * rate).toFixed(2)),
         credit: 0,
         description: `فاتورة مبيعات رقم ${invoiceNumber}${description ? ` - ${description}` : ''} - ${customer?.name}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`,
@@ -1694,9 +1708,11 @@ export const Invoices: React.FC = () => {
       if (discount > 0) {
         const discountAccountId = settings?.customer_discount_account_id || '';
         const discountAccount = accounts.find(a => a.id === discountAccountId);
+        const discountAccountCode = discountAccount?.code || '';
         journalItems.push({
           account_id: discountAccountId,
           account_name: discountAccount?.name || 'حساب الخصم المسموح به',
+          account_code: discountAccountCode,
           debit: Number((discount * rate).toFixed(2)),
           credit: 0,
           description: `خصم مسموح به - فاتورة رقم ${invoiceNumber}${description ? ` - ${description}` : ''}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`
@@ -1707,12 +1723,16 @@ export const Invoices: React.FC = () => {
         const product = products.find(p => p.id === item.product_id);
         let creditAccountId = product?.revenue_account_id || '';
         let creditAccountName = product?.revenue_account_name || 'حساب المبيعات';
+        const creditAccount = accounts.find(a => a.id === creditAccountId);
+        const creditAccountCode = creditAccount?.code || '';
         journalItems.push({
           account_id: creditAccountId,
           account_name: creditAccountName,
+          account_code: creditAccountCode,
           debit: 0,
           credit: Number((item.total * rate).toFixed(2)),
-          description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoiceNumber}${description ? ` - ${description}` : ''}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`
+          description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoiceNumber}${description ? ` - ${description}` : ''}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`,
+          product_name: item.product_name
         });
       });
 
@@ -1752,9 +1772,12 @@ export const Invoices: React.FC = () => {
         });
 
         Object.values(vatGroup).forEach(vat => {
+          const vatAccount = accounts.find(a => a.id === vat.account_id);
+          const vatAccountCode = vatAccount?.code || '';
           journalItems.push({
             account_id: vat.account_id,
             account_name: vat.account_name,
+            account_code: vatAccountCode,
             debit: 0,
             credit: Number((vat.amount * rate).toFixed(2)),
             description: `ضريبة القيمة المضافة - فاتورة رقم ${invoiceNumber}${description ? ` - ${description}` : ''}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`
@@ -1766,18 +1789,25 @@ export const Invoices: React.FC = () => {
         const pm = paymentMethods.find(p => p.id === paymentMethodId);
         let cashAccountId = pm?.account_id || '';
         let cashAccountName = pm?.account_name || 'حساب النقدية';
+        const cashAccount = accounts.find(a => a.id === cashAccountId);
+        const cashAccountCode = cashAccount?.code || '';
         journalItems.push({
           account_id: cashAccountId,
           account_name: cashAccountName,
+          account_code: cashAccountCode,
           debit: Number((total_amount * rate).toFixed(2)),
           credit: 0,
           description: `تحصيل فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`,
           sub_account_id: paymentMethodId,
           sub_account_type: 'payment_method'
         });
+        
+        const custAcc2 = accounts.find(a => a.id === customerAccountId);
+        const customerAccountCode2 = custAcc2?.code || '';
         journalItems.push({
           account_id: customerAccountId,
           account_name: customerAccountName,
+          account_code: customerAccountCode2,
           debit: 0,
           credit: Number((total_amount * rate).toFixed(2)),
           description: `سداد فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`,
@@ -3557,24 +3587,50 @@ export const Invoices: React.FC = () => {
                     animate={{ y: 0 }}
                     exit={{ y: '100%' }}
                     transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    className="absolute bottom-0 inset-x-0 z-50 h-[350px] bg-white border-t border-slate-200 shadow-2xl flex flex-col"
+                    className={`absolute bottom-0 inset-x-0 z-50 bg-white border-t border-slate-200 shadow-2xl flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${isPanelExpanded ? 'h-[480px]' : 'h-[55px]'}`}
                   >
-                    <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-zinc-50 sticky top-0">
-                      <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                        <History size={16} className="text-emerald-600" />
-                        <span>{language === 'ar' ? 'سجل التعديلات والقيد' : 'Activity Log & Journal'}</span>
-                      </h3>
-                      <button onClick={() => setShowSidePanel(false)} className="p-1.5 text-slate-400 hover:text-slate-650 hover:bg-slate-200/50 rounded-lg transition-all">
+                    <div 
+                      onClick={() => setIsPanelExpanded(!isPanelExpanded)}
+                      className="p-3 border-b border-slate-100 flex items-center justify-between bg-zinc-50 sticky top-0 cursor-pointer select-none"
+                    >
+                      <div className="flex items-center gap-3">
+                        <button 
+                          type="button"
+                          className="w-7 h-7 rounded-full bg-slate-200/70 hover:bg-slate-300 flex items-center justify-center transition-all shadow-sm"
+                        >
+                          {isPanelExpanded ? <ChevronDown size={16} className="text-slate-600" /> : <ChevronUp size={16} className="text-slate-600" />}
+                        </button>
+                        <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                          <History size={16} className="text-emerald-600 animate-pulse" />
+                          <span>{language === 'ar' ? 'سجل التعديلات والقيد' : 'Activity Log & Journal'}</span>
+                        </h3>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={(e) => { e.stopPropagation(); setShowSidePanel(false); }} 
+                        className="p-1.5 text-slate-400 hover:text-slate-650 hover:bg-slate-200/50 rounded-lg transition-all"
+                      >
                         <X size={18} />
                       </button>
                     </div>
                     <div className="flex-1 overflow-y-auto">
-                      <TransactionSidePanel 
-                        documentId={editingInvoice?.id || ''} 
-                        category="invoices" 
-                        previewJournalEntry={previewJournalEntry}
-                        previewActivityLog={previewActivityLog}
-                      />
+                      {(() => {
+                        const activeCurrency = companyCurrencies.find(c => c.id === (editingInvoice?.currency_id || selectedCurrencyId));
+                        const currencyCode = activeCurrency ? activeCurrency.code : (companyData?.settings?.currency || (companyData as any)?.currency || 'EGP');
+                        const exchangeRateVal = editingInvoice ? (editingInvoice.exchange_rate || 1) : (Number(exchangeRate) || 1);
+                        
+                        return (
+                          <TransactionSidePanel 
+                            documentId={editingInvoice?.id || ''} 
+                            category="invoices" 
+                            previewJournalEntry={previewJournalEntry}
+                            previewActivityLog={previewActivityLog}
+                            layout="bottom"
+                            currencyCode={currencyCode}
+                            exchangeRate={exchangeRateVal}
+                          />
+                        );
+                      })()}
                     </div>
                   </motion.div>
                 )}
