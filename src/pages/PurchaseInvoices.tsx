@@ -9,7 +9,7 @@ import {
   Eye, History, Printer, ArrowRight, ArrowLeft, Minimize2, 
   Maximize2, Phone, Mail, MapPin, Wallet, Layers, Paperclip, 
   Tag, Box, LayoutGrid, List, Receipt, ChevronDown, ChevronLeft, ChevronRight,
-  Coins, CheckCheck, ExternalLink, RotateCcw, ChevronUp
+  Coins, CheckCheck, ExternalLink, RotateCcw, ChevronUp, Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Barcode from 'react-barcode';
@@ -1295,7 +1295,10 @@ export const PurchaseInvoices: React.FC = () => {
 
   const calculateTotal = () => {
     const subtotal = items.reduce((sum, item) => sum + (item.total || 0), 0);
-    return subtotal - (invoiceData.discount || 0);
+    const vatTotal = isVatEnabled
+      ? items.reduce((sum, item) => sum + (Number((item as any).vat_amount) || 0), 0)
+      : 0;
+    return subtotal + vatTotal - (invoiceData.discount || 0);
   };
 
   const applyAiData = (data: any) => {
@@ -2296,6 +2299,42 @@ export const PurchaseInvoices: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  const handleCopyInvoice = async () => {
+    if (!editingInvoice) return;
+    try {
+      setEditingInvoice(null);
+      const todayDate = new Date().toISOString().slice(0, 10);
+      setInvoiceData(prev => ({ ...prev, date: todayDate }));
+      
+      const days = Number(paymentTermsDays) || 0;
+      if (days > 0) {
+        const d = new Date(todayDate);
+        d.setDate(d.getDate() + days);
+        setDueDate(d.toISOString().slice(0, 10));
+      } else {
+        setDueDate(todayDate);
+      }
+      
+      setFormSettlementNumber('');
+      setFormSettlementDate(todayDate);
+      setFormSettlements([]);
+      setRowSettlementDates({});
+      setSelectedOrderIds([]);
+      
+      const newNum = await generateInvoiceNumber(todayDate);
+      setInvoiceNumber(newNum);
+      
+      showNotification(
+        t('dir') === 'rtl' ? 'تم نسخ الفاتورة بالكامل كمسودة جديدة وتحديث رقمها وتاريخها' : 'Invoice copied completely as a new draft with updated number and date',
+        'success'
+      );
+    } catch (error: any) {
+      console.error('[COPY] Error copying invoice:', error);
+      showNotification('فشل نسخ الفاتورة: ' + error.message, 'error');
+    }
+  };
+
+
   useEffect(() => {
     if (pendingViewDoc && pendingViewDoc.type === 'purchase_invoice' && user) {
       const loadPendingDoc = async () => {
@@ -2812,6 +2851,16 @@ export const PurchaseInvoices: React.FC = () => {
             {t('dir') === 'rtl' ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
             <span>{t('dir') === 'rtl' ? 'العودة للقائمة' : 'Back to List'}</span>
           </button>
+          {editingInvoice && (
+            <button 
+              type="button"
+              onClick={handleCopyInvoice} 
+              className="flex items-center gap-1.5 px-3 py-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-xs border border-emerald-200 shadow-sm cursor-pointer"
+            >
+              <Copy size={14} />
+              <span>{t('dir') === 'rtl' ? 'نسخ' : 'Copy'}</span>
+            </button>
+          )}
         </div>
 
         <div className="flex-1 flex justify-center">
@@ -2863,7 +2912,7 @@ export const PurchaseInvoices: React.FC = () => {
                     animate={{ x: 0 }}
                     exit={{ x: t('dir') === 'rtl' ? '100%' : '-100%' }}
                     transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    className={`absolute inset-y-0 ${t('dir') === 'rtl' ? 'right-0 border-l' : 'left-0 border-r'} z-50 w-full lg:w-80 shadow-2xl lg:shadow-none lg:relative lg:inset-auto`}
+                      className={`absolute inset-y-0 ${t('dir') === 'rtl' ? 'right-0 border-l' : 'left-0 border-r'} z-50 w-full lg:w-80 shadow-2xl lg:shadow-none lg:relative lg:inset-auto`}
                   >
                     <div className="h-full bg-white border-zinc-100 flex flex-col">
                       <div className="p-4 border-b border-zinc-100 flex items-center justify-between lg:hidden">
@@ -2890,8 +2939,8 @@ export const PurchaseInvoices: React.FC = () => {
                 <div className="flex-1">
                   <SmartAIInput transactionType="purchase_invoice" onDataExtracted={applyAiData} />
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Card 1: معلومات النوع والمورد */}
-                    <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6 relative">
+                    {/* Unified Totals & Metadata Form single card layout */}
+                    <section className="bg-white p-2 md:p-2.5 rounded-xl border border-zinc-200 shadow-sm grid grid-cols-1 lg:grid-cols-4 gap-2 lg:gap-2.5 items-stretch relative">
                       {editingInvoice && (
                         <div className={`absolute ${dir === 'rtl' ? 'left-12' : 'right-12'} top-4 z-20 pointer-events-none select-none opacity-80 transform -rotate-12`}>
                           {(() => {
@@ -2915,44 +2964,73 @@ export const PurchaseInvoices: React.FC = () => {
                           })()}
                         </div>
                       )}
-                      <div className="flex items-center gap-2 mb-4 text-emerald-600">
-                        <FileText className="w-5 h-5" />
-                        <h2 className="font-semibold text-lg">المعلومات الأساسية</h2>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4 pb-6">
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            setInvoiceData({...invoiceData, purchase_type: 'items'});
-                            setItems([]);
-                          }}
-                          className={`flex-1 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 border ${invoiceData.purchase_type === 'items' ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg scale-105 z-10' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}`}
-                        >
-                          <Package size={18} />
-                          {t('pi.purchase_items')}
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            setInvoiceData({...invoiceData, purchase_type: 'expenses'});
-                            setItems([]);
-                          }}
-                          className={`flex-1 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 border ${invoiceData.purchase_type === 'expenses' ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg scale-105 z-10' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}`}
-                        >
-                          <Receipt size={18} />
-                          {t('pi.purchase_expenses')}
-                        </button>
+
+                      {/* Left: Invoice Summary Card Column */}
+                      <div className="flex flex-col justify-center space-y-1 p-0.5" dir={dir}>
+                        <div className="flex items-center gap-1 mb-0.5 text-emerald-600">
+                          <Layers className="w-3.5 h-3.5" />
+                          <h2 className="font-semibold text-zinc-900 text-[10px]">{language === 'ar' ? 'ملخص الفاتورة' : 'Invoice Summary'}</h2>
+                        </div>
+
+                        <div className="bg-zinc-50 rounded-lg p-1.5 border border-zinc-100 space-y-0.5">
+                          <div className="flex justify-between items-center text-zinc-650 text-[10px]">
+                            <span className="font-medium">{t('pi.subtotal')}</span>
+                            <span className="font-bold text-[11px]">
+                              {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-emerald-600 text-[10px]">
+                            <div className="flex items-center gap-1">
+                              <span className="font-medium">{t('pi.discount')}</span>
+                              <input 
+                                type="number" 
+                                className="w-11 bg-white border border-zinc-200 rounded px-1 py-0.5 text-center font-bold text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-[10px]"
+                                value={Number(invoiceData.discount)}
+                                onChange={(e) => setInvoiceData({ ...invoiceData, discount: parseFloat(e.target.value) || 0 })}
+                              />
+                            </div>
+                            <span className="font-bold text-[11px]">-{formatMoney(invoiceData.discount)}</span>
+                          </div>
+                          {isVatEnabled && (
+                            <div className="flex justify-between items-center text-zinc-650 text-[10px] pt-0.5 border-t border-dashed border-zinc-200">
+                              <span className="font-medium">{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</span>
+                              <span className="font-bold text-[11px]">
+                                +{formatMoney(items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0))}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex justify-between items-center text-emerald-600 text-[10px] pt-0.5 border-t border-zinc-200">
+                            <span className="font-black text-[11px]">{t('pi.grand_total')}</span>
+                            <div className="flex flex-col items-end">
+                              <span className="font-black text-xs tracking-tighter text-left">
+                                {formatMoney(calculateTotal())} {companyData?.settings?.currency || ''}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className={`grid grid-cols-1 md:grid-cols-2 ${invoiceData.purchase_type === 'items' ? 'lg:grid-cols-3' : ''} gap-6 pt-4 border-t border-slate-100`}>
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-2">{t('pi.supplier')}</label>
-                          <div className="relative">
-                            <User className="absolute start-3 top-2.5 text-slate-400" size={16} />
+                      {/* Right: Unified Metadata & Payment Settings Panel Column */}
+                      <div className="lg:col-span-3 space-y-1 relative lg:border-s lg:border-zinc-150 lg:ps-2.5 flex flex-col justify-between" dir={dir}>
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-1.5">
+                          {/* 1. Date */}
+                          <div>
+                            <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{t('common.date')}</label>
+                            <input
+                              required
+                              type="date"
+                              className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px]"
+                              value={invoiceData.date}
+                              onChange={(e) => setInvoiceData({...invoiceData, date: e.target.value})}
+                            />
+                          </div>
+
+                          {/* 2. Supplier */}
+                          <div className="col-span-1 md:col-span-2 lg:col-span-2">
+                            <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{t('pi.supplier')}</label>
                             <select 
                               required
-                              className="w-full ps-10 pe-10 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-800 appearance-none"
+                              className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer"
                               value={invoiceData.supplier_id}
                               onChange={(e) => {
                                 if (e.target.value === 'new_supplier') {
@@ -2966,152 +3044,65 @@ export const PurchaseInvoices: React.FC = () => {
                             >
                               <option value="">{t('pi.select_supplier')}</option>
                               {suppliers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
-                              <option value="new_supplier" className="font-bold text-emerald-600">+ {t('suppliers.add_new')}</option>
+                              <option value="new_supplier" className="font-bold text-emerald-600 italic">+ {t('suppliers.add_new')}</option>
                             </select>
-                            <ChevronDown className="absolute end-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
                           </div>
-                        </div>
 
-                        {invoiceData.purchase_type === 'items' && (
-                          <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
-                            <div className="relative">
-                              <Box className="absolute start-3 top-2.5 text-slate-400" size={16} />
+                          {/* 3. Warehouse */}
+                          {invoiceData.purchase_type === 'items' && (
+                            <div>
+                              <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
                               <select 
                                 required
-                                className="w-full ps-10 pe-10 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-800 appearance-none"
+                                className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer"
                                 value={invoiceData.warehouse_id}
                                 onChange={(e) => setInvoiceData({...invoiceData, warehouse_id: e.target.value})}
                               >
                                 <option value="">{language === 'ar' ? 'اختر المخزن' : 'Select Warehouse'}</option>
                                 {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                               </select>
-                              <ChevronDown className="absolute end-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
                             </div>
-                          </div>
-                        )}
+                          )}
 
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-2">{t('common.date')}</label>
-                          <div className="relative">
-                            <Calendar className="absolute start-3 top-2.5 text-slate-400" size={16} />
-                            <input 
-                              required
-                              type="date" 
-                              className="w-full ps-10 pe-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-800"
-                              value={invoiceData.date}
-                              onChange={(e) => setInvoiceData({...invoiceData, date: e.target.value})}
-                            />
-                          </div>
-                        </div>
-
-                        {editingInvoice?.entry_number && (
+                          {/* 4. Purchase Type */}
                           <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">{language === 'ar' ? 'رقم القيد المرتبط' : 'Linked Journal Entry'}</label>
-                            <div className="relative">
-                              <Layers className="absolute start-3 top-2.5 text-emerald-500" size={16} />
-                              <input 
-                                readOnly
-                                type="text" 
-                                className="w-full ps-10 pe-4 py-2.5 bg-emerald-50 border border-emerald-200 rounded-lg outline-none transition-all font-bold text-emerald-800"
-                                value={editingInvoice.entry_number}
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Currency - REMOVED */}
-
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">{t('common.notes')}</label>
-                        <textarea 
-                          rows={2}
-                          className="w-full px-4 py-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all resize-none font-medium text-sm text-slate-600"
-                          placeholder={t('pi.notes_placeholder')}
-                          value={invoiceData.notes}
-                          onChange={(e) => setInvoiceData({...invoiceData, notes: e.target.value})}
-                        />
-                      </div>
-
-                      {pendingOrders.length > 0 && (
-                        <div className="pt-4 border-t border-slate-100 space-y-3">
-                          <label className="block text-xs font-bold text-emerald-600 tracking-tighter px-2 uppercase flex items-center gap-2">
-                            <FileText className="w-4 h-4" />
-                            {language === 'ar' ? 'ربط بأوامر الشراء المعلقة' : 'Link Pending Purchase Orders'}
-                          </label>
-                          <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-4 overflow-hidden">
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-xs text-right">
-                                <thead>
-                                  <tr className="text-zinc-400 font-bold border-b border-zinc-200 pb-2">
-                                    <th className="py-2 text-center w-10"></th>
-                                    <th className="py-2 text-right">{language === 'ar' ? 'رقم الأمر' : 'Order No'}</th>
-                                    <th className="py-2 text-right">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
-                                    <th className="py-2 text-right">{language === 'ar' ? 'الإجمالي' : 'Total'}</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-zinc-100">
-                                  {pendingOrders.map(order => (
-                                    <tr key={order.id} className="hover:bg-zinc-100/50">
-                                      <td className="py-3 text-center">
-                                        <input 
-                                          type="checkbox"
-                                          checked={selectedOrderIds.includes(order.id)}
-                                          onChange={(e) => handleOrderCheckboxChange(order.id, e.target.checked)}
-                                          className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
-                                        />
-                                      </td>
-                                      <td className="py-3 font-mono text-emerald-700 font-bold">{order.order_number}</td>
-                                      <td className="py-3 text-zinc-500">{formatDate(order.date)}</td>
-                                      <td className="py-3 text-zinc-900 font-bold">{formatMoney(order.total_amount)} {t('pi.currency')}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </section>
-
-                    {/* Card 2: إعدادات الدفع */}
-                    <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
-                      <div className="flex items-center gap-2 mb-4 text-emerald-600">
-                        <Wallet className="w-5 h-5" />
-                        <h2 className="font-semibold text-lg">إعدادات الدفع</h2>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-3">{t('pi.payment_type')}</label>
-                          <div className="grid grid-cols-2 gap-3">
-                            <button 
-                              type="button"
-                              onClick={() => setInvoiceData({...invoiceData, payment_type: 'cash'})}
-                              className={`py-2.5 rounded-lg font-bold transition-all border flex items-center justify-center gap-2 ${invoiceData.payment_type === 'cash' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
+                            <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'نوع الشراء' : 'Purchase Type'}</label>
+                            <select 
+                              className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer"
+                              value={invoiceData.purchase_type}
+                              onChange={(e) => {
+                                setInvoiceData(prev => ({ ...prev, purchase_type: e.target.value as 'items' | 'expenses' }));
+                                setItems([]);
+                              }}
                             >
-                              <Wallet size={16} />
-                              {t('pi.cash')}
-                            </button>
-                            <button 
-                              type="button"
-                              onClick={() => setInvoiceData({...invoiceData, payment_type: 'credit'})}
-                              className={`py-2.5 rounded-lg font-bold transition-all border flex items-center justify-center gap-2 ${invoiceData.payment_type === 'credit' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
+                              <option value="items">{t('pi.purchase_items')}</option>
+                              <option value="expenses">{t('pi.purchase_expenses')}</option>
+                            </select>
+                          </div>
+
+                          {/* 5. Payment Type */}
+                          <div>
+                            <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{t('pi.payment_type')}</label>
+                            <select 
+                              className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer"
+                              value={invoiceData.payment_type}
+                              onChange={(e) => setInvoiceData({...invoiceData, payment_type: e.target.value})}
                             >
-                              <Layers size={16} />
-                              {t('pi.credit')}
-                            </button>
+                              <option value="cash">{t('pi.cash')}</option>
+                              <option value="credit">{t('pi.credit')}</option>
+                            </select>
                           </div>
                         </div>
 
-                        {invoiceData.payment_type === 'cash' && (
-                          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">{t('pi.payment_method')}</label>
-                            <div className="relative">
-                              <CreditCard className="absolute start-3 top-2.5 text-slate-400" size={16} />
+                        {/* Second Row of metadata */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 mt-1 pt-1 border-t border-zinc-100">
+                          {/* Payment Terms or Method */}
+                          {invoiceData.payment_type === 'cash' ? (
+                            <div>
+                              <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{t('pi.payment_method')}</label>
                               <select 
                                 required
-                                className="w-full ps-10 pe-10 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-bold text-slate-800 appearance-none"
+                                className="w-full px-1.5 py-0.5 rounded-md border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer"
                                 value={invoiceData.payment_method_id}
                                 onChange={(e) => {
                                   if (e.target.value === 'new_payment_method') {
@@ -3123,25 +3114,15 @@ export const PurchaseInvoices: React.FC = () => {
                               >
                                 <option value="">{t('pi.select_payment_method')}</option>
                                 {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
-                                <option value="new_payment_method" className="font-bold text-emerald-600">+ {t('payment_methods.add_new')}</option>
+                                <option value="new_payment_method" className="font-bold text-emerald-600 italic">+ {t('payment_methods.add_new')}</option>
                               </select>
-                              <ChevronDown className="absolute end-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
                             </div>
-                          </motion.div>
-                        )}
-                      </div>
-
-                      {invoiceData.payment_type === 'credit' && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 pt-6 border-t border-zinc-100">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                              <label className="block text-sm font-bold text-zinc-700 mb-2">
-                                {language === 'ar' ? 'شروط السداد' : 'Payment Terms'}
-                              </label>
-                              <div className="relative group">
-                                <Calendar className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                          ) : (
+                            <>
+                              <div>
+                                <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'شروط السداد' : 'Payment Terms'}</label>
                                 <select 
-                                  className={`w-full ${dir === 'rtl' ? 'pr-10' : 'pl-10'} py-2.5 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer`}
+                                  className="w-full px-1.5 py-0.5 rounded-md border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer"
                                   value={paymentTerms}
                                   onChange={(e) => {
                                     const term = e.target.value;
@@ -3177,56 +3158,71 @@ export const PurchaseInvoices: React.FC = () => {
                                   <option value="advance_50_50">{language === 'ar' ? '50% مقدم والباقي عند التسليم' : '50% Advance / 50% on Delivery'}</option>
                                   <option value="custom">{language === 'ar' ? 'مخصص (أيام / نسب مقدمة مخصصة)' : 'Custom Days & Percentage'}</option>
                                 </select>
-                                <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                               </div>
-                            </div>
 
-                            <div>
-                              <label className="block text-sm font-bold text-zinc-700 mb-2">
-                                {language === 'ar' ? 'تاريخ الاستحقاق' : 'Due Date'}
-                              </label>
-                              <div className="relative">
+                              {paymentTerms === 'custom' && (
+                                <>
+                                  <div>
+                                    <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'فترة السداد بالأيام' : 'Payment Terms (Days)'}</label>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      className="w-full px-1.5 py-0.5 rounded-md border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px]"
+                                      value={paymentTermsDays}
+                                      onChange={(e) => setPaymentTermsDays(Number(e.target.value) || 0)}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'نسبة الدفعة المقدمة %' : 'Advance Percentage %'}</label>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      className="w-full px-1.5 py-0.5 rounded-md border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px]"
+                                      value={advancePercentage}
+                                      onChange={(e) => setAdvancePercentage(Number(e.target.value) || 0)}
+                                    />
+                                  </div>
+                                </>
+                              )}
+
+                              <div>
+                                <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'تاريخ الاستحقاق' : 'Due Date'}</label>
                                 <input
                                   type="date"
-                                  className="w-full px-4 py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800"
+                                  className="w-full px-1.5 py-0.5 rounded-md border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px]"
                                   value={dueDate}
                                   onChange={(e) => setDueDate(e.target.value)}
                                 />
                               </div>
-                            </div>
+                            </>
+                          )}
 
-                            {paymentTerms === 'custom' && (
-                              <>
-                                <div>
-                                  <label className="block text-sm font-bold text-zinc-700 mb-2">
-                                    {language === 'ar' ? 'فترة السداد بالأيام' : 'Payment Terms (Days)'}
-                                  </label>
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    className="w-full px-4 py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800"
-                                    value={paymentTermsDays}
-                                    onChange={(e) => setPaymentTermsDays(Number(e.target.value) || 0)}
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-sm font-bold text-zinc-700 mb-2">
-                                    {language === 'ar' ? 'نسبة الدفعة المقدمة %' : 'Advance Percentage %'}
-                                  </label>
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    className="w-full px-4 py-2 rounded-lg border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800"
-                                    value={advancePercentage}
-                                    onChange={(e) => setAdvancePercentage(Number(e.target.value) || 0)}
-                                  />
-                                </div>
-                              </>
-                            )}
+                          {/* Notes */}
+                          <div className="col-span-1 md:col-span-2">
+                            <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{t('common.notes')}</label>
+                            <input
+                              type="text"
+                              className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-medium text-zinc-800 text-[11px]"
+                              placeholder={t('pi.notes_placeholder')}
+                              value={invoiceData.notes}
+                              onChange={(e) => setInvoiceData({...invoiceData, notes: e.target.value})}
+                            />
                           </div>
-                        </motion.div>
-                      )}
+
+                          {editingInvoice?.entry_number && (
+                            <div>
+                              <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'القيد المرتبط' : 'Linked JE'}</label>
+                              <input
+                                readOnly
+                                type="text"
+                                className="w-full px-1.5 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 font-bold text-emerald-800 text-[11px]"
+                                value={editingInvoice.entry_number}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
 
                       {/* Credit Limit Warning Banner */}
                       {invoiceData.payment_type === 'credit' && invoiceData.supplier_id && (() => {
@@ -3237,10 +3233,10 @@ export const PurchaseInvoices: React.FC = () => {
                         
                         if (currentSupplier && currentSupplier.credit_limit > 0 && totalTentativeBalance > currentSupplier.credit_limit) {
                           return (
-                            <div className="mt-4 p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-3 text-rose-800 animate-in fade-in slide-in-from-top-2 duration-300">
-                              <span className="text-xl">⚠️</span>
-                              <div className="flex-1 text-sm font-medium">
-                                <p className="font-bold text-rose-950 mb-1">
+                            <div className="col-span-1 lg:col-span-4 mt-2 p-2 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2 text-rose-800 animate-in fade-in slide-in-from-top-2 duration-300">
+                              <span className="text-lg">⚠️</span>
+                              <div className="flex-1 text-[10px] font-medium">
+                                <p className="font-bold text-rose-950 mb-0.5">
                                   {language === 'ar' ? 'تنبيه: تجاوز حد الائتمان للمورد!' : 'Warning: Supplier Credit Limit Exceeded!'}
                                 </p>
                                 <p>
@@ -3632,39 +3628,7 @@ export const PurchaseInvoices: React.FC = () => {
                           </table>
                         </div>
 
-                        {/* Totals Section within Card 3 */}
-                        <div className="mt-6 pt-6 border-t border-slate-100 space-y-3">
-                          <div className={`flex justify-between items-center py-2 italic font-bold text-slate-600`}>
-                            <span>{t('pi.subtotal')}:</span>
-                            <span className="text-slate-900">
-                              {formatNumber(calculateSubtotal())} {companyData?.settings?.currency || ''}
-                            </span>
-                          </div>
-                          <div className={`flex justify-between items-center py-2 italic font-bold text-slate-600`}>
-                            <div className="flex items-center gap-2">
-                              <span>{t('pi.discount')}:</span>
-                              <input 
-                                type="number" 
-                                className="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-emerald-500 font-bold"
-                                value={invoiceData.discount}
-                                onChange={(e) => setInvoiceData({ ...invoiceData, discount: parseFloat(e.target.value) || 0 })}
-                              />
-                            </div>
-                            <span className="text-emerald-500">
-                              -{formatNumber(invoiceData.discount)} {companyData?.settings?.currency || ''}
-                            </span>
-                          </div>
-                          <div className="flex flex-col gap-2 p-6 bg-slate-900 text-white rounded-2xl italic shadow-lg">
-                            <div className="flex justify-between items-center">
-                              <span className="font-bold text-lg">{t('pi.grand_total')}</span>
-                              <div className="text-right">
-                                <span className="font-black text-2xl text-emerald-400">
-                                  {formatNumber(calculateTotal())} {companyData?.settings?.currency || ''}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+
                     </section>
 
                     {/* Settlements Table Card in Form */}

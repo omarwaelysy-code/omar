@@ -119,6 +119,9 @@ async function startServer() {
       'ALTER TABLE "invoice_items" ADD COLUMN IF NOT EXISTS "unit_cost" DECIMAL(18, 4) DEFAULT 0',
       'ALTER TABLE "invoice_items" ADD COLUMN IF NOT EXISTS "total_cost" DECIMAL(18, 4) DEFAULT 0',
       'ALTER TABLE "invoice_items" ADD COLUMN IF NOT EXISTS "costing_method_used" VARCHAR(50)',
+      'ALTER TABLE "return_items" ADD COLUMN IF NOT EXISTS "unit_cost" DECIMAL(18, 4) DEFAULT 0',
+      'ALTER TABLE "purchase_return_items" ADD COLUMN IF NOT EXISTS "unit_cost" DECIMAL(18, 4) DEFAULT 0',
+
       
       // Companies
       'ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "logo_url" TEXT',

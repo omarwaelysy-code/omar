@@ -2283,7 +2283,7 @@ router.post('/returns', authenticateToken, async (req: AuthRequest, res) => {
     for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('return_items', item);
       const itemId = uuidv4();
-      const itemData = { ...sanitizedItem, id: itemId, return_id: returnId };
+      const itemData = { ...sanitizedItem, id: itemId, return_id: returnId, unit_cost: 0 };
       if (rData.company_id) itemData.company_id = rData.company_id;
 
       // Cost and Layer integration for sales return
@@ -2301,7 +2301,8 @@ router.post('/returns', authenticateToken, async (req: AuthRequest, res) => {
               [item.product_id, companyId]
             );
             const returnUnitCost = lastSaleRes.rows[0] ? parseFloat(lastSaleRes.rows[0].unit_cost) : (parseFloat(prod.weighted_average_cost || '0') || parseFloat(prod.cost_price || '0'));
-            
+            itemData.unit_cost = returnUnitCost;
+
             await recordSalesReturn(
               client,
               companyId,
@@ -2381,7 +2382,7 @@ router.put('/returns/:id', authenticateToken, async (req: AuthRequest, res) => {
 for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('return_items', item);
       const itemId = uuidv4();
-      const itemData = { ...sanitizedItem, id: itemId, return_id: returnId };
+      const itemData = { ...sanitizedItem, id: itemId, return_id: returnId, unit_cost: 0 };
       if (rData.company_id) itemData.company_id = rData.company_id;
 
       // Cost and Layer integration for sales return
@@ -2399,7 +2400,8 @@ for (const item of (items || [])) {
               [item.product_id, companyId]
             );
             const returnUnitCost = lastSaleRes.rows[0] ? parseFloat(lastSaleRes.rows[0].unit_cost) : (parseFloat(prod.weighted_average_cost || '0') || parseFloat(prod.cost_price || '0'));
-            
+            itemData.unit_cost = returnUnitCost;
+
             await recordSalesReturn(
               client,
               companyId,
@@ -2687,7 +2689,7 @@ router.post('/purchase_returns', authenticateToken, async (req: AuthRequest, res
     for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('purchase_return_items', item);
       const itemId = uuidv4();
-      const itemData = { ...sanitizedItem, id: itemId, return_id: returnId };
+      const itemData = { ...sanitizedItem, id: itemId, return_id: returnId, unit_cost: 0 };
       if (rData.company_id) itemData.company_id = rData.company_id;
 
       // Cost and stock integration for purchase return
@@ -2698,6 +2700,7 @@ router.post('/purchase_returns', authenticateToken, async (req: AuthRequest, res
           const qty = parseFloat(item.quantity || '0');
           if (qty > 0) {
             const returnUnitCost = parseFloat(item.unit_price || '0') || parseFloat(prod.weighted_average_cost || '0') || parseFloat(prod.cost_price || '0');
+            itemData.unit_cost = returnUnitCost;
             await recordPurchaseReturn(
               client,
               companyId,
@@ -2772,7 +2775,7 @@ router.put('/purchase_returns/:id', authenticateToken, async (req: AuthRequest, 
 for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('purchase_return_items', item);
       const itemId = uuidv4();
-      const itemData = { ...sanitizedItem, id: itemId, return_id: returnId };
+      const itemData = { ...sanitizedItem, id: itemId, return_id: returnId, unit_cost: 0 };
       if (rData.company_id) itemData.company_id = rData.company_id;
 
       // Cost and stock integration for purchase return
@@ -2783,6 +2786,7 @@ for (const item of (items || [])) {
           const qty = parseFloat(item.quantity || '0');
           if (qty > 0) {
             const returnUnitCost = parseFloat(item.unit_price || '0') || parseFloat(prod.weighted_average_cost || '0') || parseFloat(prod.cost_price || '0');
+            itemData.unit_cost = returnUnitCost;
             await recordPurchaseReturn(
               client,
               companyId,

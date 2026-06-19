@@ -375,6 +375,26 @@ export const PurchaseOrders: React.FC = () => {
     setIsFullScreen(false);
   };
 
+  const handleCopyOrder = async () => {
+    if (!editingOrder) return;
+    try {
+      setEditingOrder(null);
+      const todayDate = new Date().toISOString().slice(0, 10);
+      setDate(todayDate);
+      setDeliveryDate(todayDate);
+      const newNum = await generateOrderNumber(todayDate);
+      setOrderNumber(newNum);
+      showNotification(
+        language === 'ar' ? 'تم نسخ أمر الشراء بالكامل كمسودة جديدة وتحديث رقمه وتاريخه' : 'Purchase order copied completely as a new draft with updated number and date',
+        'success'
+      );
+    } catch (error: any) {
+      console.error('[COPY] Error copying purchase order:', error);
+      showNotification('فشل نسخ أمر الشراء: ' + error.message, 'error');
+    }
+  };
+
+
   const openEditModal = async (order: PurchaseOrder) => {
     if (order.status === 'converted') {
       showNotification(`${ot('lock_error_edit')} ${order.invoice_number || ''}`, 'error');
@@ -1168,6 +1188,16 @@ export const PurchaseOrders: React.FC = () => {
                   {dir === 'rtl' ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
                   <span>{language === 'ar' ? 'العودة للقائمة' : 'Return to List'}</span>
                 </button>
+                {editingOrder && (
+                  <button 
+                    type="button"
+                    onClick={handleCopyOrder} 
+                    className="flex items-center gap-1 px-2 py-0.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
+                  >
+                    <Copy size={11} />
+                    <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+                  </button>
+                )}
               </div>
               <div className="flex items-center gap-1.5">
                 <button 

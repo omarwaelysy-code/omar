@@ -122,6 +122,9 @@ ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS product_image_url TEXT;
 ALTER TABLE return_items ADD COLUMN IF NOT EXISTS product_name VARCHAR(255);
 ALTER TABLE return_items ADD COLUMN IF NOT EXISTS product_code VARCHAR(100);
 ALTER TABLE return_items ADD COLUMN IF NOT EXISTS product_image_url TEXT;
+ALTER TABLE return_items ADD COLUMN IF NOT EXISTS unit_cost DECIMAL(18,4) DEFAULT 0;
+ALTER TABLE purchase_return_items ADD COLUMN IF NOT EXISTS unit_cost DECIMAL(18,4) DEFAULT 0;
+
 
 -- 10. Receipt & Payment Vouchers
 ALTER TABLE receipt_vouchers ADD COLUMN IF NOT EXISTS payment_method_id VARCHAR(36);

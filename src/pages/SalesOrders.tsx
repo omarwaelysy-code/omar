@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { SalesOrder, Customer, Product, SalesOrderItem, Warehouse, Company, Operation, Department, CostCenter, Currency, ExchangeRate, ActivityLog } from '../types';
 import { 
-  Search, Plus, Trash2, X, Eye, Sparkles, FileText, Pencil, Printer, 
+  Search, Plus, Trash2, X, Eye, Sparkles, FileText, Pencil, Printer, Copy,
   ChevronLeft, ChevronRight, Hash, Calendar, Package, Tag, ArrowUpRight, 
   Lock, LayoutGrid, List, FileCheck, Layers, ChevronUp, ChevronDown, CheckCheck, History, Download, ExternalLink, Coins, Image as ImageIcon
 } from 'lucide-react';
@@ -393,6 +393,26 @@ export const SalesOrders: React.FC = () => {
     setIsModalOpen(true);
     setIsFullScreen(false);
   };
+
+  const handleCopyOrder = async () => {
+    if (!editingOrder) return;
+    try {
+      setEditingOrder(null);
+      const todayDate = new Date().toISOString().slice(0, 10);
+      setDate(todayDate);
+      setDeliveryDate(todayDate);
+      const newNum = await generateOrderNumber(todayDate);
+      setOrderNumber(newNum);
+      showNotification(
+        language === 'ar' ? 'تم نسخ أمر البيع بالكامل كمسودة جديدة وتحديث رقمه وتاريخه' : 'Sales order copied completely as a new draft with updated number and date',
+        'success'
+      );
+    } catch (error: any) {
+      console.error('[COPY] Error copying sales order:', error);
+      showNotification('فشل نسخ أمر البيع: ' + error.message, 'error');
+    }
+  };
+
 
   const openEditModal = async (order: SalesOrder) => {
     if (order.status === 'converted') {
@@ -1120,6 +1140,16 @@ export const SalesOrders: React.FC = () => {
               </h2>
             </div>
             <div className="flex items-center gap-2">
+              {editingOrder && (
+                <button 
+                  type="button"
+                  onClick={handleCopyOrder} 
+                  className="flex items-center gap-1 px-3 py-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-xs whitespace-nowrap border border-emerald-200 shadow-sm"
+                >
+                  <Copy size={12} />
+                  <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setIsFullScreen(!isFullScreen)}

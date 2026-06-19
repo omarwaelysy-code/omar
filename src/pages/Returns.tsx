@@ -5,7 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { TransactionManager } from '../services/TransactionManager';
 import { ReturnSchema, JournalEntrySchema } from '../lib/schemas';
 import { Return, Customer, Product, ReturnItem, JournalEntry, JournalEntryItem, Account, PaymentMethod, Operation, Department, CostCenter } from '../types';
-import { Search, Plus, Trash2, X, Eye, Download, FileText, RotateCcw, History, Printer, Phone, Mail, MapPin, Wallet, Calendar, Box, CreditCard, User, ChevronDown, Layers, Save, Package, ChevronRight, ChevronLeft, Maximize2, Minimize2, LayoutGrid, List, CheckCheck, Image as ImageIcon } from 'lucide-react';
+import { Search, Plus, Trash2, X, Eye, Download, FileText, RotateCcw, History, Printer, Phone, Mail, MapPin, Wallet, Calendar, Box, CreditCard, User, ChevronDown, Layers, Save, Package, ChevronRight, ChevronLeft, Maximize2, Minimize2, LayoutGrid, List, CheckCheck, Copy, Image as ImageIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
@@ -1043,6 +1043,25 @@ export const Returns: React.FC = () => {
     setIsFullScreen(false);
   };
 
+  const handleCopyReturn = async () => {
+    if (!editingReturn) return;
+    try {
+      setEditingReturn(null);
+      const todayDate = new Date().toISOString().slice(0, 10);
+      setDate(todayDate);
+      const newNum = await generateReturnNumber(todayDate);
+      setReturnNumber(newNum);
+      showNotification(
+        language === 'ar' ? 'تم نسخ المرتجع بالكامل كمسودة جديدة وتحديث رقمه وتاريخه' : 'Return copied completely as a new draft with updated number and date',
+        'success'
+      );
+    } catch (error: any) {
+      console.error('[COPY] Error copying return:', error);
+      showNotification('فشل نسخ المرتجع: ' + error.message, 'error');
+    }
+  };
+
+
   useEffect(() => {
     if (pendingViewDoc && pendingViewDoc.type === 'return' && user) {
       const loadPendingDoc = async () => {
@@ -1563,6 +1582,16 @@ export const Returns: React.FC = () => {
                   {isFullScreen ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
                   <span>{isFullScreen ? (language === 'ar' ? 'تصغير' : 'Minimize') : (language === 'ar' ? 'ملء الشاشة' : 'Fullscreen')}</span>
                 </button>
+                {editingReturn && (
+                  <button 
+                    type="button"
+                    onClick={handleCopyReturn} 
+                    className="flex items-center gap-1 px-2 py-0.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
+                  >
+                    <Copy size={11} />
+                    <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+                  </button>
+                )}
               </div>
               <div className="flex items-center gap-1.5">
                 <button 
