@@ -1386,52 +1386,81 @@ export const Invoices: React.FC = () => {
       // Preview Journal Entry
       const journalItems: JournalEntryItem[] = [];
 
-      // Debit: Customer or Payment Method
-      let debitAccountId = '';
-      let debitAccountName = '';
+      const subtotalVal = Number(items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)), 0)) || 0;
+      const discountVal = Number(discount) || 0;
 
-      if (paymentType === 'cash') {
-        const pm = paymentMethods.find(p => p.id === paymentMethodId);
-        debitAccountId = pm?.account_id || '';
-        debitAccountName = pm?.account_name || 'حساب النقدية';
-      } else {
-        debitAccountId = customer?.account_id || '';
-        debitAccountName = customer?.account_name || 'حساب العملاء';
-      }
-
-      const debitAcc = accounts.find(a => a.id === debitAccountId);
-      const debitAccountCode = debitAcc?.code || '';
-
-      journalItems.push({
-        account_id: debitAccountId,
-        account_name: debitAccountName,
-        account_code: debitAccountCode,
-        debit: Number(total_amount) || 0,
-        credit: 0,
-        description: `فاتورة مبيعات رقم ${invoice_number} - ${customer?.name || '...'}`,
-        sub_account_id: paymentType === 'cash' ? paymentMethodId : customer?.id,
-        sub_account_type: paymentType === 'cash' ? 'payment_method' : 'customer'
-      });
-
-      // Debit: Discount Account (if any)
-      if (Number(discount) > 0) {
-        const discountAccountId = settings?.customer_discount_account_id || '';
-        const discountAccount = accounts.find(a => a.id === discountAccountId);
-        journalItems.push({
-          account_id: discountAccountId,
-          account_name: discountAccount?.name || 'حساب الخصم المسموح به',
-          account_code: discountAccount?.code || '',
-          debit: Number(discount) || 0,
-          credit: 0,
-          description: `خصم مسموح به - فاتورة رقم ${invoice_number}`
-        });
-      }
-
-      // Credit: Sales Accounts (per product)
       (items || []).forEach(item => {
+        if (!item.product_id) return;
         const product = products.find(p => p.id === item.product_id);
-        let creditAccountId = product?.revenue_account_id || '';
-        let creditAccountName = product?.revenue_account_name || 'حساب المبيعات';
+        if (!product) return;
+
+        const itemTotal = Number((Number(item.quantity) || 0) * (Number(item.unit_price) || 0)) || 0;
+        const itemVat = isVatEnabled ? Number(item.vat_amount) || 0 : 0;
+        
+        // Proportional discount allocation
+        const itemDiscount = subtotalVal > 0 ? Number(((itemTotal / subtotalVal) * discountVal).toFixed(2)) : 0;
+        const itemNetTotal = Number((itemTotal + itemVat - itemDiscount).toFixed(2));
+
+        // 1. Debit: Customer or Payment Method (Cash)
+        let debitAccountId = '';
+        let debitAccountName = '';
+
+        if (paymentType === 'cash') {
+          const pm = paymentMethods.find(p => p.id === paymentMethodId);
+          debitAccountId = pm?.account_id || '';
+          debitAccountName = pm?.account_name || 'حساب النقدية';
+        } else {
+          debitAccountId = customer?.account_id || '';
+          debitAccountName = customer?.account_name || 'حساب العملاء';
+        }
+
+        const debitAcc = accounts.find(a => a.id === debitAccountId);
+        const debitAccountCode = debitAcc?.code || '';
+
+        if (paymentType === 'cash') {
+          journalItems.push({
+            account_id: debitAccountId,
+            account_name: debitAccountName,
+            account_code: debitAccountCode,
+            product_name: item.product_name,
+            debit: itemNetTotal,
+            credit: 0,
+            description: `تحصيل نقدي - صنف: ${item.product_name} - فاتورة رقم ${invoice_number}`,
+            sub_account_id: paymentMethodId,
+            sub_account_type: 'payment_method'
+          });
+        } else {
+          journalItems.push({
+            account_id: debitAccountId,
+            account_name: debitAccountName,
+            account_code: debitAccountCode,
+            product_name: item.product_name,
+            debit: itemNetTotal,
+            credit: 0,
+            description: `مبيعات عملاء - صنف: ${item.product_name} - فاتورة رقم ${invoice_number}`,
+            sub_account_id: customer?.id,
+            sub_account_type: 'customer'
+          });
+        }
+
+        // 2. Debit: Discount Account (if proportional discount > 0)
+        if (itemDiscount > 0) {
+          const discountAccountId = settings?.customer_discount_account_id || '';
+          const discountAccount = accounts.find(a => a.id === discountAccountId);
+          journalItems.push({
+            account_id: discountAccountId,
+            account_name: discountAccount?.name || 'حساب الخصم المسموح به',
+            account_code: discountAccount?.code || '',
+            product_name: item.product_name,
+            debit: itemDiscount,
+            credit: 0,
+            description: `خصم مسموح به - صنف: ${item.product_name} - فاتورة رقم ${invoice_number}`
+          });
+        }
+
+        // 3. Credit: Sales Accounts
+        let creditAccountId = product.revenue_account_id || '';
+        let creditAccountName = product.revenue_account_name || 'حساب المبيعات';
         const creditAcc = accounts.find(a => a.id === creditAccountId);
         const creditAccountCode = creditAcc?.code || '';
 
@@ -1441,30 +1470,84 @@ export const Invoices: React.FC = () => {
           account_code: creditAccountCode,
           product_name: item.product_name,
           debit: 0,
-          credit: Number(item.total) || 0,
+          credit: itemTotal,
           description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoice_number}`
         });
+
+        // 4. Credit: VAT Liability Account
+        if (itemVat > 0) {
+          let vatAccountId = product.vat_account_id || '';
+          let vatAccountName = product.vat_account_name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Liability Account');
+
+          if (!vatAccountId) {
+            const globalVatAccount = accounts.find(a => 
+              a.name.includes('ضريبة القيمة المضافة') || 
+              a.name.includes('قيمة مضافة') || 
+              a.name.includes('ضريبة مبيعات')
+            );
+            vatAccountId = globalVatAccount?.id || '';
+            vatAccountName = globalVatAccount?.name || vatAccountName;
+          }
+          const vatAccount = accounts.find(a => a.id === vatAccountId);
+          journalItems.push({
+            account_id: vatAccountId,
+            account_name: vatAccountName,
+            account_code: vatAccount?.code || '',
+            product_name: item.product_name,
+            debit: 0,
+            credit: itemVat,
+            description: `ضريبة القيمة المضافة - صنف: ${item.product_name} - فاتورة رقم ${invoice_number}`
+          });
+        }
+
+        // 5. Debit COGS & Credit Inventory (for physical products)
+        if (product.type !== 'service' && !product.is_service) {
+          const itemCost = Number((item.quantity * (product.cost_price || 0)).toFixed(2));
+          if (itemCost > 0) {
+            // Debit: COGS Account
+            let costAccId = product.cost_account_id || '';
+            let costAccName = product.cost_account_name || 'تكلفة المبيعات';
+            if (!costAccId) {
+              const fallbackCostAcc = accounts.find(a => a.name.includes('تكلفة المبيعات') || a.name.includes('تكلفة مبيعات') || a.name.includes('تكلفة البضاعة المباعة'));
+              if (fallbackCostAcc) {
+                costAccId = fallbackCostAcc.id;
+                costAccName = fallbackCostAcc.name;
+              }
+            }
+            const costAcc = accounts.find(a => a.id === costAccId);
+            journalItems.push({
+              account_id: costAccId,
+              account_name: costAccName,
+              account_code: costAcc?.code || '',
+              product_name: item.product_name,
+              debit: itemCost,
+              credit: 0,
+              description: `تكلفة البضاعة المباعة - صنف: ${item.product_name} - فاتورة ${invoice_number}`
+            });
+
+            // Credit: Inventory Account
+            let invAccId = product.inventory_account_id || '';
+            let invAccName = product.inventory_account_name || 'المخزون';
+            if (!invAccId) {
+              const fallbackInvAcc = accounts.find(a => a.name.includes('مخزون') || a.name.includes('مخازن'));
+              if (fallbackInvAcc) {
+                invAccId = fallbackInvAcc.id;
+                invAccName = fallbackInvAcc.name;
+              }
+            }
+            const invAcc = accounts.find(a => a.id === invAccId);
+            journalItems.push({
+              account_id: invAccId,
+              account_name: invAccName,
+              account_code: invAcc?.code || '',
+              product_name: item.product_name,
+              debit: 0,
+              credit: itemCost,
+              description: `تخفيض المخزون - صنف: ${item.product_name} - فاتورة ${invoice_number}`
+            });
+          }
+        }
       });
-
-      // Credit: VAT Liability Account (if VAT is enabled and total VAT > 0)
-      if (isVatEnabled && vatTotal > 0) {
-        const vatAccount = accounts.find(a => 
-          a.name.includes('ضريبة القيمة المضافة') || 
-          a.name.includes('قيمة مضافة') || 
-          a.name.includes('ضريبة مبيعات')
-        );
-        const vatAccountId = vatAccount?.id || '';
-        const vatAccountName = vatAccount?.name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Liability Account');
-
-        journalItems.push({
-          account_id: vatAccountId,
-          account_name: vatAccountName,
-          account_code: vatAccount?.code || '',
-          debit: 0,
-          credit: Number(vatTotal) || 0,
-          description: `ضريبة القيمة المضافة - فاتورة رقم ${invoice_number}`
-        });
-      }
 
       const sumDebits = Number(journalItems.reduce((s, x) => s + (Number(x.debit) || 0), 0).toFixed(2)) || 0;
       const sumCredits = Number(journalItems.reduce((s, x) => s + (Number(x.credit) || 0), 0).toFixed(2)) || 0;
@@ -1686,137 +1769,168 @@ export const Invoices: React.FC = () => {
 
       // Journal items generation
       const journalItems: any[] = [];
+      const rate = Number(exchangeRate) || 1;
       let customerAccountId = customer?.account_id || '';
       let customerAccountName = customer?.account_name || 'حساب العملاء';
       const custAcc = accounts.find(a => a.id === customerAccountId);
       const customerAccountCode = custAcc?.code || '';
-      const rate = Number(exchangeRate) || 1;
-
-      journalItems.push({
-        account_id: customerAccountId,
-        account_name: customerAccountName,
-        account_code: customerAccountCode,
-        debit: Number((total_amount * rate).toFixed(2)),
-        credit: 0,
-        description: `فاتورة مبيعات رقم ${invoiceNumber}${description ? ` - ${description}` : ''} - ${customer?.name}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`,
-        customer_id: selectedCustomerId,
-        customer_name: customer?.name,
-        sub_account_id: selectedCustomerId,
-        sub_account_type: 'customer'
-      });
-
-      if (discount > 0) {
-        const discountAccountId = settings?.customer_discount_account_id || '';
-        const discountAccount = accounts.find(a => a.id === discountAccountId);
-        const discountAccountCode = discountAccount?.code || '';
-        journalItems.push({
-          account_id: discountAccountId,
-          account_name: discountAccount?.name || 'حساب الخصم المسموح به',
-          account_code: discountAccountCode,
-          debit: Number((discount * rate).toFixed(2)),
-          credit: 0,
-          description: `خصم مسموح به - فاتورة رقم ${invoiceNumber}${description ? ` - ${description}` : ''}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`
-        });
-      }
 
       sanitizedItems.forEach(item => {
         const product = products.find(p => p.id === item.product_id);
-        let creditAccountId = product?.revenue_account_id || '';
-        let creditAccountName = product?.revenue_account_name || 'حساب المبيعات';
+        if (!product) return;
+
+        const itemTotal = item.total || 0;
+        const itemVat = item.vat_amount || 0;
+        
+        // Proportional discount allocation
+        const itemDiscount = subtotal > 0 ? Number(((itemTotal / subtotal) * discount_amount).toFixed(2)) : 0;
+        const itemNetTotal = Number((itemTotal + itemVat - itemDiscount).toFixed(2));
+
+        // 1. Debit: Customer or Payment Method (Cash)
+        if (paymentType === 'cash') {
+          const pm = paymentMethods.find(p => p.id === paymentMethodId);
+          let cashAccountId = pm?.account_id || '';
+          let cashAccountName = pm?.account_name || 'حساب النقدية';
+          const cashAccount = accounts.find(a => a.id === cashAccountId);
+
+          journalItems.push({
+            account_id: cashAccountId,
+            account_name: cashAccountName,
+            account_code: cashAccount?.code || '',
+            product_name: item.product_name,
+            debit: Number((itemNetTotal * rate).toFixed(2)),
+            credit: 0,
+            description: `تحصيل نقدي - صنف: ${item.product_name} - فاتورة رقم ${invoiceNumber}`,
+            sub_account_id: paymentMethodId,
+            sub_account_type: 'payment_method'
+          });
+        } else {
+          journalItems.push({
+            account_id: customerAccountId,
+            account_name: customerAccountName,
+            account_code: customerAccountCode,
+            product_name: item.product_name,
+            debit: Number((itemNetTotal * rate).toFixed(2)),
+            credit: 0,
+            description: `مبيعات عملاء - صنف: ${item.product_name} - فاتورة رقم ${invoiceNumber}`,
+            customer_id: selectedCustomerId,
+            customer_name: customer?.name,
+            sub_account_id: selectedCustomerId,
+            sub_account_type: 'customer'
+          });
+        }
+
+        // 2. Debit: Discount (if any)
+        if (itemDiscount > 0) {
+          const discountAccountId = settings?.customer_discount_account_id || '';
+          const discountAccount = accounts.find(a => a.id === discountAccountId);
+          journalItems.push({
+            account_id: discountAccountId,
+            account_name: discountAccount?.name || 'حساب الخصم المسموح به',
+            account_code: discountAccount?.code || '',
+            product_name: item.product_name,
+            debit: Number((itemDiscount * rate).toFixed(2)),
+            credit: 0,
+            description: `خصم مسموح به - صنف: ${item.product_name} - فاتورة رقم ${invoiceNumber}`
+          });
+        }
+
+        // 3. Credit: Sales Accounts
+        let creditAccountId = product.revenue_account_id || '';
+        let creditAccountName = product.revenue_account_name || 'حساب المبيعات';
         const creditAccount = accounts.find(a => a.id === creditAccountId);
         const creditAccountCode = creditAccount?.code || '';
+
         journalItems.push({
           account_id: creditAccountId,
           account_name: creditAccountName,
           account_code: creditAccountCode,
+          product_name: item.product_name,
           debit: 0,
-          credit: Number((item.total * rate).toFixed(2)),
-          description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoiceNumber}${description ? ` - ${description}` : ''}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`,
-          product_name: item.product_name
+          credit: Number((itemTotal * rate).toFixed(2)),
+          description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoiceNumber}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`
         });
-      });
 
-      if (isVatEnabled && vatTotal > 0) {
-        const vatGroup: Record<string, { account_id: string; account_name: string; amount: number }> = {};
-        sanitizedItems.forEach(item => {
-          const prod = products.find(p => p.id === item.product_id);
-          const vatAccountId = prod?.vat_account_id || '';
-          const vatAccountName = prod?.vat_account_name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Liability Account');
-          const vatAmount = item.vat_amount || 0;
-          
-          if (vatAmount > 0) {
-            let finalVatAccountId = vatAccountId;
-            let finalVatAccountName = vatAccountName;
-            
-            if (!finalVatAccountId) {
-              const globalVatAccount = accounts.find(a => 
-                a.name.includes('ضريبة القيمة المضافة') || 
-                a.name.includes('قيمة مضافة') || 
-                a.name.includes('ضريبة مبيعات')
-              );
-              finalVatAccountId = globalVatAccount?.id || '';
-              finalVatAccountName = globalVatAccount?.name || finalVatAccountName;
-            }
-            
-            if (finalVatAccountId) {
-              if (!vatGroup[finalVatAccountId]) {
-                vatGroup[finalVatAccountId] = {
-                  account_id: finalVatAccountId,
-                  account_name: finalVatAccountName,
-                  amount: 0
-                };
-              }
-              vatGroup[finalVatAccountId].amount += vatAmount;
-            }
+        // 4. Credit: VAT Liability Account
+        if (itemVat > 0) {
+          let vatAccountId = product.vat_account_id || '';
+          let vatAccountName = product.vat_account_name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Liability Account');
+
+          if (!vatAccountId) {
+            const globalVatAccount = accounts.find(a => 
+              a.name.includes('ضريبة القيمة المضافة') || 
+              a.name.includes('قيمة مضافة') || 
+              a.name.includes('ضريبة مبيعات')
+            );
+            vatAccountId = globalVatAccount?.id || '';
+            vatAccountName = globalVatAccount?.name || vatAccountName;
           }
-        });
-
-        Object.values(vatGroup).forEach(vat => {
-          const vatAccount = accounts.find(a => a.id === vat.account_id);
+          const vatAccount = accounts.find(a => a.id === vatAccountId);
           const vatAccountCode = vatAccount?.code || '';
-          journalItems.push({
-            account_id: vat.account_id,
-            account_name: vat.account_name,
-            account_code: vatAccountCode,
-            debit: 0,
-            credit: Number((vat.amount * rate).toFixed(2)),
-            description: `ضريبة القيمة المضافة - فاتورة رقم ${invoiceNumber}${description ? ` - ${description}` : ''}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`
-          });
-        });
-      }
 
-      if (paymentType === 'cash') {
-        const pm = paymentMethods.find(p => p.id === paymentMethodId);
-        let cashAccountId = pm?.account_id || '';
-        let cashAccountName = pm?.account_name || 'حساب النقدية';
-        const cashAccount = accounts.find(a => a.id === cashAccountId);
-        const cashAccountCode = cashAccount?.code || '';
-        journalItems.push({
-          account_id: cashAccountId,
-          account_name: cashAccountName,
-          account_code: cashAccountCode,
-          debit: Number((total_amount * rate).toFixed(2)),
-          credit: 0,
-          description: `تحصيل فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`,
-          sub_account_id: paymentMethodId,
-          sub_account_type: 'payment_method'
-        });
-        
-        const custAcc2 = accounts.find(a => a.id === customerAccountId);
-        const customerAccountCode2 = custAcc2?.code || '';
-        journalItems.push({
-          account_id: customerAccountId,
-          account_name: customerAccountName,
-          account_code: customerAccountCode2,
-          debit: 0,
-          credit: Number((total_amount * rate).toFixed(2)),
-          description: `سداد فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`,
-          customer_id: selectedCustomerId,
-          customer_name: customer?.name,
-          sub_account_id: selectedCustomerId,
-          sub_account_type: 'customer'
-        });
-      }
+          journalItems.push({
+            account_id: vatAccountId,
+            account_name: vatAccountName,
+            account_code: vatAccountCode,
+            product_name: item.product_name,
+            debit: 0,
+            credit: Number((itemVat * rate).toFixed(2)),
+            description: `ضريبة القيمة المضافة - صنف: ${item.product_name} - فاتورة رقم ${invoiceNumber}`
+          });
+        }
+
+        // 5. Debit COGS & Credit Inventory (for physical products)
+        if (product.type !== 'service' && !product.is_service) {
+          const itemCost = Number(product.cost_price) || 0;
+          const totalCost = Number((item.quantity * itemCost).toFixed(2));
+
+          if (totalCost > 0) {
+            let costAccId = product.cost_account_id || '';
+            let costAccName = product.cost_account_name || 'تكلفة المبيعات';
+            if (!costAccId) {
+              const fallbackCostAcc = accounts.find(a => a.name.includes('تكلفة المبيعات') || a.name.includes('تكلفة مبيعات') || a.name.includes('تكلفة البضاعة المباعة'));
+              if (fallbackCostAcc) {
+                costAccId = fallbackCostAcc.id;
+                costAccName = fallbackCostAcc.name;
+              }
+            }
+            const costAcc = accounts.find(a => a.id === costAccId);
+
+            let invAccId = product.inventory_account_id || '';
+            let invAccName = product.inventory_account_name || 'المخزون';
+            if (!invAccId) {
+              const fallbackInvAcc = accounts.find(a => a.name.includes('مخزون') || a.name.includes('مخازن'));
+              if (fallbackInvAcc) {
+                invAccId = fallbackInvAcc.id;
+                invAccName = fallbackInvAcc.name;
+              }
+            }
+            const invAcc = accounts.find(a => a.id === invAccId);
+
+            // Debit COGS
+            journalItems.push({
+              account_id: costAccId,
+              account_name: costAccName,
+              account_code: costAcc?.code || '',
+              product_name: item.product_name,
+              debit: Number((totalCost * rate).toFixed(2)),
+              credit: 0,
+              description: `تكلفة البضاعة المباعة - صنف: ${item.product_name} - فاتورة رقم ${invoiceNumber}`
+            });
+
+            // Credit Inventory
+            journalItems.push({
+              account_id: invAccId,
+              account_name: invAccName,
+              account_code: invAcc?.code || '',
+              product_name: item.product_name,
+              debit: 0,
+              credit: Number((totalCost * rate).toFixed(2)),
+              description: `تخفيض المخزون - صنف: ${item.product_name} - فاتورة رقم ${invoiceNumber}`
+            });
+          }
+        }
+      });
 
       let total_debit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0).toFixed(2)) || 0;
       let total_credit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0).toFixed(2)) || 0;
@@ -3578,63 +3692,8 @@ export const Invoices: React.FC = () => {
             </div>
           </div>
             
-            <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full relative">
-              {/* Bottom Drawer for Activity Log and Journal Entry */}
-              <AnimatePresence>
-                {showSidePanel && (
-                  <motion.div 
-                    initial={{ y: '100%' }}
-                    animate={{ y: 0 }}
-                    exit={{ y: '100%' }}
-                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    className={`absolute bottom-0 inset-x-0 z-50 bg-white border-t border-slate-200 shadow-2xl flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${isPanelExpanded ? 'h-[480px]' : 'h-[55px]'}`}
-                  >
-                    <div 
-                      onClick={() => setIsPanelExpanded(!isPanelExpanded)}
-                      className="p-3 border-b border-slate-100 flex items-center justify-between bg-zinc-50 sticky top-0 cursor-pointer select-none"
-                    >
-                      <div className="flex items-center gap-3">
-                        <button 
-                          type="button"
-                          className="w-7 h-7 rounded-full bg-slate-200/70 hover:bg-slate-300 flex items-center justify-center transition-all shadow-sm"
-                        >
-                          {isPanelExpanded ? <ChevronDown size={16} className="text-slate-600" /> : <ChevronUp size={16} className="text-slate-600" />}
-                        </button>
-                        <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                          <History size={16} className="text-emerald-600 animate-pulse" />
-                          <span>{language === 'ar' ? 'سجل التعديلات والقيد' : 'Activity Log & Journal'}</span>
-                        </h3>
-                      </div>
-                      <button 
-                        type="button" 
-                        onClick={(e) => { e.stopPropagation(); setShowSidePanel(false); }} 
-                        className="p-1.5 text-slate-400 hover:text-slate-650 hover:bg-slate-200/50 rounded-lg transition-all"
-                      >
-                        <X size={18} />
-                      </button>
-                    </div>
-                    <div className="flex-1 overflow-y-auto">
-                      {(() => {
-                        const activeCurrency = companyCurrencies.find(c => c.id === (editingInvoice?.currency_id || selectedCurrencyId));
-                        const currencyCode = activeCurrency ? activeCurrency.code : (companyData?.settings?.currency || (companyData as any)?.currency || 'EGP');
-                        const exchangeRateVal = editingInvoice ? (editingInvoice.exchange_rate || 1) : (Number(exchangeRate) || 1);
-                        
-                        return (
-                          <TransactionSidePanel 
-                            documentId={editingInvoice?.id || ''} 
-                            category="invoices" 
-                            previewJournalEntry={previewJournalEntry}
-                            previewActivityLog={previewActivityLog}
-                            layout="bottom"
-                            currencyCode={currencyCode}
-                            exchangeRate={exchangeRateVal}
-                          />
-                        );
-                      })()}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+            <div className="flex-1 flex flex-col h-full relative overflow-hidden">
+
 
               {/* AI Drawer (Smart Creation) sliding from the right */}
               <AnimatePresence>
@@ -4285,38 +4344,38 @@ export const Invoices: React.FC = () => {
                         <table className="w-full text-sm text-right border-collapse table-fixed min-w-[1150px]">
                           <thead>
                             <tr className="bg-zinc-100 border-b border-zinc-200 text-zinc-700 text-xs font-bold">
-                              <th className="p-1.5 border-r border-zinc-200 text-right w-80 min-w-[320px]">{t('invoices.item_name')}</th>
-                              <th className="p-1.5 border-r border-zinc-200 text-center w-12">{language === 'ar' ? 'صورة' : 'Image'}</th>
-                              <th className="p-1.5 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'باركود' : 'Barcode'}</th>
-                              <th className="p-1.5 border-r border-zinc-200 text-center w-28">{language === 'ar' ? 'رقم عملية' : 'Operation No'}</th>
-                              <th className="p-1.5 border-r border-zinc-200 text-center w-28">{language === 'ar' ? 'الإدارة' : 'Department'}</th>
-                              <th className="p-1.5 border-r border-zinc-200 text-center w-28">{language === 'ar' ? 'مركز التكلفة' : 'Cost Center'}</th>
-                              <th className="p-1.5 border-r border-zinc-200 text-center w-16">{t('invoices.item_quantity')}</th>
-                              <th className="p-1.5 border-r border-zinc-200 text-center w-24">{t('invoices.item_price')}</th>
+                              <th className="p-1 border-r border-zinc-200 text-right w-80 min-w-[320px]">{t('invoices.item_name')}</th>
+                              <th className="p-1 border-r border-zinc-200 text-center w-12">{language === 'ar' ? 'صورة' : 'Image'}</th>
+                              <th className="p-1 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'باركود' : 'Barcode'}</th>
+                              <th className="p-1 border-r border-zinc-200 text-center w-28">{language === 'ar' ? 'رقم عملية' : 'Operation No'}</th>
+                              <th className="p-1 border-r border-zinc-200 text-center w-28">{language === 'ar' ? 'الإدارة' : 'Department'}</th>
+                              <th className="p-1 border-r border-zinc-200 text-center w-28">{language === 'ar' ? 'مركز التكلفة' : 'Cost Center'}</th>
+                              <th className="p-1 border-r border-zinc-200 text-center w-16">{t('invoices.item_quantity')}</th>
+                              <th className="p-1 border-r border-zinc-200 text-center w-24">{t('invoices.item_price')}</th>
                               {isVatEnabled && (
-                                <th className="p-1.5 border-r border-zinc-200 text-center w-14">{language === 'ar' ? 'ض ق م' : 'VAT %'}</th>
+                                <th className="p-1 border-r border-zinc-200 text-center w-14">{language === 'ar' ? 'ض ق م' : 'VAT %'}</th>
                               )}
-                              <th className="p-1.5 border-r border-zinc-200 text-center w-24">{t('invoices.item_total')}</th>
-                              <th className="p-1.5 w-10"></th>
+                              <th className="p-1 border-r border-zinc-200 text-center w-24">{t('invoices.item_total')}</th>
+                              <th className="p-1 w-10"></th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-zinc-100">
                             {items.map((item, index) => (
                               <tr key={index} className="group hover:bg-zinc-50 transition-colors">
-                                <td className="p-1 border-b border-r border-zinc-200 w-80 min-w-[320px]">
+                                <td className="p-0.5 border-b border-r border-zinc-200 w-80 min-w-[320px]">
                                   <div className="relative">
                                     <select 
-                                      className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-2 py-1 outline-none font-bold text-zinc-800 appearance-none transition-all text-xs"
+                                      className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 outline-none font-bold text-zinc-800 appearance-none transition-all text-xs"
                                       value={item.product_id}
                                       onChange={(e) => updateItem(index, 'product_id', e.target.value)}
                                     >
                                       <option value="">{t('common.select_product')}</option>
                                       {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                                     </select>
-                                    <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-2' : 'right-2'} top-2 w-3.5 h-3.5 text-zinc-400 pointer-events-none`} />
+                                    <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-2' : 'right-2'} top-1.5 w-3.5 h-3.5 text-zinc-400 pointer-events-none`} />
                                   </div>
                                 </td>
-                                <td className="p-1 border-b border-r border-zinc-200 w-12 text-center">
+                                <td className="p-0.5 border-b border-r border-zinc-200 w-12 text-center">
                                   <div className="flex justify-center items-center">
                                     {item.image_url ? (
                                       <div className="relative group w-8 h-8">
@@ -4329,7 +4388,7 @@ export const Invoices: React.FC = () => {
                                         </button>
                                       </div>
                                     ) : (
-                                      <label className="cursor-pointer p-1.5 bg-zinc-50 border border-zinc-200 border-dashed rounded hover:bg-zinc-100 transition-colors inline-block">
+                                      <label className="cursor-pointer p-1 bg-zinc-50 border border-zinc-200 border-dashed rounded hover:bg-zinc-100 transition-colors inline-block">
                                         <ImageIcon size={14} className="text-zinc-400" />
                                         <input 
                                           type="file" 
@@ -4348,7 +4407,7 @@ export const Invoices: React.FC = () => {
                                     )}
                                   </div>
                                 </td>
-                                <td className="p-1 border-b border-r border-zinc-200 w-24 text-center">
+                                <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center">
                                   <div className="flex flex-col items-center gap-0.5">
                                     <input 
                                       type="text" 
@@ -4372,7 +4431,7 @@ export const Invoices: React.FC = () => {
                                 </td>
                                 
                                 {/* رقم عملية */}
-                                <td className="p-1 border-b border-r border-zinc-200 w-28 text-center">
+                                <td className="p-0.5 border-b border-r border-zinc-200 w-28 text-center">
                                   <div className="flex items-center gap-1 w-full relative">
                                     <div className="relative flex-1">
                                       <input 
@@ -4436,7 +4495,7 @@ export const Invoices: React.FC = () => {
                                 </td>
 
                                 {/* الإدارة */}
-                                <td className="p-1 border-b border-r border-zinc-200 w-28 text-center">
+                                <td className="p-0.5 border-b border-r border-zinc-200 w-28 text-center">
                                   <div className="flex items-center gap-1 w-full relative">
                                     <div className="relative flex-1">
                                       <input 
@@ -4486,7 +4545,7 @@ export const Invoices: React.FC = () => {
                                 </td>
 
                                 {/* مركز التكلفة */}
-                                <td className="p-1 border-b border-r border-zinc-200 w-28 text-center">
+                                <td className="p-0.5 border-b border-r border-zinc-200 w-28 text-center">
                                   <div className="flex items-center gap-1 w-full relative">
                                     <div className="relative flex-1">
                                       <input 
@@ -4535,7 +4594,7 @@ export const Invoices: React.FC = () => {
                                   </div>
                                 </td>
 
-                                <td className="p-1 border-b border-r border-zinc-200 w-16">
+                                <td className="p-0.5 border-b border-r border-zinc-200 w-16">
                                   <input 
                                     type="number" 
                                     className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs"
@@ -4543,7 +4602,7 @@ export const Invoices: React.FC = () => {
                                     onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
                                   />
                                 </td>
-                                <td className="p-1 border-b border-r border-zinc-200 w-24">
+                                <td className="p-0.5 border-b border-r border-zinc-200 w-24">
                                   <input 
                                     type="text" 
                                     className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1.5 py-0.5 text-center font-bold text-zinc-800 outline-none transition-all text-xs font-bold font-mono"
@@ -4565,7 +4624,7 @@ export const Invoices: React.FC = () => {
                                   />
                                 </td>
                                 {isVatEnabled && (
-                                  <td className="p-1 border-b border-r border-zinc-200 w-14">
+                                  <td className="p-0.5 border-b border-r border-zinc-200 w-14">
                                     <div className="flex items-center justify-center gap-0.5">
                                       <input 
                                         type="number" 
@@ -4579,10 +4638,10 @@ export const Invoices: React.FC = () => {
                                     </div>
                                   </td>
                                 )}
-                                <td className="p-1 border-b border-r border-zinc-200 w-24 text-center font-bold text-emerald-600 text-xs">
+                                <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-emerald-600 text-xs">
                                   {formatMoney(item.total)}
                                 </td>
-                                <td className="p-1 border-b border-zinc-200 w-10 text-center">
+                                <td className="p-0.5 border-b border-zinc-200 w-10 text-center">
                                   <button 
                                     type="button"
                                     onClick={() => removeItem(index)}
@@ -5025,15 +5084,64 @@ export const Invoices: React.FC = () => {
                       </>
                     )}
 
-                    {editingInvoice && (
+                    {/* Inline Section for Activity Log and Journal Entry */}
+                    {showSidePanel && (
+                      <div className="mt-6 border border-zinc-200 rounded-2xl overflow-hidden bg-white shadow-sm flex flex-col w-full">
+                        <div 
+                          onClick={() => setIsPanelExpanded(!isPanelExpanded)}
+                          className="p-3 border-b border-zinc-150 flex items-center justify-between bg-zinc-50 cursor-pointer select-none"
+                        >
+                          <div className="flex items-center gap-3">
+                            <button 
+                              type="button"
+                              className="w-7 h-7 rounded-full bg-slate-200/70 hover:bg-slate-300 flex items-center justify-center transition-all shadow-sm"
+                            >
+                              {isPanelExpanded ? <ChevronDown size={16} className="text-slate-600" /> : <ChevronUp size={16} className="text-slate-600" />}
+                            </button>
+                            <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                              <History size={16} className="text-emerald-600 animate-pulse" />
+                              <span>{language === 'ar' ? 'سجل التعديلات والقيد' : 'Activity Log & Journal'}</span>
+                            </h3>
+                          </div>
+                          <button 
+                            type="button" 
+                            onClick={(e) => { e.stopPropagation(); setShowSidePanel(false); }} 
+                            className="p-1.5 text-slate-400 hover:text-slate-650 hover:bg-slate-200/50 rounded-lg transition-all"
+                          >
+                            <X size={18} />
+                          </button>
+                        </div>
+                        <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isPanelExpanded ? 'max-h-[1200px] border-t border-zinc-200' : 'max-h-0'}`}>
+                          {(() => {
+                            const activeCurrency = companyCurrencies.find(c => c.id === (editingInvoice?.currency_id || selectedCurrencyId));
+                            const currencyCode = activeCurrency ? activeCurrency.code : (companyData?.settings?.currency || (companyData as any)?.currency || 'EGP');
+                            const exchangeRateVal = editingInvoice ? (editingInvoice.exchange_rate || 1) : (Number(exchangeRate) || 1);
+                            
+                            return (
+                              <TransactionSidePanel 
+                                documentId={editingInvoice?.id || ''} 
+                                category="invoices" 
+                                previewJournalEntry={previewJournalEntry}
+                                previewActivityLog={previewActivityLog}
+                                layout="bottom"
+                                currencyCode={currencyCode}
+                                exchangeRate={exchangeRateVal}
+                              />
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )}
+
+                    {!showSidePanel && (
                       <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-start">
                         <button 
                           type="button"
-                          onClick={() => setShowSidePanel(!showSidePanel)}
-                          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm ${showSidePanel ? 'bg-emerald-600 text-white border-emerald-600 shadow-emerald-500/10' : 'bg-white text-slate-755 border-slate-200 hover:bg-zinc-50'}`}
+                          onClick={() => { setShowSidePanel(true); setIsPanelExpanded(true); }}
+                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm bg-white text-slate-755 border-slate-200 hover:bg-zinc-50"
                         >
                           <History size={14} />
-                          <span>{language === 'ar' ? 'سجل التعديلات والقيد' : 'Activity Log & Journal'}</span>
+                          <span>{language === 'ar' ? 'عرض سجل التعديلات والقيد' : 'Show Activity Log & Journal'}</span>
                         </button>
                       </div>
                     )}

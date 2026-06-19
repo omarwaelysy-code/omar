@@ -89,7 +89,7 @@ export const TransactionSidePanel: React.FC<TransactionSidePanelProps> = ({
     }
 
     return (
-      <div className="w-full flex flex-col bg-white h-full overflow-y-auto custom-scrollbar" dir={dir}>
+      <div className="w-full flex flex-col bg-white" dir={dir}>
         {/* Journal Entry Section */}
         {displayJournal ? (
           <div className="px-4 py-3 flex-shrink-0">
@@ -117,13 +117,13 @@ export const TransactionSidePanel: React.FC<TransactionSidePanelProps> = ({
               <table className="w-full text-right border-collapse text-xs">
                 <thead>
                   <tr className="bg-zinc-100/80 text-zinc-650 font-bold border-b border-zinc-200">
-                    <th className="p-2.5 text-left font-black text-zinc-700 w-32 border-l border-zinc-200">{language === 'ar' ? 'المدين' : 'Debit'}</th>
-                    <th className="p-2.5 text-left font-black text-zinc-700 w-32 border-l border-zinc-200">{language === 'ar' ? 'الدائن' : 'Credit'}</th>
-                    <th className="p-2.5 text-center font-black text-zinc-700 w-32 border-l border-zinc-200">{language === 'ar' ? 'كود الحساب' : 'Account Code'}</th>
-                    <th className="p-2.5 text-right font-black text-zinc-700 border-l border-zinc-200">{language === 'ar' ? 'الحساب الرئيسي' : 'Main Account'}</th>
-                    <th className="p-2.5 text-right font-black text-zinc-700 border-l border-zinc-200">{language === 'ar' ? 'الصنف' : 'Item/Product'}</th>
-                    <th className="p-2.5 text-center font-black text-zinc-700 w-24 border-l border-zinc-200">{language === 'ar' ? 'العملة' : 'Currency'}</th>
-                    <th className="p-2.5 text-left font-black text-zinc-700 w-40">{language === 'ar' ? 'قيمة العملة الأجنبية' : 'Foreign Currency Value'}</th>
+                    <th className="p-0.5 px-1.5 text-left font-black text-zinc-700 w-32 border-l border-zinc-200 text-[9px]">{language === 'ar' ? 'المدين' : 'Debit'}</th>
+                    <th className="p-0.5 px-1.5 text-left font-black text-zinc-700 w-32 border-l border-zinc-200 text-[9px]">{language === 'ar' ? 'الدائن' : 'Credit'}</th>
+                    <th className="p-0.5 px-1.5 text-center font-black text-zinc-700 w-32 border-l border-zinc-200 text-[9px]">{language === 'ar' ? 'كود الحساب' : 'Account Code'}</th>
+                    <th className="p-0.5 px-1.5 text-right font-black text-zinc-700 border-l border-zinc-200 text-[9px]">{language === 'ar' ? 'الحساب الرئيسي' : 'Main Account'}</th>
+                    <th className="p-0.5 px-1.5 text-right font-black text-zinc-700 border-l border-zinc-200 text-[9px]">{language === 'ar' ? 'الصنف' : 'Item/Product'}</th>
+                    <th className="p-0.5 px-1.5 text-center font-black text-zinc-700 w-24 border-l border-zinc-200 text-[9px]">{language === 'ar' ? 'العملة' : 'Currency'}</th>
+                    <th className="p-0.5 px-1.5 text-left font-black text-zinc-700 w-40 text-[9px]">{language === 'ar' ? 'قيمة العملة الأجنبية' : 'Foreign Currency Value'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-150">
@@ -141,31 +141,31 @@ export const TransactionSidePanel: React.FC<TransactionSidePanelProps> = ({
                     return (
                       <tr key={idx} className="hover:bg-zinc-50/50 transition-colors">
                         {/* Debit */}
-                        <td className={`p-2.5 text-left font-bold border-l border-zinc-200 ${hasDebit ? 'text-emerald-600 bg-emerald-50/5' : 'text-zinc-350'}`}>
+                        <td className={`p-0.5 px-1.5 text-left font-bold border-l border-zinc-200 text-[10px] ${hasDebit ? 'text-emerald-600 bg-emerald-50/5' : 'text-zinc-350'}`}>
                           {hasDebit ? formatNumber(localDebit) : '-'}
                         </td>
                         {/* Credit */}
-                        <td className={`p-2.5 text-left font-bold border-l border-zinc-200 ${hasCredit ? 'text-red-500 bg-red-50/5' : 'text-zinc-350'}`}>
+                        <td className={`p-0.5 px-1.5 text-left font-bold border-l border-zinc-200 text-[10px] ${hasCredit ? 'text-red-500 bg-red-50/5' : 'text-zinc-350'}`}>
                           {hasCredit ? formatNumber(localCredit) : '-'}
                         </td>
                         {/* Account Code */}
-                        <td className="p-2.5 text-center font-mono font-bold text-zinc-550 border-l border-zinc-200 bg-amber-50/5">
+                        <td className="p-0.5 px-1.5 text-center font-mono font-bold text-zinc-550 border-l border-zinc-200 bg-amber-50/5 text-[10px]">
                           {item.account_code || '-'}
                         </td>
                         {/* Main Account */}
-                        <td className="p-2.5 text-right font-black text-zinc-800 border-l border-zinc-200">
+                        <td className="p-0.5 px-1.5 text-right font-black text-zinc-800 border-l border-zinc-200 text-[10px]">
                           {item.account_name}
                         </td>
                         {/* Item/Product */}
-                        <td className="p-2.5 text-right font-medium text-zinc-650 border-l border-zinc-200">
+                        <td className="p-0.5 px-1.5 text-right font-medium text-zinc-650 border-l border-zinc-200 text-[10px]">
                           {item.product_name || '-'}
                         </td>
                         {/* Currency */}
-                        <td className="p-2.5 text-center font-bold text-zinc-550 border-l border-zinc-200 bg-amber-50/5">
+                        <td className="p-0.5 px-1.5 text-center font-bold text-zinc-550 border-l border-zinc-200 bg-amber-50/5 text-[10px]">
                           {currencyCode || 'EGP'}
                         </td>
                         {/* Foreign Currency Value */}
-                        <td className="p-2.5 text-left font-bold text-slate-700">
+                        <td className="p-0.5 px-1.5 text-left font-bold text-slate-700 text-[10px]">
                           {formatNumber(foreignValue)}
                         </td>
                       </tr>
@@ -174,13 +174,13 @@ export const TransactionSidePanel: React.FC<TransactionSidePanelProps> = ({
                 </tbody>
                 <tfoot>
                   <tr className="bg-zinc-100 font-black border-t border-zinc-200">
-                    <td className="p-2.5 text-left text-emerald-700 text-xs border-l border-zinc-200">
+                    <td className="p-1 px-1.5 text-left text-emerald-700 text-[10px] border-l border-zinc-200">
                       {formatNumber(displayTotalDebit)}
                     </td>
-                    <td className="p-2.5 text-left text-red-650 text-xs border-l border-zinc-200">
+                    <td className="p-1 px-1.5 text-left text-red-650 text-[10px] border-l border-zinc-200">
                       {formatNumber(displayTotalCredit)}
                     </td>
-                    <td colSpan={5} className="p-2.5 text-right text-[11px] uppercase tracking-wider text-zinc-550">
+                    <td colSpan={5} className="p-1 px-1.5 text-right text-[10px] uppercase tracking-wider text-zinc-550">
                       {language === 'ar' ? 'الإجمالي العام' : 'Total'}
                     </td>
                   </tr>

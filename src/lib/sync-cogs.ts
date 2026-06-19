@@ -26,40 +26,83 @@ export async function syncCOGSForJournalEntry(client: any, companyId: string, jo
         // Fetch explicit true total cost from inventory_movements for THIS exact product and reference
         const movesRes = await client.query("SELECT SUM(ABS(total_cost)) as true_cogs FROM inventory_movements WHERE reference_id = $1 AND product_id = $2 AND movement_type IN ('sale', 'sales_return')", [referenceId, item.product_id]);
         
-        const trueCost = parseFloat(movesRes.rows[0]?.true_cogs || '0');
-        if (trueCost <= 0) continue;
-
-        // Fetch product accounts
-        const prodRes = await client.query('SELECT name, cost_account_id, cost_account_name, inventory_account_id, inventory_account_name, is_service, type FROM products WHERE id = $1', [item.product_id]);
+        // Fetch product details
+        const prodRes = await client.query('SELECT name, cost_account_id, cost_account_name, inventory_account_id, inventory_account_name, is_service, type, cost_price FROM products WHERE id = $1', [item.product_id]);
         if (prodRes.rows.length === 0) continue;
         
         const prod = prodRes.rows[0];
         if (prod.type === 'service' || prod.is_service) continue;
 
-        const costAccId = prod.cost_account_id;
-        const costAccName = prod.cost_account_name;
-        const invAccId = prod.inventory_account_id;
-        const invAccName = prod.inventory_account_name;
+        let trueCost = parseFloat(movesRes.rows[0]?.true_cogs || '0');
+        if (trueCost <= 0) {
+            // Fall back to estimated cost using invoice item unit_cost if available
+            trueCost = parseFloat(item.quantity || '0') * parseFloat(item.item_cost || '0');
+        }
+        if (trueCost <= 0) {
+            // Fall back to estimated cost using product.cost_price
+            trueCost = parseFloat(item.quantity || '0') * parseFloat(prod.cost_price || '0');
+        }
+        if (trueCost <= 0) continue;
+
+        let costAccId = prod.cost_account_id;
+        let costAccName = prod.cost_account_name;
+
+        if (costAccId) {
+            const accRes = await client.query('SELECT name FROM accounts WHERE id = $1', [costAccId]);
+            if (accRes.rows.length > 0) {
+                costAccName = accRes.rows[0].name || costAccName;
+            }
+        } else {
+            const fallbackRes = await client.query(
+                "SELECT id, name FROM accounts WHERE company_id = $1 AND (name LIKE '%تكلفة المبيعات%' OR name LIKE '%تكلفة مبيعات%' OR name LIKE '%تكلفة البضاعة المباعة%') LIMIT 1",
+                [companyId]
+            );
+            if (fallbackRes.rows.length > 0) {
+                costAccId = fallbackRes.rows[0].id;
+                costAccName = fallbackRes.rows[0].name;
+            }
+        }
+
+        let invAccId = prod.inventory_account_id;
+        let invAccName = prod.inventory_account_name;
+
+        if (invAccId) {
+            const accRes = await client.query('SELECT name FROM accounts WHERE id = $1', [invAccId]);
+            if (accRes.rows.length > 0) {
+                invAccName = accRes.rows[0].name || invAccName;
+            }
+        } else {
+            const fallbackRes = await client.query(
+                "SELECT id, name FROM accounts WHERE company_id = $1 AND (name LIKE '%مخزون%' OR name LIKE '%مخازن%') LIMIT 1",
+                [companyId]
+            );
+            if (fallbackRes.rows.length > 0) {
+                invAccId = fallbackRes.rows[0].id;
+                invAccName = fallbackRes.rows[0].name;
+            }
+        }
 
         if (costAccId && invAccId) {
            addedCOGS = true;
 
            await client.query(
-              "INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, company_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)", [
+              "INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, company_id, product_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)", [
               uuidv4(), journalEntryId, costAccId, costAccName, 
               isInvoice ? 'تكلفة البضاعة المباعة - ' + prod.name : 'إلغاء تكلفة البضاعة المباعة - ' + prod.name,
               isInvoice ? trueCost : 0,
               isInvoice ? 0 : trueCost,
-              companyId
+              companyId,
+              prod.name
            ]);
 
            await client.query(
-              "INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, company_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)", [
+              "INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, company_id, product_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)", [
               uuidv4(), journalEntryId, invAccId, invAccName, 
               isInvoice ? 'تخفيض المخزون - ' + prod.name : 'إرجاع المخزون - ' + prod.name,
               isInvoice ? 0 : trueCost,
               isInvoice ? trueCost : 0,
-              companyId
+              companyId,
+              prod.name
            ]);
         }
     }
