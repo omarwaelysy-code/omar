@@ -38,6 +38,7 @@ export const PaymentVouchers: React.FC = () => {
   const [customers, setCustomers] = useState<any[]>([]);
   const [vouchers, setVouchers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVoucher, setEditingVoucher] = useState<any | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -902,7 +903,8 @@ export const PaymentVouchers: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || isSubmitting) return;
+    setIsSubmitting(true);
 
     const finalAmount = voucherData.type === 'multi' 
       ? voucherData.items.reduce((sum, item) => sum + item.amount, 0)
@@ -1241,6 +1243,8 @@ export const PaymentVouchers: React.FC = () => {
     } catch (e: any) {
       console.error('Save failed:', e);
       showNotification(e.message || (language === 'ar' ? 'حدث خطأ أثناء حفظ السند' : 'An error occurred while saving voucher'), 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -2538,10 +2542,14 @@ export const PaymentVouchers: React.FC = () => {
                 </button>
                 <button 
                   type="submit"
-                  disabled={voucherData.items.reduce((sum, item) => sum + item.amount, 0) <= 0}
-                  className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-3"
+                  disabled={isSubmitting || voucherData.items.reduce((sum, item) => sum + item.amount, 0) <= 0}
+                  className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-wider hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-3"
                 >
-                  <Save className="w-6 h-6" />
+                  {isSubmitting ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Save className="w-6 h-6" />
+                  )}
                   {editingVoucher ? 'حفظ التعديلات' : 'حفظ السند'}
                 </button>
               </div>

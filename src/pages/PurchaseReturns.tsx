@@ -52,6 +52,7 @@ export const PurchaseReturns: React.FC = () => {
 
   // UI state
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewReturn, setViewReturn] = useState<any | null>(null);
   const [view, setView] = useState<'table' | 'card'>('table');
@@ -762,7 +763,8 @@ export const PurchaseReturns: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || isSubmitting) return;
+    setIsSubmitting(true);
 
     const validItems = items.filter(item => item.product_id);
     if (!returnData.supplier_id || validItems.length === 0) {
@@ -1255,6 +1257,8 @@ export const PurchaseReturns: React.FC = () => {
     } catch (e: any) {
       console.error('Save failed:', e);
       showNotification(e.message || (language === 'ar' ? 'حدث خطأ أثناء حفظ مرتجع المشتريات' : 'An error occurred while saving purchase return'), 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -3042,10 +3046,14 @@ export const PurchaseReturns: React.FC = () => {
                 </button>
                 <button 
                   type="submit"
-                  disabled={items.length === 0 || returnData.supplier_id === ''}
+                  disabled={isSubmitting || items.length === 0 || returnData.supplier_id === ''}
                   className="flex-1 py-4 rounded-2xl bg-emerald-600 text-white font-black hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 shadow-xl shadow-emerald-600/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Save size={20} />
+                  {isSubmitting ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Save size={20} />
+                  )}
                   {editingReturn ? t('common.save') : (language === 'ar' ? 'حفظ المرتجع' : 'Save Return')}
                 </button>
               </div>

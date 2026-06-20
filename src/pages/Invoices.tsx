@@ -74,6 +74,7 @@ export const Invoices: React.FC = () => {
   const [totalRecords, setTotalRecords] = useState(0);
   const [serverSummary, setServerSummary] = useState<any>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null);
@@ -1669,7 +1670,8 @@ export const Invoices: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || isSubmitting) return;
+    setIsSubmitting(true);
     if (!selectedCustomerId) {
       showNotification('يرجى اختيار العميل', 'error');
       return;
@@ -2331,6 +2333,8 @@ export const Invoices: React.FC = () => {
     } catch (e: any) {
       console.error('Save failed:', e);
       showNotification(e.message || 'حدث خطأ أثناء حفظ الفاتورة', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -3804,9 +3808,14 @@ export const Invoices: React.FC = () => {
                   type="submit"
                   form="invoice-form"
                   onClick={handleSubmit}
-                  className="w-20 py-1 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-1 justify-center active:scale-95 shadow-sm text-[11px] whitespace-nowrap font-sans"
+                  disabled={isSubmitting}
+                  className="w-20 py-1 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1 justify-center active:scale-95 shadow-sm text-[11px] whitespace-nowrap font-sans"
                 >
-                  <Save size={12} />
+                  {isSubmitting ? (
+                    <div className="w-3.5 h-3.5 border border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Save size={12} />
+                  )}
                   <span>{language === 'ar' ? 'حفظ' : 'Save'}</span>
                 </button>
               </div>

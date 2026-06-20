@@ -50,6 +50,7 @@ export const PurchaseInvoices: React.FC = () => {
   const [settings, setSettings] = useState<any>(null);
   const [purchaseInvoices, setPurchaseInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<any | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -1617,7 +1618,8 @@ export const PurchaseInvoices: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || isSubmitting) return;
+    setIsSubmitting(true);
     
     const validItems = items.filter(item => 
       (invoiceData.purchase_type === 'items' && item.product_id) || 
@@ -2237,6 +2239,8 @@ export const PurchaseInvoices: React.FC = () => {
     } catch (e: any) {
       console.error('Save failed:', e);
       showNotification(e.message || t('pi.save_error'), 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -4009,9 +4013,14 @@ export const PurchaseInvoices: React.FC = () => {
                       </button>
                       <button 
                         type="submit"
-                        className="flex-[2] py-3 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-3"
+                        disabled={isSubmitting}
+                        className="flex-[2] py-3 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-wider hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-3"
                       >
-                        <Save className="w-5 h-5" />
+                        {isSubmitting ? (
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Save className="w-5 h-5" />
+                        )}
                         {editingInvoice ? t('pi.edit_invoice') : t('pi.add_invoice')}
                       </button>
                     </div>
