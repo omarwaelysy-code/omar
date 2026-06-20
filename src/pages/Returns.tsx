@@ -891,8 +891,33 @@ export const Returns: React.FC = () => {
         });
       }
 
-      const total_debit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0).toFixed(2)) || 0;
-      const total_credit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0).toFixed(2)) || 0;
+      let total_debit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0).toFixed(2)) || 0;
+      let total_credit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0).toFixed(2)) || 0;
+
+      // Adjust for rounding differences if rate conversion introduces minor discrepancies
+      const diff = Number((total_debit - total_credit).toFixed(2));
+      if (diff !== 0 && journalItems.length > 0) {
+        if (diff > 0) {
+          // More debits than credits: add diff to the credit of the first credit item
+          const creditItem = journalItems.find(item => (Number(item.credit) || 0) > 0);
+          if (creditItem) {
+            creditItem.credit = Number((Number(creditItem.credit) + diff).toFixed(2));
+          } else {
+            journalItems[0].credit = Number((Number(journalItems[0].credit) + diff).toFixed(2));
+          }
+        } else {
+          // More credits than debits: add absolute diff to the debit of the first debit item
+          const debitItem = journalItems.find(item => (Number(item.debit) || 0) > 0);
+          if (debitItem) {
+            debitItem.debit = Number((Number(debitItem.debit) + Math.abs(diff)).toFixed(2));
+          } else {
+            journalItems[0].debit = Number((Number(journalItems[0].debit) + Math.abs(diff)).toFixed(2));
+          }
+        }
+        // Re-calculate totals
+        total_debit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0).toFixed(2)) || 0;
+        total_credit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0).toFixed(2)) || 0;
+      }
 
       const journalEntryData = {
         date,

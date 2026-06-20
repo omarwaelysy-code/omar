@@ -73,6 +73,10 @@ export const PurchaseReturns: React.FC = () => {
   const [serverSummary, setServerSummary] = useState<any>({});
   const [returnNumber, setReturnNumber] = useState('');
   const [company, setCompany] = useState<Company | null>(null);
+  const [settings, setSettings] = useState<any>(null);
+  const currentReturnCurrencyCode = selectedCurrencyId 
+    ? companyCurrencies.find(c => c.id === selectedCurrencyId)?.code || 'EGP'
+    : company?.settings?.currency || 'EGP';
 
   // Form State
   const [returnData, setReturnData] = useState({
@@ -218,6 +222,7 @@ export const PurchaseReturns: React.FC = () => {
     setDescription('');
     setDiscount(0);
     setShowAiInput(false);
+    prevExchangeRateRef.current = 1;
   };
 
   const handlePrevReturn = () => {
@@ -263,6 +268,16 @@ export const PurchaseReturns: React.FC = () => {
       const unsubCC = dbService.subscribe<CostCenter>('cost_centers', user.company_id, setCostCenters);
       const unsubCurrencies = dbService.subscribe<Currency>('currencies', user.company_id, setCompanyCurrencies);
       
+      const fetchSettings = async () => {
+        const docs = await dbService.getDocsByFilter<any>('settings', user.company_id, [
+          { field: 'type', operator: '==', value: 'discount_settings' }
+        ]);
+        if (docs.length > 0) {
+          setSettings(docs[0]);
+        }
+      };
+
+      fetchSettings();
       setLoading(false);
       return () => {
         unsubPR();
@@ -1047,6 +1062,84 @@ export const PurchaseReturns: React.FC = () => {
         });
       });
 
+      // Credit VAT (reverse tax)
+      const vatGroup: Record<string, { account_id: string; account_name: string; amount: number }> = {};
+      
+      sanitizedItems.forEach(item => {
+        const prod = products.find(p => p.id === item.product_id);
+        const vatAccountId = prod?.vat_account_id || '';
+        const vatAccountName = prod?.vat_account_name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Account');
+        const rateVal = Number(item.vat_rate) || 0;
+        const itemTotal = Number(item.total) || 0;
+        const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
+        
+        if (itemVat > 0) {
+          let finalVatAccountId = vatAccountId;
+          let finalVatAccountName = vatAccountName;
+          
+          if (!finalVatAccountId) {
+            const globalVatAccount = accounts.find(a => 
+              a.name.includes('ضريبة القيمة المضافة') || 
+              a.name.includes('قيمة مضافة') || 
+              a.name.includes('ضريبة مدخلات')
+            );
+            finalVatAccountId = globalVatAccount?.id || '';
+            finalVatAccountName = globalVatAccount?.name || finalVatAccountName;
+          }
+          
+          if (finalVatAccountId) {
+            if (!vatGroup[finalVatAccountId]) {
+              vatGroup[finalVatAccountId] = {
+                account_id: finalVatAccountId,
+                account_name: finalVatAccountName,
+                amount: 0
+              };
+            }
+            vatGroup[finalVatAccountId].amount += itemVat;
+          }
+        }
+      });
+
+      if (Object.keys(vatGroup).length > 0) {
+        Object.values(vatGroup).forEach(vat => {
+          journalItems.push({
+            account_id: vat.account_id,
+            account_name: vat.account_name,
+            debit: 0,
+            credit: Number((vat.amount * rate).toFixed(2)),
+            description: `ضريبة القيمة المضافة - مرتجع مشتريات رقم ${return_number}`
+          });
+        });
+      } else if (vatTotal > 0) {
+        const vatAccount = accounts.find(a => 
+          a.name.includes('ضريبة القيمة المضافة') || 
+          a.name.includes('قيمة مضافة') || 
+          a.name.includes('ضريبة مدخلات')
+        );
+        const vatAccountId = vatAccount?.id || '';
+        const vatAccountName = vatAccount?.name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Account');
+        journalItems.push({
+          account_id: vatAccountId,
+          account_name: vatAccountName,
+          debit: 0,
+          credit: Number((vatTotal * rate).toFixed(2)),
+          description: `ضريبة القيمة المضافة - مرتجع مشتريات رقم ${return_number}`
+        });
+      }
+
+      // Debit Discount (reverse discount)
+      if (discount_amount > 0) {
+        const discountAccountId = settings?.supplier_discount_account_id || '';
+        const discountAccount = accounts.find(a => a.id === discountAccountId);
+        journalItems.push({
+          account_id: discountAccountId,
+          account_name: discountAccount?.name || 'حساب الخصم المكتسب',
+          debit: Number((discount_amount * rate).toFixed(2)),
+          credit: 0,
+          description: `خصم مرتجع مشتريات رقم ${return_number}`
+        });
+      }
+
       if (returnData.payment_type === 'cash' && returnData.payment_method_id) {
         const pm = paymentMethods.find(p => p.id === returnData.payment_method_id);
         let cashAccountId = pm?.account_id || '';
@@ -1069,8 +1162,33 @@ export const PurchaseReturns: React.FC = () => {
         });
       }
 
-      const total_debit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0)) || 0;
-      const total_credit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0)) || 0;
+      let total_debit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0).toFixed(2)) || 0;
+      let total_credit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0).toFixed(2)) || 0;
+
+      // Adjust for rounding differences if rate conversion introduces minor discrepancies
+      const diff = Number((total_debit - total_credit).toFixed(2));
+      if (diff !== 0 && journalItems.length > 0) {
+        if (diff > 0) {
+          // More debits than credits: add diff to the credit of the first credit item
+          const creditItem = journalItems.find(item => (Number(item.credit) || 0) > 0);
+          if (creditItem) {
+            creditItem.credit = Number((Number(creditItem.credit) + diff).toFixed(2));
+          } else {
+            journalItems[0].credit = Number((Number(journalItems[0].credit) + diff).toFixed(2));
+          }
+        } else {
+          // More credits than debits: add absolute diff to the debit of the first debit item
+          const debitItem = journalItems.find(item => (Number(item.debit) || 0) > 0);
+          if (debitItem) {
+            debitItem.debit = Number((Number(debitItem.debit) + Math.abs(diff)).toFixed(2));
+          } else {
+            journalItems[0].debit = Number((Number(journalItems[0].debit) + Math.abs(diff)).toFixed(2));
+          }
+        }
+        // Re-calculate totals
+        total_debit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0).toFixed(2)) || 0;
+        total_credit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0).toFixed(2)) || 0;
+      }
 
       const journalEntryData = {
         date: returnData.date,
@@ -1196,6 +1314,7 @@ export const PurchaseReturns: React.FC = () => {
     setExchangeRateType('manual');
     setDescription('');
     setDiscount(0);
+    prevExchangeRateRef.current = 1;
     const num = await generateReturnNumber(newDate);
     setReturnNumber(num);
     setEditingReturn(null);
@@ -1226,6 +1345,7 @@ export const PurchaseReturns: React.FC = () => {
       setSelectedCostCenterId(fullData.cost_center_id || '');
       setSelectedCurrencyId(fullData.currency_id || '');
       setExchangeRate(fullData.exchange_rate || 1);
+      prevExchangeRateRef.current = fullData.exchange_rate || 1;
       setDescription(fullData.description || '');
       setDiscount(fullData.discount_amount || fullData.discount || 0);
 
