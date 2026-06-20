@@ -46,6 +46,7 @@ export const PurchaseInvoices: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [companyData, setCompanyData] = useState<Company | null>(null);
   const isVatEnabled = companyData?.settings?.vat_enabled || companyData?.vat_enabled || false;
+  const isMultiCurrencyEnabled = companyData?.settings?.enable_multi_currency || (companyData as any)?.enable_multi_currency || false;
   const [settings, setSettings] = useState<any>(null);
   const [purchaseInvoices, setPurchaseInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1966,8 +1967,8 @@ export const PurchaseInvoices: React.FC = () => {
         journalItems.push({
           account_id: cashAccountId,
           account_name: cashAccountName,
-          debit: Number((total_amount * rate).toFixed(2)),
-          credit: 0,
+          debit: 0,
+          credit: Number((total_amount * rate).toFixed(2)),
           description: t('pi.payment_description', { number: invoice_number, supplier: supplier?.name }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : ''),
           sub_account_id: invoiceData.payment_method_id,
           sub_account_type: 'payment_method'
@@ -2609,7 +2610,7 @@ export const PurchaseInvoices: React.FC = () => {
                       })()}
                     </td>
                     <td className="px-6 py-4 font-bold text-zinc-900">
-                      {formatNumber(inv.total_amount)} {t('common.currency')}
+                      {formatNumber(inv.total_amount)} <span className="text-[10px] font-bold text-zinc-500">{inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP')}</span>
                     </td>
                     <td className={`px-6 py-4 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
                       {inv.entry_number ? (
@@ -2762,7 +2763,7 @@ export const PurchaseInvoices: React.FC = () => {
                     <div>
                       <p className="text-zinc-400 text-[10px] uppercase font-black tracking-widest">{t('pi.total_amount')}</p>
                       <p className="font-black text-2xl tracking-tighter text-emerald-600">
-                        {formatNumber(inv.total_amount)} <span className="text-sm font-bold">{t('common.currency')}</span>
+                        {formatNumber(inv.total_amount)} <span className="text-sm font-bold">{inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP')}</span>
                       </p>
                     </div>
                     <button 
@@ -2813,7 +2814,7 @@ export const PurchaseInvoices: React.FC = () => {
                 </div>
                 <div className={t('dir') === 'rtl' ? 'text-left' : 'text-right'}>
                   <p className="font-bold text-emerald-600 text-lg">
-                    {formatNumber(inv.total_amount)} {t('common.currency')}
+                    {formatNumber(inv.total_amount)} <span className="text-[10px] font-bold text-zinc-500">{inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP')}</span>
                   </p>
                   <span className="text-xs text-zinc-400">{formatDate(inv.date)}</span>
                 </div>
@@ -3217,6 +3218,70 @@ export const PurchaseInvoices: React.FC = () => {
                               onChange={(e) => setInvoiceData({...invoiceData, notes: e.target.value})}
                             />
                           </div>
+
+                          {/* Currency & Exchange Rate Selection */}
+                          {isMultiCurrencyEnabled && (
+                            <>
+                              <div>
+                                <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5 flex items-center gap-1">
+                                  <Coins size={10} className="text-amber-500" />
+                                  {language === 'ar' ? 'عملة الفاتورة' : 'Invoice Currency'}
+                                </label>
+                                <select 
+                                  className="w-full px-1.5 py-0.5 rounded-md border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer"
+                                  value={selectedCurrencyId}
+                                  onChange={(e) => handleCurrencyChange(e.target.value)}
+                                >
+                                  {(() => {
+                                    const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
+                                    const baseCurrInList = companyCurrencies.find(c => c.code.toLowerCase() === baseCode);
+                                    const baseCurrencyName = baseCurrInList 
+                                      ? (language === 'ar' ? baseCurrInList.name_ar : baseCurrInList.name_en) 
+                                      : (language === 'ar' ? 'العملة الأساسية' : 'Base Currency');
+                                    return (
+                                      <option value="">
+                                        {`${baseCurrencyName} (${(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()})`}
+                                      </option>
+                                    );
+                                  })()}
+                                  {companyCurrencies.filter(c => (c.is_active || c.id === selectedCurrencyId) && c.code.toLowerCase() !== (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase()).map(curr => (
+                                    <option key={curr.id} value={curr.id}>
+                                      {language === 'ar' ? `${curr.name_ar} (${curr.code})` : `${curr.name_en} (${curr.code})`}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {(() => {
+                                const selectedCurr = companyCurrencies.find(c => c.id === selectedCurrencyId);
+                                const baseCurrency = companyData?.settings?.currency || 'EGP';
+                                const isForeign = selectedCurr && selectedCurr.code.toLowerCase() !== baseCurrency.toLowerCase();
+                                
+                                if (!isForeign) return null;
+
+                                return (
+                                  <div>
+                                    <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">
+                                      {language === 'ar' 
+                                        ? `سعر الصرف (${exchangeRateType === 'auto' ? 'تلقائي' : 'يدوي'})` 
+                                        : `Exchange Rate (${exchangeRateType === 'auto' ? 'Auto' : 'Manual'})`}
+                                    </label>
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      min="0.000001"
+                                      className="w-full px-1.5 py-0.5 rounded-md border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px]"
+                                      value={exchangeRate}
+                                      onChange={(e) => {
+                                        setExchangeRate(Number(e.target.value) || 1);
+                                        setExchangeRateType('manual');
+                                      }}
+                                    />
+                                  </div>
+                                );
+                              })()}
+                            </>
+                          )}
 
                           {editingInvoice?.entry_number && (
                             <div>
@@ -4009,255 +4074,239 @@ export const PurchaseInvoices: React.FC = () => {
   )}
 
       {/* View Modal */}
-      {viewInvoice && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-auto md:max-w-5xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col md:max-h-[90vh]">
-            <div className="p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10">
-              <h3 className="text-lg font-bold text-zinc-900">{t('pi.view_invoice')}</h3>
-              <button onClick={() => setViewInvoice(null)} className="p-2 text-zinc-400 hover:text-zinc-600"><X size={24} /></button>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full">
-              {/* Side Panel for Activity Log and Journal Entry */}
-              <TransactionSidePanel 
-                documentId={viewInvoice.id} 
-                category="purchase_invoices" 
-              />
-
-              <div ref={invoiceRef} id="purchase-invoice-capture-area" className={`flex-1 p-6 md:p-8 space-y-8 bg-white overflow-y-auto ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`} style={{ color: '#18181b' }}>
-                <CompanyInvoiceHeader 
-                  company={companyData} 
-                  documentNumber={viewInvoice.invoice_number}
-                  documentDate={viewInvoice.date}
-                  title={t('pi.title')}
+      {viewInvoice && (() => {
+        const viewInvoiceCurrency = viewInvoice.currency_id 
+          ? (companyCurrencies.find(c => c.id === viewInvoice.currency_id)?.code || '') 
+          : (companyData?.settings?.currency || 'EGP');
+        return (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white w-full h-full md:h-auto md:max-w-5xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col md:max-h-[90vh]">
+              <div className="p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10">
+                <h3 className="text-lg font-bold text-zinc-900">{t('pi.view_invoice')}</h3>
+                <button onClick={() => setViewInvoice(null)} className="p-2 text-zinc-400 hover:text-zinc-600"><X size={24} /></button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full">
+                {/* Side Panel for Activity Log and Journal Entry */}
+                <TransactionSidePanel 
+                  documentId={viewInvoice.id} 
+                  category="purchase_invoices" 
                 />
 
-                <div className="grid grid-cols-2 gap-8">
-                  <div>
-                    <p className="text-xs font-bold text-[#a1a1aa] uppercase tracking-widest mb-1">{t('pi.invoice_from')}</p>
-                    <p className="text-xl font-bold text-[#18181b]">{viewInvoice.supplier_name}</p>
-                    {viewInvoice.warehouse_id && (
-                      <p className="text-xs text-slate-500 font-medium mt-1">
-                        {language === 'ar' ? 'المخزن:' : 'Warehouse:'} <span className="text-emerald-600 font-bold">{warehouses.find((w: any) => w.id?.toString() === viewInvoice.warehouse_id?.toString())?.name || viewInvoice.warehouse_id}</span>
-                      </p>
-                    )}
-                    {viewInvoice.entry_number && (
-                      <p className="text-xs text-slate-500 font-medium mt-1">
-                        {language === 'ar' ? 'رقم القيد:' : 'Journal Entry:'} <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setViewInvoice(null);
-                            setPendingViewDoc({ type: 'journal', idOrNumber: viewInvoice.entry_number! });
-                            setCurrentPage('journal_entries');
-                          }}
-                          className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50"
-                        >
-                          {viewInvoice.entry_number}
-                        </button>
-                      </p>
-                    )}
-                    {viewInvoice.payment_type === 'credit' && viewInvoice.payment_terms && (
-                      <p className="text-xs text-slate-500 font-medium mt-1">
-                        {language === 'ar' ? 'شروط السداد:' : 'Payment Terms:'} <span className="text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-100/50">
-                          {viewInvoice.payment_terms === 'cash' ? (language === 'ar' ? 'نقدي عند التسليم' : 'Cash on Delivery') :
-                           viewInvoice.payment_terms === 'due_on_receipt' ? (language === 'ar' ? 'مستحق فور الاستلام' : 'Due on Receipt') :
-                           viewInvoice.payment_terms === 'net_7' ? (language === 'ar' ? 'خلال 7 أيام' : 'Net 7 Days') :
-                           viewInvoice.payment_terms === 'net_15' ? (language === 'ar' ? 'خلال 15 يوماً' : 'Net 15 Days') :
-                           viewInvoice.payment_terms === 'net_30' ? (language === 'ar' ? 'خلال 30 يوماً' : 'Net 30 Days') :
-                           viewInvoice.payment_terms === 'net_45' ? (language === 'ar' ? 'خلال 45 يوماً' : 'Net 45 Days') :
-                           viewInvoice.payment_terms === 'net_60' ? (language === 'ar' ? 'خلال 60 يوماً' : 'Net 60 Days') :
-                           viewInvoice.payment_terms === 'net_90' ? (language === 'ar' ? 'خلال 90 يوماً' : 'Net 90 Days') :
-                           viewInvoice.payment_terms === 'net_180' ? (language === 'ar' ? 'خلال 180 يوماً' : 'Net 180 Days') :
-                           viewInvoice.payment_terms === 'eom' ? (language === 'ar' ? 'نهاية الشهر' : 'End of Month (EOM)') :
-                           viewInvoice.payment_terms === 'eom_30' ? (language === 'ar' ? 'السداد بعد 30 يوم من نهاية الشهر' : '30 Days EOM') :
-                           viewInvoice.payment_terms === 'advance' ? (language === 'ar' ? 'دفعة مقدمة قبل التوريد' : 'Advance Payment') :
-                           viewInvoice.payment_terms === 'advance_50_50' ? (language === 'ar' ? '50% مقدم والباقي عند التسليم' : '50% Advance / 50% Delivery') :
-                           (language === 'ar' ? `مخصص (${viewInvoice.payment_terms_days} يوم)` : `Custom (${viewInvoice.payment_terms_days} Days)`)}
-                        </span>
-                      </p>
-                    )}
-                    {viewInvoice.payment_type === 'credit' && viewInvoice.due_date && (
-                      <p className="text-xs text-slate-500 font-medium mt-1">
-                        {language === 'ar' ? 'تاريخ الاستحقاق:' : 'Due Date:'} <span className="text-zinc-700 font-bold bg-zinc-50 px-2 py-0.5 rounded border border-zinc-200">
-                          {formatDate(viewInvoice.due_date)}
-                        </span>
-                      </p>
-                    )}
-                  </div>
-                  <div className={`flex flex-col ${dir === 'rtl' ? 'items-start' : 'items-end'} justify-center gap-2`}>
-                    <div className="mb-1 text-center">
-                      <p className="text-xs font-bold text-[#a1a1aa] uppercase tracking-widest mb-1">{t('common.date')}</p>
-                      <p className="text-lg font-medium text-[#18181b]">{formatDate(viewInvoice.date)}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border
-                        ${viewInvoice.payment_type === 'cash' 
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                          : 'bg-amber-50 text-amber-700 border-amber-100'
-                        }`}>
-                        {viewInvoice.payment_type === 'cash' ? (language === 'ar' ? 'سداد نقدي' : 'Cash') : (language === 'ar' ? 'سداد آجل' : 'Credit')}
-                      </div>
-                      {(() => {
-                        const status = getPaymentStatus(viewInvoice);
-                        const statusLabels = {
-                          paid: language === 'ar' ? 'مدفوعة' : 'Paid',
-                          partial: language === 'ar' ? 'مدفوعة جزئياً' : 'Partially Paid',
-                          unpaid: language === 'ar' ? 'غير مدفوعة' : 'Unpaid'
-                        };
-                        const statusClasses = {
-                          paid: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-                          partial: 'bg-blue-100 text-blue-800 border-blue-200',
-                          unpaid: 'bg-red-100 text-red-800 border-red-200'
-                        };
-                        return (
-                          <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${statusClasses[status]}`}>
-                            {statusLabels[status]}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                </div>
+                <div ref={invoiceRef} id="purchase-invoice-capture-area" className={`flex-1 p-6 md:p-8 space-y-8 bg-white overflow-y-auto ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`} style={{ color: '#18181b' }}>
+                  <CompanyInvoiceHeader 
+                    company={companyData} 
+                    documentNumber={viewInvoice.invoice_number}
+                    documentDate={viewInvoice.date}
+                    title={t('pi.title')}
+                  />
 
-                <div className="border border-[#f4f4f5] rounded-2xl overflow-hidden">
-                  <table className={`w-full ${t('dir') === 'rtl' ? 'text-right' : 'text-left'} text-sm`}>
-                    <thead className="bg-[#fafafa] text-[#71717a] uppercase text-[10px] font-bold tracking-widest">
-                      <tr>
-                        <th className="px-4 py-3 w-16 text-center">{t('common.image')}</th>
-                        <th className="px-4 py-3">{t('pi.item')} / {t('pi.expense_category')}</th>
-                        <th className="px-4 py-3 w-24">{t('pi.quantity')}</th>
-                        <th className="px-4 py-3 w-32">{t('pi.price')}</th>
-                        <th className="px-4 py-3 w-32">{t('pi.total')}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#f4f4f5]">
-                      {viewInvoice.items.map((item: any, idx: number) => (
-                        <tr key={idx}>
-                          <td className="px-4 py-3 text-center">
-                            {viewInvoice.purchase_type === 'items' && item.product_image_url ? (
-                              <img 
-                                src={item.product_image_url} 
-                                alt="Product" 
-                                className="w-10 h-10 object-cover rounded-lg mx-auto border border-[#f4f4f5]"
-                                referrerPolicy="no-referrer"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 bg-[#fafafa] rounded-lg flex items-center justify-center mx-auto border border-[#f4f4f5]">
-                                <Box size={16} className="text-[#a1a1aa]" />
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 font-medium text-[#18181b]">{item.product_name || item.category_name}</td>
-                          <td className="px-4 py-3 text-[#71717a]">{item.quantity}</td>
-                          <td className="px-4 py-3 text-[#71717a]">{formatNumber(item.price || item.cost_price || 0)} {companyData?.settings?.currency || ''}</td>
-                          <td className="px-4 py-3 font-bold text-[#18181b]">{formatNumber(item.total)} {companyData?.settings?.currency || ''}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot className="bg-slate-50/50 font-bold border-t border-slate-100">
-                      <tr>
-                        <td colSpan={4} className={`px-6 py-3 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} text-slate-400 font-bold text-[10px] uppercase tracking-wider`}>{t('pi.subtotal')}</td>
-                        <td className="px-6 py-3 text-slate-900 text-base">{formatNumber(viewInvoice.subtotal || viewInvoice.total_amount || 0)} {companyData?.settings?.currency || ''}</td>
-                      </tr>
-                      {viewInvoice.discount > 0 && (
-                        <tr>
-                          <td colSpan={4} className={`px-6 py-3 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} text-red-400 font-bold text-[10px] uppercase tracking-wider`}>{t('pi.discount')}</td>
-                          <td className="px-6 py-3 text-red-600 text-base">-{formatNumber(viewInvoice.discount)} {companyData?.settings?.currency || ''}</td>
-                        </tr>
+                  <div className="grid grid-cols-2 gap-8">
+                    <div>
+                      <p className="text-xs font-bold text-[#a1a1aa] uppercase tracking-widest mb-1">{t('pi.invoice_from')}</p>
+                      <p className="text-xl font-bold text-[#18181b]">{viewInvoice.supplier_name}</p>
+                      {viewInvoice.warehouse_id && (
+                        <p className="text-xs text-slate-500 font-medium mt-1">
+                          {language === 'ar' ? 'المخزن:' : 'Warehouse:'} <span className="text-emerald-600 font-bold">{warehouses.find((w: any) => w.id?.toString() === viewInvoice.warehouse_id?.toString())?.name || viewInvoice.warehouse_id}</span>
+                        </p>
                       )}
-                      <tr className="bg-slate-900 text-white">
-                        <td colSpan={4} className={`px-6 py-5 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} font-black text-lg uppercase tracking-tight`}>{t('pi.grand_total')}</td>
-                        <td className="px-6 py-5 text-2xl font-black text-emerald-400">{formatNumber(viewInvoice.total_amount)} {companyData?.settings?.currency || ''}</td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
+                      {viewInvoice.entry_number && (
+                        <p className="text-xs text-slate-500 font-medium mt-1">
+                          {language === 'ar' ? 'رقم القيد:' : 'Journal Entry:'} <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewInvoice(null);
+                              setPendingViewDoc({ type: 'journal', idOrNumber: viewInvoice.entry_number! });
+                              setCurrentPage('journal_entries');
+                            }}
+                            className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50"
+                          >
+                            {viewInvoice.entry_number}
+                          </button>
+                        </p>
+                      )}
+                      {viewInvoice.payment_type === 'credit' && viewInvoice.due_date && (
+                        <p className="text-xs text-slate-500 font-medium mt-1">
+                          {language === 'ar' ? 'تاريخ الاستحقاق:' : 'Due Date:'} <span className="text-zinc-700 font-bold bg-zinc-50 px-2 py-0.5 rounded border border-zinc-200">
+                            {formatDate(viewInvoice.due_date)}
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                    <div className={`flex flex-col ${dir === 'rtl' ? 'items-start' : 'items-end'} justify-center gap-2`}>
+                      <div className="mb-1 text-center">
+                        <p className="text-xs font-bold text-[#a1a1aa] uppercase tracking-widest mb-1">{t('common.date')}</p>
+                        <p className="text-lg font-medium text-[#18181b]">{formatDate(viewInvoice.date)}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border
+                          ${viewInvoice.payment_type === 'cash' 
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                            : 'bg-amber-50 text-amber-700 border-amber-100'
+                          }`}>
+                          {viewInvoice.payment_type === 'cash' ? (language === 'ar' ? 'سداد نقدي' : 'Cash') : (language === 'ar' ? 'سداد آجل' : 'Credit')}
+                        </div>
+                        {(() => {
+                          const status = getPaymentStatus(viewInvoice);
+                          const statusLabels = {
+                            paid: language === 'ar' ? 'مدفوعة' : 'Paid',
+                            partial: language === 'ar' ? 'مدفوعة جزئياً' : 'Partially Paid',
+                            unpaid: language === 'ar' ? 'غير مدفوعة' : 'Unpaid'
+                          };
+                          const statusClasses = {
+                            paid: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                            partial: 'bg-blue-100 text-blue-800 border-blue-200',
+                            unpaid: 'bg-red-100 text-red-800 border-red-200'
+                          };
+                          return (
+                            <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${statusClasses[status]}`}>
+                              {statusLabels[status]}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
 
-                {/* Settlements Table */}
-                {(() => {
-                  const settlements = getInvoiceSettlements(viewInvoice);
-                  if (settlements.length === 0) return null;
-                  
-                  return (
-                    <div className="space-y-3 mt-8">
-                      <h4 className="font-bold text-slate-800 text-sm border-b border-slate-150 pb-2">
-                        {language === 'ar' ? 'جدول تسويات الفاتورة' : 'Invoice Settlements Table'}
-                      </h4>
-                      <div className="overflow-x-auto rounded-2xl border border-slate-150 shadow-sm">
-                        <table className={`w-full text-sm ${t('dir') === 'rtl' ? 'text-right' : 'text-left'} border-collapse bg-slate-50/20`}>
-                          <thead>
-                            <tr className="bg-slate-50 text-slate-500 text-xs font-bold border-b border-slate-200">
-                              <th className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                {language === 'ar' ? 'التاريخ' : 'Date'}
-                              </th>
-                              <th className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                {language === 'ar' ? 'رقم التسوية' : 'Settlement No.'}
-                              </th>
-                              <th className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                {language === 'ar' ? 'نوع الحركة' : 'Transaction Type'}
-                              </th>
-                              <th className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                {language === 'ar' ? 'رقم الحركة / المرجع' : 'Transaction No. / Ref'}
-                              </th>
-                              <th className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                {language === 'ar' ? 'الملاحظات' : 'Notes'}
-                              </th>
-                              <th className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'}`}>
-                                {language === 'ar' ? 'المبلغ المسوى' : 'Settled Amount'}
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 text-slate-700">
-                            {settlements.map((s: any) => {
-                              // If language is English, map type labels
-                              let displayTypeLabel = s.type_label;
-                              if (language !== 'ar') {
-                                if (s.type_label === 'سند قبض') displayTypeLabel = 'Receipt Voucher';
-                                else if (s.type_label === 'سند صرف') displayTypeLabel = 'Payment Voucher';
-                                else if (s.type_label === 'مرتجع مبيعات') displayTypeLabel = 'Sales Return';
-                                else if (s.type_label === 'مرتجع مشتريات') displayTypeLabel = 'Purchase Return';
-                                else if (s.type_label === 'قيد يومية') displayTypeLabel = 'Journal Entry';
-                              }
-                              
-                              return (
-                                <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
-                                  <td className="px-4 py-3 font-mono text-xs">{formatDate(s.date)}</td>
-                                  <td className="px-4 py-3 font-mono text-xs text-indigo-600 font-bold">
-                                    {s.settlement_number ? (
+                  <div className="border border-[#f4f4f5] rounded-2xl overflow-hidden">
+                    <table className={`w-full ${t('dir') === 'rtl' ? 'text-right' : 'text-left'} text-sm`}>
+                      <thead className="bg-[#fafafa] text-[#71717a] uppercase text-[10px] font-bold tracking-widest">
+                        <tr>
+                          <th className="px-4 py-3 w-16 text-center">{t('common.image')}</th>
+                          <th className="px-4 py-3">{t('pi.item')} / {t('pi.expense_category')}</th>
+                          <th className="px-4 py-3 w-24">{t('pi.quantity')}</th>
+                          <th className="px-4 py-3 w-32">{t('pi.price')}</th>
+                          <th className="px-4 py-3 w-32">{t('pi.total')}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#f4f4f5]">
+                        {viewInvoice.items.map((item: any, idx: number) => (
+                          <tr key={idx}>
+                            <td className="px-4 py-3 text-center">
+                              {viewInvoice.purchase_type === 'items' && item.product_image_url ? (
+                                <img 
+                                  src={item.product_image_url} 
+                                  alt="Product" 
+                                  className="w-10 h-10 object-cover rounded-lg mx-auto border border-[#f4f4f5]"
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 bg-[#fafafa] rounded-lg flex items-center justify-center mx-auto border border-[#f4f4f5]">
+                                  <Box size={16} className="text-[#a1a1aa]" />
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 font-medium text-[#18181b]">{item.product_name || item.category_name}</td>
+                            <td className="px-4 py-3 text-[#71717a]">{item.quantity}</td>
+                            <td className="px-4 py-3 text-[#71717a]">{formatNumber(item.price || item.cost_price || 0)} {viewInvoiceCurrency}</td>
+                            <td className="px-4 py-3 font-bold text-[#18181b]">{formatNumber(item.total)} {viewInvoiceCurrency}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-slate-50/50 font-bold border-t border-slate-100">
+                        <tr>
+                          <td colSpan={4} className={`px-6 py-3 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} text-slate-400 font-bold text-[10px] uppercase tracking-wider`}>{t('pi.subtotal')}</td>
+                          <td className="px-6 py-3 text-slate-900 text-base">{formatNumber(viewInvoice.subtotal || viewInvoice.total_amount || 0)} {viewInvoiceCurrency}</td>
+                        </tr>
+                        {viewInvoice.discount > 0 && (
+                          <tr>
+                            <td colSpan={4} className={`px-6 py-3 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} text-red-400 font-bold text-[10px] uppercase tracking-wider`}>{t('pi.discount')}</td>
+                            <td className="px-6 py-3 text-red-600 text-base">-{formatNumber(viewInvoice.discount)} {viewInvoiceCurrency}</td>
+                          </tr>
+                        )}
+                        <tr className="bg-slate-900 text-white">
+                          <td colSpan={4} className={`px-6 py-5 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} font-black text-lg uppercase tracking-tight`}>{t('pi.grand_total')}</td>
+                          <td className="px-6 py-5 text-2xl font-black text-emerald-400">{formatNumber(viewInvoice.total_amount)} {viewInvoiceCurrency}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  {/* Settlements Table */}
+                  {(() => {
+                    const settlements = getInvoiceSettlements(viewInvoice);
+                    if (settlements.length === 0) return null;
+                    
+                    return (
+                      <div className="space-y-3 mt-8">
+                        <h4 className="font-bold text-slate-800 text-sm border-b border-slate-150 pb-2">
+                          {language === 'ar' ? 'جدول تسويات الفاتورة' : 'Invoice Settlements Table'}
+                        </h4>
+                        <div className="overflow-x-auto rounded-2xl border border-slate-150 shadow-sm">
+                          <table className={`w-full text-sm ${t('dir') === 'rtl' ? 'text-right' : 'text-left'} border-collapse bg-slate-50/20`}>
+                            <thead>
+                              <tr className="bg-slate-50 text-slate-500 text-xs font-bold border-b border-slate-200">
+                                <th className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  {language === 'ar' ? 'التاريخ' : 'Date'}
+                                </th>
+                                <th className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  {language === 'ar' ? 'رقم التسوية' : 'Settlement No.'}
+                                </th>
+                                <th className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  {language === 'ar' ? 'نوع الحركة' : 'Transaction Type'}
+                                </th>
+                                <th className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  {language === 'ar' ? 'رقم الحركة / المرجع' : 'Transaction No. / Ref'}
+                                </th>
+                                <th className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  {language === 'ar' ? 'الملاحظات' : 'Notes'}
+                                </th>
+                                <th className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'}`}>
+                                  {language === 'ar' ? 'المبلغ المسوى' : 'Settled Amount'}
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-slate-700">
+                              {settlements.map((s: any) => {
+                                // If language is English, map type labels
+                                let displayTypeLabel = s.type_label;
+                                if (language !== 'ar') {
+                                  if (s.type_label === 'سند قبض') displayTypeLabel = 'Receipt Voucher';
+                                  else if (s.type_label === 'سند صرف') displayTypeLabel = 'Payment Voucher';
+                                  else if (s.type_label === 'مرتجع مبيعات') displayTypeLabel = 'Sales Return';
+                                  else if (s.type_label === 'مرتجع مشتريات') displayTypeLabel = 'Purchase Return';
+                                  else if (s.type_label === 'قيد يومية') displayTypeLabel = 'Journal Entry';
+                                }
+                                
+                                return (
+                                  <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
+                                    <td className="px-4 py-3 font-mono text-xs">{formatDate(s.date)}</td>
+                                    <td className="px-4 py-3 font-mono text-xs text-indigo-600 font-bold">
+                                      {s.settlement_number ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setViewInvoice(null);
+                                            setPendingViewDoc({ type: 'settlement', idOrNumber: s.settlement_number });
+                                            setCurrentPage('supplier_settlements');
+                                          }}
+                                          className="hover:underline text-indigo-600 font-mono font-bold"
+                                        >
+                                          {s.settlement_number}
+                                        </button>
+                                      ) : (
+                                        '-'
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-3 text-xs font-bold">{displayTypeLabel}</td>
+                                    <td className="px-4 py-3 font-mono text-xs text-emerald-600 font-bold">
                                       <button
                                         type="button"
                                         onClick={() => {
                                           setViewInvoice(null);
-                                          setPendingViewDoc({ type: 'settlement', idOrNumber: s.settlement_number });
-                                          setCurrentPage('supplier_settlements');
+                                          setPendingViewDoc({ type: s.page_name === 'journal_entries' ? 'journal' : s.page_name === 'receipts' ? 'receipt' : s.page_name, idOrNumber: s.number });
+                                          setCurrentPage(s.page_name);
                                         }}
-                                        className="hover:underline text-indigo-600 font-mono font-bold"
+                                        className="hover:underline"
                                       >
-                                        {s.settlement_number}
+                                        {s.number}
                                       </button>
-                                    ) : (
-                                      '-'
-                                    )}
-                                  </td>
-                                  <td className="px-4 py-3 text-xs font-bold">{displayTypeLabel}</td>
-                                  <td className="px-4 py-3 font-mono text-xs text-emerald-600 font-bold">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setViewInvoice(null);
-                                        setPendingViewDoc({ type: s.page_name === 'journal_entries' ? 'journal' : s.page_name === 'receipts' ? 'receipt' : s.page_name, idOrNumber: s.number });
-                                        setCurrentPage(s.page_name);
-                                      }}
-                                      className="hover:underline"
-                                    >
-                                      {s.number}
-                                    </button>
-                                  </td>
-                                  <td className="px-4 py-3 text-xs text-slate-500 max-w-xs truncate" title={s.notes}>{s.notes || '-'}</td>
-                                  <td className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} font-black text-emerald-600`}>
-                                    {formatNumber(s.amount)} {companyData?.settings?.currency || ''}
-                                  </td>
-                                </tr>
+                                    </td>
+                                    <td className="px-4 py-3 text-xs text-slate-500 max-w-xs truncate" title={s.notes}>{s.notes || '-'}</td>
+                                    <td className={`px-4 py-3 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} font-black text-emerald-600`}>
+                                      {formatNumber(s.amount)} {viewInvoiceCurrency}
+                                    </td>
+                                  </tr>
                               );
                             })}
                           </tbody>
@@ -4296,7 +4345,8 @@ export const PurchaseInvoices: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Add Supplier Modal */}
       {isSupplierModalOpen && (

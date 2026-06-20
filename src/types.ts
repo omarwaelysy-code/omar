@@ -472,6 +472,10 @@ export interface Return {
   operation_id?: string | null;
   department_id?: string | null;
   cost_center_id?: string | null;
+  currency_id?: string | null;
+  exchange_rate?: number;
+  exchange_rate_type?: 'manual' | 'auto';
+  total_base_amount?: number;
 }
 
 export interface PurchaseReturn {

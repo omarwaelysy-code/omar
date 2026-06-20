@@ -4,13 +4,13 @@ import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { TransactionManager } from '../services/TransactionManager';
 import { ReturnSchema, JournalEntrySchema } from '../lib/schemas';
-import { Return, Customer, Product, ReturnItem, JournalEntry, JournalEntryItem, Account, PaymentMethod, Operation, Department, CostCenter } from '../types';
-import { Search, Plus, Trash2, X, Eye, Download, FileText, RotateCcw, History, Printer, Phone, Mail, MapPin, Wallet, Calendar, Box, CreditCard, User, ChevronDown, Layers, Save, Package, ChevronRight, ChevronLeft, Maximize2, Minimize2, LayoutGrid, List, CheckCheck, Copy, Image as ImageIcon } from 'lucide-react';
+import { Return, Customer, Product, ReturnItem, JournalEntry, JournalEntryItem, Account, PaymentMethod, Operation, Department, CostCenter, Currency, ExchangeRate } from '../types';
+import { Search, Plus, Trash2, X, Eye, Download, FileText, RotateCcw, History, Printer, Phone, Mail, MapPin, Wallet, Calendar, Box, CreditCard, User, ChevronDown, Layers, Save, Package, ChevronRight, ChevronLeft, Maximize2, Minimize2, LayoutGrid, List, CheckCheck, Copy, Coins, Image as ImageIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
-import { dbService } from '../services/dbService';
+import { dbService, apiRequest } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
@@ -74,6 +74,11 @@ export const Returns: React.FC = () => {
   const [returnNumber, setReturnNumber] = useState('');
   const [company, setCompany] = useState<Company | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [companyCurrencies, setCompanyCurrencies] = useState<Currency[]>([]);
+  const [selectedCurrencyId, setSelectedCurrencyId] = useState<string>('');
+  const [exchangeRate, setExchangeRate] = useState<number>(1);
+  const [exchangeRateType, setExchangeRateType] = useState<'manual' | 'auto'>('manual');
+  const isMultiCurrencyEnabled = company?.settings?.enable_multi_currency || (company as any)?.enable_multi_currency || false;
 
   // Floating popover lookup search states
   const [activeSearch, setActiveSearch] = useState<{
@@ -101,6 +106,80 @@ export const Returns: React.FC = () => {
     return await dbService.getNextSequence('returns', selectedDate);
   };
 
+  const handleCurrencyChange = async (currencyId: string) => {
+    setSelectedCurrencyId(currencyId);
+    if (!currencyId || !user?.company_id || !company) {
+      setExchangeRate(1);
+      return;
+    }
+    
+    const currency = companyCurrencies.find(c => c.id === currencyId);
+    if (!currency) {
+      setExchangeRate(1);
+      return;
+    }
+    
+    const baseCurrency = company.settings?.currency || 'EGP';
+    if (currency.code.toLowerCase() === baseCurrency.toLowerCase()) {
+      setExchangeRate(1);
+      setExchangeRateType('manual');
+      return;
+    }
+
+    const updateMethod = company.settings?.exchange_rate_update_method || 'manual';
+    setExchangeRateType(updateMethod);
+
+    if (updateMethod === 'auto') {
+      try {
+        const latestAutoRates = await apiRequest<Array<{
+          currency_id: string;
+          rate: number | null;
+          rate_date: string | null;
+        }>>(`/currency-rates/latest?company_id=${user.company_id}`);
+        const rateObj = latestAutoRates.find(r => r.currency_id === currencyId);
+        if (rateObj && rateObj.rate !== null) {
+          setExchangeRate(Number(rateObj.rate));
+        } else {
+          // fallback to manual rate
+          const manualRates = await dbService.list<ExchangeRate>('exchange_rates', {
+            currency_id: currencyId,
+            company_id: user.company_id,
+            _limit: 1,
+            _sort: 'rate_date',
+            _order: 'desc'
+          });
+          if (manualRates.length > 0) {
+            setExchangeRate(Number(manualRates[0].exchange_rate));
+          } else {
+            setExchangeRate(1);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching auto rate:', error);
+        setExchangeRate(1);
+      }
+    } else {
+      // manual update method
+      try {
+        const manualRates = await dbService.list<ExchangeRate>('exchange_rates', {
+          currency_id: currencyId,
+          company_id: user.company_id,
+          _limit: 1,
+          _sort: 'rate_date',
+          _order: 'desc'
+        });
+        if (manualRates.length > 0) {
+          setExchangeRate(Number(manualRates[0].exchange_rate));
+        } else {
+          setExchangeRate(1);
+        }
+      } catch (error) {
+        console.error('Error fetching manual rate:', error);
+        setExchangeRate(1);
+      }
+    }
+  };
+
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingReturn(null);
@@ -115,6 +194,9 @@ export const Returns: React.FC = () => {
     setSelectedDepartmentId('');
     setSelectedCostCenterId('');
     setItems([{ product_id: '', product_name: '', quantity: 1, unit_price: 0, total: 0 }]);
+    setSelectedCurrencyId('');
+    setExchangeRate(1);
+    setExchangeRateType('auto');
   };
 
   const handlePrevReturn = () => {
@@ -192,6 +274,7 @@ export const Returns: React.FC = () => {
       const unsubOperations = dbService.subscribe<Operation>('operations', user.company_id, setOperations);
       const unsubDepartments = dbService.subscribe<Department>('departments', user.company_id, setDepartments);
       const unsubCostCenters = dbService.subscribe<CostCenter>('cost_centers', user.company_id, setCostCenters);
+      const unsubCurrencies = dbService.subscribe<Currency>('currencies', user.company_id, setCompanyCurrencies);
       
       const fetchSettings = async () => {
         const docs = await dbService.getDocsByFilter<any>('settings', user.company_id, [
@@ -214,6 +297,7 @@ export const Returns: React.FC = () => {
         unsubOperations();
         unsubDepartments();
         unsubCostCenters();
+        unsubCurrencies();
       };
     }
   }, [user, page, limit, sortBy, sortOrder, searchTerm]);
@@ -612,11 +696,15 @@ export const Returns: React.FC = () => {
         operation_id: selectedOperationId || null,
         department_id: selectedDepartmentId || null,
         cost_center_id: selectedCostCenterId || null,
+        currency_id: selectedCurrencyId || null,
+        exchange_rate: Number(exchangeRate) || 1,
+        exchange_rate_type: exchangeRateType,
         description: description || ''
       };
 
       // Journal Items
       const journalItems: any[] = [];
+      const rate = Number(exchangeRate) || 1;
       let customerAccountId = customer?.account_id || '';
       let customerAccountName = customer?.account_name || 'حساب العملاء';
       const custAcc = accounts.find(a => a.id === customerAccountId);
@@ -636,7 +724,7 @@ export const Returns: React.FC = () => {
           account_name: debitAccountName,
           account_code: debitAccount?.code || '',
           product_name: item.product_name,
-          debit: item.total,
+          debit: Number((item.total * rate).toFixed(2)),
           credit: 0,
           description: `مرتجع مبيعات صنف: ${item.product_name} - مرتجع ${return_number}`
         });
@@ -658,7 +746,7 @@ export const Returns: React.FC = () => {
             account_name: vatAccountName,
             account_code: vatAccount?.code || '',
             product_name: item.product_name,
-            debit: item.vat_amount,
+            debit: Number((item.vat_amount * rate).toFixed(2)),
             credit: 0,
             description: `ضريبة القيمة المضافة مرتجعة - صنف: ${item.product_name} - مرتجع رقم ${return_number}`
           });
@@ -698,7 +786,7 @@ export const Returns: React.FC = () => {
               account_name: invAccName,
               account_code: invAcc?.code || '',
               product_name: item.product_name,
-              debit: totalCost,
+              debit: Number((totalCost * rate).toFixed(2)),
               credit: 0,
               description: `إرجاع للمخزون - صنف: ${item.product_name} - مرتجع رقم ${return_number}`
             });
@@ -710,7 +798,7 @@ export const Returns: React.FC = () => {
               account_code: costAcc?.code || '',
               product_name: item.product_name,
               debit: 0,
-              credit: totalCost,
+              credit: Number((totalCost * rate).toFixed(2)),
               description: `عكس تكلفة البضاعة المباعة - صنف: ${item.product_name} - مرتجع رقم ${return_number}`
             });
           }
@@ -726,7 +814,7 @@ export const Returns: React.FC = () => {
           account_name: discountAccount?.name || 'حساب الخصم المسموح به',
           account_code: discountAccount?.code || '',
           debit: 0,
-          credit: discount,
+          credit: Number((discount * rate).toFixed(2)),
           description: `تسوية خصم مرتجع مبيعات رقم ${return_number}`
         });
       }
@@ -742,7 +830,7 @@ export const Returns: React.FC = () => {
           account_name: cashAccountName,
           account_code: cashAccount?.code || '',
           debit: 0,
-          credit: total_amount,
+          credit: Number((total_amount * rate).toFixed(2)),
           description: `دفع نقدية مقابل مرتجع مبيعات رقم ${return_number} - ${customer?.name}`,
           sub_account_id: paymentMethodId,
           sub_account_type: 'payment_method'
@@ -753,7 +841,7 @@ export const Returns: React.FC = () => {
           account_name: customerAccountName,
           account_code: customerAccountCode,
           debit: 0,
-          credit: total_amount,
+          credit: Number((total_amount * rate).toFixed(2)),
           description: `مرتجع مبيعات عملاء - مرتجع رقم ${return_number} - ${customer?.name}`,
           customer_id: selectedCustomerId,
           customer_name: customer?.name,
@@ -1016,6 +1104,9 @@ export const Returns: React.FC = () => {
         setSelectedOperationId(fullData.operation_id || '');
         setSelectedDepartmentId(fullData.department_id || '');
         setSelectedCostCenterId(fullData.cost_center_id || '');
+        setSelectedCurrencyId(fullData.currency_id || '');
+        setExchangeRate(fullData.exchange_rate || 1);
+        setExchangeRateType(fullData.exchange_rate_type || 'auto');
         console.log('[EDIT] Form updated with sales return:', fullData.id);
       } catch (error: any) {
         console.error('[EDIT] Error loading return:', error);
@@ -1035,6 +1126,9 @@ export const Returns: React.FC = () => {
       setSelectedOperationId('');
       setSelectedDepartmentId('');
       setSelectedCostCenterId('');
+      setSelectedCurrencyId('');
+      setExchangeRate(1);
+      setExchangeRateType('auto');
       setItems([{ product_id: '', product_name: '', quantity: 1, unit_price: 0, total: 0 }]);
       const num = await generateReturnNumber(newDate);
       setReturnNumber(num);
@@ -1331,7 +1425,9 @@ export const Returns: React.FC = () => {
                         {ret.payment_type === 'cash' ? t('returns.payment_cash') : t('returns.payment_credit')}
                       </span>
                     </td>
-                    <td className="px-6 py-4 font-bold text-emerald-600">{formatNumber(ret.total_amount)} {t('returns.currency')}</td>
+                    <td className="px-6 py-4 font-bold text-emerald-600">
+                      {formatNumber(ret.total_amount)} <span className="text-[10px] font-bold text-zinc-500">{ret.currency_id ? (companyCurrencies.find(c => c.id === ret.currency_id)?.code || '') : (company?.settings?.currency || 'EGP')}</span>
+                    </td>
                     <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                       {ret.entry_number ? (
                         <button
@@ -1473,7 +1569,7 @@ export const Returns: React.FC = () => {
                   <div className="mt-4 pt-4 border-t border-zinc-100 flex items-center justify-between">
                     <span className="text-zinc-500 text-xs font-bold">{t('returns.column_total')}</span>
                     <span className="font-black text-emerald-600 text-lg">
-                      {formatNumber(ret.total_amount)} {t('returns.currency')}
+                      {formatNumber(ret.total_amount)} <span className="text-xs font-bold text-zinc-500">{ret.currency_id ? (companyCurrencies.find(c => c.id === ret.currency_id)?.code || '') : (company?.settings?.currency || 'EGP')}</span>
                     </span>
                   </div>
                 </div>
@@ -1809,17 +1905,81 @@ export const Returns: React.FC = () => {
                         </div>
                       ) : null}
 
-                      {/* 6. Description / Notes */}
-                      <div className={paymentType === 'cash' ? 'col-span-1 md:col-span-2 lg:col-span-3' : 'col-span-2 md:col-span-3 lg:col-span-4'}>
-                        <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'الوصف / ملاحظات' : 'Description / Notes'}</label>
-                        <input 
-                          type="text"
-                          className="w-full px-1.5 py-0.5 rounded-md border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px]"
-                          value={description}
-                          onChange={(e) => setDescription(e.target.value)}
-                          placeholder={language === 'ar' ? 'أضف وصفاً اختيارياً هنا...' : 'Add optional description...'}
-                        />
-                      </div>
+                      {/* Currency & Exchange Rate Selection */}
+                      {isMultiCurrencyEnabled && (
+                        <>
+                          <div>
+                            <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5 flex items-center gap-1">
+                              <Coins size={10} className="text-amber-500" />
+                              {language === 'ar' ? 'عملة المستند' : 'Document Currency'}
+                            </label>
+                            <select 
+                              className="w-full px-1.5 py-0.5 rounded-md border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer"
+                              value={selectedCurrencyId}
+                              onChange={(e) => handleCurrencyChange(e.target.value)}
+                            >
+                              {(() => {
+                                const baseCode = (company?.settings?.currency || (company as any)?.currency || 'egp').toLowerCase();
+                                const baseCurrInList = companyCurrencies.find(c => c.code.toLowerCase() === baseCode);
+                                const baseCurrencyName = baseCurrInList 
+                                  ? (language === 'ar' ? baseCurrInList.name_ar : baseCurrInList.name_en) 
+                                  : (language === 'ar' ? 'العملة الأساسية' : 'Base Currency');
+                                return (
+                                  <option value="">
+                                    {`${baseCurrencyName} (${(company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase()})`}
+                                  </option>
+                                );
+                              })()}
+                              {companyCurrencies.filter(c => (c.is_active || c.id === selectedCurrencyId) && c.code.toLowerCase() !== (company?.settings?.currency || (company as any)?.currency || 'egp').toLowerCase()).map(curr => (
+                                <option key={curr.id} value={curr.id}>
+                                  {language === 'ar' ? `${curr.name_ar} (${curr.code})` : `${curr.name_en} (${curr.code})`}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {(() => {
+                            const selectedCurr = companyCurrencies.find(c => c.id === selectedCurrencyId);
+                            const baseCurrency = company?.settings?.currency || 'EGP';
+                            const isForeign = selectedCurr && selectedCurr.code.toLowerCase() !== baseCurrency.toLowerCase();
+                            
+                            if (!isForeign) return null;
+
+                            return (
+                              <div>
+                                <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">
+                                  {language === 'ar' 
+                                    ? `سعر الصرف (${exchangeRateType === 'auto' ? 'تلقائي' : 'يدوي'})` 
+                                    : `Exchange Rate (${exchangeRateType === 'auto' ? 'Auto' : 'Manual'})`}
+                                </label>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  min="0.000001"
+                                  className="w-full px-1.5 py-0.5 rounded-md border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px]"
+                                  value={exchangeRate}
+                                  onChange={(e) => {
+                                    setExchangeRate(Number(e.target.value) || 1);
+                                    setExchangeRateType('manual');
+                                  }}
+                                />
+                              </div>
+                            );
+                          })()}
+                        </>
+                      )}
+                    </div>
+
+                    {/* 6. Description / Notes - Full width at the bottom of metadata */}
+                    <div className="pt-1 border-t border-zinc-100 mt-1">
+                      <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'الوصف / ملاحظات' : 'Description / Notes'}</label>
+                      <input 
+                        type="text"
+                        className="w-full px-3 py-0.5 rounded-md border border-zinc-200 bg-zinc-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-850 text-[11px]"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder={language === 'ar' ? 'أضف وصفاً اختيارياً هنا...' : 'Add optional description...'}
+                      />
                     </div>
 
                     {/* Third Row of metadata: Operation, Department, Cost Center */}
@@ -2576,161 +2736,166 @@ export const Returns: React.FC = () => {
       )}
 
       {/* View Return Modal */}
-      {viewReturn && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-auto md:max-w-6xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col md:max-h-[90vh] border border-slate-200">
-            <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
-              <h3 className="text-lg md:text-xl font-bold text-slate-900">{t('returns.view_return')}</h3>
-              <button onClick={() => setViewReturn(null)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-xl transition-all"><X size={24} /></button>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full">
-              <div ref={returnRef} id="return-capture-area" className="flex-1 p-6 md:p-8 space-y-8 bg-white overflow-y-auto" style={{ color: '#18181b' }}>
-                <CompanyInvoiceHeader 
-                  company={company} 
-                  documentNumber={viewReturn.return_number}
-                  documentDate={formatDate(viewReturn.date)}
-                />
+      {viewReturn && (() => {
+        const viewReturnCurrency = viewReturn.currency_id 
+          ? (companyCurrencies.find(c => c.id === viewReturn.currency_id)?.code || '') 
+          : (company?.settings?.currency || 'EGP');
+        return (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white w-full h-full md:h-auto md:max-w-6xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col md:max-h-[90vh] border border-slate-200">
+              <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+                <h3 className="text-lg md:text-xl font-bold text-slate-900">{t('returns.view_return')}</h3>
+                <button onClick={() => setViewReturn(null)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-xl transition-all"><X size={24} /></button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full">
+                <div ref={returnRef} id="return-capture-area" className="flex-1 p-6 md:p-8 space-y-8 bg-white overflow-y-auto" style={{ color: '#18181b' }}>
+                  <CompanyInvoiceHeader 
+                    company={company} 
+                    documentNumber={viewReturn.return_number}
+                    documentDate={formatDate(viewReturn.date)}
+                  />
 
-                <div className="grid grid-cols-2 gap-8 py-2">
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{language === 'ar' ? 'مرتجع من العميل' : 'Return From Customer'}</p>
-                    <p className="text-2xl font-black text-slate-900 tracking-tight">{viewReturn.customer_name}</p>
-                    {viewReturn.customer_id && (
-                      <p className="text-xs text-slate-500 font-medium">كود العميل: {viewReturn.customer_id.slice(-6).toUpperCase()}</p>
-                    )}
-                    {viewReturn.warehouse_id && (
-                      <p className="text-xs text-slate-500 font-medium">
-                        {language === 'ar' ? 'المخزن:' : 'Warehouse:'} <span className="text-emerald-600 font-bold">{warehouses.find(w => w.id?.toString() === viewReturn.warehouse_id?.toString())?.name || viewReturn.warehouse_id}</span>
-                      </p>
-                    )}
-                    {viewReturn.entry_number && (
-                      <p className="text-xs text-slate-500 font-medium mt-1">
-                        {language === 'ar' ? 'رقم القيد:' : 'Journal Entry:'} <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setViewReturn(null);
-                            setPendingViewDoc({ type: 'journal', idOrNumber: viewReturn.entry_number! });
-                            setCurrentPage('journal_entries');
-                          }}
-                          className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50"
-                        >
-                          {viewReturn.entry_number}
-                        </button>
-                      </p>
-                    )}
-                  </div>
-                  <div className={`flex flex-col ${dir === 'rtl' ? 'items-start' : 'items-end'} justify-center gap-2`}>
-                    <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border
-                      ${viewReturn.payment_type === 'cash' 
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                        : 'bg-amber-50 text-amber-700 border-amber-100'
-                      }`}>
-                      {viewReturn.payment_type === 'cash' ? 'سداد نقدي' : 'سداد آجل'}
+                  <div className="grid grid-cols-2 gap-8 py-2">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{language === 'ar' ? 'مرتجع من العميل' : 'Return From Customer'}</p>
+                      <p className="text-2xl font-black text-slate-900 tracking-tight">{viewReturn.customer_name}</p>
+                      {viewReturn.customer_id && (
+                        <p className="text-xs text-slate-500 font-medium">كود العميل: {viewReturn.customer_id.slice(-6).toUpperCase()}</p>
+                      )}
+                      {viewReturn.warehouse_id && (
+                        <p className="text-xs text-slate-500 font-medium">
+                          {language === 'ar' ? 'المخزن:' : 'Warehouse:'} <span className="text-emerald-600 font-bold">{warehouses.find(w => w.id?.toString() === viewReturn.warehouse_id?.toString())?.name || viewReturn.warehouse_id}</span>
+                        </p>
+                      )}
+                      {viewReturn.entry_number && (
+                        <p className="text-xs text-slate-500 font-medium mt-1">
+                          {language === 'ar' ? 'رقم القيد:' : 'Journal Entry:'} <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewReturn(null);
+                              setPendingViewDoc({ type: 'journal', idOrNumber: viewReturn.entry_number! });
+                              setCurrentPage('journal_entries');
+                            }}
+                            className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50"
+                          >
+                            {viewReturn.entry_number}
+                          </button>
+                        </p>
+                      )}
+                    </div>
+                    <div className={`flex flex-col ${dir === 'rtl' ? 'items-start' : 'items-end'} justify-center gap-2`}>
+                      <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border
+                        ${viewReturn.payment_type === 'cash' 
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                          : 'bg-amber-50 text-amber-700 border-amber-100'
+                        }`}>
+                        {viewReturn.payment_type === 'cash' ? 'سداد نقدي' : 'سداد آجل'}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {viewReturn.description && (
-                  <div className="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">{language === 'ar' ? 'الوصف / ملاحظات' : 'Description / Notes'}</p>
-                    <p className="text-slate-700 whitespace-pre-wrap">{viewReturn.description}</p>
+                  {viewReturn.description && (
+                    <div className="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">{language === 'ar' ? 'الوصف / ملاحظات' : 'Description / Notes'}</p>
+                      <p className="text-slate-700 whitespace-pre-wrap">{viewReturn.description}</p>
+                    </div>
+                  )}
+
+                  <div className="border border-[#f4f4f5] rounded-2xl overflow-hidden">
+                    <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'} text-sm`}>
+                      <thead className="bg-[#fafafa] text-[#71717a] uppercase text-[10px] font-bold tracking-widest">
+                        <tr>
+                          <th className="px-4 py-3 w-16 text-center">{t('products.column_image')}</th>
+                          <th className="px-4 py-3">{language === 'ar' ? 'الصنف' : 'Product'}</th>
+                          <th className="px-4 py-3 w-24">{language === 'ar' ? 'الكمية' : 'Quantity'}</th>
+                          <th className="px-4 py-3 w-32">{language === 'ar' ? 'السعر' : 'Price'}</th>
+                          <th className="px-4 py-3 w-32">{language === 'ar' ? 'الإجمالي' : 'Total'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#fafafa]">
+                        {viewReturn.items?.map((item, index) => (
+                          <tr key={index}>
+                            <td className="px-4 py-3 text-center">
+                              {item.product_image_url ? (
+                                <img 
+                                  src={item.product_image_url} 
+                                  alt={item.product_name} 
+                                  className="w-10 h-10 object-cover rounded-lg mx-auto border border-[#f4f4f5]"
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 bg-[#fafafa] rounded-lg flex items-center justify-center mx-auto border border-[#f4f4f5]">
+                                  <Box size={16} className="text-[#a1a1aa]" />
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 font-medium text-[#18181b]">{item.product_name}</td>
+                            <td className="px-4 py-3 text-[#71717a]">{item.quantity}</td>
+                            <td className="px-4 py-3 text-[#71717a]">{formatMoney(item.unit_price)} {viewReturnCurrency}</td>
+                            <td className="px-4 py-3 font-bold text-[#18181b]">{formatMoney(item.total)} {viewReturnCurrency}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-slate-50/50 font-bold border-t border-slate-100">
+                        <tr>
+                          <td colSpan={4} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-slate-400 font-bold text-[10px] uppercase tracking-wider`}>{language === 'ar' ? 'المجموع الفرعي' : 'Subtotal'}</td>
+                          <td className="px-6 py-3 text-slate-900 text-base">{formatMoney(viewReturn.subtotal)} {viewReturnCurrency}</td>
+                        </tr>
+                        {Number(viewReturn.discount) > 0 && (
+                          <tr>
+                            <td colSpan={4} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-red-400 font-bold text-[10px] uppercase tracking-wider`}>{language === 'ar' ? 'الخصم' : 'Discount'}</td>
+                            <td className="px-6 py-3 text-red-600 text-base">-{formatMoney(viewReturn.discount)} {viewReturnCurrency}</td>
+                          </tr>
+                        )}
+                        {Number(viewReturn.tax) > 0 && (
+                          <tr>
+                            <td colSpan={4} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-zinc-600 font-bold text-[10px] uppercase tracking-wider`}>{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</td>
+                            <td className="px-6 py-3 text-zinc-750 text-base">+{formatMoney(viewReturn.tax)} {viewReturnCurrency}</td>
+                          </tr>
+                        )}
+                        <tr className="bg-slate-900 text-white">
+                          <td colSpan={4} className={`px-6 py-5 ${dir === 'rtl' ? 'text-left' : 'text-right'} font-black text-lg uppercase tracking-tight`}>{t('returns.summary_total')}</td>
+                          <td className="px-6 py-5 text-2xl font-black text-emerald-400">{formatMoney(viewReturn.total_amount)} {viewReturnCurrency}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
                   </div>
-                )}
+                </div>
 
-                <div className="border border-[#f4f4f5] rounded-2xl overflow-hidden">
-                  <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'} text-sm`}>
-                    <thead className="bg-[#fafafa] text-[#71717a] uppercase text-[10px] font-bold tracking-widest">
-                      <tr>
-                        <th className="px-4 py-3 w-16 text-center">{t('products.column_image')}</th>
-                        <th className="px-4 py-3">{language === 'ar' ? 'الصنف' : 'Product'}</th>
-                        <th className="px-4 py-3 w-24">{language === 'ar' ? 'الكمية' : 'Quantity'}</th>
-                        <th className="px-4 py-3 w-32">{language === 'ar' ? 'السعر' : 'Price'}</th>
-                        <th className="px-4 py-3 w-32">{language === 'ar' ? 'الإجمالي' : 'Total'}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#fafafa]">
-                      {viewReturn.items?.map((item, index) => (
-                        <tr key={index}>
-                          <td className="px-4 py-3 text-center">
-                            {item.product_image_url ? (
-                              <img 
-                                src={item.product_image_url} 
-                                alt={item.product_name} 
-                                className="w-10 h-10 object-cover rounded-lg mx-auto border border-[#f4f4f5]"
-                                referrerPolicy="no-referrer"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 bg-[#fafafa] rounded-lg flex items-center justify-center mx-auto border border-[#f4f4f5]">
-                                <Box size={16} className="text-[#a1a1aa]" />
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 font-medium text-[#18181b]">{item.product_name}</td>
-                          <td className="px-4 py-3 text-[#71717a]">{item.quantity}</td>
-                          <td className="px-4 py-3 text-[#71717a]">{formatMoney(item.unit_price)} {t('returns.currency')}</td>
-                          <td className="px-4 py-3 font-bold text-[#18181b]">{formatMoney(item.total)} {t('returns.currency')}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot className="bg-slate-50/50 font-bold border-t border-slate-100">
-                      <tr>
-                        <td colSpan={4} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-slate-400 font-bold text-[10px] uppercase tracking-wider`}>{language === 'ar' ? 'المجموع الفرعي' : 'Subtotal'}</td>
-                        <td className="px-6 py-3 text-slate-900 text-base">{formatMoney(viewReturn.subtotal)} {t('returns.currency')}</td>
-                      </tr>
-                      {Number(viewReturn.discount) > 0 && (
-                        <tr>
-                          <td colSpan={4} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-red-400 font-bold text-[10px] uppercase tracking-wider`}>{language === 'ar' ? 'الخصم' : 'Discount'}</td>
-                          <td className="px-6 py-3 text-red-600 text-base">-{formatMoney(viewReturn.discount)} {t('returns.currency')}</td>
-                        </tr>
-                      )}
-                      {Number(viewReturn.tax) > 0 && (
-                        <tr>
-                          <td colSpan={4} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-zinc-600 font-bold text-[10px] uppercase tracking-wider`}>{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</td>
-                          <td className="px-6 py-3 text-zinc-750 text-base">+{formatMoney(viewReturn.tax)} {t('returns.currency')}</td>
-                        </tr>
-                      )}
-                      <tr className="bg-slate-900 text-white">
-                        <td colSpan={4} className={`px-6 py-5 ${dir === 'rtl' ? 'text-left' : 'text-right'} font-black text-lg uppercase tracking-tight`}>{t('returns.summary_total')}</td>
-                        <td className="px-6 py-5 text-2xl font-black text-emerald-400">{formatMoney(viewReturn.total_amount)} {t('returns.currency')}</td>
-                      </tr>
-                    </tfoot>
-                  </table>
+                <div className="hidden lg:block w-80 border-r border-slate-100 bg-slate-50/30">
+                  <InlineActivityLog category="returns" documentId={viewReturn.id} />
                 </div>
               </div>
 
-              <div className="hidden lg:block w-80 border-r border-slate-100 bg-slate-50/30">
-                <InlineActivityLog category="returns" documentId={viewReturn.id} />
-              </div>
-            </div>
-
-            <div className="p-4 md:p-6 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <div className="flex gap-2">
+              <div className="p-4 md:p-6 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div className="flex gap-2">
+                  <button 
+                    onClick={handlePrint}
+                    className="flex items-center gap-2 px-6 py-3 bg-white text-slate-700 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm cursor-pointer"
+                  >
+                    <Printer size={20} />
+                    {language === 'ar' ? 'طباعة' : 'Print'}
+                  </button>
+                  <button 
+                    onClick={() => exportToPDF(viewReturn)}
+                    className="flex items-center gap-2 px-6 py-3 bg-white text-slate-700 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm cursor-pointer"
+                  >
+                    <Download size={20} />
+                    PDF
+                  </button>
+                </div>
                 <button 
-                  onClick={handlePrint}
-                  className="flex items-center gap-2 px-6 py-3 bg-white text-slate-700 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm cursor-pointer"
+                  onClick={() => setViewReturn(null)}
+                  className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200 cursor-pointer"
                 >
-                  <Printer size={20} />
-                  {language === 'ar' ? 'طباعة' : 'Print'}
-                </button>
-                <button 
-                  onClick={() => exportToPDF(viewReturn)}
-                  className="flex items-center gap-2 px-6 py-3 bg-white text-slate-700 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm cursor-pointer"
-                >
-                  <Download size={20} />
-                  PDF
+                  {t('common.close')}
                 </button>
               </div>
-              <button 
-                onClick={() => setViewReturn(null)}
-                className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200 cursor-pointer"
-              >
-                {t('common.close')}
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Add Customer Modal */}
       {isCustomerModalOpen && (
