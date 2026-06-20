@@ -2872,8 +2872,8 @@ export const Returns: React.FC = () => {
                             </td>
                             <td className="px-4 py-3 font-medium text-[#18181b]">{item.product_name}</td>
                             <td className="px-4 py-3 text-[#71717a]">{item.quantity}</td>
-                            <td className="px-4 py-3 text-[#71717a]">{formatMoney(item.unit_price)} {viewReturnCurrency}</td>
-                            <td className="px-4 py-3 font-bold text-[#18181b]">{formatMoney(item.total)} {viewReturnCurrency}</td>
+                            <td className="px-4 py-3 text-[#71717a]">{formatMoney(item.unit_price)}</td>
+                            <td className="px-4 py-3 font-bold text-[#18181b]">{formatMoney(item.total)}</td>
                           </tr>
                         ))}
                       </tbody>

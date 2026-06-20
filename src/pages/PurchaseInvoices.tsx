@@ -4268,8 +4268,8 @@ export const PurchaseInvoices: React.FC = () => {
                             </td>
                             <td className="px-4 py-3 font-medium text-[#18181b]">{item.product_name || item.category_name}</td>
                             <td className="px-4 py-3 text-[#71717a]">{item.quantity}</td>
-                            <td className="px-4 py-3 text-[#71717a]">{formatNumber(item.price || item.cost_price || 0)} {viewInvoiceCurrency}</td>
-                            <td className="px-4 py-3 font-bold text-[#18181b]">{formatNumber(item.total)} {viewInvoiceCurrency}</td>
+                            <td className="px-4 py-3 text-[#71717a]">{formatNumber(item.price || item.cost_price || 0)}</td>
+                            <td className="px-4 py-3 font-bold text-[#18181b]">{formatNumber(item.total)}</td>
                           </tr>
                         ))}
                       </tbody>

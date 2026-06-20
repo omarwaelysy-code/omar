@@ -5495,8 +5495,8 @@ export const Invoices: React.FC = () => {
                             )}
                           </td>
                           <td className="px-4 py-3 text-[#71717a]">{item.quantity !== undefined && item.quantity !== null ? Number(item.quantity) : ''}</td>
-                          <td className="px-4 py-3 text-[#71717a]">{formatMoney(item.unit_price)} {t('invoices.currency')}</td>
-                          <td className="px-4 py-3 font-bold text-[#18181b]">{formatMoney(item.total)} {t('invoices.currency')}</td>
+                          <td className="px-4 py-3 text-[#71717a]">{formatMoney(item.unit_price)}</td>
+                          <td className="px-4 py-3 font-bold text-[#18181b]">{formatMoney(item.total)}</td>
                         </tr>
                       ))}
                     </tbody>
