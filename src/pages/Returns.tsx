@@ -357,11 +357,12 @@ export const Returns: React.FC = () => {
 
     const generatePreview = () => {
       const isVatEnabled = company?.settings?.vat_enabled || company?.vat_enabled || false;
-      const subtotal = (items || []).reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+      const subtotalVal = (items || []).reduce((sum, item) => sum + (Number(item.total) || 0), 0);
       const vatTotal = isVatEnabled ? (items || []).reduce((sum, item) => sum + (Number(item.vat_amount) || 0), 0) : 0;
-      const total_amount = Number((subtotal + vatTotal - discount).toFixed(2)) || 0;
+      const discountVal = Number(discount) || 0;
+      const total_amount = Number((subtotalVal + vatTotal - discountVal).toFixed(2)) || 0;
 
-      if (total_amount <= 0) {
+      if (subtotalVal <= 0) {
         setPreviewJournalEntry(null);
         setPreviewActivityLog(null);
         return;
@@ -381,27 +382,38 @@ export const Returns: React.FC = () => {
 
       // Preview Journal Entry
       const journalItems: JournalEntryItem[] = [];
+      const rate = Number(exchangeRate) || 1;
 
-      // Debit: Sales/Revenue Accounts (per product)
       (items || []).forEach(item => {
         if (!item.product_id) return;
         const product = products.find(p => p.id === item.product_id);
-        let debitAccountId = product?.revenue_account_id || '';
-        let debitAccountName = product?.revenue_account_name || 'حساب مردودات المبيعات';
+        if (!product) return;
+
         const itemTotal = Number(item.total) || 0;
         const itemVat = isVatEnabled ? (Number(item.vat_amount) || 0) : 0;
+        const itemDiscount = subtotalVal > 0 ? Number(((itemTotal / subtotalVal) * discountVal).toFixed(2)) : 0;
+        const itemNetTotal = Number((itemTotal + itemVat - itemDiscount).toFixed(2));
 
+        let debitAccountId = product.revenue_account_id || '';
+        let debitAccountName = product.revenue_account_name || 'حساب مردودات المبيعات';
+        const debitAccount = accounts.find(a => a.id === debitAccountId);
+        const debitAccountCode = debitAccount?.code || '';
+
+        // 1. Debit Revenue (reverse sales)
         journalItems.push({
           account_id: debitAccountId,
           account_name: debitAccountName,
-          debit: itemTotal,
+          account_code: debitAccountCode,
+          product_name: item.product_name,
+          debit: Number((itemTotal * rate).toFixed(2)),
           credit: 0,
           description: `مرتجع صنف: ${item.product_name} - مرتجع ${return_number}`
         });
 
+        // 2. Debit VAT (reverse tax)
         if (itemVat > 0) {
-          let vatAccountId = product?.vat_account_id || '';
-          let vatAccountName = product?.vat_account_name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Liability Account');
+          let vatAccountId = product.vat_account_id || '';
+          let vatAccountName = product.vat_account_name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Liability Account');
           if (!vatAccountId) {
             const globalVatAccount = accounts.find(a => 
               a.name.includes('ضريبة القيمة المضافة') || a.name.includes('قيمة مضافة')
@@ -409,49 +421,169 @@ export const Returns: React.FC = () => {
             vatAccountId = globalVatAccount?.id || '';
             vatAccountName = globalVatAccount?.name || vatAccountName;
           }
+          const vatAccount = accounts.find(a => a.id === vatAccountId);
+          const vatAccountCode = vatAccount?.code || '';
+
           journalItems.push({
             account_id: vatAccountId,
             account_name: vatAccountName,
-            debit: itemVat,
+            account_code: vatAccountCode,
+            product_name: item.product_name,
+            debit: Number((itemVat * rate).toFixed(2)),
             credit: 0,
             description: `ضريبة القيمة المضافة مرتجعة - صنف: ${item.product_name} - مرتجع رقم ${return_number}`
           });
         }
-      });
 
-      // Credit: Customer or Cash
-      let creditAccountId = '';
-      let creditAccountName = '';
+        // 3. Credit Discount (reverse discount) if itemDiscount > 0
+        if (itemDiscount > 0) {
+          const discountAccountId = settings?.customer_discount_account_id || '';
+          const discountAccount = accounts.find(a => a.id === discountAccountId);
+          const discountAccountCode = discountAccount?.code || '';
 
-      if (paymentType === 'cash' && paymentMethodId) {
-        const method = paymentMethods.find(m => m.id === paymentMethodId);
-        creditAccountId = method?.account_id || '';
-        creditAccountName = method?.account_name || 'حساب النقدية';
-      } else {
-        creditAccountId = customer?.account_id || '';
-        creditAccountName = customer?.account_name || 'حساب العملاء';
-      }
+          journalItems.push({
+            account_id: discountAccountId,
+            account_name: discountAccount?.name || 'حساب الخصم المسموح به',
+            account_code: discountAccountCode,
+            product_name: item.product_name,
+            debit: 0,
+            credit: Number((itemDiscount * rate).toFixed(2)),
+            description: `تسوية خصم صنف: ${item.product_name} - مرتجع مبيعات رقم ${return_number}`
+          });
+        }
 
-      if (discount > 0) {
-        const discountAccountId = settings?.customer_discount_account_id || '';
-        const discountAccount = accounts.find(a => a.id === discountAccountId);
-        journalItems.push({
-          account_id: discountAccountId,
-          account_name: discountAccount?.name || 'حساب الخصم المسموح به',
-          debit: 0,
-          credit: discount,
-          description: `تسوية خصم مرتجع مبيعات رقم ${return_number}`
-        });
-      }
+        // 4. Debit Inventory & Credit COGS for physical goods (reverse cost of goods sold)
+        if (product.type !== 'service') {
+          const itemCost = Number(product.cost_price) || 0;
+          const totalCost = Number((item.quantity * itemCost).toFixed(2));
 
-      journalItems.push({
-        account_id: creditAccountId,
-        account_name: creditAccountName,
-        debit: 0,
-        credit: total_amount,
-        description: `مرتجع مبيعات رقم ${return_number} - ${customer?.name || '...'}`,
-        customer_id: paymentType === 'credit' ? selectedCustomerId : undefined,
-        customer_name: paymentType === 'credit' ? customer?.name : undefined
+          if (totalCost > 0) {
+            let costAccId = product.cost_account_id || '';
+            let costAccName = product.cost_account_name || 'تكلفة المبيعات';
+            if (!costAccId) {
+              const fallbackCostAcc = accounts.find(a => a.name.includes('تكلفة المبيعات') || a.name.includes('تكلفة مبيعات') || a.name.includes('تكلفة البضاعة المباعة'));
+              if (fallbackCostAcc) {
+                costAccId = fallbackCostAcc.id;
+                costAccName = fallbackCostAcc.name;
+              }
+            }
+            const costAcc = accounts.find(a => a.id === costAccId);
+            const costAccountCode = costAcc?.code || '';
+
+            let invAccId = product.inventory_account_id || '';
+            let invAccName = product.inventory_account_name || 'المخزون';
+            if (!invAccId) {
+              const fallbackInvAcc = accounts.find(a => a.name.includes('مخزون') || a.name.includes('مخازن'));
+              if (fallbackInvAcc) {
+                invAccId = fallbackInvAcc.id;
+                invAccName = fallbackInvAcc.name;
+              }
+            }
+            const invAcc = accounts.find(a => a.id === invAccId);
+            const invAccountCode = invAcc?.code || '';
+
+            // Debit Inventory
+            journalItems.push({
+              account_id: invAccId,
+              account_name: invAccName,
+              account_code: invAccountCode,
+              product_name: item.product_name,
+              debit: Number((totalCost * rate).toFixed(2)),
+              credit: 0,
+              description: `إرجاع للمخزون - صنف: ${item.product_name} - مرتجع رقم ${return_number}`
+            });
+
+            // Credit COGS
+            journalItems.push({
+              account_id: costAccId,
+              account_name: costAccName,
+              account_code: costAccountCode,
+              product_name: item.product_name,
+              debit: 0,
+              credit: Number((totalCost * rate).toFixed(2)),
+              description: `عكس تكلفة البضاعة المباعة - صنف: ${item.product_name} - مرتجع رقم ${return_number}`
+            });
+          }
+        }
+
+        // Credit customer or payment method cash
+        let creditAccountId = '';
+        let creditAccountName = '';
+        if (paymentType === 'cash' && paymentMethodId) {
+          const method = paymentMethods.find(m => m.id === paymentMethodId);
+          creditAccountId = method?.account_id || '';
+          creditAccountName = method?.account_name || 'حساب النقدية';
+        } else {
+          creditAccountId = customer?.account_id || '';
+          creditAccountName = customer?.account_name || 'حساب العملاء';
+        }
+        const creditAcc = accounts.find(a => a.id === creditAccountId);
+        const creditAccountCode = creditAcc?.code || '';
+
+        // 5. Credit Customer or Cash
+        if (paymentType === 'cash') {
+          // Paid cash immediately
+          journalItems.push({
+            account_id: creditAccountId,
+            account_name: creditAccountName,
+            account_code: creditAccountCode,
+            product_name: item.product_name,
+            debit: 0,
+            credit: Number((itemNetTotal * rate).toFixed(2)),
+            description: `دفع نقدية صنف: ${item.product_name} - مرتجع رقم ${return_number} - ${customer?.name || '...'}`,
+            sub_account_id: paymentMethodId,
+            sub_account_type: 'payment_method'
+          });
+
+          // Also post through customer ledger for tracking
+          let customerAccountId = customer?.account_id || '';
+          let customerAccountName = customer?.account_name || 'حساب العملاء';
+          const custAcc = accounts.find(a => a.id === customerAccountId);
+          const customerAccountCode = custAcc?.code || '';
+
+          journalItems.push({
+            account_id: customerAccountId,
+            account_name: customerAccountName,
+            account_code: customerAccountCode,
+            product_name: item.product_name,
+            debit: Number((itemNetTotal * rate).toFixed(2)),
+            credit: 0,
+            description: `تسوية نقدية لمرتجع صنف: ${item.product_name} - مرتجع رقم ${return_number}`,
+            customer_id: selectedCustomerId,
+            customer_name: customer?.name,
+            sub_account_id: selectedCustomerId,
+            sub_account_type: 'customer'
+          });
+
+          journalItems.push({
+            account_id: customerAccountId,
+            account_name: customerAccountName,
+            account_code: customerAccountCode,
+            product_name: item.product_name,
+            debit: 0,
+            credit: Number((itemNetTotal * rate).toFixed(2)),
+            description: `مرتجع مبيعات صنف: ${item.product_name} - مرتجع رقم ${return_number}`,
+            customer_id: selectedCustomerId,
+            customer_name: customer?.name,
+            sub_account_id: selectedCustomerId,
+            sub_account_type: 'customer'
+          });
+        } else {
+          // Post to customer account
+          journalItems.push({
+            account_id: creditAccountId,
+            account_name: creditAccountName,
+            account_code: creditAccountCode,
+            product_name: item.product_name,
+            debit: 0,
+            credit: Number((itemNetTotal * rate).toFixed(2)),
+            description: `مرتجع مبيعات صنف: ${item.product_name} - مرتجع رقم ${return_number} - ${customer?.name || '...'}`,
+            customer_id: selectedCustomerId,
+            customer_name: customer?.name,
+            sub_account_id: selectedCustomerId,
+            sub_account_type: 'customer'
+          });
+        }
       });
 
       const totalDebit = journalItems.reduce((sum, i) => sum + (Number(i.debit) || 0), 0);
@@ -751,27 +883,36 @@ export const Returns: React.FC = () => {
       const custAcc = accounts.find(a => a.id === customerAccountId);
       const customerAccountCode = custAcc?.code || '';
 
-      sanitizedItems.forEach(item => {
+      const subtotalVal = (sanitizedItems || []).reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+      const discountVal = Number(discount) || 0;
+
+      (sanitizedItems || []).forEach(item => {
         const product = products.find(p => p.id === item.product_id);
         if (!product) return;
+
+        const itemTotal = Number(item.total) || 0;
+        const itemVat = isVatEnabled ? Number(item.vat_amount || 0) : 0;
+        const itemDiscount = subtotalVal > 0 ? Number(((itemTotal / subtotalVal) * discountVal).toFixed(2)) : 0;
+        const itemNetTotal = Number((itemTotal + itemVat - itemDiscount).toFixed(2));
 
         let debitAccountId = product.revenue_account_id || '';
         let debitAccountName = product.revenue_account_name || 'حساب مردودات المبيعات';
         const debitAccount = accounts.find(a => a.id === debitAccountId);
+        const debitAccountCode = debitAccount?.code || '';
 
         // 1. Debit Revenue (reverse sales)
         journalItems.push({
           account_id: debitAccountId,
           account_name: debitAccountName,
-          account_code: debitAccount?.code || '',
+          account_code: debitAccountCode,
           product_name: item.product_name,
-          debit: Number((item.total * rate).toFixed(2)),
+          debit: Number((itemTotal * rate).toFixed(2)),
           credit: 0,
           description: `مرتجع مبيعات صنف: ${item.product_name} - مرتجع ${return_number}`
         });
 
         // 2. Debit VAT (reverse tax)
-        if (isVatEnabled && item.vat_amount > 0) {
+        if (itemVat > 0) {
           let vatAccountId = product.vat_account_id || '';
           let vatAccountName = product.vat_account_name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Liability Account');
           if (!vatAccountId) {
@@ -782,18 +923,37 @@ export const Returns: React.FC = () => {
             vatAccountName = globalVatAccount?.name || vatAccountName;
           }
           const vatAccount = accounts.find(a => a.id === vatAccountId);
+          const vatAccountCode = vatAccount?.code || '';
+
           journalItems.push({
             account_id: vatAccountId,
             account_name: vatAccountName,
-            account_code: vatAccount?.code || '',
+            account_code: vatAccountCode,
             product_name: item.product_name,
-            debit: Number((item.vat_amount * rate).toFixed(2)),
+            debit: Number((itemVat * rate).toFixed(2)),
             credit: 0,
             description: `ضريبة القيمة المضافة مرتجعة - صنف: ${item.product_name} - مرتجع رقم ${return_number}`
           });
         }
 
-        // 3. Debit Inventory & Credit COGS for physical goods (reverse cost of goods sold)
+        // 3. Credit Discount (reverse discount) if itemDiscount > 0
+        if (itemDiscount > 0) {
+          const discountAccountId = settings?.customer_discount_account_id || '';
+          const discountAccount = accounts.find(a => a.id === discountAccountId);
+          const discountAccountCode = discountAccount?.code || '';
+
+          journalItems.push({
+            account_id: discountAccountId,
+            account_name: discountAccount?.name || 'حساب الخصم المسموح به',
+            account_code: discountAccountCode,
+            product_name: item.product_name,
+            debit: 0,
+            credit: Number((itemDiscount * rate).toFixed(2)),
+            description: `تسوية خصم صنف: ${item.product_name} - مرتجع مبيعات رقم ${return_number}`
+          });
+        }
+
+        // 4. Debit Inventory & Credit COGS for physical goods (reverse cost of goods sold)
         if (product.type !== 'service') {
           const itemCost = Number(product.cost_price) || 0;
           const totalCost = Number((item.quantity * itemCost).toFixed(2));
@@ -809,6 +969,7 @@ export const Returns: React.FC = () => {
               }
             }
             const costAcc = accounts.find(a => a.id === costAccId);
+            const costAccountCode = costAcc?.code || '';
 
             let invAccId = product.inventory_account_id || '';
             let invAccName = product.inventory_account_name || 'المخزون';
@@ -820,12 +981,13 @@ export const Returns: React.FC = () => {
               }
             }
             const invAcc = accounts.find(a => a.id === invAccId);
+            const invAccountCode = invAcc?.code || '';
 
             // Debit Inventory
             journalItems.push({
               account_id: invAccId,
               account_name: invAccName,
-              account_code: invAcc?.code || '',
+              account_code: invAccountCode,
               product_name: item.product_name,
               debit: Number((totalCost * rate).toFixed(2)),
               credit: 0,
@@ -836,7 +998,7 @@ export const Returns: React.FC = () => {
             journalItems.push({
               account_id: costAccId,
               account_name: costAccName,
-              account_code: costAcc?.code || '',
+              account_code: costAccountCode,
               product_name: item.product_name,
               debit: 0,
               credit: Number((totalCost * rate).toFixed(2)),
@@ -844,52 +1006,81 @@ export const Returns: React.FC = () => {
             });
           }
         }
+
+        // Credit customer or payment method cash
+        let creditAccountId = '';
+        let creditAccountName = '';
+        if (paymentType === 'cash' && paymentMethodId) {
+          const method = paymentMethods.find(m => m.id === paymentMethodId);
+          creditAccountId = method?.account_id || '';
+          creditAccountName = method?.account_name || 'حساب النقدية';
+        } else {
+          creditAccountId = customer?.account_id || '';
+          creditAccountName = customer?.account_name || 'حساب العملاء';
+        }
+        const creditAcc = accounts.find(a => a.id === creditAccountId);
+        const creditAccountCode = creditAcc?.code || '';
+
+        // 5. Credit Customer or Cash
+        if (paymentType === 'cash') {
+          // Paid cash immediately
+          journalItems.push({
+            account_id: creditAccountId,
+            account_name: creditAccountName,
+            account_code: creditAccountCode,
+            product_name: item.product_name,
+            debit: 0,
+            credit: Number((itemNetTotal * rate).toFixed(2)),
+            description: `دفع نقدية صنف: ${item.product_name} - مرتجع رقم ${return_number} - ${customer?.name}`,
+            sub_account_id: paymentMethodId,
+            sub_account_type: 'payment_method'
+          });
+
+          // Also post through customer ledger for tracking
+          journalItems.push({
+            account_id: customerAccountId,
+            account_name: customerAccountName,
+            account_code: customerAccountCode,
+            product_name: item.product_name,
+            debit: Number((itemNetTotal * rate).toFixed(2)),
+            credit: 0,
+            description: `تسوية نقدية لمرتجع صنف: ${item.product_name} - مرتجع رقم ${return_number}`,
+            customer_id: selectedCustomerId,
+            customer_name: customer?.name,
+            sub_account_id: selectedCustomerId,
+            sub_account_type: 'customer'
+          });
+
+          journalItems.push({
+            account_id: customerAccountId,
+            account_name: customerAccountName,
+            account_code: customerAccountCode,
+            product_name: item.product_name,
+            debit: 0,
+            credit: Number((itemNetTotal * rate).toFixed(2)),
+            description: `مرتجع مبيعات صنف: ${item.product_name} - مرتجع رقم ${return_number}`,
+            customer_id: selectedCustomerId,
+            customer_name: customer?.name,
+            sub_account_id: selectedCustomerId,
+            sub_account_type: 'customer'
+          });
+        } else {
+          // Post to customer account
+          journalItems.push({
+            account_id: creditAccountId,
+            account_name: creditAccountName,
+            account_code: creditAccountCode,
+            product_name: item.product_name,
+            debit: 0,
+            credit: Number((itemNetTotal * rate).toFixed(2)),
+            description: `مرتجع مبيعات صنف: ${item.product_name} - مرتجع رقم ${return_number} - ${customer?.name}`,
+            customer_id: selectedCustomerId,
+            customer_name: customer?.name,
+            sub_account_id: selectedCustomerId,
+            sub_account_type: 'customer'
+          });
+        }
       });
-
-      // 4. Credit Discount (reverse discount)
-      if (discount > 0) {
-        const discountAccountId = settings?.customer_discount_account_id || '';
-        const discountAccount = accounts.find(a => a.id === discountAccountId);
-        journalItems.push({
-          account_id: discountAccountId,
-          account_name: discountAccount?.name || 'حساب الخصم المسموح به',
-          account_code: discountAccount?.code || '',
-          debit: 0,
-          credit: Number((discount * rate).toFixed(2)),
-          description: `تسوية خصم مرتجع مبيعات رقم ${return_number}`
-        });
-      }
-
-      // 5. Credit Customer or Cash
-      if (paymentType === 'cash' && paymentMethodId) {
-        const pm = paymentMethods.find(p => p.id === paymentMethodId);
-        let cashAccountId = pm?.account_id || '';
-        let cashAccountName = pm?.account_name || 'حساب النقدية';
-        const cashAccount = accounts.find(a => a.id === cashAccountId);
-        journalItems.push({
-          account_id: cashAccountId,
-          account_name: cashAccountName,
-          account_code: cashAccount?.code || '',
-          debit: 0,
-          credit: Number((total_amount * rate).toFixed(2)),
-          description: `دفع نقدية مقابل مرتجع مبيعات رقم ${return_number} - ${customer?.name}`,
-          sub_account_id: paymentMethodId,
-          sub_account_type: 'payment_method'
-        });
-      } else {
-        journalItems.push({
-          account_id: customerAccountId,
-          account_name: customerAccountName,
-          account_code: customerAccountCode,
-          debit: 0,
-          credit: Number((total_amount * rate).toFixed(2)),
-          description: `مرتجع مبيعات عملاء - مرتجع رقم ${return_number} - ${customer?.name}`,
-          customer_id: selectedCustomerId,
-          customer_name: customer?.name,
-          sub_account_id: selectedCustomerId,
-          sub_account_type: 'customer'
-        });
-      }
 
       let total_debit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0).toFixed(2)) || 0;
       let total_credit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0).toFixed(2)) || 0;

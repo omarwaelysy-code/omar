@@ -1082,17 +1082,19 @@ router.get('/detailed-journal-entries', authenticateToken, async (req: AuthReque
         cc.code as cost_center_code,
         
         -- Product/Item names list
-        CASE 
-          WHEN je.reference_type = 'invoice' THEN 
-            (SELECT string_agg(product_name, ', ') FROM invoice_items WHERE invoice_id = je.reference_id)
-          WHEN je.reference_type = 'purchase_invoice' THEN 
-            (SELECT string_agg(COALESCE(product_name, category_name), ', ') FROM purchase_invoice_items WHERE invoice_id = je.reference_id)
-          WHEN je.reference_type = 'return' THEN 
-            (SELECT string_agg(product_name, ', ') FROM return_items WHERE return_id = je.reference_id)
-          WHEN je.reference_type = 'purchase_return' THEN 
-            (SELECT string_agg(product_name, ', ') FROM purchase_return_items WHERE return_id = je.reference_id)
-          ELSE NULL
-        END as product_names
+        COALESCE(NULLIF(jel.product_name, ''), (
+          CASE 
+            WHEN je.reference_type = 'invoice' THEN 
+              (SELECT string_agg(product_name, ', ') FROM invoice_items WHERE invoice_id = je.reference_id)
+            WHEN je.reference_type = 'purchase_invoice' THEN 
+              (SELECT string_agg(COALESCE(product_name, category_name), ', ') FROM purchase_invoice_items WHERE invoice_id = je.reference_id)
+            WHEN je.reference_type = 'return' THEN 
+              (SELECT string_agg(product_name, ', ') FROM return_items WHERE return_id = je.reference_id)
+            WHEN je.reference_type = 'purchase_return' THEN 
+              (SELECT string_agg(product_name, ', ') FROM purchase_return_items WHERE return_id = je.reference_id)
+            ELSE NULL
+          END
+        )) as product_names
       FROM journal_entry_lines jel
       JOIN journal_entries je ON jel.journal_entry_id = je.id
       LEFT JOIN accounts acc ON jel.account_id = acc.id

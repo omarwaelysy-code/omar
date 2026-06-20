@@ -1055,17 +1055,12 @@ export const PurchaseInvoices: React.FC = () => {
           console.error("Error converting purchase order", err);
         }
       };
-      loadOrderForConversion();
-    }
-  }, [pendingViewDoc, user, setPendingViewDoc]);
-
-
-  useEffect(() => {
+      loa  useEffect(() => {
     const generatePreview = () => {
-      const subtotal = (items || []).reduce((sum, item) => sum + item.total, 0);
-      const total_amount = subtotal - invoiceData.discount;
+      const subtotalVal = (items || []).reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+      const discountVal = Number(invoiceData.discount) || 0;
       
-      if (subtotal <= 0) {
+      if (subtotalVal <= 0) {
         setPreviewJournalEntry(null);
         setPreviewActivityLog(null);
         return;
@@ -1073,6 +1068,11 @@ export const PurchaseInvoices: React.FC = () => {
 
       const supplier = suppliers.find(s => s.id === invoiceData.supplier_id);
       const invoice_number = editingInvoice?.invoice_number || 'PUR-PREVIEW';
+
+      const vatTotal = isVatEnabled
+        ? (items || []).reduce((sum, item) => sum + (Number((item as any).vat_amount) || 0), 0)
+        : 0;
+      const total_amount = subtotalVal + vatTotal - discountVal;
 
       // Preview Activity Log
       setPreviewActivityLog({
@@ -1085,15 +1085,19 @@ export const PurchaseInvoices: React.FC = () => {
 
       // Preview Journal Entry
       const journalItems: JournalEntryItem[] = [];
+      const rate = Number(exchangeRate) || 1;
 
-      // Debit: Purchase/Expense Accounts (per item)
       (items || []).forEach(item => {
+        const itemTotal = Number(item.total) || 0;
+        const itemVat = isVatEnabled ? Number((item as any).vat_amount || 0) : 0;
+        const itemDiscount = subtotalVal > 0 ? Number(((itemTotal / subtotalVal) * discountVal).toFixed(2)) : 0;
+        const itemNetTotal = Number((itemTotal + itemVat - itemDiscount).toFixed(2));
+
         let debitAccountId = '';
         let debitAccountName = '';
 
         if (invoiceData.purchase_type === 'items') {
           const product = products.find(p => p.id === item.product_id);
-          
           if (product?.type !== 'service') {
             debitAccountId = product?.inventory_account_id || product?.cost_account_id || '';
             debitAccountName = product?.inventory_account_name || product?.cost_account_name || 'حساب المشتريات/المخزون';
@@ -1103,54 +1107,140 @@ export const PurchaseInvoices: React.FC = () => {
           }
         } else {
           const category = categories.find(c => c.id === item.expense_category_id);
-          debitAccountId = category?.account_id || '';
-          debitAccountName = category?.account_name || 'حساب المصروف';
+          debitAccountId = (category as any)?.account_id || '';
+          debitAccountName = (category as any)?.account_name || 'حساب المصروف';
         }
 
+        const debitAcc = accounts.find(a => a.id === debitAccountId);
+        const debitAccountCode = debitAcc?.code || '';
+
+        // 1. Debit Purchase/Inventory/Expense account
         journalItems.push({
           account_id: debitAccountId,
           account_name: debitAccountName,
-          debit: item.total,
+          account_code: debitAccountCode,
+          debit: Number((itemTotal * rate).toFixed(2)),
           credit: 0,
+          product_name: item.product_name || item.category_name,
           description: t('pi.purchase_description', { name: item.product_name || item.category_name, number: invoice_number })
         });
+
+        // 2. Debit VAT (reverse tax) if itemVat > 0
+        if (itemVat > 0) {
+          const product = products.find(p => p.id === item.product_id);
+          let vatAccountId = product?.vat_account_id || '';
+          let vatAccountName = product?.vat_account_name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Account');
+          if (!vatAccountId) {
+            const globalVatAccount = accounts.find(a => 
+              a.name.includes('ضريبة القيمة المضافة') || a.name.includes('قيمة مضافة') || a.name.includes('ضريبة مدخلات')
+            );
+            vatAccountId = globalVatAccount?.id || '';
+            vatAccountName = globalVatAccount?.name || vatAccountName;
+          }
+          const vatAcc = accounts.find(a => a.id === vatAccountId);
+          const vatAccountCode = vatAcc?.code || '';
+
+          journalItems.push({
+            account_id: vatAccountId,
+            account_name: vatAccountName,
+            account_code: vatAccountCode,
+            debit: Number((itemVat * rate).toFixed(2)),
+            credit: 0,
+            product_name: item.product_name || item.category_name,
+            description: `ضريبة القيمة المضافة - صنف: ${item.product_name || item.category_name} - فاتورة رقم ${invoice_number}`
+          });
+        }
+
+        // 3. Credit Discount Account (if any) if itemDiscount > 0
+        if (itemDiscount > 0) {
+          const discountAccountId = settings?.supplier_discount_account_id || '';
+          const discountAccount = accounts.find(a => a.id === discountAccountId);
+          journalItems.push({
+            account_id: discountAccountId,
+            account_name: discountAccount?.name || t('pi.discount_account_default'),
+            account_code: discountAccount?.code || '',
+            debit: 0,
+            credit: Number((itemDiscount * rate).toFixed(2)),
+            product_name: item.product_name || item.category_name,
+            description: t('pi.discount_description', { number: invoice_number })
+          });
+        }
+
+        // Credit Accounts
+        let supplierAccountId = supplier?.account_id || '';
+        let supplierAccountName = supplier?.account_name || 'حساب الموردين';
+        const supplierAcc = accounts.find(a => a.id === supplierAccountId);
+        const supplierAccountCode = supplierAcc?.code || '';
+
+        // 4. Credit Supplier or Payment Method (Cash)
+        if (invoiceData.payment_type === 'cash') {
+          const pm = paymentMethods.find(p => p.id === invoiceData.payment_method_id);
+          const cashAccountId = pm?.account_id || '';
+          const cashAccountName = pm?.account_name || 'حساب النقدية';
+          const cashAcc = accounts.find(a => a.id === cashAccountId);
+          const cashAccountCode = cashAcc?.code || '';
+
+          // Credit cash immediately
+          journalItems.push({
+            account_id: cashAccountId,
+            account_name: cashAccountName,
+            account_code: cashAccountCode,
+            debit: 0,
+            credit: Number((itemNetTotal * rate).toFixed(2)),
+            product_name: item.product_name || item.category_name,
+            description: t('pi.payment_description', { number: invoice_number, supplier: supplier?.name || '...' }),
+            sub_account_id: invoiceData.payment_method_id,
+            sub_account_type: 'payment_method'
+          });
+
+          // And we also clear through supplier ledger to track supplier statement
+          journalItems.push({
+            account_id: supplierAccountId,
+            account_name: supplierAccountName,
+            account_code: supplierAccountCode,
+            debit: Number((itemNetTotal * rate).toFixed(2)),
+            credit: 0,
+            product_name: item.product_name || item.category_name,
+            description: t('pi.settlement_description', { number: invoice_number, supplier: supplier?.name || '...' }),
+            supplier_id: invoiceData.supplier_id,
+            supplier_name: supplier?.name,
+            sub_account_id: invoiceData.supplier_id,
+            sub_account_type: 'supplier'
+          });
+
+          journalItems.push({
+            account_id: supplierAccountId,
+            account_name: supplierAccountName,
+            account_code: supplierAccountCode,
+            debit: 0,
+            credit: Number((itemNetTotal * rate).toFixed(2)),
+            product_name: item.product_name || item.category_name,
+            description: t('pi.invoice_description', { number: invoice_number, supplier: supplier?.name || '...' }),
+            supplier_id: invoiceData.supplier_id,
+            supplier_name: supplier?.name,
+            sub_account_id: invoiceData.supplier_id,
+            sub_account_type: 'supplier'
+          });
+        } else {
+          // Credit Supplier Account (Account Receivable)
+          journalItems.push({
+            account_id: supplierAccountId,
+            account_name: supplierAccountName,
+            account_code: supplierAccountCode,
+            debit: 0,
+            credit: Number((itemNetTotal * rate).toFixed(2)),
+            product_name: item.product_name || item.category_name,
+            description: t('pi.invoice_description', { number: invoice_number, supplier: supplier?.name || '...' }),
+            supplier_id: invoiceData.supplier_id,
+            supplier_name: supplier?.name,
+            sub_account_id: invoiceData.supplier_id,
+            sub_account_type: 'supplier'
+          });
+        }
       });
 
-      // Credit: Supplier or Payment Method
-      let creditAccountId = '';
-      let creditAccountName = '';
-
-      if (invoiceData.payment_type === 'cash') {
-        const pm = paymentMethods.find(p => p.id === invoiceData.payment_method_id);
-        creditAccountId = pm?.account_id || '';
-        creditAccountName = pm?.account_name || 'حساب النقدية';
-      } else {
-        creditAccountId = supplier?.account_id || '';
-        creditAccountName = supplier?.account_name || 'حساب الموردين';
-      }
-
-      journalItems.push({
-        account_id: creditAccountId,
-        account_name: creditAccountName,
-        debit: 0,
-        credit: total_amount,
-        description: t('pi.invoice_description', { number: invoice_number, supplier: supplier?.name || '...' }),
-        sub_account_id: invoiceData.payment_type === 'cash' ? invoiceData.payment_method_id : supplier?.id,
-        sub_account_type: invoiceData.payment_type === 'cash' ? 'payment_method' : 'supplier'
-      });
-
-      // Credit: Discount Account (if any)
-      if (invoiceData.discount > 0) {
-        const discountAccountId = settings?.supplier_discount_account_id || '';
-        const discountAccount = accounts.find(a => a.id === discountAccountId);
-        journalItems.push({
-          account_id: discountAccountId,
-          account_name: discountAccount?.name || t('pi.discount_account_default'),
-          debit: 0,
-          credit: invoiceData.discount,
-          description: t('pi.discount_description', { number: invoice_number })
-        });
-      }
+      const sumDebits = Number(journalItems.reduce((s, x) => s + (Number(x.debit) || 0), 0).toFixed(2)) || 0;
+      const sumCredits = Number(journalItems.reduce((s, x) => s + (Number(x.credit) || 0), 0).toFixed(2)) || 0;
 
       setPreviewJournalEntry({
         id: 'preview',
@@ -1160,8 +1250,8 @@ export const PurchaseInvoices: React.FC = () => {
         reference_type: 'purchase_invoice',
         description: t('pi.journal_description', { number: invoice_number }),
         items: journalItems,
-        total_debit: total_amount,
-        total_credit: total_amount,
+        total_debit: sumDebits,
+        total_credit: sumCredits,
         company_id: user.company_id,
         created_at: new Date().toISOString(),
         created_by: user.id
@@ -1878,102 +1968,23 @@ export const PurchaseInvoices: React.FC = () => {
       const rate = Number(exchangeRate) || 1;
       let supplierAccountId = supplier?.account_id || '';
       let supplierAccountName = supplier?.account_name || 'حساب الموردين';
+      const supplierAcc = accounts.find(a => a.id === supplierAccountId);
+      const supplierAccountCode = supplierAcc?.code || '';
 
-      journalItems.push({
-        account_id: supplierAccountId,
-        account_name: supplierAccountName,
-        debit: 0,
-        credit: Number((total_amount * rate).toFixed(2)),
-        description: t('pi.invoice_description', { number: invoice_number, supplier: supplier?.name }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : ''),
-        supplier_id: invoiceData.supplier_id,
-        supplier_name: supplier?.name,
-        sub_account_id: invoiceData.supplier_id,
-        sub_account_type: 'supplier'
-      });
+      const subtotalVal = (sanitizedItems || []).reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+      const discountVal = Number(discount_amount) || 0;
 
-      if (invoiceData.discount > 0) {
-        const discountAccountId = settings?.supplier_discount_account_id || '';
-        const discountAccount = accounts.find(a => a.id === discountAccountId);
-        journalItems.push({
-          account_id: discountAccountId,
-          account_name: discountAccount?.name || t('pi.discount_account_default'),
-          debit: 0,
-          credit: Number((invoiceData.discount * rate).toFixed(2)),
-          description: t('pi.discount_description', { number: invoice_number }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : '')
-        });
-      }
-
-      const vatGroup: Record<string, { account_id: string; account_name: string; amount: number }> = {};
-      
-      sanitizedItems.forEach(item => {
-        const prod = products.find(p => p.id === item.product_id);
-        const vatAccountId = prod?.vat_account_id || '';
-        const vatAccountName = prod?.vat_account_name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Account');
-        const rateVal = Number(item.vat_rate) || 0;
+      (sanitizedItems || []).forEach(item => {
         const itemTotal = Number(item.total) || 0;
-        const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
-        
-        if (itemVat > 0) {
-          let finalVatAccountId = vatAccountId;
-          let finalVatAccountName = vatAccountName;
-          
-          if (!finalVatAccountId) {
-            const globalVatAccount = accounts.find(a => 
-              a.name.includes('ضريبة القيمة المضافة') || 
-              a.name.includes('قيمة مضافة') || 
-              a.name.includes('ضريبة مدخلات')
-            );
-            finalVatAccountId = globalVatAccount?.id || '';
-            finalVatAccountName = globalVatAccount?.name || finalVatAccountName;
-          }
-          
-          if (finalVatAccountId) {
-            if (!vatGroup[finalVatAccountId]) {
-              vatGroup[finalVatAccountId] = {
-                account_id: finalVatAccountId,
-                account_name: finalVatAccountName,
-                amount: 0
-              };
-            }
-            vatGroup[finalVatAccountId].amount += itemVat;
-          }
-        }
-      });
+        const itemVat = isVatEnabled ? Number(item.vat_amount || 0) : 0;
+        const itemDiscount = subtotalVal > 0 ? Number(((itemTotal / subtotalVal) * discountVal).toFixed(2)) : 0;
+        const itemNetTotal = Number((itemTotal + itemVat - itemDiscount).toFixed(2));
 
-      if (Object.keys(vatGroup).length > 0) {
-        Object.values(vatGroup).forEach(vat => {
-          journalItems.push({
-            account_id: vat.account_id,
-            account_name: vat.account_name,
-            debit: Number((vat.amount * rate).toFixed(2)),
-            credit: 0,
-            description: `ضريبة القيمة المضافة - فاتورة مشتريات رقم ${invoice_number}`
-          });
-        });
-      } else if (vatTotal > 0) {
-        const vatAccount = accounts.find(a => 
-          a.name.includes('ضريبة القيمة المضافة') || 
-          a.name.includes('قيمة مضافة') || 
-          a.name.includes('ضريبة مدخلات')
-        );
-        const vatAccountId = vatAccount?.id || '';
-        const vatAccountName = vatAccount?.name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Account');
-        journalItems.push({
-          account_id: vatAccountId,
-          account_name: vatAccountName,
-          debit: Number((vatTotal * rate).toFixed(2)),
-          credit: 0,
-          description: `ضريبة القيمة المضافة - فاتورة مشتريات رقم ${invoice_number}`
-        });
-      }
-
-      sanitizedItems.forEach(item => {
         let debitAccountId = '';
         let debitAccountName = '';
 
         if (invoiceData.purchase_type === 'items') {
           const product = products.find(p => p.id === item.product_id);
-          
           if (product?.type !== 'service') {
             debitAccountId = product?.inventory_account_id || product?.cost_account_id || '';
             debitAccountName = product?.inventory_account_name || product?.cost_account_name || 'حساب المشتريات/المخزون';
@@ -1986,40 +1997,128 @@ export const PurchaseInvoices: React.FC = () => {
           debitAccountId = (category as any)?.account_id || '';
           debitAccountName = (category as any)?.account_name || 'حساب المصروف';
         }
+
+        const debitAcc = accounts.find(a => a.id === debitAccountId);
+        const debitAccountCode = debitAcc?.code || '';
+
+        // 1. Debit Purchase/Inventory/Expense account
         journalItems.push({
           account_id: debitAccountId,
           account_name: debitAccountName,
-          debit: Number((Number(item.total) * rate).toFixed(2)) || 0,
+          account_code: debitAccountCode,
+          debit: Number((itemTotal * rate).toFixed(2)),
           credit: 0,
+          product_name: item.product_name || item.category_name,
           description: t('pi.purchase_description', { name: item.product_name || item.category_name, number: invoice_number }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : '')
         });
-      });
 
-      if (invoiceData.payment_type === 'cash') {
-        const pm = paymentMethods.find(p => p.id === invoiceData.payment_method_id);
-        let cashAccountId = pm?.account_id || '';
-        let cashAccountName = pm?.account_name || 'حساب النقدية';
-        journalItems.push({
-          account_id: cashAccountId,
-          account_name: cashAccountName,
-          debit: 0,
-          credit: Number((total_amount * rate).toFixed(2)),
-          description: t('pi.payment_description', { number: invoice_number, supplier: supplier?.name }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : ''),
-          sub_account_id: invoiceData.payment_method_id,
-          sub_account_type: 'payment_method'
-        });
-        journalItems.push({
-          account_id: supplierAccountId,
-          account_name: supplierAccountName,
-          debit: Number((total_amount * rate).toFixed(2)),
-          credit: 0,
-          description: t('pi.settlement_description', { number: invoice_number, supplier: supplier?.name }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : ''),
-          supplier_id: invoiceData.supplier_id,
-          supplier_name: supplier?.name,
-          sub_account_id: invoiceData.supplier_id,
-          sub_account_type: 'supplier'
-        });
-      }
+        // 2. Debit VAT (reverse tax) if itemVat > 0
+        if (itemVat > 0) {
+          const product = products.find(p => p.id === item.product_id);
+          let vatAccountId = product?.vat_account_id || '';
+          let vatAccountName = product?.vat_account_name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Account');
+          if (!vatAccountId) {
+            const globalVatAccount = accounts.find(a => 
+              a.name.includes('ضريبة القيمة المضافة') || a.name.includes('قيمة مضافة') || a.name.includes('ضريبة مدخلات')
+            );
+            vatAccountId = globalVatAccount?.id || '';
+            vatAccountName = globalVatAccount?.name || vatAccountName;
+          }
+          const vatAcc = accounts.find(a => a.id === vatAccountId);
+          const vatAccountCode = vatAcc?.code || '';
+
+          journalItems.push({
+            account_id: vatAccountId,
+            account_name: vatAccountName,
+            account_code: vatAccountCode,
+            debit: Number((itemVat * rate).toFixed(2)),
+            credit: 0,
+            product_name: item.product_name || item.category_name,
+            description: `ضريبة القيمة المضافة - صنف: ${item.product_name || item.category_name} - فاتورة رقم ${invoice_number}`
+          });
+        }
+
+        // 3. Credit Discount Account (if any) if itemDiscount > 0
+        if (itemDiscount > 0) {
+          const discountAccountId = settings?.supplier_discount_account_id || '';
+          const discountAccount = accounts.find(a => a.id === discountAccountId);
+          journalItems.push({
+            account_id: discountAccountId,
+            account_name: discountAccount?.name || t('pi.discount_account_default'),
+            account_code: discountAccount?.code || '',
+            debit: 0,
+            credit: Number((itemDiscount * rate).toFixed(2)),
+            product_name: item.product_name || item.category_name,
+            description: t('pi.discount_description', { number: invoice_number }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : '')
+          });
+        }
+
+        // 4. Credit Supplier or Payment Method (Cash)
+        if (invoiceData.payment_type === 'cash') {
+          const pm = paymentMethods.find(p => p.id === invoiceData.payment_method_id);
+          const cashAccountId = pm?.account_id || '';
+          const cashAccountName = pm?.account_name || 'حساب النقدية';
+          const cashAcc = accounts.find(a => a.id === cashAccountId);
+          const cashAccountCode = cashAcc?.code || '';
+
+          // Credit cash immediately
+          journalItems.push({
+            account_id: cashAccountId,
+            account_name: cashAccountName,
+            account_code: cashAccountCode,
+            debit: 0,
+            credit: Number((itemNetTotal * rate).toFixed(2)),
+            product_name: item.product_name || item.category_name,
+            description: t('pi.payment_description', { number: invoice_number, supplier: supplier?.name }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : ''),
+            sub_account_id: invoiceData.payment_method_id,
+            sub_account_type: 'payment_method'
+          });
+
+          // And we also clear through supplier ledger to track supplier statement
+          journalItems.push({
+            account_id: supplierAccountId,
+            account_name: supplierAccountName,
+            account_code: supplierAccountCode,
+            debit: Number((itemNetTotal * rate).toFixed(2)),
+            credit: 0,
+            product_name: item.product_name || item.category_name,
+            description: t('pi.settlement_description', { number: invoice_number, supplier: supplier?.name }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : ''),
+            supplier_id: invoiceData.supplier_id,
+            supplier_name: supplier?.name,
+            sub_account_id: invoiceData.supplier_id,
+            sub_account_type: 'supplier'
+          });
+
+          journalItems.push({
+            account_id: supplierAccountId,
+            account_name: supplierAccountName,
+            account_code: supplierAccountCode,
+            debit: 0,
+            credit: Number((itemNetTotal * rate).toFixed(2)),
+            product_name: item.product_name || item.category_name,
+            description: t('pi.invoice_description', { number: invoice_number, supplier: supplier?.name }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : ''),
+            supplier_id: invoiceData.supplier_id,
+            supplier_name: supplier?.name,
+            sub_account_id: invoiceData.supplier_id,
+            sub_account_type: 'supplier'
+          });
+        } else {
+          // Credit Supplier Account (Account Receivable)
+          journalItems.push({
+            account_id: supplierAccountId,
+            account_name: supplierAccountName,
+            account_code: supplierAccountCode,
+            debit: 0,
+            credit: Number((itemNetTotal * rate).toFixed(2)),
+            product_name: item.product_name || item.category_name,
+            description: t('pi.invoice_description', { number: invoice_number, supplier: supplier?.name }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : ''),
+            supplier_id: invoiceData.supplier_id,
+            supplier_name: supplier?.name,
+            sub_account_id: invoiceData.supplier_id,
+            sub_account_type: 'supplier'
+          });
+        }
+      });
 
       let total_debit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0).toFixed(2)) || 0;
       let total_credit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0).toFixed(2)) || 0;
