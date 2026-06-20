@@ -284,3 +284,77 @@ export const exportDataToPDF = (title: string, headers: string[], rows: any[][],
 
   doc.save(`${filename}.pdf`);
 };
+
+/**
+ * Universal print utility that clones the target element and appends it to the body.
+ * This completely isolates the element from any fixed/flex containers, modals, and backdrops.
+ */
+export const printElement = (element: HTMLElement) => {
+  if (!element) return;
+
+  // Create a print container
+  const printContainer = document.createElement('div');
+  printContainer.id = 'print-section';
+  
+  // Clone the element
+  const clone = element.cloneNode(true) as HTMLElement;
+  
+  // Strip flex layout & scroll container classes on the clone to prevent formatting issues
+  clone.className = clone.className
+    .split(' ')
+    .filter(c => !c.includes('flex-1') && !c.includes('overflow-y-auto') && !c.includes('h-full') && !c.includes('max-h-'))
+    .join(' ');
+  clone.style.overflow = 'visible';
+  clone.style.maxHeight = 'none';
+  clone.style.height = 'auto';
+  clone.style.width = '100%';
+
+  printContainer.appendChild(clone);
+  document.body.appendChild(printContainer);
+
+  // Add print-specific styles dynamically
+  const style = document.createElement('style');
+  style.innerHTML = `
+    @media print {
+      body > *:not(#print-section) {
+        display: none !important;
+      }
+      #print-section {
+        display: block !important;
+        width: 100% !important;
+        direction: rtl !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      .no-print, button, .no-pdf, [data-html2canvas-ignore] {
+        display: none !important;
+      }
+      img {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      svg {
+        max-width: 100% !important;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+
+  // Trigger print
+  window.print();
+
+  // Cleanup after printing dialog closes
+  setTimeout(() => {
+    try {
+      if (document.body.contains(printContainer)) {
+        document.body.removeChild(printContainer);
+      }
+      if (document.head.contains(style)) {
+        document.head.removeChild(style);
+      }
+    } catch (e) {
+      console.error('Print Cleanup Error:', e);
+    }
+  }, 1000);
+};
+

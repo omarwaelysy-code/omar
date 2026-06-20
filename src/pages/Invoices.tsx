@@ -13,7 +13,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import Barcode from 'react-barcode';
 import { SmartAIInput } from '../components/SmartAIInput';
-import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
+import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { dbService, apiRequest } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
@@ -1180,43 +1180,9 @@ export const Invoices: React.FC = () => {
   }, [productFormData.type, isProductModalOpen, products]);
 
   const handlePrint = () => {
-    // Add print-specific styles dynamically to ensure only the invoice content is printed
-    const style = document.createElement('style');
-    style.innerHTML = `
-      @media print {
-        body * {
-          visibility: hidden !important;
-        }
-        #invoice-capture-area, #invoice-capture-area * {
-          visibility: visible !important;
-        }
-        #invoice-capture-area {
-          position: absolute !important;
-          left: 0 !important;
-          top: 0 !important;
-          width: 100% !important;
-          padding: 0 !important;
-          margin: 0 !important;
-          box-shadow: none !important;
-          border: none !important;
-        }
-        .no-print {
-          display: none !important;
-        }
-        /* Ensure images and barcodes are rendered */
-        img {
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-        }
-        svg {
-          max-width: 100% !important;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-    window.print();
-    // Remove the style after printing (optional but cleaner)
-    setTimeout(() => document.head.removeChild(style), 1000);
+    if (invoiceRef.current) {
+      printElement(invoiceRef.current);
+    }
   };
 
   const handleExportInvoicePDF = (invoice: Invoice) => {

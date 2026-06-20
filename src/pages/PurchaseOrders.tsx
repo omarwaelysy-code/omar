@@ -20,7 +20,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
 import { useNavigation } from '../contexts/NavigationContext';
-import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
+import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 
 interface ExtendedPurchaseOrderItem extends PurchaseOrderItem {
@@ -470,41 +470,9 @@ export const PurchaseOrders: React.FC = () => {
   };
 
   const handlePrint = () => {
-    // Add print-specific styles dynamically to ensure only the content of target container is printed
-    const style = document.createElement('style');
-    style.innerHTML = `
-      @media print {
-        body * {
-          visibility: hidden !important;
-        }
-        #order-print-area, #order-print-area * {
-          visibility: visible !important;
-        }
-        #order-print-area {
-          position: absolute !important;
-          left: 0 !important;
-          top: 0 !important;
-          width: 100% !important;
-          padding: 0 !important;
-          margin: 0 !important;
-          box-shadow: none !important;
-          border: none !important;
-        }
-        .no-print {
-          display: none !important;
-        }
-        img {
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-        }
-        svg {
-          max-width: 100% !important;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-    window.print();
-    setTimeout(() => document.head.removeChild(style), 1000);
+    if (orderRef.current) {
+      printElement(orderRef.current);
+    }
   };
 
   const handleConvertToInvoice = (e: React.MouseEvent, order: PurchaseOrder) => {
