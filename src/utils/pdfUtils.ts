@@ -11,7 +11,7 @@ interface PDFOptions {
 }
 
 export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => {
-  const { filename, margin = 10, orientation = 'landscape', reportTitle } = options;
+  const { filename, margin = 10, orientation = 'portrait', reportTitle } = options;
   console.log('PDF Export: Starting professional export for', filename);
 
   if (!element) {
@@ -19,12 +19,11 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
     throw new Error('Element not found');
   }
 
-  // Handle potential import variations
   // @ts-ignore
   const html2pdfFunc = html2pdf.default || html2pdf;
 
   if (typeof html2pdfFunc !== 'function') {
-    console.error('PDF Export: html2pdf is not a function. Type:', typeof html2pdfFunc);
+    console.error('PDF Export: html2pdf is not a function.');
     throw new Error('PDF export library not loaded correctly');
   }
 
@@ -35,12 +34,9 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
   // Reset scroll to 0,0 for better capture
   window.scrollTo(0, 0);
 
-  // Small delay to ensure any layout shifts or rendering is complete
+  // Small delay to ensure rendering is complete
   await new Promise(resolve => setTimeout(resolve, 150));
 
-  // Get element dimensions for explicit canvas sizing
-  const rect = element.getBoundingClientRect();
-  // For landscape A4, we want a width around 1120px for good resolution
   const targetWidth = orientation === 'landscape' ? 1120 : 800;
   
   const opt = {
@@ -48,16 +44,14 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
     filename: filename,
     image: { type: 'jpeg' as const, quality: 0.98 },
     html2canvas: { 
-      scale: 3, // High resolution
+      scale: 2, // High resolution but balanced to prevent memory crashes
       useCORS: true,
       letterRendering: true,
       logging: false,
       backgroundColor: '#ffffff',
-      width: element.scrollWidth,
-      height: element.scrollHeight,
       windowWidth: targetWidth,
       onclone: (clonedDoc: Document) => {
-        console.log('PDF Export: Cloning document and applying professional report styling...');
+        console.log('PDF Export: Applying styles in cloned document...');
         
         // Find the cloned element
         let clonedElement: HTMLElement | null = null;
@@ -65,67 +59,60 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
           clonedElement = clonedDoc.getElementById(element.id);
         }
         if (!clonedElement) {
-          // Fallback to finding by some other means if ID is missing or changed
           clonedElement = clonedDoc.body.querySelector(`[id="${element.id}"]`) as HTMLElement || 
-                         clonedDoc.body.querySelector('table') as HTMLElement ||
-                         clonedDoc.body.querySelector(':first-child') as HTMLElement;
+                          clonedDoc.body.querySelector('table') as HTMLElement ||
+                          clonedDoc.body.querySelector(':first-child') as HTMLElement;
         }
 
         if (clonedElement) {
-          // Create a professional report wrapper
-          const wrapper = clonedDoc.createElement('div');
-          wrapper.style.padding = '40px';
-          wrapper.style.backgroundColor = '#ffffff';
-          wrapper.style.direction = 'rtl';
-          wrapper.style.fontFamily = '"Cairo", sans-serif';
-          wrapper.style.width = `${targetWidth}px`;
-          wrapper.style.margin = '0 auto';
-
-          // Add Header
-          const header = clonedDoc.createElement('div');
-          header.style.display = 'flex';
-          header.style.justifyContent = 'space-between';
-          header.style.alignItems = 'flex-start';
-          header.style.marginBottom = '30px';
-          header.style.borderBottom = '2px solid #10b981';
-          header.style.paddingBottom = '15px';
-
-          const titleContainer = clonedDoc.createElement('div');
-          const mainTitle = clonedDoc.createElement('h1');
-          mainTitle.innerText = reportTitle || 'تقرير محاسبي';
-          mainTitle.style.fontSize = '28px';
-          mainTitle.style.fontWeight = 'bold';
-          mainTitle.style.color = '#064e3b';
-          mainTitle.style.margin = '0';
-          titleContainer.appendChild(mainTitle);
-
-          const dateContainer = clonedDoc.createElement('div');
-          dateContainer.style.textAlign = 'left';
-          const dateLabel = clonedDoc.createElement('p');
-          dateLabel.innerText = `تاريخ التصدير: ${formatDate(new Date())}`;
-          dateLabel.style.fontSize = '14px';
-          dateLabel.style.color = '#6b7280';
-          dateLabel.style.margin = '0';
-          dateContainer.appendChild(dateLabel);
-
-          header.appendChild(titleContainer);
-          header.appendChild(dateContainer);
-          wrapper.appendChild(header);
-
-          // Clear everything in the cloned document body and mount only the wrapped element
-          clonedDoc.body.innerHTML = '';
-          clonedDoc.body.appendChild(wrapper);
-          wrapper.appendChild(clonedElement);
-
-          // Apply professional table styling
-          clonedElement.style.width = '100%';
-          clonedElement.style.borderCollapse = 'collapse';
-          clonedElement.style.fontSize = '16px'; // Larger font
+          // Reset scroll and size constraints on the element itself to prevent clipping
           clonedElement.style.overflow = 'visible';
           clonedElement.style.maxHeight = 'none';
           clonedElement.style.height = 'auto';
+          clonedElement.style.width = '100%';
+          clonedElement.style.padding = '10px';
 
-          // Style all tables within the element
+          // Remove scroll and height limits on all parent elements in the cloned document
+          let parent = clonedElement.parentElement;
+          while (parent && parent !== clonedDoc.body) {
+            parent.style.overflow = 'visible';
+            parent.style.maxHeight = 'none';
+            parent.style.height = 'auto';
+            parent = parent.parentElement;
+          }
+
+          // Add a beautiful print header if reportTitle is provided (for lists/tables)
+          // and we are NOT exporting a single invoice (which has its own header)
+          if (reportTitle && !element.id?.includes('invoice-capture-area')) {
+            const headerDiv = clonedDoc.createElement('div');
+            headerDiv.style.display = 'flex';
+            headerDiv.style.justifyContent = 'space-between';
+            headerDiv.style.alignItems = 'center';
+            headerDiv.style.marginBottom = '25px';
+            headerDiv.style.borderBottom = '2px solid #10b981';
+            headerDiv.style.paddingBottom = '12px';
+            headerDiv.style.direction = 'rtl';
+            headerDiv.style.fontFamily = '"Cairo", sans-serif';
+
+            const titleH1 = clonedDoc.createElement('h1');
+            titleH1.innerText = reportTitle;
+            titleH1.style.fontSize = '22px';
+            titleH1.style.fontWeight = 'bold';
+            titleH1.style.color = '#064e3b';
+            titleH1.style.margin = '0';
+            headerDiv.appendChild(titleH1);
+
+            const dateP = clonedDoc.createElement('p');
+            dateP.innerText = `تاريخ التصدير: ${formatDate(new Date())}`;
+            dateP.style.fontSize = '12px';
+            dateP.style.color = '#6b7280';
+            dateP.style.margin = '0';
+            headerDiv.appendChild(dateP);
+
+            clonedElement.insertBefore(headerDiv, clonedElement.firstChild);
+          }
+
+          // Apply professional table styling to all tables inside
           const tables = Array.from(clonedElement.getElementsByTagName('table'));
           tables.forEach(table => {
             table.style.width = '100%';
@@ -137,44 +124,45 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
               th.style.backgroundColor = '#f3f4f6';
               th.style.color = '#111827';
               th.style.fontWeight = 'bold';
-              th.style.padding = '12px 15px';
+              th.style.padding = '10px 12px';
               th.style.border = '1px solid #e5e7eb';
               th.style.textAlign = 'right';
-              th.style.fontSize = '16px';
+              th.style.fontSize = '14px';
             });
 
             const tds = Array.from(table.getElementsByTagName('td'));
             tds.forEach(td => {
-              td.style.padding = '10px 15px';
+              td.style.padding = '8px 12px';
               td.style.border = '1px solid #e5e7eb';
               td.style.textAlign = 'right';
-              td.style.fontSize = '14px';
+              td.style.fontSize = '13px';
               td.style.color = '#374151';
             });
           });
 
-          // Remove unwanted elements
-          const toRemove = clonedDoc.querySelectorAll('.no-print, button, .no-pdf, [data-html2canvas-ignore]');
-          toRemove.forEach(el => (el as HTMLElement).style.display = 'none');
+          // Remove unwanted elements like buttons, actions, etc.
+          const toRemove = clonedElement.querySelectorAll('.no-print, button, .no-pdf, [data-html2canvas-ignore]');
+          toRemove.forEach(el => (el as HTMLElement).style.setProperty('display', 'none', 'important'));
 
-          // Clean all style tags in the cloned document for Tailwind 4 compatibility
+          // Fix oklch / oklab colors for html2canvas compatibility
+          const allElements = Array.from(clonedElement.getElementsByTagName('*'));
+          
+          // Replace Tailwind 4 utility colors (oklch/oklab) in stylesheets
           const styleTags = Array.from(clonedDoc.getElementsByTagName('style'));
           styleTags.forEach(tag => {
             if (tag.innerHTML) {
               tag.innerHTML = tag.innerHTML
-                .replace(/oklch\([^)]+\)/g, '#000000')
-                .replace(/oklab\([^)]+\)/g, '#000000')
-                .replace(/color-mix\([^)]+\)/g, '#000000')
-                .replace(/:\s*;/g, ': initial;');
+                .replace(/oklch\([^)]+\)/g, '#10b981') // fallback to emerald color
+                .replace(/oklab\([^)]+\)/g, '#10b981')
+                .replace(/color-mix\([^)]+\)/g, '#374151');
             }
           });
 
-          // Handle inline styles for oklch/oklab
-          const allElements = Array.from(clonedDoc.getElementsByTagName('*'));
+          // Replace inline colors
           allElements.forEach(el => {
             const htmlEl = el as HTMLElement;
             if (htmlEl.style) {
-              const props = ['color', 'backgroundColor', 'borderColor', 'outlineColor', 'fill', 'stroke'];
+              const props = ['color', 'backgroundColor', 'borderColor', 'fill', 'stroke'];
               props.forEach(prop => {
                 // @ts-ignore
                 let val = htmlEl.style[prop];
@@ -184,17 +172,28 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
                   } catch (e) {}
                 }
                 if (val && (val.includes('oklch') || val.includes('oklab') || val.includes('color-mix'))) {
-                  // @ts-ignore
-                  htmlEl.style[prop] = prop.toLowerCase().includes('background') ? 'transparent' : '#000000';
+                  if (prop === 'backgroundColor') {
+                    // check if it's light background or green
+                    if (val.includes('0.9') || val.includes('95%') || val.includes('50')) {
+                      htmlEl.style.backgroundColor = '#f0fdf4'; // very light green
+                    } else {
+                      htmlEl.style.backgroundColor = '#10b981'; // solid green
+                    }
+                  } else if (prop === 'borderColor') {
+                    htmlEl.style.borderColor = '#e5e7eb';
+                  } else {
+                    htmlEl.style[prop as any] = '#111827';
+                  }
                 }
               });
             }
           });
         }
 
+        // Add Google Fonts and generic rules to cloned document head
         const style = clonedDoc.createElement('style');
         style.innerHTML = `
-          @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
+          @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
           * { 
             font-family: "Cairo", sans-serif !important;
             -webkit-print-color-adjust: exact !important;
@@ -205,7 +204,8 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
         clonedDoc.head.appendChild(style);
       }
     },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: orientation }
+    jsPDF: { unit: 'mm', format: 'a4', orientation: orientation },
+    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
   };
 
   try {
@@ -217,7 +217,6 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
     window.scrollTo(scrollX, scrollY);
   }
 };
-
 /**
  * Robust Data Export using jsPDF-AutoTable
  * Better for large tables and multi-page reports
