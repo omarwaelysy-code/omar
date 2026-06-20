@@ -3365,7 +3365,7 @@ export const Invoices: React.FC = () => {
                         <tr 
                           key={inv.id} 
                           className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
-                          onClick={() => handleViewInvoice(inv)}
+                         onClick={() => canEdit ? openEditModal(inv) : handleViewInvoice(inv)}
                         >
                           {visibleColumns.invoice_number && (
                             <td style={{ width: columnWidths.invoice_number, minWidth: columnWidths.invoice_number }} className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>

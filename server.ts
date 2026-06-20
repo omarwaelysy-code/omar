@@ -178,7 +178,24 @@ async function startServer() {
 
       // Currency Rates
       'CREATE TABLE IF NOT EXISTS "currency_rates" ("id" VARCHAR(36) PRIMARY KEY, "currency_id" VARCHAR(36) REFERENCES "currencies"("id") ON DELETE CASCADE, "rate" DECIMAL(18, 6) NOT NULL, "rate_date" DATE NOT NULL, "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)',
-      'CREATE TABLE IF NOT EXISTS "exchange_rate_history" ("id" VARCHAR(36) PRIMARY KEY, "company_id" VARCHAR(36) REFERENCES "companies"("id"), "currency_code" VARCHAR(10) NOT NULL, "exchange_rate" DECIMAL(18, 6) NOT NULL, "provider" VARCHAR(50) NOT NULL, "retrieved_date" VARCHAR(20) NOT NULL, "retrieved_time" VARCHAR(20) NOT NULL, "updated_by" VARCHAR(100) NOT NULL, "status" VARCHAR(20) NOT NULL, "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)'
+      'CREATE TABLE IF NOT EXISTS "exchange_rate_history" ("id" VARCHAR(36) PRIMARY KEY, "company_id" VARCHAR(36) REFERENCES "companies"("id"), "currency_code" VARCHAR(10) NOT NULL, "exchange_rate" DECIMAL(18, 6) NOT NULL, "provider" VARCHAR(50) NOT NULL, "retrieved_date" VARCHAR(20) NOT NULL, "retrieved_time" VARCHAR(20) NOT NULL, "updated_by" VARCHAR(100) NOT NULL, "status" VARCHAR(20) NOT NULL, "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)',
+
+      // Performance Indexes for fast loading
+      'CREATE INDEX IF NOT EXISTS idx_invoices_company_id ON invoices(company_id)',
+      'CREATE INDEX IF NOT EXISTS idx_invoices_date ON invoices(date DESC)',
+      'CREATE INDEX IF NOT EXISTS idx_invoices_customer_id ON invoices(customer_id)',
+      'CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice_id ON invoice_items(invoice_id)',
+      'CREATE INDEX IF NOT EXISTS idx_purchase_invoices_company_id ON purchase_invoices(company_id)',
+      'CREATE INDEX IF NOT EXISTS idx_purchase_invoices_date ON purchase_invoices(date DESC)',
+      'CREATE INDEX IF NOT EXISTS idx_purchase_invoices_supplier_id ON purchase_invoices(supplier_id)',
+      'CREATE INDEX IF NOT EXISTS idx_purchase_invoice_items_invoice_id ON purchase_invoice_items(invoice_id)',
+      'CREATE INDEX IF NOT EXISTS idx_journal_entries_company_id ON journal_entries(company_id)',
+      'CREATE INDEX IF NOT EXISTS idx_journal_entries_reference_id ON journal_entries(reference_id)',
+      'CREATE INDEX IF NOT EXISTS idx_journal_entry_lines_je_id ON journal_entry_lines(journal_entry_id)',
+      'CREATE INDEX IF NOT EXISTS idx_returns_company_id ON returns(company_id)',
+      'CREATE INDEX IF NOT EXISTS idx_return_items_return_id ON return_items(return_id)',
+      'CREATE INDEX IF NOT EXISTS idx_purchase_returns_company_id ON purchase_returns(company_id)',
+      'CREATE INDEX IF NOT EXISTS idx_purchase_return_items_return_id ON purchase_return_items(return_id)'
     ];
     
     for (const q of syncQueries) {
