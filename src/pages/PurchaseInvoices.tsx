@@ -71,6 +71,38 @@ export const PurchaseInvoices: React.FC = () => {
   const [exchangeRate, setExchangeRate] = useState<number>(1);
   const [exchangeRateType, setExchangeRateType] = useState<'auto' | 'manual'>('auto');
   const [description, setDescription] = useState<string>('');
+  const prevExchangeRateRef = useRef<number>(1);
+
+  useEffect(() => {
+    const oldRate = prevExchangeRateRef.current || 1;
+    const newRate = exchangeRate || 1;
+    if (oldRate !== newRate) {
+      setItems(prev => prev.map(item => {
+        let basePrice = 0;
+        if (item.product_id) {
+          const product = products.find(p => p.id === item.product_id);
+          if (product) {
+            basePrice = Number(product.cost_price) || 0;
+          } else {
+            basePrice = (Number(item.cost_price) || 0) * oldRate;
+          }
+        } else {
+          basePrice = (Number(item.cost_price) || 0) * oldRate;
+        }
+        
+        const newPrice = Number((basePrice / newRate).toFixed(4));
+        const total = (Number(item.quantity) || 0) * newPrice;
+        const vatRate = Number(item.vat_rate) || 0;
+        return {
+          ...item,
+          cost_price: newPrice,
+          total: total,
+          vat_amount: Number((total * (vatRate / 100)).toFixed(4))
+        };
+      }));
+      prevExchangeRateRef.current = newRate;
+    }
+  }, [exchangeRate, products]);
   
   const [operations, setOperations] = useState<Operation[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -1254,7 +1286,8 @@ export const PurchaseInvoices: React.FC = () => {
       if (field === 'product_id' && invoiceData.purchase_type === 'items') {
         const product = products.find(p => p.id === value);
         if (product) {
-          newItems[index].cost_price = product.cost_price;
+          const rate = Number(exchangeRate) || 1;
+          newItems[index].cost_price = Number((product.cost_price / rate).toFixed(4));
           newItems[index].product_name = product.name;
           (newItems[index] as any).product_code = product.code;
           (newItems[index] as any).product_image_url = product.image_url;
@@ -2232,6 +2265,7 @@ export const PurchaseInvoices: React.FC = () => {
         setSelectedCurrencyId(fullData.currency_id || '');
         setExchangeRate(fullData.exchange_rate || 1);
         setExchangeRateType(fullData.exchange_rate_type || 'auto');
+        prevExchangeRateRef.current = fullData.exchange_rate || 1;
         setDescription(fullData.description || '');
         setItems((fullData.items || []).map((item: any) => ({
           product_id: item.product_id?.toString(),
@@ -2303,6 +2337,7 @@ export const PurchaseInvoices: React.FC = () => {
       setExchangeRate(1);
       setExchangeRateType('auto');
       setDescription('');
+      prevExchangeRateRef.current = 1;
       isInitialLoad.current = true;
     }
     setIsModalOpen(true);
@@ -2443,6 +2478,7 @@ export const PurchaseInvoices: React.FC = () => {
     setExchangeRate(1);
     setExchangeRateType('auto');
     setDescription('');
+    prevExchangeRateRef.current = 1;
     setActiveSearch(null);
   };
 
@@ -3012,7 +3048,7 @@ export const PurchaseInvoices: React.FC = () => {
                             <span className="font-black text-[11px]">{t('pi.grand_total')}</span>
                             <div className="flex flex-col items-end">
                               <span className="font-black text-xs tracking-tighter text-left">
-                                {formatMoney(calculateTotal())} {companyData?.settings?.currency || ''}
+                                {formatMoney(calculateTotal())} {currentInvoiceCurrencyCode}
                               </span>
                             </div>
                           </div>
@@ -3717,11 +3753,11 @@ export const PurchaseInvoices: React.FC = () => {
                           <div className="flex flex-wrap items-center gap-4 text-xs font-bold font-mono">
                             <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 text-xs font-sans">
                               <span>{language === 'ar' ? 'إجمالي المسوى:' : 'Total Settled:'}</span>
-                              <span>{formatNumber(formSettlements.reduce((sum, s) => sum + Number(s.settled_amount), 0))} {companyData?.settings?.currency || ''}</span>
+                              <span>{formatNumber(formSettlements.reduce((sum, s) => sum + Number(s.settled_amount), 0))} {currentInvoiceCurrencyCode}</span>
                             </div>
                             <div className="flex items-center gap-2 bg-slate-50 text-slate-700 px-3 py-1 rounded-full border border-slate-200 text-xs font-sans">
                               <span>{language === 'ar' ? 'الفرق:' : 'Difference:'}</span>
-                              <span>{formatNumber(Math.max(0, calculateTotal() - formSettlements.reduce((sum, s) => sum + Number(s.settled_amount), 0)))} {companyData?.settings?.currency || ''}</span>
+                              <span>{formatNumber(Math.max(0, calculateTotal() - formSettlements.reduce((sum, s) => sum + Number(s.settled_amount), 0)))} {currentInvoiceCurrencyCode}</span>
                             </div>
                           </div>
                         </div>

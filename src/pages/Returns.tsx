@@ -79,6 +79,42 @@ export const Returns: React.FC = () => {
   const [exchangeRate, setExchangeRate] = useState<number>(1);
   const [exchangeRateType, setExchangeRateType] = useState<'manual' | 'auto'>('manual');
   const isMultiCurrencyEnabled = company?.settings?.enable_multi_currency || (company as any)?.enable_multi_currency || false;
+  const prevExchangeRateRef = useRef<number>(1);
+
+  const currentReturnCurrencyCode = selectedCurrencyId 
+    ? companyCurrencies.find(c => c.id === selectedCurrencyId)?.code || 'EGP'
+    : company?.settings?.currency || 'EGP';
+
+  useEffect(() => {
+    const oldRate = prevExchangeRateRef.current || 1;
+    const newRate = exchangeRate || 1;
+    if (oldRate !== newRate) {
+      const isVatEnabled = company?.settings?.vat_enabled || company?.vat_enabled || false;
+      setItems(prev => prev.map(item => {
+        let basePrice = 0;
+        if (item.product_id) {
+          const product = products.find(p => p.id === item.product_id);
+          if (product) {
+            basePrice = Number(product.sale_price) || 0;
+          } else {
+            basePrice = (Number(item.unit_price) || 0) * oldRate;
+          }
+        } else {
+          basePrice = (Number(item.unit_price) || 0) * oldRate;
+        }
+        
+        const newPrice = Number((basePrice / newRate).toFixed(4));
+        const total = (Number(item.quantity) || 0) * newPrice;
+        return {
+          ...item,
+          unit_price: newPrice,
+          total: total,
+          vat_amount: isVatEnabled ? Number((total * ((item.vat_rate || 0) / 100)).toFixed(2)) : 0
+        };
+      }));
+      prevExchangeRateRef.current = newRate;
+    }
+  }, [exchangeRate, products, company]);
 
   // Floating popover lookup search states
   const [activeSearch, setActiveSearch] = useState<{
@@ -197,6 +233,7 @@ export const Returns: React.FC = () => {
     setSelectedCurrencyId('');
     setExchangeRate(1);
     setExchangeRateType('auto');
+    prevExchangeRateRef.current = 1;
   };
 
   const handlePrevReturn = () => {
@@ -542,14 +579,16 @@ export const Returns: React.FC = () => {
   const addItem = (productId: string) => {
     const product = products.find(p => p.id === productId);
     if (!product) return;
+    const rate = Number(exchangeRate) || 1;
+    const foreignPrice = Number((Number(product.sale_price) / rate).toFixed(4));
     setItems(prev => [...prev, {
       product_id: product.id,
       product_name: product.name,
       product_code: product.code,
       product_image_url: product.image_url,
       quantity: 1,
-      unit_price: Number(product.sale_price) || 0,
-      total: Number(product.sale_price) || 0
+      unit_price: foreignPrice,
+      total: foreignPrice
     }]);
   };
 
@@ -594,12 +633,14 @@ export const Returns: React.FC = () => {
       if (field === 'product_id') {
         const product = products.find(p => p.id === value);
         if (product) {
+          const rate = Number(exchangeRate) || 1;
+          const foreignPrice = Number((Number(product.sale_price) / rate).toFixed(4));
           item.product_name = product.name;
           item.product_image_url = product.image_url;
-          item.unit_price = Number(product.sale_price) || 0;
+          item.unit_price = foreignPrice;
           item.barcode = product.barcode || '';
           item.vat_rate = Number(product.vat_rate) || 0;
-          const total = (Number(item.quantity) || 0) * (Number(item.unit_price) || 0);
+          const total = (Number(item.quantity) || 0) * foreignPrice;
           item.total = total;
           item.vat_amount = isVatEnabled ? Number((total * ((item.vat_rate || 0) / 100)).toFixed(2)) : 0;
         } else {
@@ -1097,6 +1138,7 @@ export const Returns: React.FC = () => {
         setDate(fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10));
         setPaymentType(fullData.payment_type);
         setPaymentMethodId(fullData.payment_method_id || '');
+        prevExchangeRateRef.current = fullData.exchange_rate || 1;
         setItems(fullData.items || []);
         setReturnNumber(fullData.return_number);
         setDiscount(fullData.discount || 0);
@@ -1129,6 +1171,7 @@ export const Returns: React.FC = () => {
       setSelectedCurrencyId('');
       setExchangeRate(1);
       setExchangeRateType('auto');
+      prevExchangeRateRef.current = 1;
       setItems([{ product_id: '', product_name: '', quantity: 1, unit_price: 0, total: 0 }]);
       const num = await generateReturnNumber(newDate);
       setReturnNumber(num);
@@ -1815,7 +1858,7 @@ export const Returns: React.FC = () => {
                               items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) + 
                               ((company?.settings?.vat_enabled || company?.vat_enabled) ? items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0) : 0) - 
                               discount
-                            )} {company?.settings?.currency || 'EGP'}
+                            )} {currentReturnCurrencyCode}
                           </span>
                         </div>
                       </div>
