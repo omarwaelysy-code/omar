@@ -72,13 +72,29 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
           clonedElement.style.width = '100%';
           clonedElement.style.padding = '10px';
 
-          // Remove scroll and height limits on all parent elements in the cloned document
+          // Remove scroll, height limits, flex, and positioning on all parent elements in the cloned document
           let parent = clonedElement.parentElement;
           while (parent && parent !== clonedDoc.body) {
-            parent.style.overflow = 'visible';
-            parent.style.maxHeight = 'none';
-            parent.style.height = 'auto';
+            parent.style.setProperty('display', 'block', 'important');
+            parent.style.setProperty('position', 'relative', 'important');
+            parent.style.setProperty('overflow', 'visible', 'important');
+            parent.style.setProperty('max-height', 'none', 'important');
+            parent.style.setProperty('height', 'auto', 'important');
+            parent.style.setProperty('min-height', '0', 'important');
+            parent.style.setProperty('width', 'auto', 'important');
+            parent.style.setProperty('transform', 'none', 'important');
             parent = parent.parentElement;
+          }
+
+          // Ensure html and body are fully visible and auto-height
+          clonedDoc.body.style.setProperty('overflow', 'visible', 'important');
+          clonedDoc.body.style.setProperty('height', 'auto', 'important');
+          clonedDoc.body.style.setProperty('max-height', 'none', 'important');
+          
+          if (clonedDoc.documentElement) {
+            clonedDoc.documentElement.style.setProperty('overflow', 'visible', 'important');
+            clonedDoc.documentElement.style.setProperty('height', 'auto', 'important');
+            clonedDoc.documentElement.style.setProperty('max-height', 'none', 'important');
           }
 
           // Add a beautiful print header if reportTitle is provided (for lists/tables)
@@ -205,7 +221,7 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
       }
     },
     jsPDF: { unit: 'mm', format: 'a4', orientation: orientation },
-    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', '.avoid-break', '.company-invoice-header', '.customer-details-card'] }
   };
 
   try {
