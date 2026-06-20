@@ -1055,7 +1055,11 @@ export const PurchaseInvoices: React.FC = () => {
           console.error("Error converting purchase order", err);
         }
       };
-      loa  useEffect(() => {
+      loadOrderForConversion();
+    }
+  }, [pendingViewDoc, user, setPendingViewDoc]);
+
+  useEffect(() => {
     const generatePreview = () => {
       const subtotalVal = (items || []).reduce((sum, item) => sum + (Number(item.total) || 0), 0);
       const discountVal = Number(invoiceData.discount) || 0;
