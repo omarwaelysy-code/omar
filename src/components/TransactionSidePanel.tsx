@@ -147,12 +147,10 @@ export const TransactionSidePanel: React.FC<TransactionSidePanelProps> = ({
     const isPreview = displayJournal.id === 'preview';
 
     const rows = displayJournal.items.map(item => {
-      const localDebit = isPreview ? (item.debit * rate) : item.debit;
-      const localCredit = isPreview ? (item.credit * rate) : item.credit;
+      const localDebit = item.debit;
+      const localCredit = item.credit;
       const metadata = getLineMetadata(item);
-      const foreignValue = isPreview 
-        ? (item.debit || item.credit) 
-        : (rate > 1 ? (item.debit || item.credit) / rate : (item.debit || item.credit));
+      const foreignValue = rate > 1 ? (item.debit || item.credit) / rate : (item.debit || item.credit);
 
       return {
         date: displayJournal.date ? new Date(displayJournal.date).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US') : '-',
@@ -228,8 +226,8 @@ export const TransactionSidePanel: React.FC<TransactionSidePanelProps> = ({
 
     if (displayJournal) {
       displayJournal.items.forEach(item => {
-        const localDebit = isPreview ? (item.debit * rate) : item.debit;
-        const localCredit = isPreview ? (item.credit * rate) : item.credit;
+        const localDebit = item.debit;
+        const localCredit = item.credit;
         displayTotalDebit += localDebit;
         displayTotalCredit += localCredit;
       });
@@ -285,15 +283,13 @@ export const TransactionSidePanel: React.FC<TransactionSidePanelProps> = ({
                 </thead>
                 <tbody className="divide-y divide-zinc-150">
                   {displayJournal.items.map((item, idx) => {
-                    const localDebit = isPreview ? (item.debit * rate) : item.debit;
-                    const localCredit = isPreview ? (item.credit * rate) : item.credit;
+                    const localDebit = item.debit;
+                    const localCredit = item.credit;
                     
                     const hasDebit = localDebit > 0;
                     const hasCredit = localCredit > 0;
                     
-                    const foreignValue = isPreview 
-                      ? (item.debit || item.credit) 
-                      : (rate > 1 ? (item.debit || item.credit) / rate : (item.debit || item.credit));
+                    const foreignValue = rate > 1 ? (item.debit || item.credit) / rate : (item.debit || item.credit);
 
                     return (
                       <tr key={idx} className="hover:bg-zinc-50/50 transition-colors">

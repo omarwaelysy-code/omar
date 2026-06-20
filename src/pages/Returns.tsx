@@ -488,7 +488,7 @@ export const Returns: React.FC = () => {
               account_name: invAccName,
               account_code: invAccountCode,
               product_name: item.product_name,
-              debit: Number((totalCost * rate).toFixed(2)),
+              debit: Number(totalCost.toFixed(2)),
               credit: 0,
               description: `إرجاع للمخزون - صنف: ${item.product_name} - مرتجع رقم ${return_number}`
             });
@@ -500,7 +500,7 @@ export const Returns: React.FC = () => {
               account_code: costAccountCode,
               product_name: item.product_name,
               debit: 0,
-              credit: Number((totalCost * rate).toFixed(2)),
+              credit: Number(totalCost.toFixed(2)),
               description: `عكس تكلفة البضاعة المباعة - صنف: ${item.product_name} - مرتجع رقم ${return_number}`
             });
           }
@@ -989,7 +989,7 @@ export const Returns: React.FC = () => {
               account_name: invAccName,
               account_code: invAccountCode,
               product_name: item.product_name,
-              debit: Number((totalCost * rate).toFixed(2)),
+              debit: Number(totalCost.toFixed(2)),
               credit: 0,
               description: `إرجاع للمخزون - صنف: ${item.product_name} - مرتجع رقم ${return_number}`
             });
@@ -1001,7 +1001,7 @@ export const Returns: React.FC = () => {
               account_code: costAccountCode,
               product_name: item.product_name,
               debit: 0,
-              credit: Number((totalCost * rate).toFixed(2)),
+              credit: Number(totalCost.toFixed(2)),
               description: `عكس تكلفة البضاعة المباعة - صنف: ${item.product_name} - مرتجع رقم ${return_number}`
             });
           }

@@ -1020,6 +1020,7 @@ router.get('/detailed-journal-entries', authenticateToken, async (req: AuthReque
         jel.description as line_description,
         jel.account_id,
         jel.account_name,
+        acc.code as account_code,
         
         -- Get customer/supplier from current line or any line in the same entry (opposite party)
         COALESCE(jel.customer_name, (

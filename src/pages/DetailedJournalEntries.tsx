@@ -44,6 +44,7 @@ interface DetailedLine {
   product_names: string | null;
   parent_account_name?: string | null;
   account_type_name?: string | null;
+  account_code?: string | null;
 }
 
 export const DetailedJournalEntries: React.FC = () => {
@@ -73,6 +74,7 @@ export const DetailedJournalEntries: React.FC = () => {
     { id: 'date', labelAr: 'التاريخ', labelEn: 'Date', visible: true },
     { id: 'entry_number', labelAr: 'رقم القيد', labelEn: 'Entry No', visible: true },
     { id: 'account_name', labelAr: 'الحساب الرئيسي', labelEn: 'Main Account', visible: true },
+    { id: 'account_code', labelAr: 'كود الحساب', labelEn: 'Account Code', visible: true },
     { id: 'account_type', labelAr: 'نوع الحساب', labelEn: 'Account Type', visible: true },
     { id: 'reference_type', labelAr: 'نوع الحركة', labelEn: 'Doc Type', visible: true },
     { id: 'reference_number', labelAr: 'رقم الحركة', labelEn: 'Doc Number', visible: true },
@@ -230,6 +232,7 @@ export const DetailedJournalEntries: React.FC = () => {
         else if (col.id === 'date') entry[header] = formatDate(row.date);
         else if (col.id === 'entry_number') entry[header] = row.entry_number;
         else if (col.id === 'account_name') entry[header] = row.parent_account_name || row.account_name;
+        else if (col.id === 'account_code') entry[header] = row.account_code || '-';
         else if (col.id === 'account_type') entry[header] = row.account_type_name || '-';
         else if (col.id === 'reference_type') entry[header] = getDocTypeLabel(row.reference_type);
         else if (col.id === 'reference_number') entry[header] = row.reference_number || '-';
@@ -496,6 +499,13 @@ export const DetailedJournalEntries: React.FC = () => {
                       {columns.find(c => c.id === 'account_name')?.visible && (
                         <td className="px-3 py-1.5 border-l border-zinc-300 dark:border-zinc-700 text-right select-all font-sans">
                           {row.parent_account_name || row.account_name}
+                        </td>
+                      )}
+
+                      {/* Account Code (كود الحساب) */}
+                      {columns.find(c => c.id === 'account_code')?.visible && (
+                        <td className="px-3 py-1.5 border-l border-zinc-300 dark:border-zinc-700 text-center font-mono font-semibold">
+                          {row.account_code || '-'}
                         </td>
                       )}
 
