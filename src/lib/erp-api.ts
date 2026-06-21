@@ -708,7 +708,7 @@ const modules = [
   'currencies', 'exchange_rates', 'inventory_movements', 'inventory_layers',
   'sales_orders', 'sales_order_items', 'purchase_orders', 'purchase_order_items', 'employees',
   'warehouse_transfers', 'warehouse_transfer_items', 'opening_stock_balances', 'opening_stock_items',
-  'stock_adjustments', 'stock_adjustment_items', 'templates', 'paper_sizes'
+  'stock_adjustments', 'stock_adjustment_items', 'templates', 'paper_sizes', 'template_versions'
 ];
 
 // --- Flexible Operations Logic ---

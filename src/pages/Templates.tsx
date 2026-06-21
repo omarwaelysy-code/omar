@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
+import { validateTemplate, ValidationError } from '../utils/templateValidation';
+import { VARIABLE_REGISTRY } from '../components/VariableRegistry';
 import QRCode from 'react-qr-code';
 import BarcodeComponent from 'react-barcode';
 
@@ -73,6 +75,9 @@ interface TemplateLayout {
   watermarkRotation?: number;
   header: TemplateElement[];
   details: {
+    mode?: 'table' | 'repeater';
+    height?: number;
+    elements?: TemplateElement[];
     columns: DetailsColumn[];
     properties: {
       fontSize?: number;
@@ -107,6 +112,17 @@ interface Template {
   updated_at?: string;
   document_type?: string;
   is_default?: boolean;
+}
+
+interface TemplateVersion {
+  id: string;
+  template_id: string;
+  company_id: string;
+  version_number: number;
+  layout: TemplateLayout;
+  change_notes: string;
+  created_by: string;
+  created_at: string;
 }
 
 interface OperationCategory {
@@ -449,7 +465,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
   const [clipboard, setClipboard] = useState<TemplateElement | null>(null);
 
   // Sidebar controls
-  const [leftSidebarTab, setLeftSidebarTab] = useState<'toolbox' | 'layers'>('toolbox');
+  const [leftSidebarTab, setLeftSidebarTab] = useState<'toolbox' | 'layers' | 'history'>('toolbox');
   const [previewMode, setPreviewMode] = useState<boolean>(false);
 
   // Dynamic Fields Categories and list
@@ -490,6 +506,13 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
   // Visual Designer Layout
   const [designerLayout, setDesignerLayout] = useState<TemplateLayout>(JSON.parse(JSON.stringify(DEFAULT_LAYOUT)));
+
+  // Validation and versioning states
+  const [isValidationModalOpen, setIsValidationModalOpen] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
+  const [isVersionModalOpen, setIsVersionModalOpen] = useState(false);
+  const [changeNotes, setChangeNotes] = useState('');
+  const [templateVersions, setTemplateVersions] = useState<TemplateVersion[]>([]);
 
   const canvasRefs = {
     header: useRef<HTMLDivElement>(null),
@@ -533,6 +556,26 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       setDetailsFields([]);
     }
   }, [detailsCategoryId]);
+
+  const fetchVersions = async (templateId: string) => {
+    try {
+      const versions = await dbService.list<TemplateVersion>('template_versions', {
+        where: { template_id: templateId },
+        order: [['version_number', 'DESC']]
+      });
+      setTemplateVersions(versions);
+    } catch (error) {
+      console.error('Failed to fetch template versions:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (editingTemplate) {
+      fetchVersions(editingTemplate.id);
+    } else {
+      setTemplateVersions([]);
+    }
+  }, [editingTemplate]);
 
   // History Tracker logic
   const updateLayoutWithHistory = (newLayout: TemplateLayout) => {
@@ -1182,14 +1225,40 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
     }
   };
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!user) return;
-
+  const handleStartSaveProcess = () => {
     if (!formData.name.trim()) {
       toast.error(language === 'ar' ? 'يرجى إدخال اسم القالب' : 'Please enter template name');
       return;
     }
+
+    const selectedSize = paperSizes.find(p => p.id === formData.paper_size_id);
+    const paperWidth = selectedSize ? Number(selectedSize.width) : (formData.paper_size_id === 'custom' ? Number(formData.customWidth) : 210);
+    const paperHeight = selectedSize ? Number(selectedSize.height) : (formData.paper_size_id === 'custom' ? Number(formData.customHeight) : 297);
+    const margin = {
+      top: Number(formData.margin_top),
+      bottom: Number(formData.margin_bottom),
+      left: Number(formData.margin_left),
+      right: Number(formData.margin_right)
+    };
+
+    const errors = validateTemplate(
+      designerLayout,
+      paperWidth,
+      paperHeight,
+      margin,
+      detailsFields.map(f => f.code)
+    );
+
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      setIsValidationModalOpen(true);
+    } else {
+      setIsVersionModalOpen(true);
+    }
+  };
+
+  const handleSubmit = async (notes: string = '') => {
+    if (!user) return;
 
     try {
       let finalPaperSizeId = formData.paper_size_id;
@@ -1254,13 +1323,31 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
         is_default: formData.is_default
       };
 
+      let savedTemplateId = '';
       if (view === 'edit' && editingTemplate) {
         await dbService.update('templates', editingTemplate.id, templatePayload);
+        savedTemplateId = editingTemplate.id;
         toast.success(language === 'ar' ? 'تم حفظ تعديلات القالب والتصميم بنجاح' : 'Template layout saved successfully');
       } else {
-        await dbService.create('templates', templatePayload);
+        const newId = await dbService.create('templates', templatePayload);
+        savedTemplateId = String(newId);
         toast.success(language === 'ar' ? 'تم إنشاء القالب والتصميم بنجاح' : 'Template layout created successfully');
       }
+
+      // Create version record in database
+      const existingVersions = await dbService.list<TemplateVersion>('template_versions', {
+        where: { template_id: savedTemplateId }
+      });
+      const nextVersionNumber = existingVersions.reduce((max, v) => Math.max(max, v.version_number), 0) + 1;
+
+      await dbService.create('template_versions', {
+        template_id: savedTemplateId,
+        company_id: user.company_id,
+        version_number: nextVersionNumber,
+        layout: designerLayout,
+        change_notes: notes || (language === 'ar' ? `نسخة تلقائية رقم ${nextVersionNumber}` : `Auto-saved version ${nextVersionNumber}`),
+        created_by: user.username
+      });
 
       setView('list');
       setEditingTemplate(null);
@@ -1710,7 +1797,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
                 <button
                   type="button"
-                  onClick={() => handleSubmit()}
+                  onClick={handleStartSaveProcess}
                   className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2 rounded-xl hover:bg-emerald-700 transition-all font-bold text-sm shadow-md shadow-emerald-600/10 hover:shadow-emerald-600/25"
                 >
                   <Save size={18} />
@@ -1745,6 +1832,16 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                   >
                     <Layers size={14} />
                     <span>{language === 'ar' ? 'الطبقات' : 'Layers'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLeftSidebarTab('history')}
+                    className={`flex-1 py-2 text-xs font-black rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                      leftSidebarTab === 'history' ? 'bg-white text-zinc-950 shadow-sm' : 'text-zinc-500 hover:text-zinc-800'
+                    }`}
+                  >
+                    <RefreshCw size={14} />
+                    <span>{language === 'ar' ? 'الإصدارات' : 'History'}</span>
                   </button>
                 </div>
 
@@ -1938,7 +2035,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                       </div>
 
                     </div>
-                  ) : (
+                  ) : leftSidebarTab === 'layers' ? (
                     /* LAYERS PANEL */
                     <div className="space-y-6">
                       {/* Header layers */}
@@ -2090,6 +2187,60 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                         </div>
                       </div>
 
+                    </div>
+                  ) : (
+                    /* HISTORY PANEL */
+                    <div className="space-y-4 font-bold Cairo">
+                      <div className="text-xs font-extrabold text-zinc-400 uppercase tracking-wider mb-2">
+                        {language === 'ar' ? 'سجل إصدارات القالب' : 'Template Version History'}
+                      </div>
+
+                      {templateVersions.length === 0 ? (
+                        <p className="text-xs text-zinc-400 text-center py-8">
+                          {language === 'ar' ? 'لا يوجد إصدارات سابقة بعد.' : 'No previous versions found.'}
+                        </p>
+                      ) : (
+                        <div className="relative border-l-2 border-zinc-100 pl-4 ml-2 space-y-5">
+                          {templateVersions.map((ver) => (
+                            <div key={ver.id} className="relative group space-y-1 text-xs">
+                              {/* Dot */}
+                              <div className="absolute -left-[23px] top-1.5 w-2.5 h-2.5 bg-zinc-200 border-2 border-white rounded-full group-hover:bg-emerald-500 transition-colors" />
+
+                              <div className="flex items-center justify-between">
+                                <span className="font-black text-zinc-800">
+                                  {language === 'ar' ? `إصدار #${ver.version_number}` : `Version #${ver.version_number}`}
+                                </span>
+                                <span className="text-[10px] text-zinc-400">
+                                  {new Date(ver.created_at).toLocaleDateString()}
+                                </span>
+                              </div>
+
+                              <p className="text-[10px] text-zinc-500 font-semibold italic">
+                                {ver.change_notes || (language === 'ar' ? 'لا توجد ملاحظات' : 'No notes')}
+                              </p>
+
+                              <div className="flex items-center justify-between pt-1 text-[10px]">
+                                <span className="text-zinc-400">
+                                  {language === 'ar' ? `بواسطة: ${ver.created_by}` : `By: ${ver.created_by}`}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (window.confirm(language === 'ar' ? 'هل أنت متأكد من استعادة هذا الإصدار؟' : 'Are you sure you want to restore this version?')) {
+                                      const restoredLayout = JSON.parse(JSON.stringify(ver.layout));
+                                      updateLayoutWithHistory(restoredLayout);
+                                      toast.success(language === 'ar' ? 'تم استعادة الإصدار المختار بنجاح' : 'Selected version restored successfully');
+                                    }
+                                  }}
+                                  className="text-emerald-600 hover:text-emerald-700 font-bold hover:underline"
+                                >
+                                  {language === 'ar' ? 'استعادة' : 'Restore'}
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -3085,244 +3236,310 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
                     <div className="flex-1 overflow-y-auto p-4 space-y-5">
                       
+                      {/* Details Mode Toggle */}
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-zinc-600">{language === 'ar' ? 'حجم خط الجدول' : 'Table Font Size'}</label>
-                        <input
-                          type="number"
-                          className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-sm"
-                          value={designerLayout.details.properties.fontSize || 10}
-                          onChange={(e) => updateLayoutWithHistory({
-                            ...designerLayout,
-                            details: {
-                              ...designerLayout.details,
-                              properties: { ...designerLayout.details.properties, fontSize: parseInt(e.target.value) || 10 }
-                            }
-                          })}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-zinc-600">{language === 'ar' ? 'ارتفاع الصفوف (مم)' : 'Row Height (mm)'}</label>
-                        <input
-                          type="number"
-                          className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-sm"
-                          value={designerLayout.details.properties.rowHeight || 8}
-                          onChange={(e) => updateLayoutWithHistory({
-                            ...designerLayout,
-                            details: {
-                              ...designerLayout.details,
-                              properties: { ...designerLayout.details.properties, rowHeight: parseInt(e.target.value) || 8 }
-                            }
-                          })}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-zinc-600">{language === 'ar' ? 'نوع خط الجدول' : 'Table Font Family'}</label>
-                        <select
-                          className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold"
-                          value={designerLayout.details.properties.fontFamily || 'Cairo'}
-                          onChange={(e) => updateLayoutWithHistory({
-                            ...designerLayout,
-                            details: {
-                              ...designerLayout.details,
-                              properties: { ...designerLayout.details.properties, fontFamily: e.target.value }
-                            }
-                          })}
-                        >
-                          <option value="Cairo">Cairo (عربي)</option>
-                          <option value="Arial">Arial</option>
-                          <option value="Times New Roman">Times New Roman</option>
-                          <option value="Courier New">Monospace</option>
-                        </select>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'خلفية رأس الجدول' : 'Header Background'}</label>
-                          <input
-                            type="color"
-                            className="w-full h-8 p-0.5 bg-zinc-50 border border-zinc-200 rounded-lg cursor-pointer"
-                            value={designerLayout.details.properties.headerBgColor || '#f4f4f5'}
-                            onChange={(e) => updateLayoutWithHistory({
+                        <label className="text-xs font-bold text-zinc-600">{language === 'ar' ? 'نمط التفاصيل' : 'Details Mode'}</label>
+                        <div className="flex gap-1.5 bg-zinc-50 p-1.5 rounded-xl border border-zinc-200">
+                          <button
+                            type="button"
+                            onClick={() => updateLayoutWithHistory({
                               ...designerLayout,
-                              details: {
-                                ...designerLayout.details,
-                                properties: { ...designerLayout.details.properties, headerBgColor: e.target.value }
-                              }
+                              details: { ...designerLayout.details, mode: 'table' }
                             })}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'خلفية الصفوف' : 'Body Background'}</label>
-                          <input
-                            type="color"
-                            className="w-full h-8 p-0.5 bg-zinc-50 border border-zinc-200 rounded-lg cursor-pointer"
-                            value={designerLayout.details.properties.bodyBgColor || '#ffffff'}
-                            onChange={(e) => updateLayoutWithHistory({
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                              (designerLayout.details.mode || 'table') === 'table' ? 'bg-white text-zinc-950 shadow-sm border border-zinc-200' : 'text-zinc-500 hover:text-zinc-800'
+                            }`}
+                          >
+                            {language === 'ar' ? 'جدول' : 'Table'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateLayoutWithHistory({
                               ...designerLayout,
-                              details: {
-                                ...designerLayout.details,
-                                properties: { ...designerLayout.details.properties, bodyBgColor: e.target.value }
-                              }
+                              details: { ...designerLayout.details, mode: 'repeater' }
                             })}
-                          />
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                              designerLayout.details.mode === 'repeater' ? 'bg-white text-zinc-950 shadow-sm border border-zinc-200' : 'text-zinc-500 hover:text-zinc-800'
+                            }`}
+                          >
+                            {language === 'ar' ? 'مكرر تخطيط' : 'Repeater'}
+                          </button>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'سُمك الحدود' : 'Grid Border Width'}</label>
-                          <input
-                            type="number"
-                            className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs"
-                            value={designerLayout.details.properties.borderWidth || 1}
-                            onChange={(e) => updateLayoutWithHistory({
-                              ...designerLayout,
-                              details: {
-                                ...designerLayout.details,
-                                properties: { ...designerLayout.details.properties, borderWidth: parseInt(e.target.value) || 0 }
-                              }
-                            })}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'لون الحدود' : 'Grid Border Color'}</label>
-                          <input
-                            type="color"
-                            className="w-full h-8 p-0.5 bg-zinc-50 border border-zinc-200 rounded-lg cursor-pointer"
-                            value={designerLayout.details.properties.borderColor || '#e4e4e7'}
-                            onChange={(e) => updateLayoutWithHistory({
-                              ...designerLayout,
-                              details: {
-                                ...designerLayout.details,
-                                properties: { ...designerLayout.details.properties, borderColor: e.target.value }
-                              }
-                            })}
-                          />
-                        </div>
-                      </div>
+                      {(designerLayout.details.mode || 'table') === 'table' ? (
+                        <>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-zinc-600">{language === 'ar' ? 'حجم خط الجدول' : 'Table Font Size'}</label>
+                            <input
+                              type="number"
+                              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-sm"
+                              value={designerLayout.details.properties.fontSize || 10}
+                              onChange={(e) => updateLayoutWithHistory({
+                                ...designerLayout,
+                                details: {
+                                  ...designerLayout.details,
+                                  properties: { ...designerLayout.details.properties, fontSize: parseInt(e.target.value) || 10 }
+                                }
+                              })}
+                            />
+                          </div>
 
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'هوامش الخلايا X (مم)' : 'Cell Padding X'}</label>
-                          <input
-                            type="number"
-                            className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs"
-                            value={designerLayout.details.properties.paddingX || 2}
-                            onChange={(e) => updateLayoutWithHistory({
-                              ...designerLayout,
-                              details: {
-                                ...designerLayout.details,
-                                properties: { ...designerLayout.details.properties, paddingX: parseInt(e.target.value) || 0 }
-                              }
-                            })}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'هوامش الخلايا Y (مم)' : 'Cell Padding Y'}</label>
-                          <input
-                            type="number"
-                            className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs"
-                            value={designerLayout.details.properties.paddingY || 2}
-                            onChange={(e) => updateLayoutWithHistory({
-                              ...designerLayout,
-                              details: {
-                                ...designerLayout.details,
-                                properties: { ...designerLayout.details.properties, paddingY: parseInt(e.target.value) || 0 }
-                              }
-                            })}
-                          />
-                        </div>
-                      </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-zinc-600">{language === 'ar' ? 'ارتفاع الصفوف (مم)' : 'Row Height (mm)'}</label>
+                            <input
+                              type="number"
+                              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-sm"
+                              value={designerLayout.details.properties.rowHeight || 8}
+                              onChange={(e) => updateLayoutWithHistory({
+                                ...designerLayout,
+                                details: {
+                                  ...designerLayout.details,
+                                  properties: { ...designerLayout.details.properties, rowHeight: parseInt(e.target.value) || 8 }
+                                }
+                              })}
+                            />
+                          </div>
 
-                      <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-zinc-50 rounded-xl">
-                        <input
-                          type="checkbox"
-                          className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500/20"
-                          checked={designerLayout.details.properties.boldHeader || false}
-                          onChange={(e) => updateLayoutWithHistory({
-                            ...designerLayout,
-                            details: {
-                              ...designerLayout.details,
-                              properties: { ...designerLayout.details.properties, boldHeader: e.target.checked }
-                            }
-                          })}
-                        />
-                        <span className="text-xs font-bold text-zinc-700">{language === 'ar' ? 'رأس جدول عريض (Bold)' : 'Bold Headers'}</span>
-                      </label>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-zinc-600">{language === 'ar' ? 'نوع خط الجدول' : 'Table Font Family'}</label>
+                            <select
+                              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold"
+                              value={designerLayout.details.properties.fontFamily || 'Cairo'}
+                              onChange={(e) => updateLayoutWithHistory({
+                                ...designerLayout,
+                                details: {
+                                  ...designerLayout.details,
+                                  properties: { ...designerLayout.details.properties, fontFamily: e.target.value }
+                                }
+                              })}
+                            >
+                              <option value="Cairo">Cairo (عربي)</option>
+                              <option value="Arial">Arial</option>
+                              <option value="Times New Roman">Times New Roman</option>
+                              <option value="Courier New">Monospace</option>
+                            </select>
+                          </div>
 
-                      {/* Details variables columns checkboxes */}
-                      <div className="space-y-3 pt-3 border-t border-zinc-100">
-                        <h4 className="text-xs font-extrabold text-zinc-400 uppercase tracking-wider">{language === 'ar' ? 'أعمدة التفاصيل القياسية' : 'Standard Detail Columns'}</h4>
-                        <div className="space-y-2 max-h-48 overflow-y-auto border border-zinc-100 p-2 rounded-xl">
-                          {DETAILS_COLUMNS_PRESETS.map(preset => {
-                            const isAdded = designerLayout.details.columns.some(col => col.field === preset.field);
-                            return (
-                              <label key={preset.id} className="flex items-center justify-between text-xs font-semibold text-zinc-700 cursor-pointer p-1 hover:bg-zinc-50 rounded-lg">
-                                <span className="flex items-center gap-2">
-                                  <input
-                                    type="checkbox"
-                                    className="w-4 h-4 rounded text-emerald-600"
-                                    checked={isAdded}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        const newCol = { id: preset.id, label: language === 'ar' ? preset.arLabel : preset.enLabel, field: preset.field, width: 10 };
-                                        updateLayoutWithHistory({
-                                          ...designerLayout,
-                                          details: { ...designerLayout.details, columns: [...designerLayout.details.columns, newCol] }
-                                        });
-                                      } else {
-                                        const filtered = designerLayout.details.columns.filter(col => col.field !== preset.field);
-                                        updateLayoutWithHistory({
-                                          ...designerLayout,
-                                          details: { ...designerLayout.details, columns: filtered }
-                                        });
-                                      }
-                                    }}
-                                  />
-                                  <span>{language === 'ar' ? preset.arLabel : preset.enLabel}</span>
-                                </span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Adjust columns width range */}
-                      <div className="space-y-3 pt-3 border-t border-zinc-100">
-                        <h4 className="text-xs font-extrabold text-zinc-400 uppercase tracking-wider">{language === 'ar' ? 'تعديل عرض الأعمدة (%)' : 'Column Widths (%)'}</h4>
-                        <div className="space-y-2 max-h-40 overflow-y-auto border border-zinc-100 p-2 rounded-xl">
-                          {designerLayout.details.columns.map(col => (
-                            <div key={col.id} className="space-y-1">
-                              <div className="flex items-center justify-between text-[11px] font-bold text-zinc-700">
-                                <span>{col.label}</span>
-                                <span>{col.width}%</span>
-                              </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'خلفية رأس الجدول' : 'Header Background'}</label>
                               <input
-                                type="range"
-                                min="5"
-                                max="80"
-                                className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
-                                value={col.width}
-                                onChange={(e) => {
-                                  const updatedCols = designerLayout.details.columns.map(c => 
-                                    c.id === col.id ? { ...c, width: parseInt(e.target.value) || 5 } : c
-                                  );
-                                  // Just set state, push to history on mouseup/change end
-                                  setDesignerLayout(prev => ({
-                                    ...prev,
-                                    details: { ...prev.details, columns: updatedCols }
-                                  }));
-                                }}
-                                onMouseUp={() => {
-                                  updateLayoutWithHistory(designerLayout);
-                                }}
+                                type="color"
+                                className="w-full h-8 p-0.5 bg-zinc-50 border border-zinc-200 rounded-lg cursor-pointer"
+                                value={designerLayout.details.properties.headerBgColor || '#f4f4f5'}
+                                onChange={(e) => updateLayoutWithHistory({
+                                  ...designerLayout,
+                                  details: {
+                                    ...designerLayout.details,
+                                    properties: { ...designerLayout.details.properties, headerBgColor: e.target.value }
+                                  }
+                                })}
                               />
                             </div>
-                          ))}
-                        </div>
-                      </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'خلفية الصفوف' : 'Body Background'}</label>
+                              <input
+                                type="color"
+                                className="w-full h-8 p-0.5 bg-zinc-50 border border-zinc-200 rounded-lg cursor-pointer"
+                                value={designerLayout.details.properties.bodyBgColor || '#ffffff'}
+                                onChange={(e) => updateLayoutWithHistory({
+                                  ...designerLayout,
+                                  details: {
+                                    ...designerLayout.details,
+                                    properties: { ...designerLayout.details.properties, bodyBgColor: e.target.value }
+                                  }
+                                })}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'سُمك الحدود' : 'Grid Border Width'}</label>
+                              <input
+                                type="number"
+                                className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs"
+                                value={designerLayout.details.properties.borderWidth || 1}
+                                onChange={(e) => updateLayoutWithHistory({
+                                  ...designerLayout,
+                                  details: {
+                                    ...designerLayout.details,
+                                    properties: { ...designerLayout.details.properties, borderWidth: parseInt(e.target.value) || 0 }
+                                  }
+                                })}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'لون الحدود' : 'Grid Border Color'}</label>
+                              <input
+                                type="color"
+                                className="w-full h-8 p-0.5 bg-zinc-50 border border-zinc-200 rounded-lg cursor-pointer"
+                                value={designerLayout.details.properties.borderColor || '#e4e4e7'}
+                                onChange={(e) => updateLayoutWithHistory({
+                                  ...designerLayout,
+                                  details: {
+                                    ...designerLayout.details,
+                                    properties: { ...designerLayout.details.properties, borderColor: e.target.value }
+                                  }
+                                })}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'هوامش الخلايا X (مم)' : 'Cell Padding X'}</label>
+                              <input
+                                type="number"
+                                className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs"
+                                value={designerLayout.details.properties.paddingX || 2}
+                                onChange={(e) => updateLayoutWithHistory({
+                                  ...designerLayout,
+                                  details: {
+                                    ...designerLayout.details,
+                                    properties: { ...designerLayout.details.properties, paddingX: parseInt(e.target.value) || 0 }
+                                  }
+                                })}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'هوامش الخلايا Y (مم)' : 'Cell Padding Y'}</label>
+                              <input
+                                type="number"
+                                className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs"
+                                value={designerLayout.details.properties.paddingY || 2}
+                                onChange={(e) => updateLayoutWithHistory({
+                                  ...designerLayout,
+                                  details: {
+                                    ...designerLayout.details,
+                                    properties: { ...designerLayout.details.properties, paddingY: parseInt(e.target.value) || 0 }
+                                  }
+                                })}
+                              />
+                            </div>
+                          </div>
+
+                          <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-zinc-50 rounded-xl">
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500/20"
+                              checked={designerLayout.details.properties.boldHeader || false}
+                              onChange={(e) => updateLayoutWithHistory({
+                                ...designerLayout,
+                                details: {
+                                  ...designerLayout.details,
+                                  properties: { ...designerLayout.details.properties, boldHeader: e.target.checked }
+                                }
+                              })}
+                            />
+                            <span className="text-xs font-bold text-zinc-700">{language === 'ar' ? 'رأس جدول عريض (Bold)' : 'Bold Headers'}</span>
+                          </label>
+
+                          {/* Details variables columns checkboxes */}
+                          <div className="space-y-3 pt-3 border-t border-zinc-100">
+                            <h4 className="text-xs font-extrabold text-zinc-400 uppercase tracking-wider">{language === 'ar' ? 'أعمدة التفاصيل القياسية' : 'Standard Detail Columns'}</h4>
+                            <div className="space-y-2 max-h-48 overflow-y-auto border border-zinc-100 p-2 rounded-xl">
+                              {DETAILS_COLUMNS_PRESETS.map(preset => {
+                                const isAdded = designerLayout.details.columns.some(col => col.field === preset.field);
+                                return (
+                                  <label key={preset.id} className="flex items-center justify-between text-xs font-semibold text-zinc-700 cursor-pointer p-1 hover:bg-zinc-50 rounded-lg">
+                                    <span className="flex items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        className="w-4 h-4 rounded text-emerald-600"
+                                        checked={isAdded}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            const newCol = { id: preset.id, label: language === 'ar' ? preset.arLabel : preset.enLabel, field: preset.field, width: 10 };
+                                            updateLayoutWithHistory({
+                                              ...designerLayout,
+                                              details: { ...designerLayout.details, columns: [...designerLayout.details.columns, newCol] }
+                                            });
+                                          } else {
+                                            const filtered = designerLayout.details.columns.filter(col => col.field !== preset.field);
+                                            updateLayoutWithHistory({
+                                              ...designerLayout,
+                                              details: { ...designerLayout.details, columns: filtered }
+                                            });
+                                          }
+                                        }}
+                                      />
+                                      <span>{language === 'ar' ? preset.arLabel : preset.enLabel}</span>
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Adjust columns width range */}
+                          <div className="space-y-3 pt-3 border-t border-zinc-100">
+                            <h4 className="text-xs font-extrabold text-zinc-400 uppercase tracking-wider">{language === 'ar' ? 'تعديل عرض الأعمدة (%)' : 'Column Widths (%)'}</h4>
+                            <div className="space-y-2 max-h-40 overflow-y-auto border border-zinc-100 p-2 rounded-xl">
+                              {designerLayout.details.columns.map(col => (
+                                <div key={col.id} className="space-y-1">
+                                  <div className="flex items-center justify-between text-[11px] font-bold text-zinc-700">
+                                    <span>{col.label}</span>
+                                    <span>{col.width}%</span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="5"
+                                    max="80"
+                                    className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                                    value={col.width}
+                                    onChange={(e) => {
+                                      const updatedCols = designerLayout.details.columns.map(c => 
+                                        c.id === col.id ? { ...c, width: parseInt(e.target.value) || 5 } : c
+                                      );
+                                      // Just set state, push to history on mouseup/change end
+                                      setDesignerLayout(prev => ({
+                                        ...prev,
+                                        details: { ...prev.details, columns: updatedCols }
+                                      }));
+                                    }}
+                                    onMouseUp={() => {
+                                      updateLayoutWithHistory(designerLayout);
+                                    }}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-zinc-600">{language === 'ar' ? 'ارتفاع قسم التفاصيل المكرر (مم)' : 'Repeater Section Height (mm)'}</label>
+                            <input
+                              type="number"
+                              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-sm"
+                              value={designerLayout.details.height || 20}
+                              onChange={(e) => updateLayoutWithHistory({
+                                ...designerLayout,
+                                details: {
+                                  ...designerLayout.details,
+                                  height: parseInt(e.target.value) || 20
+                                }
+                              })}
+                            />
+                          </div>
+
+                          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-3 text-xs text-emerald-800 space-y-1.5 leading-relaxed">
+                            <p className="font-bold flex items-center gap-1.5">
+                              <Paintbrush size={14} />
+                              <span>{language === 'ar' ? 'مكرر التخطيط المرئي' : 'Visual Layout Repeater'}</span>
+                            </p>
+                            <p>
+                              {language === 'ar' 
+                                ? 'في نمط المكرر، سيتم تكرار جميع العناصر الموضوعة في قسم التفاصيل رأسياً لكل صف من صفوف الفاتورة/المستند، باستخدام الارتفاع المحدد أعلاه كإزاحة تباعد.'
+                                : 'In Repeater mode, all elements placed inside the details section will be repeated vertically for each line item of the document, using the height specified above as the offset spacing.'
+                              }
+                            </p>
+                          </div>
+                        </>
+                      )}
 
                     </div>
                   </div>
@@ -3617,6 +3834,160 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
               </div>
 
             </div>
+            {/* Validation Errors & Warnings Modal */}
+            <AnimatePresence>
+              {isValidationModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] flex items-center justify-center p-4">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                    className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-zinc-100 flex flex-col max-h-[80vh] font-bold Cairo"
+                  >
+                    {/* Header */}
+                    <div className="p-5 border-b border-zinc-100 bg-zinc-50 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 text-zinc-900">
+                        <AlertTriangle className="text-amber-500" size={20} />
+                        <h3 className="text-base font-black">
+                          {language === 'ar' ? 'نتائج فحص وتدقيق القالب' : 'Template Audit & Validation'}
+                        </h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsValidationModalOpen(false)}
+                        className="p-1 hover:bg-zinc-200 text-zinc-400 hover:text-zinc-600 rounded-lg transition-colors"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    {/* Body */}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-3.5">
+                      <p className="text-xs text-zinc-500 font-semibold leading-relaxed">
+                        {language === 'ar'
+                          ? 'يرجى مراجعة التنبيهات والأخطاء التالية للتأكد من جاهزية القالب للطباعة بشكل سليم.'
+                          : 'Please review the following warnings and errors to ensure the template prints properly.'}
+                      </p>
+
+                      <div className="space-y-2">
+                        {validationErrors.map((err) => {
+                          const isError = err.type === 'error';
+                          return (
+                            <div
+                              key={err.id}
+                              className={`flex items-start gap-3 p-3.5 rounded-2xl border ${
+                                isError
+                                  ? 'bg-red-50/50 border-red-100 text-red-900'
+                                  : 'bg-amber-50/50 border-amber-100 text-amber-900'
+                              }`}
+                            >
+                              <div
+                                className={`p-1.5 rounded-lg mt-0.5 ${
+                                  isError ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'
+                                }`}
+                              >
+                                <AlertTriangle size={14} />
+                              </div>
+                              <div className="flex-1 space-y-0.5">
+                                <p className="text-xs font-black">
+                                  {isError ? (language === 'ar' ? 'خطأ حرج' : 'Critical Error') : (language === 'ar' ? 'تنبيه' : 'Warning')}
+                                </p>
+                                <p className="text-[11px] font-semibold leading-relaxed text-zinc-600">
+                                  {language === 'ar' ? err.messageAr : err.messageEn}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="p-5 border-t border-zinc-100 bg-zinc-50 flex items-center justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setIsValidationModalOpen(false)}
+                        className="px-4 py-2 border border-zinc-200 hover:bg-zinc-100 text-zinc-700 rounded-xl text-xs font-bold transition-all"
+                      >
+                        {language === 'ar' ? 'إلغاء والعودة للتعديل' : 'Go Back & Edit'}
+                      </button>
+
+                      {!validationErrors.some((e) => e.type === 'error') && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsValidationModalOpen(false);
+                            setIsVersionModalOpen(true);
+                          }}
+                          className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-600/10 hover:shadow-emerald-600/25"
+                        >
+                          {language === 'ar' ? 'متابعة وحفظ القالب' : 'Proceed and Save'}
+                        </button>
+                      )}
+                    </div>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
+
+            {/* Version Change Notes Modal */}
+            <AnimatePresence>
+              {isVersionModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] flex items-center justify-center p-4">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                    className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-zinc-100 p-6 space-y-4 font-bold Cairo"
+                  >
+                    <div className="flex items-center gap-2.5 text-zinc-900 border-b border-zinc-100 pb-3">
+                      <Info className="text-emerald-600" size={20} />
+                      <h3 className="text-base font-black">
+                        {language === 'ar' ? 'ملاحظات الإصدار الجديد' : 'Version Change Notes'}
+                      </h3>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-zinc-600 font-bold">
+                        {language === 'ar' ? 'ما هي التغييرات التي أجريتها؟' : 'What changes did you make?'}
+                      </label>
+                      <textarea
+                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-xs outline-none focus:bg-white focus:border-emerald-600 transition-all font-semibold"
+                        rows={4}
+                        placeholder={
+                          language === 'ar'
+                            ? 'مثال: تعديل مقاسات الهوامش وإضافة كود الصنف للجدول...'
+                            : 'e.g., Adjusted margins and added item code to the table...'
+                        }
+                        value={changeNotes}
+                        onChange={(e) => setChangeNotes(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsVersionModalOpen(false);
+                          setChangeNotes('');
+                        }}
+                        className="px-4 py-2 border border-zinc-200 hover:bg-zinc-100 text-zinc-700 rounded-xl text-xs font-bold transition-all"
+                      >
+                        {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSubmit(changeNotes)}
+                        className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-600/10 hover:shadow-emerald-600/25"
+                      >
+                        {language === 'ar' ? 'حفظ الإصدار والتصميم' : 'Save Version & Design'}
+                      </button>
+                    </div>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
+
           </motion.div>
         )}
       </AnimatePresence>

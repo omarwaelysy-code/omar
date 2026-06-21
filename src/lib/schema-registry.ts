@@ -225,5 +225,8 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   paper_sizes: [
     'id', 'name', 'width', 'height', 'unit', 'is_system', 'company_id'
+  ],
+  template_versions: [
+    'id', 'template_id', 'company_id', 'version_number', 'layout', 'change_notes', 'created_by', 'created_at'
   ]
 };
