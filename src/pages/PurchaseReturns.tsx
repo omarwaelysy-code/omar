@@ -19,7 +19,7 @@ import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { ExportButtons } from '../components/ExportButtons';
-import { TemplatePrintModal } from '../components/TemplatePrintModal';
+import { printDocument } from '../utils/printEngine';
 import { TransactionManager } from '../services/TransactionManager';
 import { ReturnSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog } from '../types';
@@ -56,8 +56,6 @@ export const PurchaseReturns: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewReturn, setViewReturn] = useState<any | null>(null);
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [printModalData, setPrintModalData] = useState<any>(null);
   const [view, setView] = useState<'table' | 'card'>('table');
   const [showAiInput, setShowAiInput] = useState(false);
 
@@ -3320,8 +3318,9 @@ export const PurchaseReturns: React.FC = () => {
               <div className="flex gap-2">
                 <button 
                   onClick={() => {
-                    setPrintModalData(viewReturn);
-                    setIsPrintModalOpen(true);
+                    if (viewReturn) {
+                      printDocument('purchase_returns', viewReturn.id);
+                    }
                   }}
                   className="flex items-center gap-2 px-6 py-3 bg-white text-zinc-700 border border-zinc-200 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm text-xs"
                 >
@@ -3330,8 +3329,9 @@ export const PurchaseReturns: React.FC = () => {
                 </button>
                 <button 
                   onClick={() => {
-                    setPrintModalData(viewReturn);
-                    setIsPrintModalOpen(true);
+                    if (viewReturn) {
+                      printDocument('purchase_returns', viewReturn.id);
+                    }
                   }}
                   className="flex items-center gap-2 px-6 py-3 bg-white text-zinc-700 border border-zinc-200 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm text-xs"
                 >
@@ -3844,17 +3844,6 @@ export const PurchaseReturns: React.FC = () => {
         }}
         category="purchase_returns"
         documentId={activityLogDocumentId}
-      />
-
-      <TemplatePrintModal
-        isOpen={isPrintModalOpen}
-        onClose={() => {
-          setIsPrintModalOpen(false);
-          setPrintModalData(null);
-        }}
-        documentType="purchase_returns"
-        documentData={printModalData}
-        title={printModalData ? `مرتجع مشتريات رقم ${printModalData.return_number}` : ''}
       />
     </div>
   );

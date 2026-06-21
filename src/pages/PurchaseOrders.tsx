@@ -21,7 +21,7 @@ import { useViewPreference } from '../hooks/useViewPreference';
 import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
 import { useNavigation } from '../contexts/NavigationContext';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
-import { TemplatePrintModal } from '../components/TemplatePrintModal';
+import { printDocument } from '../utils/printEngine';
 import { exportToExcel } from '../utils/excelUtils';
 
 interface ExtendedPurchaseOrderItem extends PurchaseOrderItem {
@@ -120,8 +120,6 @@ export const PurchaseOrders: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
   const [viewOrder, setViewOrder] = useState<PurchaseOrder | null>(null);
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [printModalData, setPrintModalData] = useState<any>(null);
   const [view, setView] = useViewPreference('purchase_orders', 'table');
   const [companyData, setCompanyData] = useState<Company | null>(null);
 
@@ -2275,8 +2273,9 @@ export const PurchaseOrders: React.FC = () => {
                   )}
                   <button
                     onClick={() => {
-                      setPrintModalData(viewOrder);
-                      setIsPrintModalOpen(true);
+                      if (viewOrder) {
+                        printDocument('purchase_orders', viewOrder.id);
+                      }
                     }}
                     className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-200"
                   >
@@ -2285,8 +2284,9 @@ export const PurchaseOrders: React.FC = () => {
                   </button>
                   <button
                     onClick={() => {
-                      setPrintModalData(viewOrder);
-                      setIsPrintModalOpen(true);
+                      if (viewOrder) {
+                        printDocument('purchase_orders', viewOrder.id);
+                      }
                     }}
                     className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-200"
                   >
@@ -2442,17 +2442,6 @@ export const PurchaseOrders: React.FC = () => {
         onClose={() => setIsActivityLogOpen(false)}
         category="purchase_orders"
         documentId={activityLogDocumentId}
-      />
-
-      <TemplatePrintModal
-        isOpen={isPrintModalOpen}
-        onClose={() => {
-          setIsPrintModalOpen(false);
-          setPrintModalData(null);
-        }}
-        documentType="purchase_orders"
-        documentData={printModalData}
-        title={printModalData ? `أمر شراء رقم ${printModalData.order_number}` : ''}
       />
     </div>
   );

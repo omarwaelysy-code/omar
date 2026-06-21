@@ -74,6 +74,7 @@ import { Operations } from './pages/Operations';
 import { Departments } from './pages/Departments';
 import { CostCenters } from './pages/CostCenters';
 import { Templates } from './pages/Templates';
+import { UnifiedPrintEngine } from './components/UnifiedPrintEngine';
 
 import { LoadingScreen } from './components/LoadingScreen';
 import { AnimatePresence } from 'framer-motion';
@@ -115,6 +116,7 @@ export default function App() {
   return (
     <div className={`min-h-screen ${dir === 'rtl' ? 'font-sans' : 'font-sans'}`} dir={dir}>
       <Toaster position="top-center" />
+      <UnifiedPrintEngine />
       <AnimatePresence mode="wait">
         {loading ? (
           <LoadingScreen key="loading" />

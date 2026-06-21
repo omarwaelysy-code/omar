@@ -18,7 +18,7 @@ import { useViewPreference } from '../hooks/useViewPreference';
 import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
 import { useNavigation } from '../contexts/NavigationContext';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
-import { TemplatePrintModal } from '../components/TemplatePrintModal';
+import { printDocument } from '../utils/printEngine';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { InlineActivityLog } from '../components/InlineActivityLog';
 
@@ -106,8 +106,6 @@ export const SalesOrders: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
   const [viewOrder, setViewOrder] = useState<SalesOrder | null>(null);
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [printModalData, setPrintModalData] = useState<any>(null);
   const [view, setView] = useViewPreference('sales_orders', 'table');
   const [companyData, setCompanyData] = useState<Company | null>(null);
 
@@ -2170,8 +2168,9 @@ export const SalesOrders: React.FC = () => {
                   )}
                   <button
                     onClick={() => {
-                      setPrintModalData(viewOrder);
-                      setIsPrintModalOpen(true);
+                      if (viewOrder) {
+                        printDocument('sales_orders', viewOrder.id);
+                      }
                     }}
                     className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-200"
                   >
@@ -2180,8 +2179,9 @@ export const SalesOrders: React.FC = () => {
                   </button>
                   <button
                     onClick={() => {
-                      setPrintModalData(viewOrder);
-                      setIsPrintModalOpen(true);
+                      if (viewOrder) {
+                        printDocument('sales_orders', viewOrder.id);
+                      }
                     }}
                     className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-200"
                   >
@@ -2362,17 +2362,6 @@ export const SalesOrders: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
-
-      <TemplatePrintModal
-        isOpen={isPrintModalOpen}
-        onClose={() => {
-          setIsPrintModalOpen(false);
-          setPrintModalData(null);
-        }}
-        documentType="sales_orders"
-        documentData={printModalData}
-        title={printModalData ? `أمر بيع رقم ${printModalData.order_number}` : ''}
-      />
     </div>
   );
 };

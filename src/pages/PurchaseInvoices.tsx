@@ -28,7 +28,7 @@ import { InvoiceSchema, JournalEntrySchema } from '../lib/schemas';
 import { ExportButtons } from '../components/ExportButtons';
 import { ActivityLog } from '../types';
 import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
-import { TemplatePrintModal } from '../components/TemplatePrintModal';
+import { printDocument } from '../utils/printEngine';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { PaginationControls } from '../components/PaginationControls';
 // Currency import removed for now from view cleanup
@@ -136,8 +136,6 @@ export const PurchaseInvoices: React.FC = () => {
   const [serverSummary, setServerSummary] = useState<any>({});
   const [maxSeqGenerated, setMaxSeqGenerated] = useState<number>(0);
   const [viewInvoice, setViewInvoice] = useState<any | null>(null);
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [printModalData, setPrintModalData] = useState<any>(null);
 
   const [supplierFormData, setSupplierFormData] = useState({
     name: '',
@@ -4505,8 +4503,9 @@ export const PurchaseInvoices: React.FC = () => {
                   </button>
                   <button 
                     onClick={() => {
-                      setPrintModalData(viewInvoice);
-                      setIsPrintModalOpen(true);
+                      if (viewInvoice) {
+                        printDocument('purchase_invoices', viewInvoice.id);
+                      }
                     }}
                     className="flex-1 py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all flex items-center justify-center gap-2"
                   >
@@ -5170,17 +5169,6 @@ export const PurchaseInvoices: React.FC = () => {
         }}
         category="purchase_invoices"
         documentId={activityLogDocumentId}
-      />
-
-      <TemplatePrintModal
-        isOpen={isPrintModalOpen}
-        onClose={() => {
-          setIsPrintModalOpen(false);
-          setPrintModalData(null);
-        }}
-        documentType="purchase_invoices"
-        documentData={printModalData}
-        title={printModalData ? `${t('pi.title')} - ${printModalData.invoice_number}` : ''}
       />
     </div>
   );

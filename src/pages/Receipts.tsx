@@ -18,7 +18,7 @@ import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { ExportButtons } from '../components/ExportButtons';
 import { SmartAIInput } from '../components/SmartAIInput';
-import { TemplatePrintModal } from '../components/TemplatePrintModal';
+import { printDocument } from '../utils/printEngine';
 import { TransactionManager } from '../services/TransactionManager';
 import { VoucherSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog, ReceiptVoucher, Customer, Supplier, ExpenseCategory, PaymentMethod, JournalEntry, JournalEntryItem, Account, Company } from '../types';
@@ -73,9 +73,6 @@ export const Receipts: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [receiptToDelete, setReceiptToDelete] = useState<string | null>(null);
   const [viewReceipt, setViewReceipt] = useState<ReceiptVoucher | null>(null);
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [printModalData, setPrintModalData] = useState<any>(null);
-
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [showSidePanel, setShowSidePanel] = useState(false);
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
@@ -2384,8 +2381,9 @@ export const Receipts: React.FC = () => {
                 </button>
                 <button 
                   onClick={() => {
-                    setPrintModalData(viewReceipt);
-                    setIsPrintModalOpen(true);
+                    if (viewReceipt) {
+                      printDocument('receipt_vouchers', viewReceipt.id);
+                    }
                   }}
                   className="p-2 text-zinc-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
                   title="طباعة وتصدير بالنموذج"
@@ -2972,17 +2970,6 @@ export const Receipts: React.FC = () => {
           setActivityLogDocumentId(undefined);
         }} 
         documentId={activityLogDocumentId}
-      />
-
-      <TemplatePrintModal
-        isOpen={isPrintModalOpen}
-        onClose={() => {
-          setIsPrintModalOpen(false);
-          setPrintModalData(null);
-        }}
-        documentType="receipt_vouchers"
-        documentData={printModalData}
-        title={printModalData ? `سند قبض رقم ${printModalData.voucher_number}` : ''}
       />
     </div>
   );

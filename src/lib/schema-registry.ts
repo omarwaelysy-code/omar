@@ -221,12 +221,17 @@ export const EXPECTED_SCHEMA: TableSchema = {
   templates: [
     'id', 'company_id', 'name', 'description', 'paper_size_id', 'orientation', 
     'margin_top', 'margin_bottom', 'margin_left', 'margin_right', 'is_active', 
-    'created_at', 'updated_at', 'layout', 'document_type', 'is_default'
+    'created_at', 'updated_at', 'layout', 'document_type', 'is_default', 'print_profile_id'
   ],
   paper_sizes: [
     'id', 'name', 'width', 'height', 'unit', 'is_system', 'company_id'
   ],
   template_versions: [
     'id', 'template_id', 'company_id', 'version_number', 'layout', 'change_notes', 'created_by', 'created_at'
+  ],
+  print_profiles: [
+    'id', 'company_id', 'name', 'paper_size_id', 'custom_width', 'custom_height',
+    'orientation', 'margin_top', 'margin_bottom', 'margin_left', 'margin_right',
+    'dpi', 'print_settings', 'created_at', 'updated_at'
   ]
 };

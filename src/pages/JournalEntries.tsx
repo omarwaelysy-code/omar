@@ -11,7 +11,7 @@ import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { useNotification } from '../contexts/NotificationContext';
 import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
 import { PaginationControls } from '../components/PaginationControls';
-import { TemplatePrintModal } from '../components/TemplatePrintModal';
+import { printDocument } from '../utils/printEngine';
 import { useNavigation } from '../contexts/NavigationContext';
 
 export const JournalEntries: React.FC = () => {
@@ -83,8 +83,6 @@ export const JournalEntries: React.FC = () => {
     end: new Date().toISOString().split('T')[0]
   });
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [printModalData, setPrintModalData] = useState<any>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
 
@@ -517,8 +515,9 @@ export const JournalEntries: React.FC = () => {
                 </button>
                 <button 
                   onClick={() => {
-                    setPrintModalData(selectedEntry);
-                    setIsPrintModalOpen(true);
+                    if (selectedEntry) {
+                      printDocument('journal_entries', selectedEntry.id);
+                    }
                   }}
                   className={`px-6 py-2.5 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}
                 >
@@ -565,17 +564,6 @@ export const JournalEntries: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
-
-      <TemplatePrintModal
-        isOpen={isPrintModalOpen}
-        onClose={() => {
-          setIsPrintModalOpen(false);
-          setPrintModalData(null);
-        }}
-        documentType="journal_entries"
-        documentData={printModalData}
-        title={printModalData ? `قيد يومية رقم ${printModalData.entry_number}` : ''}
-      />
     </div>
   );
 };

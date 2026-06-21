@@ -112,6 +112,25 @@ interface Template {
   updated_at?: string;
   document_type?: string;
   is_default?: boolean;
+  print_profile_id?: string;
+}
+
+interface PrintProfile {
+  id: string;
+  company_id: string;
+  name: string;
+  paper_size_id: string;
+  custom_width?: number;
+  custom_height?: number;
+  orientation: 'portrait' | 'landscape';
+  margin_top: number;
+  margin_bottom: number;
+  margin_left: number;
+  margin_right: number;
+  dpi: number;
+  print_settings?: any;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface TemplateVersion {
@@ -501,7 +520,26 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
     customHeight: 297,
     customUnit: 'mm',
     document_type: 'invoices',
-    is_default: false
+    is_default: false,
+    print_profile_id: ''
+  });
+
+  const [printProfiles, setPrintProfiles] = useState<PrintProfile[]>([]);
+  const [subTab, setSubTab] = useState<'templates' | 'profiles' | 'assignments'>('templates');
+  const [editingProfile, setEditingProfile] = useState<PrintProfile | null>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileFormData, setProfileFormData] = useState({
+    name: '',
+    paper_size_id: 'a4',
+    custom_width: 210,
+    custom_height: 297,
+    orientation: 'portrait' as 'portrait' | 'landscape',
+    margin_top: 10,
+    margin_bottom: 10,
+    margin_left: 10,
+    margin_right: 10,
+    dpi: 300,
+    print_settings: '' // Text representation for JSON input
   });
 
   // Visual Designer Layout
@@ -649,14 +687,79 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [allTemplates, allSizes, allCats] = await Promise.all([
+      const [allTemplates, allSizes, allCats, allProfiles] = await Promise.all([
         dbService.list<Template>('templates', user?.company_id || ''),
         dbService.list<PaperSize>('paper_sizes', user?.company_id || ''),
-        dbService.list<OperationCategory>('operation_categories', user?.company_id || '')
+        dbService.list<OperationCategory>('operation_categories', user?.company_id || ''),
+        dbService.list<PrintProfile>('print_profiles', user?.company_id || '')
       ]);
       setTemplates(allTemplates);
       setPaperSizes(allSizes);
       setCategories(allCats.filter(c => (c as any).is_final));
+
+      let activeProfiles = allProfiles;
+      if (allProfiles.length === 0 && user?.company_id) {
+        // Seed default profiles if none exist
+        const defaultProfiles = [
+          {
+            name: language === 'ar' ? 'ملف طباعة A4 طولي' : 'A4 Portrait Profile',
+            paper_size_id: 'a4',
+            orientation: 'portrait',
+            margin_top: 10,
+            margin_bottom: 10,
+            margin_left: 10,
+            margin_right: 10,
+            dpi: 300,
+            print_settings: { copies: 1 }
+          },
+          {
+            name: language === 'ar' ? 'ملف طباعة A5 طولي' : 'A5 Portrait Profile',
+            paper_size_id: 'a5',
+            orientation: 'portrait',
+            margin_top: 10,
+            margin_bottom: 10,
+            margin_left: 10,
+            margin_right: 10,
+            dpi: 300,
+            print_settings: { copies: 1 }
+          },
+          {
+            name: language === 'ar' ? 'ملف طباعة حراري 80مم' : 'Thermal 80mm Profile',
+            paper_size_id: 'thermal_80',
+            orientation: 'portrait',
+            margin_top: 2,
+            margin_bottom: 2,
+            margin_left: 2,
+            margin_right: 2,
+            dpi: 203,
+            print_settings: { copies: 1 }
+          },
+          {
+            name: language === 'ar' ? 'ملف طباعة حراري 58مم' : 'Thermal 58mm Profile',
+            paper_size_id: 'thermal_58',
+            orientation: 'portrait',
+            margin_top: 2,
+            margin_bottom: 2,
+            margin_left: 2,
+            margin_right: 2,
+            dpi: 203,
+            print_settings: { copies: 1 }
+          }
+        ];
+        const seeded: PrintProfile[] = [];
+        for (const preset of defaultProfiles) {
+          const newId = 'profile-' + Date.now() + '-' + Math.floor(Math.random() * 1000000);
+          const payload = {
+            ...preset,
+            orientation: preset.orientation as 'portrait' | 'landscape',
+            company_id: user.company_id
+          };
+          await dbService.addWithId('print_profiles', newId, payload);
+          seeded.push({ ...payload, id: newId });
+        }
+        activeProfiles = seeded;
+      }
+      setPrintProfiles(activeProfiles);
     } catch (error) {
       console.error('Failed to fetch data:', error);
       toast.error(language === 'ar' ? 'فشل تحميل البيانات' : 'Failed to fetch templates data');
@@ -680,15 +783,22 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
   // Helper to determine paper bounds in mm
   const getPaperBounds = () => {
-    const sizeObj = paperSizes.find(p => p.id === formData.paper_size_id);
+    const activeProfile = formData.print_profile_id 
+      ? printProfiles.find(p => p.id === formData.print_profile_id) 
+      : null;
+
+    const paperSizeId = activeProfile ? activeProfile.paper_size_id : formData.paper_size_id;
+    const orientation = activeProfile ? activeProfile.orientation : formData.orientation;
+
+    const sizeObj = paperSizes.find(p => p.id === paperSizeId);
     let width = 210;
     let height = 297;
     
-    if (formData.paper_size_id === 'custom') {
-      width = formData.customWidth;
-      height = formData.customHeight;
+    if (paperSizeId === 'custom') {
+      width = activeProfile ? Number(activeProfile.custom_width || 210) : formData.customWidth;
+      height = activeProfile ? Number(activeProfile.custom_height || 297) : formData.customHeight;
     } else {
-      const matched = PAPER_SIZES_PRESETS.find(p => p.id === formData.paper_size_id);
+      const matched = PAPER_SIZES_PRESETS.find(p => p.id === paperSizeId);
       if (matched) {
         width = matched.width;
         height = matched.height;
@@ -698,14 +808,35 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       }
     }
 
-    if (formData.orientation === 'landscape') {
-      return { width: height, height: width };
+    if (orientation === 'landscape') {
+      return { width: height, height: width, orientation };
     }
-    return { width, height };
+    return { width, height, orientation };
+  };
+
+  const getEffectiveMargins = () => {
+    const activeProfile = formData.print_profile_id 
+      ? printProfiles.find(p => p.id === formData.print_profile_id) 
+      : null;
+    if (activeProfile) {
+      return {
+        top: Number(activeProfile.margin_top),
+        bottom: Number(activeProfile.margin_bottom),
+        left: Number(activeProfile.margin_left),
+        right: Number(activeProfile.margin_right)
+      };
+    }
+    return {
+      top: Number(formData.margin_top),
+      bottom: Number(formData.margin_bottom),
+      left: Number(formData.margin_left),
+      right: Number(formData.margin_right)
+    };
   };
 
   const { width: paperWidth } = getPaperBounds();
-  const printableWidth = paperWidth - formData.margin_left - formData.margin_right;
+  const margins = getEffectiveMargins();
+  const printableWidth = paperWidth - margins.left - margins.right;
 
   // Add Element to Canvas
   const handleAddElement = (type: TemplateElement['type'], binding?: string, label?: string) => {
@@ -1161,7 +1292,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       customHeight: isCustom ? Number(selectedSize.height) : 297,
       customUnit: isCustom ? selectedSize.unit : 'mm',
       document_type: template.document_type || 'invoices',
-      is_default: template.is_default || false
+      is_default: template.is_default || false,
+      print_profile_id: template.print_profile_id || ''
     });
 
     const targetLayout = template.layout ? JSON.parse(JSON.stringify(template.layout)) : JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
@@ -1193,7 +1325,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       customHeight: isCustom ? Number(selectedSize.height) : 297,
       customUnit: isCustom ? selectedSize.unit : 'mm',
       document_type: template.document_type || 'invoices',
-      is_default: false // Do not copy the default template status automatically
+      is_default: false, // Do not copy the default template status automatically
+      print_profile_id: template.print_profile_id || ''
     });
 
     const targetLayout = template.layout ? JSON.parse(JSON.stringify(template.layout)) : JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
@@ -1224,6 +1357,111 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       toast.error(language === 'ar' ? 'فشل حذف القالب' : 'Failed to delete template');
     }
   };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profileFormData.name.trim()) {
+      toast.error(language === 'ar' ? 'يرجى إدخال اسم ملف التعريف' : 'Please enter profile name');
+      return;
+    }
+    
+    let settingsObj = {};
+    if (profileFormData.print_settings.trim()) {
+      try {
+        settingsObj = JSON.parse(profileFormData.print_settings);
+      } catch (err) {
+        toast.error(language === 'ar' ? 'صيغة إعدادات الطباعة (JSON) غير صالحة' : 'Invalid print settings JSON format');
+        return;
+      }
+    }
+
+    try {
+      const payload = {
+        company_id: user?.company_id || '',
+        name: profileFormData.name,
+        paper_size_id: profileFormData.paper_size_id,
+        custom_width: profileFormData.paper_size_id === 'custom' ? Number(profileFormData.custom_width) : null,
+        custom_height: profileFormData.paper_size_id === 'custom' ? Number(profileFormData.custom_height) : null,
+        orientation: profileFormData.orientation,
+        margin_top: Number(profileFormData.margin_top),
+        margin_bottom: Number(profileFormData.margin_bottom),
+        margin_left: Number(profileFormData.margin_left),
+        margin_right: Number(profileFormData.margin_right),
+        dpi: Number(profileFormData.dpi || 300),
+        print_settings: settingsObj
+      };
+
+      if (editingProfile) {
+        await dbService.update('print_profiles', editingProfile.id, payload);
+        toast.success(language === 'ar' ? 'تم تحديث ملف تعريف الطباعة بنجاح' : 'Print profile updated successfully');
+      } else {
+        const newId = 'profile-' + Date.now() + '-' + Math.floor(Math.random() * 1000000);
+        await dbService.addWithId('print_profiles', newId, { ...payload, id: newId });
+        toast.success(language === 'ar' ? 'تم إضافة ملف تعريف الطباعة بنجاح' : 'Print profile created successfully');
+      }
+      setIsProfileModalOpen(false);
+      setEditingProfile(null);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      toast.error(language === 'ar' ? 'فشل حفظ ملف تعريف الطباعة' : 'Failed to save print profile');
+    }
+  };
+
+  const handleCopyProfile = async (profile: PrintProfile) => {
+    try {
+      const newId = 'profile-' + Date.now() + '-' + Math.floor(Math.random() * 1000000);
+      const payload = {
+        ...profile,
+        id: newId,
+        name: `${profile.name} - ${language === 'ar' ? 'نسخة' : 'Copy'}`,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      await dbService.addWithId('print_profiles', newId, payload);
+      toast.success(language === 'ar' ? 'تم نسخ ملف تعريف الطباعة' : 'Print profile copied successfully');
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      toast.error(language === 'ar' ? 'فشل نسخ ملف تعريف الطباعة' : 'Failed to copy print profile');
+    }
+  };
+
+  const handleDeleteProfile = async (id: string) => {
+    if (!window.confirm(language === 'ar' ? 'هل أنت متأكد من حذف ملف تعريف الطباعة هذا؟' : 'Are you sure you want to delete this print profile?')) {
+      return;
+    }
+    try {
+      await dbService.delete('print_profiles', id);
+      toast.success(language === 'ar' ? 'تم حذف ملف تعريف الطباعة بنجاح' : 'Print profile deleted successfully');
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      toast.error(language === 'ar' ? 'فشل حذف ملف تعريف الطباعة' : 'Failed to delete print profile');
+    }
+  };
+
+  const handleSetDefaultTemplate = async (templateId: string, docType: string) => {
+    try {
+      setLoading(true);
+      const matched = templates.filter(t => t.document_type === docType);
+      
+      const promises = matched.map(t => {
+        const isDefault = t.id === templateId;
+        return dbService.update('templates', t.id, { is_default: isDefault });
+      });
+      
+      await Promise.all(promises);
+      toast.success(language === 'ar' ? 'تم تعيين القالب الافتراضي بنجاح' : 'Default template set successfully');
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+      toast.error(language === 'ar' ? 'فشل تعيين القالب الافتراضي' : 'Failed to set default template');
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const handleStartSaveProcess = () => {
     if (!formData.name.trim()) {
@@ -1320,7 +1558,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
         layout: designerLayout, // Stored purely as JSON
         company_id: user.company_id,
         document_type: formData.document_type,
-        is_default: formData.is_default
+        is_default: formData.is_default,
+        print_profile_id: formData.print_profile_id || null
       };
 
       let savedTemplateId = '';
@@ -1417,125 +1656,308 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
               <div>
                 <h1 className="text-2xl font-black tracking-tight text-zinc-900 flex items-center gap-2">
                   <Settings className="text-emerald-600 animate-spin-slow" size={26} />
-                  <span>{language === 'ar' ? 'مصمم قوالب الطباعة' : 'Visual Print Templates Designer'}</span>
-                  <span className="text-xs bg-emerald-50 text-emerald-700 font-bold px-2.5 py-1 rounded-full border border-emerald-100/50">
-                    {templates.length} {language === 'ar' ? 'قوالب' : 'Templates'}
-                  </span>
+                  <span>{language === 'ar' ? 'إدارة وقوالب الطباعة' : 'Visual Print Layout Manager'}</span>
                 </h1>
                 <p className="text-zinc-500 text-sm mt-1">
                   {language === 'ar' 
-                    ? 'صمم قوالب طباعة الفواتير والسندات بالكامل بالسحب والإفلات وتغيير الخصائص.' 
-                    : 'Design billing & vouchers template layouts dynamically with drag & drop mechanics.'}
+                    ? 'إدارة قوالب الطباعة، ملفات تعريف الطباعة (Print Profiles)، وربطها بالعمليات المختلفة.' 
+                    : 'Manage visual document templates, print profiles, and direct operations routing.'}
                 </p>
               </div>
 
               {/* Action Buttons */}
               <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFormData({
-                      name: '',
-                      description: '',
-                      paper_size_id: 'a4',
-                      orientation: 'portrait',
-                      margin_top: 10,
-                      margin_bottom: 10,
-                      margin_left: 10,
-                      margin_right: 10,
-                      is_active: true,
-                      customWidth: 210,
-                      customHeight: 297,
-                      customUnit: 'mm',
-                      document_type: 'invoices',
-                      is_default: false
-                    });
-                    const targetLayout = JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
-                    setDesignerLayout(targetLayout);
-                    setHistory([JSON.parse(JSON.stringify(targetLayout))]);
-                    setHistoryIndex(0);
-                    setEditingTemplate(null);
-                    setSelectedElementId(null);
-                    setSelectedSection(null);
-                    setPreviewMode(false);
-                    setView('create');
-                  }}
-                  className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl hover:bg-emerald-700 transition-all font-bold text-sm shadow-lg shadow-emerald-600/10 hover:shadow-emerald-600/25"
-                >
-                  <Plus size={18} />
-                  <span>{language === 'ar' ? 'إنشاء قالب جديد' : 'Create New Template'}</span>
-                </button>
+                {subTab === 'templates' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData({
+                        name: '',
+                        description: '',
+                        paper_size_id: 'a4',
+                        orientation: 'portrait',
+                        margin_top: 10,
+                        margin_bottom: 10,
+                        margin_left: 10,
+                        margin_right: 10,
+                        is_active: true,
+                        customWidth: 210,
+                        customHeight: 297,
+                        customUnit: 'mm',
+                        document_type: 'invoices',
+                        is_default: false,
+                        print_profile_id: ''
+                      });
+                      const targetLayout = JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
+                      setDesignerLayout(targetLayout);
+                      setHistory([JSON.parse(JSON.stringify(targetLayout))]);
+                      setHistoryIndex(0);
+                      setEditingTemplate(null);
+                      setSelectedElementId(null);
+                      setSelectedSection(null);
+                      setPreviewMode(false);
+                      setView('create');
+                    }}
+                    className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl hover:bg-emerald-700 transition-all font-bold text-sm shadow-lg shadow-emerald-600/10 hover:shadow-emerald-600/25"
+                  >
+                    <Plus size={18} />
+                    <span>{language === 'ar' ? 'إنشاء قالب جديد' : 'Create New Template'}</span>
+                  </button>
+                )}
+                {subTab === 'profiles' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingProfile(null);
+                      setProfileFormData({
+                        name: '',
+                        paper_size_id: 'a4',
+                        custom_width: 210,
+                        custom_height: 297,
+                        orientation: 'portrait',
+                        margin_top: 10,
+                        margin_bottom: 10,
+                        margin_left: 10,
+                        margin_right: 10,
+                        dpi: 300,
+                        print_settings: '{\n  "copies": 1\n}'
+                      });
+                      setIsProfileModalOpen(true);
+                    }}
+                    className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl hover:bg-emerald-700 transition-all font-bold text-sm shadow-lg shadow-emerald-600/10 hover:shadow-emerald-600/25"
+                  >
+                    <Plus size={18} />
+                    <span>{language === 'ar' ? 'إنشاء ملف تعريف جديد' : 'Create Print Profile'}</span>
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Filters */}
-            <div className="bg-white border border-zinc-200/80 p-4 rounded-2xl shadow-sm flex flex-col md:flex-row items-center gap-4">
-              <div className="relative flex-1 w-full">
-                <Search className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
-                <input
-                  type="text"
-                  placeholder={language === 'ar' ? 'بحث باسم القالب أو الوصف...' : 'Search template name or description...'}
-                  className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2.5 bg-zinc-50/50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm`}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
+            {/* Sub Tabs */}
+            <div className="flex border-b border-zinc-200 gap-2 mb-4">
+              <button
+                type="button"
+                onClick={() => setSubTab('templates')}
+                className={`px-5 py-3 text-xs md:text-sm font-extrabold border-b-2 transition-all ${
+                  subTab === 'templates'
+                    ? 'border-emerald-600 text-emerald-600 bg-emerald-50/5'
+                    : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
+                }`}
+              >
+                {language === 'ar' ? 'قوالب الطباعة المصممة' : 'Print Templates'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSubTab('profiles')}
+                className={`px-5 py-3 text-xs md:text-sm font-extrabold border-b-2 transition-all ${
+                  subTab === 'profiles'
+                    ? 'border-emerald-600 text-emerald-600 bg-emerald-50/5'
+                    : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
+                }`}
+              >
+                {language === 'ar' ? 'ملفات تعريف الطباعة' : 'Print Profiles'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSubTab('assignments')}
+                className={`px-5 py-3 text-xs md:text-sm font-extrabold border-b-2 transition-all ${
+                  subTab === 'assignments'
+                    ? 'border-emerald-600 text-emerald-600 bg-emerald-50/5'
+                    : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'
+                }`}
+              >
+                {language === 'ar' ? 'إعدادات قوالب العمليات' : 'Operation Assignments'}
+              </button>
+            </div>
 
-              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                <div className="flex items-center gap-2">
-                  <SlidersHorizontal size={16} className="text-zinc-500" />
-                  <span className="text-xs font-bold text-zinc-500">{language === 'ar' ? 'تصفية:' : 'Filters:'}</span>
+            {subTab === 'templates' ? (
+              <>
+                {/* Filters */}
+                <div className="bg-white border border-zinc-200/80 p-4 rounded-2xl shadow-sm flex flex-col md:flex-row items-center gap-4">
+                  <div className="relative flex-1 w-full">
+                    <Search className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
+                    <input
+                      type="text"
+                      placeholder={language === 'ar' ? 'بحث باسم القالب أو الوصف...' : 'Search template name or description...'}
+                      className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2.5 bg-zinc-50/50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm`}
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                    <div className="flex items-center gap-2">
+                      <SlidersHorizontal size={16} className="text-zinc-500" />
+                      <span className="text-xs font-bold text-zinc-500">{language === 'ar' ? 'تصفية:' : 'Filters:'}</span>
+                    </div>
+                    
+                    <select
+                      className="bg-zinc-50 border border-zinc-200 px-3 py-2 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                      value={statusFilter}
+                      onChange={(e: any) => setStatusFilter(e.target.value)}
+                    >
+                      <option value="all">{language === 'ar' ? 'جميع الحالات' : 'All Statuses'}</option>
+                      <option value="active">{language === 'ar' ? 'نشط فقط' : 'Active Only'}</option>
+                      <option value="inactive">{language === 'ar' ? 'غير نشط فقط' : 'Inactive Only'}</option>
+                    </select>
+
+                    <select
+                      className="bg-zinc-50 border border-zinc-200 px-3 py-2 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                      value={sizeFilter}
+                      onChange={(e: any) => setSizeFilter(e.target.value)}
+                    >
+                      <option value="all">{language === 'ar' ? 'جميع الأحجام' : 'All Paper Sizes'}</option>
+                      {paperSizes.map(size => (
+                        <option key={size.id} value={size.id}>{size.name}</option>
+                      ))}
+                      {PAPER_SIZES_PRESETS.map(preset => (
+                        <option key={preset.id} value={preset.id}>{preset.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                
-                <select
-                  className="bg-zinc-50 border border-zinc-200 px-3 py-2 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                  value={statusFilter}
-                  onChange={(e: any) => setStatusFilter(e.target.value)}
-                >
-                  <option value="all">{language === 'ar' ? 'جميع الحالات' : 'All Statuses'}</option>
-                  <option value="active">{language === 'ar' ? 'نشط فقط' : 'Active Only'}</option>
-                  <option value="inactive">{language === 'ar' ? 'غير نشط فقط' : 'Inactive Only'}</option>
-                </select>
 
-                <select
-                  className="bg-zinc-50 border border-zinc-200 px-3 py-2 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                  value={sizeFilter}
-                  onChange={(e: any) => setSizeFilter(e.target.value)}
-                >
-                  <option value="all">{language === 'ar' ? 'جميع الأحجام' : 'All Paper Sizes'}</option>
-                  {paperSizes.map(size => (
-                    <option key={size.id} value={size.id}>{size.name}</option>
-                  ))}
-                  {PAPER_SIZES_PRESETS.map(preset => (
-                    <option key={preset.id} value={preset.id}>{preset.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+                {/* List */}
+                {loading ? (
+                  <div className="flex flex-col items-center justify-center py-24 space-y-4">
+                    <div className="w-9 h-9 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-zinc-500 text-sm font-semibold">{language === 'ar' ? 'جاري التحميل...' : 'Loading templates...'}</span>
+                  </div>
+                ) : filteredTemplates.length === 0 ? (
+                  <div className="bg-white border border-dashed border-zinc-200/80 rounded-2xl p-12 text-center flex flex-col items-center justify-center space-y-3">
+                    <FileText size={48} className="text-zinc-300" />
+                    <h3 className="text-base font-bold text-zinc-700">{language === 'ar' ? 'لا يوجد قوالب' : 'No Templates Found'}</h3>
+                    <p className="text-zinc-500 text-xs max-w-sm">
+                      {language === 'ar' 
+                        ? 'لم يتم العثور على أي قوالب مطابقة لمعايير البحث الحالية.' 
+                        : 'No print layouts matched your current search filters.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm flex-1 overflow-y-auto">
+                    <table className="w-full text-sm border-collapse text-left" dir={dir}>
+                      <thead>
+                        <tr className="bg-zinc-50/80 border-b border-zinc-200 text-zinc-700 font-bold">
+                          <th className={`px-6 py-4 text-xs font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            {language === 'ar' ? 'اسم القالب' : 'Template Name'}
+                          </th>
+                          <th className={`px-6 py-4 text-xs font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            {language === 'ar' ? 'حجم الورق' : 'Paper Size'}
+                          </th>
+                          <th className={`px-6 py-4 text-xs font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            {language === 'ar' ? 'الاتجاه' : 'Orientation'}
+                          </th>
+                          <th className={`px-6 py-4 text-xs font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            {language === 'ar' ? 'الهوامش (مم)' : 'Margins (mm)'}
+                          </th>
+                          <th className="px-6 py-4 text-xs font-extrabold text-center">
+                            {language === 'ar' ? 'حالة القالب' : 'Status'}
+                          </th>
+                          <th className="px-6 py-4 text-xs font-extrabold text-center">
+                            {language === 'ar' ? 'إجراءات' : 'Actions'}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100 text-zinc-700">
+                        {filteredTemplates.map((template) => {
+                          const sizeObj = paperSizes.find(p => p.id === template.paper_size_id);
+                          const presetObj = PAPER_SIZES_PRESETS.find(p => p.id === template.paper_size_id);
+                          const sizeName = presetObj?.name || sizeObj?.name || template.paper_size_id;
+                          const sizeWidth = presetObj?.width || sizeObj?.width || '—';
+                          const sizeHeight = presetObj?.height || sizeObj?.height || '—';
 
-            {/* List */}
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-24 space-y-4">
-                <div className="w-9 h-9 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-zinc-500 text-sm font-semibold">{language === 'ar' ? 'جاري التحميل...' : 'Loading templates...'}</span>
-              </div>
-            ) : filteredTemplates.length === 0 ? (
-              <div className="bg-white border border-dashed border-zinc-200/80 rounded-2xl p-12 text-center flex flex-col items-center justify-center space-y-3">
-                <FileText size={48} className="text-zinc-300" />
-                <h3 className="text-base font-bold text-zinc-700">{language === 'ar' ? 'لا يوجد قوالب' : 'No Templates Found'}</h3>
-                <p className="text-zinc-500 text-xs max-w-sm">
-                  {language === 'ar' 
-                    ? 'لم يتم العثور على أي قوالب مطابقة لمعايير البحث الحالية.' 
-                    : 'No print layouts matched your current search filters.'}
-                </p>
-              </div>
-            ) : (
+                          return (
+                            <tr key={template.id} className="hover:bg-zinc-50/50 transition-colors">
+                              <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                <div className="flex items-center gap-2">
+                                  <div className="font-bold text-zinc-950">{template.name}</div>
+                                  {template.is_default && (
+                                    <span className="text-[9px] bg-amber-50 text-amber-700 font-extrabold px-1.5 py-0.5 rounded border border-amber-200/50">
+                                      {language === 'ar' ? 'الافتراضي' : 'Default'}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-zinc-400 font-bold mt-0.5">
+                                  {DOCUMENT_TYPES.find(d => d.id === template.document_type)?.ar || template.document_type || ''}
+                                </div>
+                                {template.description && (
+                                  <div className="text-zinc-500 text-xs mt-1 line-clamp-1">{template.description}</div>
+                                )}
+                              </td>
+                              <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-semibold text-zinc-800">{sizeName}</span>
+                                  <span className="text-[10px] text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">
+                                    {sizeWidth} × {sizeHeight} mm
+                                  </span>
+                                </div>
+                              </td>
+                              <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} uppercase font-medium text-zinc-700`}>
+                                {template.orientation === 'portrait'
+                                  ? (language === 'ar' ? 'طولي (Portrait)' : 'Portrait')
+                                  : (language === 'ar' ? 'عرضي (Landscape)' : 'Landscape')}
+                              </td>
+                              <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} text-xs font-medium text-zinc-600`}>
+                                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 max-w-[160px]">
+                                  <span>{language === 'ar' ? 'أعلى:' : 'Top:'} {template.margin_top}</span>
+                                  <span>{language === 'ar' ? 'أسفل:' : 'Bottom:'} {template.margin_bottom}</span>
+                                  <span>{language === 'ar' ? 'يمين:' : 'Right:'} {template.margin_right}</span>
+                                  <span>{language === 'ar' ? 'يسار:' : 'Left:'} {template.margin_left}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                                  template.is_active
+                                    ? 'bg-emerald-50/80 text-emerald-700 border-emerald-200/50'
+                                    : 'bg-zinc-50 text-zinc-500 border-zinc-200/50'
+                                }`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${template.is_active ? 'bg-emerald-600' : 'bg-zinc-400'}`}></span>
+                                  {template.is_active ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex items-center justify-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEdit(template)}
+                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                    title={language === 'ar' ? 'تعديل التصميم' : 'Edit Design'}
+                                  >
+                                    <Edit2 size={16} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopy(template)}
+                                    className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                                    title={language === 'ar' ? 'نسخ القالب' : 'Copy Template'}
+                                  >
+                                    <Copy size={16} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDelete(template.id)}
+                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                    title={language === 'ar' ? 'حذف القالب' : 'Delete Template'}
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            ) : subTab === 'profiles' ? (
               <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm flex-1 overflow-y-auto">
                 <table className="w-full text-sm border-collapse text-left" dir={dir}>
                   <thead>
                     <tr className="bg-zinc-50/80 border-b border-zinc-200 text-zinc-700 font-bold">
                       <th className={`px-6 py-4 text-xs font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                        {language === 'ar' ? 'اسم القالب' : 'Template Name'}
+                        {language === 'ar' ? 'اسم ملف التعريف' : 'Profile Name'}
                       </th>
                       <th className={`px-6 py-4 text-xs font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                         {language === 'ar' ? 'حجم الورق' : 'Paper Size'}
@@ -1546,8 +1968,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                       <th className={`px-6 py-4 text-xs font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                         {language === 'ar' ? 'الهوامش (مم)' : 'Margins (mm)'}
                       </th>
-                      <th className="px-6 py-4 text-xs font-extrabold text-center">
-                        {language === 'ar' ? 'حالة القالب' : 'Status'}
+                      <th className={`px-6 py-4 text-xs font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {language === 'ar' ? 'دقة الطباعة' : 'Resolution'}
                       </th>
                       <th className="px-6 py-4 text-xs font-extrabold text-center">
                         {language === 'ar' ? 'إجراءات' : 'Actions'}
@@ -1555,99 +1977,205 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100 text-zinc-700">
-                    {filteredTemplates.map((template) => {
-                      const sizeObj = paperSizes.find(p => p.id === template.paper_size_id);
-                      const presetObj = PAPER_SIZES_PRESETS.find(p => p.id === template.paper_size_id);
-                      const sizeName = presetObj?.name || sizeObj?.name || template.paper_size_id;
-                      const sizeWidth = presetObj?.width || sizeObj?.width || '—';
-                      const sizeHeight = presetObj?.height || sizeObj?.height || '—';
+                    {printProfiles.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-12 text-zinc-400 font-bold">
+                          {language === 'ar' ? 'لا توجد ملفات تعريف طباعة مضافة بعد.' : 'No print profiles created yet.'}
+                        </td>
+                      </tr>
+                    ) : (
+                      printProfiles.map((profile) => {
+                        const sizeObj = paperSizes.find(p => p.id === profile.paper_size_id);
+                        const presetObj = PAPER_SIZES_PRESETS.find(p => p.id === profile.paper_size_id);
+                        const sizeName = presetObj?.name || sizeObj?.name || profile.paper_size_id;
+                        const sizeWidth = presetObj?.width || sizeObj?.width || profile.custom_width || '—';
+                        const sizeHeight = presetObj?.height || sizeObj?.height || profile.custom_height || '—';
 
-                      return (
-                        <tr key={template.id} className="hover:bg-zinc-50/50 transition-colors">
-                          <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                            <div className="flex items-center gap-2">
-                              <div className="font-bold text-zinc-950">{template.name}</div>
-                              {template.is_default && (
-                                <span className="text-[9px] bg-amber-50 text-amber-700 font-extrabold px-1.5 py-0.5 rounded border border-amber-200/50">
-                                  {language === 'ar' ? 'الافتراضي' : 'Default'}
+                        return (
+                          <tr key={profile.id} className="hover:bg-zinc-50/50 transition-colors">
+                            <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} font-bold text-zinc-950`}>
+                              {profile.name}
+                            </td>
+                            <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-semibold text-zinc-800 capitalize">{sizeName}</span>
+                                <span className="text-[10px] text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">
+                                  {sizeWidth} × {sizeHeight} mm
                                 </span>
-                              )}
-                            </div>
-                            <div className="text-[10px] text-zinc-400 font-bold mt-0.5">
-                              {DOCUMENT_TYPES.find(d => d.id === template.document_type)?.ar || template.document_type || ''}
-                            </div>
-                            {template.description && (
-                              <div className="text-zinc-500 text-xs mt-1 line-clamp-1">{template.description}</div>
-                            )}
-                          </td>
-                          <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-semibold text-zinc-800">{sizeName}</span>
-                              <span className="text-[10px] text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">
-                                {sizeWidth} × {sizeHeight} mm
-                              </span>
-                            </div>
-                          </td>
-                          <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} capitalize`}>
-                            <span className="font-medium text-zinc-700">
-                              {template.orientation === 'portrait'
+                              </div>
+                            </td>
+                            <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} capitalize font-medium text-zinc-700`}>
+                              {profile.orientation === 'portrait'
                                 ? (language === 'ar' ? 'طولي (Portrait)' : 'Portrait')
                                 : (language === 'ar' ? 'عرضي (Landscape)' : 'Landscape')}
-                            </span>
-                          </td>
-                          <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} text-xs font-medium text-zinc-600`}>
-                            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 max-w-[160px]">
-                              <span>{language === 'ar' ? 'أعلى:' : 'Top:'} {template.margin_top}</span>
-                              <span>{language === 'ar' ? 'أسفل:' : 'Bottom:'} {template.margin_bottom}</span>
-                              <span>{language === 'ar' ? 'يمين:' : 'Right:'} {template.margin_right}</span>
-                              <span>{language === 'ar' ? 'يسار:' : 'Left:'} {template.margin_left}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${
-                              template.is_active
-                                ? 'bg-emerald-50/80 text-emerald-700 border-emerald-200/50'
-                                : 'bg-zinc-50 text-zinc-500 border-zinc-200/50'
-                            }`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${template.is_active ? 'bg-emerald-600' : 'bg-zinc-400'}`}></span>
-                              {template.is_active ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center justify-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleEdit(template)}
-                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                title={language === 'ar' ? 'تعديل التصميم' : 'Edit Design'}
-                              >
-                                <Edit2 size={16} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleCopy(template)}
-                                className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                                title={language === 'ar' ? 'نسخ القالب' : 'Copy Template'}
-                              >
-                                <Copy size={16} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDelete(template.id)}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                title={language === 'ar' ? 'حذف القالب' : 'Delete Template'}
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                            </td>
+                            <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} text-xs font-medium text-zinc-600`}>
+                              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 max-w-[160px]">
+                                <span>{language === 'ar' ? 'أعلى:' : 'Top:'} {profile.margin_top}</span>
+                                <span>{language === 'ar' ? 'أسفل:' : 'Bottom:'} {profile.margin_bottom}</span>
+                                <span>{language === 'ar' ? 'يمين:' : 'Right:'} {profile.margin_right}</span>
+                                <span>{language === 'ar' ? 'يسار:' : 'Left:'} {profile.margin_left}</span>
+                              </div>
+                            </td>
+                            <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} font-semibold text-zinc-800`}>
+                              {profile.dpi} DPI
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingProfile(profile);
+                                    setProfileFormData({
+                                      name: profile.name,
+                                      paper_size_id: profile.paper_size_id,
+                                      custom_width: Number(profile.custom_width || 210),
+                                      custom_height: Number(profile.custom_height || 297),
+                                      orientation: profile.orientation,
+                                      margin_top: Number(profile.margin_top),
+                                      margin_bottom: Number(profile.margin_bottom),
+                                      margin_left: Number(profile.margin_left),
+                                      margin_right: Number(profile.margin_right),
+                                      dpi: Number(profile.dpi || 300),
+                                      print_settings: JSON.stringify(profile.print_settings || {}, null, 2)
+                                    });
+                                    setIsProfileModalOpen(true);
+                                  }}
+                                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                  title={language === 'ar' ? 'تعديل الملف' : 'Edit Profile'}
+                                >
+                                  <Edit2 size={16} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyProfile(profile)}
+                                  className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                                  title={language === 'ar' ? 'نسخ الملف' : 'Copy Profile'}
+                                >
+                                  <Copy size={16} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteProfile(profile.id)}
+                                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                  title={language === 'ar' ? 'حذف الملف' : 'Delete Profile'}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
-            )}
+            ) : subTab === 'assignments' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto flex-1 pb-10">
+                {DOCUMENT_TYPES.map((docType) => {
+                  const matchedTemplates = templates.filter(t => t.document_type === docType.id);
+                  const defaultTemplate = matchedTemplates.find(t => t.is_default);
+
+                  return (
+                    <div
+                      key={docType.id}
+                      className="bg-white border border-zinc-200 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4 font-bold"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-black text-zinc-900 text-sm">
+                            {language === 'ar' ? docType.ar.split(' / ')[0] : docType.en}
+                          </h3>
+                          <span className="text-[10px] text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded-full font-bold">
+                            {matchedTemplates.length} {language === 'ar' ? 'قوالب' : 'Templates'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-zinc-400 font-semibold mt-1">
+                          {language === 'ar' ? `تخصيص القوالب والطباعة لـ ${docType.ar.split(' / ')[0]}` : `Assign and configure print routing for ${docType.en}`}
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[11px] text-zinc-500 font-bold block">
+                          {language === 'ar' ? 'القالب الافتراضي النشط:' : 'Active Default Template:'}
+                        </label>
+                        {matchedTemplates.length === 0 ? (
+                          <div className="p-3 bg-amber-50/50 border border-dashed border-amber-200 rounded-2xl text-center">
+                            <span className="text-[10px] text-amber-700 font-bold block">
+                              {language === 'ar' ? 'لا يوجد أي قوالب مصممة لهذه العملية' : 'No templates designed for this operation'}
+                            </span>
+                          </div>
+                        ) : (
+                          <select
+                            value={defaultTemplate?.id || ''}
+                            onChange={(e) => handleSetDefaultTemplate(e.target.value, docType.id)}
+                            className="w-full bg-zinc-50 border border-zinc-200 px-3 py-2.5 rounded-xl text-xs font-bold outline-none focus:border-emerald-500 focus:bg-white transition-all"
+                          >
+                            <option value="">{language === 'ar' ? 'اختر قالب افتراضي...' : 'Select default template...'}</option>
+                            {matchedTemplates.map(t => (
+                              <option key={t.id} value={t.id}>{t.name} ({t.paper_size_id.toUpperCase()})</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+
+                      <div className="pt-3 border-t border-zinc-100 flex items-center justify-between gap-2">
+                        {matchedTemplates.length > 0 && (
+                          <div className="text-[10px] text-zinc-500 font-semibold">
+                            {defaultTemplate ? (
+                              <span className="text-emerald-600 flex items-center gap-1">
+                                <Check size={12} />
+                                <span>{language === 'ar' ? 'افتراضي: ' : 'Default: '}{defaultTemplate.name}</span>
+                              </span>
+                            ) : (
+                              <span className="text-amber-600 font-bold">
+                                {language === 'ar' ? 'لم يتم تحديد قالب افتراضي' : 'No default selected'}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData({
+                              name: '',
+                              description: '',
+                              paper_size_id: 'a4',
+                              orientation: 'portrait',
+                              margin_top: 10,
+                              margin_bottom: 10,
+                              margin_left: 10,
+                              margin_right: 10,
+                              is_active: true,
+                              customWidth: 210,
+                              customHeight: 297,
+                              customUnit: 'mm',
+                              document_type: docType.id,
+                              is_default: matchedTemplates.length === 0,
+                              print_profile_id: ''
+                            });
+                            const targetLayout = JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
+                            setDesignerLayout(targetLayout);
+                            setHistory([JSON.parse(JSON.stringify(targetLayout))]);
+                            setHistoryIndex(0);
+                            setEditingTemplate(null);
+                            setSelectedElementId(null);
+                            setSelectedSection(null);
+                            setPreviewMode(false);
+                            setView('create');
+                          }}
+                          className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-[10px] font-black transition-all ml-auto"
+                        >
+                          <Plus size={12} />
+                          <span>{language === 'ar' ? 'إضافة قالب' : 'Add Template'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
           </motion.div>
         ) : (
           /* DESIGNER INTERFACE */
@@ -2255,10 +2783,10 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                     className="bg-white border border-zinc-300 shadow-2xl transition-all relative overflow-hidden"
                     style={{
                       width: `${printableWidth * zoomScale}px`,
-                      paddingTop: `${formData.margin_top * zoomScale}px`,
-                      paddingBottom: `${formData.margin_bottom * zoomScale}px`,
-                      paddingLeft: `${formData.margin_left * zoomScale}px`,
-                      paddingRight: `${formData.margin_right * zoomScale}px`,
+                      paddingTop: `${margins.top * zoomScale}px`,
+                      paddingBottom: `${margins.bottom * zoomScale}px`,
+                      paddingLeft: `${margins.left * zoomScale}px`,
+                      paddingRight: `${margins.right * zoomScale}px`,
                       backgroundImage: designerLayout.bgImage ? `url(${designerLayout.bgImage})` : 'none',
                       backgroundSize: 'cover',
                       backgroundPosition: 'center',
@@ -2502,10 +3030,10 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                     className="bg-white border border-zinc-300 shadow-xl relative overflow-hidden transition-all"
                     style={{
                       width: `${printableWidth * zoomScale}px`,
-                      paddingTop: `${formData.margin_top * zoomScale}px`,
-                      paddingBottom: `${formData.margin_bottom * zoomScale}px`,
-                      paddingLeft: `${formData.margin_left * zoomScale}px`,
-                      paddingRight: `${formData.margin_right * zoomScale}px`,
+                      paddingTop: `${margins.top * zoomScale}px`,
+                      paddingBottom: `${margins.bottom * zoomScale}px`,
+                      paddingLeft: `${margins.left * zoomScale}px`,
+                      paddingRight: `${margins.right * zoomScale}px`,
                       backgroundImage: designerLayout.bgImage ? `url(${designerLayout.bgImage})` : 'none',
                       backgroundSize: 'cover',
                       backgroundPosition: 'center',
@@ -2565,14 +3093,14 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                           <div 
                             key={`x-${index}`} 
                             className="absolute top-0 bottom-0 border-l border-dashed border-red-500" 
-                            style={{ left: `${(xVal + formData.margin_left) * zoomScale}px` }} 
+                            style={{ left: `${(xVal + margins.left) * zoomScale}px` }} 
                           />
                         ))}
                         {snapGuides.y.map((yVal, index) => (
                           <div 
                             key={`y-${index}`} 
                             className="absolute left-0 right-0 border-t border-dashed border-red-500" 
-                            style={{ top: `${(yVal + formData.margin_top) * zoomScale}px` }} 
+                            style={{ top: `${(yVal + margins.top) * zoomScale}px` }} 
                           />
                         ))}
                       </div>
@@ -3552,12 +4080,34 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
                     <div className="flex-1 overflow-y-auto p-4 space-y-5">
                       
+                      {/* Print Profile Select */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-zinc-700">{language === 'ar' ? 'ملف تعريف الطباعة (Print Profile)' : 'Print Profile'}</label>
+                        <select
+                          className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                          value={formData.print_profile_id || ''}
+                          onChange={(e) => setFormData(prev => ({ ...prev, print_profile_id: e.target.value }))}
+                        >
+                          <option value="">{language === 'ar' ? 'مخصص بالقالب (None)' : 'Local Template Settings (None)'}</option>
+                          {printProfiles.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
+                        {formData.print_profile_id && (
+                          <div className="p-2.5 bg-emerald-50/50 text-[10px] text-emerald-700 font-bold rounded-xl border border-emerald-100 flex items-start gap-1.5 mt-1.5">
+                            <Info size={12} className="mt-0.5 shrink-0" />
+                            <span>{language === 'ar' ? 'أبعاد الصفحة والهوامش والاتجاه مقيدة وتدار بالكامل بواسطة ملف تعريف الطباعة المحدد.' : 'Page size, orientation, and margins are managed by the linked print profile.'}</span>
+                          </div>
+                        )}
+                      </div>
+
                       {/* Paper preset */}
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold text-zinc-700">{language === 'ar' ? 'حجم الورقة' : 'Paper Size'}</label>
                         <select
-                          className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold outline-none"
-                          value={formData.paper_size_id}
+                          disabled={!!formData.print_profile_id}
+                          className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold outline-none disabled:opacity-60"
+                          value={formData.print_profile_id ? (printProfiles.find(p => p.id === formData.print_profile_id)?.paper_size_id ?? 'a4') : formData.paper_size_id}
                           onChange={(e) => setFormData(prev => ({ ...prev, paper_size_id: e.target.value }))}
                         >
                           {PAPER_SIZES_PRESETS.map(preset => (
@@ -3570,14 +4120,15 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                         </select>
                       </div>
 
-                      {formData.paper_size_id === 'custom' && (
+                      {((formData.print_profile_id ? (printProfiles.find(p => p.id === formData.print_profile_id)?.paper_size_id) : formData.paper_size_id) === 'custom') && (
                         <div className="grid grid-cols-2 gap-3 bg-zinc-50 p-3 rounded-xl border border-zinc-200">
                           <div className="space-y-1">
                             <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'العرض (مم)' : 'Width (mm)'}</label>
                             <input
                               type="number"
-                              className="w-full px-2 py-1.5 bg-white border border-zinc-200 rounded-lg text-xs"
-                              value={formData.customWidth}
+                              disabled={!!formData.print_profile_id}
+                              className="w-full px-2 py-1.5 bg-white border border-zinc-200 rounded-lg text-xs disabled:opacity-60"
+                              value={formData.print_profile_id ? (printProfiles.find(p => p.id === formData.print_profile_id)?.custom_width ?? formData.customWidth) : formData.customWidth}
                               onChange={(e) => setFormData(prev => ({ ...prev, customWidth: parseInt(e.target.value) || 210 }))}
                             />
                           </div>
@@ -3585,8 +4136,9 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'الارتفاع (مم)' : 'Height (mm)'}</label>
                             <input
                               type="number"
-                              className="w-full px-2 py-1.5 bg-white border border-zinc-200 rounded-lg text-xs"
-                              value={formData.customHeight}
+                              disabled={!!formData.print_profile_id}
+                              className="w-full px-2 py-1.5 bg-white border border-zinc-200 rounded-lg text-xs disabled:opacity-60"
+                              value={formData.print_profile_id ? (printProfiles.find(p => p.id === formData.print_profile_id)?.custom_height ?? formData.customHeight) : formData.customHeight}
                               onChange={(e) => setFormData(prev => ({ ...prev, customHeight: parseInt(e.target.value) || 297 }))}
                             />
                           </div>
@@ -3599,10 +4151,11 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                         <div className="flex gap-2">
                           <button
                             type="button"
+                            disabled={!!formData.print_profile_id}
                             onClick={() => setFormData(prev => ({ ...prev, orientation: 'portrait' }))}
-                            className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all ${
-                              formData.orientation === 'portrait' 
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                            className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all disabled:opacity-60 ${
+                              (formData.print_profile_id ? (printProfiles.find(p => p.id === formData.print_profile_id)?.orientation ?? 'portrait') : formData.orientation) === 'portrait' 
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 font-extrabold' 
                                 : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:bg-zinc-100'
                             }`}
                           >
@@ -3610,10 +4163,11 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                           </button>
                           <button
                             type="button"
+                            disabled={!!formData.print_profile_id}
                             onClick={() => setFormData(prev => ({ ...prev, orientation: 'landscape' }))}
-                            className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all ${
-                              formData.orientation === 'landscape' 
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                            className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all disabled:opacity-60 ${
+                              (formData.print_profile_id ? (printProfiles.find(p => p.id === formData.print_profile_id)?.orientation ?? 'portrait') : formData.orientation) === 'landscape' 
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 font-extrabold' 
                                 : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:bg-zinc-100'
                             }`}
                           >
@@ -3655,8 +4209,9 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'الهامش العلوي' : 'Top Margin'}</label>
                             <input
                               type="number"
-                              className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs"
-                              value={formData.margin_top}
+                              disabled={!!formData.print_profile_id}
+                              className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs disabled:opacity-60"
+                              value={formData.print_profile_id ? (printProfiles.find(p => p.id === formData.print_profile_id)?.margin_top ?? formData.margin_top) : formData.margin_top}
                               onChange={(e) => setFormData(prev => ({ ...prev, margin_top: parseInt(e.target.value) || 0 }))}
                             />
                           </div>
@@ -3664,8 +4219,9 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'الهامش السفلي' : 'Bottom Margin'}</label>
                             <input
                               type="number"
-                              className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs"
-                              value={formData.margin_bottom}
+                              disabled={!!formData.print_profile_id}
+                              className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs disabled:opacity-60"
+                              value={formData.print_profile_id ? (printProfiles.find(p => p.id === formData.print_profile_id)?.margin_bottom ?? formData.margin_bottom) : formData.margin_bottom}
                               onChange={(e) => setFormData(prev => ({ ...prev, margin_bottom: parseInt(e.target.value) || 0 }))}
                             />
                           </div>
@@ -3673,8 +4229,9 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'الهامش الأيسر' : 'Left Margin'}</label>
                             <input
                               type="number"
-                              className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs"
-                              value={formData.margin_left}
+                              disabled={!!formData.print_profile_id}
+                              className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs disabled:opacity-60"
+                              value={formData.print_profile_id ? (printProfiles.find(p => p.id === formData.print_profile_id)?.margin_left ?? formData.margin_left) : formData.margin_left}
                               onChange={(e) => setFormData(prev => ({ ...prev, margin_left: parseInt(e.target.value) || 0 }))}
                             />
                           </div>
@@ -3682,8 +4239,9 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'الهامش الأيمن' : 'Right Margin'}</label>
                             <input
                               type="number"
-                              className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs"
-                              value={formData.margin_right}
+                              disabled={!!formData.print_profile_id}
+                              className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs disabled:opacity-60"
+                              value={formData.print_profile_id ? (printProfiles.find(p => p.id === formData.print_profile_id)?.margin_right ?? formData.margin_right) : formData.margin_right}
                               onChange={(e) => setFormData(prev => ({ ...prev, margin_right: parseInt(e.target.value) || 0 }))}
                             />
                           </div>
@@ -3983,6 +4541,227 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                         {language === 'ar' ? 'حفظ الإصدار والتصميم' : 'Save Version & Design'}
                       </button>
                     </div>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
+
+            {/* Print Profile Edit/Create Modal */}
+            <AnimatePresence>
+              {isProfileModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] flex items-center justify-center p-4">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                    className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-zinc-100 flex flex-col max-h-[90vh] font-bold Cairo"
+                    dir={dir}
+                  >
+                    {/* Header */}
+                    <div className="p-5 border-b border-zinc-100 bg-zinc-50 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 text-zinc-900">
+                        <Settings className="text-emerald-600 animate-spin-slow" size={20} />
+                        <h3 className="text-base font-black">
+                          {editingProfile 
+                            ? (language === 'ar' ? 'تعديل ملف تعريف الطباعة' : 'Edit Print Profile')
+                            : (language === 'ar' ? 'إنشاء ملف تعريف طباعة جديد' : 'New Print Profile')}
+                        </h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProfileModalOpen(false);
+                          setEditingProfile(null);
+                        }}
+                        className="p-1 hover:bg-zinc-200 text-zinc-400 hover:text-zinc-600 rounded-lg transition-colors"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    {/* Form Body */}
+                    <form onSubmit={handleSaveProfile} className="flex-1 overflow-y-auto p-6 space-y-4 text-xs font-semibold text-zinc-700">
+                      <div className="space-y-1.5">
+                        <label className="text-zinc-600 font-bold">
+                          {language === 'ar' ? 'اسم ملف التعريف *' : 'Profile Name *'}
+                        </label>
+                        <input
+                          required
+                          type="text"
+                          className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:bg-white focus:border-emerald-600 transition-all font-semibold text-zinc-800"
+                          value={profileFormData.name}
+                          onChange={(e) => setProfileFormData(prev => ({ ...prev, name: e.target.value }))}
+                          placeholder={language === 'ar' ? 'مثال: طابعة الفواتير الحرارية الصيدلية' : 'e.g., Pharmacy Thermal Printer'}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-zinc-600 font-bold">{language === 'ar' ? 'حجم الورق' : 'Paper Size'}</label>
+                          <select
+                            className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:bg-white focus:border-emerald-600 transition-all font-semibold text-zinc-850"
+                            value={profileFormData.paper_size_id}
+                            onChange={(e) => setProfileFormData(prev => ({ ...prev, paper_size_id: e.target.value }))}
+                          >
+                            <option value="a4">A4 (210 x 297 mm)</option>
+                            <option value="a5">A5 (148 x 210 mm)</option>
+                            <option value="a6">A6 (105 x 148 mm)</option>
+                            <option value="letter">Letter (8.5 x 11 in)</option>
+                            <option value="legal">Legal (8.5 x 14 in)</option>
+                            <option value="thermal_80">Thermal 80mm</option>
+                            <option value="thermal_58">Thermal 58mm</option>
+                            <option value="custom">{language === 'ar' ? 'حجم مخصص' : 'Custom Size'}</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-zinc-600 font-bold">{language === 'ar' ? 'الدقة (DPI)' : 'Resolution (DPI)'}</label>
+                          <input
+                            type="number"
+                            className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:bg-white focus:border-emerald-600 transition-all font-semibold text-zinc-800"
+                            value={profileFormData.dpi}
+                            onChange={(e) => setProfileFormData(prev => ({ ...prev, dpi: Number(e.target.value) }))}
+                            min={72}
+                            max={1200}
+                          />
+                        </div>
+                      </div>
+
+                      {profileFormData.paper_size_id === 'custom' && (
+                        <div className="grid grid-cols-2 gap-4 bg-zinc-50 p-3 rounded-2xl border border-zinc-200/50">
+                          <div className="space-y-1.5">
+                            <label className="text-zinc-600 font-bold">{language === 'ar' ? 'العرض (مم) *' : 'Width (mm) *'}</label>
+                            <input
+                              required
+                              type="number"
+                              className="w-full px-4 py-2 bg-white border border-zinc-200 rounded-lg outline-none focus:border-emerald-600 transition-all font-semibold text-zinc-800"
+                              value={profileFormData.custom_width}
+                              onChange={(e) => setProfileFormData(prev => ({ ...prev, custom_width: Number(e.target.value) }))}
+                              min={10}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-zinc-600 font-bold">{language === 'ar' ? 'الارتفاع (مم) *' : 'Height (mm) *'}</label>
+                            <input
+                              required
+                              type="number"
+                              className="w-full px-4 py-2 bg-white border border-zinc-200 rounded-lg outline-none focus:border-emerald-600 transition-all font-semibold text-zinc-800"
+                              value={profileFormData.custom_height}
+                              onChange={(e) => setProfileFormData(prev => ({ ...prev, custom_height: Number(e.target.value) }))}
+                              min={10}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="space-y-1.5">
+                        <label className="text-zinc-600 font-bold block">{language === 'ar' ? 'اتجاه الصفحة' : 'Orientation'}</label>
+                        <div className="flex gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer font-semibold">
+                            <input
+                              type="radio"
+                              name="profile_orientation"
+                              checked={profileFormData.orientation === 'portrait'}
+                              onChange={() => setProfileFormData(prev => ({ ...prev, orientation: 'portrait' }))}
+                              className="text-emerald-600 focus:ring-emerald-500"
+                            />
+                            <span>{language === 'ar' ? 'طولي (Portrait)' : 'Portrait'}</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer font-semibold">
+                            <input
+                              type="radio"
+                              name="profile_orientation"
+                              checked={profileFormData.orientation === 'landscape'}
+                              onChange={() => setProfileFormData(prev => ({ ...prev, orientation: 'landscape' }))}
+                              className="text-emerald-600 focus:ring-emerald-500"
+                            />
+                            <span>{language === 'ar' ? 'عرضي (Landscape)' : 'Landscape'}</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Margins */}
+                      <div className="space-y-2">
+                        <label className="text-zinc-600 font-bold block">{language === 'ar' ? 'الهوامش (مم)' : 'Margins (mm)'}</label>
+                        <div className="grid grid-cols-4 gap-2 bg-zinc-50 p-3.5 rounded-2xl border border-zinc-200/50 text-center">
+                          <div className="space-y-1">
+                            <span className="text-[10px] text-zinc-400 block">{language === 'ar' ? 'أعلى' : 'Top'}</span>
+                            <input
+                              type="number"
+                              className="w-full px-2 py-1.5 bg-white border border-zinc-200 rounded-lg text-center font-bold text-zinc-800"
+                              value={profileFormData.margin_top}
+                              onChange={(e) => setProfileFormData(prev => ({ ...prev, margin_top: Number(e.target.value) }))}
+                              min={0}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-[10px] text-zinc-400 block">{language === 'ar' ? 'أسفل' : 'Bottom'}</span>
+                            <input
+                              type="number"
+                              className="w-full px-2 py-1.5 bg-white border border-zinc-200 rounded-lg text-center font-bold text-zinc-800"
+                              value={profileFormData.margin_bottom}
+                              onChange={(e) => setProfileFormData(prev => ({ ...prev, margin_bottom: Number(e.target.value) }))}
+                              min={0}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-[10px] text-zinc-400 block">{language === 'ar' ? 'يمين' : 'Right'}</span>
+                            <input
+                              type="number"
+                              className="w-full px-2 py-1.5 bg-white border border-zinc-200 rounded-lg text-center font-bold text-zinc-800"
+                              value={profileFormData.margin_right}
+                              onChange={(e) => setProfileFormData(prev => ({ ...prev, margin_right: Number(e.target.value) }))}
+                              min={0}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-[10px] text-zinc-400 block">{language === 'ar' ? 'يسار' : 'Left'}</span>
+                            <input
+                              type="number"
+                              className="w-full px-2 py-1.5 bg-white border border-zinc-200 rounded-lg text-center font-bold text-zinc-800"
+                              value={profileFormData.margin_left}
+                              onChange={(e) => setProfileFormData(prev => ({ ...prev, margin_left: Number(e.target.value) }))}
+                              min={0}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Print settings JSON */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-zinc-600 font-bold">{language === 'ar' ? 'إعدادات طباعة إضافية (JSON)' : 'Additional Print Settings (JSON)'}</label>
+                          <span className="text-[9px] text-zinc-400">Optional</span>
+                        </div>
+                        <textarea
+                          className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:bg-white focus:border-emerald-600 transition-all font-mono text-[10px] font-semibold text-zinc-800"
+                          rows={3}
+                          value={profileFormData.print_settings}
+                          onChange={(e) => setProfileFormData(prev => ({ ...prev, print_settings: e.target.value }))}
+                          placeholder='{\n  "copies": 1,\n  "density": 10\n}'
+                        />
+                      </div>
+
+                      {/* Footer Actions */}
+                      <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsProfileModalOpen(false);
+                            setEditingProfile(null);
+                          }}
+                          className="px-4 py-2 border border-zinc-200 hover:bg-zinc-100 text-zinc-700 rounded-xl text-xs font-bold transition-all"
+                        >
+                          {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-600/10 hover:shadow-emerald-600/25"
+                        >
+                          {language === 'ar' ? 'حفظ ملف التعريف' : 'Save Profile'}
+                        </button>
+                      </div>
+                    </form>
                   </motion.div>
                 </div>
               )}

@@ -25,7 +25,7 @@ import { ExportButtons } from '../components/ExportButtons';
 import { PaginationControls } from '../components/PaginationControls';
 import { usePermissions } from '../hooks/usePermissions';
 import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
-import { TemplatePrintModal } from '../components/TemplatePrintModal';
+import { printDocument } from '../utils/printEngine';
 
 import { useLanguage } from '../contexts/LanguageContext';
 import { transactionManager, TransactionManager } from '../services/TransactionManager';
@@ -174,8 +174,6 @@ export const Invoices: React.FC = () => {
   const [allPurchaseInvoices, setAllPurchaseInvoices] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>(null);
   const [companyData, setCompanyData] = useState<Company | null>(null);
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [printModalData, setPrintModalData] = useState<any>(null);
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [companyCurrencies, setCompanyCurrencies] = useState<Currency[]>([]);
   const [selectedCurrencyId, setSelectedCurrencyId] = useState<string>('');
@@ -5612,8 +5610,9 @@ export const Invoices: React.FC = () => {
               <div className="flex gap-2">
                 <button 
                   onClick={() => {
-                    setPrintModalData(viewInvoice);
-                    setIsPrintModalOpen(true);
+                    if (viewInvoice) {
+                      printDocument('invoices', viewInvoice.id);
+                    }
                   }}
                   className="flex items-center gap-2 px-6 py-3 bg-white text-slate-700 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
                 >
@@ -5622,8 +5621,9 @@ export const Invoices: React.FC = () => {
                 </button>
                 <button 
                   onClick={() => {
-                    setPrintModalData(viewInvoice);
-                    setIsPrintModalOpen(true);
+                    if (viewInvoice) {
+                      printDocument('invoices', viewInvoice.id);
+                    }
                   }}
                   className="flex items-center gap-2 px-6 py-3 bg-white text-slate-700 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
                 >
@@ -6227,17 +6227,6 @@ export const Invoices: React.FC = () => {
           setActivityLogDocumentId(undefined);
         }} 
         documentId={activityLogDocumentId}
-      />
-
-      <TemplatePrintModal
-        isOpen={isPrintModalOpen}
-        onClose={() => {
-          setIsPrintModalOpen(false);
-          setPrintModalData(null);
-        }}
-        documentType="invoices"
-        documentData={printModalData}
-        title={printModalData ? `فاتورة مبيعات رقم ${printModalData.invoice_number}` : ''}
       />
     </div>
   );

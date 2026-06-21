@@ -1021,3 +1021,51 @@ export interface PersistRatesResult {
   message: string;
 }
 
+export interface PaperSize {
+  id: string;
+  company_id?: string;
+  name: string;
+  width: number;
+  height: number;
+  unit: string;
+  is_system?: boolean;
+}
+
+export interface PrintProfile {
+  id: string;
+  company_id: string;
+  name: string;
+  paper_size_id: string;
+  custom_width?: number;
+  custom_height?: number;
+  orientation: 'portrait' | 'landscape';
+  margin_top: number;
+  margin_bottom: number;
+  margin_left: number;
+  margin_right: number;
+  dpi: number;
+  print_settings?: any;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Template {
+  id: string;
+  company_id: string;
+  name: string;
+  description: string;
+  paper_size_id: string;
+  orientation: 'portrait' | 'landscape';
+  margin_top: number;
+  margin_bottom: number;
+  margin_left: number;
+  margin_right: number;
+  is_active: boolean;
+  layout?: any;
+  document_type?: string;
+  is_default?: boolean;
+  print_profile_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+

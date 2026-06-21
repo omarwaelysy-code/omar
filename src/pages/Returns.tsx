@@ -16,7 +16,7 @@ import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { InlineActivityLog } from '../components/InlineActivityLog';
 import { ExportButtons } from '../components/ExportButtons';
-import { TemplatePrintModal } from '../components/TemplatePrintModal';
+import { printDocument } from '../utils/printEngine';
 import { ActivityLog, Company } from '../types';
 import { PaginationControls } from '../components/PaginationControls';
 import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
@@ -56,8 +56,6 @@ export const Returns: React.FC = () => {
   const [maxSeqGenerated, setMaxSeqGenerated] = useState<number>(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewReturn, setViewReturn] = useState<Return | null>(null);
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [printModalData, setPrintModalData] = useState<any>(null);
   const [view, setView] = useState<'table' | 'card'>('table');
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -3106,8 +3104,9 @@ export const Returns: React.FC = () => {
                 <div className="flex gap-2">
                   <button 
                     onClick={() => {
-                      setPrintModalData(viewReturn);
-                      setIsPrintModalOpen(true);
+                      if (viewReturn) {
+                        printDocument('returns', viewReturn.id);
+                      }
                     }}
                     className="flex items-center gap-2 px-6 py-3 bg-white text-slate-700 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm cursor-pointer"
                   >
@@ -3116,8 +3115,9 @@ export const Returns: React.FC = () => {
                   </button>
                   <button 
                     onClick={() => {
-                      setPrintModalData(viewReturn);
-                      setIsPrintModalOpen(true);
+                      if (viewReturn) {
+                        printDocument('returns', viewReturn.id);
+                      }
                     }}
                     className="flex items-center gap-2 px-6 py-3 bg-white text-slate-700 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm cursor-pointer"
                   >
@@ -3429,17 +3429,6 @@ export const Returns: React.FC = () => {
         }}
         category="returns"
         documentId={activityLogDocumentId}
-      />
-
-      <TemplatePrintModal
-        isOpen={isPrintModalOpen}
-        onClose={() => {
-          setIsPrintModalOpen(false);
-          setPrintModalData(null);
-        }}
-        documentType="returns"
-        documentData={printModalData}
-        title={printModalData ? `مرتجع مبيعات رقم ${printModalData.return_number}` : ''}
       />
     </div>
   );
