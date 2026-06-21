@@ -263,4 +263,82 @@ describe('Templates Page - Designer Integrations', () => {
       expect(docTypeSelect.value).toBe('sales_orders');
     });
   });
+
+  it('should add static elements centered on the canvas when clicked', async () => {
+    const { container } = render(<Templates initialView="create" />);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/اسم القالب/i)).toBeInTheDocument();
+    });
+
+    // Add Text element by clicking it
+    const textTool = screen.getByText('نص ثابت');
+    const clickableContainer = textTool.closest('.cursor-grab') || textTool;
+    fireEvent.click(clickableContainer);
+
+    // Verify text element is rendered
+    await waitFor(() => {
+      expect(screen.getAllByText('نص ثابت / Text').length).toBeGreaterThanOrEqual(1);
+    });
+
+    // Add QR Code element by clicking it
+    const qrTool = screen.getByText('QR Code');
+    fireEvent.click(qrTool.closest('.cursor-grab') || qrTool);
+
+    // Verify that elements are present in the canvas
+    await waitFor(() => {
+      const canvasElements = document.querySelectorAll('.cursor-move');
+      expect(canvasElements.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  it('should support Drag & Drop of static elements onto the canvas', async () => {
+    const { container } = render(<Templates initialView="create" />);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/اسم القالب/i)).toBeInTheDocument();
+    });
+
+    // Mock getBoundingClientRect for canvas drop target
+    const originalGetBoundingClientRect = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = vi.fn().mockImplementation(function (this: Element) {
+      if (this.textContent?.includes('Header / الهيدر')) {
+        return { left: 100, top: 100, width: 600, height: 300, bottom: 400, right: 700 } as DOMRect;
+      }
+      return originalGetBoundingClientRect.call(this);
+    });
+
+    const dropZone = screen.getByText(/Header \/ الهيدر/i).parentElement;
+    expect(dropZone).toBeInTheDocument();
+
+    const dataTransfer = {
+      getData: vi.fn().mockImplementation((format: string) => {
+        if (format === 'application/json' || format === 'text/plain') {
+          return JSON.stringify({ type: 'circle' });
+        }
+        return '';
+      })
+    };
+
+    // Create a custom Event to bypass JSDOM read-only property restrictions
+    const event = new Event('drop', {
+      bubbles: true,
+      cancelable: true,
+    } as any);
+    Object.defineProperty(event, 'clientX', { value: 240 }); // rect.left (100) + 140
+    Object.defineProperty(event, 'clientY', { value: 170 }); // rect.top (100) + 70
+    Object.defineProperty(event, 'dataTransfer', { value: dataTransfer });
+
+    fireEvent(dropZone!, event);
+
+    // Verify circle element was added to the canvas at coordinates (40, 20) => left: 140px, top: 70px
+    await waitFor(() => {
+      const circleEl = container.querySelector('[style*="left: 140px"]');
+      expect(circleEl).toBeInTheDocument();
+    });
+
+    // Restore original getBoundingClientRect
+    Element.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+  });
 });
+

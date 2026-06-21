@@ -557,10 +557,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
   const [isUnsavedModalOpen, setIsUnsavedModalOpen] = useState(false);
   const [nextPendingDocType, setNextPendingDocType] = useState<string>('');
 
-  const canvasRefs = {
-    header: useRef<HTMLDivElement>(null),
-    footer: useRef<HTMLDivElement>(null)
-  };
+  const headerCanvasRef = useRef<HTMLDivElement>(null);
+  const footerCanvasRef = useRef<HTMLDivElement>(null);
 
   const [mouseDragState, setMouseDragState] = useState<{
     elementId: string;
@@ -985,14 +983,35 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
   // Add Element to Canvas
   const handleAddElement = (type: TemplateElement['type'], binding?: string, label?: string) => {
     const section = selectedSection === 'footer' ? 'footer' : 'header';
+    
+    let width = 50;
+    let height = 10;
+    if (type === 'line') {
+      width = 100;
+      height = 1.5;
+    } else if (type === 'qr' || type === 'circle' || type === 'logo' || type === 'image') {
+      width = 30;
+      height = 30;
+    } else if (type === 'barcode') {
+      width = 50;
+      height = 15;
+    } else if (type === 'rectangle') {
+      width = 50;
+      height = 20;
+    }
+
+    const sectionHeight = section === 'header' ? designerLayout.headerHeight : designerLayout.footerHeight;
+    const x = Math.max(0, (printableWidth - width) / 2);
+    const y = Math.max(0, (sectionHeight - height) / 2);
+
     const id = `${type}-${Date.now()}`;
     const newElement: TemplateElement = {
       id,
       type,
-      x: 10,
-      y: 10,
-      width: type === 'line' ? 100 : type === 'qr' || type === 'circle' ? 30 : 50,
-      height: type === 'line' ? 2 : type === 'qr' || type === 'circle' ? 30 : 10,
+      x: Math.round(x),
+      y: Math.round(y),
+      width,
+      height,
       properties: {
         text: label || (type === 'text' ? 'نص ثابت / Text' : ''),
         fontFamily: 'Cairo',
@@ -1018,23 +1037,44 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
   // Drag and drop helper
   const handleDragStart = (e: React.DragEvent, type: string, binding?: string, label?: string) => {
-    e.dataTransfer.setData('application/json', JSON.stringify({ type, binding, label }));
+    const payload = JSON.stringify({ type, binding, label });
+    e.dataTransfer.setData('application/json', payload);
+    e.dataTransfer.setData('text/plain', payload);
   };
 
   const handleCanvasDrop = (e: React.DragEvent, section: 'header' | 'footer') => {
     e.preventDefault();
-    const dataStr = e.dataTransfer.getData('application/json');
+    let dataStr = e.dataTransfer.getData('application/json');
+    if (!dataStr) {
+      dataStr = e.dataTransfer.getData('text/plain');
+    }
     if (!dataStr) return;
 
     try {
       const { type, binding, label } = JSON.parse(dataStr);
-      const canvasRef = canvasRefs[section].current;
+      const canvasRef = section === 'header' ? headerCanvasRef.current : footerCanvasRef.current;
       if (!canvasRef) return;
 
+      let width = 50;
+      let height = 10;
+      if (type === 'line') {
+        width = 100;
+        height = 1.5;
+      } else if (type === 'qr' || type === 'circle' || type === 'logo' || type === 'image') {
+        width = 30;
+        height = 30;
+      } else if (type === 'barcode') {
+        width = 50;
+        height = 15;
+      } else if (type === 'rectangle') {
+        width = 50;
+        height = 20;
+      }
+
       const rect = canvasRef.getBoundingClientRect();
-      const x = Math.max(0, Math.min(printableWidth - 30, (e.clientX - rect.left) / zoomScale));
+      const x = Math.max(0, Math.min(printableWidth - width, (e.clientX - rect.left) / zoomScale));
       const sectionHeight = section === 'header' ? designerLayout.headerHeight : designerLayout.footerHeight;
-      const y = Math.max(0, Math.min(sectionHeight - 10, (e.clientY - rect.top) / zoomScale));
+      const y = Math.max(0, Math.min(sectionHeight - height, (e.clientY - rect.top) / zoomScale));
 
       const id = `${type}-${Date.now()}`;
       const newElement: TemplateElement = {
@@ -1042,8 +1082,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
         type: type as TemplateElement['type'],
         x: Math.round(x),
         y: Math.round(y),
-        width: type === 'line' ? 100 : type === 'qr' || type === 'circle' ? 30 : 50,
-        height: type === 'line' ? 1.5 : type === 'qr' || type === 'circle' ? 30 : 10,
+        width,
+        height,
         properties: {
           text: label || (type === 'text' ? 'نص ثابت / Text' : ''),
           fontFamily: 'Cairo',
@@ -1790,7 +1830,9 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
   };
 
   return (
-    <div className="p-6 max-w-[1600px] mx-auto h-full flex flex-col overflow-hidden text-zinc-800" dir={dir}>
+    <div className={`h-full flex flex-col overflow-hidden text-zinc-800 transition-all ${
+      view === 'list' ? 'p-6 max-w-[1600px] mx-auto' : 'p-3 w-full max-w-none'
+    }`} dir={dir}>
       <AnimatePresence mode="wait">
         {view === 'list' ? (
           <motion.div
@@ -2547,8 +2589,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                               onClick={() => handleAddElement(el.type as any)}
                               className="flex items-center gap-2 p-2 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded-xl cursor-grab active:cursor-grabbing text-xs font-bold transition-all"
                             >
-                              <el.icon size={14} className="text-zinc-500" />
-                              <span>{language === 'ar' ? el.label : el.type.toUpperCase()}</span>
+                              <el.icon size={14} className="text-zinc-500 pointer-events-none" />
+                              <span className="pointer-events-none">{language === 'ar' ? el.label : el.type.toUpperCase()}</span>
                             </div>
                           ))}
                         </div>
@@ -2570,8 +2612,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                                   onClick={() => handleAddElement('variable', v.key, language === 'ar' ? v.arLabel : v.enLabel)}
                                   className="p-1.5 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded-lg cursor-grab text-[10px] font-semibold flex items-center justify-between"
                                 >
-                                  <span>{language === 'ar' ? v.arLabel : v.enLabel}</span>
-                                  <Tag size={10} className="text-zinc-400" />
+                                  <span className="pointer-events-none">{language === 'ar' ? v.arLabel : v.enLabel}</span>
+                                  <Tag size={10} className="text-zinc-400 pointer-events-none" />
                                 </div>
                               ))}
                             </div>
@@ -2589,8 +2631,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                                   onClick={() => handleAddElement('variable', v.key, language === 'ar' ? v.arLabel : v.enLabel)}
                                   className="p-1.5 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded-lg cursor-grab text-[10px] font-semibold flex items-center justify-between"
                                 >
-                                  <span>{language === 'ar' ? v.arLabel : v.enLabel}</span>
-                                  <Tag size={10} className="text-zinc-400" />
+                                  <span className="pointer-events-none">{language === 'ar' ? v.arLabel : v.enLabel}</span>
+                                  <Tag size={10} className="text-zinc-400 pointer-events-none" />
                                 </div>
                               ))}
                             </div>
@@ -2608,8 +2650,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                                   onClick={() => handleAddElement('variable', v.key, language === 'ar' ? v.arLabel : v.enLabel)}
                                   className="p-1.5 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded-lg cursor-grab text-[10px] font-semibold flex items-center justify-between"
                                 >
-                                  <span>{language === 'ar' ? v.arLabel : v.enLabel}</span>
-                                  <Tag size={10} className="text-zinc-400" />
+                                  <span className="pointer-events-none">{language === 'ar' ? v.arLabel : v.enLabel}</span>
+                                  <Tag size={10} className="text-zinc-400 pointer-events-none" />
                                 </div>
                               ))}
                             </div>
@@ -2645,8 +2687,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                                 onClick={() => handleAddElement('field', f.code, f.label)}
                                 className="flex items-center justify-between p-2 hover:bg-zinc-50 cursor-grab text-[10px] font-semibold"
                               >
-                                <span>{f.label}</span>
-                                <span className="text-[9px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-mono">{f.code}</span>
+                                <span className="pointer-events-none">{f.label}</span>
+                                <span className="text-[9px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-mono pointer-events-none">{f.code}</span>
                               </div>
                             ))}
                           </div>
@@ -2924,7 +2966,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
               </div>
 
               {/* 2. CENTER WORKSPACE: PAPER SHEET RENDERING */}
-              <div className="flex-1 bg-zinc-100 border border-zinc-200 rounded-2xl overflow-auto p-8 flex items-start justify-center relative shadow-inner h-full">
+              <div className="flex-1 bg-zinc-100 border border-zinc-200 rounded-2xl overflow-auto p-8 flex items-center justify-center relative shadow-inner h-full">
                 
                 {previewMode ? (
                   /* LIVE PREVIEW CONTAINER */
@@ -2994,7 +3036,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             color: el.properties.color || '#000000',
                             backgroundColor: el.properties.backgroundColor || 'transparent',
                             border: el.properties.borderWidth ? `${el.properties.borderWidth}px solid ${el.properties.borderColor || '#000'}` : 'none',
-                            borderRadius: el.properties.borderRadius ? `${el.properties.borderRadius}px` : '0px',
+                            borderRadius: el.type === 'circle' ? '9999px' : el.properties.borderRadius ? `${el.properties.borderRadius}px` : '0px',
                             textAlign: el.properties.align || 'left',
                             opacity: el.properties.opacity ?? 1,
                             transform: `rotate(${el.properties.rotation || 0}deg)`,
@@ -3027,7 +3069,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             />
                           )}
                           {el.type === 'rectangle' && <div className="w-full h-full" />}
-                          {el.type === 'circle' && <div className="w-full h-full rounded-full border border-zinc-950" style={{ borderColor: el.properties.borderColor }} />}
+                          {el.type === 'circle' && <div className="w-full h-full" />}
                           {el.type === 'qr' && (
                             <div className="p-0.5 bg-white border border-zinc-100 flex items-center justify-center">
                               <QRCode value="Invoice: INV-2026-90432 Total: 6325.00 SAR Date: 2026-06-21" size={Math.min(el.width, el.height) * zoomScale - 4} />
@@ -3124,7 +3166,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             color: el.properties.color || '#000000',
                             backgroundColor: el.properties.backgroundColor || 'transparent',
                             border: el.properties.borderWidth ? `${el.properties.borderWidth}px solid ${el.properties.borderColor || '#000'}` : 'none',
-                            borderRadius: el.properties.borderRadius ? `${el.properties.borderRadius}px` : '0px',
+                            borderRadius: el.type === 'circle' ? '9999px' : el.properties.borderRadius ? `${el.properties.borderRadius}px` : '0px',
                             textAlign: el.properties.align || 'left',
                             opacity: el.properties.opacity ?? 1,
                             transform: `rotate(${el.properties.rotation || 0}deg)`,
@@ -3157,7 +3199,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             />
                           )}
                           {el.type === 'rectangle' && <div className="w-full h-full" />}
-                          {el.type === 'circle' && <div className="w-full h-full rounded-full border border-zinc-950" style={{ borderColor: el.properties.borderColor }} />}
+                          {el.type === 'circle' && <div className="w-full h-full" />}
                           {el.type === 'qr' && (
                             <div className="p-0.5 bg-white border border-zinc-100 flex items-center justify-center">
                               <QRCode value="Invoice: INV-2026-90432 Total: 6325.00 SAR Date: 2026-06-21" size={Math.min(el.width, el.height) * zoomScale - 4} />
@@ -3257,7 +3299,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
                     {/* SECTION 1: HEADER CANVAS */}
                     <div 
-                      ref={canvasRefs.header}
+                      ref={headerCanvasRef}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={(e) => handleCanvasDrop(e, 'header')}
                       onClick={(e) => {
@@ -3306,7 +3348,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             color: el.properties.color || '#000000',
                             backgroundColor: el.properties.backgroundColor || 'transparent',
                             border: el.properties.borderWidth ? `${el.properties.borderWidth}px solid ${el.properties.borderColor || '#000'}` : 'none',
-                            borderRadius: el.properties.borderRadius ? `${el.properties.borderRadius}px` : '0px',
+                            borderRadius: el.type === 'circle' ? '9999px' : el.properties.borderRadius ? `${el.properties.borderRadius}px` : '0px',
                             textAlign: el.properties.align || 'left',
                             opacity: el.properties.opacity ?? 1,
                             transform: `rotate(${el.properties.rotation || 0}deg)`,
@@ -3357,7 +3399,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             />
                           )}
                           {el.type === 'rectangle' && <div className="w-full h-full" />}
-                          {el.type === 'circle' && <div className="w-full h-full rounded-full border border-zinc-950" style={{ borderColor: el.properties.borderColor }} />}
+                          {el.type === 'circle' && <div className="w-full h-full" />}
                           {el.type === 'qr' && (
                             <div className="w-full h-full bg-zinc-50 flex flex-col items-center justify-center border border-zinc-200 text-zinc-400">
                               <QrCode size={Math.min(el.width, el.height) * zoomScale * 0.7} />
@@ -3465,7 +3507,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
                     {/* SECTION 3: FOOTER CANVAS */}
                     <div 
-                      ref={canvasRefs.footer}
+                      ref={footerCanvasRef}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={(e) => handleCanvasDrop(e, 'footer')}
                       onClick={(e) => {
@@ -3514,7 +3556,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             color: el.properties.color || '#000000',
                             backgroundColor: el.properties.backgroundColor || 'transparent',
                             border: el.properties.borderWidth ? `${el.properties.borderWidth}px solid ${el.properties.borderColor || '#000'}` : 'none',
-                            borderRadius: el.properties.borderRadius ? `${el.properties.borderRadius}px` : '0px',
+                            borderRadius: el.type === 'circle' ? '9999px' : el.properties.borderRadius ? `${el.properties.borderRadius}px` : '0px',
                             textAlign: el.properties.align || 'left',
                             opacity: el.properties.opacity ?? 1,
                             transform: `rotate(${el.properties.rotation || 0}deg)`,
@@ -3565,7 +3607,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             />
                           )}
                           {el.type === 'rectangle' && <div className="w-full h-full" />}
-                          {el.type === 'circle' && <div className="w-full h-full rounded-full border border-zinc-950" style={{ borderColor: el.properties.borderColor }} />}
+                          {el.type === 'circle' && <div className="w-full h-full" />}
                           {el.type === 'qr' && (
                             <div className="w-full h-full bg-zinc-50 flex flex-col items-center justify-center border border-zinc-200 text-zinc-400">
                               <QrCode size={Math.min(el.width, el.height) * zoomScale * 0.7} />
