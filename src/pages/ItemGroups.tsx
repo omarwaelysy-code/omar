@@ -4,7 +4,7 @@ import {
   ChevronRight, ChevronLeft, LayoutGrid, List, Lock, FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { toast } from 'react-hot-toast';
+import { useNotification } from '../contexts/NotificationContext';
 import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -24,6 +24,7 @@ interface ItemGroup {
 export function ItemGroups() {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
+  const { showNotification } = useNotification();
   
   const [itemGroups, setItemGroups] = useState<ItemGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,7 +153,7 @@ export function ItemGroups() {
     if (!user?.company_id) return;
 
     if (!formData.name.trim()) {
-      toast.error(language === 'ar' ? 'اسم المجموعة مطلوب' : 'Group Name is required');
+      showNotification(language === 'ar' ? 'اسم المجموعة مطلوب' : 'Group Name is required', 'error');
       return;
     }
 
@@ -168,15 +169,15 @@ export function ItemGroups() {
     try {
       if (editingGroup) {
         await dbService.update('item_groups', editingGroup.id, payload);
-        toast.success(language === 'ar' ? 'تم تحديث المجموعة بنجاح' : 'Group updated successfully');
+        showNotification(language === 'ar' ? 'تم تحديث المجموعة بنجاح' : 'Group updated successfully', 'success');
       } else {
         await dbService.add('item_groups', payload);
-        toast.success(language === 'ar' ? 'تمت إضافة المجموعة بنجاح' : 'Group created successfully');
+        showNotification(language === 'ar' ? 'تمت إضافة المجموعة بنجاح' : 'Group created successfully', 'success');
       }
       closeModal();
     } catch (error: any) {
       console.error('Error saving item groups:', error);
-      toast.error(language === 'ar' ? 'فشل حفظ المجموعة' : 'Failed to save group');
+      showNotification(language === 'ar' ? 'فشل حفظ المجموعة' : 'Failed to save group', 'error');
     }
   };
 
@@ -189,10 +190,10 @@ export function ItemGroups() {
     if (window.confirm(confirmMsg)) {
       try {
         await dbService.delete('item_groups', id);
-        toast.success(language === 'ar' ? 'تم حذف المجموعة بنجاح' : 'Group deleted successfully');
+        showNotification(language === 'ar' ? 'تم حذف المجموعة بنجاح' : 'Group deleted successfully', 'success');
       } catch (error) {
         console.error('Failed to delete item group:', error);
-        toast.error(language === 'ar' ? 'فشل حذف المجموعة' : 'Failed to delete group');
+        showNotification(language === 'ar' ? 'فشل حذف المجموعة' : 'Failed to delete group', 'error');
       }
     }
   };

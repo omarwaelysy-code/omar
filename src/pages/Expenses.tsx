@@ -4,7 +4,7 @@ import {
   Layers, Hash, Box, AlertCircle, LayoutGrid, List, FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { toast } from 'react-hot-toast';
+import { useNotification } from '../contexts/NotificationContext';
 import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,6 +15,7 @@ import { InlineActivityLog } from '../components/InlineActivityLog';
 export const Expenses: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
+  const { showNotification } = useNotification();
   
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -61,15 +62,15 @@ export const Expenses: React.FC = () => {
 
       if (editingCategory) {
         await dbService.update('expense_categories', editingCategory.id, dataToSave);
-        toast.success(t('common.updated_successfully'));
+        showNotification(t('common.updated_successfully'), 'success');
       } else {
         await dbService.add('expense_categories', dataToSave);
-        toast.success(t('common.created_successfully'));
+        showNotification(t('common.created_successfully'), 'success');
       }
       setIsModalOpen(false);
       resetForm();
     } catch (e) {
-      toast.error('حدث خطأ أثناء حفظ البيانات');
+      showNotification('حدث خطأ أثناء حفظ البيانات', 'error');
     }
   };
 
@@ -205,7 +206,7 @@ export const Expenses: React.FC = () => {
                                 e.stopPropagation();
                                 if (window.confirm(t('common.confirm_delete'))) {
                                   await dbService.delete('expense_categories', category.id);
-                                  toast.success(t('common.deleted_successfully'));
+                                  showNotification(t('common.deleted_successfully'), 'success');
                                 }
                               }} className="p-3 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"><Trash2 size={20} /></button>
                            </div>
@@ -277,7 +278,7 @@ export const Expenses: React.FC = () => {
                                     e.stopPropagation();
                                     if (window.confirm(t('common.confirm_delete'))) {
                                       await dbService.delete('expense_categories', category.id);
-                                      toast.success(t('common.deleted_successfully'));
+                                      showNotification(t('common.deleted_successfully'), 'success');
                                     }
                                   }}
                                   className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all"

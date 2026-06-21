@@ -115,10 +115,10 @@ export const LogoElement: React.FC<ElementComponentProps> = ({ el, data, scale }
   return (
     <div className="absolute flex items-center select-none font-bold" style={getSharedStyles(el, scale)}>
       {data.company_logo ? (
-        <img src={data.company_logo} alt="logo" className="w-full h-full object-contain" />
+        <img src={data.company_logo} alt="logo" className="w-full h-full object-contain pointer-events-none" />
       ) : (
-        <div className="w-full h-full border border-zinc-250 bg-zinc-50 rounded flex items-center justify-center text-[10px] text-zinc-400">
-          LOGO
+        <div className="w-full h-full border border-dashed border-zinc-300 bg-zinc-50/50 rounded flex items-center justify-center text-[10px] text-zinc-400 font-extrabold uppercase">
+          [ LOGO ]
         </div>
       )}
     </div>
@@ -168,13 +168,29 @@ export const ShapeElement: React.FC<ElementComponentProps> = ({ el, scale }) => 
 
 // 7. QR Component
 export const QrElement: React.FC<ElementComponentProps> = ({ el, data, scale }) => {
-  const boundVal = data[el.binding as keyof NormalizedDocument];
-  const displayValue = boundVal !== undefined && typeof boundVal !== 'object' ? String(boundVal) : '';
-  const qrString = displayValue || `INV:${data.document_number || ''}|NET:${data.net_total || 0}|VAT:${data.vat_amount || 0}`;
+  let val = '';
+  if (el.binding) {
+    const boundVal = data[el.binding as keyof NormalizedDocument];
+    if (boundVal !== undefined && typeof boundVal !== 'object') {
+      val = String(boundVal);
+    } else if (data.dynamicFields?.[el.binding] !== undefined) {
+      val = String(data.dynamicFields[el.binding]);
+    }
+  }
+
+  if (!val) {
+    return (
+      <div className="absolute flex flex-col items-center justify-center bg-zinc-50 border border-dashed border-zinc-300 text-zinc-400 p-1 text-center rounded overflow-hidden" style={getSharedStyles(el, scale)}>
+        <span style={{ fontSize: `${Math.max(6, 8 * scale)}px` }} className="font-black tracking-tight leading-none">QR Code</span>
+        <span style={{ fontSize: `${Math.max(5, 7 * scale)}px` }} className="opacity-65 mt-0.5 leading-none">{el.binding || 'No Source'}</span>
+      </div>
+    );
+  }
+
   return (
     <div className="absolute flex items-center justify-center p-0.5 bg-white border border-zinc-100" style={getSharedStyles(el, scale)}>
       <QRCode 
-        value={qrString} 
+        value={val} 
         size={Math.min(el.width, el.height) * scale - 4} 
       />
     </div>
@@ -183,13 +199,39 @@ export const QrElement: React.FC<ElementComponentProps> = ({ el, data, scale }) 
 
 // 8. Barcode Component
 export const BarcodeElement: React.FC<ElementComponentProps> = ({ el, data, scale }) => {
-  const boundVal = data[el.binding as keyof NormalizedDocument];
-  const displayValue = boundVal !== undefined && typeof boundVal !== 'object' ? String(boundVal) : '';
-  const barcodeVal = displayValue || data.document_number || '00000000';
+  let val = '';
+  if (el.binding) {
+    const boundVal = data[el.binding as keyof NormalizedDocument];
+    if (boundVal !== undefined && typeof boundVal !== 'object') {
+      val = String(boundVal);
+    } else if (data.dynamicFields?.[el.binding] !== undefined) {
+      val = String(data.dynamicFields[el.binding]);
+    }
+  }
+
+  if (!val) {
+    return (
+      <div className="absolute flex flex-col items-center justify-center bg-zinc-50 border border-dashed border-zinc-300 text-zinc-400 p-1 text-center rounded overflow-hidden" style={getSharedStyles(el, scale)}>
+        <span style={{ fontSize: `${Math.max(6, 8 * scale)}px` }} className="font-black tracking-tight leading-none">Barcode</span>
+        <span style={{ fontSize: `${Math.max(5, 7 * scale)}px` }} className="opacity-65 mt-0.5 leading-none">{el.binding || 'No Source'}</span>
+      </div>
+    );
+  }
+
+  const isValidBarcode = /^[\x00-\x7F]*$/.test(val);
+  if (!isValidBarcode) {
+    return (
+      <div className="absolute flex flex-col items-center justify-center bg-red-50 border border-red-250 text-red-500 p-1 text-center rounded overflow-hidden" style={getSharedStyles(el, scale)}>
+        <span style={{ fontSize: `${Math.max(5, 7 * scale)}px` }} className="font-extrabold leading-none">Invalid Barcode</span>
+        <span style={{ fontSize: `${Math.max(4, 6 * scale)}px` }} className="break-all mt-0.5 leading-tight">{val}</span>
+      </div>
+    );
+  }
+
   return (
     <div className="absolute flex items-center justify-center p-0.5 bg-white border border-zinc-100 overflow-hidden w-full h-full" style={getSharedStyles(el, scale)}>
       <BarcodeComponent 
-        value={barcodeVal} 
+        value={val} 
         width={1.1} 
         height={Math.min(el.height) * scale - 12} 
         displayValue={false} 

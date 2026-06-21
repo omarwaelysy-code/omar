@@ -4,7 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, Edit2, Trash2, Users, Briefcase, ChevronRight, X, LayoutGrid, List } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { toast } from 'react-hot-toast';
+import { useNotification } from '../contexts/NotificationContext';
 import { useViewPreference } from '../hooks/useViewPreference';
 
 interface Department {
@@ -21,6 +21,7 @@ interface Department {
 export function Departments() {
   const { t, dir, language } = useLanguage();
   const { user } = useAuth();
+  const { showNotification } = useNotification();
   const [view, setView] = useViewPreference('departments', 'card');
   const [departments, setDepartments] = useState<Department[]>([]);
   const [managerUsers, setManagerUsers] = useState<{id: string, name: string}[]>([]);
@@ -49,7 +50,7 @@ export function Departments() {
       setDepartments(depts);
       setManagerUsers(users);
     } catch (error) {
-      toast.error('Failed to fetch data');
+      showNotification('Failed to fetch data', 'error');
     } finally {
       setLoading(false);
     }
@@ -69,16 +70,16 @@ export function Departments() {
     try {
       if (editingDept) {
         await dbService.update('departments', editingDept.id, payload);
-        toast.success(t('common.updated_successfully'));
+        showNotification(t('common.updated_successfully'), 'success');
       } else {
         await dbService.create('departments', payload);
-        toast.success(t('common.created_successfully'));
+        showNotification(t('common.created_successfully'), 'success');
       }
       setIsModalOpen(false);
       setEditingDept(null);
       fetchData();
     } catch (error) {
-      toast.error('Operation failed');
+      showNotification('Operation failed', 'error');
     }
   };
 

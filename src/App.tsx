@@ -67,7 +67,6 @@ import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
 import { SystemCheck } from './pages/SystemCheck';
 import { MaintenanceModeGuard } from './components/MaintenanceModeGuard';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
-import { Toaster } from 'react-hot-toast';
 import { OperationCategories } from './pages/OperationCategories';
 import { OperationFields } from './pages/OperationFields';
 import { Operations } from './pages/Operations';
@@ -115,7 +114,6 @@ export default function App() {
 
   return (
     <div className={`min-h-screen ${dir === 'rtl' ? 'font-sans' : 'font-sans'}`} dir={dir}>
-      <Toaster position="top-center" />
       <UnifiedPrintEngine />
       <AnimatePresence mode="wait">
         {loading ? (

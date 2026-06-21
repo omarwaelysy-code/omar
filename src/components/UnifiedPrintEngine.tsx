@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { X, Printer, Download, FileText, Settings, Sliders } from 'lucide-react';
 import { TemplateRenderer, normalizeDocumentData } from './TemplateRenderer';
 import html2pdf from 'html2pdf.js';
-import { toast } from 'react-hot-toast';
+import { useNotification } from '../contexts/NotificationContext';
 import { PaperSize, Template, PrintProfile } from '../types';
 
 const DEFAULT_TEMPLATE_LAYOUT = {
@@ -146,6 +146,13 @@ const DEFAULT_TEMPLATE_LAYOUT = {
 export function UnifiedPrintEngine() {
   const { dir, language } = useLanguage();
   const { user } = useAuth();
+  const { showNotification } = useNotification();
+
+  const toast = {
+    success: (msg: string) => showNotification(msg, 'success'),
+    error: (msg: string) => showNotification(msg, 'error'),
+    info: (msg: string) => showNotification(msg, 'info')
+  };
 
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -230,7 +237,7 @@ export function UnifiedPrintEngine() {
 
       } catch (err) {
         console.error('UnifiedPrintEngine failed to load document:', err);
-        toast.error(language === 'ar' ? 'فشل تحميل بيانات الطباعة' : 'Failed to load printing records');
+        showNotification(language === 'ar' ? 'فشل تحميل بيانات الطباعة' : 'Failed to load printing records', 'error');
         setIsOpen(false);
       } finally {
         setLoading(false);
@@ -384,14 +391,14 @@ export function UnifiedPrintEngine() {
     };
 
     try {
-      toast.loading(language === 'ar' ? 'جاري تحضير ملف PDF...' : 'Preparing PDF file...', { id: 'pdf-toast' });
+      showNotification(language === 'ar' ? 'جاري تحضير ملف PDF...' : 'Preparing PDF file...', 'info');
       // @ts-ignore
       const html2pdfFunc = html2pdf.default || html2pdf;
       await html2pdfFunc().set(opt).from(printArea).save();
-      toast.success(language === 'ar' ? 'تم تحميل الملف بنجاح' : 'PDF downloaded successfully', { id: 'pdf-toast' });
+      showNotification(language === 'ar' ? 'تم تحميل الملف بنجاح' : 'PDF downloaded successfully', 'success');
     } catch (e) {
       console.error(e);
-      toast.error(language === 'ar' ? 'فشل تحميل الملف' : 'Failed to download PDF', { id: 'pdf-toast' });
+      showNotification(language === 'ar' ? 'فشل تحميل الملف' : 'Failed to download PDF', 'error');
     }
   };
 

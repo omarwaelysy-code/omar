@@ -8,12 +8,13 @@ import {
   AlertCircle, Search, RefreshCcw, MoreVertical, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { toast } from 'react-hot-toast';
+import { useNotification } from '../contexts/NotificationContext';
 import { OperationCategory } from '../types';
 
 export function OperationCategories() {
   const { t, dir, language } = useLanguage();
   const { user } = useAuth();
+  const { showNotification } = useNotification();
   const [categories, setCategories] = useState<OperationCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -41,7 +42,7 @@ export function OperationCategories() {
       // Sort alphabetically for consistency
       setCategories(data.sort((a, b) => a.name.localeCompare(b.name)));
     } catch (error) {
-      toast.error('Failed to fetch categories');
+      showNotification('Failed to fetch categories', 'error');
     } finally {
       setLoading(false);
     }
@@ -76,7 +77,7 @@ export function OperationCategories() {
     // But mainly: if parent is final, cannot add children.
     const parent = categories.find(c => c.id === formData.parent_id);
     if (parent?.is_final) {
-      toast.error('لا يمكن إضافة أبناء تحت مستوى نهائي');
+      showNotification('لا يمكن إضافة أبناء تحت مستوى نهائي', 'error');
       return;
     }
 
@@ -90,17 +91,17 @@ export function OperationCategories() {
 
       if (editingCategory) {
         await dbService.update('operation_categories', editingCategory.id, payload);
-        toast.success(t('common.updated_successfully'));
+        showNotification(t('common.updated_successfully'), 'success');
       } else {
         await dbService.create('operation_categories', payload);
-        toast.success(t('common.created_successfully'));
+        showNotification(t('common.created_successfully'), 'success');
       }
       setIsModalOpen(false);
       resetForm();
       fetchCategories();
     } catch (error: any) {
       console.error('Category error:', error);
-      toast.error(error.message || 'Operation failed');
+      showNotification(error.message || 'Operation failed', 'error');
     }
   };
 
@@ -112,17 +113,17 @@ export function OperationCategories() {
   const handleDelete = async (id: string) => {
     const hasChildren = categories.some(c => c.parent_id === id);
     if (hasChildren) {
-      toast.error('لا يمكن حذف تصنيف يحتوي على أبناء. قم بحذف الأبناء أولاً.');
+      showNotification('لا يمكن حذف تصنيف يحتوي على أبناء. قم بحذف الأبناء أولاً.', 'error');
       return;
     }
 
     if (!window.confirm(t('common.confirm_delete'))) return;
     try {
       await dbService.delete('operation_categories', id);
-      toast.success(t('common.deleted_successfully'));
+      showNotification(t('common.deleted_successfully'), 'success');
       fetchCategories();
     } catch (error: any) {
-      toast.error(error.message || 'Delete failed');
+      showNotification(error.message || 'Delete failed', 'error');
     }
   };
 

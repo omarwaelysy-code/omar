@@ -4,7 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, Edit2, Trash2, Settings, List, CheckSquare, Type, Hash, Calendar, Layers, Search, Info, X, LayoutGrid } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { toast } from 'react-hot-toast';
+import { useNotification } from '../contexts/NotificationContext';
 import { useViewPreference } from '../hooks/useViewPreference';
 
 import { OperationField, OperationCategory } from '../types';
@@ -13,6 +13,7 @@ import { FIELD_TYPES, FIELD_CATEGORIES } from '../lib/field-types';
 export function OperationFields() {
   const { t, dir, language } = useLanguage();
   const { user } = useAuth();
+  const { showNotification } = useNotification();
   const [view, setView] = useViewPreference('operation_fields', 'table');
   const [fields, setFields] = useState<OperationField[]>([]);
   const [categories, setCategories] = useState<OperationCategory[]>([]);
@@ -51,7 +52,7 @@ export function OperationFields() {
       setCategories(catsData);
       setFieldMappings(mappingsData);
     } catch (error) {
-      toast.error('Failed to fetch data');
+      showNotification('Failed to fetch data', 'error');
     } finally {
       setLoading(false);
     }
@@ -82,7 +83,7 @@ export function OperationFields() {
       let fieldId = editingField?.id;
       if (editingField) {
         await dbService.update('operation_fields', editingField.id, directPayload);
-        toast.success(t('common.updated_successfully'));
+        showNotification(t('common.updated_successfully'), 'success');
         
         // Update many-to-many links
         const oldLinks = fieldMappings.filter(m => m.field_id === editingField.id);
@@ -94,7 +95,7 @@ export function OperationFields() {
           ...directPayload,
           company_id: user.company_id
         });
-        toast.success(t('common.created_successfully'));
+        showNotification(t('common.created_successfully'), 'success');
       }
 
       // Create new links
@@ -112,7 +113,7 @@ export function OperationFields() {
       setEditingField(null);
       fetchData();
     } catch (error) {
-      toast.error('Operation failed');
+      showNotification('Operation failed', 'error');
     }
   };
 
@@ -279,7 +280,7 @@ export function OperationFields() {
                               for (const mapping of mappings) {
                                 await dbService.delete('field_operation_categories', mapping.id);
                               }
-                              toast.success(t('common.deleted_successfully'));
+                              showNotification(t('common.deleted_successfully'), 'success');
                               fetchData();
                             }
                           }}

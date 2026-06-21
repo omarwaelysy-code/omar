@@ -4,7 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, Edit2, Trash2, PieChart, Landmark, DollarSign, X, LayoutGrid, List } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { toast } from 'react-hot-toast';
+import { useNotification } from '../contexts/NotificationContext';
 import { useViewPreference } from '../hooks/useViewPreference';
 
 interface CostCenter {
@@ -27,6 +27,7 @@ interface Department {
 export function CostCenters() {
   const { t, dir, language } = useLanguage();
   const { user } = useAuth();
+  const { showNotification } = useNotification();
   const [view, setView] = useViewPreference('cost_centers', 'card');
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -56,7 +57,7 @@ export function CostCenters() {
       setCostCenters(ccs);
       setDepartments(depts);
     } catch (error) {
-      toast.error('Failed to fetch data');
+      showNotification('Failed to fetch data', 'error');
     } finally {
       setLoading(false);
     }
@@ -75,16 +76,16 @@ export function CostCenters() {
     try {
       if (editingCC) {
         await dbService.update('cost_centers', editingCC.id, payload);
-        toast.success(t('common.updated_successfully'));
+        showNotification(t('common.updated_successfully'), 'success');
       } else {
         await dbService.create('cost_centers', payload);
-        toast.success(t('common.created_successfully'));
+        showNotification(t('common.created_successfully'), 'success');
       }
       setIsModalOpen(false);
       setEditingCC(null);
       fetchData();
     } catch (error) {
-      toast.error('Operation failed');
+      showNotification('Operation failed', 'error');
     }
   };
 

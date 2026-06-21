@@ -4,7 +4,6 @@ import {
   Wallet, Layers, Hash, Box, AlertCircle, Calendar, LayoutGrid, List, FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { toast } from 'react-hot-toast';
 import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -69,10 +68,10 @@ export const PaymentMethods: React.FC = () => {
       if (editingMethod) {
         await dbService.update('payment_methods', editingMethod.id, dataToSave);
         id = editingMethod.id;
-        toast.success(t('common.updated_successfully'));
+        showNotification(t('common.updated_successfully'), 'success');
       } else {
         id = await dbService.add('payment_methods', dataToSave);
-        toast.success(t('common.created_successfully'));
+        showNotification(t('common.created_successfully'), 'success');
       }
 
       setIsModalOpen(false);
@@ -113,7 +112,7 @@ export const PaymentMethods: React.FC = () => {
         });
       }
     } catch (e) {
-      toast.error('حدث خطأ أثناء حفظ البيانات');
+      showNotification('حدث خطأ أثناء حفظ البيانات', 'error');
     }
   };
 
@@ -253,7 +252,7 @@ export const PaymentMethods: React.FC = () => {
                                 e.stopPropagation();
                                 if (window.confirm(t('common.confirm_delete'))) {
                                   await dbService.delete('payment_methods', method.id);
-                                  toast.success(t('common.deleted_successfully'));
+                                  showNotification(t('common.deleted_successfully'), 'success');
                                 }
                               }} className="p-3 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"><Trash2 size={20} /></button>
                            </div>
@@ -322,7 +321,7 @@ export const PaymentMethods: React.FC = () => {
                                     e.stopPropagation();
                                     if (window.confirm(t('common.confirm_delete'))) {
                                       await dbService.delete('payment_methods', method.id);
-                                      toast.success(t('common.deleted_successfully'));
+                                      showNotification(t('common.deleted_successfully'), 'success');
                                     }
                                   }}
                                   className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all"

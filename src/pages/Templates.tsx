@@ -525,6 +525,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
   });
 
   const [printProfiles, setPrintProfiles] = useState<PrintProfile[]>([]);
+  const [company, setCompany] = useState<any>(null);
   const [subTab, setSubTab] = useState<'templates' | 'profiles' | 'assignments'>('templates');
   const [editingProfile, setEditingProfile] = useState<PrintProfile | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -824,15 +825,17 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [allTemplates, allSizes, allCats, allProfiles] = await Promise.all([
+      const [allTemplates, allSizes, allCats, allProfiles, companyData] = await Promise.all([
         dbService.list<Template>('templates', user?.company_id || ''),
         dbService.list<PaperSize>('paper_sizes', user?.company_id || ''),
         dbService.list<OperationCategory>('operation_categories', user?.company_id || ''),
-        dbService.list<PrintProfile>('print_profiles', user?.company_id || '')
+        dbService.list<PrintProfile>('print_profiles', user?.company_id || ''),
+        user?.company_id ? dbService.get<any>('companies', user.company_id) : Promise.resolve(null)
       ]);
       setTemplates(allTemplates);
       setPaperSizes(allSizes);
       setCategories(allCats.filter(c => (c as any).is_final));
+      setCompany(companyData);
 
       let activeProfiles = allProfiles;
       if (allProfiles.length === 0 && user?.company_id) {
@@ -1806,8 +1809,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
   // Mock document data for Real Live Preview
   const previewDocData = {
-    company_logo: 'LOGO',
-    company_name: 'مجموعة التطور الرقمي المحدودة',
+    company_logo: company?.logo_url || '',
+    company_name: company?.name || 'مجموعة التطور الرقمي المحدودة',
     branch_name: 'فرع الرياض الرئيسي',
     user_name: user?.username || 'المشرف العام',
     date: new Date().toLocaleDateString('ar-SA'),
@@ -1827,6 +1830,119 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       { product_code: 'ITM-902', product_name: 'تراخيص سيرفر تداول مالي متقدم', barcode: '628045612378', quantity: 2, unit: 'رخصة', unit_price: 2500, discount: 250, vat_amount: 712.5, total: 5462.5 },
       { product_code: 'ITM-503', product_name: 'خدمة إعداد وبدء تشغيل قواعد البيانات', barcode: 'N/A', quantity: 1, unit: 'ساعة', unit_price: 850, discount: 100, vat_amount: 112.5, total: 862.5 }
     ]
+  };
+
+  const getBindingValueForPreview = (binding?: string) => {
+    if (!binding) return '';
+    if (binding in previewDocData) {
+      const val = previewDocData[binding as keyof typeof previewDocData];
+      return val !== undefined && typeof val !== 'object' ? String(val) : '';
+    }
+    // Check if it exists in the first item
+    const firstItem = previewDocData.items[0];
+    if (firstItem && binding in firstItem) {
+      const val = firstItem[binding as keyof typeof firstItem];
+      return val !== undefined && typeof val !== 'object' ? String(val) : '';
+    }
+    return '';
+  };
+
+  const renderElementInnerContent = (el: TemplateElement, isPreview: boolean = false) => {
+    switch (el.type) {
+      case 'text':
+        return el.properties.text || '';
+      case 'variable': {
+        const val = getBindingValueForPreview(el.binding);
+        return isPreview ? (val || '') : (
+          <span className="bg-zinc-100 text-zinc-700 border border-zinc-200 px-1 py-0.5 rounded text-[10px] select-none font-bold">
+            {"{"}{el.binding || 'Variable'}{"}"}
+          </span>
+        );
+      }
+      case 'field': {
+        const val = getBindingValueForPreview(el.binding);
+        return isPreview ? (val || '') : (
+          <span className="bg-purple-50 text-purple-700 border border-purple-200 px-1 py-0.5 rounded text-[10px] select-none font-bold">
+            {"{"}{el.properties.text || el.binding || 'Field'}{"}"}
+          </span>
+        );
+      }
+      case 'logo': {
+        const logoUrl = company?.logo_url;
+        if (logoUrl) {
+          return <img src={logoUrl} alt="logo" className="w-full h-full object-contain pointer-events-none" />;
+        }
+        return (
+          <div className="w-full h-full border border-dashed border-zinc-300 rounded flex items-center justify-center bg-zinc-50/50 text-[10px] font-extrabold text-zinc-400">
+            [ LOGO ]
+          </div>
+        );
+      }
+      case 'image':
+        return el.properties.imageUrl ? (
+          <img src={el.properties.imageUrl} alt="custom" className="w-full h-full object-contain pointer-events-none" />
+        ) : (
+          <div className="w-full h-full border border-dashed border-zinc-300 rounded flex items-center justify-center bg-zinc-50/50 text-[10px] font-extrabold text-zinc-400">
+            [ IMAGE ]
+          </div>
+        );
+      case 'line':
+        return (
+          <div 
+            className="w-full h-full pointer-events-none" 
+            style={{ 
+              borderTop: el.width >= el.height ? `${el.properties.borderWidth || 1}px solid ${el.properties.borderColor || '#000'}` : 'none',
+              borderLeft: el.width < el.height ? `${el.properties.borderWidth || 1}px solid ${el.properties.borderColor || '#000'}` : 'none'
+            }} 
+          />
+        );
+      case 'rectangle':
+      case 'circle':
+        return <div className="w-full h-full" />;
+      case 'qr': {
+        const val = getBindingValueForPreview(el.binding);
+        if (!val) {
+          return (
+            <div className="w-full h-full bg-zinc-50 flex flex-col items-center justify-center border border-dashed border-zinc-300 text-zinc-400 rounded p-1 text-center">
+              <QrCode size={Math.min(el.width, el.height) * zoomScale * 0.4} />
+              <span className="text-[8px] font-bold mt-0.5">QR Code Placeholder</span>
+            </div>
+          );
+        }
+        return (
+          <div className="p-0.5 bg-white border border-zinc-100 flex items-center justify-center w-full h-full">
+            <QRCode value={val} size={Math.min(el.width, el.height) * zoomScale - 4} />
+          </div>
+        );
+      }
+      case 'barcode': {
+        const val = getBindingValueForPreview(el.binding);
+        if (!val) {
+          return (
+            <div className="w-full h-full bg-zinc-50 flex flex-col items-center justify-center border border-dashed border-zinc-300 text-zinc-400 rounded p-1 text-center">
+              <Barcode size={Math.min(el.width, el.height) * zoomScale * 0.4} />
+              <span className="text-[8px] font-bold mt-0.5">Barcode Placeholder</span>
+            </div>
+          );
+        }
+        const isValidBarcode = /^[\x00-\x7F]*$/.test(val);
+        if (!isValidBarcode) {
+          return (
+            <div className="w-full h-full bg-red-50 border border-red-250 text-red-500 rounded p-1 flex flex-col items-center justify-center text-center">
+              <span className="text-[8px] font-extrabold">{language === 'ar' ? 'رموز باركود غير صالحة' : 'Invalid Barcode'}</span>
+              <span className="text-[7px] font-semibold break-all leading-tight max-w-full overflow-hidden truncate">{val}</span>
+            </div>
+          );
+        }
+        return (
+          <div className="p-0.5 bg-white border border-zinc-100 flex items-center justify-center w-full h-full overflow-hidden">
+            <BarcodeComponent value={val} width={1.1} height={Math.min(el.height) * zoomScale - 12} displayValue={false} />
+          </div>
+        );
+      }
+      default:
+        return null;
+    }
   };
 
   return (
@@ -3044,42 +3160,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             padding: `${(el.properties.padding || 0) * zoomScale}px`
                           }}
                         >
-                          {el.type === 'text' && el.properties.text}
-                          {el.type === 'variable' && typeof previewDocData[el.binding as keyof typeof previewDocData] !== 'object' ? String(previewDocData[el.binding as keyof typeof previewDocData] ?? '') : ''}
-                          {el.type === 'field' && 'حقل ديناميكي / Field Value'}
-                          {el.type === 'logo' && (
-                            <div className="w-full h-full border border-zinc-200 bg-zinc-50 rounded flex items-center justify-center text-[10px] text-zinc-400 font-bold">
-                              LOGO
-                            </div>
-                          )}
-                          {el.type === 'image' && (
-                            el.properties.imageUrl ? (
-                              <img src={el.properties.imageUrl} alt="element" className="w-full h-full object-contain" />
-                            ) : (
-                              <div className="w-full h-full border border-dashed border-zinc-200 bg-zinc-50 rounded" />
-                            )
-                          )}
-                          {el.type === 'line' && (
-                            <div 
-                              className="w-full h-full" 
-                              style={{ 
-                                borderTop: el.width >= el.height ? `${el.properties.borderWidth || 1}px solid ${el.properties.borderColor || '#000'}` : 'none',
-                                borderLeft: el.width < el.height ? `${el.properties.borderWidth || 1}px solid ${el.properties.borderColor || '#000'}` : 'none'
-                              }} 
-                            />
-                          )}
-                          {el.type === 'rectangle' && <div className="w-full h-full" />}
-                          {el.type === 'circle' && <div className="w-full h-full" />}
-                          {el.type === 'qr' && (
-                            <div className="p-0.5 bg-white border border-zinc-100 flex items-center justify-center">
-                              <QRCode value="Invoice: INV-2026-90432 Total: 6325.00 SAR Date: 2026-06-21" size={Math.min(el.width, el.height) * zoomScale - 4} />
-                            </div>
-                          )}
-                          {el.type === 'barcode' && (
-                            <div className="p-0.5 bg-white border border-zinc-100 flex items-center justify-center w-full h-full overflow-hidden">
-                              <BarcodeComponent value="INV202690432" width={1.2} height={Math.min(el.height) * zoomScale - 10} displayValue={false} />
-                            </div>
-                          )}
+                          {renderElementInnerContent(el, true)}
                         </div>
                       ))}
                     </div>
@@ -3174,42 +3255,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             padding: `${(el.properties.padding || 0) * zoomScale}px`
                           }}
                         >
-                          {el.type === 'text' && el.properties.text}
-                          {el.type === 'variable' && typeof previewDocData[el.binding as keyof typeof previewDocData] !== 'object' ? String(previewDocData[el.binding as keyof typeof previewDocData] ?? '') : ''}
-                          {el.type === 'field' && 'حقل ديناميكي / Field Value'}
-                          {el.type === 'logo' && (
-                            <div className="w-full h-full border border-zinc-200 bg-zinc-50 rounded flex items-center justify-center text-[10px] text-zinc-400 font-bold">
-                              LOGO
-                            </div>
-                          )}
-                          {el.type === 'image' && (
-                            el.properties.imageUrl ? (
-                              <img src={el.properties.imageUrl} alt="element" className="w-full h-full object-contain" />
-                            ) : (
-                              <div className="w-full h-full border border-dashed border-zinc-200 bg-zinc-50 rounded" />
-                            )
-                          )}
-                          {el.type === 'line' && (
-                            <div 
-                              className="w-full h-full" 
-                              style={{ 
-                                borderTop: el.width >= el.height ? `${el.properties.borderWidth || 1}px solid ${el.properties.borderColor || '#000'}` : 'none',
-                                borderLeft: el.width < el.height ? `${el.properties.borderWidth || 1}px solid ${el.properties.borderColor || '#000'}` : 'none'
-                              }} 
-                            />
-                          )}
-                          {el.type === 'rectangle' && <div className="w-full h-full" />}
-                          {el.type === 'circle' && <div className="w-full h-full" />}
-                          {el.type === 'qr' && (
-                            <div className="p-0.5 bg-white border border-zinc-100 flex items-center justify-center">
-                              <QRCode value="Invoice: INV-2026-90432 Total: 6325.00 SAR Date: 2026-06-21" size={Math.min(el.width, el.height) * zoomScale - 4} />
-                            </div>
-                          )}
-                          {el.type === 'barcode' && (
-                            <div className="p-0.5 bg-white border border-zinc-100 flex items-center justify-center w-full h-full overflow-hidden">
-                              <BarcodeComponent value="INV202690432" width={1.2} height={Math.min(el.height) * zoomScale - 10} displayValue={false} />
-                            </div>
-                          )}
+                          {renderElementInnerContent(el, true)}
                         </div>
                       ))}
                     </div>
@@ -3364,52 +3410,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             </div>
                           )}
 
-                          {el.type === 'text' && (el.properties.text || 'Text')}
-                          {el.type === 'variable' && (
-                            <span className="bg-zinc-100 text-zinc-700 border border-zinc-200 px-1 py-0.5 rounded text-[10px] select-none font-bold">
-                              {"{"}{el.binding}{"}"}
-                            </span>
-                          )}
-                          {el.type === 'field' && (
-                            <span className="bg-purple-50 text-purple-700 border border-purple-200 px-1 py-0.5 rounded text-[10px] select-none font-bold">
-                              {"{"}{el.properties.text || el.binding}{"}"}
-                            </span>
-                          )}
-                          {el.type === 'logo' && (
-                            <div className="w-full h-full border border-dashed border-zinc-300 rounded flex items-center justify-center bg-zinc-50/50 text-[10px] font-extrabold text-zinc-400">
-                              [ LOGO ]
-                            </div>
-                          )}
-                          {el.type === 'image' && (
-                            el.properties.imageUrl ? (
-                              <img src={el.properties.imageUrl} alt="custom" className="w-full h-full object-contain pointer-events-none" />
-                            ) : (
-                              <div className="w-full h-full border border-dashed border-zinc-300 rounded flex items-center justify-center bg-zinc-50/50 text-[10px] font-extrabold text-zinc-400">
-                                [ IMAGE ]
-                              </div>
-                            )
-                          )}
-                          {el.type === 'line' && (
-                            <div 
-                              className="w-full h-full pointer-events-none" 
-                              style={{ 
-                                borderTop: el.width >= el.height ? `${el.properties.borderWidth || 1}px solid ${el.properties.borderColor || '#000'}` : 'none',
-                                borderLeft: el.width < el.height ? `${el.properties.borderWidth || 1}px solid ${el.properties.borderColor || '#000'}` : 'none'
-                              }} 
-                            />
-                          )}
-                          {el.type === 'rectangle' && <div className="w-full h-full" />}
-                          {el.type === 'circle' && <div className="w-full h-full" />}
-                          {el.type === 'qr' && (
-                            <div className="w-full h-full bg-zinc-50 flex flex-col items-center justify-center border border-zinc-200 text-zinc-400">
-                              <QrCode size={Math.min(el.width, el.height) * zoomScale * 0.7} />
-                            </div>
-                          )}
-                          {el.type === 'barcode' && (
-                            <div className="w-full h-full bg-zinc-50 flex flex-col items-center justify-center border border-zinc-200 text-zinc-400">
-                              <Barcode size={Math.min(el.width, el.height) * zoomScale * 0.7} />
-                            </div>
-                          )}
+                          {renderElementInnerContent(el, false)}
 
                           {/* Resize handles */}
                           {selectedElementId === el.id && !el.properties.locked && (
@@ -3572,52 +3573,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             </div>
                           )}
 
-                          {el.type === 'text' && (el.properties.text || 'Text')}
-                          {el.type === 'variable' && (
-                            <span className="bg-zinc-100 text-zinc-700 border border-zinc-200 px-1 py-0.5 rounded text-[10px] select-none font-bold">
-                              {"{"}{el.binding}{"}"}
-                            </span>
-                          )}
-                          {el.type === 'field' && (
-                            <span className="bg-purple-50 text-purple-700 border border-purple-200 px-1 py-0.5 rounded text-[10px] select-none font-bold">
-                              {"{"}{el.properties.text || el.binding}{"}"}
-                            </span>
-                          )}
-                          {el.type === 'logo' && (
-                            <div className="w-full h-full border border-dashed border-zinc-300 rounded flex items-center justify-center bg-zinc-50/50 text-[10px] font-extrabold text-zinc-400">
-                              [ LOGO ]
-                            </div>
-                          )}
-                          {el.type === 'image' && (
-                            el.properties.imageUrl ? (
-                              <img src={el.properties.imageUrl} alt="custom" className="w-full h-full object-contain pointer-events-none" />
-                            ) : (
-                              <div className="w-full h-full border border-dashed border-zinc-300 rounded flex items-center justify-center bg-zinc-50/50 text-[10px] font-extrabold text-zinc-400">
-                                [ IMAGE ]
-                              </div>
-                            )
-                          )}
-                          {el.type === 'line' && (
-                            <div 
-                              className="w-full h-full pointer-events-none" 
-                              style={{ 
-                                borderTop: el.width >= el.height ? `${el.properties.borderWidth || 1}px solid ${el.properties.borderColor || '#000'}` : 'none',
-                                borderLeft: el.width < el.height ? `${el.properties.borderWidth || 1}px solid ${el.properties.borderColor || '#000'}` : 'none'
-                              }} 
-                            />
-                          )}
-                          {el.type === 'rectangle' && <div className="w-full h-full" />}
-                          {el.type === 'circle' && <div className="w-full h-full" />}
-                          {el.type === 'qr' && (
-                            <div className="w-full h-full bg-zinc-50 flex flex-col items-center justify-center border border-zinc-200 text-zinc-400">
-                              <QrCode size={Math.min(el.width, el.height) * zoomScale * 0.7} />
-                            </div>
-                          )}
-                          {el.type === 'barcode' && (
-                            <div className="w-full h-full bg-zinc-50 flex flex-col items-center justify-center border border-zinc-200 text-zinc-400">
-                              <Barcode size={Math.min(el.width, el.height) * zoomScale * 0.7} />
-                            </div>
-                          )}
+                          {renderElementInnerContent(el, false)}
 
                           {/* Resize handles */}
                           {selectedElementId === el.id && !el.properties.locked && (
@@ -3724,6 +3680,67 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             value={activeElement.properties.text}
                             onChange={(e) => handleUpdateElementProperty('text', e.target.value)}
                           />
+                        </div>
+                      )}
+
+                      {['barcode', 'qr', 'variable', 'field'].includes(activeElement.type) && (
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-zinc-600">
+                            {language === 'ar' ? 'مصدر القيمة (Value Source)' : 'Value Source'}
+                          </label>
+                          <select
+                            className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-emerald-600"
+                            value={activeElement.binding || ''}
+                            onChange={(e) => handleUpdateElementProperty('binding', e.target.value)}
+                          >
+                            <option value="">{language === 'ar' ? 'اختر مصدر بيانات...' : 'Choose data source...'}</option>
+                            <optgroup label={language === 'ar' ? 'عام' : 'General'}>
+                              {DYNAMIC_VARIABLES.general.map(v => (
+                                <option key={v.key} value={v.key}>
+                                  {language === 'ar' ? v.arLabel : v.enLabel}
+                                </option>
+                              ))}
+                            </optgroup>
+                            <optgroup label={language === 'ar' ? 'بيانات المستند' : 'Document Data'}>
+                              {DYNAMIC_VARIABLES.invoice.map(v => (
+                                <option key={v.key} value={v.key}>
+                                  {language === 'ar' ? v.arLabel : v.enLabel}
+                                </option>
+                              ))}
+                            </optgroup>
+                            <optgroup label={language === 'ar' ? 'الإجماليات والمالية' : 'Totals & Financials'}>
+                              {DYNAMIC_VARIABLES.totals.map(v => (
+                                <option key={v.key} value={v.key}>
+                                  {language === 'ar' ? v.arLabel : v.enLabel}
+                                </option>
+                              ))}
+                            </optgroup>
+                            <optgroup label={language === 'ar' ? 'أعمدة الفاتورة' : 'Details Columns'}>
+                              {DETAILS_COLUMNS_PRESETS.map(c => (
+                                <option key={c.field} value={c.field}>
+                                  {language === 'ar' ? c.arLabel : c.enLabel}
+                                </option>
+                              ))}
+                            </optgroup>
+                            {headerFields.length > 0 && (
+                              <optgroup label={language === 'ar' ? 'حقول الهيدر الديناميكية' : 'Dynamic Header Fields'}>
+                                {headerFields.map(f => (
+                                  <option key={f.id} value={f.code}>
+                                    {f.label}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                            {detailsFields.length > 0 && (
+                              <optgroup label={language === 'ar' ? 'حقول التفاصيل الديناميكية' : 'Dynamic Details Fields'}>
+                                {detailsFields.map(f => (
+                                  <option key={f.id} value={f.code}>
+                                    {f.label}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                          </select>
                         </div>
                       )}
 

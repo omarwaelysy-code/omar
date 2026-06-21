@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import SignatureCanvas from 'react-signature-canvas';
 import QRCode from 'react-qr-code';
 import Barcode from 'react-barcode';
-import { toast } from 'react-hot-toast';
+import { useNotification } from '../contexts/NotificationContext';
 import { apiRequest } from '../services/dbService';
 import { Operation, OperationField, OperationCategory, Customer, Department, CostCenter } from '../types';
 import { PaginationControls } from '../components/PaginationControls';
@@ -23,6 +23,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 export const Operations: React.FC = () => {
   const { t, dir, language } = useLanguage();
   const { user } = useAuth();
+  const { showNotification } = useNotification();
   const { pendingViewDoc, setPendingViewDoc } = useNavigation();
   
   const [view, setView] = useViewPreference('operations', 'card');
@@ -121,7 +122,7 @@ export const Operations: React.FC = () => {
       setDepartments(depts);
       setCostCenters(ccs);
     } catch (error) {
-      toast.error('Failed to fetch data');
+      showNotification('Failed to fetch data', 'error');
     } finally {
       setLoading(false);
     }
@@ -157,16 +158,16 @@ export const Operations: React.FC = () => {
     try {
       if (editingOperation) {
         await apiRequest(`/operations/complex/${editingOperation.id}`, 'PUT', payload);
-        toast.success(t('common.updated_successfully'));
+        showNotification(t('common.updated_successfully'), 'success');
       } else {
         await apiRequest('/operations/complex', 'POST', payload);
-        toast.success(t('common.created_successfully'));
+        showNotification(t('common.created_successfully'), 'success');
       }
       setIsModalOpen(false);
       resetForm();
       fetchInitialData();
     } catch (error) {
-      toast.error('Operation failed');
+      showNotification('Operation failed', 'error');
     }
   };
 
@@ -331,12 +332,11 @@ export const Operations: React.FC = () => {
               type="button" 
               onClick={() => {
                 if (navigator.geolocation) {
-                  const id = toast.loading('Locating...');
+                  showNotification('Locating...', 'info');
                   navigator.geolocation.getCurrentPosition((pos) => {
-                    toast.dismiss(id);
                     onChange(`${pos.coords.latitude}, ${pos.coords.longitude}`);
-                    toast.success('Location Captured');
-                  }, () => { toast.dismiss(id); toast.error('Failed to locate'); });
+                    showNotification('Location Captured', 'success');
+                  }, () => { showNotification('Failed to locate', 'error'); });
                 }
               }}
               className="px-6 bg-emerald-600 text-white rounded-2xl shadow-xl shadow-emerald-500/20 hover:bg-emerald-700 active:scale-95"

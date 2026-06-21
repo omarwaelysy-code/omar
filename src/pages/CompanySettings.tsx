@@ -25,9 +25,9 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotification } from '../contexts/NotificationContext';
 import { dbService, apiRequest } from '../services/dbService';
 import { COUNTRIES, CURRENCIES, MONTHS } from '../constants/company';
-import toast from 'react-hot-toast';
 
 interface CompanyData {
   id: string;
@@ -154,6 +154,7 @@ function SearchableSelect({ options, value, onChange, label, placeholder, icon, 
 export function CompanySettings() {
   const { t, language, dir } = useLanguage();
   const { user } = useAuth();
+  const { showNotification } = useNotification();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [originalSettings, setOriginalSettings] = useState<any>({});
@@ -220,17 +221,17 @@ export function CompanySettings() {
         setErLastUpdate(formatSyncDateTime());
         setErConnStatus('ok');
         setErLastResult(summary);
-        toast.success('تم تحديث أسعار الصرف بنجاح');
+        showNotification('تم تحديث أسعار الصرف بنجاح', 'success');
       } else {
         setErConnStatus('error');
         setErLastResult(`فشل: ${result.message}`);
-        toast.error(`فشل التحديث: ${result.message}`);
+        showNotification(`فشل التحديث: ${result.message}`, 'error');
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setErConnStatus('error');
       setErLastResult(`خطأ: ${msg}`);
-      toast.error(`خطأ: ${msg}`);
+      showNotification(`خطأ: ${msg}`, 'error');
     } finally {
       setErIsUpdating(false);
     }
@@ -252,17 +253,17 @@ export function CompanySettings() {
       if (result.success) {
         setErConnStatus('ok');
         setErLastResult('الاتصال ناجح — تم استقبال بيانات أسعار الصرف بنجاح');
-        toast.success('اختبار الاتصال ناجح');
+        showNotification('اختبار الاتصال ناجح', 'success');
       } else {
         setErConnStatus('error');
         setErLastResult(`فشل الاتصال: ${result.message}`);
-        toast.error('فشل اختبار الاتصال');
+        showNotification('فشل اختبار الاتصال', 'error');
       }
     } catch (err: unknown) {
       setErConnStatus('error');
       const msg = err instanceof Error ? err.message : String(err);
       setErLastResult(`خطأ الاتصال: ${msg}`);
-      toast.error('فشل اختبار الاتصال');
+      showNotification('فشل اختبار الاتصال', 'error');
     } finally {
       setErIsTesting(false);
     }
@@ -325,7 +326,7 @@ export function CompanySettings() {
       }
     } catch (error) {
       console.error('Failed to load company data:', error);
-      toast.error(t('common.error'));
+      showNotification(t('common.error'), 'error');
     } finally {
       setLoading(false);
     }
@@ -377,10 +378,10 @@ export function CompanySettings() {
       // Update local original settings to reflect the save
       setOriginalSettings(newSettings);
       
-      toast.success(t('company_settings.save_success'));
+      showNotification(t('company_settings.save_success'), 'success');
     } catch (error) {
       console.error('Failed to save company settings:', error);
-      toast.error(t('common.error'));
+      showNotification(t('common.error'), 'error');
     } finally {
       setSaving(false);
     }

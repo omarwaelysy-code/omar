@@ -4,7 +4,7 @@ import {
   ChevronRight, ChevronLeft, LayoutGrid, List, Home, Edit
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { toast } from 'react-hot-toast';
+import { useNotification } from '../contexts/NotificationContext';
 import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -13,6 +13,7 @@ import { Warehouse } from '../types';
 export function Warehouses() {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
+  const { showNotification } = useNotification();
   
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,7 +89,7 @@ export function Warehouses() {
     if (!user?.company_id) return;
 
     if (!formData.name.trim()) {
-      toast.error(language === 'ar' ? 'اسم المخزن مطلوب' : 'Warehouse Name is required');
+      showNotification(language === 'ar' ? 'اسم المخزن مطلوب' : 'Warehouse Name is required', 'error');
       return;
     }
 
@@ -106,15 +107,15 @@ export function Warehouses() {
     try {
       if (editingWarehouse) {
         await dbService.update('warehouses', editingWarehouse.id, payload);
-        toast.success(language === 'ar' ? 'تم تحديث المخزن بنجاح' : 'Warehouse updated successfully');
+        showNotification(language === 'ar' ? 'تم تحديث المخزن بنجاح' : 'Warehouse updated successfully', 'success');
       } else {
         await dbService.add('warehouses', payload);
-        toast.success(language === 'ar' ? 'تمت إضافة المخزن بنجاح' : 'Warehouse created successfully');
+        showNotification(language === 'ar' ? 'تمت إضافة المخزن بنجاح' : 'Warehouse created successfully', 'success');
       }
       closeModal();
     } catch (error: any) {
       console.error('Error saving warehouse:', error);
-      toast.error(language === 'ar' ? 'فشل حفظ المخزن' : 'Failed to save warehouse');
+      showNotification(language === 'ar' ? 'فشل حفظ المخزن' : 'Failed to save warehouse', 'error');
     }
   };
 
@@ -127,10 +128,10 @@ export function Warehouses() {
     if (window.confirm(confirmMsg)) {
       try {
         await dbService.delete('warehouses', id);
-        toast.success(language === 'ar' ? 'تم حذف المخزن بنجاح' : 'Warehouse deleted successfully');
+        showNotification(language === 'ar' ? 'تم حذف المخزن بنجاح' : 'Warehouse deleted successfully', 'success');
       } catch (error) {
         console.error('Failed to delete warehouse:', error);
-        toast.error(language === 'ar' ? 'فشل حذف المخزن' : 'Failed to delete warehouse');
+        showNotification(language === 'ar' ? 'فشل حذف المخزن' : 'Failed to delete warehouse', 'error');
       }
     }
   };

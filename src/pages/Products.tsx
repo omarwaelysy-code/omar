@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Barcode from 'react-barcode';
-import { toast } from 'react-hot-toast';
 import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -256,18 +255,18 @@ export const Products: React.FC = () => {
 
     try {
       if (!formData.item_group_id) {
-        toast.error(language === 'ar' ? 'الرجاء اختيار مجموعة للصنف' : 'Please select an item group for the product');
+        showNotification(language === 'ar' ? 'الرجاء اختيار مجموعة للصنف' : 'Please select an item group for the product', 'error');
         return;
       }
 
       if (!formData.revenue_account_id || !formData.cost_account_id) {
-        toast.error('يجب اختيار حساب الإيرادات وحساب التكلفة للصنف');
+        showNotification('يجب اختيار حساب الإيرادات وحساب التكلفة للصنف', 'error');
         return;
       }
 
       const isPhysicalProduct = ['finished_good', 'raw_material', 'commodity', 'consumable'].includes(formData.type);
       if (isPhysicalProduct && !formData.inventory_account_id) {
-        toast.error(language === 'ar' ? 'الرجاء اختيار حساب المخزون للصنف' : 'Please select the inventory account for the product');
+        showNotification(language === 'ar' ? 'الرجاء اختيار حساب المخزون للصنف' : 'Please select the inventory account for the product', 'error');
         return;
       }
 
@@ -288,15 +287,15 @@ export const Products: React.FC = () => {
 
       if (editingProduct) {
         await dbService.update('products', editingProduct.id, dataToSave);
-        toast.success(t('common.updated_successfully'));
+        showNotification(t('common.updated_successfully'), 'success');
       } else {
         await dbService.add('products', { ...dataToSave, company_id: user.company_id });
-        toast.success(t('common.created_successfully'));
+        showNotification(t('common.created_successfully'), 'success');
       }
       setIsModalOpen(false);
       resetForm();
     } catch (e) {
-      toast.error('حدث خطأ أثناء حفظ البيانات');
+      showNotification('حدث خطأ أثناء حفظ البيانات', 'error');
     }
   };
 
@@ -550,13 +549,13 @@ export const Products: React.FC = () => {
                         });
                         const data = await req.json().catch(() => ({}));
                         if (!req.ok) {
-                           toast.error(data.details || data.error || t('products.recalculate_error'));
+                           showNotification(data.details || data.error || t('products.recalculate_error'), 'error');
                            return;
                         }
-                        toast.success(t('products.recalculate_success'));
+                        showNotification(t('products.recalculate_success'), 'success');
                         window.location.reload();
                       } catch (e: any) {
-                         toast.error(e.message || t('common.server_error'));
+                         showNotification(e.message || t('common.server_error'), 'error');
                       }
                     }
                   }} 
@@ -662,9 +661,9 @@ export const Products: React.FC = () => {
                                       if (window.confirm(t('common.confirm_delete'))) {
                                         try {
                                           await dbService.delete('products', product.id);
-                                          toast.success(t('common.deleted_successfully'));
+                                          showNotification(t('common.deleted_successfully'), 'success');
                                         } catch (err: any) {
-                                          toast.error(err.message || 'Error deleting');
+                                          showNotification(err.message || 'Error deleting', 'error');
                                         }
                                       }
                                     }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"><Trash2 size={18} /></button>

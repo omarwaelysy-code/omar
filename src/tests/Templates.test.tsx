@@ -27,10 +27,26 @@ vi.mock('../contexts/LanguageContext', () => ({
   })
 }));
 
+vi.mock('../contexts/NotificationContext', () => ({
+  useNotification: () => ({
+    showNotification: vi.fn(),
+    addPersistentNotification: vi.fn(),
+    notifications: [],
+    unreadCount: 0,
+    markAsRead: vi.fn(),
+    dismissNotification: vi.fn(),
+    markAllAsRead: vi.fn(),
+    clearAll: vi.fn(),
+    isCenterOpen: false,
+    setIsCenterOpen: vi.fn()
+  })
+}));
+
 // Mock dbService
 vi.mock('../services/dbService', () => ({
   dbService: {
     list: vi.fn(),
+    get: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     addWithId: vi.fn()
@@ -64,6 +80,12 @@ vi.mock('motion/react', () => ({
 describe('Templates Page - Designer Integrations', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    vi.mocked(dbService.get).mockResolvedValue({
+      id: 'test-company-id',
+      name: 'Test Company',
+      logo_url: 'http://example.com/logo.png'
+    });
 
     // Setup default mock values for dbService.list
     vi.mocked(dbService.list).mockImplementation(async (collection: string) => {

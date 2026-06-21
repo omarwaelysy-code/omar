@@ -21,7 +21,7 @@ import { dbService } from '../services/dbService';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Currency, ExchangeRate, Company } from '../types';
-import { toast } from 'react-hot-toast';
+import { useNotification } from '../contexts/NotificationContext';
 import { format } from 'date-fns';
 import { WORLD_CURRENCIES, WorldCurrency } from '../constants/worldCurrencies';
 import { apiRequest } from '../services/dbService';
@@ -29,6 +29,7 @@ import { apiRequest } from '../services/dbService';
 export default function Currencies() {
   const { language, t, dir } = useLanguage();
   const { user } = useAuth();
+  const { showNotification } = useNotification();
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [exchangeRates, setExchangeRates] = useState<Record<string, ExchangeRate[]>>({});
   const [loading, setLoading] = useState(true);
@@ -62,24 +63,25 @@ export default function Currencies() {
       }>('/currencies/update-rates', 'POST', { baseCurrency });
 
       if (result.success) {
-        toast.success(
+        showNotification(
           language === 'ar'
             ? `تم تحديث أسعار الصرف بنجاح.\nمضاف: ${result.inserted} | محدَّث: ${result.updated} | متجاوَز: ${result.skipped}`
             : `Exchange rates updated successfully.\nInserted: ${result.inserted} | Updated: ${result.updated} | Skipped: ${result.skipped}`,
-          { duration: 5000 }
+          'success'
         );
         // Refresh the list without reloading the whole page
         await loadData();
       } else {
-        toast.error(
+        showNotification(
           language === 'ar'
             ? `فشل تحديث أسعار الصرف: ${result.message}`
-            : `Failed to update exchange rates: ${result.message}`
+            : `Failed to update exchange rates: ${result.message}`,
+          'error'
         );
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      toast.error(language === 'ar' ? `خطأ: ${msg}` : `Error: ${msg}`);
+      showNotification(language === 'ar' ? `خطأ: ${msg}` : `Error: ${msg}`, 'error');
     } finally {
       setIsUpdatingRates(false);
     }
@@ -169,7 +171,7 @@ export default function Currencies() {
       }
     } catch (error) {
       console.error('Failed to load currency data:', error);
-      toast.error(t('common.error'));
+      showNotification(t('common.error'), 'error');
     } finally {
       setLoading(false);
     }
@@ -193,7 +195,7 @@ export default function Currencies() {
       }
     } catch (error) {
       console.error('Failed to load rate history:', error);
-      toast.error(t('common.error'));
+      showNotification(t('common.error'), 'error');
     } finally {
       setLoadingHistory(false);
     }
@@ -206,7 +208,7 @@ export default function Currencies() {
     // Check for duplicates
     const isDuplicate = currencies.some(c => c.code.toLowerCase() === newCurrency.code.toLowerCase());
     if (isDuplicate) {
-      toast.error(language === 'ar' ? 'هذه العملة مضافة بالفعل' : 'This currency is already added');
+      showNotification(language === 'ar' ? 'هذه العملة مضافة بالفعل' : 'This currency is already added', 'error');
       return;
     }
 
@@ -234,14 +236,14 @@ export default function Currencies() {
         flag: ''
       });
       setSearchQuery('');
-      toast.success(t('common.save_success'));
+      showNotification(t('common.save_success'), 'success');
       
       // Automatically show rate addition for the new currency
       setSelectedCurrency(addedCurrency);
       setIsHistoryOpen(true);
     } catch (error) {
       console.error('Failed to add currency:', error);
-      toast.error(t('common.error'));
+      showNotification(t('common.error'), 'error');
     }
   };
 
@@ -250,10 +252,10 @@ export default function Currencies() {
     try {
       await dbService.delete('currencies', id);
       setCurrencies(prev => prev.filter(c => c.id !== id));
-      toast.success(t('common.delete_success'));
+      showNotification(t('common.delete_success'), 'success');
     } catch (error) {
       console.error('Failed to delete currency:', error);
-      toast.error(t('common.error'));
+      showNotification(t('common.error'), 'error');
     }
   };
 
@@ -265,10 +267,10 @@ export default function Currencies() {
       setCurrencies(currencies.map(c => 
         c.id === currency.id ? { ...c, is_active: !c.is_active } : c
       ));
-      toast.success(t('common.update_success'));
+      showNotification(t('common.update_success'), 'success');
     } catch (error) {
       console.error('Failed to toggle currency status:', error);
-      toast.error(t('common.error'));
+      showNotification(t('common.error'), 'error');
     }
   };
 
@@ -308,10 +310,10 @@ export default function Currencies() {
         rate_date: format(new Date(), 'yyyy-MM-dd'),
         notes: ''
       });
-      toast.success(t('common.save_success'));
+      showNotification(t('common.save_success'), 'success');
     } catch (error) {
       console.error('Failed to add exchange rate:', error);
-      toast.error(t('common.error'));
+      showNotification(t('common.error'), 'error');
     }
   };
 

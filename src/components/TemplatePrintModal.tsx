@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { X, Printer, Download, FileText, AlertTriangle } from 'lucide-react';
 import { TemplateRenderer, normalizeDocumentData, TemplateLayout } from './TemplateRenderer';
 import html2pdf from 'html2pdf.js';
-import { toast } from 'react-hot-toast';
+import { useNotification } from '../contexts/NotificationContext';
 
 interface PaperSize {
   id: string;
@@ -184,6 +184,13 @@ export function TemplatePrintModal({
 }: TemplatePrintModalProps) {
   const { dir, language } = useLanguage();
   const { user } = useAuth();
+  const { showNotification } = useNotification();
+
+  const toast = {
+    success: (msg: string) => showNotification(msg, 'success'),
+    error: (msg: string) => showNotification(msg, 'error'),
+    info: (msg: string) => showNotification(msg, 'info')
+  };
   
   const [templates, setTemplates] = useState<Template[]>([]);
   const [paperSizes, setPaperSizes] = useState<PaperSize[]>([]);
@@ -282,14 +289,14 @@ export function TemplatePrintModal({
     };
 
     try {
-      toast.loading(language === 'ar' ? 'جاري تحضير ملف PDF...' : 'Preparing PDF file...', { id: 'pdf-toast' });
+      showNotification(language === 'ar' ? 'جاري تحضير ملف PDF...' : 'Preparing PDF file...', 'info');
       // @ts-ignore
       const html2pdfFunc = html2pdf.default || html2pdf;
       await html2pdfFunc().set(opt).from(printArea).save();
-      toast.success(language === 'ar' ? 'تم تحميل الملف بنجاح' : 'PDF downloaded successfully', { id: 'pdf-toast' });
+      showNotification(language === 'ar' ? 'تم تحميل الملف بنجاح' : 'PDF downloaded successfully', 'success');
     } catch (e) {
       console.error(e);
-      toast.error(language === 'ar' ? 'فشل تحميل الملف' : 'Failed to download PDF', { id: 'pdf-toast' });
+      showNotification(language === 'ar' ? 'فشل تحميل الملف' : 'Failed to download PDF', 'error');
     }
   };
 
