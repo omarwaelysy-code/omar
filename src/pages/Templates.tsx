@@ -551,6 +551,11 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
   const [isVersionModalOpen, setIsVersionModalOpen] = useState(false);
   const [changeNotes, setChangeNotes] = useState('');
   const [templateVersions, setTemplateVersions] = useState<TemplateVersion[]>([]);
+  
+  // Pending document type changes & unsaved changes confirmation modal states
+  const [pendingDocTypeChange, setPendingDocTypeChange] = useState<string | null>(null);
+  const [isUnsavedModalOpen, setIsUnsavedModalOpen] = useState(false);
+  const [nextPendingDocType, setNextPendingDocType] = useState<string>('');
 
   const canvasRefs = {
     header: useRef<HTMLDivElement>(null),
@@ -614,6 +619,140 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       setTemplateVersions([]);
     }
   }, [editingTemplate]);
+
+  const hasUnsavedChanges = (): boolean => {
+    if (historyIndex > 0) return true;
+
+    if (editingTemplate) {
+      if (formData.name !== editingTemplate.name) return true;
+      if (formData.description !== (editingTemplate.description || '')) return true;
+      if (formData.is_active !== editingTemplate.is_active) return true;
+      if (formData.is_default !== (editingTemplate.is_default || false)) return true;
+    } else {
+      if (formData.name.trim() !== '') return true;
+      if (formData.description.trim() !== '') return true;
+    }
+    return false;
+  };
+
+  const matchCategoryForDocType = (docType: string): string => {
+    // Try exact match on code
+    let cat = categories.find(c => c.code === docType);
+    if (cat) return cat.id;
+
+    // Try mapping common variations
+    const mappings: Record<string, string[]> = {
+      'invoices': ['sales_invoice', 'invoice', 'invoices', 'sales_invoices'],
+      'purchase_invoices': ['purchase_invoice', 'purchase_invoices'],
+      'returns': ['sales_return', 'return', 'returns', 'sales_returns'],
+      'purchase_returns': ['purchase_return', 'purchase_returns'],
+      'sales_orders': ['sales_order', 'sales_orders'],
+      'purchase_orders': ['purchase_order', 'purchase_orders'],
+      'receipt_vouchers': ['receipt_voucher', 'receipt_vouchers', 'receipts'],
+      'payment_vouchers': ['payment_voucher', 'payment_vouchers', 'payments'],
+      'journal_entries': ['journal_entry', 'journal_entries', 'journals']
+    };
+
+    const targetCodes = mappings[docType] || [docType];
+    cat = categories.find(c => c.code && targetCodes.includes(c.code));
+    if (cat) return cat.id;
+
+    // Fallback to name match
+    cat = categories.find(c => {
+      const nameLower = c.name.toLowerCase();
+      return targetCodes.some(code => nameLower.includes(code.replace('_', ' ')));
+    });
+    
+    return cat ? cat.id : '';
+  };
+
+  const changeDocumentType = async (newDocType: string) => {
+    const matchedTemplates = templates.filter(t => t.document_type === newDocType);
+    const defaultTemplate = matchedTemplates.find(t => t.is_default) || matchedTemplates[0];
+
+    const catId = matchCategoryForDocType(newDocType);
+    setHeaderCategoryId(catId);
+    setDetailsCategoryId(catId);
+    setPreviewMode(false);
+
+    if (defaultTemplate) {
+      setEditingTemplate(defaultTemplate);
+      const selectedSize = paperSizes.find(p => p.id === defaultTemplate.paper_size_id);
+      const isCustomPreset = PAPER_SIZES_PRESETS.some(p => p.id === defaultTemplate.paper_size_id);
+      const isCustom = selectedSize && !selectedSize.is_system && !isCustomPreset;
+
+      setFormData({
+        name: defaultTemplate.name,
+        description: defaultTemplate.description || '',
+        paper_size_id: isCustom ? 'custom' : defaultTemplate.paper_size_id,
+        orientation: defaultTemplate.orientation,
+        margin_top: Number(defaultTemplate.margin_top),
+        margin_bottom: Number(defaultTemplate.margin_bottom),
+        margin_left: Number(defaultTemplate.margin_left),
+        margin_right: Number(defaultTemplate.margin_right),
+        is_active: defaultTemplate.is_active,
+        customWidth: isCustom ? Number(selectedSize.width) : 210,
+        customHeight: isCustom ? Number(selectedSize.height) : 297,
+        customUnit: isCustom ? selectedSize.unit : 'mm',
+        document_type: newDocType,
+        is_default: defaultTemplate.is_default || false,
+        print_profile_id: defaultTemplate.print_profile_id || ''
+      });
+
+      const targetLayout = defaultTemplate.layout ? JSON.parse(JSON.stringify(defaultTemplate.layout)) : JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
+      setDesignerLayout(targetLayout);
+      setHistory([JSON.parse(JSON.stringify(targetLayout))]);
+      setHistoryIndex(0);
+      setSelectedElementId(null);
+      setSelectedSection(null);
+      setView('edit');
+    } else {
+      setEditingTemplate(null);
+      setFormData(prev => ({
+        ...prev,
+        name: '',
+        description: '',
+        document_type: newDocType,
+        is_default: true
+      }));
+
+      const cleanLayout: TemplateLayout = {
+        headerHeight: designerLayout.headerHeight || 70,
+        footerHeight: designerLayout.footerHeight || 50,
+        header: [],
+        details: {
+          mode: 'table',
+          columns: [
+            { id: 'product_code', label: language === 'ar' ? 'كود الصنف' : 'Item Code', field: 'product_code', width: 15 },
+            { id: 'product_name', label: language === 'ar' ? 'اسم الصنف' : 'Item Name', field: 'product_name', width: 45 },
+            { id: 'quantity', label: language === 'ar' ? 'الكمية' : 'Qty', field: 'quantity', width: 10 },
+            { id: 'unit_price', label: language === 'ar' ? 'السعر' : 'Price', field: 'unit_price', width: 15 },
+            { id: 'total', label: language === 'ar' ? 'الإجمالي' : 'Total', field: 'total', width: 15 }
+          ],
+          properties: {
+            fontSize: 10,
+            borderColor: '#e4e4e7',
+            boldHeader: true,
+            headerBgColor: '#f4f4f5',
+            bodyBgColor: '#ffffff',
+            borderWidth: 1,
+            paddingX: 2,
+            paddingY: 2,
+            rowHeight: 8,
+            fontFamily: 'Cairo'
+          }
+        },
+        footer: []
+      };
+
+      setDesignerLayout(cleanLayout);
+      setHistory([JSON.parse(JSON.stringify(cleanLayout))]);
+      setHistoryIndex(0);
+      setSelectedElementId(null);
+      setSelectedSection(null);
+      setView('create');
+    }
+  };
 
   // History Tracker logic
   const updateLayoutWithHistory = (newLayout: TemplateLayout) => {
@@ -772,12 +911,17 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
     try {
       const data = await apiRequest<OperationField[]>(`/operation_fields/by-category/${catId}`);
       if (type === 'header') {
-        setHeaderFields(data);
+        setHeaderFields(data || []);
       } else {
-        setDetailsFields(data);
+        setDetailsFields(data || []);
       }
     } catch (e) {
       console.error('Failed to load fields:', e);
+      if (type === 'header') {
+        setHeaderFields([]);
+      } else {
+        setDetailsFields([]);
+      }
     }
   };
 
@@ -1588,10 +1732,15 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
         created_by: user.username
       });
 
-      setView('list');
-      setEditingTemplate(null);
-      setSelectedElementId(null);
-      fetchData();
+      await fetchData();
+      if (pendingDocTypeChange) {
+        await changeDocumentType(pendingDocTypeChange);
+        setPendingDocTypeChange(null);
+      } else {
+        setView('list');
+        setEditingTemplate(null);
+        setSelectedElementId(null);
+      }
     } catch (error) {
       console.error('Submit failed:', error);
       toast.error(language === 'ar' ? 'فشلت العملية' : 'Operation failed');
@@ -4343,11 +4492,20 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
                       {/* Target Document type */}
                       <div className="space-y-1.5 pt-2 border-t border-zinc-100">
-                        <label className="text-xs font-bold text-zinc-700">{language === 'ar' ? 'نوع المستند / العملية' : 'Target Document / Operation'}</label>
+                        <label htmlFor="document_type_select" className="text-xs font-bold text-zinc-700">{language === 'ar' ? 'نوع المستند / العملية' : 'Target Document / Operation'}</label>
                         <select
+                          id="document_type_select"
                           className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold outline-none"
                           value={formData.document_type}
-                          onChange={(e) => setFormData(prev => ({ ...prev, document_type: e.target.value }))}
+                          onChange={(e) => {
+                            const newDocType = e.target.value;
+                            if (hasUnsavedChanges()) {
+                              setNextPendingDocType(newDocType);
+                              setIsUnsavedModalOpen(true);
+                            } else {
+                              changeDocumentType(newDocType);
+                            }
+                          }}
                         >
                           {DOCUMENT_TYPES.map(doc => (
                             <option key={doc.id} value={doc.id}>
@@ -4358,32 +4516,50 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                       </div>
 
                       {/* Default template status toggle */}
-                      <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-zinc-50 rounded-xl pt-2 border-t border-zinc-100">
+                      <div 
+                        onClick={(e) => e.stopPropagation()} 
+                        className="flex items-center gap-3 p-2 hover:bg-zinc-50 rounded-xl pt-2 border-t border-zinc-100"
+                      >
                         <input
+                          id="is_default_checkbox"
                           type="checkbox"
-                          className="w-5 h-5 rounded-lg border-zinc-300 text-emerald-600 focus:ring-emerald-500/20"
+                          className="w-5 h-5 rounded-lg border-zinc-300 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer"
                           checked={formData.is_default}
                           onChange={(e) => setFormData(prev => ({ ...prev, is_default: e.target.checked }))}
+                          onClick={(e) => e.stopPropagation()}
                         />
-                        <div className="flex flex-col">
+                        <label 
+                          htmlFor="is_default_checkbox" 
+                          className="flex flex-col cursor-pointer select-none flex-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <span className="text-xs font-bold text-zinc-800">{language === 'ar' ? 'القالب الافتراضي' : 'Default Template'}</span>
                           <span className="text-[10px] text-zinc-400">{language === 'ar' ? 'استخدام هذا القالب تلقائياً للمستند' : 'Use this template by default for this document'}</span>
-                        </div>
-                      </label>
+                        </label>
+                      </div>
 
                       {/* Active Status */}
-                      <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-zinc-50 rounded-xl pt-2 border-t border-zinc-100">
+                      <div 
+                        onClick={(e) => e.stopPropagation()} 
+                        className="flex items-center gap-3 p-2 hover:bg-zinc-50 rounded-xl pt-2 border-t border-zinc-100"
+                      >
                         <input
+                          id="is_active_checkbox"
                           type="checkbox"
-                          className="w-5 h-5 rounded-lg border-zinc-300 text-emerald-600 focus:ring-emerald-500/20"
+                          className="w-5 h-5 rounded-lg border-zinc-300 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer"
                           checked={formData.is_active}
                           onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
+                          onClick={(e) => e.stopPropagation()}
                         />
-                        <div className="flex flex-col">
+                        <label 
+                          htmlFor="is_active_checkbox" 
+                          className="flex flex-col cursor-pointer select-none flex-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <span className="text-xs font-bold text-zinc-800">{language === 'ar' ? 'قالب نشط' : 'Active Template'}</span>
                           <span className="text-[10px] text-zinc-400">{language === 'ar' ? 'السماح باستخدام القالب للطباعة' : 'Enable template for prints'}</span>
-                        </div>
-                      </label>
+                        </label>
+                      </div>
 
                     </div>
                   </div>
@@ -4539,6 +4715,69 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                         className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-600/10 hover:shadow-emerald-600/25"
                       >
                         {language === 'ar' ? 'حفظ الإصدار والتصميم' : 'Save Version & Design'}
+                      </button>
+                    </div>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
+
+            {/* Unsaved Changes Warning Modal */}
+            <AnimatePresence>
+              {isUnsavedModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] flex items-center justify-center p-4">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                    className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-zinc-100 p-6 space-y-4 font-bold Cairo text-right"
+                  >
+                    <div className="flex items-center gap-2.5 text-zinc-900 border-b border-zinc-100 pb-3">
+                      <AlertTriangle className="text-amber-500" size={20} />
+                      <h3 className="text-base font-black">
+                        {language === 'ar' ? 'تعديلات غير محفوظة' : 'Unsaved Changes'}
+                      </h3>
+                    </div>
+
+                    <p className="text-xs font-semibold leading-relaxed text-zinc-600">
+                      {language === 'ar' 
+                        ? 'لقد أجريت تعديلات على القالب الحالي. هل ترغب في حفظ التعديلات قبل الانتقال لنوع مستند آخر؟' 
+                        : 'You have unsaved changes on the current template. Do you want to save them before switching the document type?'}
+                    </p>
+
+                    <div className="flex items-center justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsUnsavedModalOpen(false);
+                          setNextPendingDocType('');
+                        }}
+                        className="px-4 py-2 border border-zinc-200 hover:bg-zinc-100 text-zinc-700 rounded-xl text-xs font-bold transition-all"
+                      >
+                        {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsUnsavedModalOpen(false);
+                          changeDocumentType(nextPendingDocType);
+                          setNextPendingDocType('');
+                        }}
+                        className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all"
+                      >
+                        {language === 'ar' ? 'تجاهل التغييرات' : 'Discard Changes'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPendingDocTypeChange(nextPendingDocType);
+                          setIsUnsavedModalOpen(false);
+                          setNextPendingDocType('');
+                          handleStartSaveProcess();
+                        }}
+                        className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-600/10 hover:shadow-emerald-600/25"
+                      >
+                        {language === 'ar' ? 'حفظ التعديلات' : 'Save Changes'}
                       </button>
                     </div>
                   </motion.div>
