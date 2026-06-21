@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { PurchaseOrder, Supplier, Product, PurchaseOrderItem, Warehouse, Company, Operation, Department, CostCenter, Currency, ExchangeRate } from '../types';
 import { 
-  Search, Plus, Trash2, X, Eye, Sparkles, FileText, Pencil, Printer, 
+  Search, Plus, Trash2, X, Eye, Sparkles, FileText, Pencil, Printer, Download, 
   ChevronLeft, ChevronRight, Hash, Calendar, Package, Tag, ArrowUpRight, 
   Lock, LayoutGrid, List, ChevronDown, ChevronUp, History, Coins, CheckCheck, ExternalLink, Image as ImageIcon, RotateCcw, Save, Copy, Layers
 } from 'lucide-react';
@@ -21,6 +21,7 @@ import { useViewPreference } from '../hooks/useViewPreference';
 import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
 import { useNavigation } from '../contexts/NavigationContext';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
+import { TemplatePrintModal } from '../components/TemplatePrintModal';
 import { exportToExcel } from '../utils/excelUtils';
 
 interface ExtendedPurchaseOrderItem extends PurchaseOrderItem {
@@ -119,6 +120,8 @@ export const PurchaseOrders: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
   const [viewOrder, setViewOrder] = useState<PurchaseOrder | null>(null);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [printModalData, setPrintModalData] = useState<any>(null);
   const [view, setView] = useViewPreference('purchase_orders', 'table');
   const [companyData, setCompanyData] = useState<Company | null>(null);
 
@@ -2271,11 +2274,24 @@ export const PurchaseOrders: React.FC = () => {
                     </button>
                   )}
                   <button
-                    onClick={handlePrint}
+                    onClick={() => {
+                      setPrintModalData(viewOrder);
+                      setIsPrintModalOpen(true);
+                    }}
                     className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-200"
                   >
                     <Printer size={16} />
-                    {language === 'ar' ? 'طباعة' : 'Print'}
+                    {language === 'ar' ? 'طباعة ونموذج' : 'Print & Template'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPrintModalData(viewOrder);
+                      setIsPrintModalOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-200"
+                  >
+                    <Download size={16} />
+                    تصدير بالنموذج
                   </button>
                 </div>
               </div>
@@ -2426,6 +2442,17 @@ export const PurchaseOrders: React.FC = () => {
         onClose={() => setIsActivityLogOpen(false)}
         category="purchase_orders"
         documentId={activityLogDocumentId}
+      />
+
+      <TemplatePrintModal
+        isOpen={isPrintModalOpen}
+        onClose={() => {
+          setIsPrintModalOpen(false);
+          setPrintModalData(null);
+        }}
+        documentType="purchase_orders"
+        documentData={printModalData}
+        title={printModalData ? `أمر شراء رقم ${printModalData.order_number}` : ''}
       />
     </div>
   );

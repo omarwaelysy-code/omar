@@ -17,6 +17,7 @@ import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { ExportButtons } from '../components/ExportButtons';
+import { TemplatePrintModal } from '../components/TemplatePrintModal';
 import { TransactionManager } from '../services/TransactionManager';
 import { VoucherSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog, Supplier, ExpenseCategory, PaymentMethod, JournalEntry, JournalEntryItem, Account, Company } from '../types';
@@ -64,6 +65,8 @@ export const PaymentVouchers: React.FC = () => {
   const [internalRef, setInternalRef] = useState('');
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [viewVoucher, setViewVoucher] = useState<any | null>(null);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [printModalData, setPrintModalData] = useState<any>(null);
 
   const voucherRef = React.useRef<HTMLDivElement>(null);
   const tableRef = React.useRef<HTMLDivElement>(null);
@@ -2580,9 +2583,12 @@ export const PaymentVouchers: React.FC = () => {
                   <History size={20} />
                 </button>
                 <button 
-                  onClick={() => exportToPDF(viewVoucher)}
+                  onClick={() => {
+                    setPrintModalData(viewVoucher);
+                    setIsPrintModalOpen(true);
+                  }}
                   className="p-2 text-zinc-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
-                  title="تصدير PDF"
+                  title="طباعة وتصدير بالنموذج"
                 >
                   <Download size={20} />
                 </button>
@@ -3196,6 +3202,17 @@ export const PaymentVouchers: React.FC = () => {
         }}
         category="payment_vouchers"
         documentId={activityLogDocumentId}
+      />
+
+      <TemplatePrintModal
+        isOpen={isPrintModalOpen}
+        onClose={() => {
+          setIsPrintModalOpen(false);
+          setPrintModalData(null);
+        }}
+        documentType="payment_vouchers"
+        documentData={printModalData}
+        title={printModalData ? `سند صرف رقم ${printModalData.voucher_number}` : ''}
       />
     </div>
   );

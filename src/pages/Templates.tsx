@@ -105,6 +105,8 @@ interface Template {
   layout?: TemplateLayout;
   created_at?: string;
   updated_at?: string;
+  document_type?: string;
+  is_default?: boolean;
 }
 
 interface OperationCategory {
@@ -125,6 +127,18 @@ interface OperationField {
 interface TemplatesProps {
   initialView?: 'list' | 'create';
 }
+
+const DOCUMENT_TYPES = [
+  { id: 'invoices', ar: 'فاتورة مبيعات / Sales Invoice', en: 'Sales Invoice' },
+  { id: 'purchase_invoices', ar: 'فاتورة مشتريات / Purchase Invoice', en: 'Purchase Invoice' },
+  { id: 'returns', ar: 'مرتجع مبيعات / Sales Return', en: 'Sales Return' },
+  { id: 'purchase_returns', ar: 'مرتجع مشتريات / Purchase Return', en: 'Purchase Return' },
+  { id: 'sales_orders', ar: 'أمر بيع / Sales Order', en: 'Sales Order' },
+  { id: 'purchase_orders', ar: 'أمر شراء / Purchase Order', en: 'Purchase Order' },
+  { id: 'receipt_vouchers', ar: 'سند قبض / Receipt Voucher', en: 'Receipt Voucher' },
+  { id: 'payment_vouchers', ar: 'سند صرف / Payment Voucher', en: 'Payment Voucher' },
+  { id: 'journal_entries', ar: 'قيد يومية / Journal Entry', en: 'Journal Entry' }
+];
 
 const DEFAULT_LAYOUT: TemplateLayout = {
   headerHeight: 70,
@@ -469,7 +483,9 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
     is_active: true,
     customWidth: 210,
     customHeight: 297,
-    customUnit: 'mm'
+    customUnit: 'mm',
+    document_type: 'invoices',
+    is_default: false
   });
 
   // Visual Designer Layout
@@ -1100,7 +1116,9 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       is_active: template.is_active,
       customWidth: isCustom ? Number(selectedSize.width) : 210,
       customHeight: isCustom ? Number(selectedSize.height) : 297,
-      customUnit: isCustom ? selectedSize.unit : 'mm'
+      customUnit: isCustom ? selectedSize.unit : 'mm',
+      document_type: template.document_type || 'invoices',
+      is_default: template.is_default || false
     });
 
     const targetLayout = template.layout ? JSON.parse(JSON.stringify(template.layout)) : JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
@@ -1130,7 +1148,9 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       is_active: template.is_active,
       customWidth: isCustom ? Number(selectedSize.width) : 210,
       customHeight: isCustom ? Number(selectedSize.height) : 297,
-      customUnit: isCustom ? selectedSize.unit : 'mm'
+      customUnit: isCustom ? selectedSize.unit : 'mm',
+      document_type: template.document_type || 'invoices',
+      is_default: false // Do not copy the default template status automatically
     });
 
     const targetLayout = template.layout ? JSON.parse(JSON.stringify(template.layout)) : JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
@@ -1211,6 +1231,13 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
         }
       }
 
+      if (formData.is_default) {
+        const siblingTemplates = templates.filter(t => t.document_type === formData.document_type && t.id !== editingTemplate?.id && t.is_default);
+        for (const sibling of siblingTemplates) {
+          await dbService.update('templates', sibling.id, { is_default: false });
+        }
+      }
+
       const templatePayload = {
         name: formData.name,
         description: formData.description,
@@ -1222,7 +1249,9 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
         margin_right: Number(formData.margin_right),
         is_active: formData.is_active,
         layout: designerLayout, // Stored purely as JSON
-        company_id: user.company_id
+        company_id: user.company_id,
+        document_type: formData.document_type,
+        is_default: formData.is_default
       };
 
       if (view === 'edit' && editingTemplate) {
@@ -1330,7 +1359,9 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                       is_active: true,
                       customWidth: 210,
                       customHeight: 297,
-                      customUnit: 'mm'
+                      customUnit: 'mm',
+                      document_type: 'invoices',
+                      is_default: false
                     });
                     const targetLayout = JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
                     setDesignerLayout(targetLayout);
@@ -1447,9 +1478,19 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                       return (
                         <tr key={template.id} className="hover:bg-zinc-50/50 transition-colors">
                           <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                            <div className="font-bold text-zinc-950">{template.name}</div>
+                            <div className="flex items-center gap-2">
+                              <div className="font-bold text-zinc-950">{template.name}</div>
+                              {template.is_default && (
+                                <span className="text-[9px] bg-amber-50 text-amber-700 font-extrabold px-1.5 py-0.5 rounded border border-amber-200/50">
+                                  {language === 'ar' ? 'الافتراضي' : 'Default'}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-zinc-400 font-bold mt-0.5">
+                              {DOCUMENT_TYPES.find(d => d.id === template.document_type)?.ar || template.document_type || ''}
+                            </div>
                             {template.description && (
-                              <div className="text-zinc-500 text-xs mt-0.5 line-clamp-1">{template.description}</div>
+                              <div className="text-zinc-500 text-xs mt-1 line-clamp-1">{template.description}</div>
                             )}
                           </td>
                           <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
@@ -3524,6 +3565,36 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                           </>
                         )}
                       </div>
+
+                      {/* Target Document type */}
+                      <div className="space-y-1.5 pt-2 border-t border-zinc-100">
+                        <label className="text-xs font-bold text-zinc-700">{language === 'ar' ? 'نوع المستند / العملية' : 'Target Document / Operation'}</label>
+                        <select
+                          className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold outline-none"
+                          value={formData.document_type}
+                          onChange={(e) => setFormData(prev => ({ ...prev, document_type: e.target.value }))}
+                        >
+                          {DOCUMENT_TYPES.map(doc => (
+                            <option key={doc.id} value={doc.id}>
+                              {language === 'ar' ? doc.ar : doc.en}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Default template status toggle */}
+                      <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-zinc-50 rounded-xl pt-2 border-t border-zinc-100">
+                        <input
+                          type="checkbox"
+                          className="w-5 h-5 rounded-lg border-zinc-300 text-emerald-600 focus:ring-emerald-500/20"
+                          checked={formData.is_default}
+                          onChange={(e) => setFormData(prev => ({ ...prev, is_default: e.target.checked }))}
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold text-zinc-800">{language === 'ar' ? 'القالب الافتراضي' : 'Default Template'}</span>
+                          <span className="text-[10px] text-zinc-400">{language === 'ar' ? 'استخدام هذا القالب تلقائياً للمستند' : 'Use this template by default for this document'}</span>
+                        </div>
+                      </label>
 
                       {/* Active Status */}
                       <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-zinc-50 rounded-xl pt-2 border-t border-zinc-100">
