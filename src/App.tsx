@@ -73,6 +73,7 @@ import { OperationFields } from './pages/OperationFields';
 import { Operations } from './pages/Operations';
 import { Departments } from './pages/Departments';
 import { CostCenters } from './pages/CostCenters';
+import { Templates } from './pages/Templates';
 
 import { LoadingScreen } from './components/LoadingScreen';
 import { AnimatePresence } from 'framer-motion';
@@ -224,6 +225,8 @@ export default function App() {
       case 'departments': return <Departments />;
       case 'cost_centers': return <CostCenters />;
       case 'system_check': return <SystemCheck />;
+      case 'templates': return <Templates initialView="list" />;
+      case 'create_template': return <Templates initialView="create" />;
       default: return <Dashboard />;
     }
   }

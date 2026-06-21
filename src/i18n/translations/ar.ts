@@ -1,6 +1,9 @@
 export const ar = {
   // Navigation
   'nav.dashboard': 'لوحة التحكم',
+  'nav.templates': 'القوالب',
+  'nav.templates_list': 'جميع القوالب',
+  'nav.create_template': 'إنشاء قالب',
   'nav.master_data': 'البيانات الأساسية',
   'nav.customers': 'العملاء',
   'nav.suppliers': 'الموردين',

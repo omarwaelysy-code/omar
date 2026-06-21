@@ -1,6 +1,9 @@
 export const en = {
   // Navigation
   'nav.dashboard': 'Dashboard',
+  'nav.templates': 'Templates',
+  'nav.templates_list': 'All Templates',
+  'nav.create_template': 'Create Template',
   'nav.master_data': 'Master Data',
   'nav.customers': 'Customers',
   'nav.suppliers': 'Suppliers',

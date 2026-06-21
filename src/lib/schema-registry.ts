@@ -217,5 +217,13 @@ export const EXPECTED_SCHEMA: TableSchema = {
   stock_adjustment_items: [
     'id', 'adjustment_id', 'product_id', 'product_name', 'product_code', 'warehouse_id', 
     'warehouse_name', 'quantity', 'unit_cost', 'total_cost', 'company_id', 'created_at'
+  ],
+  templates: [
+    'id', 'company_id', 'name', 'description', 'paper_size_id', 'orientation', 
+    'margin_top', 'margin_bottom', 'margin_left', 'margin_right', 'is_active', 
+    'created_at', 'updated_at'
+  ],
+  paper_sizes: [
+    'id', 'name', 'width', 'height', 'unit', 'is_system', 'company_id'
   ]
 };

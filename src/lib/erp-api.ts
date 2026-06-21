@@ -708,7 +708,7 @@ const modules = [
   'currencies', 'exchange_rates', 'inventory_movements', 'inventory_layers',
   'sales_orders', 'sales_order_items', 'purchase_orders', 'purchase_order_items', 'employees',
   'warehouse_transfers', 'warehouse_transfer_items', 'opening_stock_balances', 'opening_stock_items',
-  'stock_adjustments', 'stock_adjustment_items'
+  'stock_adjustments', 'stock_adjustment_items', 'templates', 'paper_sizes'
 ];
 
 // --- Flexible Operations Logic ---
@@ -1175,6 +1175,35 @@ router.get('/detailed-journal-entries', authenticateToken, async (req: AuthReque
     });
   } catch (error: any) {
     console.error('Error fetching detailed journal entries:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Custom endpoint for paper sizes to get both system-default and company-specific sizes
+router.get('/paper_sizes', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const companyId = req.user?.company_id;
+    const { rows } = await pool.query(
+      `SELECT * FROM paper_sizes WHERE company_id = $1 OR is_system = TRUE OR company_id IS NULL ORDER BY is_system DESC, name ASC`,
+      [companyId]
+    );
+    res.json(rows);
+  } catch (error: any) {
+    console.error('Error fetching paper sizes:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/paper-sizes', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const companyId = req.user?.company_id;
+    const { rows } = await pool.query(
+      `SELECT * FROM paper_sizes WHERE company_id = $1 OR is_system = TRUE OR company_id IS NULL ORDER BY is_system DESC, name ASC`,
+      [companyId]
+    );
+    res.json(rows);
+  } catch (error: any) {
+    console.error('Error fetching paper sizes:', error);
     res.status(500).json({ error: error.message });
   }
 });

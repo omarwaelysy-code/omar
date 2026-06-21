@@ -68,6 +68,8 @@ const pageLabels: { [key: string]: string } = {
   'backup_restore': 'النسخ الاحتياطي والاستعادة',
   'audit_logs': 'سجل الرقابة',
   'stock_card_report': 'كارت الصنف',
+  'templates': 'القوالب',
+  'create_template': 'إنشاء قالب',
 };
 
 export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

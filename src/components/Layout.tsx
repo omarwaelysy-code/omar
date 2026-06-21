@@ -46,7 +46,8 @@ import {
   Coins,
   Home,
   ListPlus,
-  Sliders
+  Sliders,
+  LayoutTemplate
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
@@ -145,6 +146,9 @@ const getTabIcon = (id: string) => {
     case 'system_check':
       return <ShieldCheck {...iconProps} />;
     case 'backup_restore': return <Database {...iconProps} />;
+    case 'templates':
+    case 'create_template':
+      return <LayoutTemplate {...iconProps} />;
     default: return <Folder {...iconProps} />;
   }
 };
@@ -373,6 +377,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         ]
       },
       {
+        id: 'templates_menu',
+        label: t('nav.templates') || 'القوالب',
+        icon: LayoutTemplate,
+        subItems: [
+          { id: 'templates', label: t('nav.templates_list') || 'جميع القوالب', icon: FileText },
+          { id: 'create_template', label: t('nav.create_template') || 'إنشاء قالب', icon: Plus }
+        ]
+      },
+      {
         id: 'reports_menu',
         label: t('nav.reports') || 'التقارير',
         icon: BarChart3,
@@ -435,12 +448,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
     return navItems.map(item => {
       // Check if top-level item should be visible
-      const canView = hasPermission(item.id, 'view') || item.id === 'currencies';
+      const canView = hasPermission(item.id, 'view') || item.id === 'currencies' || item.id === 'templates_menu';
       
       if (item.subItems) {
         const visibleSubItems = item.subItems.filter(sub => {
           if (sub.isDivider || sub.isHeader) return true;
-          if (sub.id === 'currencies') return true;
+          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template') return true;
           return hasPermission(sub.id, 'view');
         });
         
