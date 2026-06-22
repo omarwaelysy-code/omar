@@ -165,15 +165,13 @@ export const CashReport: React.FC = () => {
         return a.id.localeCompare(b.id);
       });
 
-      const startD = startDate ? new Date(startDate) : new Date(0);
-      startD.setHours(0, 0, 0, 0);
-      const endD = endDate ? new Date(endDate) : new Date();
-      endD.setHours(23, 59, 59, 999);
-
-      const before = allTrans.filter(t => new Date(t.date) < startD);
+      const before = allTrans.filter(t => {
+        const tDateStr = (t.date || '').slice(0, 10);
+        return startDate && tDateStr < startDate;
+      });
       const during = allTrans.filter(t => {
-        const d = new Date(t.date);
-        return d >= startD && d <= endD;
+        const tDateStr = (t.date || '').slice(0, 10);
+        return (!startDate || tDateStr >= startDate) && (!endDate || tDateStr <= endDate);
       });
 
       const balBefore = before.reduce((sum, t) => sum + (t.in - t.out), 0);

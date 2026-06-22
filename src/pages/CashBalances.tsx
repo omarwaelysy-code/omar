@@ -80,9 +80,8 @@ export const CashBalances: React.FC = () => {
           dbService.list<any>('purchase_invoices', user.company_id)
         ]);
 
-        const startDate = new Date(dateRange.start);
-        const endDate = new Date(dateRange.end);
-        endDate.setHours(23, 59, 59, 999);
+        const startStr = dateRange.start;
+        const endStr = dateRange.end;
 
         const calculatedBalances = paymentMethodsData.map(method => {
           let opIn = 0;
@@ -92,8 +91,7 @@ export const CashBalances: React.FC = () => {
 
           // Process ALL journal entries for this method's account
           journalEntries.forEach(je => {
-            const d = new Date(je.date);
-            d.setHours(0, 0, 0, 0);
+            const jeDateStr = (je.date || '').slice(0, 10);
 
             je.items?.forEach((item: any) => {
               let isMatch = false;
@@ -152,10 +150,10 @@ export const CashBalances: React.FC = () => {
                 const amountDebit = Number(item.debit || 0);
                 const amountCredit = Number(item.credit || 0);
 
-                if (d < startDate) {
+                if (startStr && jeDateStr < startStr) {
                   opIn += amountDebit;
                   opOut += amountCredit;
-                } else if (d >= startDate && d <= endDate) {
+                } else if ((!startStr || jeDateStr >= startStr) && (!endStr || jeDateStr <= endStr)) {
                   movIn += amountDebit;
                   movOut += amountCredit;
                 }
@@ -166,12 +164,15 @@ export const CashBalances: React.FC = () => {
           const opBalance = opIn - opOut;
           const clBalance = opBalance + (movIn - movOut);
 
+          const netOpIn = opBalance >= 0 ? opBalance : 0;
+          const netOpOut = opBalance < 0 ? Math.abs(opBalance) : 0;
+
           return {
             id: method.id,
             name: method.name,
             opening: {
-              in: opIn,
-              out: opOut,
+              in: netOpIn,
+              out: netOpOut,
               balance: opBalance
             },
             movement: {
@@ -179,8 +180,8 @@ export const CashBalances: React.FC = () => {
               out: movOut
             },
             closing: {
-              in: opIn + movIn,
-              out: opOut + movOut,
+              in: netOpIn + movIn,
+              out: netOpOut + movOut,
               balance: clBalance
             }
           };
@@ -326,13 +327,13 @@ export const CashBalances: React.FC = () => {
                 <tr key={b.id} className="hover:bg-zinc-50/50 transition-colors">
                   <td className="px-6 py-4 text-sm font-bold text-zinc-900 border-l border-zinc-100">{b.name}</td>
                   <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.opening.in > 0 ? formatNumber(b.opening.in) : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.opening.out > 0 ? formatNumber(b.opening.out) : '-'}</td>
+                  <td className="px-4 py-4 text-sm font-black text-zinc-500 text-center border-l border-zinc-100">{b.opening.out > 0 ? formatNumber(b.opening.out) : '-'}</td>
                   <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.movement.in > 0 ? formatNumber(b.movement.in) : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.movement.out > 0 ? formatNumber(b.movement.out) : '-'}</td>
+                  <td className="px-4 py-4 text-sm font-black text-zinc-500 text-center border-l border-zinc-100">{b.movement.out > 0 ? formatNumber(b.movement.out) : '-'}</td>
                   <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.closing.in > 0 ? formatNumber(b.closing.in) : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.closing.out > 0 ? formatNumber(b.closing.out) : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-zinc-900 text-center">
-                    <span className={b.closing.balance >= 0 ? 'text-emerald-600' : 'text-emerald-600'}>
+                  <td className="px-4 py-4 text-sm font-black text-zinc-500 text-center border-l border-zinc-100">{b.closing.out > 0 ? formatNumber(b.closing.out) : '-'}</td>
+                  <td className="px-4 py-4 text-sm font-black text-center">
+                    <span className={b.closing.balance >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
                       {formatNumber(b.closing.balance)}
                     </span>
                   </td>
