@@ -21,22 +21,49 @@ export const ActivityLogPage: React.FC = () => {
     if (!user) return;
     setLoading(true);
     try {
-      // Try to fetch from audit_logs first (the new system)
-      let data = await dbService.listAll<ActivityLog>('audit_logs');
-      
-      // If none found (maybe system just started), try activity_logs
-      if (data.length === 0) {
-        const fallback = await dbService.listAll<ActivityLog>('activity_logs');
-        data = fallback.map(l => ({
-          ...l,
-          module: l.action?.split(':')[0] || 'SYSTEM',
-          action: l.action?.split(':')[1] || l.action
-        }));
-      }
+      // Fetch both collections in parallel
+      const [auditData, activityData] = await Promise.all([
+        dbService.listAll<ActivityLog>('audit_logs').catch(() => []),
+        dbService.listAll<ActivityLog>('activity_logs').catch(() => [])
+      ]);
 
-      setLogs(data);
+      // Normalize activity_logs data
+      const normalizedActivity = activityData.map(l => {
+        let mod = l.module || 'SYSTEM';
+        let act = l.action || '';
+        
+        // If action contains format 'MODULE:ACTION'
+        if (l.action && l.action.includes(':')) {
+          const parts = l.action.split(':');
+          mod = parts[0] || 'SYSTEM';
+          act = parts[1] || l.action;
+        } else if (l.entity) {
+          mod = typeof l.entity === 'string' ? l.entity : 'SYSTEM';
+        }
+        
+        return {
+          ...l,
+          module: mod,
+          action: act || l.action,
+          created_at: l.created_at || (l as any).timestamp || new Date().toISOString()
+        };
+      });
+
+      // Normalize audit_logs data
+      const normalizedAudit = auditData.map(l => ({
+        ...l,
+        module: l.module || 'SYSTEM',
+        action: l.action || '',
+        created_at: l.created_at || (l as any).timestamp || new Date().toISOString()
+      }));
+
+      // Combine and sort by timestamp DESC
+      const combined = [...normalizedAudit, ...normalizedActivity];
+      combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      setLogs(combined);
     } catch (error) {
-      console.error('Failed to fetch audit logs:', error);
+      console.error('Failed to fetch audit/activity logs:', error);
     } finally {
       setLoading(false);
     }
@@ -65,7 +92,8 @@ export const ActivityLogPage: React.FC = () => {
   const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
   const paginatedLogs = filteredLogs.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
-  const getActionColor = (action: string) => {
+  const getActionColor = (action: string = '') => {
+    if (!action) return 'bg-blue-100 text-blue-700 border-blue-200';
     if (action.includes('CREATE') || action.includes('RESTORE')) return 'bg-emerald-100 text-emerald-700 border-emerald-200';
     if (action.includes('DELETE') || action.includes('FAILED')) return 'bg-emerald-100 text-emerald-700 border-emerald-200';
     if (action.includes('UPDATE')) return 'bg-amber-100 text-amber-700 border-amber-200';

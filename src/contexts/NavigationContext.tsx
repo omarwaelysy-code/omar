@@ -25,7 +25,7 @@ interface NavigationContextType {
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
 
-const pageLabels: { [key: string]: string } = {
+export const pageLabels: { [key: string]: string } = {
   'dashboard': 'لوحة التحكم',
   'dashboard_designer': 'مصمم لوحات التحكم',
   'super_admin_dashboard': 'لوحة تحكم المدير العام',
@@ -71,6 +71,27 @@ const pageLabels: { [key: string]: string } = {
   'stock_card_report': 'كارت الصنف',
   'templates': 'القوالب',
   'create_template': 'إنشاء قالب',
+  'warehouses': 'المستودعات',
+  'item_groups': 'مجموعات الأصناف',
+  'customer_settlements': 'تسويات العملاء',
+  'supplier_settlements': 'تسويات الموردين',
+  'cash_transfers': 'حوالات الخزينة',
+  'warehouse_transfers': 'حوالات المستودعات',
+  'opening_stock_balances': 'أرصدة أول المدة للمخزون',
+  'stock_adjustments': 'تسويات المخزون',
+  'stock_balances_report': 'تقرير أرصدة المخزون',
+  'general_stock_movements_report': 'تقرير حركة المخزون العامة',
+  'cash_balances': 'أرصدة النقدية',
+  'detailed_journal_entries': 'دفتر اليومية المفصل',
+  'integrity_dashboard': 'فحص سلامة البيانات',
+  'currencies': 'العملات',
+  'operation_categories': 'فئات العمليات',
+  'operation_fields': 'حقول العمليات',
+  'operations': 'العمليات',
+  'departments': 'الأقسام',
+  'cost_centers': 'مراكز التكلفة',
+  'company_settings': 'إعدادات الشركة',
+  'quotations': 'عروض الأسعار',
 };
 
 export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

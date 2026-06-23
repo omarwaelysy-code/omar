@@ -27,7 +27,14 @@ vi.mock('../contexts/NavigationContext', () => ({
   useNavigation: () => ({
     activeTabId: 'dashboard',
     setCurrentPage: vi.fn()
-  })
+  }),
+  pageLabels: {
+    'dashboard': 'لوحة التحكم',
+    'customers': 'العملاء',
+    'suppliers': 'الموردين',
+    'products': 'الأصناف',
+    'invoices': 'فواتير مبيعات'
+  }
 }));
 
 vi.mock('../contexts/LanguageContext', () => ({
@@ -347,4 +354,55 @@ describe('Dashboard Page Customization Mode and Templates', () => {
       }));
     });
   });
+
+  it('allows customizing Quick Access cards (replace, duplicate, delete)', async () => {
+    render(<Dashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Customize')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Customize'));
+
+    // Select the shortcuts widget on canvas to open properties panel
+    await waitFor(() => {
+      expect(screen.getByText('Quick Access Shortcuts')).toBeInTheDocument();
+    });
+    const shortcutsWidget = screen.getByText('Quick Access Shortcuts').closest('.group');
+    expect(shortcutsWidget).toBeInTheDocument();
+    fireEvent.click(shortcutsWidget!);
+
+    // Verify Customize Quick Access is displayed in properties panel
+    await waitFor(() => {
+      expect(screen.getByText('Customize Quick Access')).toBeInTheDocument();
+    });
+
+    // Test Deletion
+    const deleteButtons = screen.getAllByRole('button');
+    const crossButtons = deleteButtons.filter(b => b.textContent === '×');
+    expect(crossButtons.length).toBeGreaterThan(0);
+    
+    // Delete the first card
+    fireEvent.click(crossButtons[0]);
+
+    // Test Duplication
+    const duplicateButtons = screen.getAllByTitle('Duplicate');
+    expect(duplicateButtons.length).toBeGreaterThan(0);
+    fireEvent.click(duplicateButtons[0]);
+
+    // Test Replace Page
+    const replaceButtons = screen.getAllByText('Replace Page');
+    expect(replaceButtons.length).toBeGreaterThan(0);
+    fireEvent.click(replaceButtons[0]);
+
+    // Search and select a page in searchable popup
+    const searchInputs = screen.getAllByPlaceholderText('Search page to replace...');
+    expect(searchInputs.length).toBeGreaterThan(0);
+    fireEvent.change(searchInputs[0], { target: { value: 'Invoices' } });
+
+    const pageOption = screen.getByText('Invoices');
+    expect(pageOption).toBeInTheDocument();
+    fireEvent.click(pageOption);
+  });
 });
+

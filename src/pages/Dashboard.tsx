@@ -69,7 +69,7 @@ import {
 } from 'recharts';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigation } from '../contexts/NavigationContext';
+import { useNavigation, pageLabels } from '../contexts/NavigationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { 
   DashboardStats, 
@@ -515,9 +515,21 @@ interface WidgetRendererProps {
   widget: Widget;
   stats: DashboardStats | null;
   onToggleGroupCollapse?: (widgetId: string, groupId: string) => void;
+  isEditing?: boolean;
+  onCardClick?: (widgetId: string, item: any) => void;
+  onAddCardClick?: (widgetId: string) => void;
+  onReorderCards?: (widgetId: string, dragId: string, dropId: string) => void;
 }
 
-const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, stats, onToggleGroupCollapse }) => {
+const WidgetRenderer: React.FC<WidgetRendererProps> = ({ 
+  widget, 
+  stats, 
+  onToggleGroupCollapse,
+  isEditing = false,
+  onCardClick,
+  onAddCardClick,
+  onReorderCards
+}) => {
   const { t, dir, language } = useLanguage();
   const { setCurrentPage } = useNavigation();
   
@@ -537,139 +549,178 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, stats, onToggle
 
   switch (widget_type) {
     case 'shortcuts': {
-      const qaSettings = widget.settings?.quickAccess || {};
-      const useCustom = qaSettings.useCustom;
+      const qaSettings = widget.settings?.quickAccess || {
+        useCustom: true,
+        items: [
+          { id: 'customers', label: language === 'ar' ? 'العملاء' : 'Customers', icon: 'Users', color: 'from-blue-500/20 to-blue-600/20', iconColor: 'text-blue-600', size: 'medium', pinned: false },
+          { id: 'suppliers', label: language === 'ar' ? 'الموردين' : 'Suppliers', icon: 'Truck', color: 'from-emerald-500/20 to-emerald-600/20', iconColor: 'text-emerald-600', size: 'medium', pinned: false },
+          { id: 'products', label: language === 'ar' ? 'الأصناف' : 'Products', icon: 'Package', color: 'from-amber-500/20 to-amber-600/20', iconColor: 'text-amber-600', size: 'medium', pinned: false },
+          { id: 'accounts', label: language === 'ar' ? 'الحسابات' : 'Accounts', icon: 'Wallet', color: 'from-purple-500/20 to-purple-600/20', iconColor: 'text-purple-600', size: 'medium', pinned: false },
+          { id: 'payment_methods', label: language === 'ar' ? 'وسائل الدفع' : 'Payment Methods', icon: 'CreditCard', color: 'from-indigo-500/20 to-indigo-600/20', iconColor: 'text-indigo-600', size: 'medium', pinned: false },
+          { id: 'company_settings', label: language === 'ar' ? 'الإعدادات' : 'Settings', icon: 'Settings', color: 'from-slate-500/20 to-slate-600/20', iconColor: 'text-slate-600', size: 'medium', pinned: false }
+        ],
+        groups: []
+      };
+
+      const items: any[] = qaSettings.items || [];
+      const groups: any[] = qaSettings.groups || [];
       
-      if (useCustom) {
-        const items: any[] = qaSettings.items || [];
-        const groups: any[] = qaSettings.groups || [];
+      const getGroupItems = (groupId?: string) => {
+        const filtered = items.filter(item => item.groupId === groupId);
+        return filtered.sort((a, b) => {
+          if (a.pinned && !b.pinned) return -1;
+          if (!a.pinned && b.pinned) return 1;
+          return 0;
+        });
+      };
+
+      const handleCardDragStart = (e: React.DragEvent, cardId: string) => {
+        if (!isEditing) return;
+        e.stopPropagation();
+        e.dataTransfer.setData('cardId', cardId);
+        e.dataTransfer.setData('widgetId', widget.id);
+      };
+
+      const handleCardDrop = (e: React.DragEvent, targetCardId: string) => {
+        if (!isEditing) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const dragCardId = e.dataTransfer.getData('cardId');
+        const dragWidgetId = e.dataTransfer.getData('widgetId');
+        if (dragWidgetId === widget.id && dragCardId !== targetCardId) {
+          onReorderCards?.(widget.id, dragCardId, targetCardId);
+        }
+      };
+
+      const renderShortcutItem = (item: any) => {
+        let sizeClasses = "relative flex items-center bg-slate-50/50 hover:bg-white border border-slate-100 rounded-xl hover:shadow-md hover:border-indigo-500/30 transition-all overflow-hidden cursor-pointer";
+        let iconWrapper = "rounded-lg bg-white flex items-center justify-center shadow-sm border border-slate-100 shrink-0";
+        let textClass = "font-bold text-slate-600 group-hover:text-slate-900 transition-colors uppercase tracking-tight";
         
-        const getGroupItems = (groupId?: string) => {
-          const filtered = items.filter(item => item.groupId === groupId);
-          return filtered.sort((a, b) => {
-            if (a.pinned && !b.pinned) return -1;
-            if (!a.pinned && b.pinned) return 1;
-            return 0;
-          });
-        };
-
-        const renderShortcutItem = (item: any) => {
-          let sizeClasses = "relative flex items-center bg-slate-50/50 hover:bg-white border border-slate-100 rounded-xl hover:shadow-md hover:border-indigo-500/30 transition-all overflow-hidden cursor-pointer";
-          let iconWrapper = "rounded-lg bg-white flex items-center justify-center shadow-sm border border-slate-100 shrink-0";
-          let textClass = "font-bold text-slate-600 group-hover:text-slate-900 transition-colors uppercase tracking-tight";
-          
-          if (item.size === 'small') {
-            sizeClasses += " p-2 flex-row gap-2 h-10 w-full";
-            iconWrapper += " w-6 h-6";
-            textClass += " text-[8px] truncate";
-          } else if (item.size === 'large') {
-            sizeClasses += " p-4 flex-col justify-between items-start h-28 w-full";
-            iconWrapper += " w-10 h-10 mb-2";
-            textClass += " text-[10px] line-clamp-2 text-left";
-          } else { // medium
-            sizeClasses += " p-3 flex-col justify-center items-center h-20 w-full text-center";
-            iconWrapper += " w-8 h-8 mb-1";
-            textClass += " text-[9px] line-clamp-2";
-          }
-
-          return (
-            <button
-              key={item.id}
-              onClick={() => setCurrentPage(item.id)}
-              className={`group ${sizeClasses}`}
-            >
-              <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-br ${item.color || 'from-slate-500/20 to-slate-600/20'} rounded-full -mr-8 -mt-8 opacity-40 group-hover:scale-150 transition-transform duration-500`} />
-              
-              <div className={iconWrapper}>
-                {renderLucideIcon(item.icon || 'HelpCircle', item.size === 'small' ? 12 : item.size === 'large' ? 20 : 16, item.iconColor || 'text-slate-600')}
-              </div>
-              
-              <span className={textClass}>
-                {item.label}
-              </span>
-              
-              {item.pinned && (
-                <span className="absolute top-1 left-1 flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-                </span>
-              )}
-            </button>
-          );
-        };
-
-        const ungroupedItems = getGroupItems(undefined);
+        if (item.size === 'small') {
+          sizeClasses += " p-2 flex-row gap-2 h-10 w-full";
+          iconWrapper += " w-6 h-6";
+          textClass += " text-[8px] truncate";
+        } else if (item.size === 'large') {
+          sizeClasses += " p-4 flex-col justify-between items-start h-28 w-full";
+          iconWrapper += " w-10 h-10 mb-2";
+          textClass += " text-[10px] line-clamp-2 text-left";
+        } else { // medium
+          sizeClasses += " p-3 flex-col justify-center items-center h-20 w-full text-center";
+          iconWrapper += " w-8 h-8 mb-1";
+          textClass += " text-[9px] line-clamp-2";
+        }
 
         return (
-          <div className="w-full h-full overflow-y-auto custom-scrollbar flex flex-col gap-4 pr-1">
-            {items.some(i => i.pinned) && (
-              <div className="border border-indigo-100 bg-indigo-50/10 p-3 rounded-2xl">
-                <div className="flex items-center gap-1.5 mb-2">
-                  {renderLucideIcon('Pin', 12, 'text-indigo-600')}
-                  <span className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">
-                    {language === 'ar' ? 'البطاقات المثبتة' : 'Pinned shortcuts'}
-                  </span>
-                </div>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                  {items.filter(i => i.pinned).map(renderShortcutItem)}
-                </div>
-              </div>
+          <button
+            key={item.id}
+            onClick={(e) => {
+              if (isEditing) {
+                e.stopPropagation();
+                onCardClick?.(widget.id, item);
+              } else {
+                setCurrentPage(item.id);
+              }
+            }}
+            draggable={isEditing}
+            onDragStart={(e) => handleCardDragStart(e, item.id)}
+            onDragOver={(e) => { if (isEditing) e.preventDefault(); }}
+            onDrop={(e) => handleCardDrop(e, item.id)}
+            className={`group ${sizeClasses}`}
+            type="button"
+          >
+            <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-br ${item.color || 'from-slate-500/20 to-slate-600/20'} rounded-full -mr-8 -mt-8 opacity-40 group-hover:scale-150 transition-transform duration-500`} />
+            
+            <div className={iconWrapper}>
+              {renderLucideIcon(item.icon || 'HelpCircle', item.size === 'small' ? 12 : item.size === 'large' ? 20 : 16, item.iconColor || 'text-slate-600')}
+            </div>
+            
+            <span className={textClass}>
+              {item.label}
+            </span>
+            
+            {item.pinned && (
+              <span className="absolute top-1 left-1 flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+              </span>
             )}
 
-            {ungroupedItems.length > 0 && (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                {ungroupedItems.map(renderShortcutItem)}
+            {isEditing && (
+              <div className="absolute top-1 right-1 opacity-40 group-hover:opacity-100 transition-opacity">
+                <Lucide.Settings size={10} className="text-indigo-600" />
               </div>
             )}
-
-            {groups.map(group => {
-              const groupItems = getGroupItems(group.id);
-              return (
-                <div key={group.id} className="border border-slate-100 bg-slate-50/20 p-3 rounded-2xl flex flex-col gap-2">
-                  <button 
-                    onClick={() => {
-                      onToggleGroupCollapse?.(widget.id, group.id);
-                    }}
-                    className="flex items-center justify-between w-full hover:bg-slate-50 p-1.5 rounded-lg text-slate-700 transition-colors"
-                  >
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider">{group.name}</span>
-                    {group.collapsed ? renderLucideIcon('ChevronDown', 14) : renderLucideIcon('ChevronUp', 14)}
-                  </button>
-                  
-                  {!group.collapsed && (
-                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 pt-1">
-                      {groupItems.length > 0 ? (
-                        groupItems.map(renderShortcutItem)
-                      ) : (
-                        <div className="col-span-full text-center py-2 text-[9px] text-slate-400">
-                          {language === 'ar' ? 'لا توجد عناصر في هذه المجموعة' : 'No items in this group'}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          </button>
         );
-      }
+      };
+
+      const ungroupedItems = getGroupItems(undefined);
 
       return (
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-3 lg:gap-4 w-full h-full">
-          {masterDataItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setCurrentPage(item.id)}
-              className="group relative flex flex-col items-center justify-center p-3 bg-slate-50/50 border border-slate-100 rounded-xl hover:shadow-md hover:border-brand-primary/30 transition-all overflow-hidden h-full min-h-[80px]"
-            >
-              <div className={`w-8 h-8 rounded-lg bg-white flex items-center justify-center mb-1 group-hover:scale-105 transition-transform shadow-sm border border-slate-100 relative z-10`}>
-                <item.icon size={16} className={item.iconColor} />
+        <div className="w-full h-full overflow-y-auto custom-scrollbar flex flex-col gap-4 pr-1">
+          {items.some(i => i.pinned) && (
+            <div className="border border-indigo-100 bg-indigo-50/10 p-3 rounded-2xl">
+              <div className="flex items-center gap-1.5 mb-2">
+                {renderLucideIcon('Pin', 12, 'text-indigo-600')}
+                <span className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">
+                  {language === 'ar' ? 'البطاقات المثبتة' : 'Pinned shortcuts'}
+                </span>
               </div>
-              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tight relative z-10 group-hover:text-slate-900 transition-colors">
-                {item.label}
-              </span>
-            </button>
-          ))}
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                {items.filter(i => i.pinned).map(renderShortcutItem)}
+              </div>
+            </div>
+          )}
+
+          {(ungroupedItems.length > 0 || isEditing) && (
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+              {ungroupedItems.map(renderShortcutItem)}
+              {isEditing && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddCardClick?.(widget.id);
+                  }}
+                  className="group relative flex flex-col justify-center items-center p-3 h-20 w-full text-center border-2 border-dashed border-slate-200 hover:border-indigo-500 rounded-xl bg-slate-50/20 hover:bg-white text-slate-400 hover:text-indigo-600 transition-all cursor-pointer"
+                  type="button"
+                >
+                  <Lucide.Plus size={16} className="mb-1 transition-transform group-hover:scale-110" />
+                  <span className="text-[9px] font-bold uppercase tracking-tight">{language === 'ar' ? 'إضافة بطاقة' : 'Add Card'}</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {groups.map(group => {
+            const groupItems = getGroupItems(group.id);
+            return (
+              <div key={group.id} className="border border-slate-100 bg-slate-50/20 p-3 rounded-2xl flex flex-col gap-2">
+                <button 
+                  onClick={() => {
+                    onToggleGroupCollapse?.(widget.id, group.id);
+                  }}
+                  className="flex items-center justify-between w-full hover:bg-slate-50 p-1.5 rounded-lg text-slate-700 transition-colors"
+                  type="button"
+                >
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider">{group.name}</span>
+                  {group.collapsed ? renderLucideIcon('ChevronDown', 14) : renderLucideIcon('ChevronUp', 14)}
+                </button>
+                
+                {!group.collapsed && (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 pt-1">
+                    {groupItems.length > 0 ? (
+                      groupItems.map(renderShortcutItem)
+                    ) : (
+                      <div className="col-span-full text-center py-2 text-[9px] text-slate-400">
+                        {language === 'ar' ? 'لا توجد عناصر في هذه المجموعة' : 'No items in this group'}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       );
     }
@@ -1193,59 +1244,65 @@ interface ERPPageItem {
   defaultColor: string;
 }
 
-const ERP_PAGES_DIRECTORY: ERPPageItem[] = [
-  { id: 'accounts', nameEn: 'Chart of Accounts List', nameAr: 'دليل الحسابات', category: 'accounting', defaultIcon: 'Wallet', defaultColor: 'from-purple-500/20 to-purple-600/20' },
-  { id: 'chart_of_accounts', nameEn: 'Tree Chart of Accounts', nameAr: 'شجرة الحسابات', category: 'accounting', defaultIcon: 'GitFork', defaultColor: 'from-purple-500/20 to-purple-600/20' },
-  { id: 'account_types', nameEn: 'Account Types', nameAr: 'أنواع الحسابات', category: 'accounting', defaultIcon: 'Layers', defaultColor: 'from-purple-500/20 to-purple-600/20' },
-  { id: 'journal_entries', nameEn: 'Journal Entries List', nameAr: 'قيود اليومية', category: 'accounting', defaultIcon: 'FileText', defaultColor: 'from-purple-500/20 to-purple-600/20' },
-  { id: 'create_journal_entry', nameEn: 'Add Journal Entry', nameAr: 'إضافة قيد يومية', category: 'accounting', defaultIcon: 'PlusCircle', defaultColor: 'from-purple-500/20 to-purple-600/20' },
-  { id: 'general_ledger_report', nameEn: 'General Ledger Report', nameAr: 'حساب الأستاذ', category: 'accounting', defaultIcon: 'BookOpen', defaultColor: 'from-purple-500/20 to-purple-600/20' },
-  { id: 'trial_balance', nameEn: 'Trial Balance', nameAr: 'ميزان المراجعة', category: 'accounting', defaultIcon: 'Scale', defaultColor: 'from-purple-500/20 to-purple-600/20' },
-  { id: 'income_statement', nameEn: 'Income Statement', nameAr: 'قائمة الدخل', category: 'accounting', defaultIcon: 'TrendingUp', defaultColor: 'from-emerald-500/20 to-emerald-600/20' },
-  { id: 'balance_sheet', nameEn: 'Balance Sheet', nameAr: 'المركز المالي', category: 'accounting', defaultIcon: 'Briefcase', defaultColor: 'from-indigo-500/20 to-indigo-600/20' },
-  { id: 'customers', nameEn: 'Customers Directory', nameAr: 'العملاء', category: 'sales', defaultIcon: 'Users', defaultColor: 'from-blue-500/20 to-blue-600/20' },
-  { id: 'invoices', nameEn: 'Sales Invoices', nameAr: 'فواتير مبيعات', category: 'sales', defaultIcon: 'FileText', defaultColor: 'from-blue-500/20 to-blue-600/20' },
-  { id: 'sales_orders', nameEn: 'Sales Orders', nameAr: 'أوامر بيع', category: 'sales', defaultIcon: 'FileSpreadsheet', defaultColor: 'from-blue-500/20 to-blue-600/20' },
-  { id: 'returns', nameEn: 'Sales Returns', nameAr: 'مرتجع مبيعات', category: 'sales', defaultIcon: 'RotateCcw', defaultColor: 'from-red-500/20 to-red-600/20' },
-  { id: 'customer_discounts', nameEn: 'Customer Discounts', nameAr: 'خصم عملاء', category: 'sales', defaultIcon: 'Percent', defaultColor: 'from-blue-500/20 to-blue-600/20' },
-  { id: 'customer_settlements', nameEn: 'Customer Settlements', nameAr: 'تسويات العملاء', category: 'sales', defaultIcon: 'CheckSquare', defaultColor: 'from-blue-500/20 to-blue-600/20' },
-  { id: 'customer_statement', nameEn: 'Customer Statement', nameAr: 'كشف حساب العميل', category: 'sales', defaultIcon: 'UserCheck', defaultColor: 'from-blue-500/20 to-blue-600/20' },
-  { id: 'customer_balances', nameEn: 'Customer Balances Report', nameAr: 'أرصدة العملاء', category: 'sales', defaultIcon: 'DollarSign', defaultColor: 'from-blue-500/20 to-blue-600/20' },
-  { id: 'sales_report', nameEn: 'Sales Report', nameAr: 'تقرير المبيعات', category: 'sales', defaultIcon: 'BarChart2', defaultColor: 'from-blue-500/20 to-blue-600/20' },
-  { id: 'suppliers', nameEn: 'Suppliers Directory', nameAr: 'الموردين', category: 'purchases', defaultIcon: 'Truck', defaultColor: 'from-emerald-500/20 to-emerald-600/20' },
-  { id: 'purchase_invoices', nameEn: 'Purchase Invoices', nameAr: 'فواتير مشتريات', category: 'purchases', defaultIcon: 'FileText', defaultColor: 'from-emerald-500/20 to-emerald-600/20' },
-  { id: 'purchase_orders', nameEn: 'Purchase Orders', nameAr: 'أوامر شراء', category: 'purchases', defaultIcon: 'FileSpreadsheet', defaultColor: 'from-emerald-500/20 to-emerald-600/20' },
-  { id: 'purchase_returns', nameEn: 'Purchase Returns', nameAr: 'مرتجع مشتريات', category: 'purchases', defaultIcon: 'RotateCcw', defaultColor: 'from-red-500/20 to-red-600/20' },
-  { id: 'supplier_discounts', nameEn: 'Supplier Discounts', nameAr: 'خصم موردين', category: 'purchases', defaultIcon: 'Percent', defaultColor: 'from-emerald-500/20 to-emerald-600/20' },
-  { id: 'supplier_settlements', nameEn: 'Supplier Settlements', nameAr: 'تسويات الموردين', category: 'purchases', defaultIcon: 'CheckSquare', defaultColor: 'from-emerald-500/20 to-emerald-600/20' },
-  { id: 'supplier_statement', nameEn: 'Supplier Statement', nameAr: 'كشف حساب المورد', category: 'purchases', defaultIcon: 'UserCheck', defaultColor: 'from-emerald-500/20 to-emerald-600/20' },
-  { id: 'supplier_balances', nameEn: 'Supplier Balances Report', nameAr: 'أرصدة الموردين', category: 'purchases', defaultIcon: 'DollarSign', defaultColor: 'from-emerald-500/20 to-emerald-600/20' },
-  { id: 'products', nameEn: 'Products List', nameAr: 'الأصناف', category: 'inventory', defaultIcon: 'Package', defaultColor: 'from-amber-500/20 to-amber-600/20' },
-  { id: 'warehouses', nameEn: 'Warehouses List', nameAr: 'المستودعات', category: 'inventory', defaultIcon: 'Home', defaultColor: 'from-amber-500/20 to-amber-600/20' },
-  { id: 'item_groups', nameEn: 'Product Item Groups', nameAr: 'مجموعات الأصناف', category: 'inventory', defaultIcon: 'Folder', defaultColor: 'from-amber-500/20 to-amber-600/20' },
-  { id: 'warehouse_transfers', nameEn: 'Warehouse Stock Transfers', nameAr: 'تحويلات المستودعات', category: 'inventory', defaultIcon: 'Shuffle', defaultColor: 'from-amber-500/20 to-amber-600/20' },
-  { id: 'opening_stock_balances', nameEn: 'Opening Stock Balances', nameAr: 'أرصدة أول المدة للمخزون', category: 'inventory', defaultIcon: 'Play', defaultColor: 'from-amber-500/20 to-amber-600/20' },
-  { id: 'stock_adjustments', nameEn: 'Stock Adjustments', nameAr: 'تسويات المخزون', category: 'inventory', defaultIcon: 'Sliders', defaultColor: 'from-amber-500/20 to-amber-600/20' },
-  { id: 'stock_card_report', nameEn: 'Stock Card Report', nameAr: 'كارت الصنف', category: 'inventory', defaultIcon: 'CreditCard', defaultColor: 'from-amber-500/20 to-amber-600/20' },
-  { id: 'stock_balances_report', nameEn: 'Stock Balances Report', nameAr: 'تقرير أرصدة المخزون', category: 'inventory', defaultIcon: 'Archive', defaultColor: 'from-amber-500/20 to-amber-600/20' },
-  { id: 'general_stock_movements_report', nameEn: 'Stock Movements Report', nameAr: 'تقرير حركة المخزون العام', category: 'inventory', defaultIcon: 'TrendingUp', defaultColor: 'from-amber-500/20 to-amber-600/20' },
-  { id: 'employees', nameEn: 'Employees List', nameAr: 'الموظفين', category: 'system', defaultIcon: 'User', defaultColor: 'from-slate-500/20 to-slate-600/20' },
-  { id: 'expenses', nameEn: 'Expense Categories', nameAr: 'بنود المصروفات', category: 'system', defaultIcon: 'Zap', defaultColor: 'from-red-500/20 to-red-600/20' },
-  { id: 'payment_methods', nameEn: 'Payment Methods', nameAr: 'طرق السداد', category: 'system', defaultIcon: 'CreditCard', defaultColor: 'from-indigo-500/20 to-indigo-600/20' },
-  { id: 'cash_transfers', nameEn: 'Cash Transfers', nameAr: 'تحويلات النقدية', category: 'system', defaultIcon: 'ArrowRightLeft', defaultColor: 'from-indigo-500/20 to-indigo-600/20' },
-  { id: 'expenses_report', nameEn: 'Expenses Report', nameAr: 'تقرير المصروفات', category: 'system', defaultIcon: 'PieChart', defaultColor: 'from-red-500/20 to-red-600/20' },
-  { id: 'cash_report', nameEn: 'Cash Report', nameAr: 'تقرير الخزينة', category: 'system', defaultIcon: 'BookOpen', defaultColor: 'from-indigo-500/20 to-indigo-600/20' },
-  { id: 'users', nameEn: 'Users Administration', nameAr: 'إدارة المستخدمين', category: 'system', defaultIcon: 'Users', defaultColor: 'from-slate-500/20 to-slate-600/20' },
-  { id: 'activity_log', nameEn: 'Activity Log History', nameAr: 'سجل النشاط', category: 'system', defaultIcon: 'Clock', defaultColor: 'from-slate-500/20 to-slate-600/20' },
-  { id: 'company_settings', nameEn: 'Company Settings', nameAr: 'الإعدادات', category: 'system', defaultIcon: 'Settings', defaultColor: 'from-slate-500/20 to-slate-600/20' },
-  { id: 'currencies', nameEn: 'Currencies List', nameAr: 'العملات', category: 'system', defaultIcon: 'Globe', defaultColor: 'from-slate-500/20 to-slate-600/20' },
-  { id: 'departments', nameEn: 'Departments List', nameAr: 'الأقسام', category: 'system', defaultIcon: 'Network', defaultColor: 'from-slate-500/20 to-slate-600/20' },
-  { id: 'cost_centers', nameEn: 'Cost Centers', nameAr: 'مراكز التكلفة', category: 'system', defaultIcon: 'Target', defaultColor: 'from-slate-500/20 to-slate-600/20' },
-  { id: 'templates', nameEn: 'Print Templates', nameAr: 'القوالب', category: 'system', defaultIcon: 'Printer', defaultColor: 'from-slate-500/20 to-slate-600/20' },
-  { id: 'system_check', nameEn: 'System Health Check', nameAr: 'فحص النظام', category: 'system', defaultIcon: 'Activity', defaultColor: 'from-rose-500/20 to-rose-600/20' },
-];
+const getErpPagesDirectory = (t: (key: string) => string): ERPPageItem[] => {
+  return Object.keys(pageLabels).map(key => {
+    const nameAr = pageLabels[key];
+    const navKey = `nav.${key}`;
+    const nameEnTranslated = t(navKey);
+    const nameEn = (nameEnTranslated && nameEnTranslated !== navKey) 
+      ? nameEnTranslated 
+      : key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    
+    let category = 'system';
+    if (['accounts', 'chart_of_accounts', 'account_types', 'journal_entries', 'create_journal_entry', 'general_ledger_report', 'trial_balance', 'income_statement', 'balance_sheet'].includes(key)) {
+      category = 'accounting';
+    } else if (['customers', 'invoices', 'sales_orders', 'returns', 'customer_discounts', 'customer_settlements', 'customer_statement', 'customer_balances', 'sales_report'].includes(key)) {
+      category = 'sales';
+    } else if (['suppliers', 'purchase_invoices', 'purchase_orders', 'purchase_returns', 'supplier_discounts', 'supplier_settlements', 'supplier_statement', 'supplier_balances'].includes(key)) {
+      category = 'purchases';
+    } else if (['products', 'warehouses', 'item_groups', 'warehouse_transfers', 'opening_stock_balances', 'stock_adjustments', 'stock_card_report', 'stock_balances_report', 'general_stock_movements_report'].includes(key)) {
+      category = 'inventory';
+    }
 
-export const Dashboard: React.FC = () => {
+    let defaultIcon = 'HelpCircle';
+    if (key.includes('invoice') || key === 'invoices') defaultIcon = 'FileText';
+    else if (key.includes('order')) defaultIcon = 'FileSpreadsheet';
+    else if (key.includes('return')) defaultIcon = 'RotateCcw';
+    else if (key.includes('report') || key.includes('balance') || key === 'income_statement' || key === 'balance_sheet') defaultIcon = 'BarChart2';
+    else if (key === 'customers') defaultIcon = 'Users';
+    else if (key === 'suppliers') defaultIcon = 'Truck';
+    else if (key === 'products') defaultIcon = 'Package';
+    else if (key === 'warehouses') defaultIcon = 'Home';
+    else if (key === 'employees') defaultIcon = 'User';
+    else if (key === 'expenses') defaultIcon = 'Zap';
+    else if (key === 'payment_methods') defaultIcon = 'CreditCard';
+    else if (key === 'accounts' || key === 'chart_of_accounts') defaultIcon = 'Wallet';
+    else if (key === 'settings' || key === 'company_settings') defaultIcon = 'Settings';
+    else if (key === 'templates') defaultIcon = 'Printer';
+    else if (key === 'users') defaultIcon = 'Users';
+
+    let defaultColor = 'from-slate-500/20 to-slate-600/20';
+    if (category === 'accounting') defaultColor = 'from-purple-500/20 to-purple-600/20';
+    else if (category === 'sales') defaultColor = 'from-blue-500/20 to-blue-600/20';
+    else if (category === 'purchases') defaultColor = 'from-emerald-500/20 to-emerald-600/20';
+    else if (category === 'inventory') defaultColor = 'from-amber-500/20 to-amber-600/20';
+
+    return {
+      id: key,
+      nameEn,
+      nameAr,
+      category,
+      defaultIcon,
+      defaultColor
+    };
+  });
+};
+
+interface DashboardProps {
+  initialEditMode?: boolean;
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({ initialEditMode = false }) => {
   const { user, isSuperAdmin, isCompanyAdmin } = useAuth();
   const { activeTabId, setCurrentPage } = useNavigation();
   const { t, dir, language } = useLanguage();
@@ -1298,6 +1355,76 @@ export const Dashboard: React.FC = () => {
   // Quick Access Customization States
   const [qaSearchQuery, setQaSearchQuery] = useState('');
   const [newGroupName, setNewGroupName] = useState('');
+  const [replacingCardId, setReplacingCardId] = useState<string | null>(null);
+  const [replacingSearchQuery, setReplacingSearchQuery] = useState('');
+
+  // Card customization modal popup states
+  const [editingCard, setEditingCard] = useState<{ widgetId: string; card: any } | null>(null);
+  const [replacingPopupSearchQuery, setReplacingPopupSearchQuery] = useState('');
+  const [showReplacePopupList, setShowReplacePopupList] = useState(false);
+
+  const handleCardClick = (widgetId: string, item: any) => {
+    setEditingCard({ widgetId, card: { ...item } });
+    setReplacingPopupSearchQuery('');
+    setShowReplacePopupList(false);
+  };
+
+  const handleAddCardClickOnCanvas = (widgetId: string) => {
+    setEditingCard({
+      widgetId,
+      card: {
+        id: '',
+        label: '',
+        icon: 'HelpCircle',
+        color: 'from-slate-500/20 to-slate-600/20',
+        iconColor: 'text-slate-600',
+        size: 'medium',
+        pinned: false,
+        isNew: true
+      }
+    });
+    setReplacingPopupSearchQuery('');
+    setShowReplacePopupList(true);
+  };
+
+  const handleReorderCardsOnCanvas = (widgetId: string, dragId: string, dropId: string) => {
+    setTempWidgets(prev => {
+      const next = prev.map(w => {
+        if (w.id === widgetId) {
+          const qa = w.settings?.quickAccess || { items: [], groups: [], useCustom: true };
+          const items = [...(qa.items || [])];
+          
+          const dragIdx = items.findIndex((i: any) => i.id === dragId);
+          const dropIdx = items.findIndex((i: any) => i.id === dropId);
+          
+          if (dragIdx !== -1 && dropIdx !== -1) {
+            const [draggedItem] = items.splice(dragIdx, 1);
+            items.splice(dropIdx, 0, draggedItem);
+          }
+          
+          return { ...w, settings: { ...w.settings, quickAccess: { ...qa, items } } };
+        }
+        return w;
+      });
+      pushEditHistory(next);
+      return next;
+    });
+  };
+
+  const updateQuickAccessSettingsFromModal = (widgetId: string, updater: (qa: any) => any) => {
+    setTempWidgets(prev => {
+      const next = prev.map(w => {
+        if (w.id === widgetId) {
+          const qa = w.settings?.quickAccess || { items: [], groups: [], useCustom: true };
+          const updatedQa = { ...qa, ...updater(qa), useCustom: true };
+          return { ...w, settings: { ...w.settings, quickAccess: updatedQa } };
+        }
+        return w;
+      });
+      pushEditHistory(next);
+      return next;
+    });
+  };
 
   const handleToggleGroupCollapse = async (widgetId: string, groupId: string) => {
     if (isEditing) {
@@ -2235,6 +2362,13 @@ export const Dashboard: React.FC = () => {
       window.removeEventListener('focus', handleFocus);
     };
   }, [user?.id, user?.company_id, isSuperAdmin, activeTabId]);
+
+  useEffect(() => {
+    if (initialEditMode && !loading) {
+      handleStartCustomizing();
+    }
+  }, [initialEditMode, loading]);
+
   const fetchStats = async (showLoading = true) => {
     if (!user || isSuperAdmin) return;
     const companyId = user.company_id;
@@ -2401,7 +2535,8 @@ export const Dashboard: React.FC = () => {
     const qa = selectedWidget?.settings?.quickAccess || { items: [], groups: [] };
 
     return (
-      <div className="flex flex-col h-[calc(100vh-100px)] bg-slate-50 border border-slate-200 rounded-3xl overflow-hidden font-sans shadow-lg select-none" dir={dir}>
+      <>
+        <div className="flex flex-col h-[calc(100vh-100px)] bg-slate-50 border border-slate-200 rounded-3xl overflow-hidden font-sans shadow-lg select-none" dir={dir}>
         {/* Top Header toolbar */}
         <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 flex-shrink-0 z-20 shadow-sm">
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
@@ -2734,8 +2869,16 @@ export const Dashboard: React.FC = () => {
                               </div>
                             </div>
 
-                            <div className="flex-1 min-h-0 w-full pointer-events-none select-none">
-                              <WidgetRenderer widget={w} stats={stats} onToggleGroupCollapse={handleToggleGroupCollapse} />
+                            <div className={`flex-1 min-h-0 w-full select-none ${w.widget_type === 'shortcuts' ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+                              <WidgetRenderer 
+                                widget={w} 
+                                stats={stats} 
+                                onToggleGroupCollapse={handleToggleGroupCollapse} 
+                                isEditing={true}
+                                onCardClick={(widgetId, item) => handleCardClick(widgetId, item)}
+                                onAddCardClick={(widgetId) => handleAddCardClickOnCanvas(widgetId)}
+                                onReorderCards={(widgetId, dragId, dropId) => handleReorderCardsOnCanvas(widgetId, dragId, dropId)}
+                              />
                             </div>
 
                             {!w.locked && (
@@ -2848,7 +2991,7 @@ export const Dashboard: React.FC = () => {
                           />
                           {qaSearchQuery.trim() && (
                             <div className="border border-slate-200 rounded-lg bg-white max-h-40 overflow-y-auto mt-1 shadow-md p-1 space-y-1">
-                              {ERP_PAGES_DIRECTORY.filter(p => 
+                              {getErpPagesDirectory(t).filter(p => 
                                 p.nameEn.toLowerCase().includes(qaSearchQuery.toLowerCase()) || 
                                 p.nameAr.includes(qaSearchQuery)
                               ).slice(0, 5).map(page => (
@@ -2953,6 +3096,7 @@ export const Dashboard: React.FC = () => {
                                         }, true);
                                       }}
                                       className="p-1 hover:bg-slate-200 disabled:opacity-30 rounded text-[9px]"
+                                      type="button"
                                     >
                                       &uarr;
                                     </button>
@@ -2968,9 +3112,33 @@ export const Dashboard: React.FC = () => {
                                         }, true);
                                       }}
                                       className="p-1 hover:bg-slate-200 disabled:opacity-30 rounded text-[9px]"
+                                      type="button"
                                     >
                                       &darr;
                                     </button>
+                                    
+                                    {/* Duplicate Card */}
+                                    <button
+                                      onClick={() => {
+                                        updateQuickAccessSettings(qa => {
+                                          const cardToCopy = qa.items[idx];
+                                          const duplicatedCard = {
+                                            ...cardToCopy,
+                                            id: `${cardToCopy.id}-dup-${uuidv4().substring(0, 4)}`,
+                                            label: `${cardToCopy.label} (${language === 'ar' ? 'نسخة' : 'Copy'})`
+                                          };
+                                          const nextItems = [...qa.items];
+                                          nextItems.splice(idx + 1, 0, duplicatedCard);
+                                          return { ...qa, items: nextItems };
+                                        }, true);
+                                      }}
+                                      className="p-1 hover:bg-slate-200 rounded text-[9px] flex items-center justify-center"
+                                      title={language === 'ar' ? 'تكرار' : 'Duplicate'}
+                                      type="button"
+                                    >
+                                      <Copy size={10} />
+                                    </button>
+
                                     <button
                                       onClick={() => {
                                         updateQuickAccessSettings(qa => {
@@ -2979,6 +3147,7 @@ export const Dashboard: React.FC = () => {
                                         }, true);
                                       }}
                                       className="p-1 hover:bg-rose-100 text-rose-500 rounded text-[9px]"
+                                      type="button"
                                     >
                                       &times;
                                     </button>
@@ -3098,6 +3267,62 @@ export const Dashboard: React.FC = () => {
                                     <span className="text-[9px] font-bold text-slate-500 uppercase">{language === 'ar' ? 'تثبيت' : 'Pin'}</span>
                                   </label>
                                 </div>
+
+                                {/* Replace Page Trigger */}
+                                <div className="pt-1.5 border-t border-slate-100/50">
+                                  <button
+                                    onClick={() => {
+                                      setReplacingCardId(replacingCardId === item.id ? null : item.id);
+                                      setReplacingSearchQuery('');
+                                    }}
+                                    className="w-full py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg text-[9px] transition-colors flex items-center justify-center gap-1"
+                                    type="button"
+                                  >
+                                    <Lucide.RefreshCw size={10} />
+                                    {language === 'ar' ? 'استبدال الصفحة' : 'Replace Page'}
+                                  </button>
+                                  
+                                  {replacingCardId === item.id && (
+                                    <div className="mt-1.5 border border-slate-200 rounded-lg bg-white p-2 shadow-sm space-y-1.5 z-10 relative">
+                                      <input
+                                        type="text"
+                                        placeholder={language === 'ar' ? 'ابحث عن صفحة لتبديلها...' : 'Search page to replace...'}
+                                        value={replacingSearchQuery}
+                                        onChange={(e) => setReplacingSearchQuery(e.target.value)}
+                                        className="w-full border border-slate-200 rounded p-1 text-[9px] bg-slate-50 focus:bg-white outline-none"
+                                      />
+                                      <div className="max-h-24 overflow-y-auto space-y-1 custom-scrollbar">
+                                        {getErpPagesDirectory(t).filter(p => 
+                                          p.nameEn.toLowerCase().includes(replacingSearchQuery.toLowerCase()) || 
+                                          p.nameAr.includes(replacingSearchQuery)
+                                        ).map(page => (
+                                          <button
+                                            key={page.id}
+                                            onClick={() => {
+                                              updateQuickAccessSettings(qa => {
+                                                const nextItems = qa.items.map((i: any) => i.id === item.id ? { 
+                                                  ...i, 
+                                                  id: page.id, 
+                                                  label: language === 'ar' ? page.nameAr : page.nameEn,
+                                                  icon: page.defaultIcon,
+                                                  color: page.defaultColor,
+                                                  iconColor: page.defaultColor.split(' ')[0].replace('from-', 'text-').split('/')[0]
+                                                } : i);
+                                                return { ...qa, items: nextItems };
+                                              }, true);
+                                              setReplacingCardId(null);
+                                            }}
+                                            className="w-full text-left flex items-center justify-between p-1 hover:bg-slate-50 rounded text-[9px] font-bold text-slate-600"
+                                            type="button"
+                                          >
+                                            <span>{language === 'ar' ? page.nameAr : page.nameEn}</span>
+                                            <span className="text-[7px] bg-slate-100 px-1 rounded text-slate-400">{page.category}</span>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -3208,6 +3433,214 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {editingCard && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setEditingCard(null)}>
+          <div 
+            className="bg-white rounded-3xl border border-slate-100 shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <Lucide.Settings size={16} className="text-indigo-600 animate-spin-slow" />
+                {language === 'ar' ? 'تعديل الرابط المفضل' : 'Edit Favorite Link'}
+              </h3>
+              <button 
+                onClick={() => setEditingCard(null)}
+                className="text-slate-400 hover:text-slate-600 transition-colors p-1 hover:bg-slate-50 rounded-lg"
+              >
+                <Lucide.X size={16} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 overflow-y-auto space-y-5 custom-scrollbar text-slate-700" dir={dir}>
+              {/* Card Title */}
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  {language === 'ar' ? 'العنوان' : 'Title'}
+                </label>
+                <input
+                  type="text"
+                  value={editingCard.card.label}
+                  onChange={(e) => setEditingCard({ ...editingCard, card: { ...editingCard.card, label: e.target.value } })}
+                  className="w-full border border-slate-200 rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-slate-50 hover:bg-slate-100/50 focus:bg-white text-slate-800 text-xs font-bold transition-all"
+                />
+              </div>
+
+              {/* Size Selector */}
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  {language === 'ar' ? 'الحجم' : 'Size'}
+                </label>
+                <select
+                  value={editingCard.card.size || 'medium'}
+                  onChange={(e) => setEditingCard({ ...editingCard, card: { ...editingCard.card, size: e.target.value } })}
+                  className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-700 text-xs font-bold transition-all"
+                >
+                  <option value="small">{language === 'ar' ? 'صغير' : 'Small'}</option>
+                  <option value="medium">{language === 'ar' ? 'متوسط' : 'Medium'}</option>
+                  <option value="large">{language === 'ar' ? 'كبير' : 'Large'}</option>
+                </select>
+              </div>
+
+              {/* Icon & Color (Grid) */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    {language === 'ar' ? 'الأيقونة' : 'Icon'}
+                  </label>
+                  <select
+                    value={editingCard.card.icon}
+                    onChange={(e) => setEditingCard({ ...editingCard, card: { ...editingCard.card, icon: e.target.value } })}
+                    className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-700 text-xs font-bold transition-all"
+                  >
+                    {ICON_OPTIONS.map(icon => (
+                      <option key={icon} value={icon}>{icon}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    {language === 'ar' ? 'اللون' : 'Color'}
+                  </label>
+                  <select
+                    value={COLOR_PRESETS.find(p => p.bg === editingCard.card.color)?.name || 'Slate'}
+                    onChange={(e) => {
+                      const preset = COLOR_PRESETS.find(p => p.name === e.target.value) || COLOR_PRESETS[6];
+                      setEditingCard({
+                        ...editingCard,
+                        card: {
+                          ...editingCard.card,
+                          color: preset.bg,
+                          iconColor: preset.text
+                        }
+                      });
+                    }}
+                    className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-700 text-xs font-bold transition-all"
+                  >
+                    {COLOR_PRESETS.map(p => (
+                      <option key={p.name} value={p.name}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Pin Checkbox */}
+              <label className="flex items-center gap-2.5 cursor-pointer p-3 bg-slate-50 rounded-xl border border-slate-100 hover:bg-slate-100/50 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={editingCard.card.pinned === true}
+                  onChange={(e) => setEditingCard({ ...editingCard, card: { ...editingCard.card, pinned: e.target.checked } })}
+                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                />
+                <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wide">
+                  {language === 'ar' ? 'تثبيت في المفضلات' : 'Pin to favorites'}
+                </span>
+              </label>
+
+              {/* Replace Page Trigger */}
+              <div className="pt-4 border-t border-slate-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-slate-500 tracking-tight">
+                    {editingCard.card.id ? (language === 'ar' ? `الوجهة الحالية: ${pageLabels[editingCard.card.id] || editingCard.card.id}` : `Current destination: ${pageLabels[editingCard.card.id] || editingCard.card.id}`) : (language === 'ar' ? 'لم يتم تحديد وجهة' : 'No destination selected')}
+                  </span>
+                  <button
+                    onClick={() => setShowReplacePopupList(!showReplacePopupList)}
+                    className="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black rounded-xl text-[10px] transition-colors flex items-center gap-1.5 shadow-sm uppercase tracking-tight"
+                    type="button"
+                  >
+                    <Lucide.RefreshCw size={11} className={showReplacePopupList ? 'rotate-180 duration-300' : 'duration-300'} />
+                    {language === 'ar' ? 'استبدال الصفحة' : 'Replace Page'}
+                  </button>
+                </div>
+
+                {showReplacePopupList && (
+                  <div className="border border-slate-200 rounded-2xl bg-white p-3 shadow-md space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <input
+                      type="text"
+                      placeholder={language === 'ar' ? 'ابحث عن صفحة...' : 'Search page...'}
+                      value={replacingPopupSearchQuery}
+                      onChange={(e) => setReplacingPopupSearchQuery(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl p-2 text-xs bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-semibold"
+                    />
+                    <div className="max-h-40 overflow-y-auto space-y-1.5 custom-scrollbar pr-1">
+                      {getErpPagesDirectory(t).filter(p => 
+                        p.nameEn.toLowerCase().includes(replacingPopupSearchQuery.toLowerCase()) || 
+                        p.nameAr.includes(replacingPopupSearchQuery)
+                      ).map(page => (
+                        <button
+                          key={page.id}
+                          onClick={() => {
+                            setEditingCard({
+                              ...editingCard,
+                              card: {
+                                ...editingCard.card,
+                                id: page.id,
+                                label: language === 'ar' ? page.nameAr : page.nameEn,
+                                icon: page.defaultIcon,
+                                color: page.defaultColor,
+                                iconColor: page.defaultColor.split(' ')[0].replace('from-', 'text-').split('/')[0]
+                              }
+                            });
+                            setShowReplacePopupList(false);
+                          }}
+                          className="w-full text-left flex items-center justify-between p-2 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-600 transition-colors"
+                          type="button"
+                        >
+                          <span>{language === 'ar' ? page.nameAr : page.nameEn}</span>
+                          <span className="text-[8px] bg-slate-100 px-2 py-0.5 rounded-full text-slate-400 font-extrabold uppercase">{page.category}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              <button
+                onClick={() => setEditingCard(null)}
+                className="px-4 py-2 border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold rounded-xl text-xs transition-colors"
+                type="button"
+              >
+                {language === 'ar' ? 'إلغاء' : 'Cancel'}
+              </button>
+              <button
+                onClick={() => {
+                  if (!editingCard.card.id) {
+                    alert(language === 'ar' ? 'يرجى اختيار صفحة أولاً' : 'Please select a page first');
+                    return;
+                  }
+                  if (editingCard.card.isNew) {
+                    updateQuickAccessSettingsFromModal(editingCard.widgetId, qa => {
+                      const currentItems = qa.items || [];
+                      const newItem = {
+                        ...editingCard.card,
+                        isNew: undefined
+                      };
+                      return { ...qa, items: [...currentItems, newItem] };
+                    });
+                  } else {
+                    updateQuickAccessSettingsFromModal(editingCard.widgetId, qa => {
+                      const nextItems = qa.items.map((i: any) => i.id === editingCard.card.id ? editingCard.card : i);
+                      return { ...qa, items: nextItems };
+                    });
+                  }
+                  setEditingCard(null);
+                }}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-colors"
+                type="button"
+              >
+                {language === 'ar' ? 'حفظ' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      </>
     );
   }
 
@@ -3334,7 +3767,10 @@ export const Dashboard: React.FC = () => {
 
           {(isCompanyAdmin || isSuperAdmin) && (
             <button 
-              onClick={() => setCurrentPage('dashboard_designer')}
+              onClick={() => {
+                localStorage.setItem('templates_active_subtab', 'dashboard_designer');
+                setCurrentPage('templates');
+              }}
               className="flex items-center gap-2 px-4 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-all font-bold text-xs uppercase tracking-wider shadow-sm active:scale-95 w-full sm:w-auto justify-center"
             >
               <Settings size={14} />
@@ -3462,28 +3898,32 @@ export const Dashboard: React.FC = () => {
       ) : (
         /* Fallback Default Static Dashboard */
         <>
-          {/* Master Data Shortcuts Integration */}
-          <div className="grid grid-cols-3 md:grid-cols-6 gap-3 lg:gap-4">
-            {masterDataItems.map((item) => (
-              <motion.button
-                key={item.id}
-                whileHover={{ y: -4, scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setCurrentPage(item.id)}
-                className="group relative flex flex-col items-center justify-center p-4 lg:p-6 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-xl hover:border-brand-primary/30 transition-all overflow-hidden"
-              >
-                <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-br ${item.color} rounded-full -mr-8 -mt-8 opacity-50 group-hover:scale-150 transition-transform duration-500`} />
-                <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-slate-50 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm border border-slate-100 relative z-10`}>
-                  <item.icon size={22} className={item.iconColor} />
-                </div>
-                <span className={`text-[10px] lg:text-xs font-bold text-slate-600 uppercase tracking-tight relative z-10 group-hover:text-slate-900 transition-colors`}>
-                  {item.label}
-                </span>
-                <div className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-10 transition-opacity">
-                  <Sparkles size={12} className="text-brand-primary" />
-                </div>
-              </motion.button>
-            ))}
+          {/* Dynamic Quick Access Integration */}
+          <div className="bg-white border border-slate-200 shadow-sm rounded-3xl p-6 relative hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100/50">
+              <h5 className="text-[11px] font-black text-slate-800 flex items-center gap-2">
+                <Lucide.Layout size={14} className="text-indigo-600" />
+                {language === 'ar' ? 'الوصول السريع' : 'Quick Access Shortcuts'}
+              </h5>
+            </div>
+            <div className="min-h-[80px]">
+              <WidgetRenderer 
+                widget={{
+                  id: 'w-shortcuts-default',
+                  dashboard_id: 'default',
+                  widget_type: 'shortcuts',
+                  title: language === 'ar' ? 'الوصول السريع' : 'Quick Access Shortcuts',
+                  x: 0, y: 0, w: 12, h: 2,
+                  settings: {},
+                  filters: {},
+                  order: 0,
+                  visible: true,
+                  locked: false
+                }} 
+                stats={stats} 
+                onToggleGroupCollapse={handleToggleGroupCollapse} 
+              />
+            </div>
           </div>
 
           {/* Stats Cards Grid */}
