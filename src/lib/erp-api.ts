@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { AsyncLocalStorage } from 'async_hooks';
 import pool from './postgres';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
@@ -48,6 +49,14 @@ export async function syncProductsCostAndJEs(client: any, companyId: string, pro
 
 const router = Router();
 
+export const requestContainer = new AsyncLocalStorage<{ req: any; res: any }>();
+
+router.use((req, res, next) => {
+  requestContainer.run({ req, res }, () => {
+    next();
+  });
+});
+
 // Middleware to clear cache on database updates
 router.use((req, res, next) => {
   if (['POST', 'PUT', 'DELETE'].includes(req.method)) {
@@ -64,6 +73,211 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 function getIp(req: any): string {
   return req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
 }
+
+function parseUserAgent(ua: string): { browser: string; os: string; device: string } {
+  let browser = 'Unknown';
+  let os = 'Unknown';
+  let device = 'Desktop';
+
+  const uaLower = ua.toLowerCase();
+
+  // Parse OS
+  if (uaLower.includes('windows')) os = 'Windows';
+  else if (uaLower.includes('macintosh') || uaLower.includes('mac os')) os = 'macOS';
+  else if (uaLower.includes('iphone') || uaLower.includes('ipad')) os = 'iOS';
+  else if (uaLower.includes('android')) os = 'Android';
+  else if (uaLower.includes('linux')) os = 'Linux';
+
+  // Parse Browser
+  if (uaLower.includes('edg/')) browser = 'Edge';
+  else if (uaLower.includes('chrome') || uaLower.includes('crios')) browser = 'Chrome';
+  else if (uaLower.includes('firefox') || uaLower.includes('fxios')) browser = 'Firefox';
+  else if (uaLower.includes('safari') && !uaLower.includes('chrome')) browser = 'Safari';
+  else if (uaLower.includes('opr/')) browser = 'Opera';
+
+  // Parse Device
+  if (uaLower.includes('mobile') || uaLower.includes('iphone') || uaLower.includes('android')) {
+    device = 'Mobile';
+  } else if (uaLower.includes('ipad') || uaLower.includes('tablet')) {
+    device = 'Tablet';
+  }
+
+  return { browser, os, device };
+}
+
+// Global Automated Audit Logger Middleware
+router.use(async (req: any, res: any, next: any) => {
+  const path = req.path || '';
+  const isPolling = req.query._polling === 'true' || req.headers['x-polling'] === 'true';
+  const isLogRetrieval = path.includes('/activity_logs') || path.includes('/audit_logs');
+  const isHealthOrMe = path.includes('/health') || path.includes('/auth/me');
+
+  if (isPolling || isLogRetrieval || isHealthOrMe) {
+    return next();
+  }
+
+  const startTime = Date.now();
+  const ipAddress = getIp(req);
+  const userAgent = req.headers['user-agent'] || '';
+  const { browser, os, device } = parseUserAgent(userAgent);
+
+  // Buffer response body
+  const originalJson = res.json;
+  const originalSend = res.send;
+  let responseBody: any = null;
+
+  res.json = function(body: any) {
+    responseBody = body;
+    return originalJson.apply(this, arguments);
+  };
+  res.send = function(body: any) {
+    responseBody = body;
+    try {
+      if (typeof body === 'string') {
+        responseBody = JSON.parse(body);
+      }
+    } catch (e) {}
+    return originalSend.apply(this, arguments);
+  };
+
+  // Determine module and basic details
+  const pathParts = path.split('/').filter(Boolean);
+  let moduleName = 'SYSTEM';
+  if (pathParts.length > 0) {
+    if (pathParts[0] === 'auth') {
+      moduleName = 'AUTH';
+    } else {
+      moduleName = pathParts[0].toUpperCase();
+    }
+  }
+
+  const lowercaseModule = moduleName.toLowerCase();
+  const isValidTable = modules.includes(lowercaseModule);
+
+  let recordId: string | null = null;
+  let recordName: string | null = null;
+  let oldValues: any = null;
+
+  if (req.params?.id) recordId = req.params.id;
+  else if (pathParts.length > 1 && isUUID(pathParts[1])) recordId = pathParts[1];
+  else if (req.body?.id) recordId = req.body.id;
+
+  const isUpdate = req.method === 'PUT';
+  const isDelete = req.method === 'DELETE';
+  const isCreate = req.method === 'POST';
+
+  // Fetch old state before the change occurs
+  if ((isUpdate || isDelete) && recordId && isValidTable) {
+    try {
+      const { rows } = await pool.query(`SELECT * FROM "${lowercaseModule}" WHERE id = $1`, [recordId]);
+      if (rows.length > 0) {
+        oldValues = rows[0];
+        recordName = oldValues.name || oldValues.code || oldValues.invoice_number || oldValues.number || oldValues.username || oldValues.title || null;
+      }
+    } catch (err) {
+      // Ignore pre-fetch failures silently
+    }
+  }
+
+  res.on('finish', async () => {
+    if (req._auditLogged) return;
+
+    const executionTime = Date.now() - startTime;
+    const success = res.statusCode >= 200 && res.statusCode < 400;
+
+    const user = req.user;
+    const userId = user?.id || (req.method === 'POST' && path.includes('/auth/login') && responseBody?.user?.id) || null;
+    const username = user?.username || user?.email || (req.method === 'POST' && path.includes('/auth/login') && responseBody?.user?.username) || null;
+    const userEmail = user?.email || (req.method === 'POST' && path.includes('/auth/login') && responseBody?.user?.email) || null;
+    const companyId = user?.company_id || responseBody?.user?.company_id || req.body?.company_id || null;
+    const branch = user?.branch || user?.branch_name || req.body?.branch_name || req.body?.branch_id || responseBody?.user?.branch_name || null;
+
+    let action = 'VIEW';
+    if (isCreate) {
+      if (path.includes('/login')) {
+        action = success ? 'LOGIN' : 'FAILED_LOGIN';
+      } else if (path.includes('/logout')) {
+        action = 'LOGOUT';
+      } else if (path.includes('/backup')) {
+        action = 'BACKUP';
+      } else if (path.includes('/restore')) {
+        action = 'RESTORE_BACKUP';
+      } else {
+        action = 'CREATE';
+      }
+    } else if (isUpdate) {
+      if (path.includes('/change-password') || req.body?.password) {
+        action = 'PASSWORD_CHANGE';
+      } else if (path.includes('/profile') || (lowercaseModule === 'users' && recordId === userId)) {
+        action = 'PROFILE_UPDATE';
+      } else {
+        action = 'UPDATE';
+      }
+    } else if (isDelete) {
+      action = 'DELETE';
+    } else if (req.method === 'GET') {
+      if (path.includes('/export')) action = 'EXPORT';
+      else if (path.includes('/import')) action = 'IMPORT';
+      else if (req.query._search) action = 'SEARCH';
+      else if (Object.keys(req.query).some(k => !k.startsWith('_') && k !== 'company_id')) action = 'FILTER';
+      else if (req.query._refresh === 'true') action = 'REFRESH';
+      else action = 'VIEW';
+    }
+
+    if (!recordId) {
+      recordId = responseBody?.id || responseBody?.data?.id || req.body?.id || null;
+    }
+
+    if (!recordName) {
+      const dataObj = responseBody?.rows?.[0] || responseBody || req.body;
+      recordName = dataObj?.name || dataObj?.code || dataObj?.invoice_number || dataObj?.number || dataObj?.username || dataObj?.title || null;
+    }
+
+    let newValues = null;
+    if (isUpdate || isCreate) {
+      newValues = req.body;
+    }
+
+    let details = `${action} in module ${moduleName}`;
+    if (recordName) {
+      details += `: ${recordName}`;
+    } else if (recordId) {
+      details += ` (ID: ${recordId})`;
+    }
+    if (!success && responseBody?.error) {
+      details += ` - Failed: ${responseBody.error}`;
+    }
+
+    try {
+      const logId = uuidv4();
+      await pool.query(
+        `INSERT INTO audit_logs (
+          id, company_id, user_id, username, user_email, action, module, details, 
+          entity_type, entity_id, ip_address, browser, operating_system, device, 
+          branch, record_name, record_id, old_values, new_values, success, execution_time
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
+        [
+          logId, companyId, userId, username, userEmail, action, moduleName, details,
+          lowercaseModule, recordId, ipAddress, browser, os, device,
+          branch, recordName, recordId, JSON.stringify(oldValues || {}), JSON.stringify(newValues || {}), success, executionTime
+        ]
+      );
+
+      await pool.query(
+        `INSERT INTO activity_logs (company_id, user_id, username, action, details, entity, document_id, changes, ip_address)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          companyId, userId, username, `${moduleName}:${action}`, details,
+          JSON.stringify(oldValues || {}), recordId, JSON.stringify(newValues || {}), ipAddress
+        ]
+      ).catch(() => {});
+    } catch (err: any) {
+      console.error('[DATABASE] Middleware Logging Error:', err.message);
+    }
+  });
+
+  next();
+});
 
 // Centralized Audit Log Helper (Non-blocking)
 async function logAudit(params: {
@@ -83,14 +297,46 @@ async function logAudit(params: {
     company_id, user_id, username, user_email, action, module, 
     details, entity_type, entity_id, ip_address, metadata
   } = params;
-  
+
+  // Retrieve current request context
+  const context = requestContainer.getStore();
+  let reqBrowser = null;
+  let reqOS = null;
+  let reqDevice = null;
+  let reqBranch = null;
+  let reqExecutionTime = 0;
+  let reqSuccess = true;
+
+  if (context) {
+    const { req } = context;
+    req._auditLogged = true; // Prevent middleware logging duplicates
+    const userAgent = req.headers['user-agent'] || '';
+    const parsed = parseUserAgent(userAgent);
+    reqBrowser = parsed.browser;
+    reqOS = parsed.os;
+    reqDevice = parsed.device;
+    reqBranch = req.user?.branch || req.user?.branch_name || req.body?.branch_name || req.body?.branch_id || null;
+  }
+
+  // Parse old/new values
+  const oldValues = metadata?.oldValues || metadata?.before || {};
+  const newValues = metadata?.newValues || metadata?.after || metadata || {};
+  const recordName = metadata?.name || metadata?.code || metadata?.invoice_number || metadata?.number || metadata?.username || metadata?.title || null;
+
   // Non-blocking fire-and-forget query
   pool.query(
-    `INSERT INTO audit_logs (company_id, user_id, username, user_email, action, module, details, entity_type, entity_id, ip_address, metadata)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-    [company_id, user_id, username, user_email, action, module, details, entity_type, entity_id, ip_address || 'unknown', JSON.stringify(metadata || {})]
+    `INSERT INTO audit_logs (
+      company_id, user_id, username, user_email, action, module, details, 
+      entity_type, entity_id, ip_address, metadata, browser, operating_system, 
+      device, branch, record_name, record_id, old_values, new_values, success, execution_time
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
+    [
+      company_id, user_id, username, user_email, action, module, details, 
+      entity_type, entity_id, ip_address || 'unknown', JSON.stringify(metadata || {}),
+      reqBrowser, reqOS, reqDevice, reqBranch, recordName, entity_id, 
+      JSON.stringify(oldValues), JSON.stringify(newValues), reqSuccess, reqExecutionTime
+    ]
   ).catch(err => {
-    // Fail silently in the background but log to console
     console.error('[DATABASE] Audit Log Failed:', err.message);
   });
 

@@ -143,7 +143,17 @@ export async function initDatabase() {
         "entity_id" VARCHAR(100),
         "ip_address" VARCHAR(45),
         "metadata" JSONB DEFAULT '{}',
-        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "browser" VARCHAR(255),
+        "operating_system" VARCHAR(255),
+        "device" VARCHAR(255),
+        "branch" VARCHAR(255),
+        "record_name" VARCHAR(255),
+        "record_id" VARCHAR(255),
+        "old_values" JSONB DEFAULT '{}',
+        "new_values" JSONB DEFAULT '{}',
+        "success" BOOLEAN DEFAULT TRUE,
+        "execution_time" INTEGER DEFAULT 0
       );
     `, 'audit_logs table');
 

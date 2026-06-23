@@ -104,14 +104,24 @@ export const dbService = {
 
   subscribePaginated<T>(
     collectionName: string, 
-    options: string | { company_id: string; [key: string]: any }, 
+    options: string | { company_id: string; [key: string]: any } | any[], 
     callback: (result: { data: T[], total: number, summary: any, page: number, limit: number }) => void, 
     onError?: (error: Error) => void
   ) {
     let lastData = '';
     const fetchData = async () => {
       try {
-        const result = await dbService.listPaginated<T>(collectionName, options);
+        let pollOptions: any = options;
+        if (typeof options === 'string') {
+          pollOptions = { company_id: options, _polling: 'true' };
+        } else if (Array.isArray(options)) {
+          pollOptions = [...options, { field: '_polling', operator: '==', value: 'true' }];
+        } else if (options && typeof options === 'object') {
+          pollOptions = { ...options, _polling: 'true' };
+        } else {
+          pollOptions = { _polling: 'true' };
+        }
+        const result = await dbService.listPaginated<T>(collectionName, pollOptions);
         // Only stringify the data part to avoid missing updates if only summary changes? No, stringify whole result
         const dataString = JSON.stringify(result);
         if (dataString !== lastData) {
@@ -140,11 +150,21 @@ export const dbService = {
     };
   },
 
-  subscribe<T>(collectionName: string, options: string | { company_id: string; [key: string]: any }, callback: (data: T[]) => void, onError?: (error: Error) => void) {
+  subscribe<T>(collectionName: string, options: string | { company_id: string; [key: string]: any } | any[], callback: (data: T[]) => void, onError?: (error: Error) => void) {
     let lastData = '';
     const fetchData = async () => {
       try {
-        const data = await dbService.list<T>(collectionName, options);
+        let pollOptions: any = options;
+        if (typeof options === 'string') {
+          pollOptions = { company_id: options, _polling: 'true' };
+        } else if (Array.isArray(options)) {
+          pollOptions = [...options, { field: '_polling', operator: '==', value: 'true' }];
+        } else if (options && typeof options === 'object') {
+          pollOptions = { ...options, _polling: 'true' };
+        } else {
+          pollOptions = { _polling: 'true' };
+        }
+        const data = await dbService.list<T>(collectionName, pollOptions);
         const dataString = JSON.stringify(data);
         if (dataString !== lastData) {
           lastData = dataString;
@@ -374,5 +394,25 @@ export const dbService = {
   
   async queryWidgetData(payload: any): Promise<any[]> {
     return apiRequest<any[]>('/widgets/query', 'POST', payload);
+  },
+
+  async logClientAudit(action: string, moduleName: string, details: string, metadata?: any) {
+    try {
+      const authUserStr = localStorage.getItem('auth_user');
+      const user = authUserStr ? JSON.parse(authUserStr) : null;
+      await apiRequest('/audit_logs', 'POST', {
+        action,
+        module: moduleName.toUpperCase(),
+        details,
+        metadata: metadata || {},
+        user_id: user?.id || user?.user?.id,
+        username: user?.username || user?.user?.username,
+        user_email: user?.email || user?.user?.email,
+        company_id: user?.company_id || user?.user?.company_id,
+        branch: user?.branch || user?.branch_name || user?.user?.branch_name
+      });
+    } catch (error) {
+      console.error('Failed to log client audit:', error);
+    }
   }
 };
