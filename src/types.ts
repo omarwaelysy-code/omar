@@ -1069,3 +1069,44 @@ export interface Template {
   updated_at?: string;
 }
 
+export interface Dashboard {
+  id: string;
+  company_id: string;
+  owner_user_id: string | null;
+  name: string;
+  description?: string;
+  is_default: boolean;
+  is_system: boolean;
+  icon?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Widget {
+  id: string;
+  dashboard_id: string;
+  widget_type: string;
+  title: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  settings: any;
+  filters: any;
+  order: number;
+  visible: boolean;
+  locked: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface WidgetTypeDefinition {
+  type: string;
+  nameEn: string;
+  nameAr: string;
+  defaultW: number;
+  defaultH: number;
+  description?: string;
+}
+
+

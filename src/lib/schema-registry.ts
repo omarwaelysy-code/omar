@@ -233,5 +233,21 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'id', 'company_id', 'name', 'paper_size_id', 'custom_width', 'custom_height',
     'orientation', 'margin_top', 'margin_bottom', 'margin_left', 'margin_right',
     'dpi', 'print_settings', 'created_at', 'updated_at'
+  ],
+  dashboards: [
+    'id', 'company_id', 'owner_user_id', 'name', 'description', 'is_default', 'is_system', 'icon', 'created_at', 'updated_at'
+  ],
+  widgets: [
+    'id', 'dashboard_id', 'widget_type', 'title', 'x', 'y', 'w', 'h', 'settings', 'filters', 'order', 'visible', 'locked', 'created_at', 'updated_at'
+  ],
+  attendance: [
+    'id', 'company_id', 'employee_id', 'employee_name', 'date', 'check_in', 'check_out', 'status', 'created_at'
+  ],
+  payroll: [
+    'id', 'company_id', 'employee_id', 'employee_name', 'month', 'year', 'date', 'basic_salary', 'allowances', 'deductions', 'net_salary', 'status', 'created_at'
+  ],
+  assets: [
+    'id', 'company_id', 'code', 'name', 'category', 'purchase_date', 'purchase_cost', 'current_value', 'depreciation_rate', 'status', 'created_at'
   ]
 };
+

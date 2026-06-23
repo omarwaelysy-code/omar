@@ -346,5 +346,33 @@ export const dbService = {
       clearInterval(interval);
       window.removeEventListener('db-refresh', handleRefresh as EventListener);
     };
+  },
+
+  async getOrCreateDefaultDashboard(companyId: string, userId: string): Promise<any> {
+    return apiRequest<any>('/dashboards/user/my-default');
+  },
+
+  async saveAsTemplate(dashboardId: string, companyId: string, name: string): Promise<any> {
+    return apiRequest<any>(`/dashboards/${dashboardId}/save-template`, 'POST', { name });
+  },
+
+  async resetDashboard(dashboardId: string, companyId: string): Promise<any> {
+    return apiRequest<any>(`/dashboards/${dashboardId}/reset`, 'POST');
+  },
+
+  async exportDashboard(dashboardId: string, companyId: string): Promise<any> {
+    return apiRequest<any>(`/dashboards/${dashboardId}/export`);
+  },
+
+  async importDashboard(json: any, companyId: string, userId: string): Promise<any> {
+    return apiRequest<any>('/dashboards/import', 'POST', json);
+  },
+  
+  async getWidgetDataSources(): Promise<{ [tableName: string]: string[] }> {
+    return apiRequest<{ [tableName: string]: string[] }>('/widgets/data-sources');
+  },
+  
+  async queryWidgetData(payload: any): Promise<any[]> {
+    return apiRequest<any[]>('/widgets/query', 'POST', payload);
   }
 };

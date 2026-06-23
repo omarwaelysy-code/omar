@@ -27,6 +27,7 @@ const NavigationContext = createContext<NavigationContextType | undefined>(undef
 
 const pageLabels: { [key: string]: string } = {
   'dashboard': 'لوحة التحكم',
+  'dashboard_designer': 'مصمم لوحات التحكم',
   'super_admin_dashboard': 'لوحة تحكم المدير العام',
   'customers': 'العملاء',
   'suppliers': 'الموردين',

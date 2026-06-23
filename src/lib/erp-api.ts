@@ -5,6 +5,8 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { authenticateToken, AuthRequest, authorizeRoles } from './auth-middleware';
 import { EXPECTED_SCHEMA } from './schema-registry';
+import { DashboardService } from '../services/DashboardService';
+import { WIDGET_REGISTRY } from '../constants/widgets';
 import { runMigrations } from './migration-runner';
 import fs from 'fs';
 import path from 'path';
@@ -46,7 +48,15 @@ export async function syncProductsCostAndJEs(client: any, companyId: string, pro
 
 const router = Router();
 
-
+// Middleware to clear cache on database updates
+router.use((req, res, next) => {
+  if (['POST', 'PUT', 'DELETE'].includes(req.method)) {
+    if (typeof (global as any).clearWidgetCache === 'function') {
+      (global as any).clearWidgetCache();
+    }
+  }
+  next();
+});
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
@@ -708,7 +718,8 @@ const modules = [
   'currencies', 'exchange_rates', 'inventory_movements', 'inventory_layers',
   'sales_orders', 'sales_order_items', 'purchase_orders', 'purchase_order_items', 'employees',
   'warehouse_transfers', 'warehouse_transfer_items', 'opening_stock_balances', 'opening_stock_items',
-  'stock_adjustments', 'stock_adjustment_items', 'templates', 'paper_sizes', 'template_versions', 'print_profiles'
+  'stock_adjustments', 'stock_adjustment_items', 'templates', 'paper_sizes', 'template_versions', 'print_profiles',
+  'dashboards', 'widgets'
 ];
 
 // --- Flexible Operations Logic ---
@@ -801,7 +812,7 @@ function sendError(res: any, status: number, message: string, details?: any) {
 // Helper to parse JSONB fields if they are returned as strings
 function parseRow(table: string, row: any) {
   if (!row) return row;
-  const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features', 'options', 'settlements'];
+  const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features', 'options', 'settlements', 'filters'];
   
   const parsed = { ...row };
   jsonbFields.forEach(field => {
@@ -827,7 +838,7 @@ function sanitizeData(table: string, data: any) {
   if (!allowedKeys) return data;
   
   const sanitized: any = {};
-  const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features', 'value', 'options', 'settlements'];
+  const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features', 'value', 'options', 'settlements', 'filters'];
 
   allowedKeys.forEach(key => {
     if (key in data) {
@@ -4835,6 +4846,576 @@ router.get('/currency-rates/latest', authenticateToken, async (req: AuthRequest,
     res.json(rows);
   } catch (error: any) {
     console.error('[ERP] GET /currency-rates/latest error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/erp/widget-types
+router.get('/widget-types', authenticateToken, (req, res) => {
+  res.json(WIDGET_REGISTRY);
+});
+
+// GET /api/erp/dashboards/user/my-default
+router.get('/dashboards/user/my-default', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const companyId = req.user?.company_id;
+    const userId = req.user?.id;
+    if (!companyId || !userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const dashboard = await DashboardService.getOrCreateDefaultDashboard(companyId, userId);
+    res.json(dashboard);
+  } catch (error: any) {
+    console.error('[ERP] Error provisioning default dashboard:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/erp/dashboards/:id/save-template
+router.post('/dashboards/:id/save-template', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description } = req.body;
+    const companyId = req.user?.company_id;
+    if (!companyId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!name) return res.status(400).json({ error: 'name is required' });
+
+    // Restrict template creation to admin/super_admin
+    const isAuthorized = req.user?.role === 'admin' || req.user?.role === 'super_admin';
+    if (!isAuthorized) {
+      return res.status(403).json({ error: 'Only administrators can save templates' });
+    }
+
+    const template = await DashboardService.saveAsTemplate(id, companyId, name, description);
+    res.status(201).json(template);
+  } catch (error: any) {
+    console.error('[ERP] Error saving dashboard template:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/erp/dashboards/:id/duplicate
+router.post('/dashboards/:id/duplicate', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description } = req.body;
+    const companyId = req.user?.company_id;
+    const userId = req.user?.id;
+    if (!companyId || !userId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!name) return res.status(400).json({ error: 'name is required' });
+
+    const duplicate = await DashboardService.duplicateDashboard(id, companyId, userId, name, description);
+    res.status(201).json(duplicate);
+  } catch (error: any) {
+    console.error('[ERP] Error duplicating dashboard:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/erp/dashboards/:id/export
+router.get('/dashboards/:id/export', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const companyId = req.user?.company_id;
+    if (!companyId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const exported = await DashboardService.exportDashboard(id, companyId);
+    res.json(exported);
+  } catch (error: any) {
+    console.error('[ERP] Error exporting dashboard:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/erp/dashboards/import
+router.post('/dashboards/import', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const companyId = req.user?.company_id;
+    const userId = req.user?.id;
+    if (!companyId || !userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const imported = await DashboardService.importDashboard(req.body, companyId, userId);
+    res.status(201).json(imported);
+  } catch (error: any) {
+    console.error('[ERP] Error importing dashboard:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/erp/dashboards/:id/reset
+router.post('/dashboards/:id/reset', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const companyId = req.user?.company_id;
+    if (!companyId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const reset = await DashboardService.resetDashboard(id, companyId);
+    res.json(reset);
+  } catch (error: any) {
+    console.error('[ERP] Error resetting dashboard:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /api/erp/dashboards/:id/reorder
+router.put('/dashboards/:id/reorder', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const companyId = req.user?.company_id;
+    if (!companyId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { orders } = req.body;
+    if (!Array.isArray(orders)) {
+      return res.status(400).json({ error: 'orders must be an array' });
+    }
+
+    await DashboardService.reorderWidgets(id, companyId, orders);
+    res.json({ success: true, message: 'Widgets reordered successfully' });
+  } catch (error: any) {
+    console.error('[ERP] Error reordering widgets:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- UNIVERSAL WIDGET DATA ENGINE API ---
+
+const PARENT_TABLES: { [child: string]: { parent: string, joinCol: string } } = {
+  invoice_items: { parent: 'invoices', joinCol: 'invoice_id' },
+  purchase_invoice_items: { parent: 'purchase_invoices', joinCol: 'invoice_id' },
+  sales_order_items: { parent: 'sales_orders', joinCol: 'order_id' },
+  purchase_order_items: { parent: 'purchase_orders', joinCol: 'order_id' },
+  return_items: { parent: 'returns', joinCol: 'return_id' },
+  purchase_return_items: { parent: 'purchase_returns', joinCol: 'return_id' },
+  journal_entry_lines: { parent: 'journal_entry_lines', joinCol: 'journal_entry_id' },
+  warehouse_transfer_items: { parent: 'warehouse_transfers', joinCol: 'transfer_id' },
+  opening_stock_items: { parent: 'opening_stock_items', joinCol: 'opening_stock_id' },
+  stock_adjustment_items: { parent: 'stock_adjustment_items', joinCol: 'adjustment_id' }
+};
+
+function getDateRangeBoundaries(range: string) {
+  const now = new Date();
+  let start: Date;
+  let end: Date = new Date();
+  
+  switch (range) {
+    case 'today':
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      break;
+    case 'this_week': {
+      const day = now.getDay();
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+      start = new Date(now.setDate(diff));
+      start.setHours(0, 0, 0, 0);
+      break;
+    }
+    case 'this_month':
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      break;
+    case 'last_30_days':
+      start = new Date();
+      start.setDate(start.getDate() - 30);
+      start.setHours(0, 0, 0, 0);
+      break;
+    case 'this_year':
+      start = new Date(now.getFullYear(), 0, 1);
+      end = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+      break;
+    case 'all_time':
+    default:
+      start = new Date(2000, 0, 1);
+      break;
+  }
+  return { start, end };
+}
+
+function shiftDateRange(start: Date, end: Date, range: string) {
+  const shiftedStart = new Date(start);
+  const shiftedEnd = new Date(end);
+  
+  switch (range) {
+    case 'today':
+      shiftedStart.setDate(shiftedStart.getDate() - 1);
+      shiftedEnd.setDate(shiftedEnd.getDate() - 1);
+      break;
+    case 'this_week':
+      shiftedStart.setDate(shiftedStart.getDate() - 7);
+      shiftedEnd.setDate(shiftedEnd.getDate() - 7);
+      break;
+    case 'this_month':
+      shiftedStart.setMonth(shiftedStart.getMonth() - 1);
+      shiftedEnd.setMonth(shiftedEnd.getMonth() - 1);
+      break;
+    case 'last_30_days':
+      shiftedStart.setDate(shiftedStart.getDate() - 30);
+      shiftedEnd.setDate(shiftedEnd.getDate() - 30);
+      break;
+    case 'this_year':
+      shiftedStart.setFullYear(shiftedStart.getFullYear() - 1);
+      shiftedEnd.setFullYear(shiftedEnd.getFullYear() - 1);
+      break;
+  }
+  return { start: shiftedStart, end: shiftedEnd };
+}
+
+let widgetQueryCache: { [key: string]: { data: any, timestamp: number } } = {};
+
+export function clearWidgetCache() {
+  widgetQueryCache = {};
+}
+(global as any).clearWidgetCache = clearWidgetCache;
+
+// Middleware to clear cache on writes
+router.use((req, res, next) => {
+  if (['POST', 'PUT', 'DELETE'].includes(req.method)) {
+    clearWidgetCache();
+  }
+  next();
+});
+
+// GET /api/erp/widgets/data-sources
+router.get('/widgets/data-sources', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT table_name, column_name 
+      FROM information_schema.columns 
+      WHERE table_schema = 'public'
+    `);
+    
+    const tables: { [tableName: string]: string[] } = {};
+    result.rows.forEach(row => {
+      const name = row.table_name;
+      // Filter out internal tables
+      if (['migrations', 'sessions', 'dashboards', 'widgets', 'users', 'roles', 'system_config', 'exchange_rate_history', 'audit_logs'].includes(name)) {
+        return;
+      }
+      if (!tables[name]) tables[name] = [];
+      tables[name].push(row.column_name);
+    });
+    
+    // Fallbacks from EXPECTED_SCHEMA
+    Object.keys(EXPECTED_SCHEMA).forEach(name => {
+      if (['migrations', 'sessions', 'dashboards', 'widgets', 'users', 'roles', 'system_config', 'exchange_rate_history', 'audit_logs'].includes(name)) {
+        return;
+      }
+      if (!tables[name]) {
+        tables[name] = EXPECTED_SCHEMA[name] || [];
+      }
+    });
+
+    res.json(tables);
+  } catch (error: any) {
+    console.error('[ERP] GET /widgets/data-sources error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/erp/widgets/query
+router.post('/widgets/query', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const companyId = req.user?.company_id;
+    if (!companyId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const {
+      source,
+      fields = [],
+      filters = [],
+      dateRange,
+      sorting,
+      grouping = [],
+      aggregation,
+      limit,
+      offset
+    } = req.body;
+
+    if (!source) return res.status(400).json({ error: 'source table is required' });
+
+    // Validate table name (source)
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(source)) {
+      return res.status(400).json({ error: 'Invalid source name' });
+    }
+
+    // Cache hit?
+    const cacheKey = `${companyId}_${JSON.stringify(req.body)}`;
+    const cached = widgetQueryCache[cacheKey];
+    if (cached && (Date.now() - cached.timestamp < 30000)) {
+      return res.json(cached.data);
+    }
+
+    // Fetch column metadata to validate inputs
+    const colMetadataRes = await pool.query(`
+      SELECT column_name, data_type 
+      FROM information_schema.columns 
+      WHERE table_schema = 'public' AND table_name = $1
+    `, [source]);
+    
+    let tableCols = colMetadataRes.rows.map(r => r.column_name);
+    
+    // Fallback if database info schema query is empty
+    if (tableCols.length === 0 && EXPECTED_SCHEMA[source]) {
+      tableCols = EXPECTED_SCHEMA[source];
+    }
+    
+    if (tableCols.length === 0) {
+      return res.status(400).json({ error: `Table '${source}' does not exist or has no columns` });
+    }
+
+    const allExpectedCols = [...tableCols];
+    
+    // Add columns of joined parent if parent join is applicable
+    const parentMapping = PARENT_TABLES[source];
+    let parentCols: string[] = [];
+    if (parentMapping) {
+      const parentMetadata = await pool.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = $1
+      `, [parentMapping.parent]);
+      parentCols = parentMetadata.rows.map(r => r.column_name);
+      if (parentCols.length === 0 && EXPECTED_SCHEMA[parentMapping.parent]) {
+        parentCols = EXPECTED_SCHEMA[parentMapping.parent];
+      }
+      parentCols.forEach(c => allExpectedCols.push(`parent_${c}`));
+    }
+
+    const validateCol = (col: string) => {
+      if (col.includes('.')) {
+        const parts = col.split('.');
+        if (parts.length === 2) {
+          const tName = parts[0];
+          const cName = parts[1];
+          if (tName === source) return tableCols.includes(cName);
+          if (parentMapping && tName === parentMapping.parent) return parentCols.includes(cName);
+        }
+        return false;
+      }
+      return tableCols.includes(col) || allExpectedCols.includes(col);
+    };
+
+    // Validate fields
+    for (const f of fields) {
+      if (!validateCol(f)) return res.status(400).json({ error: `Invalid column: ${f}` });
+    }
+    
+    // Validate groupings
+    for (const g of grouping) {
+      if (!validateCol(g)) return res.status(400).json({ error: `Invalid grouping column: ${g}` });
+    }
+
+    // Validate sorting
+    if (sorting?.field && !validateCol(sorting.field)) {
+      return res.status(400).json({ error: `Invalid sorting column: ${sorting.field}` });
+    }
+
+    // Validate aggregation
+    if (aggregation?.field && !validateCol(aggregation.field)) {
+      return res.status(400).json({ error: `Invalid aggregation column: ${aggregation.field}` });
+    }
+
+    // Helper to build WHERE conditions
+    const buildQueryConditions = (
+      params: any[],
+      dateRangeOverride?: { start: Date, end: Date }
+    ) => {
+      const conditions: string[] = [];
+      
+      // 1. Company Isolation
+      if (tableCols.includes('company_id')) {
+        conditions.push(`"${source}"."company_id" = $${params.length + 1}`);
+        params.push(companyId);
+      } else if (parentMapping && parentCols.includes('company_id')) {
+        conditions.push(`"${parentMapping.parent}"."company_id" = $${params.length + 1}`);
+        params.push(companyId);
+      }
+
+      // 2. Date Range Filters
+      let dateField = '';
+      if (tableCols.includes('date')) dateField = 'date';
+      else if (tableCols.includes('created_at')) dateField = 'created_at';
+      else if (tableCols.includes('timestamp')) dateField = 'timestamp';
+      else if (tableCols.includes('rate_date')) dateField = 'rate_date';
+
+      if (dateField) {
+        if (dateRangeOverride) {
+          conditions.push(`"${source}"."${dateField}" >= $${params.length + 1}`);
+          params.push(dateRangeOverride.start.toISOString().split('T')[0]);
+          conditions.push(`"${source}"."${dateField}" <= $${params.length + 1}`);
+          params.push(dateRangeOverride.end.toISOString().split('T')[0]);
+        } else if (dateRange && dateRange !== 'all_time') {
+          const { start, end } = getDateRangeBoundaries(dateRange);
+          conditions.push(`"${source}"."${dateField}" >= $${params.length + 1}`);
+          params.push(start.toISOString().split('T')[0]);
+          conditions.push(`"${source}"."${dateField}" <= $${params.length + 1}`);
+          params.push(end.toISOString().split('T')[0]);
+        }
+      }
+
+      // 3. Custom Filters
+      if (Array.isArray(filters)) {
+        for (const filter of filters) {
+          const { field, operator, value } = filter;
+          if (!validateCol(field)) continue;
+
+          let sqlOp = '=';
+          let sqlVal = value;
+          if (operator === '==' || operator === '=') sqlOp = '=';
+          else if (operator === '!=' || operator === '<>') sqlOp = '<>';
+          else if (operator === '>') sqlOp = '>';
+          else if (operator === '>=') sqlOp = '>=';
+          else if (operator === '<') sqlOp = '<';
+          else if (operator === '<=') sqlOp = '<=';
+          else if (operator === 'like' || operator === 'contains') {
+            sqlOp = 'ILIKE';
+            sqlVal = `%${value}%`;
+          }
+
+          const colRef = field.includes('.') ? field.split('.').map(x => `"${x}"`).join('.') : `"${source}"."${field}"`;
+          conditions.push(`${colRef} ${sqlOp} $${params.length + 1}`);
+          params.push(sqlVal);
+        }
+      }
+
+      return conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    };
+
+    const executeQuery = async (dateRangeOverride?: { start: Date, end: Date }) => {
+      let selectClause = '';
+      let groupClause = '';
+      const queryParams: any[] = [];
+
+      let joinClause = '';
+      if (parentMapping && (parentCols.includes('company_id') || fields.some(f => f.startsWith('parent_')))) {
+        joinClause = `INNER JOIN "${parentMapping.parent}" ON "${source}"."${parentMapping.joinCol}" = "${parentMapping.parent}"."id"`;
+      }
+
+      if (aggregation && aggregation.type && !['RUNNING_TOTAL', 'GROWTH', 'COMPARISON'].includes(aggregation.type.toUpperCase())) {
+        const aggField = aggregation.field ? `"${source}"."${aggregation.field}"` : '*';
+        let aggExpr = '';
+        
+        switch (aggregation.type.toUpperCase()) {
+          case 'SUM': aggExpr = `SUM(${aggField})`; break;
+          case 'COUNT': aggExpr = `COUNT(${aggField})`; break;
+          case 'AVG': aggExpr = `AVG(${aggField})`; break;
+          case 'MIN': aggExpr = `MIN(${aggField})`; break;
+          case 'MAX': aggExpr = `MAX(${aggField})`; break;
+          case 'DISTINCT': aggExpr = `COUNT(DISTINCT ${aggField})`; break;
+          default: aggExpr = `COUNT(*)`;
+        }
+
+        const selectedGroupCols = grouping.map(g => {
+          const colRef = g.includes('.') ? g.split('.').map(x => `"${x}"`).join('.') : `"${source}"."${g}"`;
+          return `${colRef} AS "${g}"`;
+        });
+        
+        selectClause = [...selectedGroupCols, `${aggExpr} AS value`].join(', ');
+        
+        if (grouping.length > 0) {
+          groupClause = `GROUP BY ` + grouping.map(g => g.includes('.') ? g.split('.').map(x => `"${x}"`).join('.') : `"${source}"."${g}"`).join(', ');
+        }
+      } else {
+        if (fields.length > 0) {
+          selectClause = fields.map(f => {
+            if (f.includes('.')) return f.split('.').map(x => `"${x}"`).join('.') + ` AS "${f}"`;
+            return `"${source}"."${f}" AS "${f}"`;
+          }).join(', ');
+        } else {
+          selectClause = tableCols.map(c => `"${source}"."${c}" AS "${c}"`).join(', ');
+        }
+      }
+
+      const whereClause = buildQueryConditions(queryParams, dateRangeOverride);
+      let sql = `SELECT ${selectClause} FROM "${source}" ${joinClause} ${whereClause} ${groupClause}`;
+
+      if (sorting && sorting.field) {
+        const sortOrder = sorting.order?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+        const sortRef = sorting.field.includes('.') ? sorting.field.split('.').map(x => `"${x}"`).join('.') : `"${source}"."${sorting.field}"`;
+        sql += ` ORDER BY ${sortRef} ${sortOrder}`;
+      }
+
+      if (limit !== undefined) {
+        sql += ` LIMIT $${queryParams.length + 1}`;
+        queryParams.push(parseInt(limit, 10));
+      }
+      if (offset !== undefined) {
+        sql += ` OFFSET $${queryParams.length + 1}`;
+        queryParams.push(parseInt(offset, 10));
+      }
+
+      const dbRes = await pool.query(sql, queryParams);
+      return dbRes.rows;
+    };
+
+    let rows: any[] = [];
+    const hasGrowthDateRange = dateRange && dateRange !== 'all_time' && aggregation && (aggregation.type?.toUpperCase() === 'GROWTH' || aggregation.type?.toUpperCase() === 'COMPARISON');
+    const hasRunningTotalDate = aggregation && aggregation.type?.toUpperCase() === 'RUNNING_TOTAL' && (tableCols.includes('date') || tableCols.includes('created_at'));
+    
+    if (!(hasGrowthDateRange || hasRunningTotalDate)) {
+      rows = await executeQuery();
+    }
+
+    // 1. Running Total Calculation
+    if (aggregation && aggregation.type?.toUpperCase() === 'RUNNING_TOTAL') {
+      let dateField = '';
+      if (tableCols.includes('date')) dateField = 'date';
+      else if (tableCols.includes('created_at')) dateField = 'created_at';
+      
+      if (dateField) {
+        const queryParams: any[] = [];
+        const whereClause = buildQueryConditions(queryParams);
+        const aggField = aggregation.field || 'total_amount';
+        const sql = `SELECT "${source}"."${dateField}" AS date, SUM("${source}"."${aggField}") AS total FROM "${source}" ${whereClause} GROUP BY "${source}"."${dateField}" ORDER BY "${source}"."${dateField}" ASC`;
+        const resList = await pool.query(sql, queryParams);
+        
+        let runSum = 0;
+        rows = resList.rows.map(r => {
+          runSum += Number(r.total || 0);
+          return {
+            date: r.date,
+            value: runSum
+          };
+        });
+      }
+    }
+
+    // 2. Growth % and Comparison Calculations
+    if (dateRange && dateRange !== 'all_time' && aggregation && (aggregation.type?.toUpperCase() === 'GROWTH' || aggregation.type?.toUpperCase() === 'COMPARISON')) {
+      const { start, end } = getDateRangeBoundaries(dateRange);
+      const shifted = shiftDateRange(start, end, dateRange);
+
+      // Temporary override aggregation type to SUM or COUNT for raw comparisons
+      const backupAgg = req.body.aggregation;
+      req.body.aggregation = { field: backupAgg.field, type: 'SUM' };
+
+      const currentValRes = await executeQuery();
+      const previousValRes = await executeQuery(shifted);
+
+      req.body.aggregation = backupAgg; // restore
+
+      const currSum = currentValRes.reduce((sum, r) => sum + Number(r.value || 0), 0);
+      const prevSum = previousValRes.reduce((sum, r) => sum + Number(r.value || 0), 0);
+
+      let growthVal = 0;
+      if (prevSum > 0) {
+        growthVal = ((currSum - prevSum) / prevSum) * 100;
+      } else {
+        growthVal = currSum > 0 ? 100 : 0;
+      }
+
+      rows = [{
+        current: currSum,
+        previous: prevSum,
+        growth: Number(growthVal.toFixed(2)),
+        value: currSum
+      }];
+    }
+
+    widgetQueryCache[cacheKey] = {
+      data: rows,
+      timestamp: Date.now()
+    };
+
+    res.json(rows);
+  } catch (error: any) {
+    console.error('[ERP] POST /widgets/query error:', error);
     res.status(500).json({ error: error.message });
   }
 });

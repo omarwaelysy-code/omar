@@ -930,6 +930,96 @@ export async function initDatabase() {
       );
     `, 'exchange_rate_history table');
 
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "dashboards" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id"),
+        "owner_user_id" VARCHAR(36) REFERENCES "users"("id"),
+        "name" VARCHAR(255) NOT NULL,
+        "description" TEXT,
+        "is_default" BOOLEAN DEFAULT FALSE,
+        "is_system" BOOLEAN DEFAULT FALSE,
+        "icon" VARCHAR(100),
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'dashboards table');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "widgets" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "dashboard_id" VARCHAR(36) REFERENCES "dashboards"("id") ON DELETE CASCADE,
+        "widget_type" VARCHAR(100) NOT NULL,
+        "title" VARCHAR(255) NOT NULL,
+        "x" INTEGER NOT NULL,
+        "y" INTEGER NOT NULL,
+        "w" INTEGER NOT NULL,
+        "h" INTEGER NOT NULL,
+        "settings" JSONB DEFAULT '{}',
+        "filters" JSONB DEFAULT '{}',
+        "order" INTEGER DEFAULT 0,
+        "visible" BOOLEAN DEFAULT TRUE,
+        "locked" BOOLEAN DEFAULT FALSE,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'widgets table');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "attendance" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id") ON DELETE CASCADE,
+        "employee_id" VARCHAR(36) REFERENCES "employees"("id") ON DELETE CASCADE,
+        "employee_name" VARCHAR(255),
+        "date" DATE,
+        "check_in" TIMESTAMP,
+        "check_out" TIMESTAMP,
+        "status" VARCHAR(50),
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'attendance table');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "payroll" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id") ON DELETE CASCADE,
+        "employee_id" VARCHAR(36) REFERENCES "employees"("id") ON DELETE CASCADE,
+        "employee_name" VARCHAR(255),
+        "month" INTEGER,
+        "year" INTEGER,
+        "date" DATE,
+        "basic_salary" DECIMAL(18, 4) DEFAULT 0,
+        "allowances" DECIMAL(18, 4) DEFAULT 0,
+        "deductions" DECIMAL(18, 4) DEFAULT 0,
+        "net_salary" DECIMAL(18, 4) DEFAULT 0,
+        "status" VARCHAR(50),
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'payroll table');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "assets" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) REFERENCES "companies"("id") ON DELETE CASCADE,
+        "code" VARCHAR(100),
+        "name" VARCHAR(255) NOT NULL,
+        "category" VARCHAR(100),
+        "purchase_date" DATE,
+        "purchase_cost" DECIMAL(18, 4) DEFAULT 0,
+        "current_value" DECIMAL(18, 4) DEFAULT 0,
+        "depreciation_rate" DECIMAL(5, 2) DEFAULT 0,
+        "status" VARCHAR(50),
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'assets table');
+
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_dashboards_company" ON "dashboards"("company_id");', 'idx_dashboards_company');
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_dashboards_owner" ON "dashboards"("owner_user_id");', 'idx_dashboards_owner');
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_widgets_dashboard" ON "widgets"("dashboard_id");', 'idx_widgets_dashboard');
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_attendance_company" ON "attendance"("company_id");', 'idx_attendance_company');
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_payroll_company" ON "payroll"("company_id");', 'idx_payroll_company');
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_assets_company" ON "assets"("company_id");', 'idx_assets_company');
+
     console.log('✅ Base Schema Guardrails active.');
 
     // Seeding
@@ -988,5 +1078,68 @@ async function seedDatabase(client: any) {
     }
   } catch (e) {
     console.warn('    ! Config seeding failed:', e);
+  }
+
+  // 4. Default Dashboard Template
+  try {
+    const defaultTemplateId = 'system-default-dashboard';
+    const { rows: dashRows } = await client.query('SELECT id FROM dashboards WHERE id = $1', [defaultTemplateId]);
+    if (dashRows.length === 0) {
+      console.log('    - Seeding Default Dashboard Template...');
+      await client.query(`
+        INSERT INTO dashboards (id, company_id, owner_user_id, name, description, is_default, is_system, icon)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `, [defaultTemplateId, 'SYSTEM', null, 'Default Workspace', 'System default dashboard layout template', true, true, 'LayoutDashboard']);
+
+      // Seed default widgets for this template
+      const defaultWidgets = [
+        {
+          id: 'widget-default-kpi-sales',
+          widget_type: 'kpi_card',
+          title: 'Sales KPI',
+          x: 0, y: 0, w: 3, h: 2,
+          settings: { metric: 'sales_total', comparison: 'previous_month' },
+          filters: {},
+          order: 0
+        },
+        {
+          id: 'widget-default-kpi-profit',
+          widget_type: 'profit',
+          title: 'Profit Overview',
+          x: 3, y: 0, w: 3, h: 2,
+          settings: { metric: 'net_profit' },
+          filters: {},
+          order: 1
+        },
+        {
+          id: 'widget-default-revenue-chart',
+          widget_type: 'line_chart',
+          title: 'Monthly Revenue Trend',
+          x: 0, y: 2, w: 6, h: 4,
+          settings: { dataKey: 'revenue', timeRange: '12_months' },
+          filters: {},
+          order: 2
+        },
+        {
+          id: 'widget-default-recent-activities',
+          widget_type: 'recent_activities',
+          title: 'Recent Activity Logs',
+          x: 6, y: 0, w: 6, h: 6,
+          settings: { limit: 10 },
+          filters: {},
+          order: 3
+        }
+      ];
+
+      for (const w of defaultWidgets) {
+        await client.query(`
+          INSERT INTO widgets (id, dashboard_id, widget_type, title, x, y, w, h, settings, filters, "order")
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        `, [w.id, defaultTemplateId, w.widget_type, w.title, w.x, w.y, w.w, w.h, JSON.stringify(w.settings), JSON.stringify(w.filters), w.order]);
+      }
+      console.log('    - Default Dashboard Template widgets seeded.');
+    }
+  } catch (e) {
+    console.warn('    ! Dashboard template seeding failed:', e);
   }
 }

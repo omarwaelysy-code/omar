@@ -11,11 +11,19 @@ import {
   Zap,
   Users as UsersIcon,
   Calendar,
+  Calendar as CalendarIcon,
   Wallet,
   Truck,
   Package,
   CreditCard,
-  Settings
+  Settings,
+  Bell,
+  List,
+  Layout,
+  BarChart2,
+  LineChart as LineChartIcon,
+  PieChart as PieIcon,
+  Table as TableIcon
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -26,7 +34,20 @@ import {
   Tooltip, 
   ResponsiveContainer,
   AreaChart,
-  Area
+  Area,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  ScatterChart,
+  Scatter
 } from 'recharts';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
@@ -46,7 +67,8 @@ import {
   CustomerDiscount,
   SupplierDiscount,
   Account,
-  AccountType
+  AccountType,
+  Widget
 } from '../types';
 import { smartSearch } from '../services/geminiService';
 import { dbService } from '../services/dbService';
@@ -95,6 +117,689 @@ const StatCard = ({ title, value, subtitle, icon: Icon, trend, colorClass }: any
   </motion.div>
 );
 
+const DynamicWidgetRenderer: React.FC<{ widget: Widget }> = ({ widget }) => {
+  const { language } = useLanguage();
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const payload = {
+        source: widget.settings?.dataSource,
+        fields: widget.settings?.fields || [],
+        filters: [
+          ...(widget.filters?.custom || []),
+          ...(widget.filters?.warehouseId ? [{ field: 'warehouse_id', operator: '=', value: widget.filters.warehouseId }] : [])
+        ],
+        dateRange: widget.filters?.dateRange || 'this_month',
+        sorting: widget.settings?.sorting,
+        grouping: widget.settings?.grouping || [],
+        aggregation: widget.settings?.aggregation
+      };
+
+      const result = await dbService.queryWidgetData(payload);
+      setData(result);
+    } catch (err: any) {
+      console.error('Error fetching widget query:', err);
+      setError(err.message || 'Error loading widget data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+    
+    let interval: any;
+    if (widget.settings?.autoRefresh) {
+      const intervalMs = Math.max(10, widget.settings?.refreshInterval || 60) * 1000;
+      interval = setInterval(fetchData, intervalMs);
+    }
+
+    const handleDbRefresh = (e: any) => {
+      if (e.detail?.collection === widget.settings?.dataSource) {
+        fetchData();
+      }
+    };
+    window.addEventListener('db-refresh', handleDbRefresh);
+
+    return () => {
+      if (interval) clearInterval(interval);
+      window.removeEventListener('db-refresh', handleDbRefresh);
+    };
+  }, [widget]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="w-5 h-5 border-2 border-brand-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full text-rose-500 text-[10px] p-2 text-center leading-normal">
+        {error}
+      </div>
+    );
+  }
+
+  if (data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-slate-400 text-[10px]">
+        No data found
+      </div>
+    );
+  }
+
+  const chartType = widget.settings?.chartType || 'line';
+
+  switch (chartType) {
+    case 'kpi_card': {
+      const firstRow = data[0] || {};
+      const value = firstRow.value !== undefined ? firstRow.value : (firstRow.current !== undefined ? firstRow.current : 0);
+      const isMoney = !widget.settings?.aggregation?.field?.includes('count') && !widget.settings?.aggregation?.field?.includes('id');
+      const formattedVal = isMoney ? formatMoney(value) : formatNumber(value);
+
+      return (
+        <div className="flex flex-col justify-center h-full py-1 relative">
+          <p className="text-2xl font-extrabold text-slate-900 truncate tracking-tight">{formattedVal}</p>
+          
+          {firstRow.growth !== undefined && (
+            <div className="flex items-center gap-1.5 mt-2">
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg flex items-center gap-0.5 ${
+                firstRow.growth >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+              }`}>
+                {firstRow.growth >= 0 ? '▲' : '▼'} {Math.abs(firstRow.growth)}%
+              </span>
+              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">vs prev period</span>
+            </div>
+          )}
+          
+          {firstRow.previous !== undefined && (
+            <p className="text-[9px] text-slate-400 font-semibold mt-1">
+              Previous: {isMoney ? formatMoney(firstRow.previous) : formatNumber(firstRow.previous)}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    case 'line':
+      return (
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis dataKey={widget.settings?.grouping?.[0] || 'date'} tick={{ fontSize: 9, fill: '#94a3b8' }} />
+            <YAxis tick={{ fontSize: 9, fill: '#94a3b8' }} />
+            <Tooltip contentStyle={{ fontSize: 10 }} />
+            {widget.settings?.showLegend !== false && <Legend iconSize={8} wrapperStyle={{ fontSize: 8 }} />}
+            <Line type="monotone" dataKey="value" stroke={widget.settings?.color || '#3b82f6'} strokeWidth={2} dot={{ r: 2 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      );
+
+    case 'bar':
+      return (
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis dataKey={widget.settings?.grouping?.[0] || 'date'} tick={{ fontSize: 9, fill: '#94a3b8' }} />
+            <YAxis tick={{ fontSize: 9, fill: '#94a3b8' }} />
+            <Tooltip contentStyle={{ fontSize: 10 }} />
+            {widget.settings?.showLegend !== false && <Legend iconSize={8} wrapperStyle={{ fontSize: 8 }} />}
+            <Bar dataKey="value" fill={widget.settings?.color || '#10b981'} radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      );
+
+    case 'area':
+      return (
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
+            <defs>
+              <linearGradient id={`gradient-${widget.id}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={widget.settings?.color || '#10b981'} stopOpacity={0.2}/>
+                <stop offset="95%" stopColor={widget.settings?.color || '#10b981'} stopOpacity={0}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis dataKey={widget.settings?.grouping?.[0] || 'date'} tick={{ fontSize: 9, fill: '#94a3b8' }} />
+            <YAxis tick={{ fontSize: 9, fill: '#94a3b8' }} />
+            <Tooltip contentStyle={{ fontSize: 10 }} />
+            {widget.settings?.showLegend !== false && <Legend iconSize={8} wrapperStyle={{ fontSize: 8 }} />}
+            <Area type="monotone" dataKey="value" stroke={widget.settings?.color || '#10b981'} strokeWidth={2} fill={`url(#gradient-${widget.id})`} />
+          </AreaChart>
+        </ResponsiveContainer>
+      );
+
+    case 'pie':
+    case 'donut': {
+      const isDonut = chartType === 'donut';
+      const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+      return (
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie 
+              data={data} 
+              cx="50%" 
+              cy="50%" 
+              innerRadius={isDonut ? 20 : 0} 
+              outerRadius={35} 
+              paddingAngle={2} 
+              dataKey="value"
+              nameKey={widget.settings?.grouping?.[0] || 'date'}
+            >
+              {data.map((entry, idx) => (
+                <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip contentStyle={{ fontSize: 10 }} />
+            {widget.settings?.showLegend !== false && <Legend iconSize={6} wrapperStyle={{ fontSize: 7 }} />}
+          </PieChart>
+        </ResponsiveContainer>
+      );
+    }
+
+    case 'radar': {
+      const radarColor = widget.settings?.color || '#8b5cf6';
+      return (
+        <ResponsiveContainer width="100%" height="100%">
+          <RadarChart cx="50%" cy="50%" outerRadius="70%" data={data}>
+            <PolarGrid stroke="#f1f5f9" />
+            <PolarAngleAxis dataKey={widget.settings?.grouping?.[0] || 'date'} tick={{ fontSize: 8 }} />
+            <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={{ fontSize: 8 }} />
+            <Radar name="Value" dataKey="value" stroke={radarColor} fill={radarColor} fillOpacity={0.4} />
+            <Tooltip contentStyle={{ fontSize: 9 }} />
+          </RadarChart>
+        </ResponsiveContainer>
+      );
+    }
+
+    case 'scatter':
+      return (
+        <ResponsiveContainer width="100%" height="100%">
+          <ScatterChart margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis type="category" dataKey={widget.settings?.grouping?.[0] || 'date'} tick={{ fontSize: 8 }} name="Group" />
+            <YAxis type="number" dataKey="value" name="Value" tick={{ fontSize: 8 }} />
+            <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ fontSize: 9 }} />
+            <Scatter name="Data Points" data={data} fill={widget.settings?.color || '#f59e0b'} />
+          </ScatterChart>
+        </ResponsiveContainer>
+      );
+
+    case 'heatmap': {
+      const valMax = Math.max(...data.map(d => Number(d.value || 0)), 1);
+      return (
+        <div className="w-full h-full overflow-auto text-[9px] custom-scrollbar">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 p-1">
+            {data.slice(0, 16).map((item, idx) => {
+              const val = Number(item.value || 0);
+              const label = item[widget.settings?.grouping?.[0] || 'date'] || item.date || `Item ${idx+1}`;
+              const ratio = Math.min(1, val / valMax);
+              return (
+                <div 
+                  key={idx}
+                  className="p-2.5 rounded-xl border flex flex-col justify-between h-14 font-semibold text-slate-800 transition-all shadow-sm hover:scale-[1.02]"
+                  style={{
+                    backgroundColor: `rgba(99, 102, 241, ${Math.max(0.05, ratio * 0.4)})`,
+                    borderColor: `rgba(99, 102, 241, ${Math.max(0.1, ratio * 0.5)})`
+                  }}
+                >
+                  <span className="truncate block opacity-85">{label}</span>
+                  <span className="font-extrabold text-[11px] mt-1 text-indigo-950 block">{formatNumber(val)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    case 'gauge': {
+      const firstRow = data[0] || {};
+      const val = Number(firstRow.value !== undefined ? firstRow.value : 0);
+      const limitVal = widget.settings?.gaugeLimit || Math.max(100, val * 1.2);
+      
+      const gaugeData = [
+        { name: 'Progress', value: val, color: widget.settings?.color || '#3b82f6' },
+        { name: 'Remaining', value: Math.max(0, limitVal - val), color: '#e2e8f0' }
+      ];
+
+      return (
+        <div className="relative w-full h-full flex flex-col items-center justify-center">
+          <ResponsiveContainer width="100%" height="80%">
+            <PieChart>
+              <Pie
+                data={gaugeData}
+                cx="50%"
+                cy="80%"
+                startAngle={180}
+                endAngle={0}
+                innerRadius={30}
+                outerRadius={45}
+                dataKey="value"
+              >
+                {gaugeData.map((entry, idx) => (
+                  <Cell key={`cell-${idx}`} fill={entry.color} />
+                ))}
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="absolute bottom-[20%] text-center">
+            <span className="text-sm font-extrabold text-slate-800 block leading-none">{formatNumber(val)}</span>
+            <span className="text-[7px] text-slate-400 uppercase font-black block mt-0.5">Target {formatNumber(limitVal)}</span>
+          </div>
+        </div>
+      );
+    }
+
+    case 'table': {
+      const cols = data.length > 0 ? Object.keys(data[0]) : [];
+      return (
+        <div className="w-full h-full overflow-auto text-[9px] border border-slate-100 rounded-xl bg-slate-50/30 custom-scrollbar">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-bold sticky top-0">
+                {cols.map(c => (
+                  <th key={c} className="text-left p-1.5 capitalize">{c.replace(/_/g, ' ')}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row, idx) => (
+                <tr key={idx} className="border-b border-slate-100 last:border-0 hover:bg-slate-100/50">
+                  {cols.map(c => {
+                    const val = row[c];
+                    const displayVal = typeof val === 'number' ? formatNumber(val) : String(val || '');
+                    return (
+                      <td key={c} className="p-1.5 font-medium text-slate-700 max-w-[120px] truncate">{displayVal}</td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    case 'pivot': {
+      const pivotRowKey = widget.settings?.grouping?.[0] || Object.keys(data[0] || {}).find(k => k !== 'value') || 'date';
+      const pivotColKey = Object.keys(data[0] || {}).find(k => k !== pivotRowKey && k !== 'value') || '';
+
+      const pivotRows = Array.from(new Set(data.map(d => String(d[pivotRowKey] || ''))));
+      const pivotCols = pivotColKey ? Array.from(new Set(data.map(d => String(d[pivotColKey] || '')))) : ['Value'];
+
+      return (
+        <div className="w-full h-full overflow-auto text-[9px] border border-slate-100 rounded-xl bg-slate-50/30 custom-scrollbar">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-bold sticky top-0">
+                <th className="text-left p-1.5 capitalize">{pivotRowKey.replace(/_/g, ' ')}</th>
+                {pivotCols.map(c => (
+                  <th key={c} className="text-right p-1.5 capitalize">{c.replace(/_/g, ' ')}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {pivotRows.map(rowVal => {
+                return (
+                  <tr key={rowVal} className="border-b border-slate-100 last:border-0 hover:bg-slate-100/50">
+                    <td className="p-1.5 font-bold text-slate-700">{rowVal}</td>
+                    {pivotCols.map(colVal => {
+                      const item = data.find(d => String(d[pivotRowKey] || '') === rowVal && (!pivotColKey || String(d[pivotColKey] || '') === colVal));
+                      const val = item ? Number(item.value || 0) : 0;
+                      return (
+                        <td key={colVal} className="p-1.5 text-right font-semibold text-slate-900">{formatNumber(val)}</td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    default:
+      return <div className="text-slate-400 text-[10px] flex items-center justify-center h-full">Unsupported Chart: {chartType}</div>;
+  }
+};
+
+interface WidgetRendererProps {
+  widget: Widget;
+  stats: DashboardStats | null;
+}
+
+const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, stats }) => {
+  const { t, language } = useLanguage();
+  
+  if (widget.settings?.dataSource) {
+    return <DynamicWidgetRenderer widget={widget} />;
+  }
+
+  if (!stats) {
+    return (
+      <div className="flex items-center justify-center h-full text-slate-400 text-xs">
+        {t('common.loading') || 'Loading...'}
+      </div>
+    );
+  }
+
+  const { widget_type, settings } = widget;
+
+  switch (widget_type) {
+    case 'kpi_card': {
+      const source = settings?.dataSource || 'net_profit';
+      let val = 0;
+      let isMoney = true;
+      let title = '';
+
+      switch (source) {
+        case 'net_profit':
+          val = stats.netProfit;
+          title = language === 'ar' ? 'صافي الأرباح' : 'Net Profit';
+          break;
+        case 'total_invoices':
+          val = stats.totalInvoices;
+          isMoney = false;
+          title = language === 'ar' ? 'إجمالي الفواتير' : 'Total Invoices';
+          break;
+        case 'total_receipts':
+          val = stats.totalReceipts;
+          title = language === 'ar' ? 'سندات القبض' : 'Receipt Vouchers';
+          break;
+        case 'total_expenses':
+          val = stats.totalExpenses;
+          title = language === 'ar' ? 'المصروفات' : 'Total Expenses';
+          break;
+        case 'total_customer_balances':
+          val = stats.totalCustomerBalances;
+          title = language === 'ar' ? 'أرصدة العملاء' : 'Customer Balances';
+          break;
+        case 'total_supplier_balances':
+          val = stats.totalSupplierBalances;
+          title = language === 'ar' ? 'أرصدة الموردين' : 'Supplier Balances';
+          break;
+        case 'total_cash_balance':
+          val = stats.totalCashBalance;
+          title = language === 'ar' ? 'رصيد النقدية' : 'Cash Balance';
+          break;
+      }
+
+      const formattedVal = isMoney ? formatMoney(val) : formatNumber(val);
+
+      return (
+        <div className="flex flex-col justify-center h-full py-2">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{title}</p>
+          <p className="text-2xl font-extrabold text-slate-900 mt-1 truncate">{formattedVal}</p>
+          {settings?.description && (
+            <p className="text-[9px] text-slate-400 mt-1 truncate">{settings.description}</p>
+          )}
+        </div>
+      );
+    }
+
+    case 'line_chart':
+      return (
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={stats.salesByMonth} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis dataKey="month" tick={{ fontSize: 9, fill: '#94a3b8' }} />
+            <YAxis tick={{ fontSize: 9, fill: '#94a3b8' }} />
+            <Tooltip contentStyle={{ fontSize: 10 }} />
+            <Line type="monotone" dataKey="total" stroke="#3b82f6" strokeWidth={2} dot={{ r: 2 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      );
+
+    case 'bar_chart':
+      return (
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={stats.salesByMonth} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis dataKey="month" tick={{ fontSize: 9, fill: '#94a3b8' }} />
+            <YAxis tick={{ fontSize: 9, fill: '#94a3b8' }} />
+            <Tooltip contentStyle={{ fontSize: 10 }} />
+            <Bar dataKey="total" fill="#10b981" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      );
+
+    case 'pie_chart': {
+      const pieData = [
+        { name: language === 'ar' ? 'السيولة' : 'Cash', value: Math.max(0, stats.totalCashBalance), color: '#10b981' },
+        { name: language === 'ar' ? 'العملاء' : 'Receivables', value: Math.max(0, stats.totalCustomerBalances), color: '#3b82f6' },
+        { name: language === 'ar' ? 'الموردين' : 'Payables', value: Math.max(0, stats.totalSupplierBalances), color: '#ef4444' }
+      ];
+      return (
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie data={pieData} cx="50%" cy="50%" innerRadius={25} outerRadius={40} paddingAngle={3} dataKey="value">
+              {pieData.map((entry, idx) => (
+                <Cell key={`cell-${idx}`} fill={entry.color} />
+              ))}
+            </Pie>
+            <Tooltip contentStyle={{ fontSize: 10 }} />
+            <Legend layout="horizontal" verticalAlign="bottom" align="center" iconSize={8} wrapperStyle={{ fontSize: 8 }} />
+          </PieChart>
+        </ResponsiveContainer>
+      );
+    }
+
+    case 'area_chart':
+      return (
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={stats.salesByMonth} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
+            <defs>
+              <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis dataKey="month" tick={{ fontSize: 9, fill: '#94a3b8' }} />
+            <YAxis tick={{ fontSize: 9, fill: '#94a3b8' }} />
+            <Tooltip contentStyle={{ fontSize: 10 }} />
+            <Area type="monotone" dataKey="total" stroke="#10b981" strokeWidth={2} fill="url(#areaGradient)" />
+          </AreaChart>
+        </ResponsiveContainer>
+      );
+
+    case 'table':
+      return (
+        <div className="w-full h-full overflow-auto text-[10px]">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-slate-100 text-slate-400 font-bold">
+                <th className="text-left pb-1.5">{language === 'ar' ? 'المستند' : 'Doc'}</th>
+                <th className="text-left pb-1.5">{language === 'ar' ? 'الاسم' : 'Name'}</th>
+                <th className="text-right pb-1.5">{language === 'ar' ? 'المبلغ' : 'Amount'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stats.recentTransactions.slice(0, 4).map((tx: any) => (
+                <tr key={`${tx.type}-${tx.id}`} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
+                  <td className="py-1.5 font-bold text-slate-700">#{tx.number}</td>
+                  <td className="py-1.5 text-slate-500 truncate max-w-[85px]">{tx.customer_name}</td>
+                  <td className="py-1.5 text-right font-semibold text-slate-900">{formatMoney(tx.total_amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+
+    case 'calendar': {
+      const now = new Date();
+      const currentDay = now.getDate();
+      const currentMonth = now.toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US', { month: 'long' });
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center py-1">
+          <div className="w-12 h-12 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl flex flex-col items-center justify-center shadow-sm">
+            <span className="text-[10px] font-bold uppercase leading-none text-indigo-500">{currentMonth.slice(0, 3)}</span>
+            <span className="text-lg font-black leading-none mt-0.5">{currentDay}</span>
+          </div>
+          <p className="text-[10px] font-bold text-slate-700 mt-2">
+            {now.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long' })}
+          </p>
+        </div>
+      );
+    }
+
+    case 'recent_activities':
+      return (
+        <div className="w-full h-full overflow-y-auto space-y-2 text-[10px] pr-1">
+          {stats.recentTransactions.slice(0, 4).map((tx: any) => (
+            <div key={`${tx.type}-${tx.id}`} className="flex items-center justify-between border-b border-slate-50 pb-1.5 last:border-0 last:pb-0">
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                <div>
+                  <p className="font-bold text-slate-800">{tx.customer_name}</p>
+                  <p className="text-[8px] text-slate-400">#{tx.number}</p>
+                </div>
+              </div>
+              <span className="text-[9px] font-bold text-indigo-600">{formatMoney(tx.total_amount)}</span>
+            </div>
+          ))}
+        </div>
+      );
+
+    case 'notifications':
+      return (
+        <div className="w-full h-full flex flex-col justify-center gap-2 text-[10px]">
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 p-2 rounded-lg text-amber-800">
+            <div className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1 shrink-0" />
+            <p className="font-medium leading-normal">{language === 'ar' ? 'تحقق من الأرصدة المستحقة للعملاء' : 'Review outstanding customer debts'}</p>
+          </div>
+          <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 p-2 rounded-lg text-blue-800">
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1 shrink-0" />
+            <p className="font-medium leading-normal">{language === 'ar' ? 'التقارير المالية الشهرية جاهزة' : 'Monthly financial summaries are ready'}</p>
+          </div>
+        </div>
+      );
+
+    case 'sales_summary':
+      return (
+        <div className="flex flex-col justify-between h-full py-1">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[9px] font-bold text-slate-400">{language === 'ar' ? 'صافي المبيعات' : 'Net Sales'}</p>
+              <h4 className="text-base font-extrabold text-slate-900">{formatMoney(stats.netSales)}</h4>
+            </div>
+            <div className="text-right">
+              <p className="text-[9px] font-bold text-slate-400">{language === 'ar' ? 'الفواتير' : 'Invoices'}</p>
+              <h4 className="text-base font-extrabold text-slate-900">{stats.totalInvoices}</h4>
+            </div>
+          </div>
+          <div className="h-10 mt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={stats.salesByMonth.slice(-4)}>
+                <Area type="monotone" dataKey="total" stroke="#3b82f6" fill="#eff6ff" strokeWidth={1.5} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      );
+
+    case 'inventory_summary':
+      return (
+        <div className="flex flex-col justify-center h-full py-1 gap-2">
+          <div className="flex items-center justify-between border-b border-slate-50 pb-1">
+            <span className="text-[10px] text-slate-500">{language === 'ar' ? 'حالة المخزون' : 'Stock Status'}</span>
+            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{language === 'ar' ? 'مستقر' : 'Stable'}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-slate-500">{language === 'ar' ? 'أصناف منخفضة' : 'Low Stock Items'}</span>
+            <span className="text-sm font-bold text-slate-900">0</span>
+          </div>
+        </div>
+      );
+
+    case 'cash_flow':
+      return (
+        <div className="flex flex-col justify-between h-full py-1">
+          <div className="flex items-center justify-between border-b border-slate-50 pb-1">
+            <span className="text-[10px] text-slate-500">{language === 'ar' ? 'تدفقات نقدية داخلة' : 'Cash Inflow'}</span>
+            <span className="text-[10px] font-bold text-emerald-600">{formatMoney(stats.totalReceipts)}</span>
+          </div>
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-[10px] text-slate-500">{language === 'ar' ? 'مصروفات نقدية' : 'Cash Outflow'}</span>
+            <span className="text-[10px] font-bold text-rose-600">{formatMoney(stats.totalExpenses)}</span>
+          </div>
+        </div>
+      );
+
+    case 'profit': {
+      const margin = stats.netSales > 0 ? ((stats.netProfit / stats.netSales) * 100).toFixed(1) : '0.0';
+      return (
+        <div className="flex flex-col justify-center h-full py-1 text-center">
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{language === 'ar' ? 'هامش الربح' : 'Profit Margin'}</p>
+          <p className="text-2xl font-black text-emerald-600 mt-0.5">{margin}%</p>
+          <p className="text-[8px] text-slate-400 mt-1">{language === 'ar' ? 'صافي الربح مقارنة بالمبيعات' : 'Net profit relative to revenues'}</p>
+        </div>
+      );
+    }
+
+    case 'customers':
+      return (
+        <div className="flex flex-col justify-center h-full py-1">
+          <p className="text-[9px] font-bold text-slate-400 uppercase">{language === 'ar' ? 'مديونية العملاء' : 'Customer Receivables'}</p>
+          <p className="text-base font-extrabold text-slate-900 mt-1">{formatMoney(stats.totalCustomerBalances)}</p>
+          <div className="w-full bg-slate-100 h-1.5 rounded-full mt-2 overflow-hidden">
+            <div className="bg-blue-500 h-full rounded-full" style={{ width: '60%' }} />
+          </div>
+        </div>
+      );
+
+    case 'suppliers':
+      return (
+        <div className="flex flex-col justify-center h-full py-1">
+          <p className="text-[9px] font-bold text-slate-400 uppercase">{language === 'ar' ? 'مستحقات الموردين' : 'Supplier Payables'}</p>
+          <p className="text-base font-extrabold text-slate-900 mt-1">{formatMoney(stats.totalSupplierBalances)}</p>
+          <div className="w-full bg-slate-100 h-1.5 rounded-full mt-2 overflow-hidden">
+            <div className="bg-red-500 h-full rounded-full" style={{ width: '40%' }} />
+          </div>
+        </div>
+      );
+
+    default:
+      return (
+        <div className="flex items-center justify-center h-full text-slate-400 text-[10px]">
+          {widget_type}
+        </div>
+      );
+  }
+};
+
+const getWidgetIcon = (type: string) => {
+  switch (type) {
+    case 'kpi_card': return TrendingUp;
+    case 'line_chart': return LineChartIcon;
+    case 'bar_chart': return BarChart2;
+    case 'pie_chart': return PieIcon;
+    case 'table': return TableIcon;
+    case 'calendar': return CalendarIcon;
+    case 'recent_activities': return List;
+    case 'notifications': return Bell;
+    case 'sales_summary': return TrendingUp;
+    case 'inventory_summary': return Sparkles;
+    case 'cash_flow': return Wallet;
+    case 'profit': return TrendingUp;
+    case 'customers': return UsersIcon;
+    case 'suppliers': return Truck;
+    default: return Layout;
+  }
+};
+
 const masterDataItems = [
   { id: 'customers', label: 'العملاء', icon: UsersIcon, color: 'from-blue-500/20 to-blue-600/20', iconColor: 'text-blue-600' },
   { id: 'suppliers', label: 'الموردين', icon: Truck, color: 'from-emerald-500/20 to-emerald-600/20', iconColor: 'text-emerald-600' },
@@ -103,7 +808,6 @@ const masterDataItems = [
   { id: 'payment_methods', label: 'وسائل الدفع', icon: CreditCard, color: 'from-indigo-500/20 to-indigo-600/20', iconColor: 'text-indigo-600' },
   { id: 'company_settings', label: 'الإعدادات', icon: Settings, color: 'from-slate-500/20 to-slate-600/20', iconColor: 'text-slate-600' },
 ];
-
 export const Dashboard: React.FC = () => {
   const { user, isSuperAdmin, isCompanyAdmin } = useAuth();
   const { activeTabId, setCurrentPage } = useNavigation();
@@ -114,6 +818,73 @@ export const Dashboard: React.FC = () => {
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [isAiSearching, setIsAiSearching] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Custom Dashboard States
+  const [customDashboard, setCustomDashboard] = useState<any>(null);
+  const [customWidgets, setCustomWidgets] = useState<Widget[]>([]);
+  const [activeDashboardPage, setActiveDashboardPage] = useState<number>(0);
+  const [pages, setPages] = useState<string[]>(['Main Page']);
+  const [deviceSize, setDeviceSize] = useState<'desktop' | 'laptop' | 'tablet' | 'mobile'>('desktop');
+
+  useEffect(() => {
+    const handleResize = () => {
+      const w = window.innerWidth;
+      if (w < 640) setDeviceSize('mobile');
+      else if (w < 1024) setDeviceSize('tablet');
+      else if (w < 1280) setDeviceSize('laptop');
+      else setDeviceSize('desktop');
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const getGridConfig = () => {
+    switch (deviceSize) {
+      case 'mobile': return { cols: 2, rowHeight: 80 };
+      case 'tablet': return { cols: 6, rowHeight: 80 };
+      case 'laptop': return { cols: 10, rowHeight: 85 };
+      default: return { cols: 12, rowHeight: 90 };
+    }
+  };
+  const gridConfig = getGridConfig();
+
+  const getNextAvailableRow = () => {
+    let maxY = 0;
+    customWidgets.forEach(w => {
+      if (w.visible && (w.settings?.page || 0) === activeDashboardPage) {
+        const bottom = w.y + w.h;
+        if (bottom > maxY) maxY = bottom;
+      }
+    });
+    return maxY;
+  };
+
+  const fetchCustomDashboard = async () => {
+    if (!user || isSuperAdmin) return;
+    try {
+      const data = await dbService.getOrCreateDefaultDashboard(user.company_id, user.id);
+      if (data) {
+        setCustomDashboard(data);
+        setCustomWidgets(data.widgets || []);
+        
+        // Parse pages
+        let loadedPages = ['Main Page'];
+        if (data.widgets && data.widgets.length > 0) {
+          const pageIndices = data.widgets
+            .map((w: any) => w.settings?.page || 0)
+            .filter((val: number, idx: number, arr: number[]) => arr.indexOf(val) === idx)
+            .sort();
+          if (pageIndices.length > 0) {
+            loadedPages = pageIndices.map((p: number) => `Page ${p + 1}`);
+          }
+        }
+        setPages(loadedPages);
+      }
+    } catch (err) {
+      console.error('Error fetching custom dashboard:', err);
+    }
+  };
 
   useEffect(() => {
     if (user && !isSuperAdmin) {
@@ -127,18 +898,23 @@ export const Dashboard: React.FC = () => {
       } else {
         fetchStats();
       }
+      fetchCustomDashboard();
     } else if (isSuperAdmin) {
       setLoading(false);
     }
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
 
-    const handleFocus = () => fetchStats(false);
+    const handleFocus = () => {
+      fetchStats(false);
+      fetchCustomDashboard();
+    };
     const handleDbRefresh = () => {
       if (user) {
         const cacheKey = `${user.id}_${user.company_id}`;
         delete statsCache[cacheKey];
       }
       fetchStats(false);
+      fetchCustomDashboard();
     };
 
     window.addEventListener('db-refresh', handleDbRefresh);
@@ -149,8 +925,7 @@ export const Dashboard: React.FC = () => {
       window.removeEventListener('db-refresh', handleDbRefresh);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [user, isSuperAdmin]);
-
+  }, [user, isSuperAdmin, activeTabId]);
   const fetchStats = async (showLoading = true) => {
     if (!user || isSuperAdmin) return;
     const companyId = user.company_id;
@@ -328,23 +1103,35 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
         
-        <form onSubmit={handleAiSearch} className="relative w-full lg:w-[420px] group">
-          <input
-            type="text"
-            placeholder={t('dashboard.ask_ai')}
-            className={`relative w-full ${dir === 'rtl' ? 'pl-10 pr-12' : 'pr-10 pl-12'} py-4 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-primary/10 focus:border-brand-primary outline-none transition-all shadow-sm text-sm font-medium text-slate-900 placeholder:text-slate-400`}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          <Search className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-primary transition-colors`} size={18} />
-          <button 
-            type="submit"
-            disabled={isAiSearching}
-            className={`absolute ${dir === 'rtl' ? 'left-2' : 'right-2'} top-2 bottom-2 w-10 bg-slate-900 text-white rounded-xl hover:bg-brand-primary transition-all active:scale-95 flex items-center justify-center disabled:opacity-50`}
-          >
-            {isAiSearching ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Sparkles size={18} />}
-          </button>
-        </form>
+        <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
+          {(isCompanyAdmin || isSuperAdmin) && (
+            <button 
+              onClick={() => setCurrentPage('dashboard_designer')}
+              className="flex items-center gap-2 px-4 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-all font-bold text-xs uppercase tracking-wider shadow-sm active:scale-95 w-full sm:w-auto justify-center"
+            >
+              <Settings size={14} />
+              {language === 'ar' ? 'تصميم لوحة التحكم' : 'Design Layout'}
+            </button>
+          )}
+
+          <form onSubmit={handleAiSearch} className="relative w-full lg:w-[420px] group">
+            <input
+              type="text"
+              placeholder={t('dashboard.ask_ai')}
+              className={`relative w-full ${dir === 'rtl' ? 'pl-10 pr-12' : 'pr-10 pl-12'} py-4 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-primary/10 focus:border-brand-primary outline-none transition-all shadow-sm text-sm font-medium text-slate-900 placeholder:text-slate-400`}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <Search className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-primary transition-colors`} size={18} />
+            <button 
+              type="submit"
+              disabled={isAiSearching}
+              className={`absolute ${dir === 'rtl' ? 'left-2' : 'right-2'} top-2 bottom-2 w-10 bg-slate-900 text-white rounded-xl hover:bg-brand-primary transition-all active:scale-95 flex items-center justify-center disabled:opacity-50`}
+            >
+              {isAiSearching ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Sparkles size={18} />}
+            </button>
+          </form>
+        </div>
       </div>
 
       {aiResponse && (
@@ -370,264 +1157,343 @@ export const Dashboard: React.FC = () => {
         </motion.div>
       )}
 
-      {/* Master Data Shortcuts Integration */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-3 lg:gap-4">
-        {masterDataItems.map((item) => (
-          <motion.button
-            key={item.id}
-            whileHover={{ y: -4, scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setCurrentPage(item.id)}
-            className="group relative flex flex-col items-center justify-center p-4 lg:p-6 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-xl hover:border-brand-primary/30 transition-all overflow-hidden"
-          >
-            <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-br ${item.color} rounded-full -mr-8 -mt-8 opacity-50 group-hover:scale-150 transition-transform duration-500`} />
-            <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-slate-50 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm border border-slate-100 relative z-10`}>
-              <item.icon size={22} className={item.iconColor} />
-            </div>
-            <span className={`text-[10px] lg:text-xs font-bold text-slate-600 uppercase tracking-tight relative z-10 group-hover:text-slate-900 transition-colors`}>
-              {item.label}
-            </span>
-            <div className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-10 transition-opacity">
-              <Sparkles size={12} className="text-brand-primary" />
-            </div>
-          </motion.button>
-        ))}
-      </div>
-
-      {/* Stats Cards Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard 
-          title={t('dashboard.net_profit')} 
-          value={formatMoney(stats?.netProfit || 0)} 
-          subtitle={t('dashboard.after_returns')}
-          icon={TrendingUp} 
-          trend={12.4}
-          colorClass="from-emerald-500 to-emerald-600 text-emerald-500"
-        />
-        <StatCard 
-          title={t('dashboard.total_invoices')} 
-          value={stats?.totalInvoices || 0} 
-          subtitle="عدد المستندات المصدرة"
-          icon={FileText} 
-          colorClass="from-blue-500 to-blue-600 text-blue-500"
-        />
-        <StatCard 
-          title={t('dashboard.receipt_vouchers')} 
-          value={formatMoney(stats?.totalReceipts || 0)} 
-          subtitle="إجمالي سندات القبض"
-          icon={ReceiptIcon} 
-          colorClass="from-amber-500 to-amber-600 text-amber-500"
-        />
-        <StatCard 
-          title={t('dashboard.total_expenses')} 
-          value={formatMoney(stats?.totalExpenses || 0)} 
-          subtitle="التكاليف والمصروفات"
-          icon={Zap} 
-          trend={-2.1}
-          colorClass="from-emerald-500 to-emerald-600 text-emerald-500"
-        />
-      </div>
-
-      {/* Major Analytics Bento Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <motion.div 
-              whileHover={{ scale: 1.01 }}
-              className="bg-brand-primary p-6 rounded-3xl text-white relative overflow-hidden group shadow-lg h-[220px] flex flex-col justify-between"
+      {/* Page Selector Tabs for Multi-page Dashboard */}
+      {customWidgets.length > 0 && pages.length > 1 && (
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+          {pages.map((pageName, idx) => (
+            <button
+              key={idx}
+              onClick={() => setActiveDashboardPage(idx)}
+              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+                activeDashboardPage === idx
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-50 border border-slate-200'
+              }`}
             >
-              <div className="absolute top-0 right-0 p-8 opacity-5 scale-150 group-hover:scale-[1.7] transition-transform duration-1000 rotate-12">
-                <Wallet size={120} />
-              </div>
-              <div className="relative z-10">
-                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-4">
-                  <Wallet className="text-white" size={20} />
-                </div>
-                <p className="text-white/60 text-[10px] font-bold uppercase tracking-wider mb-2">رصيد النقدية</p>
-                <h3 className="text-2xl md:text-3xl font-bold tracking-tight">
-                  {formatMoney(stats?.totalCashBalance || 0)} 
-                </h3>
-              </div>
-              <div className="flex items-center gap-2 text-white text-[9px] font-bold uppercase tracking-wider relative z-10 bg-white/10 self-start px-3 py-1.5 rounded-full border border-white/20">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
-                سيولة نقدية
-              </div>
-            </motion.div>
-
-            <motion.div 
-              whileHover={{ scale: 1.01 }}
-              className="bg-slate-900 p-6 rounded-3xl text-white relative overflow-hidden group shadow-xl h-[220px] flex flex-col justify-between"
-            >
-              <div className="absolute top-0 right-0 p-8 opacity-5 scale-150 group-hover:scale-[1.7] transition-transform duration-1000 rotate-12">
-                <UsersIcon size={120} />
-              </div>
-              <div className="relative z-10">
-                <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center mb-4">
-                  <TrendingUp className="text-emerald-400" size={20} />
-                </div>
-                <p className="text-white/40 text-[10px] font-bold uppercase tracking-wider mb-2">{t('dashboard.customer_balances')}</p>
-                <h3 className="text-2xl md:text-3xl font-bold tracking-tight">
-                  {formatMoney(stats?.totalCustomerBalances || 0)} 
-                </h3>
-              </div>
-              <div className="flex items-center gap-2 text-emerald-400 text-[9px] font-bold uppercase tracking-wider relative z-10 bg-emerald-400/10 self-start px-3 py-1.5 rounded-full border border-emerald-400/20">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                {t('dashboard.active_receivables')}
-              </div>
-            </motion.div>
-
-            <motion.div 
-              whileHover={{ scale: 1.01 }}
-              className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden group h-[220px] flex flex-col justify-between"
-            >
-              <div className="absolute top-0 right-0 p-8 opacity-[0.02] scale-150 group-hover:scale-[1.7] transition-transform duration-1000 -rotate-12">
-                <ReceiptIcon size={120} />
-              </div>
-              <div className="relative z-10">
-                <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center mb-4 border border-slate-100">
-                  <ReceiptIcon className="text-slate-400" size={20} />
-                </div>
-                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2">{t('dashboard.supplier_balances')}</p>
-                <h3 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">
-                  {formatMoney(stats?.totalSupplierBalances || 0)} 
-                </h3>
-              </div>
-              <div className="flex items-center gap-2 text-emerald-500 text-[9px] font-bold uppercase tracking-wider relative z-10 bg-emerald-50 self-start px-3 py-1.5 rounded-full border border-emerald-100">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                {t('dashboard.outstanding_debts')}
-              </div>
-            </motion.div>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h4 className="text-lg font-bold text-slate-900 tracking-tight">{t('dashboard.sales_performance')}</h4>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Monthly Analytics Breakdown</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-brand-primary" />
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Net Revenue</span>
-              </div>
-            </div>
-            <div className="w-full h-[300px]">
-              {activeTabId === 'dashboard' && (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={stats?.salesByMonth} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="premiumGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="6 6" vertical={false} stroke="#f1f5f9" />
-                    <XAxis 
-                      dataKey="month" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 600}} 
-                      dy={10} 
-                    />
-                    <YAxis 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 600}} 
-                    />
-                    <Tooltip 
-                      contentStyle={{
-                        borderRadius: '12px', 
-                        border: '1px solid #e2e8f0', 
-                        boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
-                        backgroundColor: '#fff',
-                        fontSize: '12px'
-                      }}
-                      itemStyle={{ color: '#10b981', fontWeight: 600 }}
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="total" 
-                      stroke="#10b981" 
-                      strokeWidth={3} 
-                      fillOpacity={1} 
-                      fill="url(#premiumGradient)" 
-                      animationDuration={1500}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm flex flex-col">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h4 className="text-lg font-bold text-slate-900 tracking-tight">{t('dashboard.recent_transactions')}</h4>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Live Feed</p>
-            </div>
-            <button className="p-2 hover:bg-slate-50 rounded-lg transition-all text-slate-400">
-              <ArrowUpRight size={18} />
+              {language === 'ar' ? `الصفحة ${idx + 1}` : pageName}
             </button>
-          </div>
+          ))}
+        </div>
+      )}
 
-          <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-1 h-[550px]">
-            {stats?.recentTransactions.map((tx, idx) => (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                key={`${tx.type}-${tx.id}`} 
-                className={`group flex items-center justify-between p-4 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all cursor-pointer ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm ${
-                    tx.type === 'invoice' || tx.type === 'receipt' ? 'bg-emerald-50 text-emerald-600' : 
-                    tx.type === 'return' || tx.type === 'payment' ? 'bg-emerald-50 text-emerald-600' : 
-                    'bg-slate-50 text-slate-600'
-                  }`}>
-                    {tx.type === 'invoice' || tx.type === 'receipt' ? <TrendingUp size={20} /> : 
-                     tx.type === 'return' || tx.type === 'payment' ? <TrendingUp size={20} className="rotate-180" /> :
-                     <FileText size={20} />}
-                  </div>
-                  <div>
-                    <p className="font-bold text-slate-900 text-sm tracking-tight">{tx.customer_name}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                        tx.type === 'invoice' ? 'bg-emerald-100 text-emerald-700' : 
-                        tx.type === 'return' ? 'bg-emerald-100 text-emerald-700' : 
-                        'bg-slate-100 text-slate-600'
-                      }`}>
-                        {tx.type === 'invoice' ? t('dashboard.invoice') : 
-                         tx.type === 'return' ? t('dashboard.return') : 
-                         tx.type === 'receipt' ? t('dashboard.receipt') : 
-                         tx.type === 'payment' ? t('dashboard.payment') : 
-                         t('dashboard.manual_journal')}
-                      </span>
-                      <span className="text-[9px] text-slate-400 font-bold font-mono">#{tx.number}</span>
+      {customWidgets.length > 0 ? (
+        /* Custom Dashboard Layout */
+        <div 
+          className="relative w-full transition-all duration-300"
+          style={{ 
+            height: `${Math.max(6, getNextAvailableRow()) * gridConfig.rowHeight}px`,
+            minHeight: '450px'
+          }}
+        >
+          {customWidgets
+            .filter(w => w.visible && (w.settings?.page || 0) === activeDashboardPage)
+            .map(w => {
+              const colWidthPct = 100 / gridConfig.cols;
+              return (
+                <div
+                  key={w.id}
+                  className="absolute transition-all duration-300"
+                  style={{
+                    left: `${w.x * colWidthPct}%`,
+                    width: `${w.w * colWidthPct}%`,
+                    top: `${w.y * gridConfig.rowHeight}px`,
+                    height: `${w.h * gridConfig.rowHeight}px`,
+                    padding: '6px'
+                  }}
+                >
+                  <div 
+                    className="bg-white border border-slate-200 shadow-sm rounded-2xl h-full w-full overflow-hidden flex flex-col p-4 relative hover:shadow-md transition-shadow"
+                    style={{
+                      backgroundColor: w.settings?.backgroundColor || undefined,
+                      borderRadius: w.settings?.borderRadius ? `${w.settings.borderRadius}px` : undefined,
+                      boxShadow: w.settings?.shadow === 'none' ? 'none' : 
+                                 w.settings?.shadow === 'md' ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 
+                                 w.settings?.shadow === 'lg' ? '0 10px 15px -3px rgba(0,0,0,0.1)' : undefined
+                    }}
+                  >
+                    {/* Widget Title Bar */}
+                    <div className="flex items-center justify-between mb-3 pb-1.5 border-b border-slate-100/50">
+                      <h5 className="text-[11px] font-extrabold text-slate-800 flex items-center gap-2">
+                        {React.createElement(getWidgetIcon(w.widget_type), { size: 14, className: 'text-indigo-600' })}
+                        {w.title}
+                      </h5>
+                      {w.settings?.description && (
+                        <span className="text-[9px] text-slate-400 font-bold max-w-[150px] truncate">{w.settings.description}</span>
+                      )}
+                    </div>
+
+                    {/* Widget Content */}
+                    <div className="flex-1 min-h-0 w-full">
+                      <WidgetRenderer widget={w} stats={stats} />
                     </div>
                   </div>
                 </div>
-                <div className={`text-right ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                  <p className={`font-bold text-sm tracking-tight ${tx.type === 'invoice' || tx.type === 'receipt' ? 'text-slate-900' : 'text-emerald-600'}`}>
-                    {tx.type === 'invoice' || tx.type === 'receipt' ? '' : '-'}{formatMoney(tx.total_amount || 0)}
-                  </p>
-                  <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">{formatDate(tx.date)}</p>
+              );
+            })}
+        </div>
+      ) : (
+        /* Fallback Default Static Dashboard */
+        <>
+          {/* Master Data Shortcuts Integration */}
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-3 lg:gap-4">
+            {masterDataItems.map((item) => (
+              <motion.button
+                key={item.id}
+                whileHover={{ y: -4, scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setCurrentPage(item.id)}
+                className="group relative flex flex-col items-center justify-center p-4 lg:p-6 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-xl hover:border-brand-primary/30 transition-all overflow-hidden"
+              >
+                <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-br ${item.color} rounded-full -mr-8 -mt-8 opacity-50 group-hover:scale-150 transition-transform duration-500`} />
+                <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-slate-50 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm border border-slate-100 relative z-10`}>
+                  <item.icon size={22} className={item.iconColor} />
                 </div>
-              </motion.div>
+                <span className={`text-[10px] lg:text-xs font-bold text-slate-600 uppercase tracking-tight relative z-10 group-hover:text-slate-900 transition-colors`}>
+                  {item.label}
+                </span>
+                <div className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-10 transition-opacity">
+                  <Sparkles size={12} className="text-brand-primary" />
+                </div>
+              </motion.button>
             ))}
-            {!stats?.recentTransactions.length && (
-              <div className="flex flex-col items-center justify-center py-20 opacity-20">
-                <FileText size={40} className="mb-4 text-slate-400" />
-                <p className="font-bold uppercase tracking-wider text-[10px] text-slate-400">{t('dashboard.no_recent')}</p>
-              </div>
-            )}
           </div>
 
-          <button className="w-full mt-4 py-3 bg-slate-50 hover:bg-slate-100 text-slate-400 rounded-xl font-bold uppercase tracking-wider text-[10px] transition-all">
-            {t('dashboard.view_all')}
-          </button>
-        </div>
-      </div>
+          {/* Stats Cards Grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+            <StatCard 
+              title={t('dashboard.net_profit')} 
+              value={formatMoney(stats?.netProfit || 0)} 
+              subtitle={t('dashboard.after_returns')}
+              icon={TrendingUp} 
+              trend={12.4}
+              colorClass="from-emerald-500 to-emerald-600 text-emerald-500"
+            />
+            <StatCard 
+              title={t('dashboard.total_invoices')} 
+              value={stats?.totalInvoices || 0} 
+              subtitle="عدد المستندات المصدرة"
+              icon={FileText} 
+              colorClass="from-blue-500 to-blue-600 text-blue-500"
+            />
+            <StatCard 
+              title={t('dashboard.receipt_vouchers')} 
+              value={formatMoney(stats?.totalReceipts || 0)} 
+              subtitle="إجمالي سندات القبض"
+              icon={ReceiptIcon} 
+              colorClass="from-amber-500 to-amber-600 text-amber-500"
+            />
+            <StatCard 
+              title={t('dashboard.total_expenses')} 
+              value={formatMoney(stats?.totalExpenses || 0)} 
+              subtitle="التكاليف والمصروفات"
+              icon={Zap} 
+              trend={-2.1}
+              colorClass="from-emerald-500 to-emerald-600 text-emerald-500"
+            />
+          </div>
+
+          {/* Major Analytics Bento Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <motion.div 
+                  whileHover={{ scale: 1.01 }}
+                  className="bg-brand-primary p-6 rounded-3xl text-white relative overflow-hidden group shadow-lg h-[220px] flex flex-col justify-between"
+                >
+                  <div className="absolute top-0 right-0 p-8 opacity-5 scale-150 group-hover:scale-[1.7] transition-transform duration-1000 rotate-12">
+                    <Wallet size={120} />
+                  </div>
+                  <div className="relative z-10">
+                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-4">
+                      <Wallet className="text-white" size={20} />
+                    </div>
+                    <p className="text-white/60 text-[10px] font-bold uppercase tracking-wider mb-2">رصيد النقدية</p>
+                    <h3 className="text-2xl md:text-3xl font-bold tracking-tight">
+                      {formatMoney(stats?.totalCashBalance || 0)} 
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2 text-white text-[9px] font-bold uppercase tracking-wider relative z-10 bg-white/10 self-start px-3 py-1.5 rounded-full border border-white/20">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
+                    سيولة نقدية
+                  </div>
+                </motion.div>
+
+                <motion.div 
+                  whileHover={{ scale: 1.01 }}
+                  className="bg-slate-900 p-6 rounded-3xl text-white relative overflow-hidden group shadow-xl h-[220px] flex flex-col justify-between"
+                >
+                  <div className="absolute top-0 right-0 p-8 opacity-5 scale-150 group-hover:scale-[1.7] transition-transform duration-1000 rotate-12">
+                    <UsersIcon size={120} />
+                  </div>
+                  <div className="relative z-10">
+                    <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center mb-4">
+                      <TrendingUp className="text-emerald-400" size={20} />
+                    </div>
+                    <p className="text-white/40 text-[10px] font-bold uppercase tracking-wider mb-2">{t('dashboard.customer_balances')}</p>
+                    <h3 className="text-2xl md:text-3xl font-bold tracking-tight">
+                      {formatMoney(stats?.totalCustomerBalances || 0)} 
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2 text-emerald-400 text-[9px] font-bold uppercase tracking-wider relative z-10 bg-emerald-400/10 self-start px-3 py-1.5 rounded-full border border-emerald-400/20">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    {t('dashboard.active_receivables')}
+                  </div>
+                </motion.div>
+
+                <motion.div 
+                  whileHover={{ scale: 1.01 }}
+                  className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden group h-[220px] flex flex-col justify-between"
+                >
+                  <div className="absolute top-0 right-0 p-8 opacity-[0.02] scale-150 group-hover:scale-[1.7] transition-transform duration-1000 -rotate-12">
+                    <ReceiptIcon size={120} />
+                  </div>
+                  <div className="relative z-10">
+                    <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center mb-4 border border-slate-100">
+                      <ReceiptIcon className="text-slate-400" size={20} />
+                    </div>
+                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2">{t('dashboard.supplier_balances')}</p>
+                    <h3 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">
+                      {formatMoney(stats?.totalSupplierBalances || 0)} 
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2 text-emerald-500 text-[9px] font-bold uppercase tracking-wider relative z-10 bg-emerald-50 self-start px-3 py-1.5 rounded-full border border-emerald-100">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    {t('dashboard.outstanding_debts')}
+                  </div>
+                </motion.div>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
+                <div className="flex items-center justify-between mb-8">
+                  <div>
+                    <h4 className="text-lg font-bold text-slate-900 tracking-tight">{t('dashboard.sales_performance')}</h4>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Monthly Analytics Breakdown</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-brand-primary" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Net Revenue</span>
+                  </div>
+                </div>
+                <div className="w-full h-[300px]">
+                  {activeTabId === 'dashboard' && (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={stats?.salesByMonth} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="premiumGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
+                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="6 6" vertical={false} stroke="#f1f5f9" />
+                        <XAxis 
+                          dataKey="month" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 600}} 
+                          dy={10} 
+                        />
+                        <YAxis 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 600}} 
+                        />
+                        <Tooltip 
+                          contentStyle={{
+                            borderRadius: '12px', 
+                            border: '1px solid #e2e8f0', 
+                            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+                            backgroundColor: '#fff',
+                            fontSize: '12px'
+                          }}
+                          itemStyle={{ color: '#10b981', fontWeight: 600 }}
+                        />
+                        <Area 
+                          type="monotone" 
+                          dataKey="total" 
+                          stroke="#10b981" 
+                          strokeWidth={3} 
+                          fillOpacity={1} 
+                          fill="url(#premiumGradient)" 
+                          animationDuration={1500}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm flex flex-col">
+              <div className="flex items-center justify-between mb-8">
+                <div>
+                  <h4 className="text-lg font-bold text-slate-900 tracking-tight">{t('dashboard.recent_transactions')}</h4>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Live Feed</p>
+                </div>
+                <button className="p-2 hover:bg-slate-50 rounded-lg transition-all text-slate-400">
+                  <ArrowUpRight size={18} />
+                </button>
+              </div>
+
+              <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-1 h-[550px]">
+                {stats?.recentTransactions.map((tx, idx) => (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    key={`${tx.type}-${tx.id}`} 
+                    className={`group flex items-center justify-between p-4 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all cursor-pointer ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm ${
+                        tx.type === 'invoice' || tx.type === 'receipt' ? 'bg-emerald-50 text-emerald-600' : 
+                        tx.type === 'return' || tx.type === 'payment' ? 'bg-emerald-50 text-emerald-600' : 
+                        'bg-slate-50 text-slate-600'
+                      }`}>
+                        {tx.type === 'invoice' || tx.type === 'receipt' ? <TrendingUp size={20} /> : 
+                         tx.type === 'return' || tx.type === 'payment' ? <TrendingUp size={20} className="rotate-180" /> :
+                         <FileText size={20} />}
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-900 text-sm tracking-tight">{tx.customer_name}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                            tx.type === 'invoice' ? 'bg-emerald-100 text-emerald-700' : 
+                            tx.type === 'return' ? 'bg-emerald-100 text-emerald-700' : 
+                            'bg-slate-100 text-slate-600'
+                          }`}>
+                            {tx.type === 'invoice' ? t('dashboard.invoice') : 
+                             tx.type === 'return' ? t('dashboard.return') : 
+                             tx.type === 'receipt' ? t('dashboard.receipt') : 
+                             tx.type === 'payment' ? t('dashboard.payment') : 
+                             t('dashboard.manual_journal')}
+                          </span>
+                          <span className="text-[9px] text-slate-400 font-bold font-mono">#{tx.number}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className={`text-right ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                      <p className={`font-bold text-sm tracking-tight ${tx.type === 'invoice' || tx.type === 'receipt' ? 'text-slate-900' : 'text-emerald-600'}`}>
+                        {tx.type === 'invoice' || tx.type === 'receipt' ? '' : '-'}{formatMoney(tx.total_amount || 0)}
+                      </p>
+                      <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">{formatDate(tx.date)}</p>
+                    </div>
+                  </motion.div>
+                ))}
+                {!stats?.recentTransactions.length && (
+                  <div className="flex flex-col items-center justify-center py-20 opacity-20">
+                    <FileText size={40} className="mb-4 text-slate-400" />
+                    <p className="font-bold uppercase tracking-wider text-[10px] text-slate-400">{t('dashboard.no_recent')}</p>
+                  </div>
+                )}
+              </div>
+
+              <button className="w-full mt-4 py-3 bg-slate-50 hover:bg-slate-100 text-slate-400 rounded-xl font-bold uppercase tracking-wider text-[10px] transition-all">
+                {t('dashboard.view_all')}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </motion.div>
   );
 };

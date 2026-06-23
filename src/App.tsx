@@ -56,6 +56,7 @@ import { DiscountSettings } from './pages/DiscountSettings';
 import { BackupRestore } from './pages/BackupRestore';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
+import { DashboardBuilder } from './pages/DashboardBuilder';
 
 import { useNavigation } from './contexts/NavigationContext';
 import { useLanguage } from './contexts/LanguageContext';
@@ -167,6 +168,7 @@ export default function App() {
 
     switch (id) {
       case 'dashboard': return <Dashboard />;
+      case 'dashboard_designer': return <DashboardBuilder />;
       case 'customers': return <Customers />;
       case 'employees': return <Employees />;
       case 'products': return <Products />;
