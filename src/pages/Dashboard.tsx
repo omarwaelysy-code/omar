@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   TrendingUp, 
   FileText, 
@@ -23,7 +23,24 @@ import {
   BarChart2,
   LineChart as LineChartIcon,
   PieChart as PieIcon,
-  Table as TableIcon
+  Table as TableIcon,
+  Plus,
+  Trash2,
+  Lock,
+  Unlock,
+  Eye,
+  EyeOff,
+  Save,
+  Undo2,
+  Redo2,
+  Copy,
+  Share2,
+  X as XIcon,
+  HelpCircle,
+  Smartphone,
+  Tablet as TabletIcon,
+  Laptop as LaptopIcon,
+  Monitor
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -74,6 +91,7 @@ import { smartSearch } from '../services/geminiService';
 import { dbService } from '../services/dbService';
 import { AccountingEngine } from '../services/AccountingEngine';
 import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
+import { WIDGET_REGISTRY } from '../constants/widgets';
 
 // Global cache for dashboard stats to reduce reads on tab switches
 let statsCache: { [companyId: string]: { stats: DashboardStats, timestamp: number } } = {};
@@ -142,7 +160,7 @@ const DynamicWidgetRenderer: React.FC<{ widget: Widget }> = ({ widget }) => {
       };
 
       const result = await dbService.queryWidgetData(payload);
-      setData(result);
+      setData(Array.isArray(result) ? result : []);
     } catch (err: any) {
       console.error('Error fetching widget query:', err);
       setError(err.message || 'Error loading widget data');
@@ -483,13 +501,23 @@ const DynamicWidgetRenderer: React.FC<{ widget: Widget }> = ({ widget }) => {
   }
 };
 
+const masterDataItems = [
+  { id: 'customers', label: 'العملاء', icon: UsersIcon, color: 'from-blue-500/20 to-blue-600/20', iconColor: 'text-blue-600' },
+  { id: 'suppliers', label: 'الموردين', icon: Truck, color: 'from-emerald-500/20 to-emerald-600/20', iconColor: 'text-emerald-600' },
+  { id: 'products', label: 'المنتجات', icon: Package, color: 'from-amber-500/20 to-amber-600/20', iconColor: 'text-amber-600' },
+  { id: 'accounts', label: 'الحسابات', icon: Wallet, color: 'from-purple-500/20 to-purple-600/20', iconColor: 'text-purple-600' },
+  { id: 'payment_methods', label: 'وسائل الدفع', icon: CreditCard, color: 'from-indigo-500/20 to-indigo-600/20', iconColor: 'text-indigo-600' },
+  { id: 'company_settings', label: 'الإعدادات', icon: Settings, color: 'from-slate-500/20 to-slate-600/20', iconColor: 'text-slate-600' },
+];
+
 interface WidgetRendererProps {
   widget: Widget;
   stats: DashboardStats | null;
 }
 
 const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, stats }) => {
-  const { t, language } = useLanguage();
+  const { t, dir, language } = useLanguage();
+  const { setCurrentPage } = useNavigation();
   
   if (widget.settings?.dataSource) {
     return <DynamicWidgetRenderer widget={widget} />;
@@ -506,6 +534,185 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, stats }) => {
   const { widget_type, settings } = widget;
 
   switch (widget_type) {
+    case 'shortcuts':
+      return (
+        <div className="grid grid-cols-3 md:grid-cols-6 gap-3 lg:gap-4 w-full h-full">
+          {masterDataItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setCurrentPage(item.id)}
+              className="group relative flex flex-col items-center justify-center p-3 bg-slate-50/50 border border-slate-100 rounded-xl hover:shadow-md hover:border-brand-primary/30 transition-all overflow-hidden h-full min-h-[80px]"
+            >
+              <div className={`w-8 h-8 rounded-lg bg-white flex items-center justify-center mb-1 group-hover:scale-105 transition-transform shadow-sm border border-slate-100 relative z-10`}>
+                <item.icon size={16} className={item.iconColor} />
+              </div>
+              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tight relative z-10 group-hover:text-slate-900 transition-colors">
+                {item.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      );
+
+    case 'card_cash':
+      return (
+        <div className="flex flex-col justify-between h-full relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 opacity-5 scale-150 group-hover:scale-[1.7] transition-transform duration-1000 rotate-12 pointer-events-none">
+            <Wallet size={80} />
+          </div>
+          <div className="relative z-10">
+            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center mb-2">
+              <Wallet className="text-white" size={16} />
+            </div>
+            <p className="text-white/60 text-[9px] font-bold uppercase tracking-wider mb-1">رصيد النقدية</p>
+            <h3 className="text-xl md:text-2xl font-bold tracking-tight">
+              {formatMoney(stats?.totalCashBalance || 0)} 
+            </h3>
+          </div>
+          <div className="flex items-center gap-1.5 text-white text-[8px] font-bold uppercase tracking-wider relative z-10 bg-white/10 self-start px-2.5 py-1 rounded-full border border-white/20">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
+            سيولة نقدية
+          </div>
+        </div>
+      );
+
+    case 'card_customers':
+      return (
+        <div className="flex flex-col justify-between h-full relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 opacity-5 scale-150 group-hover:scale-[1.7] transition-transform duration-1000 rotate-12 pointer-events-none">
+            <UsersIcon size={80} />
+          </div>
+          <div className="relative z-10">
+            <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center mb-2">
+              <TrendingUp className="text-emerald-400" size={16} />
+            </div>
+            <p className="text-white/40 text-[9px] font-bold uppercase tracking-wider mb-1">{t('dashboard.customer_balances')}</p>
+            <h3 className="text-xl md:text-2xl font-bold tracking-tight">
+              {formatMoney(stats?.totalCustomerBalances || 0)} 
+            </h3>
+          </div>
+          <div className="flex items-center gap-1.5 text-emerald-400 text-[8px] font-bold uppercase tracking-wider relative z-10 bg-emerald-400/10 self-start px-2.5 py-1 rounded-full border border-emerald-400/20">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            {t('dashboard.active_receivables')}
+          </div>
+        </div>
+      );
+
+    case 'card_suppliers':
+      return (
+        <div className="flex flex-col justify-between h-full relative overflow-hidden group text-slate-900">
+          <div className="absolute top-0 right-0 p-4 opacity-[0.02] scale-150 group-hover:scale-[1.7] transition-transform duration-1000 -rotate-12 pointer-events-none">
+            <ReceiptIcon size={80} />
+          </div>
+          <div className="relative z-10">
+            <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center mb-2 border border-slate-100">
+              <ReceiptIcon className="text-slate-400" size={16} />
+            </div>
+            <p className="text-slate-400 text-[9px] font-bold uppercase tracking-wider mb-1">{t('dashboard.supplier_balances')}</p>
+            <h3 className="text-xl md:text-2xl font-bold tracking-tight text-slate-900">
+              {formatMoney(stats?.totalSupplierBalances || 0)} 
+            </h3>
+          </div>
+          <div className="flex items-center gap-1.5 text-emerald-500 text-[8px] font-bold uppercase tracking-wider relative z-10 bg-emerald-50 self-start px-2.5 py-1 rounded-full border border-emerald-100">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            {t('dashboard.outstanding_debts')}
+          </div>
+        </div>
+      );
+
+    case 'chart_sales':
+      return (
+        <div className="w-full h-full flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h4 className="text-sm font-bold text-slate-900 tracking-tight">{t('dashboard.sales_performance')}</h4>
+              <p className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Monthly Net Revenue</p>
+            </div>
+          </div>
+          <div className="flex-1 min-h-0 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={stats?.salesByMonth} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
+                <defs>
+                  <linearGradient id="premiumGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="6 6" vertical={false} stroke="#f1f5f9" />
+                <XAxis 
+                  dataKey="month" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{fill: '#94a3b8', fontSize: 8, fontWeight: 600}} 
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{fill: '#94a3b8', fontSize: 8, fontWeight: 600}} 
+                />
+                <Tooltip 
+                  contentStyle={{
+                    borderRadius: '8px', 
+                    border: '1px solid #e2e8f0', 
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+                    backgroundColor: '#fff',
+                    fontSize: '10px'
+                  }}
+                  itemStyle={{ color: '#10b981', fontWeight: 600 }}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="total" 
+                  stroke="#10b981" 
+                  strokeWidth={2} 
+                  fillOpacity={1} 
+                  fill="url(#premiumGradient)" 
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      );
+
+    case 'list_transactions':
+      return (
+        <div className="w-full h-full flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h4 className="text-sm font-bold text-slate-900 tracking-tight">{t('dashboard.recent_transactions')}</h4>
+              <p className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Live Feed</p>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-1">
+            {stats?.recentTransactions.map((tx) => (
+              <div 
+                key={`${tx.type}-${tx.id}`} 
+                className={`flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-slate-50 border border-slate-100 text-slate-500`}>
+                    {tx.type === 'invoice' || tx.type === 'receipt' ? <TrendingUp size={14} /> : 
+                     tx.type === 'return' || tx.type === 'payment' ? <TrendingUp size={14} className="rotate-180" /> :
+                     <FileText size={14} />}
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-900 text-xs tracking-tight truncate max-w-[100px]">{tx.customer_name}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[8px] font-bold uppercase tracking-wider text-slate-400">#{tx.number}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className={`text-right ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                  <p className="font-bold text-xs text-slate-900">
+                    {tx.type === 'invoice' || tx.type === 'receipt' ? '' : '-'}{formatMoney(tx.total_amount || 0)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+
     case 'kpi_card': {
       const source = settings?.dataSource || 'net_profit';
       let val = 0;
@@ -814,18 +1021,16 @@ const getWidgetIcon = (type: string) => {
     case 'profit': return TrendingUp;
     case 'customers': return UsersIcon;
     case 'suppliers': return Truck;
+    case 'shortcuts': return Layout;
+    case 'card_cash': return Wallet;
+    case 'card_customers': return UsersIcon;
+    case 'card_suppliers': return Truck;
+    case 'chart_sales': return TrendingUp;
+    case 'list_transactions': return List;
     default: return Layout;
   }
 };
 
-const masterDataItems = [
-  { id: 'customers', label: 'العملاء', icon: UsersIcon, color: 'from-blue-500/20 to-blue-600/20', iconColor: 'text-blue-600' },
-  { id: 'suppliers', label: 'الموردين', icon: Truck, color: 'from-emerald-500/20 to-emerald-600/20', iconColor: 'text-emerald-600' },
-  { id: 'products', label: 'المنتجات', icon: Package, color: 'from-amber-500/20 to-amber-600/20', iconColor: 'text-amber-600' },
-  { id: 'accounts', label: 'الحسابات', icon: Wallet, color: 'from-purple-500/20 to-purple-600/20', iconColor: 'text-purple-600' },
-  { id: 'payment_methods', label: 'وسائل الدفع', icon: CreditCard, color: 'from-indigo-500/20 to-indigo-600/20', iconColor: 'text-indigo-600' },
-  { id: 'company_settings', label: 'الإعدادات', icon: Settings, color: 'from-slate-500/20 to-slate-600/20', iconColor: 'text-slate-600' },
-];
 export const Dashboard: React.FC = () => {
   const { user, isSuperAdmin, isCompanyAdmin } = useAuth();
   const { activeTabId, setCurrentPage } = useNavigation();
@@ -843,6 +1048,36 @@ export const Dashboard: React.FC = () => {
   const [activeDashboardPage, setActiveDashboardPage] = useState<number>(0);
   const [pages, setPages] = useState<string[]>(['Main Page']);
   const [deviceSize, setDeviceSize] = useState<'desktop' | 'laptop' | 'tablet' | 'mobile'>('desktop');
+
+  // Customization Edit Mode States
+  const [isEditing, setIsEditing] = useState(false);
+  const [tempWidgets, setTempWidgets] = useState<Widget[]>([]);
+  const [selectedWidgetId, setSelectedWidgetId] = useState<string | null>(null);
+  const [dashboardsList, setDashboardsList] = useState<any[]>([]);
+  const [currentDashboard, setCurrentDashboard] = useState<any>(null); // null = Default static layout
+  const [dashboardName, setDashboardName] = useState('');
+  const [dashboardDescription, setDashboardDescription] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [showWidgetLibrary, setShowWidgetLibrary] = useState(false);
+
+  // Sharing states
+  const [isTemplateShared, setIsTemplateShared] = useState(false);
+  const [sharedRoles, setSharedRoles] = useState<string[]>([]);
+  const [dataSources, setDataSources] = useState<{ [tableName: string]: string[] }>({});
+
+  // Drag, Resize & Snap State
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [draggedWidget, setDraggedWidget] = useState<Widget | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [resizingWidget, setResizingWidget] = useState<Widget | null>(null);
+
+  // Edit History
+  const [editHistory, setEditHistory] = useState<Widget[][]>([]);
+  const [editHistoryIndex, setEditHistoryIndex] = useState<number>(-1);
+
+  // Widget Catalog Search
+  const [widgetSearchQuery, setWidgetSearchQuery] = useState('');
+  const [widgetCategory, setWidgetCategory] = useState('all');
 
   useEffect(() => {
     const handleResize = () => {
@@ -868,8 +1103,9 @@ export const Dashboard: React.FC = () => {
   const gridConfig = getGridConfig();
 
   const getNextAvailableRow = () => {
+    const sourceWidgets = isEditing ? tempWidgets : customWidgets;
     let maxY = 0;
-    customWidgets.forEach(w => {
+    sourceWidgets.forEach(w => {
       if (w.visible && (w.settings?.page || 0) === activeDashboardPage) {
         const bottom = w.y + w.h;
         if (bottom > maxY) maxY = bottom;
@@ -878,18 +1114,152 @@ export const Dashboard: React.FC = () => {
     return maxY;
   };
 
-  const fetchCustomDashboard = async () => {
+  const getInitialDefaultWidgets = (): Widget[] => {
+    const dashId = currentDashboard?.id || 'temp-id';
+    return [
+      {
+        id: 'w-shortcuts',
+        dashboard_id: dashId,
+        widget_type: 'shortcuts',
+        title: language === 'ar' ? 'الوصول السريع' : 'Quick Access Shortcuts',
+        x: 0, y: 0, w: 12, h: 2,
+        settings: { page: 0 },
+        filters: {},
+        order: 0,
+        visible: true,
+        locked: false
+      },
+      {
+        id: 'w-kpi-profit',
+        dashboard_id: dashId,
+        widget_type: 'kpi_card',
+        title: language === 'ar' ? 'صافي الأرباح' : 'Net Profit',
+        x: 0, y: 2, w: 3, h: 2,
+        settings: { dataSource: 'net_profit', page: 0 },
+        filters: {},
+        order: 1,
+        visible: true,
+        locked: false
+      },
+      {
+        id: 'w-kpi-invoices',
+        dashboard_id: dashId,
+        widget_type: 'kpi_card',
+        title: language === 'ar' ? 'إجمالي الفواتير' : 'Total Invoices',
+        x: 3, y: 2, w: 3, h: 2,
+        settings: { dataSource: 'total_invoices', page: 0 },
+        filters: {},
+        order: 2,
+        visible: true,
+        locked: false
+      },
+      {
+        id: 'w-kpi-receipts',
+        dashboard_id: dashId,
+        widget_type: 'kpi_card',
+        title: language === 'ar' ? 'سندات القبض' : 'Receipt Vouchers',
+        x: 6, y: 2, w: 3, h: 2,
+        settings: { dataSource: 'total_receipts', page: 0 },
+        filters: {},
+        order: 3,
+        visible: true,
+        locked: false
+      },
+      {
+        id: 'w-kpi-expenses',
+        dashboard_id: dashId,
+        widget_type: 'kpi_card',
+        title: language === 'ar' ? 'المصروفات' : 'Total Expenses',
+        x: 9, y: 2, w: 3, h: 2,
+        settings: { dataSource: 'total_expenses', page: 0 },
+        filters: {},
+        order: 4,
+        visible: true,
+        locked: false
+      },
+      {
+        id: 'w-card-cash',
+        dashboard_id: dashId,
+        widget_type: 'card_cash',
+        title: language === 'ar' ? 'رصيد النقدية' : 'Cash Balance',
+        x: 0, y: 4, w: 4, h: 3,
+        settings: { page: 0 },
+        filters: {},
+        order: 5,
+        visible: true,
+        locked: false
+      },
+      {
+        id: 'w-card-customers',
+        dashboard_id: dashId,
+        widget_type: 'card_customers',
+        title: language === 'ar' ? 'أرصدة العملاء' : 'Customer Balances',
+        x: 4, y: 4, w: 4, h: 3,
+        settings: { page: 0 },
+        filters: {},
+        order: 6,
+        visible: true,
+        locked: false
+      },
+      {
+        id: 'w-card-suppliers',
+        dashboard_id: dashId,
+        widget_type: 'card_suppliers',
+        title: language === 'ar' ? 'مستحقات الموردين' : 'Supplier Payables',
+        x: 8, y: 4, w: 4, h: 3,
+        settings: { page: 0 },
+        filters: {},
+        order: 7,
+        visible: true,
+        locked: false
+      },
+      {
+        id: 'w-chart-sales',
+        dashboard_id: dashId,
+        widget_type: 'chart_sales',
+        title: language === 'ar' ? 'أداء المبيعات' : 'Sales Performance',
+        x: 0, y: 7, w: 8, h: 6,
+        settings: { page: 0 },
+        filters: {},
+        order: 8,
+        visible: true,
+        locked: false
+      },
+      {
+        id: 'w-list-transactions',
+        dashboard_id: dashId,
+        widget_type: 'list_transactions',
+        title: language === 'ar' ? 'آخر العمليات' : 'Recent Transactions',
+        x: 8, y: 7, w: 4, h: 6,
+        settings: { page: 0 },
+        filters: {},
+        order: 9,
+        visible: true,
+        locked: false
+      }
+    ];
+  };
+
+  const loadActiveDashboard = async () => {
     if (!user || isSuperAdmin) return;
     try {
-      const data = await dbService.getOrCreateDefaultDashboard(user.company_id, user.id);
-      if (data) {
-        setCustomDashboard(data);
-        setCustomWidgets(data.widgets || []);
-        
-        // Parse pages
+      const activeId = localStorage.getItem(`active_dashboard_${user.id}`);
+      if (!activeId || activeId === 'default') {
+        setCustomDashboard(null);
+        setCustomWidgets([]);
+        return;
+      }
+
+      const dash = await dbService.get<any>('dashboards', activeId);
+      if (dash) {
+        const widgets = await dbService.list<Widget>('widgets', { dashboard_id: activeId });
+        setCustomDashboard({ ...dash, widgets });
+        setCustomWidgets(widgets);
+        setCurrentDashboard({ ...dash, widgets });
+
         let loadedPages = ['Main Page'];
-        if (data.widgets && data.widgets.length > 0) {
-          const pageIndices = data.widgets
+        if (widgets.length > 0) {
+          const pageIndices = widgets
             .map((w: any) => w.settings?.page || 0)
             .filter((val: number, idx: number, arr: number[]) => arr.indexOf(val) === idx)
             .sort();
@@ -898,9 +1268,383 @@ export const Dashboard: React.FC = () => {
           }
         }
         setPages(loadedPages);
+      } else {
+        localStorage.removeItem(`active_dashboard_${user.id}`);
+        setCustomDashboard(null);
+        setCustomWidgets([]);
+        setCurrentDashboard(null);
       }
     } catch (err) {
-      console.error('Error fetching custom dashboard:', err);
+      console.error('Error loading active dashboard:', err);
+    }
+  };
+
+  const fetchDashboards = async () => {
+    if (!user || isSuperAdmin) return;
+    try {
+      const list = await dbService.list<any>('dashboards');
+      const filtered = list.filter(dash => {
+        if (dash.company_id !== user.company_id) return false;
+        if (dash.owner_user_id === user.id) return true;
+        if (!dash.owner_user_id) {
+          if (dash.allowed_roles) {
+            const roles = dash.allowed_roles.split(',').map((r: string) => r.trim());
+            if (!roles.includes(user.role)) return false;
+          }
+          if (dash.allowed_users) {
+            const users = dash.allowed_users.split(',').map((u: string) => u.trim());
+            if (!users.includes(user.id)) return false;
+          }
+          return true;
+        }
+        return false;
+      });
+      setDashboardsList(filtered);
+    } catch (err) {
+      console.error('Failed to fetch dashboards list:', err);
+    }
+  };
+
+  useEffect(() => {
+    const fetchDataSources = async () => {
+      try {
+        const sources = await dbService.getWidgetDataSources();
+        setDataSources(sources);
+      } catch (err) {
+        console.error('Failed to load data sources:', err);
+      }
+    };
+    if (isEditing) {
+      fetchDataSources();
+    }
+  }, [isEditing]);
+
+  const handleStartCustomizing = () => {
+    let initialWidgets: Widget[] = [];
+    if (customWidgets.length > 0) {
+      initialWidgets = [...customWidgets];
+    } else {
+      initialWidgets = getInitialDefaultWidgets();
+    }
+    setTempWidgets(initialWidgets);
+
+    if (currentDashboard) {
+      setDashboardName(currentDashboard.name);
+      setDashboardDescription(currentDashboard.description || '');
+      setIsTemplateShared(currentDashboard.owner_user_id === null);
+      setSharedRoles(currentDashboard.allowed_roles ? currentDashboard.allowed_roles.split(',') : []);
+    } else {
+      setDashboardName(language === 'ar' ? 'لوحة تحكم مخصصة' : 'My Customized Dashboard');
+      setDashboardDescription('');
+      setIsTemplateShared(false);
+      setSharedRoles([]);
+    }
+
+    setEditHistory([initialWidgets]);
+    setEditHistoryIndex(0);
+    setIsEditing(true);
+    setSelectedWidgetId(null);
+  };
+
+  const handleCancelCustomizing = () => {
+    setIsEditing(false);
+    setSelectedWidgetId(null);
+  };
+
+  const handleSaveLayout = async () => {
+    if (!user) return;
+    try {
+      setIsSaving(true);
+      let dashId = currentDashboard?.id;
+
+      if (!dashId) {
+        const newDashId = `dash-${uuidv4()}`;
+        const newDashPayload = {
+          id: newDashId,
+          company_id: user.company_id,
+          owner_user_id: isTemplateShared ? null : user.id,
+          name: dashboardName,
+          description: dashboardDescription || 'Customized layout',
+          is_default: true,
+          is_system: false,
+          icon: 'LayoutDashboard',
+          allowed_roles: sharedRoles.length > 0 ? sharedRoles.join(',') : null,
+          allowed_users: null
+        };
+        await dbService.addWithId('dashboards', newDashId, newDashPayload);
+        dashId = newDashId;
+      } else {
+        const updatePayload: any = {
+          name: dashboardName,
+          description: dashboardDescription,
+          owner_user_id: isTemplateShared ? null : user.id,
+          allowed_roles: sharedRoles.length > 0 ? sharedRoles.join(',') : null
+        };
+        await dbService.update('dashboards', dashId, updatePayload);
+      }
+
+      const dbWidgets = await dbService.list<Widget>('widgets', { dashboard_id: dashId });
+      const dbWidgetIds = dbWidgets.map(w => w.id);
+      const currentWidgetIds = tempWidgets.map(w => w.id);
+
+      const toDelete = dbWidgetIds.filter(id => !currentWidgetIds.includes(id));
+      for (const id of toDelete) {
+        await dbService.delete('widgets', id);
+      }
+
+      for (const w of tempWidgets) {
+        const payload = {
+          dashboard_id: dashId,
+          widget_type: w.widget_type,
+          title: w.title,
+          x: w.x,
+          y: w.y,
+          w: w.w,
+          h: w.h,
+          settings: w.settings || {},
+          filters: w.filters || {},
+          order: w.order,
+          visible: w.visible,
+          locked: w.locked
+        };
+
+        if (dbWidgetIds.includes(w.id)) {
+          await dbService.update('widgets', w.id, payload);
+        } else {
+          const finalId = w.id.startsWith('w-temp-') ? `w-${uuidv4()}` : w.id;
+          await dbService.addWithId('widgets', finalId, payload);
+        }
+      }
+
+      localStorage.setItem(`active_dashboard_${user.id}`, dashId);
+      await loadActiveDashboard();
+      await fetchDashboards();
+      setIsEditing(false);
+    } catch (err) {
+      console.error('Failed to save dashboard customization:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRestoreDefaultLayout = async () => {
+    if (!user) return;
+    if (!window.confirm(language === 'ar' ? 'هل أنت متأكد من استعادة التنسيق الافتراضي الأساسي بالكامل؟ سيتم مسح التعديلات المخصصة الحالية.' : 'Are you sure you want to restore the default dashboard layout? Your customized widgets will be lost.')) return;
+    
+    try {
+      if (currentDashboard && currentDashboard.owner_user_id === user.id) {
+        await dbService.delete('dashboards', currentDashboard.id);
+      }
+      localStorage.setItem(`active_dashboard_${user.id}`, 'default');
+      await loadActiveDashboard();
+      await fetchDashboards();
+      setIsEditing(false);
+    } catch (err) {
+      console.error('Failed to restore default layout:', err);
+    }
+  };
+
+  const pushEditHistory = (widgetsList: Widget[]) => {
+    const nextHistory = editHistory.slice(0, editHistoryIndex + 1);
+    setEditHistory([...nextHistory, widgetsList]);
+    setEditHistoryIndex(nextHistory.length);
+  };
+
+  const handleUndo = () => {
+    if (editHistoryIndex > 0) {
+      const prevIndex = editHistoryIndex - 1;
+      setTempWidgets(editHistory[prevIndex]);
+      setEditHistoryIndex(prevIndex);
+    }
+  };
+
+  const handleRedo = () => {
+    if (editHistoryIndex < editHistory.length - 1) {
+      const nextIndex = editHistoryIndex + 1;
+      setTempWidgets(editHistory[nextIndex]);
+      setEditHistoryIndex(nextIndex);
+    }
+  };
+
+  const uuidv4 = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+
+  // Canvas Grid actions
+  const handleDragStart = (e: React.DragEvent, w: Widget) => {
+    if (w.locked) return;
+    setDraggedWidget(w);
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    setDragOffset({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    });
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!draggedWidget || !canvasRef.current) return;
+
+    const canvasRect = canvasRef.current.getBoundingClientRect();
+    const clientX = e.clientX - canvasRect.left - dragOffset.x;
+    const clientY = e.clientY - canvasRect.top - dragOffset.y;
+
+    const colWidth = canvasRect.width / gridConfig.cols;
+    let gridX = Math.round(clientX / colWidth);
+    let gridY = Math.round(clientY / gridConfig.rowHeight);
+
+    gridX = Math.max(0, Math.min(gridX, gridConfig.cols - draggedWidget.w));
+    gridY = Math.max(0, gridY);
+
+    if (draggedWidget.x !== gridX || draggedWidget.y !== gridY) {
+      const updated = tempWidgets.map(w => 
+        w.id === draggedWidget.id ? { ...w, x: gridX, y: gridY } : w
+      );
+      setTempWidgets(updated);
+    }
+  };
+
+  const handleDragEnd = () => {
+    if (draggedWidget) {
+      pushEditHistory(tempWidgets);
+      setDraggedWidget(null);
+    }
+  };
+
+  const handleResizeStart = (e: React.MouseEvent, w: Widget) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (w.locked) return;
+
+    setResizingWidget(w);
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!canvasRef.current) return;
+      const canvasRect = canvasRef.current.getBoundingClientRect();
+      const colWidth = canvasRect.width / gridConfig.cols;
+      
+      const deltaX = moveEvent.clientX - e.clientX;
+      const deltaY = moveEvent.clientY - e.clientY;
+
+      const gridDeltaX = Math.round(deltaX / colWidth);
+      const gridDeltaY = Math.round(deltaY / gridConfig.rowHeight);
+
+      let newW = Math.max(1, Math.min(w.w + gridDeltaX, gridConfig.cols - w.x));
+      let newH = Math.max(1, w.h + gridDeltaY);
+
+      setTempWidgets(prev => prev.map(item => 
+        item.id === w.id ? { ...item, w: newW, h: newH } : item
+      ));
+    };
+
+    const handleMouseUp = () => {
+      pushEditHistory(tempWidgets);
+      setResizingWidget(null);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleAddWidget = (def: any) => {
+    const dashId = currentDashboard?.id || 'temp-id';
+    const newWidget: Widget = {
+      id: `w-temp-${uuidv4()}`,
+      dashboard_id: dashId,
+      widget_type: def.type,
+      title: language === 'ar' ? def.nameAr : def.nameEn,
+      x: 0,
+      y: getNextAvailableRow(),
+      w: Math.min(def.defaultW, gridConfig.cols),
+      h: def.defaultH,
+      settings: { page: activeDashboardPage },
+      filters: {},
+      order: tempWidgets.length,
+      visible: true,
+      locked: false
+    };
+
+    const newWidgets = [...tempWidgets, newWidget];
+    setTempWidgets(newWidgets);
+    setSelectedWidgetId(newWidget.id);
+    pushEditHistory(newWidgets);
+  };
+
+  const handleDeleteWidget = (id: string) => {
+    const newWidgets = tempWidgets.filter(w => w.id !== id);
+    setTempWidgets(newWidgets);
+    if (selectedWidgetId === id) setSelectedWidgetId(null);
+    pushEditHistory(newWidgets);
+  };
+
+  const handleToggleLockWidget = (id: string) => {
+    const newWidgets = tempWidgets.map(w => w.id === id ? { ...w, locked: !w.locked } : w);
+    setTempWidgets(newWidgets);
+    pushEditHistory(newWidgets);
+  };
+
+  const handleToggleVisibleWidget = (id: string) => {
+    const newWidgets = tempWidgets.map(w => w.id === id ? { ...w, visible: !w.visible } : w);
+    setTempWidgets(newWidgets);
+    pushEditHistory(newWidgets);
+  };
+
+  const handleDuplicateWidget = (w: Widget) => {
+    const newWidget: Widget = {
+      ...w,
+      id: `w-temp-${uuidv4()}`,
+      title: `${w.title} (${language === 'ar' ? 'نسخة' : 'Copy'})`,
+      x: (w.x + w.w <= gridConfig.cols - w.w) ? w.x + w.w : 0,
+      y: (w.x + w.w <= gridConfig.cols - w.w) ? w.y : getNextAvailableRow(),
+      order: tempWidgets.length
+    };
+
+    const newWidgets = [...tempWidgets, newWidget];
+    setTempWidgets(newWidgets);
+    setSelectedWidgetId(newWidget.id);
+    pushEditHistory(newWidgets);
+  };
+
+  const handleAddPage = () => {
+    const newPages = [...pages, `Page ${pages.length + 1}`];
+    setPages(newPages);
+    setActiveDashboardPage(newPages.length - 1);
+  };
+
+  const handleDeletePage = (idx: number) => {
+    if (pages.length <= 1) return;
+    if (!window.confirm(language === 'ar' ? 'هل أنت متأكد من مسح هذه الصفحة وكافة بطاقاتها؟' : 'Are you sure you want to delete this page and all its widgets?')) return;
+    
+    const newPages = pages.filter((_, i) => i !== idx);
+    const newWidgets = tempWidgets
+      .filter(w => (w.settings?.page || 0) !== idx)
+      .map(w => {
+        const pageNum = w.settings?.page || 0;
+        if (pageNum > idx) {
+          return { ...w, settings: { ...w.settings, page: pageNum - 1 } };
+        }
+        return w;
+      });
+
+    setPages(newPages);
+    setTempWidgets(newWidgets);
+    pushEditHistory(newWidgets);
+    setActiveDashboardPage(Math.max(0, idx - 1));
+  };
+
+  const handleRenamePage = (idx: number) => {
+    const currentName = pages[idx];
+    const newName = window.prompt(language === 'ar' ? 'أدخل الاسم الجديد للصفحة:' : 'Enter new page name:', currentName);
+    if (newName && newName.trim()) {
+      const newPages = [...pages];
+      newPages[idx] = newName.trim();
+      setPages(newPages);
     }
   };
 
@@ -916,7 +1660,8 @@ export const Dashboard: React.FC = () => {
       } else {
         fetchStats();
       }
-      fetchCustomDashboard();
+      loadActiveDashboard();
+      fetchDashboards();
     } else if (isSuperAdmin) {
       setLoading(false);
     }
@@ -924,7 +1669,8 @@ export const Dashboard: React.FC = () => {
 
     const handleFocus = () => {
       fetchStats(false);
-      fetchCustomDashboard();
+      loadActiveDashboard();
+      fetchDashboards();
     };
     const handleDbRefresh = () => {
       if (user) {
@@ -932,7 +1678,8 @@ export const Dashboard: React.FC = () => {
         delete statsCache[cacheKey];
       }
       fetchStats(false);
-      fetchCustomDashboard();
+      loadActiveDashboard();
+      fetchDashboards();
     };
 
     window.addEventListener('db-refresh', handleDbRefresh);
@@ -943,7 +1690,7 @@ export const Dashboard: React.FC = () => {
       window.removeEventListener('db-refresh', handleDbRefresh);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [user, isSuperAdmin, activeTabId]);
+  }, [user?.id, user?.company_id, isSuperAdmin, activeTabId]);
   const fetchStats = async (showLoading = true) => {
     if (!user || isSuperAdmin) return;
     const companyId = user.company_id;
@@ -1084,6 +1831,517 @@ export const Dashboard: React.FC = () => {
 
   if (loading) return <div className="flex items-center justify-center h-full p-20"><div className="w-10 h-10 border-4 border-brand-primary border-t-transparent rounded-full animate-spin" /></div>;
 
+  if (isEditing) {
+    const WIDGET_CATALOG = [
+      ...WIDGET_REGISTRY,
+      { type: 'shortcuts', nameEn: 'Quick Access Shortcuts', nameAr: 'الوصول السريع', defaultW: 12, defaultH: 2, description: 'Links to ERP lists.' },
+      { type: 'card_cash', nameEn: 'Cash Balance', nameAr: 'رصيد النقدية', defaultW: 4, defaultH: 3, description: 'Shows total cash.' },
+      { type: 'card_customers', nameEn: 'Customer Balances', nameAr: 'أرصدة العملاء', defaultW: 4, defaultH: 3, description: 'Receivables.' },
+      { type: 'card_suppliers', nameEn: 'Supplier Balances', nameAr: 'مستحقات الموردين', defaultW: 4, defaultH: 3, description: 'Payables.' },
+      { type: 'chart_sales', nameEn: 'Sales Performance Area', nameAr: 'أداء المبيعات', defaultW: 8, defaultH: 6, description: 'Area chart.' },
+      { type: 'list_transactions', nameEn: 'Recent Transactions List', nameAr: 'آخر العمليات', defaultW: 4, defaultH: 6, description: 'Feed of operations.' }
+    ];
+
+    const filteredCatalog = WIDGET_CATALOG.filter(def => {
+      const cat = def.type.includes('kpi') || def.type === 'profit' ? 'kpi' :
+                  def.type.includes('chart') || def.type === 'cash_flow' ? 'charts' :
+                  def.type === 'table' || def.type === 'customers' || def.type === 'suppliers' ? 'tables' : 'custom';
+      
+      const matchesSearch = def.nameEn.toLowerCase().includes(widgetSearchQuery.toLowerCase()) || 
+                            def.nameAr.includes(widgetSearchQuery);
+      const matchesCategory = widgetCategory === 'all' || cat === widgetCategory;
+      return matchesSearch && matchesCategory;
+    });
+
+    const selectedWidget = tempWidgets.find(w => w.id === selectedWidgetId);
+
+    return (
+      <div className="flex flex-col h-[calc(100vh-100px)] bg-slate-50 border border-slate-200 rounded-3xl overflow-hidden font-sans shadow-lg select-none" dir={dir}>
+        {/* Top Header toolbar */}
+        <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 flex-shrink-0 z-20 shadow-sm">
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+            <input
+              type="text"
+              value={dashboardName}
+              onChange={(e) => setDashboardName(e.target.value)}
+              placeholder={language === 'ar' ? 'اسم لوحة التحكم' : 'Dashboard Name'}
+              className="text-sm font-bold border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-brand-primary bg-white text-slate-800 w-full sm:w-60"
+            />
+            <input
+              type="text"
+              value={dashboardDescription}
+              onChange={(e) => setDashboardDescription(e.target.value)}
+              placeholder={language === 'ar' ? 'الوصف' : 'Description'}
+              className="text-xs border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-brand-primary bg-white text-slate-500 w-full sm:w-80"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+            <button
+              onClick={() => setShowWidgetLibrary(!showWidgetLibrary)}
+              className={`flex items-center gap-1.5 px-3.5 py-2 border rounded-xl text-xs font-bold transition-all ${
+                showWidgetLibrary 
+                  ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm' 
+                  : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Plus size={14} />
+              {language === 'ar' ? 'مكتبة البطاقات' : 'Widget Library'}
+            </button>
+
+            <div className="w-[1px] h-5 bg-slate-200 hidden sm:block" />
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleUndo}
+                disabled={editHistoryIndex <= 0}
+                className="p-2 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 disabled:opacity-40 text-slate-600 transition-colors"
+                title="Undo"
+              >
+                <Undo2 size={14} />
+              </button>
+              <button
+                onClick={handleRedo}
+                disabled={editHistoryIndex >= editHistory.length - 1}
+                className="p-2 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 disabled:opacity-40 text-slate-600 transition-colors"
+                title="Redo"
+              >
+                <Redo2 size={14} />
+              </button>
+            </div>
+
+            <div className="w-[1px] h-5 bg-slate-200 hidden sm:block" />
+
+            <button
+              onClick={handleRestoreDefaultLayout}
+              className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 rounded-xl text-xs font-bold transition-all"
+            >
+              <Trash2 size={14} />
+              {language === 'ar' ? 'استعادة الافتراضي' : 'Restore Default'}
+            </button>
+            
+            <button
+              onClick={handleCancelCustomizing}
+              className="px-3.5 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-colors"
+            >
+              {language === 'ar' ? 'إلغاء' : 'Cancel'}
+            </button>
+            
+            <button
+              onClick={handleSaveLayout}
+              disabled={isSaving || !dashboardName.trim()}
+              className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95"
+            >
+              <Save size={14} />
+              {isSaving ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...') : (language === 'ar' ? 'حفظ التغييرات' : 'Save')}
+            </button>
+          </div>
+        </div>
+
+        {/* Admin templates banner */}
+        {isCompanyAdmin && (
+          <div className="bg-slate-100 border-b border-slate-200 px-6 py-2 flex items-center justify-between flex-shrink-0">
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 text-xs text-slate-700 font-semibold cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isTemplateShared}
+                  onChange={(e) => setIsTemplateShared(e.target.checked)}
+                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                {language === 'ar' ? 'مشاركة كقالب مشترك للشركة' : 'Share as company template'}
+              </label>
+              
+              {isTemplateShared && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase">{language === 'ar' ? 'الأدوار المسموحة:' : 'Allowed Roles:'}</span>
+                  <div className="flex gap-1.5">
+                    {['admin', 'user'].map(role => (
+                      <label key={role} className="flex items-center gap-1 text-[10px] bg-white border border-slate-200 rounded-md px-1.5 py-0.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={sharedRoles.includes(role)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSharedRoles([...sharedRoles, role]);
+                            } else {
+                              setSharedRoles(sharedRoles.filter(r => r !== role));
+                            }
+                          }}
+                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3 h-3"
+                        />
+                        {role.toUpperCase()}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="text-[10px] text-slate-400 font-semibold">
+              {language === 'ar' ? 'تعديل وحفظ القوالب المشتركة متاح للمشرفين فقط' : 'Shared templates can only be managed by admins'}
+            </div>
+          </div>
+        )}
+
+        {/* Workspace Body */}
+        <div className="flex-1 flex overflow-hidden relative">
+          {/* Widget Catalog Sidebar */}
+          {showWidgetLibrary && (
+            <div className="w-80 border-r border-slate-200 bg-white flex flex-col flex-shrink-0 z-10 shadow-sm">
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">{language === 'ar' ? 'إضافة بطاقات' : 'Widget Catalog'}</h3>
+                <button onClick={() => setShowWidgetLibrary(false)} className="text-slate-400 hover:text-slate-800">
+                  <XIcon size={16} />
+                </button>
+              </div>
+
+              <div className="p-3 bg-slate-50/50 border-b border-slate-100 flex gap-1 overflow-x-auto">
+                {[
+                  { id: 'all', nameAr: 'الكل', nameEn: 'All' },
+                  { id: 'kpi', nameAr: 'مؤشرات', nameEn: 'KPIs' },
+                  { id: 'charts', nameAr: 'مخططات', nameEn: 'Charts' },
+                  { id: 'tables', nameAr: 'جداول', nameEn: 'Tables' },
+                  { id: 'custom', nameAr: 'الافتراضية', nameEn: 'Defaults' }
+                ].map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setWidgetCategory(cat.id)}
+                    className={`px-2.5 py-1 text-[10px] font-bold rounded-lg whitespace-nowrap transition-all ${
+                      widgetCategory === cat.id 
+                        ? 'bg-slate-900 text-white' 
+                        : 'bg-white text-slate-500 hover:text-slate-800 border border-slate-200'
+                    }`}
+                  >
+                    {language === 'ar' ? cat.nameAr : cat.nameEn}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                {filteredCatalog.map(def => {
+                  const IconComponent = getWidgetIcon(def.type);
+                  return (
+                    <div 
+                      key={def.type}
+                      className="border border-slate-100 hover:border-brand-primary/40 rounded-xl p-3 bg-slate-50/50 hover:bg-white hover:shadow-md cursor-pointer transition-all group flex items-start justify-between"
+                      onClick={() => handleAddWidget(def)}
+                    >
+                      <div className="flex gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-white border border-slate-100 flex items-center justify-center text-indigo-500 shrink-0">
+                          <IconComponent size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-xs font-bold text-slate-800 truncate">{language === 'ar' ? def.nameAr : def.nameEn}</h4>
+                          <p className="text-[9px] text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">{def.description}</p>
+                        </div>
+                      </div>
+                      <button className="p-1 rounded-md bg-white border border-slate-100 hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors">
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Grid Canvas */}
+          <div className="flex-1 overflow-auto flex flex-col h-full bg-slate-100">
+            <div className="bg-white border-b border-slate-200 px-6 py-2 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-1">
+                {pages.map((pName, idx) => (
+                  <div key={idx} className="flex items-center group">
+                    <button
+                      onClick={() => setActiveDashboardPage(idx)}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                        activeDashboardPage === idx 
+                          ? 'bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-sm shadow-indigo-50/50' 
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      {pName}
+                    </button>
+                    {activeDashboardPage === idx && (
+                      <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity ml-1 gap-0.5">
+                        <button onClick={() => handleRenamePage(idx)} className="text-[10px] text-slate-400 hover:text-slate-700 font-bold px-1">Rename</button>
+                        {pages.length > 1 && (
+                          <button onClick={() => handleDeletePage(idx)} className="text-[10px] text-rose-500 hover:text-rose-700 font-bold px-1">Delete</button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <button 
+                  onClick={handleAddPage}
+                  className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg ml-2 transition-all"
+                  title="Add Page"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+              
+              <div className="text-xs text-slate-400 font-medium">
+                {deviceSize.toUpperCase()} MODE &bull; {gridConfig.cols} COLUMNS
+              </div>
+            </div>
+
+            <div className="flex-1 p-6 flex items-start justify-center overflow-auto min-h-0">
+              <div 
+                className="bg-white border border-slate-200 shadow-xl rounded-3xl relative p-6 flex-shrink-0 select-none transition-all w-full"
+                style={{ minHeight: '450px' }}
+              >
+                <div className="absolute inset-0 rounded-3xl overflow-hidden pointer-events-none opacity-[0.03]"
+                  style={{
+                    backgroundImage: `radial-gradient(circle, #000 1px, transparent 1px)`,
+                    backgroundSize: `calc(100% / ${gridConfig.cols}) ${gridConfig.rowHeight}px`
+                  }}
+                />
+
+                <div 
+                  ref={canvasRef}
+                  onDragOver={handleDragOver}
+                  className="relative w-full transition-all"
+                  style={{ 
+                    height: `${Math.max(6, getNextAvailableRow()) * gridConfig.rowHeight}px`,
+                    minHeight: '400px'
+                  }}
+                >
+                  {tempWidgets
+                    .filter(w => (w.settings?.page || 0) === activeDashboardPage)
+                    .map(w => {
+                      const isSelected = selectedWidgetId === w.id;
+                      const colWidthPct = 100 / gridConfig.cols;
+                      
+                      let finalX = w.x;
+                      let finalW = w.w;
+                      if (gridConfig.cols === 2) {
+                        finalX = w.x % 2;
+                        finalW = Math.min(2, w.w);
+                      } else if (gridConfig.cols === 6) {
+                        finalX = Math.min(5, w.x);
+                        finalW = Math.min(6 - finalX, w.w);
+                      }
+
+                      return (
+                        <div
+                          key={w.id}
+                          draggable={!w.locked}
+                          onDragStart={(e) => handleDragStart(e, w)}
+                          onDragEnd={handleDragEnd}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedWidgetId(w.id);
+                          }}
+                          className={`absolute group cursor-move ${isSelected ? 'ring-2 ring-indigo-500 z-30 shadow-lg' : 'hover:shadow-md'}`}
+                          style={{
+                            left: `${finalX * colWidthPct}%`,
+                            width: `${finalW * colWidthPct}%`,
+                            top: `${w.y * gridConfig.rowHeight}px`,
+                            height: `${w.h * gridConfig.rowHeight}px`,
+                            padding: '6px'
+                          }}
+                        >
+                          <div 
+                            className={`bg-white border rounded-2xl h-full w-full overflow-hidden flex flex-col p-4 relative transition-all ${
+                              !w.visible ? 'opacity-40 border-dashed border-slate-300' : 'border-slate-200'
+                            }`}
+                            style={{
+                              backgroundColor: w.settings?.backgroundColor || undefined,
+                              borderRadius: w.settings?.borderRadius ? `${w.settings.borderRadius}px` : undefined
+                            }}
+                          >
+                            <div className="flex items-center justify-between mb-3 pb-1.5 border-b border-slate-100 flex-shrink-0">
+                              <h5 className="text-[10px] font-black text-slate-800 flex items-center gap-1.5 truncate pr-10">
+                                {React.createElement(getWidgetIcon(w.widget_type), { size: 12, className: 'text-indigo-600' })}
+                                {w.title}
+                              </h5>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {w.locked && <Lock size={10} className="text-slate-400" />}
+                                {!w.visible && <EyeOff size={10} className="text-slate-400" />}
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteWidget(w.id);
+                                  }} 
+                                  className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded transition-all"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="flex-1 min-h-0 w-full pointer-events-none select-none">
+                              <WidgetRenderer widget={w} stats={stats} />
+                            </div>
+
+                            {!w.locked && (
+                              <div 
+                                onMouseDown={(e) => handleResizeStart(e, w)}
+                                className="absolute bottom-1 right-1 w-3.5 h-3.5 cursor-se-resize flex items-end justify-end opacity-40 group-hover:opacity-100"
+                              >
+                                <svg width="8" height="8" viewBox="0 0 8 8" className="text-slate-500 fill-current">
+                                  <line x1="6" y1="0" x2="6" y2="8" stroke="currentColor" strokeWidth="1" />
+                                  <line x1="3" y1="3" x2="3" y2="8" stroke="currentColor" strokeWidth="1" />
+                                  <line x1="0" y1="6" x2="6" y2="6" stroke="currentColor" strokeWidth="1" />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Properties Panel Sidebar */}
+          <div className="w-80 border-l border-slate-200 bg-white flex flex-col flex-shrink-0 z-10 shadow-sm">
+            {selectedWidget ? (
+              <div className="flex flex-col h-full overflow-hidden">
+                <div className="p-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+                  <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">{language === 'ar' ? 'خصائص البطاقة' : 'Widget Properties'}</h3>
+                  <button onClick={() => setSelectedWidgetId(null)} className="text-slate-400 hover:text-slate-800">
+                    <XIcon size={16} />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar text-xs">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      {language === 'ar' ? 'عنوان البطاقة' : 'Widget Title'}
+                    </label>
+                    <input
+                      type="text"
+                      value={selectedWidget.title}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setTempWidgets(prev => prev.map(w => w.id === selectedWidget.id ? { ...w, title: val } : w));
+                      }}
+                      className="w-full border border-slate-200 rounded-lg p-2 focus:ring-1 focus:ring-indigo-500 focus:outline-none bg-white text-slate-800"
+                    />
+                  </div>
+
+                  {selectedWidget.widget_type === 'text' && (
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        {language === 'ar' ? 'محتوى النص' : 'Text Content'}
+                      </label>
+                      <textarea
+                        rows={4}
+                        value={selectedWidget.settings?.text || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setTempWidgets(prev => prev.map(w => w.id === selectedWidget.id ? { ...w, settings: { ...w.settings, text: val } } : w));
+                        }}
+                        className="w-full border border-slate-200 rounded-lg p-2 focus:ring-1 focus:ring-indigo-500 focus:outline-none bg-white text-slate-800"
+                      />
+                    </div>
+                  )}
+
+                  {selectedWidget.widget_type === 'kpi_card' && (
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        {language === 'ar' ? 'مصدر البيانات' : 'Data Source'}
+                      </label>
+                      <select
+                        value={selectedWidget.settings?.dataSource || 'net_profit'}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setTempWidgets(prev => prev.map(w => w.id === selectedWidget.id ? { ...w, settings: { ...w.settings, dataSource: val } } : w));
+                        }}
+                        className="w-full border border-slate-200 rounded-lg p-2 focus:ring-1 focus:ring-indigo-500 focus:outline-none bg-white text-slate-700"
+                      >
+                        <option value="net_profit">{language === 'ar' ? 'صافي الأرباح' : 'Net Profit'}</option>
+                        <option value="total_invoices">{language === 'ar' ? 'إجمالي الفواتير' : 'Total Invoices'}</option>
+                        <option value="total_receipts">{language === 'ar' ? 'سندات القبض' : 'Receipt Vouchers'}</option>
+                        <option value="total_expenses">{language === 'ar' ? 'المصروفات' : 'Total Expenses'}</option>
+                        <option value="total_customer_balances">{language === 'ar' ? 'أرصدة العملاء' : 'Customer Balances'}</option>
+                        <option value="total_supplier_balances">{language === 'ar' ? 'أرصدة الموردين' : 'Supplier Balances'}</option>
+                        <option value="total_cash_balance">{language === 'ar' ? 'رصيد النقدية' : 'Cash Balance'}</option>
+                      </select>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      {language === 'ar' ? 'لون الخلفية' : 'Background Color'}
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { color: '#ffffff', label: 'White' },
+                        { color: '#f8fafc', label: 'Slate' },
+                        { color: '#eff6ff', label: 'Blue' },
+                        { color: '#ecfdf5', label: 'Green' },
+                        { color: '#fffbeb', label: 'Yellow' },
+                        { color: '#fdf2f8', label: 'Pink' }
+                      ].map(c => (
+                        <button
+                          key={c.color}
+                          onClick={() => {
+                            setTempWidgets(prev => prev.map(w => w.id === selectedWidget.id ? { ...w, settings: { ...w.settings, backgroundColor: c.color } } : w));
+                          }}
+                          className={`w-6 h-6 rounded-full border shadow-sm transition-transform ${
+                            selectedWidget.settings?.backgroundColor === c.color ? 'scale-110 ring-2 ring-indigo-500' : 'hover:scale-105'
+                          }`}
+                          style={{ backgroundColor: c.color }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 border-t border-slate-100 pt-3">
+                    <label className="flex items-center justify-between cursor-pointer">
+                      <span className="text-slate-600 font-semibold">{language === 'ar' ? 'قفل العنصر' : 'Lock widget'}</span>
+                      <input
+                        type="checkbox"
+                        checked={selectedWidget.locked === true}
+                        onChange={(e) => handleToggleLockWidget(selectedWidget.id)}
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                    </label>
+                    <label className="flex items-center justify-between cursor-pointer">
+                      <span className="text-slate-600 font-semibold">{language === 'ar' ? 'مرئي للجميع' : 'Visible'}</span>
+                      <input
+                        type="checkbox"
+                        checked={selectedWidget.visible !== false}
+                        onChange={(e) => handleToggleVisibleWidget(selectedWidget.id)}
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between flex-shrink-0">
+                  <button
+                    onClick={() => handleDuplicateWidget(selectedWidget)}
+                    className="px-3 py-1.5 border border-slate-200 hover:bg-white text-slate-700 font-bold rounded-xl flex items-center gap-1.5 transition-all bg-white"
+                  >
+                    <Copy size={13} />
+                    {language === 'ar' ? 'تكرار' : 'Duplicate'}
+                  </button>
+                  <button
+                    onClick={() => handleDeleteWidget(selectedWidget.id)}
+                    className="px-3 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 font-bold rounded-xl flex items-center gap-1.5 transition-all"
+                  >
+                    <Trash2 size={13} />
+                    {language === 'ar' ? 'حذف' : 'Remove'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-5 flex flex-col justify-center items-center h-full text-center text-slate-400">
+                <HelpCircle size={32} className="mb-2 text-slate-300" />
+                <h4 className="font-bold text-xs">{language === 'ar' ? 'لم يتم تحديد بطاقة' : 'No widget selected'}</h4>
+                <p className="text-[10px] mt-1 leading-relaxed">{language === 'ar' ? 'اضغط على أي بطاقة لتعديل خصائصها ومظهرها بشكل كامل.' : 'Click on any widget on the canvas to configure its settings and appearance.'}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
@@ -1122,6 +2380,40 @@ export const Dashboard: React.FC = () => {
         </div>
         
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
+          {/* Dropdown Layout Switcher & Customize Button */}
+          {user && !isSuperAdmin && (
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <select
+                value={currentDashboard?.id || 'default'}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'default') {
+                    localStorage.setItem(`active_dashboard_${user.id}`, 'default');
+                  } else {
+                    localStorage.setItem(`active_dashboard_${user.id}`, val);
+                  }
+                  loadActiveDashboard();
+                }}
+                className="px-3.5 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-bold text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-auto min-w-[160px]"
+              >
+                <option value="default">{language === 'ar' ? 'لوحة التحكم الافتراضية' : 'Default Dashboard'}</option>
+                {dashboardsList.map(dash => (
+                  <option key={dash.id} value={dash.id}>
+                    {dash.name} {dash.owner_user_id === null ? `(${language === 'ar' ? 'قالب مشترك' : 'Shared'})` : ''}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                onClick={handleStartCustomizing}
+                className="flex items-center gap-2 px-4 py-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all font-bold text-xs uppercase tracking-wider shadow-sm active:scale-95 whitespace-nowrap"
+              >
+                <Settings size={14} />
+                {language === 'ar' ? 'تخصيص' : 'Customize'}
+              </button>
+            </div>
+          )}
+
           {(isCompanyAdmin || isSuperAdmin) && (
             <button 
               onClick={() => setCurrentPage('dashboard_designer')}

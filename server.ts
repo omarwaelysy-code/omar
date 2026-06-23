@@ -335,7 +335,9 @@ async function startServer() {
   try {
       const { default: pool } = await import('./src/lib/postgres.js');
       await pool.query('ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS entry_number VARCHAR(50);');
-      console.log('Successfully altered journal_entries');
+      await pool.query('ALTER TABLE dashboards ADD COLUMN IF NOT EXISTS allowed_roles TEXT;');
+      await pool.query('ALTER TABLE dashboards ADD COLUMN IF NOT EXISTS allowed_users TEXT;');
+      console.log('Successfully altered journal_entries and dashboards schema');
       await migrateExchangeRateDirections();
     } catch (e) { console.error('Failed to alter/migrate', e); }
 

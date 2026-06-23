@@ -25,6 +25,10 @@ export default defineConfig(({mode}) => {
       globals: true,
       environment: 'jsdom',
       setupFiles: './src/tests/setup.ts',
+      pool: 'forks',
+      forks: {
+        isolate: false
+      }
     },
   };
 });
