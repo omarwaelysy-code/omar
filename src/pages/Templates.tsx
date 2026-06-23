@@ -11,7 +11,7 @@ import {
   Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { toast } from 'react-hot-toast';
+import { useNotification } from '../contexts/NotificationContext';
 import { validateTemplate, ValidationError } from '../utils/templateValidation';
 import { VARIABLE_REGISTRY } from '../components/VariableRegistry';
 import QRCode from 'react-qr-code';
@@ -461,6 +461,14 @@ const convertToMM = (val: number, unit: 'mm' | 'cm' | 'inch' | 'px'): number => 
 export function Templates({ initialView = 'list' }: TemplatesProps) {
   const { dir, language } = useLanguage();
   const { user } = useAuth();
+  const { showNotification } = useNotification();
+
+  const toast = {
+    success: (msg: string) => showNotification(msg, 'success'),
+    error: (msg: string) => showNotification(msg, 'error'),
+    info: (msg: string) => showNotification(msg, 'info'),
+    warning: (msg: string) => showNotification(msg, 'warning')
+  };
   
   const [view, setView] = useState<'list' | 'create' | 'edit'>(initialView);
   const [templates, setTemplates] = useState<Template[]>([]);

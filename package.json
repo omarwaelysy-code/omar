@@ -9,8 +9,8 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "ci": "npm run lint && npm run test",
-    "build": "npm run ci && vite build",
+    "ci": "yarn run lint && yarn run test",
+    "build": "yarn run ci && vite build",
     "start": "node server.ts"
   },
   "dependencies": {
@@ -42,7 +42,6 @@
     "react": "^19.0.0",
     "react-barcode": "^1.6.1",
     "react-dom": "^19.0.0",
-    "react-hot-toast": "^2.6.0",
     "react-markdown": "^10.1.0",
     "react-qr-code": "^2.0.21",
     "react-router-dom": "^7.13.1",
