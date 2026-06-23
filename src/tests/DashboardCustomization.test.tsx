@@ -243,4 +243,108 @@ describe('Dashboard Page Customization Mode and Templates', () => {
       expect(localStorage.getItem('active_dashboard_test-user-id')).toBe('default');
     });
   });
+
+  it('duplicates template successfully', async () => {
+    vi.mocked(dbService.addWithId).mockResolvedValue(undefined);
+    vi.mocked(dbService.list).mockResolvedValue([]);
+    
+    render(<Dashboard />);
+    
+    await waitFor(() => {
+      expect(screen.getByText('Customize')).toBeInTheDocument();
+    });
+
+    const promptSpy = vi.spyOn(window, 'prompt').mockImplementation(() => 'My Duplicate Layout');
+    const duplicateBtn = screen.getByTitle('Duplicate Layout');
+    fireEvent.click(duplicateBtn);
+
+    await waitFor(() => {
+      expect(promptSpy).toHaveBeenCalled();
+      expect(dbService.addWithId).toHaveBeenCalledWith('dashboards', expect.stringContaining('dash-'), expect.objectContaining({
+        name: 'My Duplicate Layout'
+      }));
+    });
+  });
+
+  it('deletes template layout successfully', async () => {
+    vi.mocked(dbService.delete).mockResolvedValue(undefined);
+    vi.mocked(dbService.list).mockResolvedValue([]);
+    localStorage.setItem('active_dashboard_test-user-id', 'dash-custom-1');
+
+    render(<Dashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTitle('Delete Layout')).toBeInTheDocument();
+    });
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => true);
+    const deleteBtn = screen.getByTitle('Delete Layout');
+    fireEvent.click(deleteBtn);
+
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalled();
+      expect(dbService.delete).toHaveBeenCalledWith('dashboards', 'dash-custom-1');
+      expect(localStorage.getItem('active_dashboard_test-user-id')).toBe('default');
+    });
+  });
+
+  it('exports template successfully', async () => {
+    vi.mocked(dbService.list).mockResolvedValue([]);
+    const appendSpy = vi.spyOn(document.body, 'appendChild');
+
+    render(<Dashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTitle('Export Template')).toBeInTheDocument();
+    });
+
+    const exportBtn = screen.getByTitle('Export Template');
+    fireEvent.click(exportBtn);
+
+    expect(appendSpy).toHaveBeenCalled();
+  });
+
+  it('imports template successfully', async () => {
+    vi.mocked(dbService.addWithId).mockResolvedValue(undefined);
+    
+    render(<Dashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTitle('Import Template')).toBeInTheDocument();
+    });
+
+    const fileInput = document.getElementById('import-dashboard-file-input') as HTMLInputElement;
+    expect(fileInput).toBeInTheDocument();
+
+    const fileContents = JSON.stringify({
+      name: 'Imported Layout Test',
+      widgets: [
+        {
+          widget_type: 'kpi_card',
+          title: 'KPI test',
+          x: 0, y: 0, w: 3, h: 2,
+          settings: {},
+          filters: {},
+          order: 0,
+          visible: true,
+          locked: false
+        }
+      ]
+    });
+    const file = new File([fileContents], 'test.json', { type: 'application/json' });
+
+    const readAsTextSpy = vi.spyOn(FileReader.prototype, 'readAsText').mockImplementation(function(this: FileReader) {
+      if (this.onload) {
+        this.onload({ target: { result: fileContents } } as any);
+      }
+    });
+
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(dbService.addWithId).toHaveBeenCalledWith('dashboards', expect.stringContaining('dash-'), expect.objectContaining({
+        name: expect.stringContaining('Imported Layout Test')
+      }));
+    });
+  });
 });

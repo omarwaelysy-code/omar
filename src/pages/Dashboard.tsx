@@ -42,6 +42,7 @@ import {
   Laptop as LaptopIcon,
   Monitor
 } from 'lucide-react';
+import * as Lucide from 'lucide-react';
 import { 
   BarChart, 
   Bar, 
@@ -513,9 +514,10 @@ const masterDataItems = [
 interface WidgetRendererProps {
   widget: Widget;
   stats: DashboardStats | null;
+  onToggleGroupCollapse?: (widgetId: string, groupId: string) => void;
 }
 
-const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, stats }) => {
+const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, stats, onToggleGroupCollapse }) => {
   const { t, dir, language } = useLanguage();
   const { setCurrentPage } = useNavigation();
   
@@ -534,7 +536,124 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, stats }) => {
   const { widget_type, settings } = widget;
 
   switch (widget_type) {
-    case 'shortcuts':
+    case 'shortcuts': {
+      const qaSettings = widget.settings?.quickAccess || {};
+      const useCustom = qaSettings.useCustom;
+      
+      if (useCustom) {
+        const items: any[] = qaSettings.items || [];
+        const groups: any[] = qaSettings.groups || [];
+        
+        const getGroupItems = (groupId?: string) => {
+          const filtered = items.filter(item => item.groupId === groupId);
+          return filtered.sort((a, b) => {
+            if (a.pinned && !b.pinned) return -1;
+            if (!a.pinned && b.pinned) return 1;
+            return 0;
+          });
+        };
+
+        const renderShortcutItem = (item: any) => {
+          let sizeClasses = "relative flex items-center bg-slate-50/50 hover:bg-white border border-slate-100 rounded-xl hover:shadow-md hover:border-indigo-500/30 transition-all overflow-hidden cursor-pointer";
+          let iconWrapper = "rounded-lg bg-white flex items-center justify-center shadow-sm border border-slate-100 shrink-0";
+          let textClass = "font-bold text-slate-600 group-hover:text-slate-900 transition-colors uppercase tracking-tight";
+          
+          if (item.size === 'small') {
+            sizeClasses += " p-2 flex-row gap-2 h-10 w-full";
+            iconWrapper += " w-6 h-6";
+            textClass += " text-[8px] truncate";
+          } else if (item.size === 'large') {
+            sizeClasses += " p-4 flex-col justify-between items-start h-28 w-full";
+            iconWrapper += " w-10 h-10 mb-2";
+            textClass += " text-[10px] line-clamp-2 text-left";
+          } else { // medium
+            sizeClasses += " p-3 flex-col justify-center items-center h-20 w-full text-center";
+            iconWrapper += " w-8 h-8 mb-1";
+            textClass += " text-[9px] line-clamp-2";
+          }
+
+          return (
+            <button
+              key={item.id}
+              onClick={() => setCurrentPage(item.id)}
+              className={`group ${sizeClasses}`}
+            >
+              <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-br ${item.color || 'from-slate-500/20 to-slate-600/20'} rounded-full -mr-8 -mt-8 opacity-40 group-hover:scale-150 transition-transform duration-500`} />
+              
+              <div className={iconWrapper}>
+                {renderLucideIcon(item.icon || 'HelpCircle', item.size === 'small' ? 12 : item.size === 'large' ? 20 : 16, item.iconColor || 'text-slate-600')}
+              </div>
+              
+              <span className={textClass}>
+                {item.label}
+              </span>
+              
+              {item.pinned && (
+                <span className="absolute top-1 left-1 flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                </span>
+              )}
+            </button>
+          );
+        };
+
+        const ungroupedItems = getGroupItems(undefined);
+
+        return (
+          <div className="w-full h-full overflow-y-auto custom-scrollbar flex flex-col gap-4 pr-1">
+            {items.some(i => i.pinned) && (
+              <div className="border border-indigo-100 bg-indigo-50/10 p-3 rounded-2xl">
+                <div className="flex items-center gap-1.5 mb-2">
+                  {renderLucideIcon('Pin', 12, 'text-indigo-600')}
+                  <span className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">
+                    {language === 'ar' ? 'البطاقات المثبتة' : 'Pinned shortcuts'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                  {items.filter(i => i.pinned).map(renderShortcutItem)}
+                </div>
+              </div>
+            )}
+
+            {ungroupedItems.length > 0 && (
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                {ungroupedItems.map(renderShortcutItem)}
+              </div>
+            )}
+
+            {groups.map(group => {
+              const groupItems = getGroupItems(group.id);
+              return (
+                <div key={group.id} className="border border-slate-100 bg-slate-50/20 p-3 rounded-2xl flex flex-col gap-2">
+                  <button 
+                    onClick={() => {
+                      onToggleGroupCollapse?.(widget.id, group.id);
+                    }}
+                    className="flex items-center justify-between w-full hover:bg-slate-50 p-1.5 rounded-lg text-slate-700 transition-colors"
+                  >
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider">{group.name}</span>
+                    {group.collapsed ? renderLucideIcon('ChevronDown', 14) : renderLucideIcon('ChevronUp', 14)}
+                  </button>
+                  
+                  {!group.collapsed && (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 pt-1">
+                      {groupItems.length > 0 ? (
+                        groupItems.map(renderShortcutItem)
+                      ) : (
+                        <div className="col-span-full text-center py-2 text-[9px] text-slate-400">
+                          {language === 'ar' ? 'لا توجد عناصر في هذه المجموعة' : 'No items in this group'}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+
       return (
         <div className="grid grid-cols-3 md:grid-cols-6 gap-3 lg:gap-4 w-full h-full">
           {masterDataItems.map((item) => (
@@ -553,6 +672,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, stats }) => {
           ))}
         </div>
       );
+    }
 
     case 'card_cash':
       return (
@@ -1031,6 +1151,100 @@ const getWidgetIcon = (type: string) => {
   }
 };
 
+const renderLucideIcon = (name: string, size = 16, className = '') => {
+  let cleanName = name;
+  if (name === 'UsersIcon') cleanName = 'Users';
+  if (name === 'CalendarIcon') cleanName = 'Calendar';
+  if (name === 'TableIcon') cleanName = 'Table';
+  if (name === 'LineChartIcon') cleanName = 'LineChart';
+  if (name === 'PieIcon') cleanName = 'PieChart';
+  if (name === 'ReceiptIcon') cleanName = 'Receipt';
+  if (name === 'TabletIcon') cleanName = 'Tablet';
+  if (name === 'LaptopIcon') cleanName = 'Laptop';
+  if (name === 'XIcon') cleanName = 'X';
+
+  const IconComp = (Lucide as any)[cleanName] || (Lucide as any)[name] || Lucide.HelpCircle;
+  return React.createElement(IconComp, { size, className });
+};
+
+const COLOR_PRESETS = [
+  { name: 'Blue', bg: 'from-blue-500/20 to-blue-600/20', text: 'text-blue-600' },
+  { name: 'Emerald', bg: 'from-emerald-500/20 to-emerald-600/20', text: 'text-emerald-600' },
+  { name: 'Amber', bg: 'from-amber-500/20 to-amber-600/20', text: 'text-amber-600' },
+  { name: 'Purple', bg: 'from-purple-500/20 to-purple-600/20', text: 'text-purple-600' },
+  { name: 'Indigo', bg: 'from-indigo-500/20 to-indigo-600/20', text: 'text-indigo-600' },
+  { name: 'Rose', bg: 'from-rose-500/20 to-rose-600/20', text: 'text-rose-600' },
+  { name: 'Slate', bg: 'from-slate-500/20 to-slate-600/20', text: 'text-slate-600' },
+];
+
+const ICON_OPTIONS = [
+  'Users', 'Truck', 'Package', 'Wallet', 'CreditCard', 'Settings', 'FileText', 'Percent',
+  'PlusCircle', 'Scale', 'TrendingUp', 'Home', 'Folder', 'List', 'Bell', 'Clock',
+  'Printer', 'BookOpen', 'Activity', 'Globe', 'Target', 'Layers', 'GitFork', 'ChevronDown',
+  'ChevronUp', 'Pin', 'Heart', 'HelpCircle'
+];
+
+interface ERPPageItem {
+  id: string;
+  nameEn: string;
+  nameAr: string;
+  category: string;
+  defaultIcon: string;
+  defaultColor: string;
+}
+
+const ERP_PAGES_DIRECTORY: ERPPageItem[] = [
+  { id: 'accounts', nameEn: 'Chart of Accounts List', nameAr: 'دليل الحسابات', category: 'accounting', defaultIcon: 'Wallet', defaultColor: 'from-purple-500/20 to-purple-600/20' },
+  { id: 'chart_of_accounts', nameEn: 'Tree Chart of Accounts', nameAr: 'شجرة الحسابات', category: 'accounting', defaultIcon: 'GitFork', defaultColor: 'from-purple-500/20 to-purple-600/20' },
+  { id: 'account_types', nameEn: 'Account Types', nameAr: 'أنواع الحسابات', category: 'accounting', defaultIcon: 'Layers', defaultColor: 'from-purple-500/20 to-purple-600/20' },
+  { id: 'journal_entries', nameEn: 'Journal Entries List', nameAr: 'قيود اليومية', category: 'accounting', defaultIcon: 'FileText', defaultColor: 'from-purple-500/20 to-purple-600/20' },
+  { id: 'create_journal_entry', nameEn: 'Add Journal Entry', nameAr: 'إضافة قيد يومية', category: 'accounting', defaultIcon: 'PlusCircle', defaultColor: 'from-purple-500/20 to-purple-600/20' },
+  { id: 'general_ledger_report', nameEn: 'General Ledger Report', nameAr: 'حساب الأستاذ', category: 'accounting', defaultIcon: 'BookOpen', defaultColor: 'from-purple-500/20 to-purple-600/20' },
+  { id: 'trial_balance', nameEn: 'Trial Balance', nameAr: 'ميزان المراجعة', category: 'accounting', defaultIcon: 'Scale', defaultColor: 'from-purple-500/20 to-purple-600/20' },
+  { id: 'income_statement', nameEn: 'Income Statement', nameAr: 'قائمة الدخل', category: 'accounting', defaultIcon: 'TrendingUp', defaultColor: 'from-emerald-500/20 to-emerald-600/20' },
+  { id: 'balance_sheet', nameEn: 'Balance Sheet', nameAr: 'المركز المالي', category: 'accounting', defaultIcon: 'Briefcase', defaultColor: 'from-indigo-500/20 to-indigo-600/20' },
+  { id: 'customers', nameEn: 'Customers Directory', nameAr: 'العملاء', category: 'sales', defaultIcon: 'Users', defaultColor: 'from-blue-500/20 to-blue-600/20' },
+  { id: 'invoices', nameEn: 'Sales Invoices', nameAr: 'فواتير مبيعات', category: 'sales', defaultIcon: 'FileText', defaultColor: 'from-blue-500/20 to-blue-600/20' },
+  { id: 'sales_orders', nameEn: 'Sales Orders', nameAr: 'أوامر بيع', category: 'sales', defaultIcon: 'FileSpreadsheet', defaultColor: 'from-blue-500/20 to-blue-600/20' },
+  { id: 'returns', nameEn: 'Sales Returns', nameAr: 'مرتجع مبيعات', category: 'sales', defaultIcon: 'RotateCcw', defaultColor: 'from-red-500/20 to-red-600/20' },
+  { id: 'customer_discounts', nameEn: 'Customer Discounts', nameAr: 'خصم عملاء', category: 'sales', defaultIcon: 'Percent', defaultColor: 'from-blue-500/20 to-blue-600/20' },
+  { id: 'customer_settlements', nameEn: 'Customer Settlements', nameAr: 'تسويات العملاء', category: 'sales', defaultIcon: 'CheckSquare', defaultColor: 'from-blue-500/20 to-blue-600/20' },
+  { id: 'customer_statement', nameEn: 'Customer Statement', nameAr: 'كشف حساب العميل', category: 'sales', defaultIcon: 'UserCheck', defaultColor: 'from-blue-500/20 to-blue-600/20' },
+  { id: 'customer_balances', nameEn: 'Customer Balances Report', nameAr: 'أرصدة العملاء', category: 'sales', defaultIcon: 'DollarSign', defaultColor: 'from-blue-500/20 to-blue-600/20' },
+  { id: 'sales_report', nameEn: 'Sales Report', nameAr: 'تقرير المبيعات', category: 'sales', defaultIcon: 'BarChart2', defaultColor: 'from-blue-500/20 to-blue-600/20' },
+  { id: 'suppliers', nameEn: 'Suppliers Directory', nameAr: 'الموردين', category: 'purchases', defaultIcon: 'Truck', defaultColor: 'from-emerald-500/20 to-emerald-600/20' },
+  { id: 'purchase_invoices', nameEn: 'Purchase Invoices', nameAr: 'فواتير مشتريات', category: 'purchases', defaultIcon: 'FileText', defaultColor: 'from-emerald-500/20 to-emerald-600/20' },
+  { id: 'purchase_orders', nameEn: 'Purchase Orders', nameAr: 'أوامر شراء', category: 'purchases', defaultIcon: 'FileSpreadsheet', defaultColor: 'from-emerald-500/20 to-emerald-600/20' },
+  { id: 'purchase_returns', nameEn: 'Purchase Returns', nameAr: 'مرتجع مشتريات', category: 'purchases', defaultIcon: 'RotateCcw', defaultColor: 'from-red-500/20 to-red-600/20' },
+  { id: 'supplier_discounts', nameEn: 'Supplier Discounts', nameAr: 'خصم موردين', category: 'purchases', defaultIcon: 'Percent', defaultColor: 'from-emerald-500/20 to-emerald-600/20' },
+  { id: 'supplier_settlements', nameEn: 'Supplier Settlements', nameAr: 'تسويات الموردين', category: 'purchases', defaultIcon: 'CheckSquare', defaultColor: 'from-emerald-500/20 to-emerald-600/20' },
+  { id: 'supplier_statement', nameEn: 'Supplier Statement', nameAr: 'كشف حساب المورد', category: 'purchases', defaultIcon: 'UserCheck', defaultColor: 'from-emerald-500/20 to-emerald-600/20' },
+  { id: 'supplier_balances', nameEn: 'Supplier Balances Report', nameAr: 'أرصدة الموردين', category: 'purchases', defaultIcon: 'DollarSign', defaultColor: 'from-emerald-500/20 to-emerald-600/20' },
+  { id: 'products', nameEn: 'Products List', nameAr: 'الأصناف', category: 'inventory', defaultIcon: 'Package', defaultColor: 'from-amber-500/20 to-amber-600/20' },
+  { id: 'warehouses', nameEn: 'Warehouses List', nameAr: 'المستودعات', category: 'inventory', defaultIcon: 'Home', defaultColor: 'from-amber-500/20 to-amber-600/20' },
+  { id: 'item_groups', nameEn: 'Product Item Groups', nameAr: 'مجموعات الأصناف', category: 'inventory', defaultIcon: 'Folder', defaultColor: 'from-amber-500/20 to-amber-600/20' },
+  { id: 'warehouse_transfers', nameEn: 'Warehouse Stock Transfers', nameAr: 'تحويلات المستودعات', category: 'inventory', defaultIcon: 'Shuffle', defaultColor: 'from-amber-500/20 to-amber-600/20' },
+  { id: 'opening_stock_balances', nameEn: 'Opening Stock Balances', nameAr: 'أرصدة أول المدة للمخزون', category: 'inventory', defaultIcon: 'Play', defaultColor: 'from-amber-500/20 to-amber-600/20' },
+  { id: 'stock_adjustments', nameEn: 'Stock Adjustments', nameAr: 'تسويات المخزون', category: 'inventory', defaultIcon: 'Sliders', defaultColor: 'from-amber-500/20 to-amber-600/20' },
+  { id: 'stock_card_report', nameEn: 'Stock Card Report', nameAr: 'كارت الصنف', category: 'inventory', defaultIcon: 'CreditCard', defaultColor: 'from-amber-500/20 to-amber-600/20' },
+  { id: 'stock_balances_report', nameEn: 'Stock Balances Report', nameAr: 'تقرير أرصدة المخزون', category: 'inventory', defaultIcon: 'Archive', defaultColor: 'from-amber-500/20 to-amber-600/20' },
+  { id: 'general_stock_movements_report', nameEn: 'Stock Movements Report', nameAr: 'تقرير حركة المخزون العام', category: 'inventory', defaultIcon: 'TrendingUp', defaultColor: 'from-amber-500/20 to-amber-600/20' },
+  { id: 'employees', nameEn: 'Employees List', nameAr: 'الموظفين', category: 'system', defaultIcon: 'User', defaultColor: 'from-slate-500/20 to-slate-600/20' },
+  { id: 'expenses', nameEn: 'Expense Categories', nameAr: 'بنود المصروفات', category: 'system', defaultIcon: 'Zap', defaultColor: 'from-red-500/20 to-red-600/20' },
+  { id: 'payment_methods', nameEn: 'Payment Methods', nameAr: 'طرق السداد', category: 'system', defaultIcon: 'CreditCard', defaultColor: 'from-indigo-500/20 to-indigo-600/20' },
+  { id: 'cash_transfers', nameEn: 'Cash Transfers', nameAr: 'تحويلات النقدية', category: 'system', defaultIcon: 'ArrowRightLeft', defaultColor: 'from-indigo-500/20 to-indigo-600/20' },
+  { id: 'expenses_report', nameEn: 'Expenses Report', nameAr: 'تقرير المصروفات', category: 'system', defaultIcon: 'PieChart', defaultColor: 'from-red-500/20 to-red-600/20' },
+  { id: 'cash_report', nameEn: 'Cash Report', nameAr: 'تقرير الخزينة', category: 'system', defaultIcon: 'BookOpen', defaultColor: 'from-indigo-500/20 to-indigo-600/20' },
+  { id: 'users', nameEn: 'Users Administration', nameAr: 'إدارة المستخدمين', category: 'system', defaultIcon: 'Users', defaultColor: 'from-slate-500/20 to-slate-600/20' },
+  { id: 'activity_log', nameEn: 'Activity Log History', nameAr: 'سجل النشاط', category: 'system', defaultIcon: 'Clock', defaultColor: 'from-slate-500/20 to-slate-600/20' },
+  { id: 'company_settings', nameEn: 'Company Settings', nameAr: 'الإعدادات', category: 'system', defaultIcon: 'Settings', defaultColor: 'from-slate-500/20 to-slate-600/20' },
+  { id: 'currencies', nameEn: 'Currencies List', nameAr: 'العملات', category: 'system', defaultIcon: 'Globe', defaultColor: 'from-slate-500/20 to-slate-600/20' },
+  { id: 'departments', nameEn: 'Departments List', nameAr: 'الأقسام', category: 'system', defaultIcon: 'Network', defaultColor: 'from-slate-500/20 to-slate-600/20' },
+  { id: 'cost_centers', nameEn: 'Cost Centers', nameAr: 'مراكز التكلفة', category: 'system', defaultIcon: 'Target', defaultColor: 'from-slate-500/20 to-slate-600/20' },
+  { id: 'templates', nameEn: 'Print Templates', nameAr: 'القوالب', category: 'system', defaultIcon: 'Printer', defaultColor: 'from-slate-500/20 to-slate-600/20' },
+  { id: 'system_check', nameEn: 'System Health Check', nameAr: 'فحص النظام', category: 'system', defaultIcon: 'Activity', defaultColor: 'from-rose-500/20 to-rose-600/20' },
+];
+
 export const Dashboard: React.FC = () => {
   const { user, isSuperAdmin, isCompanyAdmin } = useAuth();
   const { activeTabId, setCurrentPage } = useNavigation();
@@ -1063,6 +1277,8 @@ export const Dashboard: React.FC = () => {
   // Sharing states
   const [isTemplateShared, setIsTemplateShared] = useState(false);
   const [sharedRoles, setSharedRoles] = useState<string[]>([]);
+  const [sharedUsers, setSharedUsers] = useState<string[]>([]);
+  const [usersList, setUsersList] = useState<any[]>([]);
   const [dataSources, setDataSources] = useState<{ [tableName: string]: string[] }>({});
 
   // Drag, Resize & Snap State
@@ -1078,6 +1294,84 @@ export const Dashboard: React.FC = () => {
   // Widget Catalog Search
   const [widgetSearchQuery, setWidgetSearchQuery] = useState('');
   const [widgetCategory, setWidgetCategory] = useState('all');
+
+  // Quick Access Customization States
+  const [qaSearchQuery, setQaSearchQuery] = useState('');
+  const [newGroupName, setNewGroupName] = useState('');
+
+  const handleToggleGroupCollapse = async (widgetId: string, groupId: string) => {
+    if (isEditing) {
+      const updated = tempWidgets.map(w => {
+        if (w.id === widgetId) {
+          const quickAccess = w.settings?.quickAccess || {};
+          const groups = (quickAccess.groups || []).map((g: any) => 
+            g.id === groupId ? { ...g, collapsed: !g.collapsed } : g
+          );
+          return { ...w, settings: { ...w.settings, quickAccess: { ...quickAccess, groups } } };
+        }
+        return w;
+      });
+      setTempWidgets(updated);
+      pushEditHistory(updated);
+    } else {
+      const updated = customWidgets.map(w => {
+        if (w.id === widgetId) {
+          const quickAccess = w.settings?.quickAccess || {};
+          const groups = (quickAccess.groups || []).map((g: any) => 
+            g.id === groupId ? { ...g, collapsed: !g.collapsed } : g
+          );
+          return { ...w, settings: { ...w.settings, quickAccess: { ...quickAccess, groups } } };
+        }
+        return w;
+      });
+      setCustomWidgets(updated);
+      setCustomDashboard(prev => prev ? { ...prev, widgets: updated } : null);
+      
+      const targetWidget = updated.find(w => w.id === widgetId);
+      if (targetWidget) {
+        await dbService.update('widgets', widgetId, { settings: targetWidget.settings });
+      }
+    }
+  };
+
+  const updateQuickAccessSettings = (updater: (qa: any) => any, shouldPushHistory = false) => {
+    setTempWidgets(prev => {
+      const next = prev.map(w => {
+        if (w.id === selectedWidgetId) {
+          const qa = w.settings?.quickAccess || { items: [], groups: [], useCustom: true };
+          const updatedQa = { ...qa, ...updater(qa), useCustom: true };
+          return { ...w, settings: { ...w.settings, quickAccess: updatedQa } };
+        }
+        return w;
+      });
+      if (shouldPushHistory) {
+        pushEditHistory(next);
+      }
+      return next;
+    });
+  };
+
+  const handleAddQuickAccessItem = (page: ERPPageItem) => {
+    updateQuickAccessSettings(qa => {
+      const currentItems = qa.items || [];
+      if (currentItems.some((i: any) => i.id === page.id)) {
+        return qa;
+      }
+      
+      const newItem = {
+        id: page.id,
+        label: language === 'ar' ? page.nameAr : page.nameEn,
+        icon: page.defaultIcon,
+        color: page.defaultColor,
+        iconColor: page.defaultColor.split(' ')[0].replace('from-', 'text-').split('/')[0],
+        size: 'medium',
+        pinned: false
+      };
+      
+      return { ...qa, items: [...currentItems, newItem] };
+    }, true);
+    setQaSearchQuery('');
+  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -1114,8 +1408,8 @@ export const Dashboard: React.FC = () => {
     return maxY;
   };
 
-  const getInitialDefaultWidgets = (): Widget[] => {
-    const dashId = currentDashboard?.id || 'temp-id';
+  const getInitialDefaultWidgets = (customDashId?: string): Widget[] => {
+    const dashId = customDashId || currentDashboard?.id || 'temp-id';
     return [
       {
         id: 'w-shortcuts',
@@ -1326,6 +1620,38 @@ export const Dashboard: React.FC = () => {
     } else {
       initialWidgets = getInitialDefaultWidgets();
     }
+
+    initialWidgets = initialWidgets.map(w => {
+      if (w.widget_type === 'shortcuts' && !w.settings?.quickAccess) {
+        const defaultItems = masterDataItems.map(item => ({
+          id: item.id,
+          label: item.label,
+          icon: item.icon === UsersIcon ? 'Users' :
+                item.icon === Truck ? 'Truck' :
+                item.icon === Package ? 'Package' :
+                item.icon === Wallet ? 'Wallet' :
+                item.icon === CreditCard ? 'CreditCard' :
+                item.icon === Settings ? 'Settings' : 'HelpCircle',
+          color: item.color,
+          iconColor: item.iconColor,
+          size: 'medium' as const,
+          pinned: false
+        }));
+        return {
+          ...w,
+          settings: {
+            ...w.settings,
+            quickAccess: {
+              useCustom: true,
+              items: defaultItems,
+              groups: []
+            }
+          }
+        };
+      }
+      return w;
+    });
+
     setTempWidgets(initialWidgets);
 
     if (currentDashboard) {
@@ -1333,11 +1659,13 @@ export const Dashboard: React.FC = () => {
       setDashboardDescription(currentDashboard.description || '');
       setIsTemplateShared(currentDashboard.owner_user_id === null);
       setSharedRoles(currentDashboard.allowed_roles ? currentDashboard.allowed_roles.split(',') : []);
+      setSharedUsers(currentDashboard.allowed_users ? currentDashboard.allowed_users.split(',') : []);
     } else {
       setDashboardName(language === 'ar' ? 'لوحة تحكم مخصصة' : 'My Customized Dashboard');
       setDashboardDescription('');
       setIsTemplateShared(false);
       setSharedRoles([]);
+      setSharedUsers([]);
     }
 
     setEditHistory([initialWidgets]);
@@ -1369,7 +1697,7 @@ export const Dashboard: React.FC = () => {
           is_system: false,
           icon: 'LayoutDashboard',
           allowed_roles: sharedRoles.length > 0 ? sharedRoles.join(',') : null,
-          allowed_users: null
+          allowed_users: sharedUsers.length > 0 ? sharedUsers.join(',') : null
         };
         await dbService.addWithId('dashboards', newDashId, newDashPayload);
         dashId = newDashId;
@@ -1378,7 +1706,8 @@ export const Dashboard: React.FC = () => {
           name: dashboardName,
           description: dashboardDescription,
           owner_user_id: isTemplateShared ? null : user.id,
-          allowed_roles: sharedRoles.length > 0 ? sharedRoles.join(',') : null
+          allowed_roles: sharedRoles.length > 0 ? sharedRoles.join(',') : null,
+          allowed_users: sharedUsers.length > 0 ? sharedUsers.join(',') : null
         };
         await dbService.update('dashboards', dashId, updatePayload);
       }
@@ -1442,6 +1771,213 @@ export const Dashboard: React.FC = () => {
     } catch (err) {
       console.error('Failed to restore default layout:', err);
     }
+  };
+
+  const handleDuplicateDashboard = async () => {
+    if (!user) return;
+    const currentName = currentDashboard ? currentDashboard.name : (language === 'ar' ? 'لوحة التحكم الافتراضية' : 'Default Dashboard');
+    const promptMsg = language === 'ar' 
+      ? `أدخل اسماً للوحة التحكم المكررة:` 
+      : `Enter a name for the duplicated dashboard layout:`;
+    const newName = window.prompt(promptMsg, `${currentName} - ${language === 'ar' ? 'نسخة' : 'Copy'}`);
+    if (!newName || !newName.trim()) return;
+
+    try {
+      setLoading(true);
+      const newDashId = `dash-${uuidv4()}`;
+      
+      // Get current widgets
+      let widgetsToCopy: Widget[] = [];
+      if (currentDashboard) {
+        widgetsToCopy = await dbService.list<Widget>('widgets', { dashboard_id: currentDashboard.id });
+      } else {
+        widgetsToCopy = getInitialDefaultWidgets(newDashId);
+      }
+
+      const newDashPayload = {
+        id: newDashId,
+        company_id: user.company_id,
+        owner_user_id: user.id,
+        name: newName.trim(),
+        description: currentDashboard?.description || 'Duplicated layout',
+        is_default: false,
+        is_system: false,
+        icon: currentDashboard?.icon || 'LayoutDashboard',
+        allowed_roles: null,
+        allowed_users: null
+      };
+
+      await dbService.addWithId('dashboards', newDashId, newDashPayload);
+
+      for (const w of widgetsToCopy) {
+        const widgetPayload = {
+          dashboard_id: newDashId,
+          widget_type: w.widget_type,
+          title: w.title,
+          x: w.x,
+          y: w.y,
+          w: w.w,
+          h: w.h,
+          settings: w.settings || {},
+          filters: w.filters || {},
+          order: w.order,
+          visible: w.visible,
+          locked: w.locked
+        };
+        await dbService.addWithId('widgets', `w-${uuidv4()}`, widgetPayload);
+      }
+
+      localStorage.setItem(`active_dashboard_${user.id}`, newDashId);
+      await loadActiveDashboard();
+      await fetchDashboards();
+    } catch (err) {
+      console.error('Failed to duplicate dashboard:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteDashboard = async () => {
+    if (!user || !currentDashboard) return;
+    if (currentDashboard.owner_user_id === null && !isCompanyAdmin) {
+      alert(language === 'ar' ? 'القوالب المشتركة لا يمكن حذفها إلا بواسطة مسؤولي النظام.' : 'Shared templates can only be deleted by administrators.');
+      return;
+    }
+
+    const confirmMsg = language === 'ar'
+      ? `هل أنت متأكد من حذف لوحة التحكم هذه؟`
+      : `Are you sure you want to delete this dashboard template?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      setLoading(true);
+      await dbService.delete('dashboards', currentDashboard.id);
+      
+      const widgetsToDelete = await dbService.list<Widget>('widgets', { dashboard_id: currentDashboard.id });
+      for (const w of widgetsToDelete) {
+        await dbService.delete('widgets', w.id);
+      }
+
+      localStorage.setItem(`active_dashboard_${user.id}`, 'default');
+      await loadActiveDashboard();
+      await fetchDashboards();
+    } catch (err) {
+      console.error('Failed to delete dashboard template:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportDashboard = async () => {
+    if (!user) return;
+    try {
+      let exportWidgets: Widget[] = [];
+      let name = '';
+      let description = '';
+      
+      if (currentDashboard) {
+        name = currentDashboard.name;
+        description = currentDashboard.description || '';
+        exportWidgets = await dbService.list<Widget>('widgets', { dashboard_id: currentDashboard.id });
+      } else {
+        name = language === 'ar' ? 'لوحة التحكم الافتراضية' : 'Default Dashboard';
+        description = 'Default ERP dashboard layout';
+        exportWidgets = getInitialDefaultWidgets();
+      }
+
+      const exportData = {
+        name,
+        description,
+        icon: currentDashboard?.icon || 'LayoutDashboard',
+        allowed_roles: currentDashboard?.allowed_roles || null,
+        allowed_users: currentDashboard?.allowed_users || null,
+        widgets: exportWidgets.map(w => ({
+          widget_type: w.widget_type,
+          title: w.title,
+          x: w.x,
+          y: w.y,
+          w: w.w,
+          h: w.h,
+          settings: w.settings || {},
+          filters: w.filters || {},
+          order: w.order,
+          visible: w.visible,
+          locked: w.locked
+        }))
+      };
+
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `dashboard-template-${name.toLowerCase().replace(/\s+/g, '-')}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    } catch (err) {
+      console.error('Failed to export dashboard layout:', err);
+    }
+  };
+
+  const handleImportDashboard = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user || !e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const parsed = JSON.parse(text);
+        
+        if (!parsed.name || !Array.isArray(parsed.widgets)) {
+          alert(language === 'ar' ? 'ملف القالب غير صالح.' : 'Invalid template file structure.');
+          return;
+        }
+
+        setLoading(true);
+        const newDashId = `dash-${uuidv4()}`;
+        const newDashPayload = {
+          id: newDashId,
+          company_id: user.company_id,
+          owner_user_id: user.id,
+          name: `${parsed.name} (${language === 'ar' ? 'مستورد' : 'Imported'})`,
+          description: parsed.description || 'Imported dashboard layout',
+          icon: parsed.icon || 'LayoutDashboard',
+          allowed_roles: parsed.allowed_roles || null,
+          allowed_users: parsed.allowed_users || null
+        };
+
+        await dbService.addWithId('dashboards', newDashId, newDashPayload);
+
+        for (const w of parsed.widgets) {
+          const widgetPayload = {
+            dashboard_id: newDashId,
+            widget_type: w.widget_type,
+            title: w.title,
+            x: w.x,
+            y: w.y,
+            w: w.w,
+            h: w.h,
+            settings: w.settings || {},
+            filters: w.filters || {},
+            order: w.order,
+            visible: w.visible,
+            locked: w.locked
+          };
+          await dbService.addWithId('widgets', `w-${uuidv4()}`, widgetPayload);
+        }
+
+        localStorage.setItem(`active_dashboard_${user.id}`, newDashId);
+        await loadActiveDashboard();
+        await fetchDashboards();
+      } catch (err) {
+        console.error('Failed to import dashboard template:', err);
+        alert(language === 'ar' ? 'فشل استيراد قالب لوحة التحكم.' : 'Failed to import dashboard template.');
+      } finally {
+        setLoading(false);
+        e.target.value = '';
+      }
+    };
+    reader.readAsText(file);
   };
 
   const pushEditHistory = (widgetsList: Widget[]) => {
@@ -1662,6 +2198,14 @@ export const Dashboard: React.FC = () => {
       }
       loadActiveDashboard();
       fetchDashboards();
+
+      if (isCompanyAdmin) {
+        dbService.list<any>('users')
+          .then(list => {
+            setUsersList((list || []).filter(u => u.company_id === user.company_id));
+          })
+          .catch(err => console.error("Failed to load users list:", err));
+      }
     } else if (isSuperAdmin) {
       setLoading(false);
     }
@@ -1854,6 +2398,7 @@ export const Dashboard: React.FC = () => {
     });
 
     const selectedWidget = tempWidgets.find(w => w.id === selectedWidgetId);
+    const qa = selectedWidget?.settings?.quickAccess || { items: [], groups: [] };
 
     return (
       <div className="flex flex-col h-[calc(100vh-100px)] bg-slate-50 border border-slate-200 rounded-3xl overflow-hidden font-sans shadow-lg select-none" dir={dir}>
@@ -1974,6 +2519,25 @@ export const Dashboard: React.FC = () => {
                       </label>
                     ))}
                   </div>
+                  {usersList.length > 0 && (
+                    <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase">{language === 'ar' ? 'المستخدمين المسموحين:' : 'Allowed Users:'}</span>
+                      <select
+                        multiple
+                        value={sharedUsers}
+                        onChange={(e) => {
+                          const options = Array.from(e.target.selectedOptions).map(o => o.value);
+                          setSharedUsers(options);
+                        }}
+                        className="text-[9px] bg-white border border-slate-200 rounded-md p-1 min-w-[120px] max-h-[30px] overflow-y-auto outline-none"
+                      >
+                        {usersList.map(u => (
+                          <option key={u.id} value={u.id}>{u.username}</option>
+                        ))}
+                      </select>
+                      <span className="text-[8px] text-slate-400">({language === 'ar' ? 'Ctrl+اضغط للتحديد المتعدد' : 'Ctrl+Click to select multiple'})</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2171,7 +2735,7 @@ export const Dashboard: React.FC = () => {
                             </div>
 
                             <div className="flex-1 min-h-0 w-full pointer-events-none select-none">
-                              <WidgetRenderer widget={w} stats={stats} />
+                              <WidgetRenderer widget={w} stats={stats} onToggleGroupCollapse={handleToggleGroupCollapse} />
                             </div>
 
                             {!w.locked && (
@@ -2260,6 +2824,311 @@ export const Dashboard: React.FC = () => {
                         <option value="total_supplier_balances">{language === 'ar' ? 'أرصدة الموردين' : 'Supplier Balances'}</option>
                         <option value="total_cash_balance">{language === 'ar' ? 'رصيد النقدية' : 'Cash Balance'}</option>
                       </select>
+                    </div>
+                  )}
+
+                  {selectedWidget.widget_type === 'shortcuts' && (
+                    <div className="space-y-4 border-t border-slate-100 pt-3">
+                      <div>
+                        <h4 className="font-extrabold text-[10px] uppercase text-indigo-600 mb-2">
+                          {language === 'ar' ? 'تخصيص الوصول السريع' : 'Customize Quick Access'}
+                        </h4>
+                        
+                        {/* Search ERP pages */}
+                        <div className="space-y-1">
+                          <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                            {language === 'ar' ? 'بحث وإضافة صفحة' : 'Search & Add Page'}
+                          </label>
+                          <input
+                            type="text"
+                            placeholder={language === 'ar' ? 'اكتب للبحث...' : 'Type to search...'}
+                            value={qaSearchQuery}
+                            onChange={(e) => setQaSearchQuery(e.target.value)}
+                            className="w-full border border-slate-200 rounded-lg p-2 focus:ring-1 focus:ring-indigo-500 focus:outline-none bg-white text-slate-800"
+                          />
+                          {qaSearchQuery.trim() && (
+                            <div className="border border-slate-200 rounded-lg bg-white max-h-40 overflow-y-auto mt-1 shadow-md p-1 space-y-1">
+                              {ERP_PAGES_DIRECTORY.filter(p => 
+                                p.nameEn.toLowerCase().includes(qaSearchQuery.toLowerCase()) || 
+                                p.nameAr.includes(qaSearchQuery)
+                              ).slice(0, 5).map(page => (
+                                <button
+                                  key={page.id}
+                                  onClick={() => handleAddQuickAccessItem(page)}
+                                  className="w-full text-left flex items-center justify-between p-1.5 hover:bg-slate-50 rounded text-[10px] text-slate-700 font-semibold"
+                                >
+                                  <span>{language === 'ar' ? page.nameAr : page.nameEn}</span>
+                                  <span className="text-[8px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{page.category}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Group Management */}
+                      <div className="space-y-2 border-t border-slate-100 pt-3">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                          {language === 'ar' ? 'إدارة المجموعات' : 'Groups Management'}
+                        </label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            placeholder={language === 'ar' ? 'اسم المجموعة...' : 'Group name...'}
+                            value={newGroupName}
+                            onChange={(e) => setNewGroupName(e.target.value)}
+                            className="flex-1 border border-slate-200 rounded-lg p-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-[10px]"
+                          />
+                          <button
+                            onClick={() => {
+                              if (!newGroupName.trim()) return;
+                              updateQuickAccessSettings(qa => {
+                                const newGroup = {
+                                  id: `g-${uuidv4()}`,
+                                  name: newGroupName.trim(),
+                                  collapsed: false
+                                };
+                                return { ...qa, groups: [...(qa.groups || []), newGroup] };
+                              }, true);
+                              setNewGroupName('');
+                            }}
+                            className="bg-indigo-600 text-white px-2.5 py-1.5 rounded-lg font-bold text-[10px] hover:bg-indigo-700 transition-colors"
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        {/* List of created groups with delete option */}
+                        {(qa.groups || []).length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {(qa.groups || []).map((g: any) => (
+                              <div key={g.id} className="flex items-center gap-1 bg-slate-100 text-slate-600 text-[9px] px-2 py-0.5 rounded-full border border-slate-200">
+                                <span>{g.name}</span>
+                                <button
+                                  onClick={() => {
+                                    // Remove group and ungroup its items
+                                    updateQuickAccessSettings(qa => {
+                                      const nextGroups = (qa.groups || []).filter((group: any) => group.id !== g.id);
+                                      const nextItems = (qa.items || []).map((item: any) => 
+                                        item.groupId === g.id ? { ...item, groupId: undefined } : item
+                                      );
+                                      return { ...qa, groups: nextGroups, items: nextItems };
+                                    }, true);
+                                  }}
+                                  className="text-rose-500 hover:text-rose-700 font-bold ml-1"
+                                >
+                                  &times;
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Customize Items */}
+                      <div className="space-y-2 border-t border-slate-100 pt-3">
+                        <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                          {language === 'ar' ? 'العناصر الحالية' : 'Shortcut Items'}
+                        </label>
+                        
+                        {(qa.items || []).length === 0 ? (
+                          <p className="text-[10px] text-slate-400 italic">No shortcuts added yet.</p>
+                        ) : (
+                          <div className="space-y-3 max-h-80 overflow-y-auto pr-1 custom-scrollbar">
+                            {(qa.items || []).map((item: any, idx: number) => (
+                              <div key={item.id} className="p-2 border border-slate-100 rounded-xl bg-slate-50/50 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-[10px] text-slate-700 truncate max-w-[120px]">{item.label}</span>
+                                  <div className="flex items-center gap-1">
+                                    {/* Move up / down */}
+                                    <button
+                                      disabled={idx === 0}
+                                      onClick={() => {
+                                        updateQuickAccessSettings(qa => {
+                                          const nextItems = [...qa.items];
+                                          const temp = nextItems[idx];
+                                          nextItems[idx] = nextItems[idx - 1];
+                                          nextItems[idx - 1] = temp;
+                                          return { ...qa, items: nextItems };
+                                        }, true);
+                                      }}
+                                      className="p-1 hover:bg-slate-200 disabled:opacity-30 rounded text-[9px]"
+                                    >
+                                      &uarr;
+                                    </button>
+                                    <button
+                                      disabled={idx === (qa.items || []).length - 1}
+                                      onClick={() => {
+                                        updateQuickAccessSettings(qa => {
+                                          const nextItems = [...qa.items];
+                                          const temp = nextItems[idx];
+                                          nextItems[idx] = nextItems[idx + 1];
+                                          nextItems[idx + 1] = temp;
+                                          return { ...qa, items: nextItems };
+                                        }, true);
+                                      }}
+                                      className="p-1 hover:bg-slate-200 disabled:opacity-30 rounded text-[9px]"
+                                    >
+                                      &darr;
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        updateQuickAccessSettings(qa => {
+                                          const nextItems = qa.items.filter((i: any) => i.id !== item.id);
+                                          return { ...qa, items: nextItems };
+                                        }, true);
+                                      }}
+                                      className="p-1 hover:bg-rose-100 text-rose-500 rounded text-[9px]"
+                                    >
+                                      &times;
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Custom Label & size */}
+                                <div className="grid grid-cols-2 gap-1.5">
+                                  <div>
+                                    <label className="block text-[8px] text-slate-400 font-bold uppercase">{language === 'ar' ? 'العنوان' : 'Title'}</label>
+                                    <input
+                                      type="text"
+                                      value={item.label}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        updateQuickAccessSettings(qa => {
+                                          const nextItems = qa.items.map((i: any) => i.id === item.id ? { ...i, label: val } : i);
+                                          return { ...qa, items: nextItems };
+                                        });
+                                      }}
+                                      className="w-full border border-slate-200 rounded p-1 text-[9px] bg-white"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[8px] text-slate-400 font-bold uppercase">{language === 'ar' ? 'الحجم' : 'Size'}</label>
+                                    <select
+                                      value={item.size}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        updateQuickAccessSettings(qa => {
+                                          const nextItems = qa.items.map((i: any) => i.id === item.id ? { ...i, size: val } : i);
+                                          return { ...qa, items: nextItems };
+                                        }, true);
+                                      }}
+                                      className="w-full border border-slate-200 rounded p-1 text-[9px] bg-white text-slate-700"
+                                    >
+                                      <option value="small">{language === 'ar' ? 'صغير' : 'Small'}</option>
+                                      <option value="medium">{language === 'ar' ? 'متوسط' : 'Medium'}</option>
+                                      <option value="large">{language === 'ar' ? 'كبير' : 'Large'}</option>
+                                    </select>
+                                  </div>
+                                </div>
+
+                                {/* Icon, Color, Group, Pin */}
+                                <div className="grid grid-cols-2 gap-1.5">
+                                  <div>
+                                    <label className="block text-[8px] text-slate-400 font-bold uppercase">{language === 'ar' ? 'الأيقونة' : 'Icon'}</label>
+                                    <select
+                                      value={item.icon}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        updateQuickAccessSettings(qa => {
+                                          const nextItems = qa.items.map((i: any) => i.id === item.id ? { ...i, icon: val } : i);
+                                          return { ...qa, items: nextItems };
+                                        }, true);
+                                      }}
+                                      className="w-full border border-slate-200 rounded p-1 text-[9px] bg-white text-slate-700"
+                                    >
+                                      {ICON_OPTIONS.map(icon => (
+                                        <option key={icon} value={icon}>{icon}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-[8px] text-slate-400 font-bold uppercase">{language === 'ar' ? 'اللون' : 'Color'}</label>
+                                    <select
+                                      value={COLOR_PRESETS.find(p => p.bg === item.color)?.name || 'Slate'}
+                                      onChange={(e) => {
+                                        const preset = COLOR_PRESETS.find(p => p.name === e.target.value) || COLOR_PRESETS[6];
+                                        updateQuickAccessSettings(qa => {
+                                          const nextItems = qa.items.map((i: any) => i.id === item.id ? { ...i, color: preset.bg, iconColor: preset.text } : i);
+                                          return { ...qa, items: nextItems };
+                                        }, true);
+                                      }}
+                                      className="w-full border border-slate-200 rounded p-1 text-[9px] bg-white text-slate-700"
+                                    >
+                                      {COLOR_PRESETS.map(p => (
+                                        <option key={p.name} value={p.name}>{p.name}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-1.5 items-center">
+                                  <div>
+                                    <label className="block text-[8px] text-slate-400 font-bold uppercase">{language === 'ar' ? 'المجموعة' : 'Group'}</label>
+                                    <select
+                                      value={item.groupId || ''}
+                                      onChange={(e) => {
+                                        const val = e.target.value || undefined;
+                                        updateQuickAccessSettings(qa => {
+                                          const nextItems = qa.items.map((i: any) => i.id === item.id ? { ...i, groupId: val } : i);
+                                          return { ...qa, items: nextItems };
+                                        }, true);
+                                      }}
+                                      className="w-full border border-slate-200 rounded p-1 text-[9px] bg-white text-slate-700"
+                                    >
+                                      <option value="">{language === 'ar' ? 'بدون مجموعة' : 'Ungrouped'}</option>
+                                      {(qa.groups || []).map((g: any) => (
+                                        <option key={g.id} value={g.id}>{g.name}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <label className="flex items-center gap-1.5 cursor-pointer mt-3">
+                                    <input
+                                      type="checkbox"
+                                      checked={item.pinned === true}
+                                      onChange={(e) => {
+                                        const val = e.target.checked;
+                                        updateQuickAccessSettings(qa => {
+                                          const nextItems = qa.items.map((i: any) => i.id === item.id ? { ...i, pinned: val } : i);
+                                          return { ...qa, items: nextItems };
+                                        }, true);
+                                      }}
+                                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3 h-3"
+                                    />
+                                    <span className="text-[9px] font-bold text-slate-500 uppercase">{language === 'ar' ? 'تثبيت' : 'Pin'}</span>
+                                  </label>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        <button
+                          onClick={() => {
+                            if (!window.confirm(language === 'ar' ? 'هل أنت متأكد من استعادة اختصارات الوصول السريع الافتراضية؟' : 'Are you sure you want to restore default Quick Access shortcuts?')) return;
+                            updateQuickAccessSettings(qa => {
+                              const defaultItems = masterDataItems.map(item => ({
+                                id: item.id,
+                                label: item.label,
+                                icon: item.icon === UsersIcon ? 'Users' :
+                                      item.icon === Truck ? 'Truck' :
+                                      item.icon === Package ? 'Package' :
+                                      item.icon === Wallet ? 'Wallet' :
+                                      item.icon === CreditCard ? 'CreditCard' :
+                                      item.icon === Settings ? 'Settings' : 'HelpCircle',
+                                color: item.color,
+                                iconColor: item.iconColor,
+                                size: 'medium' as const,
+                                pinned: false
+                              }));
+                              return { ...qa, items: defaultItems, groups: [] };
+                            }, true);
+                          }}
+                          className="w-full mt-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-lg text-[9px] transition-colors"
+                        >
+                          {language === 'ar' ? 'استعادة الوصول السريع الافتراضي' : 'Restore Default Quick Access'}
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -2404,6 +3273,55 @@ export const Dashboard: React.FC = () => {
                 ))}
               </select>
 
+              {/* Duplicate Layout */}
+              <button
+                onClick={handleDuplicateDashboard}
+                className="p-3 bg-white border border-slate-200 text-slate-600 hover:text-slate-900 rounded-2xl shadow-sm transition-all hover:bg-slate-50 flex items-center justify-center shrink-0"
+                title={language === 'ar' ? 'تكرار لوحة التحكم' : 'Duplicate Layout'}
+                type="button"
+              >
+                <Copy size={14} />
+              </button>
+
+              {/* Export Layout */}
+              <button
+                onClick={handleExportDashboard}
+                className="p-3 bg-white border border-slate-200 text-slate-600 hover:text-slate-900 rounded-2xl shadow-sm transition-all hover:bg-slate-50 flex items-center justify-center shrink-0"
+                title={language === 'ar' ? 'تصدير القالب' : 'Export Template'}
+                type="button"
+              >
+                <Lucide.Download size={14} />
+              </button>
+
+              {/* Import Layout */}
+              <button
+                onClick={() => document.getElementById('import-dashboard-file-input')?.click()}
+                className="p-3 bg-white border border-slate-200 text-slate-600 hover:text-slate-900 rounded-2xl shadow-sm transition-all hover:bg-slate-50 flex items-center justify-center shrink-0"
+                title={language === 'ar' ? 'استيراد قالب' : 'Import Template'}
+                type="button"
+              >
+                <Lucide.Upload size={14} />
+              </button>
+              <input
+                id="import-dashboard-file-input"
+                type="file"
+                accept=".json"
+                onChange={handleImportDashboard}
+                className="hidden"
+              />
+
+              {/* Delete Layout */}
+              {currentDashboard && (
+                <button
+                  onClick={handleDeleteDashboard}
+                  className="p-3 bg-white border border-slate-200 text-rose-600 hover:text-rose-700 hover:border-rose-300 rounded-2xl shadow-sm transition-all hover:bg-rose-50 flex items-center justify-center shrink-0"
+                  title={language === 'ar' ? 'حذف لوحة التحكم' : 'Delete Layout'}
+                  type="button"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+
               <button
                 onClick={handleStartCustomizing}
                 className="flex items-center gap-2 px-4 py-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all font-bold text-xs uppercase tracking-wider shadow-sm active:scale-95 whitespace-nowrap"
@@ -2534,7 +3452,7 @@ export const Dashboard: React.FC = () => {
 
                     {/* Widget Content */}
                     <div className="flex-1 min-h-0 w-full">
-                      <WidgetRenderer widget={w} stats={stats} />
+                      <WidgetRenderer widget={w} stats={stats} onToggleGroupCollapse={handleToggleGroupCollapse} />
                     </div>
                   </div>
                 </div>
