@@ -821,6 +821,17 @@ export const DashboardBuilder: React.FC = () => {
                         className="w-full text-xs border border-slate-200 rounded-lg p-2 focus:ring-1 focus:ring-indigo-500 focus:outline-none bg-white text-slate-800 font-medium"
                       />
                     </div>
+                    {selectedWidget.widget_type === 'text' && (
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">{language === 'ar' ? 'محتوى النص' : 'Text Content'}</label>
+                        <textarea 
+                          rows={4}
+                          value={selectedWidget.settings?.text || ''}
+                          onChange={(e) => handleUpdateWidgetProperty('settings.text', e.target.value)}
+                          className="w-full text-xs border border-slate-200 rounded-lg p-2 focus:ring-1 focus:ring-indigo-500 focus:outline-none bg-white text-slate-800 font-medium"
+                        />
+                      </div>
+                    )}
                     <div>
                       <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">{language === 'ar' ? 'شرح ووصف' : 'Description'}</label>
                       <textarea 

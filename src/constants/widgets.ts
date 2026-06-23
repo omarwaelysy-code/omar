@@ -15,5 +15,6 @@ export const WIDGET_REGISTRY: WidgetTypeDefinition[] = [
   { type: 'cash_flow', nameEn: 'Cash Flow', nameAr: 'حركة التدفق النقدي', defaultW: 6, defaultH: 4, description: 'Inflow and outflow of cash assets across payment methods.' },
   { type: 'profit', nameEn: 'Profitability', nameAr: 'الأرباح والخسائر', defaultW: 6, defaultH: 4, description: 'Summary of income vs expenses yielding net profit.' },
   { type: 'customers', nameEn: 'Customers Overview', nameAr: 'نظرة عامة على العملاء', defaultW: 6, defaultH: 4, description: 'Highlights customer debt profiles, top buyers, and growth.' },
-  { type: 'suppliers', nameEn: 'Suppliers Overview', nameAr: 'نظرة عامة على الموردين', defaultW: 6, defaultH: 4, description: 'Highlights supplier outstanding balances and procurement.' }
+  { type: 'suppliers', nameEn: 'Suppliers Overview', nameAr: 'نظرة عامة على الموردين', defaultW: 6, defaultH: 4, description: 'Highlights supplier outstanding balances and procurement.' },
+  { type: 'text', nameEn: 'Text Label', nameAr: 'نص مخصص', defaultW: 4, defaultH: 2, description: 'Renders custom text labels, headers, or markdown instructions.' }
 ];

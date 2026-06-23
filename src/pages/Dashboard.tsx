@@ -469,6 +469,15 @@ const DynamicWidgetRenderer: React.FC<{ widget: Widget }> = ({ widget }) => {
       );
     }
 
+    case 'text':
+      return (
+        <div className="flex flex-col justify-center h-full py-1 text-slate-700">
+          <p className="text-xs font-semibold whitespace-pre-wrap leading-normal">
+            {widget.settings?.text || widget.settings?.description || widget.title || 'Text Widget'}
+          </p>
+        </div>
+      );
+
     default:
       return <div className="text-slate-400 text-[10px] flex items-center justify-center h-full">Unsupported Chart: {chartType}</div>;
   }
@@ -768,6 +777,15 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget, stats }) => {
           <div className="w-full bg-slate-100 h-1.5 rounded-full mt-2 overflow-hidden">
             <div className="bg-red-500 h-full rounded-full" style={{ width: '40%' }} />
           </div>
+        </div>
+      );
+
+    case 'text':
+      return (
+        <div className="flex flex-col justify-center h-full py-1 text-slate-700">
+          <p className="text-xs font-semibold whitespace-pre-wrap leading-normal">
+            {settings?.text || settings?.description || widget.title || 'Text Widget'}
+          </p>
         </div>
       );
 

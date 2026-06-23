@@ -290,6 +290,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
     const navItems = [
       ...(isSuperAdmin ? [{ id: 'super_admin_dashboard', label: t('nav.super_admin_dashboard'), icon: Shield, path: '/super-admin@m@r2020' }] : []),
       { id: 'dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
+      { id: 'dashboard_designer', label: language === 'ar' ? 'مصمم لوحات التحكم' : 'Dashboard Builder', icon: Sliders },
       { 
         id: 'master_data', 
         label: t('nav.master_data'), 
@@ -448,7 +449,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
     return navItems.map(item => {
       // Check if top-level item should be visible
-      const canView = hasPermission(item.id, 'view') || item.id === 'currencies' || item.id === 'templates_menu';
+      const canView = hasPermission(item.id, 'view') || item.id === 'currencies' || item.id === 'templates_menu' || item.id === 'dashboard_designer';
       
       if (item.subItems) {
         const visibleSubItems = item.subItems.filter(sub => {
