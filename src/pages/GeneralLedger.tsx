@@ -260,6 +260,25 @@ export const GeneralLedger: React.FC = () => {
 
   const currentBalance = ledgerData.length > 0 ? ledgerData[ledgerData.length - 1].balance : startBalance;
 
+  const getSubAccountOrProductSingle = (line: any) => {
+    const desc = line.description || '';
+    const productMatch = desc.match(/(?:صنف|الصنف)\s*:\s*([^-\n\r]+)/i);
+    if (productMatch && productMatch[1]) {
+      return productMatch[1].trim();
+    }
+    
+    if (line.sub_account_id) {
+      if (line.sub_account_type === 'payment_method') {
+        return 'خزينة / بنك';
+      }
+      if (line.sub_account_type === 'expense') {
+        return 'مصروف';
+      }
+      return line.sub_account_id;
+    }
+    return '-';
+  };
+
   const handleExportPDF = async () => {
     if (reportRef.current) {
       if (ledgerMode === 'detailed') {
@@ -300,6 +319,7 @@ export const GeneralLedger: React.FC = () => {
       const data = ledgerData.map(tx => ({
         [t('journal.column_date')]: tx.date,
         [t('ledger.column_entity')]: tx.entity_name || '-',
+        [language === 'ar' ? 'الحساب الفرعي/الصنف' : 'Sub-account/Product']: getSubAccountOrProductSingle(tx),
         [t('journal.column_description')]: tx.description,
         [t('journal.column_reference')]: tx.reference || '-',
         [language === 'ar' ? 'رقم القيد' : 'Entry No.']: tx.entry_number || '-',
@@ -623,6 +643,7 @@ export const GeneralLedger: React.FC = () => {
                     <tr className="bg-zinc-50 border-b border-zinc-200">
                       <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_date')}</th>
                       <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('ledger.column_entity')}</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">{language === 'ar' ? 'الحساب الفرعي / الصنف' : 'Sub-account / Product'}</th>
                       <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_description')}</th>
                       <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_reference')}</th>
                       <th className="px-6 py-4 text-sm font-bold text-zinc-700">{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</th>
@@ -636,6 +657,7 @@ export const GeneralLedger: React.FC = () => {
                     <tr className="bg-zinc-50/50">
                       <td className="px-6 py-4 text-sm font-bold text-zinc-900">{dateRange.start}</td>
                       <td className="px-6 py-4 text-sm text-zinc-400">-</td>
+                      <td className="px-6 py-4 text-sm text-zinc-400">-</td>
                       <td className="px-6 py-4 text-sm font-medium text-zinc-600">{t('ledger.opening_balance_row')}</td>
                       <td className="px-6 py-4 text-sm text-zinc-400 text-center">-</td>
                       <td className="px-6 py-4 text-sm text-zinc-400 text-center">-</td>
@@ -648,6 +670,9 @@ export const GeneralLedger: React.FC = () => {
                         <td className="px-6 py-4 text-sm font-bold text-zinc-900">{formatDate(tx.date)}</td>
                         <td className="px-6 py-4 text-sm font-bold text-emerald-600">
                           {tx.entity_name || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-zinc-600">
+                          {getSubAccountOrProductSingle(tx)}
                         </td>
                         <td className="px-6 py-4 text-sm font-medium text-zinc-600 max-w-xs truncate">
                           {tx.description}
@@ -690,7 +715,7 @@ export const GeneralLedger: React.FC = () => {
                     ))}
                     {ledgerData.length === 0 && (
                       <tr>
-                        <td colSpan={8} className="px-6 py-12 text-center text-zinc-500 font-medium">
+                        <td colSpan={9} className="px-6 py-12 text-center text-zinc-500 font-medium">
                           {t('ledger.no_transactions')}
                         </td>
                       </tr>

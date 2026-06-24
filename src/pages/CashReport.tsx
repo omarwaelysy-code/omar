@@ -130,8 +130,35 @@ export const CashReport: React.FC = () => {
               if (sharingMethods.length === 1) {
                 isMatch = true;
               } else {
-                const matchDesc = (desc: string) => desc && (desc.includes(method.name) || desc.includes(method.code));
-                isMatch = matchDesc(item.description) || matchDesc(je.description);
+                const matchDesc = (desc: string) => {
+                  if (!desc) return false;
+                  const hasName = desc.includes(method.name) || (method.code && desc.includes(method.code));
+                  if (!hasName) return false;
+                  
+                  const longerMatch = paymentMethods.find(other => {
+                    if (other.id === method.id) return false;
+                    if (other.name.length <= method.name.length) return false;
+                    if (!other.name.includes(method.name)) return false;
+                    return desc.includes(other.name) || (other.code && desc.includes(other.code));
+                  });
+                  return !longerMatch;
+                };
+
+                // Special handling for transfers to avoid double-matching when both names are in description
+                if (je.reference_type === 'transfer' || je.reference_type === 'cash_transfer' || je.description?.includes('تحويل')) {
+                  if (item.description) {
+                    const isToUs = item.description.includes(`إلى ${method.name}`) || item.description.includes(`وارد ${method.name}`);
+                    const isFromUs = item.description.includes(`من ${method.name}`) || item.description.includes(`صادر ${method.name}`);
+                    
+                    if (item.debit > 0) isMatch = isToUs || (matchDesc(item.description) && !isFromUs);
+                    else if (item.credit > 0) isMatch = isFromUs || (matchDesc(item.description) && !isToUs);
+                    else isMatch = matchDesc(item.description);
+                  } else {
+                    isMatch = matchDesc(je.description);
+                  }
+                } else {
+                  isMatch = matchDesc(item.description) || matchDesc(je.description);
+                }
               }
             }
           }

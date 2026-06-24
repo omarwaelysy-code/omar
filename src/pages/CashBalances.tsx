@@ -122,7 +122,19 @@ export const CashBalances: React.FC = () => {
                   if (sharingMethods.length === 1) {
                     isMatch = true;
                   } else {
-                    const matchDesc = (desc: string) => desc && (desc.includes(method.name) || desc.includes(method.code));
+                    const matchDesc = (desc: string) => {
+                      if (!desc) return false;
+                      const hasName = desc.includes(method.name) || (method.code && desc.includes(method.code));
+                      if (!hasName) return false;
+                      
+                      const longerMatch = paymentMethodsData.find(other => {
+                        if (other.id === method.id) return false;
+                        if (other.name.length <= method.name.length) return false;
+                        if (!other.name.includes(method.name)) return false;
+                        return desc.includes(other.name) || (other.code && desc.includes(other.code));
+                      });
+                      return !longerMatch;
+                    };
                     
                     // Special handling for transfers to avoid double-matching when both names are in description
                     if (je.reference_type === 'transfer' || je.reference_type === 'cash_transfer' || je.description?.includes('تحويل')) {

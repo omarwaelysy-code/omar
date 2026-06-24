@@ -142,7 +142,9 @@ export class AccountingEngine {
               balance: 0,
               entity_name: entityName,
               reference_type: entry.reference_type,
-              entry_number: entry.entry_number
+              entry_number: entry.entry_number,
+              sub_account_id: item.sub_account_id,
+              sub_account_type: item.sub_account_type
             });
           }
         }
