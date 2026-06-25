@@ -98,7 +98,7 @@ export const CashBalances: React.FC = () => {
 
               // 1. Check strict sub_account match
               if (item.sub_account_id && item.sub_account_type === 'payment_method') {
-                isMatch = item.sub_account_id === method.id;
+                isMatch = item.sub_account_id === method.id && item.account_id === method.account_id;
               } 
               // 2. Check Opening Balances explicitly
               else if (je.reference_type === 'opening_balance' && je.reference_id === method.id) {

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
-import { JournalEntry, Account, Customer, Supplier, LedgerLine, AccountType } from '../types';
+import { JournalEntry, Account, Customer, Supplier, LedgerLine, AccountType, PaymentMethod } from '../types';
 import { Search, Calendar, FileText, Download, Printer, Filter, BookOpen, ArrowLeftRight, User, Users, RefreshCcw, LayoutGrid, List } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF } from '../utils/pdfUtils';
@@ -23,6 +23,7 @@ export const GeneralLedger: React.FC = () => {
   const [ledgerMode, setLedgerMode] = useState<'single' | 'detailed'>('single');
   const [accountTypes, setAccountTypes] = useState<AccountType[]>([]);
   const [detailedSearchTerm, setDetailedSearchTerm] = useState('');
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
 
   const handleTransactionClick = (type: string | undefined, reference: string) => {
     if (!reference || reference === '-' || reference === '') return;
@@ -95,6 +96,7 @@ export const GeneralLedger: React.FC = () => {
     const unsubscribeCustomers = dbService.subscribe<Customer>('customers', user.company_id, setCustomers);
     const unsubscribeSuppliers = dbService.subscribe<Supplier>('suppliers', user.company_id, setSuppliers);
     const unsubscribeAccountTypes = dbService.subscribe<AccountType>('account_types', user.company_id, setAccountTypes);
+    const unsubscribePaymentMethods = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setPaymentMethods);
 
     return () => {
       unsubscribeEntries();
@@ -102,6 +104,7 @@ export const GeneralLedger: React.FC = () => {
       unsubscribeCustomers();
       unsubscribeSuppliers();
       unsubscribeAccountTypes();
+      unsubscribePaymentMethods();
     };
   }, [user, refreshTrigger]);
 
@@ -167,7 +170,8 @@ export const GeneralLedger: React.FC = () => {
           
           if (itm.sub_account_id) {
             if (itm.sub_account_type === 'payment_method') {
-              return 'خزينة / بنك';
+              const pm = paymentMethods.find(p => p.id === itm.sub_account_id);
+              return pm ? pm.name : (language === 'ar' ? 'خزينة / بنك' : 'Cash/Bank');
             }
             if (itm.sub_account_type === 'expense') {
               return 'مصروف';
@@ -269,7 +273,8 @@ export const GeneralLedger: React.FC = () => {
     
     if (line.sub_account_id) {
       if (line.sub_account_type === 'payment_method') {
-        return 'خزينة / بنك';
+        const pm = paymentMethods.find(p => p.id === line.sub_account_id);
+        return pm ? pm.name : (language === 'ar' ? 'خزينة / بنك' : 'Cash/Bank');
       }
       if (line.sub_account_type === 'expense') {
         return 'مصروف';
