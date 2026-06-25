@@ -62,7 +62,7 @@ export const CashReport: React.FC = () => {
     } else if (normType === 'receipt' || normType === 'receipt_voucher') {
       setPendingViewDoc({ type: 'receipt', idOrNumber: reference });
       setCurrentPage('receipts');
-    } else if (normType === 'payment_voucher') {
+    } else if (normType === 'payment_voucher' || normType === 'payment') {
       setPendingViewDoc({ type: 'payment_voucher', idOrNumber: reference });
       setCurrentPage('payment_vouchers');
     } else if (normType === 'return') {
@@ -158,16 +158,13 @@ export const CashReport: React.FC = () => {
 
                 // Special handling for transfers to avoid double-matching when both names are in description
                 if (je.reference_type === 'transfer' || je.reference_type === 'cash_transfer' || je.description?.includes('تحويل')) {
-                  if (item.description) {
-                    const isToUs = item.description.includes(`إلى ${method.name}`) || item.description.includes(`وارد ${method.name}`);
-                    const isFromUs = item.description.includes(`من ${method.name}`) || item.description.includes(`صادر ${method.name}`);
-                    
-                    if (item.debit > 0) isMatch = isToUs || (matchDesc(item.description) && !isFromUs);
-                    else if (item.credit > 0) isMatch = isFromUs || (matchDesc(item.description) && !isToUs);
-                    else isMatch = matchDesc(item.description);
-                  } else {
-                    isMatch = matchDesc(je.description);
-                  }
+                  const descToUse = item.description || je.description || '';
+                  const isToUs = descToUse.includes(`إلى ${method.name}`) || descToUse.includes(`وارد ${method.name}`);
+                  const isFromUs = descToUse.includes(`من ${method.name}`) || descToUse.includes(`صادر ${method.name}`);
+                  
+                  if (item.debit > 0) isMatch = isToUs || (matchDesc(descToUse) && !isFromUs);
+                  else if (item.credit > 0) isMatch = isFromUs || (matchDesc(descToUse) && !isToUs);
+                  else isMatch = matchDesc(descToUse);
                 } else {
                   const matchesUs = matchDesc(item.description) || matchDesc(je.description);
                   if (matchesUs) {

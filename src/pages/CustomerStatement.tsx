@@ -42,6 +42,9 @@ export const CustomerStatement: React.FC = () => {
     } else if (type === 'receipt' || type === 'receipt_voucher') {
       setPendingViewDoc({ type: 'receipt', idOrNumber: reference });
       setCurrentPage('receipts');
+    } else if (type === 'payment_voucher' || type === 'payment') {
+      setPendingViewDoc({ type: 'payment_voucher', idOrNumber: reference });
+      setCurrentPage('payment_vouchers');
     } else if (type === 'return') {
       setPendingViewDoc({ type: 'return', idOrNumber: reference });
       setCurrentPage('returns');

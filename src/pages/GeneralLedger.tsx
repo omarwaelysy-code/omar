@@ -11,6 +11,18 @@ import { AccountingEngine } from '../services/AccountingEngine';
 import { formatNumber, formatDate } from '../utils/formatUtils';
 import { useNavigation } from '../contexts/NavigationContext';
 
+const isDefaultMethodForAccount = (method: any, sharingMethods: any[]) => {
+  if (sharingMethods.length === 1) return true;
+  const hasCashInName = (name: string) => {
+    const n = name.toLowerCase();
+    return n === 'كاش' || n === 'cash' || n === 'الخزينة الرئيسية' || n === 'الخزنة الرئيسية';
+  };
+  const cashMethod = sharingMethods.find(p => hasCashInName(p.name));
+  if (cashMethod) return method.id === cashMethod.id;
+  const sorted = [...sharingMethods].sort((a, b) => a.name.localeCompare(b.name));
+  return method.id === sorted[0].id;
+};
+
 export const GeneralLedger: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
@@ -24,6 +36,71 @@ export const GeneralLedger: React.FC = () => {
   const [accountTypes, setAccountTypes] = useState<AccountType[]>([]);
   const [detailedSearchTerm, setDetailedSearchTerm] = useState('');
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+
+  const resolvePaymentMethodForLine = (line: any) => {
+    const sharingMethods = paymentMethods.filter(p => p.account_id === line.account_id);
+    if (sharingMethods.length === 0) return null;
+    
+    if (line.sub_account_id && line.sub_account_type === 'payment_method') {
+      const pm = sharingMethods.find(p => p.id === line.sub_account_id);
+      if (pm) return pm;
+    }
+    
+    if (line.reference_type === 'opening_balance' && line.reference) {
+      const pm = sharingMethods.find(p => p.id === line.reference || p.code === line.reference || p.name === line.reference);
+      if (pm) return pm;
+    }
+
+    if (sharingMethods.length === 1) {
+      return sharingMethods[0];
+    }
+
+    const matchDesc = (desc: string, method: any) => {
+      if (!desc) return false;
+      const hasName = desc.includes(method.name) || (method.code && desc.includes(method.code));
+      if (!hasName) return false;
+      
+      const longerMatch = sharingMethods.find(other => {
+        if (other.id === method.id) return false;
+        if (other.name.length <= method.name.length) return false;
+        if (!other.name.includes(method.name)) return false;
+        return desc.includes(other.name) || (other.code && desc.includes(other.code));
+      });
+      return !longerMatch;
+    };
+
+    let matchedMethod = null;
+    const descToUse = line.description || '';
+    
+    if (line.reference_type === 'transfer' || line.reference_type === 'cash_transfer' || descToUse.includes('تحويل')) {
+      for (const method of sharingMethods) {
+        let isMatch = false;
+        const isToUs = descToUse.includes(`إلى ${method.name}`) || descToUse.includes(`وارد ${method.name}`);
+        const isFromUs = descToUse.includes(`من ${method.name}`) || descToUse.includes(`صادر ${method.name}`);
+        
+        if (line.debit > 0) isMatch = isToUs || (matchDesc(descToUse, method) && !isFromUs);
+        else if (line.credit > 0) isMatch = isFromUs || (matchDesc(descToUse, method) && !isToUs);
+        else isMatch = matchDesc(descToUse, method);
+        
+        if (isMatch) {
+          matchedMethod = method;
+          break;
+        }
+      }
+    } else {
+      for (const method of sharingMethods) {
+        if (matchDesc(descToUse, method)) {
+          matchedMethod = method;
+          break;
+        }
+      }
+    }
+
+    if (matchedMethod) return matchedMethod;
+
+    const defaultMethod = sharingMethods.find(method => isDefaultMethodForAccount(method, sharingMethods));
+    return defaultMethod || sharingMethods[0];
+  };
 
   const handleTransactionClick = (type: string | undefined, reference: string) => {
     if (!reference || reference === '-' || reference === '') return;
@@ -48,7 +125,7 @@ export const GeneralLedger: React.FC = () => {
     } else if (normType === 'receipt' || normType === 'receipt_voucher') {
       setPendingViewDoc({ type: 'receipt', idOrNumber: reference });
       setCurrentPage('receipts');
-    } else if (normType === 'payment_voucher') {
+    } else if (normType === 'payment_voucher' || normType === 'payment') {
       setPendingViewDoc({ type: 'payment_voucher', idOrNumber: reference });
       setCurrentPage('payment_vouchers');
     } else if (normType === 'return') {
@@ -168,11 +245,19 @@ export const GeneralLedger: React.FC = () => {
             return productMatch[1].trim();
           }
           
+          const pm = resolvePaymentMethodForLine({
+            account_id: itm.account_id,
+            sub_account_id: itm.sub_account_id,
+            sub_account_type: itm.sub_account_type,
+            reference_type: entry.reference_type,
+            reference: entry.reference_number,
+            description: itm.description || entry.description,
+            debit: Number(itm.debit) || 0,
+            credit: Number(itm.credit) || 0
+          });
+          if (pm) return pm.name;
+
           if (itm.sub_account_id) {
-            if (itm.sub_account_type === 'payment_method') {
-              const pm = paymentMethods.find(p => p.id === itm.sub_account_id);
-              return pm ? pm.name : (language === 'ar' ? 'خزينة / بنك' : 'Cash/Bank');
-            }
             if (itm.sub_account_type === 'expense') {
               return 'مصروف';
             }
@@ -271,11 +356,19 @@ export const GeneralLedger: React.FC = () => {
       return productMatch[1].trim();
     }
     
+    const pm = resolvePaymentMethodForLine({
+      account_id: line.account_id || selectedAccountId,
+      sub_account_id: line.sub_account_id,
+      sub_account_type: line.sub_account_type,
+      reference_type: line.reference_type,
+      reference: line.reference,
+      description: line.description,
+      debit: Number(line.debit) || 0,
+      credit: Number(line.credit) || 0
+    });
+    if (pm) return pm.name;
+
     if (line.sub_account_id) {
-      if (line.sub_account_type === 'payment_method') {
-        const pm = paymentMethods.find(p => p.id === line.sub_account_id);
-        return pm ? pm.name : (language === 'ar' ? 'خزينة / بنك' : 'Cash/Bank');
-      }
       if (line.sub_account_type === 'expense') {
         return 'مصروف';
       }

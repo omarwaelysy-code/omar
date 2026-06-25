@@ -39,7 +39,7 @@ export const SupplierStatement: React.FC = () => {
     if (type === 'purchase_invoice') {
       setPendingViewDoc({ type: 'purchase_invoice', idOrNumber: reference });
       setCurrentPage('purchase_invoices');
-    } else if (type === 'payment_voucher') {
+    } else if (type === 'payment_voucher' || type === 'payment') {
       setPendingViewDoc({ type: 'payment_voucher', idOrNumber: reference });
       setCurrentPage('payment_vouchers');
     } else if (type === 'purchase_return') {

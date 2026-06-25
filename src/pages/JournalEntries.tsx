@@ -42,7 +42,7 @@ export const JournalEntries: React.FC = () => {
     } else if (normType === 'receipt' || normType === 'receipt_voucher') {
       setPendingViewDoc({ type: 'receipt', idOrNumber: reference });
       setCurrentPage('receipts');
-    } else if (normType === 'payment_voucher') {
+    } else if (normType === 'payment_voucher' || normType === 'payment') {
       setPendingViewDoc({ type: 'payment_voucher', idOrNumber: reference });
       setCurrentPage('payment_vouchers');
     } else if (normType === 'return') {
