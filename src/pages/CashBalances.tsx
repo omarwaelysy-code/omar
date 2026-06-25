@@ -7,6 +7,18 @@ import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
 import { formatNumber } from '../utils/formatUtils';
 
+const isDefaultMethodForAccount = (method: any, sharingMethods: any[]) => {
+  if (sharingMethods.length === 1) return true;
+  const hasCashInName = (name: string) => {
+    const n = name.toLowerCase();
+    return n === 'كاش' || n === 'cash' || n === 'الخزينة الرئيسية' || n === 'الخزنة الرئيسية';
+  };
+  const cashMethod = sharingMethods.find(p => hasCashInName(p.name));
+  if (cashMethod) return method.id === cashMethod.id;
+  const sorted = [...sharingMethods].sort((a, b) => a.name.localeCompare(b.name));
+  return method.id === sorted[0].id;
+};
+
 interface CashBalanceData {
   id: string;
   name: string;
@@ -152,7 +164,20 @@ export const CashBalances: React.FC = () => {
                         isMatch = matchDesc(je.description);
                       }
                     } else {
-                      isMatch = matchDesc(item.description) || matchDesc(je.description);
+                      const matchesUs = matchDesc(item.description) || matchDesc(je.description);
+                      if (matchesUs) {
+                        isMatch = true;
+                      } else {
+                        // If it doesn't match us specifically, check if it matches any other sharing method specifically
+                        const otherMatched = sharingMethods.some(other => {
+                          if (other.id === method.id) return false;
+                          const desc = item.description || je.description || '';
+                          return desc.includes(other.name) || (other.code && desc.includes(other.code));
+                        });
+                        if (!otherMatched) {
+                          isMatch = isDefaultMethodForAccount(method, sharingMethods);
+                        }
+                      }
                     }
                   }
                 }
