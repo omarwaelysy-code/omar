@@ -8,6 +8,17 @@ import { Plus, Trash2, Save, AlertCircle, CheckCircle2, ArrowRightLeft, User, Tr
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatNumber } from '../utils/formatUtils';
 
+const normalizeText = (text: string): string => {
+  if (!text) return '';
+  return text
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/[ى]/g, 'ي')
+    .replace(/[\u064B-\u065F]/g, '') // remove diacritics
+    .trim()
+    .toLowerCase();
+};
+
 export const CreateJournalEntry: React.FC = () => {
   const { user } = useAuth();
   const { showNotification } = useNotification();
@@ -315,15 +326,31 @@ export const CreateJournalEntry: React.FC = () => {
     const item = newItems[index];
 
     if (field === 'debit') {
-      item.debit = val;
-      if (val > 0) item.credit = 0;
-      const rate = Number(item.exchange_rate) || 1;
-      item.foreign_amount = val > 0 ? val / rate : 0;
+      if (val < 0) {
+        const positiveVal = Math.abs(val);
+        item.credit = positiveVal;
+        item.debit = 0;
+        const rate = Number(item.exchange_rate) || 1;
+        item.foreign_amount = positiveVal / rate;
+      } else {
+        item.debit = val;
+        if (val > 0) item.credit = 0;
+        const rate = Number(item.exchange_rate) || 1;
+        item.foreign_amount = val > 0 ? val / rate : 0;
+      }
     } else if (field === 'credit') {
-      item.credit = val;
-      if (val > 0) item.debit = 0;
-      const rate = Number(item.exchange_rate) || 1;
-      item.foreign_amount = val > 0 ? val / rate : 0;
+      if (val < 0) {
+        const positiveVal = Math.abs(val);
+        item.debit = positiveVal;
+        item.credit = 0;
+        const rate = Number(item.exchange_rate) || 1;
+        item.foreign_amount = positiveVal / rate;
+      } else {
+        item.credit = val;
+        if (val > 0) item.debit = 0;
+        const rate = Number(item.exchange_rate) || 1;
+        item.foreign_amount = val > 0 ? val / rate : 0;
+      }
     } else if (field === 'exchange_rate') {
       item.exchange_rate = val;
       const rate = val || 1;
@@ -335,14 +362,22 @@ export const CreateJournalEntry: React.FC = () => {
         item.foreign_amount = localVal > 0 ? localVal / rate : 0;
       }
     } else if (field === 'foreign_amount') {
-      item.foreign_amount = val;
-      const rate = Number(item.exchange_rate) || 1;
-      if (item.credit > 0) {
-        item.credit = val * rate;
+      if (val < 0) {
+        const positiveVal = Math.abs(val);
+        item.foreign_amount = positiveVal;
+        const rate = Number(item.exchange_rate) || 1;
+        item.credit = positiveVal * rate;
         item.debit = 0;
       } else {
-        item.debit = val * rate;
-        item.credit = 0;
+        item.foreign_amount = val;
+        const rate = Number(item.exchange_rate) || 1;
+        if (item.credit > 0) {
+          item.credit = val * rate;
+          item.debit = 0;
+        } else {
+          item.debit = val * rate;
+          item.credit = 0;
+        }
       }
     }
 
@@ -610,10 +645,20 @@ export const CreateJournalEntry: React.FC = () => {
                     />
                     {activeHeaderSearch !== null && (
                       <div className="absolute top-full right-0 left-0 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto min-w-[200px]">
-                        {operations
-                          .filter(o => o.operation_number.toLowerCase().includes(activeHeaderSearch.toLowerCase()) || (o.description && o.description.toLowerCase().includes(activeHeaderSearch.toLowerCase())))
-                          .slice(0, 10)
-                          .map(o => (
+                        {(() => {
+                          const queryNorm = normalizeText(activeHeaderSearch);
+                          const filtered = operations.filter(o => 
+                            normalizeText(o.operation_number).includes(queryNorm) || 
+                            (o.description && normalizeText(o.description).includes(queryNorm))
+                          );
+                          if (filtered.length === 0) {
+                            return (
+                              <div className="p-3 text-center text-xs text-zinc-400 font-bold">
+                                {language === 'ar' ? 'لا توجد نتائج مطابقة' : 'No matching results'}
+                              </div>
+                            );
+                          }
+                          return filtered.slice(0, 10).map(o => (
                             <button
                               key={o.id}
                               type="button"
@@ -626,7 +671,8 @@ export const CreateJournalEntry: React.FC = () => {
                               <span className="text-zinc-800">{o.operation_number}</span>
                               <span className="text-zinc-400 text-[10px] truncate max-w-[120px]">{o.description}</span>
                             </button>
-                          ))}
+                          ));
+                        })()}
                       </div>
                     )}
                   </div>
@@ -743,7 +789,10 @@ export const CreateJournalEntry: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-zinc-200 bg-white">
                 {formData.items.map((item, index) => (
-                  <tr key={index} className="hover:bg-zinc-50/40 transition-colors">
+                  <tr 
+                    key={index} 
+                    className={`transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-zinc-50/40'} hover:bg-emerald-50/15`}
+                  >
                     {/* Debit Input */}
                     <td className="p-0 border-r border-zinc-200 w-28 bg-emerald-50/5">
                       <input
@@ -788,10 +837,20 @@ export const CreateJournalEntry: React.FC = () => {
                       />
                       {activeRowSearch && activeRowSearch.index === index && activeRowSearch.field === 'account_code' && (
                         <div className="absolute top-full right-0 left-0 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto min-w-[240px]">
-                          {accounts
-                            .filter(a => a.code.toLowerCase().includes(activeRowSearch.query.toLowerCase()) || a.name.toLowerCase().includes(activeRowSearch.query.toLowerCase()))
-                            .slice(0, 10)
-                            .map(a => (
+                          {(() => {
+                            const queryNorm = normalizeText(activeRowSearch.query);
+                            const filtered = accounts.filter(a => 
+                              normalizeText(a.code).includes(queryNorm) || 
+                              normalizeText(a.name).includes(queryNorm)
+                            );
+                            if (filtered.length === 0) {
+                              return (
+                                <div className="p-3 text-center text-xs text-zinc-400 font-bold">
+                                  {language === 'ar' ? 'لا توجد نتائج مطابقة' : 'No matching results'}
+                                </div>
+                              );
+                            }
+                            return filtered.slice(0, 10).map(a => (
                               <button
                                 key={a.id}
                                 type="button"
@@ -804,7 +863,8 @@ export const CreateJournalEntry: React.FC = () => {
                                 <span className="font-mono text-zinc-500">{a.code}</span>
                                 <span className="text-zinc-800">{a.name}</span>
                               </button>
-                            ))}
+                            ));
+                          })()}
                         </div>
                       )}
                     </td>
@@ -827,10 +887,20 @@ export const CreateJournalEntry: React.FC = () => {
                       />
                       {activeRowSearch && activeRowSearch.index === index && activeRowSearch.field === 'account_name' && (
                         <div className="absolute top-full right-0 left-0 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto min-w-[240px]">
-                          {accounts
-                            .filter(a => a.code.toLowerCase().includes(activeRowSearch.query.toLowerCase()) || a.name.toLowerCase().includes(activeRowSearch.query.toLowerCase()))
-                            .slice(0, 10)
-                            .map(a => (
+                          {(() => {
+                            const queryNorm = normalizeText(activeRowSearch.query);
+                            const filtered = accounts.filter(a => 
+                              normalizeText(a.code).includes(queryNorm) || 
+                              normalizeText(a.name).includes(queryNorm)
+                            );
+                            if (filtered.length === 0) {
+                              return (
+                                <div className="p-3 text-center text-xs text-zinc-400 font-bold">
+                                  {language === 'ar' ? 'لا توجد نتائج مطابقة' : 'No matching results'}
+                                </div>
+                              );
+                            }
+                            return filtered.slice(0, 10).map(a => (
                               <button
                                 key={a.id}
                                 type="button"
@@ -843,7 +913,8 @@ export const CreateJournalEntry: React.FC = () => {
                                 <span className="text-zinc-800">{a.name}</span>
                                 <span className="font-mono text-zinc-400 text-[10px]">{a.code}</span>
                               </button>
-                            ))}
+                            ));
+                          })()}
                         </div>
                       )}
                     </td>
@@ -936,10 +1007,20 @@ export const CreateJournalEntry: React.FC = () => {
                       />
                       {activeRowSearch && activeRowSearch.index === index && activeRowSearch.field === 'operation' && (
                         <div className="absolute top-full right-0 left-0 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto min-w-[200px]">
-                          {operations
-                            .filter(o => o.operation_number.toLowerCase().includes(activeRowSearch.query.toLowerCase()) || (o.description && o.description.toLowerCase().includes(activeRowSearch.query.toLowerCase())))
-                            .slice(0, 10)
-                            .map(o => (
+                          {(() => {
+                            const queryNorm = normalizeText(activeRowSearch.query);
+                            const filtered = operations.filter(o => 
+                              normalizeText(o.operation_number).includes(queryNorm) || 
+                              (o.description && normalizeText(o.description).includes(queryNorm))
+                            );
+                            if (filtered.length === 0) {
+                              return (
+                                <div className="p-3 text-center text-xs text-zinc-400 font-bold">
+                                  {language === 'ar' ? 'لا توجد نتائج مطابقة' : 'No matching results'}
+                                </div>
+                              );
+                            }
+                            return filtered.slice(0, 10).map(o => (
                               <button
                                 key={o.id}
                                 type="button"
@@ -952,7 +1033,8 @@ export const CreateJournalEntry: React.FC = () => {
                                 <span className="text-zinc-800">{o.operation_number}</span>
                                 <span className="text-zinc-400 text-[10px] font-normal truncate max-w-[120px]">{o.description}</span>
                               </button>
-                            ))}
+                            ));
+                          })()}
                         </div>
                       )}
                     </td>
