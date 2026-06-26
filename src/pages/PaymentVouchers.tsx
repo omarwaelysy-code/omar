@@ -1250,13 +1250,46 @@ export const PaymentVouchers: React.FC = () => {
   };
 
   const handleExportExcel = () => {
-    const formattedData = formatDataForExcel(filteredVouchers, {
-      'voucher_number': t('payments.column_number'),
-      'entity_name': t('payments.column_recipient'),
-      'date': t('payments.column_date'),
-      'amount': t('payments.column_amount'),
-      'description': t('payments.column_description')
+    const preparedData = filteredVouchers.map(voucher => {
+      // Resolve recipient name
+      let recipient = '---';
+      if (voucher.voucher_type === 'multi') {
+        recipient = 'متعدد';
+      } else if (voucher.items && voucher.items.length > 0) {
+        const names = voucher.items.map((item: any) => {
+          if (item.type === 'supplier') return suppliers.find(s => s.id === item.entity_id)?.name || 'مورد';
+          if (item.type === 'customer') return customers.find(c => c.id === item.entity_id)?.name || 'عميل';
+          if (item.type === 'expense') return categories.find(c => c.id === item.entity_id)?.name || 'مصروف';
+          return accounts.find(a => a.id === item.entity_id)?.name || 'حساب';
+        });
+        recipient = names.join(', ');
+      } else {
+        recipient = voucher.type === 'supplier' ? (voucher.supplier_name || '') : (voucher.category_name || '');
+      }
+
+      // Resolve voucher type label
+      const typeLabel = voucher.voucher_type === 'multi' ? 'متعدد' : voucher.type === 'supplier' ? 'مورد' : 'مصروف';
+
+      return {
+        ...voucher,
+        resolved_recipient: recipient,
+        resolved_type: typeLabel,
+        resolved_date: formatDate(voucher.date),
+        resolved_amount: voucher.amount
+      };
     });
+
+    const formattedData = formatDataForExcel(preparedData, {
+      'voucher_number': language === 'ar' ? 'رقم السند / المرجع' : 'Voucher No. / Ref',
+      'resolved_type': language === 'ar' ? 'النوع' : 'Type',
+      'resolved_recipient': language === 'ar' ? 'المستفيد / الفئة' : 'Beneficiary / Class',
+      'resolved_date': language === 'ar' ? 'التاريخ' : 'Date',
+      'payment_method_name': language === 'ar' ? 'طريقة السداد' : 'Payment Method',
+      'resolved_amount': language === 'ar' ? 'المبلغ' : 'Amount',
+      'entry_number': language === 'ar' ? 'رقم القيد' : 'Entry No.',
+      'description': language === 'ar' ? 'البيان / التفاصيل' : 'Description / Details'
+    });
+
     exportToExcel(formattedData, { filename: 'PaymentVouchers_Report', sheetName: t('payments.title') });
   };
 
@@ -1709,6 +1742,7 @@ export const PaymentVouchers: React.FC = () => {
                       </span>
                     </div>
                   </th>
+                  <th className="px-6 py-4 font-bold">{language === 'ar' ? 'طريقة السداد' : 'Payment Method'}</th>
                   <th className="px-6 py-4 font-bold">{t('common.description')}</th>
                   <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('amount')}>
                     <div className="flex items-center gap-1">
@@ -1725,7 +1759,7 @@ export const PaymentVouchers: React.FC = () => {
               <tbody className="divide-y divide-zinc-50">
                 {filteredVouchers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد سندات صرف حالياً' : 'No payment vouchers currently'}</td>
+                    <td colSpan={9} className="px-6 py-12 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد سندات صرف حالياً' : 'No payment vouchers currently'}</td>
                   </tr>
                 ) : filteredVouchers.map((voucher) => (
                   <tr 
@@ -1767,6 +1801,15 @@ export const PaymentVouchers: React.FC = () => {
                       )}
                     </td>
                     <td className="px-6 py-4 text-zinc-500">{formatDate(voucher.date)}</td>
+                    <td className="px-6 py-4">
+                      {voucher.payment_method_name ? (
+                        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
+                          {voucher.payment_method_name}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-zinc-400">-</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-zinc-600 max-w-xs">{voucher.description || '---'}</td>
                     <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(voucher.amount)} {t('common.currency')}</td>
                     <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>

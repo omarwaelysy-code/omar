@@ -1392,13 +1392,24 @@ export const Receipts: React.FC = () => {
   };
 
   const handleExportExcel = () => {
-    const formattedData = formatDataForExcel(filteredReceipts, {
-      'receipt_number': t('receipts.column_number'),
-      'customer_name': t('receipts.column_customer'),
-      'date': t('receipts.column_date'),
-      'amount': t('receipts.column_amount'),
-      'description': t('receipts.column_description')
+    const preparedData = filteredReceipts.map(receipt => {
+      return {
+        ...receipt,
+        resolved_date: formatDate(receipt.date),
+        resolved_amount: receipt.amount
+      };
     });
+
+    const formattedData = formatDataForExcel(preparedData, {
+      'voucher_number': language === 'ar' ? 'الرقم' : 'Number',
+      'customer_name': language === 'ar' ? 'العميل' : 'Customer',
+      'resolved_date': language === 'ar' ? 'التاريخ' : 'Date',
+      'payment_method_name': language === 'ar' ? 'طريقة السداد' : 'Payment Method',
+      'resolved_amount': language === 'ar' ? 'المبلغ' : 'Amount',
+      'entry_number': language === 'ar' ? 'رقم القيد' : 'Entry No.',
+      'description': language === 'ar' ? 'البيان' : 'Description'
+    });
+
     exportToExcel(formattedData, { filename: 'Receipts_Report', sheetName: t('receipts.title') });
   };
 
