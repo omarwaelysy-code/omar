@@ -698,6 +698,7 @@ export interface LedgerLine {
   entry_number?: string;
   sub_account_id?: string;
   sub_account_type?: string;
+  reference_id?: string;
 }
 
 export interface Department {

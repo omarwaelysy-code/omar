@@ -19,6 +19,104 @@ const isDefaultMethodForAccount = (method: any, sharingMethods: any[]) => {
   return method.id === sorted[0].id;
 };
 
+const resolvePaymentMethodForLine = (
+  line: any,
+  paymentMethods: PaymentMethod[],
+  invoices?: any[],
+  purchaseInvoices?: any[]
+) => {
+  const sharingMethods = paymentMethods.filter(p => p.account_id === line.account_id);
+  if (sharingMethods.length === 0) return null;
+
+  // 1. Strict sub_account match
+  if (line.sub_account_id && line.sub_account_type === 'payment_method') {
+    const pm = sharingMethods.find(p => p.id === line.sub_account_id);
+    if (pm) return pm;
+  }
+
+  // 2. Opening Balance match
+  if (line.reference_type === 'opening_balance') {
+    const ref = line.reference_id || line.reference;
+    if (ref) {
+      const pm = sharingMethods.find(p => p.id === ref || p.code === ref || p.name === ref);
+      if (pm) return pm;
+    }
+  }
+
+  // 3. Invoice / Purchase Invoice lookup if arrays are provided
+  if (!line.sub_account_id && line.reference_id) {
+    if (line.reference_type === 'invoice' && invoices) {
+      const invoice = invoices.find(i => i.id === line.reference_id);
+      if (invoice && invoice.payment_type === 'cash' && invoice.payment_method_id) {
+        const pm = sharingMethods.find(p => p.id === invoice.payment_method_id);
+        if (pm) return pm;
+      }
+    } else if (line.reference_type === 'purchase_invoice' && purchaseInvoices) {
+      const pInvoice = purchaseInvoices.find(i => i.id === line.reference_id);
+      if (pInvoice && pInvoice.payment_type === 'cash' && pInvoice.payment_method_id) {
+        const pm = sharingMethods.find(p => p.id === pInvoice.payment_method_id);
+        if (pm) return pm;
+      }
+    }
+  }
+
+  // 4. If only one safe points to this account, it must be it
+  if (sharingMethods.length === 1) {
+    return sharingMethods[0];
+  }
+
+  const matchDesc = (desc: string, method: PaymentMethod) => {
+    if (!desc) return false;
+    const hasName = desc.includes(method.name) || (method.code && desc.includes(method.code));
+    if (!hasName) return false;
+
+    const longerMatch = sharingMethods.find(other => {
+      if (other.id === method.id) return false;
+      if (other.name.length <= method.name.length) return false;
+      if (!other.name.includes(method.name)) return false;
+      return desc.includes(other.name) || (other.code && desc.includes(other.code));
+    });
+    return !longerMatch;
+  };
+
+  let matchedMethod = null;
+  const descToUse = line.description || '';
+
+  // 5. Transfer matching
+  if (line.reference_type === 'transfer' || line.reference_type === 'cash_transfer' || descToUse.includes('تحويل')) {
+    for (const method of sharingMethods) {
+      let isMatch = false;
+      const isToUs = descToUse.includes(`إلى ${method.name}`) || descToUse.includes(`وارد ${method.name}`);
+      const isFromUs = descToUse.includes(`من ${method.name}`) || descToUse.includes(`صادر ${method.name}`);
+
+      const debit = Number(line.debit) || 0;
+      const credit = Number(line.credit) || 0;
+
+      if (debit > 0) isMatch = isToUs || (matchDesc(descToUse, method) && !isFromUs);
+      else if (credit > 0) isMatch = isFromUs || (matchDesc(descToUse, method) && !isToUs);
+      else isMatch = matchDesc(descToUse, method);
+
+      if (isMatch) {
+        matchedMethod = method;
+        break;
+      }
+    }
+  } else {
+    for (const method of sharingMethods) {
+      if (matchDesc(descToUse, method)) {
+        matchedMethod = method;
+        break;
+      }
+    }
+  }
+
+  if (matchedMethod) return matchedMethod;
+
+  // 6. Fallback to default safe
+  const defaultMethod = sharingMethods.find(method => isDefaultMethodForAccount(method, sharingMethods));
+  return defaultMethod || sharingMethods[0];
+};
+
 interface CashBalanceData {
   id: string;
   name: string;
@@ -106,76 +204,23 @@ export const CashBalances: React.FC = () => {
             const jeDateStr = (je.date || '').slice(0, 10);
 
             je.items?.forEach((item: any) => {
-              let isMatch = false;
-
-              // 1. Check strict sub_account match
-              if (item.sub_account_id && item.sub_account_type === 'payment_method') {
-                isMatch = item.sub_account_id === method.id && item.account_id === method.account_id;
-              } 
-              // 2. Check Opening Balances explicitly
-              else if (je.reference_type === 'opening_balance' && je.reference_id === method.id) {
-                isMatch = item.account_id === method.account_id;
-              } 
-              // 3. Look up real reference mapping for missing data (e.g. backend auto-generated JEs)
-              else if (item.account_id === method.account_id && !item.sub_account_id) {
-                if (je.reference_type === 'invoice') {
-                  const invoice = invoices.find(i => i.id === je.reference_id);
-                  if (invoice && invoice.payment_type === 'cash' && invoice.payment_method_id === method.id) {
-                    isMatch = true;
-                  }
-                } else if (je.reference_type === 'purchase_invoice') {
-                  const pInvoice = purchaseInvoices.find(i => i.id === je.reference_id);
-                  if (pInvoice && pInvoice.payment_type === 'cash' && pInvoice.payment_method_id === method.id) {
-                    isMatch = true;
-                  }
-                } else {
-                  // Support for legacy entries before sub_accounts were enforced
-                  const sharingMethods = paymentMethodsData.filter(p => p.account_id === method.account_id);
-                  if (sharingMethods.length === 1) {
-                    isMatch = true;
-                  } else {
-                    const matchDesc = (desc: string) => {
-                      if (!desc) return false;
-                      const hasName = desc.includes(method.name) || (method.code && desc.includes(method.code));
-                      if (!hasName) return false;
-                      
-                      const longerMatch = paymentMethodsData.find(other => {
-                        if (other.id === method.id) return false;
-                        if (other.name.length <= method.name.length) return false;
-                        if (!other.name.includes(method.name)) return false;
-                        return desc.includes(other.name) || (other.code && desc.includes(other.code));
-                      });
-                      return !longerMatch;
-                    };
-                    
-                    // Special handling for transfers to avoid double-matching when both names are in description
-                    if (je.reference_type === 'transfer' || je.reference_type === 'cash_transfer' || je.description?.includes('تحويل')) {
-                      const descToUse = item.description || je.description || '';
-                      const isToUs = descToUse.includes(`إلى ${method.name}`) || descToUse.includes(`وارد ${method.name}`);
-                      const isFromUs = descToUse.includes(`من ${method.name}`) || descToUse.includes(`صادر ${method.name}`);
-                      
-                      if (item.debit > 0) isMatch = isToUs || (matchDesc(descToUse) && !isFromUs);
-                      else if (item.credit > 0) isMatch = isFromUs || (matchDesc(descToUse) && !isToUs);
-                      else isMatch = matchDesc(descToUse);
-                    } else {
-                      const matchesUs = matchDesc(item.description) || matchDesc(je.description);
-                      if (matchesUs) {
-                        isMatch = true;
-                      } else {
-                        // If it doesn't match us specifically, check if it matches any other sharing method specifically
-                        const otherMatched = sharingMethods.some(other => {
-                          if (other.id === method.id) return false;
-                          const desc = item.description || je.description || '';
-                          return desc.includes(other.name) || (other.code && desc.includes(other.code));
-                        });
-                        if (!otherMatched) {
-                          isMatch = isDefaultMethodForAccount(method, sharingMethods);
-                        }
-                      }
-                    }
-                  }
-                }
-              }
+              const resolvedMethod = resolvePaymentMethodForLine(
+                {
+                  account_id: item.account_id,
+                  sub_account_id: item.sub_account_id,
+                  sub_account_type: item.sub_account_type,
+                  reference_type: je.reference_type,
+                  reference_id: je.reference_id,
+                  reference: je.reference_number,
+                  description: item.description || je.description,
+                  debit: Number(item.debit) || 0,
+                  credit: Number(item.credit) || 0
+                },
+                paymentMethodsData,
+                invoices,
+                purchaseInvoices
+              );
+              const isMatch = resolvedMethod?.id === method.id;
 
               if (isMatch) {
                 const amountDebit = Number(item.debit || 0);

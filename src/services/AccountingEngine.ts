@@ -144,7 +144,8 @@ export class AccountingEngine {
               reference_type: entry.reference_type,
               entry_number: entry.entry_number,
               sub_account_id: item.sub_account_id,
-              sub_account_type: item.sub_account_type
+              sub_account_type: item.sub_account_type,
+              reference_id: entry.reference_id
             });
           }
         }

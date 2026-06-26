@@ -37,20 +37,47 @@ export const GeneralLedger: React.FC = () => {
   const [detailedSearchTerm, setDetailedSearchTerm] = useState('');
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
 
-  const resolvePaymentMethodForLine = (line: any) => {
+  const resolvePaymentMethodForLine = (
+    line: any,
+    invoices?: any[],
+    purchaseInvoices?: any[]
+  ) => {
     const sharingMethods = paymentMethods.filter(p => p.account_id === line.account_id);
     if (sharingMethods.length === 0) return null;
     
+    // 1. Strict sub_account match
     if (line.sub_account_id && line.sub_account_type === 'payment_method') {
       const pm = sharingMethods.find(p => p.id === line.sub_account_id);
       if (pm) return pm;
     }
     
-    if (line.reference_type === 'opening_balance' && line.reference) {
-      const pm = sharingMethods.find(p => p.id === line.reference || p.code === line.reference || p.name === line.reference);
-      if (pm) return pm;
+    // 2. Opening Balance match
+    if (line.reference_type === 'opening_balance') {
+      const ref = line.reference_id || line.reference;
+      if (ref) {
+        const pm = sharingMethods.find(p => p.id === ref || p.code === ref || p.name === ref);
+        if (pm) return pm;
+      }
     }
 
+    // 3. Invoice / Purchase Invoice lookup if arrays are provided
+    if (!line.sub_account_id && line.reference_id) {
+      if (line.reference_type === 'invoice' && invoices) {
+        const invoice = invoices.find(i => i.id === line.reference_id);
+        if (invoice && invoice.payment_type === 'cash' && invoice.payment_method_id) {
+          const pm = sharingMethods.find(p => p.id === invoice.payment_method_id);
+          if (pm) return pm;
+        }
+      } else if (line.reference_type === 'purchase_invoice' && purchaseInvoices) {
+        const pInvoice = purchaseInvoices.find(i => i.id === line.reference_id);
+        if (pInvoice && pInvoice.payment_type === 'cash' && pInvoice.payment_method_id) {
+          const pm = sharingMethods.find(p => p.id === pInvoice.payment_method_id);
+          if (pm) return pm;
+        }
+      }
+    }
+
+    // 4. If only one safe points to this account, it must be it
     if (sharingMethods.length === 1) {
       return sharingMethods[0];
     }
@@ -72,14 +99,18 @@ export const GeneralLedger: React.FC = () => {
     let matchedMethod = null;
     const descToUse = line.description || '';
     
+    // 5. Transfer matching
     if (line.reference_type === 'transfer' || line.reference_type === 'cash_transfer' || descToUse.includes('تحويل')) {
       for (const method of sharingMethods) {
         let isMatch = false;
         const isToUs = descToUse.includes(`إلى ${method.name}`) || descToUse.includes(`وارد ${method.name}`);
         const isFromUs = descToUse.includes(`من ${method.name}`) || descToUse.includes(`صادر ${method.name}`);
         
-        if (line.debit > 0) isMatch = isToUs || (matchDesc(descToUse, method) && !isFromUs);
-        else if (line.credit > 0) isMatch = isFromUs || (matchDesc(descToUse, method) && !isToUs);
+        const debit = Number(line.debit) || 0;
+        const credit = Number(line.credit) || 0;
+
+        if (debit > 0) isMatch = isToUs || (matchDesc(descToUse, method) && !isFromUs);
+        else if (credit > 0) isMatch = isFromUs || (matchDesc(descToUse, method) && !isToUs);
         else isMatch = matchDesc(descToUse, method);
         
         if (isMatch) {
@@ -98,6 +129,7 @@ export const GeneralLedger: React.FC = () => {
 
     if (matchedMethod) return matchedMethod;
 
+    // 6. Fallback to default safe
     const defaultMethod = sharingMethods.find(method => isDefaultMethodForAccount(method, sharingMethods));
     return defaultMethod || sharingMethods[0];
   };
@@ -250,6 +282,7 @@ export const GeneralLedger: React.FC = () => {
             sub_account_id: itm.sub_account_id,
             sub_account_type: itm.sub_account_type,
             reference_type: entry.reference_type,
+            reference_id: entry.reference_id,
             reference: entry.reference_number,
             description: itm.description || entry.description,
             debit: Number(itm.debit) || 0,
@@ -361,6 +394,7 @@ export const GeneralLedger: React.FC = () => {
       sub_account_id: line.sub_account_id,
       sub_account_type: line.sub_account_type,
       reference_type: line.reference_type,
+      reference_id: line.reference_id,
       reference: line.reference,
       description: line.description,
       debit: Number(line.debit) || 0,
