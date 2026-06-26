@@ -664,6 +664,9 @@ export interface JournalEntryItem {
   operation_id?: string | null;
   department_id?: string | null;
   cost_center_id?: string | null;
+  currency?: string;
+  exchange_rate?: number;
+  foreign_amount?: number;
 }
 
 export interface TrialBalanceItem {

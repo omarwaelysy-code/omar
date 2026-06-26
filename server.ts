@@ -70,6 +70,12 @@ async function startServer() {
       'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "sub_account_type" VARCHAR(50)',
       'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "company_id" VARCHAR(36)',
       'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "product_name" VARCHAR(255)',
+      'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "operation_id" VARCHAR(36)',
+      'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "department_id" VARCHAR(36)',
+      'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "cost_center_id" VARCHAR(36)',
+      'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "currency" VARCHAR(10)',
+      'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "exchange_rate" DECIMAL(18, 4) DEFAULT 1',
+      'ALTER TABLE "journal_entry_lines" ADD COLUMN IF NOT EXISTS "foreign_amount" DECIMAL(18, 4) DEFAULT 0',
 
       // Vouchers
       'ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "description" TEXT',

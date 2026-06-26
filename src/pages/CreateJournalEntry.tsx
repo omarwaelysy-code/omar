@@ -3,8 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
-import { Account, Customer, Supplier, JournalEntry, JournalEntryItem } from '../types';
-import { Plus, Trash2, Save, AlertCircle, CheckCircle2, ArrowRightLeft, User, Truck } from 'lucide-react';
+import { Account, Customer, Supplier, JournalEntry, JournalEntryItem, Department, CostCenter, Operation } from '../types';
+import { Plus, Trash2, Save, AlertCircle, CheckCircle2, ArrowRightLeft, User, Truck, Copy, X, Check, Search, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatNumber } from '../utils/formatUtils';
 
@@ -16,17 +16,42 @@ export const CreateJournalEntry: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSupplier] = useState<Supplier[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
+  const [operations, setOperations] = useState<Operation[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // States for Copy / Duplicate Feature
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [recentEntries, setRecentEntries] = useState<JournalEntry[]>([]);
+  const [copySearchQuery, setCopySearchQuery] = useState('');
+
+  // States for Header Defaults Dimensions
+  const [headerDimensions, setHeaderDimensions] = useState({
+    operation_id: '',
+    department_id: '',
+    cost_center_id: ''
+  });
+
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     description: '',
     reference_number: '',
     items: [
-      { account_id: '', account_name: '', debit: 0, credit: 0, description: '', sub_account_id: '', sub_account_type: undefined },
-      { account_id: '', account_name: '', debit: 0, credit: 0, description: '', sub_account_id: '', sub_account_type: undefined }
+      { account_id: '', account_name: '', debit: 0, credit: 0, description: '', sub_account_id: '', sub_account_type: undefined, operation_id: '', department_id: '', cost_center_id: '', currency: 'local', exchange_rate: 1, foreign_amount: 0 },
+      { account_id: '', account_name: '', debit: 0, credit: 0, description: '', sub_account_id: '', sub_account_type: undefined, operation_id: '', department_id: '', cost_center_id: '', currency: 'local', exchange_rate: 1, foreign_amount: 0 }
     ]
   });
+
+  const currencies = [
+    { code: 'local', name: language === 'ar' ? 'العملة المحلية' : 'Local Currency' },
+    { code: 'USD', name: 'USD (دولار)' },
+    { code: 'EUR', name: 'EUR (يورو)' },
+    { code: 'SAR', name: 'SAR (ريال سعودي)' },
+    { code: 'AED', name: 'AED (درهم إماراتي)' },
+    { code: 'KWD', name: 'KWD (دينار كويتي)' }
+  ];
 
   // Dynamic Sub-account Options
   const subAccounts = [
@@ -41,20 +66,118 @@ export const CreateJournalEntry: React.FC = () => {
       const unsubCustomers = dbService.subscribe<Customer>('customers', user.company_id, setCustomers);
       const unsubSuppliers = dbService.subscribe<Supplier>('suppliers', user.company_id, setSupplier);
       const unsubPMs = dbService.subscribe<any>('payment_methods', user.company_id, setPaymentMethods);
+      const unsubDepartments = dbService.subscribe<Department>('departments', user.company_id, setDepartments);
+      const unsubCostCenters = dbService.subscribe<CostCenter>('cost_centers', user.company_id, setCostCenters);
+      const unsubOperations = dbService.subscribe<Operation>('operations', user.company_id, setOperations);
       setLoading(false);
       return () => {
         unsubAccounts();
         unsubCustomers();
         unsubSuppliers();
         unsubPMs();
+        unsubDepartments();
+        unsubCostCenters();
+        unsubOperations();
       };
     }
   }, [user]);
 
+  // Load recent journal entries when Copy Modal is opened
+  useEffect(() => {
+    if (showCopyModal && user) {
+      dbService.list<JournalEntry>('journal_entries', user.company_id)
+        .then(data => {
+          const manualEntries = data.filter(e => e.reference_type === 'manual' || !e.reference_type);
+          const sorted = manualEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          setRecentEntries(sorted);
+        })
+        .catch(err => {
+          console.error('[ERP] Error loading entries for copy:', err);
+          showNotification('تعذر تحميل القيود السابقة', 'error');
+        });
+    }
+  }, [showCopyModal, user]);
+
+  const handleCopyEntry = async (entryId: string) => {
+    try {
+      showNotification('جاري تحميل القيد المحدد...', 'info');
+      const entry = recentEntries.find(e => e.id === entryId);
+      if (!entry) return;
+
+      const lines = await dbService.query<JournalEntryItem>('journal_entry_lines', [
+        { field: 'journal_entry_id', operator: '==', value: entryId }
+      ]);
+
+      if (lines.length === 0) {
+        showNotification('القيد المحدد لا يحتوي على أسطر صالحة للنسخ', 'error');
+        return;
+      }
+
+      const copiedItems = lines.map(line => ({
+        account_id: line.account_id || '',
+        account_name: line.account_name || '',
+        debit: Number(line.debit) || 0,
+        credit: Number(line.credit) || 0,
+        description: line.description || '',
+        sub_account_id: line.sub_account_id || '',
+        sub_account_type: line.sub_account_type || undefined,
+        customer_id: line.customer_id || '',
+        supplier_id: line.supplier_id || '',
+        operation_id: line.operation_id || '',
+        department_id: line.department_id || '',
+        cost_center_id: line.cost_center_id || '',
+        currency: line.currency || 'local',
+        exchange_rate: Number(line.exchange_rate) || 1,
+        foreign_amount: Number(line.foreign_amount) || 0
+      }));
+
+      setFormData({
+        date: new Date().toISOString().split('T')[0],
+        description: entry.description || '',
+        reference_number: entry.reference_number || '',
+        items: copiedItems
+      } as any);
+
+      setShowCopyModal(false);
+      showNotification('تم نسخ القيد بنجاح! يمكنك الآن تعديله وحفظه.', 'success');
+    } catch (err) {
+      console.error('[ERP] Error copying entry:', err);
+      showNotification('حدث خطأ أثناء نسخ القيد', 'error');
+    }
+  };
+
+  const applyHeaderDimensionsToAll = () => {
+    const updatedItems = formData.items.map(item => ({
+      ...item,
+      operation_id: headerDimensions.operation_id || item.operation_id,
+      department_id: headerDimensions.department_id || item.department_id,
+      cost_center_id: headerDimensions.cost_center_id || item.cost_center_id
+    }));
+    setFormData({ ...formData, items: updatedItems });
+    showNotification('تم تطبيق الأبعاد على جميع أسطر الجدول بنجاح', 'success');
+  };
+
   const addItem = () => {
     setFormData({
       ...formData,
-      items: [...formData.items, { account_id: '', account_name: '', debit: 0, credit: 0, description: '', sub_account_id: '', sub_account_type: undefined }]
+      items: [
+        ...formData.items,
+        {
+          account_id: '',
+          account_name: '',
+          debit: 0,
+          credit: 0,
+          description: '',
+          sub_account_id: '',
+          sub_account_type: undefined,
+          operation_id: headerDimensions.operation_id || '',
+          department_id: headerDimensions.department_id || '',
+          cost_center_id: headerDimensions.cost_center_id || '',
+          currency: 'local',
+          exchange_rate: 1,
+          foreign_amount: 0
+        }
+      ]
     } as any);
   };
 
@@ -70,37 +193,86 @@ export const CreateJournalEntry: React.FC = () => {
 
   const updateItem = (index: number, field: string, value: any) => {
     const newItems = [...formData.items] as any;
-    newItems[index][field] = value;
+    const item = newItems[index];
 
     if (field === 'account_id') {
       const account = accounts.find(a => a.id === value);
-      newItems[index].account_name = account?.name || '';
-      // Reset entity selections when account changes
-      newItems[index].sub_account_id = '';
-      newItems[index].sub_account_type = undefined;
-      newItems[index].customer_id = '';
-      newItems[index].supplier_id = '';
+      item.account_id = value;
+      item.account_name = account?.name || '';
+      item.sub_account_id = '';
+      item.sub_account_type = undefined;
+      item.customer_id = '';
+      item.supplier_id = '';
+    } else if (field === 'sub_account_id') {
+      const subAccount = subAccounts.find(s => s.id === value);
+      item.sub_account_id = value;
+      item.sub_account_type = subAccount?.type;
       
-      console.log(`[ERP] Account Selected: ${account?.name}, Required Sub: ${account?.required_sub_account}`);
+      if (subAccount?.type === 'customer') {
+        item.customer_id = subAccount.id;
+        item.supplier_id = '';
+      } else if (subAccount?.type === 'supplier') {
+        item.customer_id = '';
+        item.supplier_id = subAccount.id;
+      } else {
+        item.customer_id = '';
+        item.supplier_id = '';
+      }
+    } else if (field === 'currency') {
+      item.currency = value;
+      if (value === 'local') {
+        item.exchange_rate = 1;
+        item.foreign_amount = Number(item.debit) || Number(item.credit) || 0;
+      } else {
+        let defaultRate = 1;
+        if (value === 'USD') defaultRate = 50;
+        else if (value === 'EUR') defaultRate = 54;
+        else if (value === 'SAR') defaultRate = 13.3;
+        item.exchange_rate = defaultRate;
+        const localVal = Number(item.debit) || Number(item.credit) || 0;
+        item.foreign_amount = localVal > 0 ? localVal / defaultRate : 0;
+      }
+    } else {
+      item[field] = value;
     }
 
-    if (field === 'sub_account_id') {
-       const subAccount = subAccounts.find(s => s.id === value);
-       newItems[index].sub_account_type = subAccount?.type;
-       
-       // Maintain backward compatibility for columns
-       if (subAccount?.type === 'customer') {
-          newItems[index].customer_id = subAccount.id;
-          newItems[index].supplier_id = '';
-       } else if (subAccount?.type === 'supplier') {
-          newItems[index].customer_id = '';
-          newItems[index].supplier_id = subAccount.id;
-       } else {
-          newItems[index].customer_id = '';
-          newItems[index].supplier_id = '';
-       }
-       
-       console.log(`[ERP] Sub-account Selected: ${subAccount?.name}, Type: ${subAccount?.type}`);
+    setFormData({ ...formData, items: newItems });
+  };
+
+  const handleCalculations = (index: number, field: 'debit' | 'credit' | 'exchange_rate' | 'foreign_amount', val: number) => {
+    const newItems = [...formData.items] as any;
+    const item = newItems[index];
+
+    if (field === 'debit') {
+      item.debit = val;
+      if (val > 0) item.credit = 0;
+      const rate = Number(item.exchange_rate) || 1;
+      item.foreign_amount = val > 0 ? val / rate : 0;
+    } else if (field === 'credit') {
+      item.credit = val;
+      if (val > 0) item.debit = 0;
+      const rate = Number(item.exchange_rate) || 1;
+      item.foreign_amount = val > 0 ? val / rate : 0;
+    } else if (field === 'exchange_rate') {
+      item.exchange_rate = val;
+      const rate = val || 1;
+      if (item.foreign_amount > 0) {
+        if (item.debit > 0) item.debit = item.foreign_amount * rate;
+        if (item.credit > 0) item.credit = item.foreign_amount * rate;
+      } else {
+        const localVal = item.debit || item.credit || 0;
+        item.foreign_amount = localVal > 0 ? localVal / rate : 0;
+      }
+    } else if (field === 'foreign_amount') {
+      item.foreign_amount = val;
+      const rate = Number(item.exchange_rate) || 1;
+      if (item.credit > 0) {
+        item.credit = val * rate;
+        item.debit = 0;
+      } else {
+        item.debit = val * rate;
+        item.credit = 0;
+      }
     }
 
     setFormData({ ...formData, items: newItems });
@@ -110,8 +282,8 @@ export const CreateJournalEntry: React.FC = () => {
   const totalCredit = formData.items.reduce((sum, item) => sum + (Number(item.credit) || 0), 0);
   const difference = Math.abs(totalDebit - totalCredit);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!user) return;
 
     if (totalDebit === 0 || totalCredit === 0) {
@@ -119,12 +291,11 @@ export const CreateJournalEntry: React.FC = () => {
       return;
     }
 
-    if (totalDebit !== totalCredit) {
+    if (Math.abs(totalDebit - totalCredit) >= 0.01) {
       showNotification('القيد غير متزن (إجمالي المدين يجب أن يساوي إجمالي الدائن)', 'error');
       return;
     }
 
-    // Validate customer/supplier selection
     for (let i = 0; i < formData.items.length; i++) {
       const item = formData.items[i] as any;
       const account = accounts.find(a => a.id === item.account_id);
@@ -137,7 +308,6 @@ export const CreateJournalEntry: React.FC = () => {
     }
 
     setIsSubmitting(true);
-    console.log('[ERP] Submitting Journal Entry:', JSON.stringify(formData, null, 2));
     
     try {
       const journalEntry: Omit<JournalEntry, 'id'> = {
@@ -145,6 +315,7 @@ export const CreateJournalEntry: React.FC = () => {
         description: formData.description,
         reference_id: 'manual',
         reference_type: 'manual',
+        reference_number: formData.reference_number || undefined,
         total_debit: totalDebit,
         total_credit: totalCredit,
         company_id: user.company_id,
@@ -161,26 +332,32 @@ export const CreateJournalEntry: React.FC = () => {
           supplier_id: item.supplier_id || undefined,
           supplier_name: suppliers.find(s => s.id === item.supplier_id)?.name || undefined,
           sub_account_id: item.sub_account_id || undefined,
-          sub_account_type: item.sub_account_type || undefined
+          sub_account_type: item.sub_account_type || undefined,
+          operation_id: item.operation_id || undefined,
+          department_id: item.department_id || undefined,
+          cost_center_id: item.cost_center_id || undefined,
+          currency: item.currency || 'local',
+          exchange_rate: Number(item.exchange_rate) || 1,
+          foreign_amount: Number(item.foreign_amount) || 0
         }))
       };
 
       const id = await dbService.add('journal_entries', journalEntry);
-      console.log('[ERP] Journal Entry Saved Successfully. ID:', id);
-
       await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة قيد يومية', `إضافة قيد يومية يدوي رقم: ${id}`, 'journal_entries', id);
       
       showNotification('تم حفظ قيد اليومية بنجاح', 'success');
       
-      // Reset form
       setFormData({
         date: new Date().toISOString().split('T')[0],
         description: '',
+        reference_number: '',
         items: [
-          { account_id: '', account_name: '', debit: 0, credit: 0, description: '', sub_account_id: '', sub_account_type: undefined },
-          { account_id: '', account_name: '', debit: 0, credit: 0, description: '', sub_account_id: '', sub_account_type: undefined }
+          { account_id: '', account_name: '', debit: 0, credit: 0, description: '', sub_account_id: '', sub_account_type: undefined, operation_id: '', department_id: '', cost_center_id: '', currency: 'local', exchange_rate: 1, foreign_amount: 0 },
+          { account_id: '', account_name: '', debit: 0, credit: 0, description: '', sub_account_id: '', sub_account_type: undefined, operation_id: '', department_id: '', cost_center_id: '', currency: 'local', exchange_rate: 1, foreign_amount: 0 }
         ]
       } as any);
+
+      setHeaderDimensions({ operation_id: '', department_id: '', cost_center_id: '' });
     } catch (error) {
       console.error(error);
       showNotification('حدث خطأ أثناء حفظ القيد', 'error');
@@ -194,121 +371,351 @@ export const CreateJournalEntry: React.FC = () => {
     return account?.required_sub_account || false;
   };
 
+  const filteredRecentEntries = recentEntries.filter(e => 
+    (e.entry_number && e.entry_number.toLowerCase().includes(copySearchQuery.toLowerCase())) ||
+    (e.description && e.description.toLowerCase().includes(copySearchQuery.toLowerCase()))
+  );
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Top Header Row with Title and Action Buttons */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-zinc-100 shadow-sm">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">إضافة قيد يومية</h2>
-          <p className="text-zinc-500 text-sm">تسجيل القيود المحاسبية اليدوية في النظام.</p>
+          <h2 className="text-2xl font-black text-zinc-900">{language === 'ar' ? 'إضافة قيد يومية' : 'Create Journal Entry'}</h2>
+          <p className="text-zinc-500 text-sm mt-1">{language === 'ar' ? 'تسجيل القيود المحاسبية اليدوية مع الفروع والعملات' : 'Record manual double-entry transactions with currencies'}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowCopyModal(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-2xl font-bold transition-all hover:scale-105 active:scale-95 border border-zinc-200"
+          >
+            <Copy size={18} />
+            <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSubmit()}
+            disabled={isSubmitting || difference >= 0.01 || totalDebit === 0}
+            className="flex items-center gap-2 px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 shadow-lg shadow-emerald-500/10"
+          >
+            {isSubmitting ? (
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Save size={18} />
+            )}
+            <span>{language === 'ar' ? 'حفظ قيد اليومية' : 'Save Entry'}</span>
+          </button>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-6">
+        {/* Main Card with Date, Description, and Header Operations */}
         <div className="bg-white p-8 rounded-[2.5rem] border border-zinc-100 shadow-sm space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
             <div className="space-y-2">
               <label className="block text-sm font-bold text-zinc-700 mr-1">تاريخ القيد</label>
               <input
                 required
                 type="date"
-                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium text-sm text-zinc-800"
                 value={formData.date}
                 onChange={(e) => setFormData({ ...formData, date: e.target.value })}
               />
             </div>
-            <div className="space-y-2">
-              <label className="block text-sm font-bold text-zinc-700 mr-1">البيان العام</label>
+            
+            <div className="space-y-2 lg:col-span-2">
+              <label className="block text-sm font-bold text-zinc-700 mr-1">البيان العام للقيد</label>
               <input
                 required
                 type="text"
                 placeholder="وصف مختصر للقيد..."
-                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm text-zinc-800 font-medium"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               />
             </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-zinc-700 mr-1">رقم المرجع (اختياري)</label>
+              <input
+                type="text"
+                placeholder="رقم مرجع خارجي..."
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm text-zinc-800 font-medium"
+                value={formData.reference_number}
+                onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
+              />
+            </div>
+
+            <div className="flex items-end">
+              <div className="flex items-center gap-4 bg-zinc-50 px-6 py-2.5 rounded-2xl border border-zinc-100 w-full justify-around">
+                <div className="text-center">
+                  <p className="text-[10px] font-black text-zinc-400 uppercase mb-0.5">مدين</p>
+                  <p className="text-base font-black text-emerald-600">{formatNumber(totalDebit)}</p>
+                </div>
+                <div className="w-px h-6 bg-zinc-200" />
+                <div className="text-center">
+                  <p className="text-[10px] font-black text-zinc-400 uppercase mb-0.5">دائن</p>
+                  <p className="text-base font-black text-red-600">{formatNumber(totalCredit)}</p>
+                </div>
+                <div className="w-px h-6 bg-zinc-200" />
+                <div className="text-center">
+                  <p className="text-[10px] font-black text-zinc-400 uppercase mb-0.5">الفرق</p>
+                  <p className={`text-base font-black ${difference < 0.01 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                    {formatNumber(difference)}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="overflow-x-auto -mx-8 px-8">
-            <table className="w-full border-collapse min-w-[800px]">
+          {/* Header Operations Box (Apply dimension to the whole invoice) */}
+          <div className="p-5 bg-zinc-50/50 rounded-3xl border border-zinc-200/50 space-y-4">
+            <h4 className="text-xs font-black text-zinc-500 uppercase tracking-wider flex items-center gap-2">
+              <Info size={14} className="text-emerald-500" />
+              <span>{language === 'ar' ? 'أبعاد العمليات الافتراضية للجدول (تطبيق كالفاتورة)' : 'Default Operational Dimensions (Apply like invoice)'}</span>
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-zinc-600 mr-1">العملية الافتراضية</label>
+                <select
+                  className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-xs font-semibold"
+                  value={headerDimensions.operation_id}
+                  onChange={(e) => setHeaderDimensions({ ...headerDimensions, operation_id: e.target.value })}
+                >
+                  <option value="">اختر العملية...</option>
+                  {operations.map(op => (
+                    <option key={op.id} value={op.id}>{op.operation_number} - {op.description}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-zinc-600 mr-1">مركز التكلفة الافتراضي</label>
+                <select
+                  className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-xs font-semibold"
+                  value={headerDimensions.cost_center_id}
+                  onChange={(e) => setHeaderDimensions({ ...headerDimensions, cost_center_id: e.target.value })}
+                >
+                  <option value="">اختر مركز التكلفة...</option>
+                  {costCenters.map(cc => (
+                    <option key={cc.id} value={cc.id}>{cc.name} ({cc.code})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-zinc-600 mr-1">الإدارة الافتراضية</label>
+                <select
+                  className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-xs font-semibold"
+                  value={headerDimensions.department_id}
+                  onChange={(e) => setHeaderDimensions({ ...headerDimensions, department_id: e.target.value })}
+                >
+                  <option value="">اختر الإدارة...</option>
+                  {departments.map(dept => (
+                    <option key={dept.id} value={dept.id}>{dept.name} ({dept.code})</option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="button"
+                onClick={applyHeaderDimensionsToAll}
+                className="w-full py-2 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-black rounded-xl transition-all border border-emerald-100 active:scale-95 flex items-center justify-center gap-1.5"
+              >
+                <ArrowRightLeft size={14} />
+                <span>{language === 'ar' ? 'تطبيق على كل أسطر الجدول' : 'Apply to all rows'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Excel-Style Spreadsheet Table Grid */}
+          <div className="overflow-x-auto rounded-2xl border border-zinc-200 shadow-inner">
+            <table className="w-full border-collapse min-w-[1500px]" dir={dir}>
               <thead>
-                <tr className="text-right border-b border-zinc-100 uppercase tracking-widest text-[10px]">
-                  <th className="py-4 px-2 font-black text-zinc-400 w-1/4">الحساب</th>
-                  <th className="py-4 px-2 font-black text-zinc-400 w-32 text-center">مدين</th>
-                  <th className="py-4 px-2 font-black text-zinc-400 w-32 text-center">دائن</th>
-                  <th className="py-4 px-2 font-black text-zinc-400">البيان</th>
-                  <th className="py-4 px-2 font-black text-zinc-400 w-10"></th>
+                <tr className="bg-zinc-50/80 border-b border-zinc-200 text-xs font-black uppercase text-zinc-500 select-none">
+                  <th className="py-2.5 px-3 border-r border-zinc-200 text-center w-28 bg-emerald-50/20 text-emerald-700">{language === 'ar' ? 'مدين' : 'Debit'}</th>
+                  <th className="py-2.5 px-3 border-r border-zinc-200 text-center w-28 bg-red-50/20 text-red-700">{language === 'ar' ? 'دائن' : 'Credit'}</th>
+                  <th className="py-2.5 px-3 border-r border-zinc-200 text-right w-64">{language === 'ar' ? 'الحساب' : 'Account'}</th>
+                  <th className="py-2.5 px-3 border-r border-zinc-200 text-right w-60">{language === 'ar' ? 'الحساب الفرعي' : 'Sub-Account'}</th>
+                  <th className="py-2.5 px-3 border-r border-zinc-200 text-center w-36">{language === 'ar' ? 'العملة' : 'Currency'}</th>
+                  <th className="py-2.5 px-3 border-r border-zinc-200 text-center w-28">{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
+                  <th className="py-2.5 px-3 border-r border-zinc-200 text-center w-36">{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</th>
+                  <th className="py-2.5 px-3 border-r border-zinc-200 text-right w-48">{language === 'ar' ? 'العملية' : 'Operation'}</th>
+                  <th className="py-2.5 px-3 border-r border-zinc-200 text-right w-48">{language === 'ar' ? 'مركز التكلفة' : 'Cost Center'}</th>
+                  <th className="py-2.5 px-3 border-r border-zinc-200 text-right w-48">{language === 'ar' ? 'الإدارة' : 'Department'}</th>
+                  <th className="py-2.5 px-3 border-r border-zinc-200 text-right">{language === 'ar' ? 'البيان' : 'Row Description'}</th>
+                  <th className="py-2.5 px-2 text-center w-12"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-50">
+              <tbody className="divide-y divide-zinc-200 bg-white">
                 {formData.items.map((item, index) => (
-                  <tr key={index} className="group hover:bg-zinc-50/50 transition-colors">
-                    <td className="py-4 px-2 space-y-2">
+                  <tr key={index} className="hover:bg-zinc-50/40 transition-colors">
+                    {/* Debit Input */}
+                    <td className="p-0 border-r border-zinc-200 w-28 bg-emerald-50/5">
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="0.00"
+                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/20 px-3 py-2.5 text-sm font-black text-emerald-600 text-center bg-transparent outline-none transition-all shadow-inner"
+                        value={item.debit || ''}
+                        onChange={(e) => handleCalculations(index, 'debit', parseFloat(e.target.value) || 0)}
+                        onFocus={(e) => e.target.select()}
+                      />
+                    </td>
+                    
+                    {/* Credit Input */}
+                    <td className="p-0 border-r border-zinc-200 w-28 bg-red-50/5">
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="0.00"
+                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/20 px-3 py-2.5 text-sm font-black text-red-600 text-center bg-transparent outline-none transition-all shadow-inner"
+                        value={item.credit || ''}
+                        onChange={(e) => handleCalculations(index, 'credit', parseFloat(e.target.value) || 0)}
+                        onFocus={(e) => e.target.select()}
+                      />
+                    </td>
+
+                    {/* Account Selector */}
+                    <td className="p-0 border-r border-zinc-200 w-64">
                       <select
                         required
-                        className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
+                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/10 px-3 py-2 text-sm bg-transparent outline-none font-bold text-zinc-800 cursor-pointer"
                         value={item.account_id}
                         onChange={(e) => updateItem(index, 'account_id', e.target.value)}
                       >
-                        <option value="">اختر الحساب...</option>
+                        <option value="">{language === 'ar' ? 'اختر الحساب...' : 'Choose Account...'}</option>
                         {accounts.map(account => (
                           <option key={account.id} value={account.id}>{account.name} ({account.code})</option>
                         ))}
                       </select>
-                      
-                      {needsSubAccount(item.account_id) && (
-                        <div className="relative animate-in slide-in-from-top-2 duration-200">
-                          <User className="absolute right-3 top-2.5 text-emerald-500" size={16} />
-                          <select
-                            required
-                            className="w-full pr-10 pl-3 py-2 bg-emerald-50 border border-emerald-100 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-bold text-emerald-700"
-                            value={item.sub_account_id}
-                            onChange={(e) => updateItem(index, 'sub_account_id', e.target.value)}
-                          >
-                            <option value="">اختر الحساب الفرعي...</option>
-                            {subAccounts.map(sa => (
-                              <option key={sa.id} value={sa.id}>{sa.label}</option>
-                            ))}
-                          </select>
+                    </td>
+
+                    {/* Sub-Account Selector (Dynamic Inline) */}
+                    <td className="p-0 border-r border-zinc-200 w-60 bg-zinc-50/20">
+                      {needsSubAccount(item.account_id) ? (
+                        <select
+                          required
+                          className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/20 px-3 py-2 text-sm bg-transparent outline-none font-bold text-emerald-700 cursor-pointer"
+                          value={item.sub_account_id}
+                          onChange={(e) => updateItem(index, 'sub_account_id', e.target.value)}
+                        >
+                          <option value="">{language === 'ar' ? 'اختر الحساب الفرعي...' : 'Choose Sub-Account...'}</option>
+                          {subAccounts.map(sa => (
+                            <option key={sa.id} value={sa.id}>{sa.label}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="w-full h-full bg-zinc-100/50 py-2.5 px-3 text-xs text-zinc-400 italic font-medium select-none">
+                          {language === 'ar' ? 'غير مطلوب' : 'Not required'}
                         </div>
                       )}
                     </td>
-                    <td className="py-4 px-2">
+
+                    {/* Currency Selector */}
+                    <td className="p-0 border-r border-zinc-200 w-36">
+                      <select
+                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/10 px-3 py-2 text-sm bg-transparent outline-none font-semibold text-zinc-700 cursor-pointer"
+                        value={item.currency || 'local'}
+                        onChange={(e) => updateItem(index, 'currency', e.target.value)}
+                      >
+                        {currencies.map(c => (
+                          <option key={c.code} value={c.code}>{c.name}</option>
+                        ))}
+                      </select>
+                    </td>
+
+                    {/* Exchange Rate */}
+                    <td className="p-0 border-r border-zinc-200 w-28 bg-zinc-50/5">
                       <input
                         type="number"
                         step="any"
-                        className="w-full px-3 py-2.5 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-bold text-emerald-600 text-center shadow-sm"
-                        value={item.debit || ''}
-                        onChange={(e) => updateItem(index, 'debit', e.target.value)}
+                        disabled={item.currency === 'local'}
+                        placeholder="1.00"
+                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/20 px-3 py-2.5 text-sm font-bold text-zinc-700 text-center bg-transparent outline-none disabled:opacity-50 disabled:bg-zinc-100/30"
+                        value={item.exchange_rate || ''}
+                        onChange={(e) => handleCalculations(index, 'exchange_rate', parseFloat(e.target.value) || 1)}
                         onFocus={(e) => e.target.select()}
                       />
                     </td>
-                    <td className="py-4 px-2">
+
+                    {/* Foreign Currency Amount */}
+                    <td className="p-0 border-r border-zinc-200 w-36 bg-zinc-50/5">
                       <input
                         type="number"
                         step="any"
-                        className="w-full px-3 py-2.5 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-bold text-red-600 text-center shadow-sm"
-                        value={item.credit || ''}
-                        onChange={(e) => updateItem(index, 'credit', e.target.value)}
+                        disabled={item.currency === 'local'}
+                        placeholder="0.00"
+                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/20 px-3 py-2.5 text-sm font-black text-emerald-700 text-center bg-transparent outline-none disabled:opacity-50 disabled:bg-zinc-100/30"
+                        value={item.foreign_amount || ''}
+                        onChange={(e) => handleCalculations(index, 'foreign_amount', parseFloat(e.target.value) || 0)}
                         onFocus={(e) => e.target.select()}
                       />
                     </td>
-                    <td className="py-4 px-2">
+
+                    {/* Operation dimension select */}
+                    <td className="p-0 border-r border-zinc-200 w-48">
+                      <select
+                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/10 px-3 py-2 text-xs bg-transparent outline-none font-semibold text-zinc-700 cursor-pointer"
+                        value={item.operation_id || ''}
+                        onChange={(e) => updateItem(index, 'operation_id', e.target.value)}
+                      >
+                        <option value="">---</option>
+                        {operations.map(op => (
+                          <option key={op.id} value={op.id}>{op.operation_number} - {op.description}</option>
+                        ))}
+                      </select>
+                    </td>
+
+                    {/* Cost center dimension select */}
+                    <td className="p-0 border-r border-zinc-200 w-48">
+                      <select
+                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/10 px-3 py-2 text-xs bg-transparent outline-none font-semibold text-zinc-700 cursor-pointer"
+                        value={item.cost_center_id || ''}
+                        onChange={(e) => updateItem(index, 'cost_center_id', e.target.value)}
+                      >
+                        <option value="">---</option>
+                        {costCenters.map(cc => (
+                          <option key={cc.id} value={cc.id}>{cc.name} ({cc.code})</option>
+                        ))}
+                      </select>
+                    </td>
+
+                    {/* Department dimension select */}
+                    <td className="p-0 border-r border-zinc-200 w-48">
+                      <select
+                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/10 px-3 py-2 text-xs bg-transparent outline-none font-semibold text-zinc-700 cursor-pointer"
+                        value={item.department_id || ''}
+                        onChange={(e) => updateItem(index, 'department_id', e.target.value)}
+                      >
+                        <option value="">---</option>
+                        {departments.map(dept => (
+                          <option key={dept.id} value={dept.id}>{dept.name} ({dept.code})</option>
+                        ))}
+                      </select>
+                    </td>
+
+                    {/* Row Description */}
+                    <td className="p-0 border-r border-zinc-200">
                       <input
                         type="text"
-                        className="w-full px-3 py-2.5 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm shadow-sm"
-                        placeholder="بيان السطر..."
-                        value={item.description}
+                        placeholder="شرح وتفاصيل السطر..."
+                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/20 px-3 py-2.5 text-sm bg-transparent outline-none text-zinc-800"
+                        value={item.description || ''}
                         onChange={(e) => updateItem(index, 'description', e.target.value)}
                       />
                     </td>
-                    <td className="py-4 px-2">
+
+                    {/* Delete button */}
+                    <td className="p-0 text-center w-12 bg-zinc-50/10">
                       <button
                         type="button"
                         onClick={() => removeItem(index)}
-                        className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50/50 rounded-lg transition-all mx-auto block"
+                        title="حذف السطر"
                       >
-                        <Trash2 size={18} />
+                        <Trash2 size={16} />
                       </button>
                     </td>
                   </tr>
@@ -317,64 +724,115 @@ export const CreateJournalEntry: React.FC = () => {
             </table>
           </div>
 
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6 pt-6 border-t border-zinc-100">
+          {/* Add Row Button at the bottom of the table card */}
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6 pt-4">
             <button
               type="button"
               onClick={addItem}
-              className="flex items-center gap-2 px-6 py-3 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all active:scale-95"
+              className="flex items-center gap-2 px-6 py-3 bg-zinc-100 text-zinc-700 rounded-2xl font-bold hover:bg-zinc-200 transition-all hover:scale-105 active:scale-95 shadow-sm border border-zinc-200"
             >
-              <Plus size={20} />
-              إضافة سطر جديد
+              <Plus size={18} />
+              <span>إضافة سطر جديد</span>
             </button>
-
-            <div className="flex items-center gap-8 bg-zinc-50 px-8 py-4 rounded-3xl border border-zinc-100">
-              <div className="text-center">
-                <p className="text-[10px] font-black text-zinc-400 uppercase tracking-wider mb-1">إجمالي المدين</p>
-                <p className="text-xl font-black text-emerald-600">{formatNumber(totalDebit)}</p>
-              </div>
-              <div className="w-px h-8 bg-zinc-200" />
-              <div className="text-center">
-                <p className="text-[10px] font-black text-zinc-400 uppercase tracking-wider mb-1">إجمالي الدائن</p>
-                <p className="text-xl font-black text-red-600">{formatNumber(totalCredit)}</p>
-              </div>
-              <div className="w-px h-8 bg-zinc-200" />
-              <div className="text-center">
-                <p className="text-[10px] font-black text-zinc-400 uppercase tracking-wider mb-1">الفرق</p>
-                <p className={`text-xl font-black ${difference === 0 ? 'text-emerald-500' : 'text-emerald-500'}`}>
-                  {formatNumber(difference)}
-                </p>
-              </div>
+            
+            {/* Status alerts */}
+            <div className="flex items-center gap-4">
+              {difference >= 0.01 && (
+                <div className="flex items-center gap-2 text-amber-700 bg-amber-50 border border-amber-100 px-5 py-2.5 rounded-2xl text-xs font-bold animate-pulse">
+                  <AlertCircle size={16} />
+                  <span>القيد غير متزن حالياً (فرق التوازن: {formatNumber(difference)})</span>
+                </div>
+              )}
+              {difference < 0.01 && totalDebit > 0 && (
+                <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-100 px-5 py-2.5 rounded-2xl text-xs font-bold">
+                  <CheckCircle2 size={16} />
+                  <span>القيد متزن تماماً وجاهز للحفظ</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
-
-        <div className="flex items-center justify-end gap-4">
-          {difference !== 0 && (
-            <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl text-sm font-bold animate-pulse">
-              <AlertCircle size={18} />
-              <span>القيد غير متزن حالياً</span>
-            </div>
-          )}
-          {difference === 0 && totalDebit > 0 && (
-            <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl text-sm font-bold">
-              <CheckCircle2 size={18} />
-              <span>القيد متزن وجاهز للحفظ</span>
-            </div>
-          )}
-          <button
-            type="submit"
-            disabled={isSubmitting || difference !== 0 || totalDebit === 0}
-            className="flex items-center gap-2 px-10 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl shadow-emerald-500/20 active:scale-95"
-          >
-            {isSubmitting ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Save size={20} />
-            )}
-            {language === 'ar' ? 'حفظ قيد اليومية' : 'Save Journal Entry'}
-          </button>
-        </div>
       </form>
+
+      {/* Copy / Duplicate Entry Modal Dialog */}
+      <AnimatePresence>
+        {showCopyModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-[2rem] max-w-3xl w-full p-8 space-y-6 shadow-2xl max-h-[85vh] flex flex-col border border-zinc-100"
+            >
+              <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
+                <div>
+                  <h3 className="text-xl font-black text-zinc-900">{language === 'ar' ? 'نسخ من قيد سابق' : 'Copy Previous Journal Entry'}</h3>
+                  <p className="text-zinc-500 text-xs mt-0.5">{language === 'ar' ? 'اختر قيداً سابقاً لنسخ بياناته وتكرار تفاصيله' : 'Select a past manual entry to duplicate lines'}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCopyModal(false)}
+                  className="p-2 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-xl transition-all"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Search input in modal */}
+              <div className="relative">
+                <Search className="absolute right-3 top-3 text-zinc-400" size={18} />
+                <input
+                  type="text"
+                  placeholder={language === 'ar' ? 'ابحث برقم القيد أو البيان...' : 'Search by entry number or description...'}
+                  className="w-full pr-10 pl-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm text-zinc-800 font-medium"
+                  value={copySearchQuery}
+                  onChange={(e) => setCopySearchQuery(e.target.value)}
+                />
+              </div>
+
+              {/* Entries list container */}
+              <div className="overflow-y-auto flex-1 border border-zinc-100 rounded-2xl divide-y divide-zinc-100 max-h-[45vh]">
+                {filteredRecentEntries.map(entry => (
+                  <div
+                    key={entry.id}
+                    onClick={() => handleCopyEntry(entry.id)}
+                    className="p-4 hover:bg-zinc-50 transition-all cursor-pointer flex items-center justify-between gap-4 group"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-zinc-900 group-hover:text-emerald-600 transition-colors">
+                          {entry.entry_number || entry.id.substring(0, 8)}
+                        </span>
+                        <span className="text-[10px] text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded-md font-semibold">{entry.date}</span>
+                      </div>
+                      <p className="text-xs text-zinc-500 font-medium line-clamp-1">{entry.description}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-black text-emerald-600">{formatNumber(entry.total_debit)}</span>
+                      <span className="text-[10px] block text-zinc-400 font-bold">{language === 'ar' ? 'إجمالي المدين' : 'Total'}</span>
+                    </div>
+                  </div>
+                ))}
+
+                {filteredRecentEntries.length === 0 && (
+                  <p className="p-12 text-center text-zinc-400 font-medium italic text-sm">{language === 'ar' ? 'لا توجد قيود مطابقة متوفرة حالياً' : 'No matching entries found'}</p>
+                )}
+              </div>
+
+              {/* Footer info inside modal */}
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCopyModal(false)}
+                  className="px-6 py-3 bg-zinc-100 text-zinc-700 font-bold rounded-2xl hover:bg-zinc-200 transition-all text-sm"
+                >
+                  {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

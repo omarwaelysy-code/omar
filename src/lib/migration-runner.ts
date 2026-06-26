@@ -116,7 +116,13 @@ export async function runMigrations() {
       { table: 'journal_entry_lines', column: 'supplier_name', type: 'VARCHAR(255)' },
       { table: 'journal_entry_lines', column: 'created_at', type: 'TIMESTAMP DEFAULT NOW()' },
       { table: 'journal_entry_lines', column: 'sub_account_id', type: 'VARCHAR(36)' },
-      { table: 'journal_entry_lines', column: 'sub_account_type', type: 'VARCHAR(50)' }
+      { table: 'journal_entry_lines', column: 'sub_account_type', type: 'VARCHAR(50)' },
+      { table: 'journal_entry_lines', column: 'operation_id', type: 'VARCHAR(36)' },
+      { table: 'journal_entry_lines', column: 'department_id', type: 'VARCHAR(36)' },
+      { table: 'journal_entry_lines', column: 'cost_center_id', type: 'VARCHAR(36)' },
+      { table: 'journal_entry_lines', column: 'currency', type: 'VARCHAR(10)' },
+      { table: 'journal_entry_lines', column: 'exchange_rate', type: 'DECIMAL(18, 4) DEFAULT 1' },
+      { table: 'journal_entry_lines', column: 'foreign_amount', type: 'DECIMAL(18, 4) DEFAULT 0' }
     ];
 
     for (const item of columnsToSync) {
