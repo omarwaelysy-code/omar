@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { dbService } from '../services/dbService';
-import { Account, Customer, Supplier, JournalEntry, JournalEntryItem, Department, CostCenter, Operation } from '../types';
-import { Plus, Trash2, Save, AlertCircle, CheckCircle2, ArrowRightLeft, User, Truck, Copy, X, Check, Search, Info } from 'lucide-react';
+import { dbService, apiRequest } from '../services/dbService';
+import { Account, Customer, Supplier, JournalEntry, JournalEntryItem, Department, CostCenter, Operation, Currency, AccountType, ExchangeRate } from '../types';
+import { Plus, Trash2, Save, AlertCircle, CheckCircle2, ArrowRightLeft, User, Truck, Copy, X, Check, Search, Info, CheckCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatNumber } from '../utils/formatUtils';
 
@@ -12,15 +12,26 @@ export const CreateJournalEntry: React.FC = () => {
   const { user } = useAuth();
   const { showNotification } = useNotification();
   const { t, dir, language } = useLanguage();
+  
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accountTypes, setAccountTypes] = useState<AccountType[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSupplier] = useState<Supplier[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [operations, setOperations] = useState<Operation[]>([]);
+  const [companyCurrencies, setCompanyCurrencies] = useState<Currency[]>([]);
+  const [companyData, setCompanyData] = useState<any>(null);
+  const [latestRates, setLatestRates] = useState<any[]>([]);
+  const [entryNumber, setEntryNumber] = useState<string>('');
+  
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // States for Autocomplete searches
+  const [activeRowSearch, setActiveRowSearch] = useState<{ index: number; field: 'account_code' | 'account_name' | 'operation'; query: string } | null>(null);
+  const [activeHeaderSearch, setActiveHeaderSearch] = useState<string | null>(null);
 
   // States for Copy / Duplicate Feature
   const [showCopyModal, setShowCopyModal] = useState(false);
@@ -44,15 +55,6 @@ export const CreateJournalEntry: React.FC = () => {
     ]
   });
 
-  const currencies = [
-    { code: 'local', name: language === 'ar' ? 'العملة المحلية' : 'Local Currency' },
-    { code: 'USD', name: 'USD (دولار)' },
-    { code: 'EUR', name: 'EUR (يورو)' },
-    { code: 'SAR', name: 'SAR (ريال سعودي)' },
-    { code: 'AED', name: 'AED (درهم إماراتي)' },
-    { code: 'KWD', name: 'KWD (دينار كويتي)' }
-  ];
-
   // Dynamic Sub-account Options
   const subAccounts = [
     ...customers.map(c => ({ id: c.id, name: c.name, type: 'customer' as const, label: `عميل: ${c.name}` })),
@@ -63,24 +65,58 @@ export const CreateJournalEntry: React.FC = () => {
   useEffect(() => {
     if (user) {
       const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
+      const unsubAccountTypes = dbService.subscribe<AccountType>('account_types', user.company_id, setAccountTypes);
       const unsubCustomers = dbService.subscribe<Customer>('customers', user.company_id, setCustomers);
       const unsubSuppliers = dbService.subscribe<Supplier>('suppliers', user.company_id, setSupplier);
       const unsubPMs = dbService.subscribe<any>('payment_methods', user.company_id, setPaymentMethods);
       const unsubDepartments = dbService.subscribe<Department>('departments', user.company_id, setDepartments);
       const unsubCostCenters = dbService.subscribe<CostCenter>('cost_centers', user.company_id, setCostCenters);
       const unsubOperations = dbService.subscribe<Operation>('operations', user.company_id, setOperations);
+      const unsubCurrencies = dbService.subscribe<Currency>('currencies', user.company_id, setCompanyCurrencies);
+      
+      const unsubCompany = dbService.subscribe<any>('companies', user.company_id, (data) => {
+        if (data && data.length > 0) setCompanyData(data[0]);
+      });
+
+      // Fetch latest rates
+      apiRequest<any[]>(`/currency-rates/latest?company_id=${user.company_id}`)
+        .then(setLatestRates)
+        .catch(err => console.error('[ERP] Error loading latest rates:', err));
+
       setLoading(false);
       return () => {
         unsubAccounts();
+        unsubAccountTypes();
         unsubCustomers();
         unsubSuppliers();
         unsubPMs();
         unsubDepartments();
         unsubCostCenters();
         unsubOperations();
+        unsubCurrencies();
+        unsubCompany();
       };
     }
   }, [user]);
+
+  // Click outside to close active search
+  useEffect(() => {
+    const handleOutsideClick = () => {
+      setActiveRowSearch(null);
+      setActiveHeaderSearch(null);
+    };
+    window.addEventListener('click', handleOutsideClick);
+    return () => window.removeEventListener('click', handleOutsideClick);
+  }, []);
+
+  // Fetch automatic entry number sequence when date changes
+  useEffect(() => {
+    if (user && formData.date) {
+      dbService.getNextSequence('journal_entries', formData.date)
+        .then(setEntryNumber)
+        .catch(err => console.error('[ERP] Error fetching sequence number:', err));
+    }
+  }, [user, formData.date]);
 
   // Load recent journal entries when Copy Modal is opened
   useEffect(() => {
@@ -146,15 +182,49 @@ export const CreateJournalEntry: React.FC = () => {
     }
   };
 
-  const applyHeaderDimensionsToAll = () => {
-    const updatedItems = formData.items.map(item => ({
-      ...item,
-      operation_id: headerDimensions.operation_id || item.operation_id,
-      department_id: headerDimensions.department_id || item.department_id,
-      cost_center_id: headerDimensions.cost_center_id || item.cost_center_id
-    }));
-    setFormData({ ...formData, items: updatedItems });
-    showNotification('تم تطبيق الأبعاد على جميع أسطر الجدول بنجاح', 'success');
+  const getExchangeRateForCurrency = async (currId: string): Promise<number> => {
+    const currency = companyCurrencies.find(c => c.id === currId);
+    if (!currency) return 1;
+    const baseCurrency = companyData?.settings?.currency || 'EGP';
+    if (currency.code.toLowerCase() === baseCurrency.toLowerCase()) {
+      return 1;
+    }
+    
+    // Check auto fetched rates on mount
+    const autoRate = latestRates.find(r => r.currency_id === currId);
+    if (autoRate && autoRate.rate) {
+      return Number(autoRate.rate);
+    }
+
+    // Check manual exchange rates table
+    try {
+      const dbRates = await dbService.list<ExchangeRate>('exchange_rates', {
+        currency_id: currId,
+        company_id: user?.company_id
+      });
+      if (dbRates && dbRates.length > 0) {
+        const sorted = dbRates.sort((a, b) => new Date(b.rate_date).getTime() - new Date(a.rate_date).getTime());
+        return Number(sorted[0].exchange_rate);
+      }
+    } catch (err) {
+      console.error('[ERP] Error fetching rate from db:', err);
+    }
+
+    return 1.0;
+  };
+
+  const handleHeaderOperationChange = (opId: string) => {
+    setHeaderDimensions(prev => {
+      const updated = { ...prev, operation_id: opId };
+      if (opId) {
+        const op = operations.find(o => o.id === opId);
+        if (op) {
+          if (op.cost_center_id) updated.cost_center_id = op.cost_center_id;
+          if (op.department_id) updated.department_id = op.department_id;
+        }
+      }
+      return updated;
+    });
   };
 
   const addItem = () => {
@@ -191,7 +261,7 @@ export const CreateJournalEntry: React.FC = () => {
     setFormData({ ...formData, items: newItems });
   };
 
-  const updateItem = (index: number, field: string, value: any) => {
+  const updateItem = async (index: number, field: string, value: any) => {
     const newItems = [...formData.items] as any;
     const item = newItems[index];
 
@@ -220,17 +290,18 @@ export const CreateJournalEntry: React.FC = () => {
       }
     } else if (field === 'currency') {
       item.currency = value;
-      if (value === 'local') {
-        item.exchange_rate = 1;
-        item.foreign_amount = Number(item.debit) || Number(item.credit) || 0;
-      } else {
-        let defaultRate = 1;
-        if (value === 'USD') defaultRate = 50;
-        else if (value === 'EUR') defaultRate = 54;
-        else if (value === 'SAR') defaultRate = 13.3;
-        item.exchange_rate = defaultRate;
-        const localVal = Number(item.debit) || Number(item.credit) || 0;
-        item.foreign_amount = localVal > 0 ? localVal / defaultRate : 0;
+      const rate = await getExchangeRateForCurrency(value);
+      item.exchange_rate = rate;
+      const localVal = Number(item.debit) || Number(item.credit) || 0;
+      item.foreign_amount = localVal > 0 ? localVal / rate : 0;
+    } else if (field === 'operation_id') {
+      item.operation_id = value;
+      if (value) {
+        const op = operations.find(o => o.id === value);
+        if (op) {
+          if (op.cost_center_id) item.cost_center_id = op.cost_center_id;
+          if (op.department_id) item.department_id = op.department_id;
+        }
       }
     } else {
       item[field] = value;
@@ -278,6 +349,14 @@ export const CreateJournalEntry: React.FC = () => {
     setFormData({ ...formData, items: newItems });
   };
 
+  const getAccountTypeName = (accountId: string) => {
+    const account = accounts.find(a => a.id === accountId);
+    if (!account) return '';
+    if (account.type_name) return account.type_name;
+    const typeObj = accountTypes.find(t => t.id === account.type_id);
+    return typeObj ? typeObj.name : '';
+  };
+
   const totalDebit = formData.items.reduce((sum, item) => sum + (Number(item.debit) || 0), 0);
   const totalCredit = formData.items.reduce((sum, item) => sum + (Number(item.credit) || 0), 0);
   const difference = Math.abs(totalDebit - totalCredit);
@@ -316,6 +395,7 @@ export const CreateJournalEntry: React.FC = () => {
         reference_id: 'manual',
         reference_type: 'manual',
         reference_number: formData.reference_number || undefined,
+        entry_number: entryNumber || undefined,
         total_debit: totalDebit,
         total_credit: totalCredit,
         company_id: user.company_id,
@@ -358,6 +438,10 @@ export const CreateJournalEntry: React.FC = () => {
       } as any);
 
       setHeaderDimensions({ operation_id: '', department_id: '', cost_center_id: '' });
+      // pre-generate next entry number for the new transaction
+      dbService.getNextSequence('journal_entries', formData.date)
+        .then(setEntryNumber)
+        .catch(err => console.error('[ERP] Error fetching sequence number:', err));
     } catch (error) {
       console.error(error);
       showNotification('حدث خطأ أثناء حفظ القيد', 'error');
@@ -382,7 +466,7 @@ export const CreateJournalEntry: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-zinc-100 shadow-sm">
         <div>
           <h2 className="text-2xl font-black text-zinc-900">{language === 'ar' ? 'إضافة قيد يومية' : 'Create Journal Entry'}</h2>
-          <p className="text-zinc-500 text-sm mt-1">{language === 'ar' ? 'تسجيل القيود المحاسبية اليدوية مع الفروع والعملات' : 'Record manual double-entry transactions with currencies'}</p>
+          <p className="text-zinc-500 text-sm mt-1">{language === 'ar' ? 'تسجيل القيود المحاسبية اليدوية مع الفروع والعملات والتحقق التلقائي' : 'Record manual double-entry transactions with currencies'}</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -412,131 +496,240 @@ export const CreateJournalEntry: React.FC = () => {
       <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-6">
         {/* Main Card with Date, Description, and Header Operations */}
         <div className="bg-white p-8 rounded-[2.5rem] border border-zinc-100 shadow-sm space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            <div className="space-y-2">
-              <label className="block text-sm font-bold text-zinc-700 mr-1">تاريخ القيد</label>
-              <input
-                required
-                type="date"
-                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium text-sm text-zinc-800"
-                value={formData.date}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              />
-            </div>
-            
-            <div className="space-y-2 lg:col-span-2">
-              <label className="block text-sm font-bold text-zinc-700 mr-1">البيان العام للقيد</label>
-              <input
-                required
-                type="text"
-                placeholder="وصف مختصر للقيد..."
-                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm text-zinc-800 font-medium"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-sm font-bold text-zinc-700 mr-1">رقم المرجع (اختياري)</label>
-              <input
-                type="text"
-                placeholder="رقم مرجع خارجي..."
-                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm text-zinc-800 font-medium"
-                value={formData.reference_number}
-                onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
-              />
-            </div>
-
-            <div className="flex items-end">
-              <div className="flex items-center gap-4 bg-zinc-50 px-6 py-2.5 rounded-2xl border border-zinc-100 w-full justify-around">
-                <div className="text-center">
-                  <p className="text-[10px] font-black text-zinc-400 uppercase mb-0.5">مدين</p>
-                  <p className="text-base font-black text-emerald-600">{formatNumber(totalDebit)}</p>
+          <div className="flex flex-col xl:flex-row gap-8">
+            {/* Right Side fields (in RTL) */}
+            <div className="flex-1 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-zinc-700 mr-1">تاريخ القيد</label>
+                  <input
+                    required
+                    type="date"
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium text-sm text-zinc-800"
+                    value={formData.date}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  />
                 </div>
-                <div className="w-px h-6 bg-zinc-200" />
+                
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-zinc-700 mr-1">رقم القيد التلقائي</label>
+                  <div className="w-full px-4 py-3 bg-zinc-100 border border-zinc-200 rounded-2xl font-mono text-sm text-zinc-600 font-bold select-none h-[46px] flex items-center">
+                    {entryNumber || 'JE-YYYY-MM-DD-00000'}
+                  </div>
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <label className="block text-sm font-bold text-zinc-700 mr-1">البيان العام للقيد</label>
+                  <input
+                    required
+                    type="text"
+                    placeholder="وصف مختصر للقيد..."
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm text-zinc-800 font-medium"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-zinc-700 mr-1">رقم المرجع (اختياري)</label>
+                  <input
+                    type="text"
+                    placeholder="رقم مرجع خارجي..."
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm text-zinc-800 font-medium"
+                    value={formData.reference_number}
+                    onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Left Side Status and Totals (in RTL) */}
+            <div className="w-full xl:w-80 flex flex-col gap-3 justify-end">
+              {/* Balance status label above the numbers */}
+              {difference >= 0.01 || totalDebit === 0 ? (
+                <div className="flex items-center gap-2 text-amber-700 bg-amber-50 border border-amber-100 px-5 py-3 rounded-2xl text-xs font-black animate-pulse shadow-sm">
+                  <AlertCircle size={18} className="text-amber-600 flex-shrink-0" />
+                  <span>{language === 'ar' ? 'القيد غير متنز حالياً' : 'Entry is currently unbalanced'}</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-100 px-5 py-3 rounded-2xl text-xs font-black shadow-sm">
+                  <CheckCircle2 size={18} className="text-emerald-600 flex-shrink-0" />
+                  <span>{language === 'ar' ? 'القيد متزن تماماً وجاهز للحفظ' : 'Entry is balanced and ready'}</span>
+                </div>
+              )}
+
+              {/* Totals numbers */}
+              <div className="flex items-center gap-4 bg-zinc-50 px-6 py-4 rounded-3xl border border-zinc-200 w-full justify-around shadow-sm select-none">
+                <div className="text-center">
+                  <p className="text-[10px] font-black text-zinc-400 uppercase mb-0.5">الفرق</p>
+                  <p className={`text-base font-black ${difference < 0.01 ? 'text-emerald-600' : 'text-amber-600 animate-pulse'}`}>
+                    {formatNumber(difference)}
+                  </p>
+                </div>
+                <div className="w-px h-8 bg-zinc-200" />
                 <div className="text-center">
                   <p className="text-[10px] font-black text-zinc-400 uppercase mb-0.5">دائن</p>
                   <p className="text-base font-black text-red-600">{formatNumber(totalCredit)}</p>
                 </div>
-                <div className="w-px h-6 bg-zinc-200" />
+                <div className="w-px h-8 bg-zinc-200" />
                 <div className="text-center">
-                  <p className="text-[10px] font-black text-zinc-400 uppercase mb-0.5">الفرق</p>
-                  <p className={`text-base font-black ${difference < 0.01 ? 'text-emerald-500' : 'text-amber-500'}`}>
-                    {formatNumber(difference)}
-                  </p>
+                  <p className="text-[10px] font-black text-zinc-400 uppercase mb-0.5">مدين</p>
+                  <p className="text-base font-black text-emerald-600">{formatNumber(totalDebit)}</p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Header Operations Box (Apply dimension to the whole invoice) */}
+          {/* Header Operations Box */}
           <div className="p-5 bg-zinc-50/50 rounded-3xl border border-zinc-200/50 space-y-4">
             <h4 className="text-xs font-black text-zinc-500 uppercase tracking-wider flex items-center gap-2">
               <Info size={14} className="text-emerald-500" />
               <span>{language === 'ar' ? 'أبعاد العمليات الافتراضية للجدول (تطبيق كالفاتورة)' : 'Default Operational Dimensions (Apply like invoice)'}</span>
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-              <div className="space-y-1.5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Default Operation with Autocomplete Search */}
+              <div className="space-y-1.5 relative" onClick={(e) => e.stopPropagation()}>
                 <label className="block text-xs font-bold text-zinc-600 mr-1">العملية الافتراضية</label>
-                <select
-                  className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-xs font-semibold"
-                  value={headerDimensions.operation_id}
-                  onChange={(e) => setHeaderDimensions({ ...headerDimensions, operation_id: e.target.value })}
-                >
-                  <option value="">اختر العملية...</option>
-                  {operations.map(op => (
-                    <option key={op.id} value={op.id}>{op.operation_number} - {op.description}</option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-1.5">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      placeholder="ابحث عن العملية..."
+                      className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-xs font-semibold"
+                      value={
+                        activeHeaderSearch !== null
+                          ? activeHeaderSearch
+                          : (operations.find(o => o.id === headerDimensions.operation_id)?.operation_number || '')
+                      }
+                      onChange={(e) => setActiveHeaderSearch(e.target.value)}
+                      onFocus={() => {
+                        setActiveHeaderSearch(operations.find(o => o.id === headerDimensions.operation_id)?.operation_number || '');
+                      }}
+                    />
+                    {activeHeaderSearch !== null && (
+                      <div className="absolute top-full right-0 left-0 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto min-w-[200px]">
+                        {operations
+                          .filter(o => o.operation_number.toLowerCase().includes(activeHeaderSearch.toLowerCase()) || (o.description && o.description.toLowerCase().includes(activeHeaderSearch.toLowerCase())))
+                          .slice(0, 10)
+                          .map(o => (
+                            <button
+                              key={o.id}
+                              type="button"
+                              className="w-full px-3 py-2 text-right hover:bg-zinc-50 transition-all text-xs font-bold flex justify-between items-center"
+                              onClick={() => {
+                                handleHeaderOperationChange(o.id);
+                                setActiveHeaderSearch(null);
+                              }}
+                            >
+                              <span className="text-zinc-800">{o.operation_number}</span>
+                              <span className="text-zinc-400 text-[10px] truncate max-w-[120px]">{o.description}</span>
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                  {headerDimensions.operation_id && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updatedItems = formData.items.map(item => ({
+                          ...item,
+                          operation_id: headerDimensions.operation_id
+                        }));
+                        setFormData({ ...formData, items: updatedItems });
+                        showNotification('تم تطبيق العملية على جميع الأسطر', 'success');
+                      }}
+                      className="p-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-emerald-600 hover:text-emerald-700 transition-all flex-shrink-0"
+                      title="تطبيق على كل الجدول"
+                    >
+                      <CheckCheck size={16} />
+                    </button>
+                  )}
+                </div>
               </div>
 
+              {/* Default Cost Center with CheckCheck Button */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-zinc-600 mr-1">مركز التكلفة الافتراضي</label>
-                <select
-                  className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-xs font-semibold"
-                  value={headerDimensions.cost_center_id}
-                  onChange={(e) => setHeaderDimensions({ ...headerDimensions, cost_center_id: e.target.value })}
-                >
-                  <option value="">اختر مركز التكلفة...</option>
-                  {costCenters.map(cc => (
-                    <option key={cc.id} value={cc.id}>{cc.name} ({cc.code})</option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-1.5">
+                  <select
+                    className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-xs font-semibold"
+                    value={headerDimensions.cost_center_id}
+                    onChange={(e) => setHeaderDimensions({ ...headerDimensions, cost_center_id: e.target.value })}
+                  >
+                    <option value="">اختر مركز التكلفة...</option>
+                    {costCenters.map(cc => (
+                      <option key={cc.id} value={cc.id}>{cc.name} ({cc.code})</option>
+                    ))}
+                  </select>
+                  {headerDimensions.cost_center_id && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updatedItems = formData.items.map(item => ({
+                          ...item,
+                          cost_center_id: headerDimensions.cost_center_id
+                        }));
+                        setFormData({ ...formData, items: updatedItems });
+                        showNotification('تم تطبيق مركز التكلفة على الجدول', 'success');
+                      }}
+                      className="p-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-emerald-600 hover:text-emerald-700 transition-all flex-shrink-0"
+                      title="تطبيق على كل الجدول"
+                    >
+                      <CheckCheck size={16} />
+                    </button>
+                  )}
+                </div>
               </div>
 
+              {/* Default Department with CheckCheck Button */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-zinc-600 mr-1">الإدارة الافتراضية</label>
-                <select
-                  className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-xs font-semibold"
-                  value={headerDimensions.department_id}
-                  onChange={(e) => setHeaderDimensions({ ...headerDimensions, department_id: e.target.value })}
-                >
-                  <option value="">اختر الإدارة...</option>
-                  {departments.map(dept => (
-                    <option key={dept.id} value={dept.id}>{dept.name} ({dept.code})</option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-1.5">
+                  <select
+                    className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-xs font-semibold"
+                    value={headerDimensions.department_id}
+                    onChange={(e) => setHeaderDimensions({ ...headerDimensions, department_id: e.target.value })}
+                  >
+                    <option value="">اختر الإدارة...</option>
+                    {departments.map(dept => (
+                      <option key={dept.id} value={dept.id}>{dept.name} ({dept.code})</option>
+                    ))}
+                  </select>
+                  {headerDimensions.department_id && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updatedItems = formData.items.map(item => ({
+                          ...item,
+                          department_id: headerDimensions.department_id
+                        }));
+                        setFormData({ ...formData, items: updatedItems });
+                        showNotification('تم تطبيق الإدارة على الجدول', 'success');
+                      }}
+                      className="p-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-emerald-600 hover:text-emerald-700 transition-all flex-shrink-0"
+                      title="تطبيق على كل الجدول"
+                    >
+                      <CheckCheck size={16} />
+                    </button>
+                  )}
+                </div>
               </div>
-
-              <button
-                type="button"
-                onClick={applyHeaderDimensionsToAll}
-                className="w-full py-2 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-black rounded-xl transition-all border border-emerald-100 active:scale-95 flex items-center justify-center gap-1.5"
-              >
-                <ArrowRightLeft size={14} />
-                <span>{language === 'ar' ? 'تطبيق على كل أسطر الجدول' : 'Apply to all rows'}</span>
-              </button>
             </div>
           </div>
 
           {/* Excel-Style Spreadsheet Table Grid */}
           <div className="overflow-x-auto rounded-2xl border border-zinc-200 shadow-inner">
-            <table className="w-full border-collapse min-w-[1500px]" dir={dir}>
+            <table className="w-full border-collapse min-w-[1700px]" dir={dir}>
               <thead>
                 <tr className="bg-zinc-50/80 border-b border-zinc-200 text-xs font-black uppercase text-zinc-500 select-none">
                   <th className="py-2.5 px-3 border-r border-zinc-200 text-center w-28 bg-emerald-50/20 text-emerald-700">{language === 'ar' ? 'مدين' : 'Debit'}</th>
                   <th className="py-2.5 px-3 border-r border-zinc-200 text-center w-28 bg-red-50/20 text-red-700">{language === 'ar' ? 'دائن' : 'Credit'}</th>
-                  <th className="py-2.5 px-3 border-r border-zinc-200 text-right w-64">{language === 'ar' ? 'الحساب' : 'Account'}</th>
+                  <th className="py-2.5 px-3 border-r border-zinc-200 text-right w-36">{language === 'ar' ? 'كود الحساب' : 'Account Code'}</th>
+                  <th className="py-2.5 px-3 border-r border-zinc-200 text-right w-64">{language === 'ar' ? 'الحساب' : 'Account Name'}</th>
+                  <th className="py-2.5 px-3 border-r border-zinc-200 text-right w-36 text-zinc-400 bg-zinc-50/20 font-bold">{language === 'ar' ? 'نوع الحساب' : 'Account Type'}</th>
                   <th className="py-2.5 px-3 border-r border-zinc-200 text-right w-60">{language === 'ar' ? 'الحساب الفرعي' : 'Sub-Account'}</th>
                   <th className="py-2.5 px-3 border-r border-zinc-200 text-center w-36">{language === 'ar' ? 'العملة' : 'Currency'}</th>
                   <th className="py-2.5 px-3 border-r border-zinc-200 text-center w-28">{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
@@ -577,19 +770,87 @@ export const CreateJournalEntry: React.FC = () => {
                       />
                     </td>
 
-                    {/* Account Selector */}
-                    <td className="p-0 border-r border-zinc-200 w-64">
-                      <select
-                        required
-                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/10 px-3 py-2 text-sm bg-transparent outline-none font-bold text-zinc-800 cursor-pointer"
-                        value={item.account_id}
-                        onChange={(e) => updateItem(index, 'account_id', e.target.value)}
-                      >
-                        <option value="">{language === 'ar' ? 'اختر الحساب...' : 'Choose Account...'}</option>
-                        {accounts.map(account => (
-                          <option key={account.id} value={account.id}>{account.name} ({account.code})</option>
-                        ))}
-                      </select>
+                    {/* Account Code Selector (Searchable) */}
+                    <td className="p-0 border-r border-zinc-200 w-36 relative" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        placeholder="رمز الحساب..."
+                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white px-3 py-2 text-sm bg-transparent outline-none font-mono text-right"
+                        value={
+                          activeRowSearch && activeRowSearch.index === index && activeRowSearch.field === 'account_code'
+                            ? activeRowSearch.query
+                            : (accounts.find(a => a.id === item.account_id)?.code || '')
+                        }
+                        onChange={(e) => setActiveRowSearch({ index, field: 'account_code', query: e.target.value })}
+                        onFocus={() => {
+                          setActiveRowSearch({ index, field: 'account_code', query: accounts.find(a => a.id === item.account_id)?.code || '' });
+                        }}
+                      />
+                      {activeRowSearch && activeRowSearch.index === index && activeRowSearch.field === 'account_code' && (
+                        <div className="absolute top-full right-0 left-0 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto min-w-[240px]">
+                          {accounts
+                            .filter(a => a.code.toLowerCase().includes(activeRowSearch.query.toLowerCase()) || a.name.toLowerCase().includes(activeRowSearch.query.toLowerCase()))
+                            .slice(0, 10)
+                            .map(a => (
+                              <button
+                                key={a.id}
+                                type="button"
+                                className="w-full px-3 py-2 text-right hover:bg-zinc-50 transition-all text-xs font-bold flex justify-between items-center"
+                                onClick={() => {
+                                  updateItem(index, 'account_id', a.id);
+                                  setActiveRowSearch(null);
+                                }}
+                              >
+                                <span className="font-mono text-zinc-500">{a.code}</span>
+                                <span className="text-zinc-800">{a.name}</span>
+                              </button>
+                            ))}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Account Name Selector (Searchable) */}
+                    <td className="p-0 border-r border-zinc-200 w-64 relative" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        placeholder="اسم الحساب..."
+                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white px-3 py-2 text-sm bg-transparent outline-none font-bold text-zinc-800"
+                        value={
+                          activeRowSearch && activeRowSearch.index === index && activeRowSearch.field === 'account_name'
+                            ? activeRowSearch.query
+                            : (accounts.find(a => a.id === item.account_id)?.name || '')
+                        }
+                        onChange={(e) => setActiveRowSearch({ index, field: 'account_name', query: e.target.value })}
+                        onFocus={() => {
+                          setActiveRowSearch({ index, field: 'account_name', query: accounts.find(a => a.id === item.account_id)?.name || '' });
+                        }}
+                      />
+                      {activeRowSearch && activeRowSearch.index === index && activeRowSearch.field === 'account_name' && (
+                        <div className="absolute top-full right-0 left-0 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto min-w-[240px]">
+                          {accounts
+                            .filter(a => a.code.toLowerCase().includes(activeRowSearch.query.toLowerCase()) || a.name.toLowerCase().includes(activeRowSearch.query.toLowerCase()))
+                            .slice(0, 10)
+                            .map(a => (
+                              <button
+                                key={a.id}
+                                type="button"
+                                className="w-full px-3 py-2 text-right hover:bg-zinc-50 transition-all text-xs font-bold flex justify-between items-center"
+                                onClick={() => {
+                                  updateItem(index, 'account_id', a.id);
+                                  setActiveRowSearch(null);
+                                }}
+                              >
+                                <span className="text-zinc-800">{a.name}</span>
+                                <span className="font-mono text-zinc-400 text-[10px]">{a.code}</span>
+                              </button>
+                            ))}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Account Type (Read-only) */}
+                    <td className="p-3 border-r border-zinc-200 w-36 text-right text-xs font-bold text-zinc-500 bg-zinc-50/20 select-none">
+                      {getAccountTypeName(item.account_id) || '---'}
                     </td>
 
                     {/* Sub-Account Selector (Dynamic Inline) */}
@@ -620,8 +881,11 @@ export const CreateJournalEntry: React.FC = () => {
                         value={item.currency || 'local'}
                         onChange={(e) => updateItem(index, 'currency', e.target.value)}
                       >
-                        {currencies.map(c => (
-                          <option key={c.code} value={c.code}>{c.name}</option>
+                        <option value="local">
+                          {language === 'ar' ? 'العملة المحلية' : 'Local Currency'}
+                        </option>
+                        {companyCurrencies.filter(c => c.is_active).map(c => (
+                          <option key={c.id} value={c.id}>{c.name_ar || c.name_en} ({c.code})</option>
                         ))}
                       </select>
                     </td>
@@ -654,18 +918,43 @@ export const CreateJournalEntry: React.FC = () => {
                       />
                     </td>
 
-                    {/* Operation dimension select */}
-                    <td className="p-0 border-r border-zinc-200 w-48">
-                      <select
-                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/10 px-3 py-2 text-xs bg-transparent outline-none font-semibold text-zinc-700 cursor-pointer"
-                        value={item.operation_id || ''}
-                        onChange={(e) => updateItem(index, 'operation_id', e.target.value)}
-                      >
-                        <option value="">---</option>
-                        {operations.map(op => (
-                          <option key={op.id} value={op.id}>{op.operation_number} - {op.description}</option>
-                        ))}
-                      </select>
+                    {/* Operation dimension select (Searchable) */}
+                    <td className="p-0 border-r border-zinc-200 w-48 relative" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        placeholder="ابحث..."
+                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white px-3 py-2 text-xs bg-transparent outline-none font-semibold text-zinc-700"
+                        value={
+                          activeRowSearch && activeRowSearch.index === index && activeRowSearch.field === 'operation'
+                            ? activeRowSearch.query
+                            : (operations.find(o => o.id === item.operation_id)?.operation_number || '')
+                        }
+                        onChange={(e) => setActiveRowSearch({ index, field: 'operation', query: e.target.value })}
+                        onFocus={() => {
+                          setActiveRowSearch({ index, field: 'operation', query: operations.find(o => o.id === item.operation_id)?.operation_number || '' });
+                        }}
+                      />
+                      {activeRowSearch && activeRowSearch.index === index && activeRowSearch.field === 'operation' && (
+                        <div className="absolute top-full right-0 left-0 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto min-w-[200px]">
+                          {operations
+                            .filter(o => o.operation_number.toLowerCase().includes(activeRowSearch.query.toLowerCase()) || (o.description && o.description.toLowerCase().includes(activeRowSearch.query.toLowerCase())))
+                            .slice(0, 10)
+                            .map(o => (
+                              <button
+                                key={o.id}
+                                type="button"
+                                className="w-full px-3 py-2 text-right hover:bg-zinc-50 transition-all text-xs font-bold flex justify-between items-center"
+                                onClick={() => {
+                                  updateItem(index, 'operation_id', o.id);
+                                  setActiveRowSearch(null);
+                                }}
+                              >
+                                <span className="text-zinc-800">{o.operation_number}</span>
+                                <span className="text-zinc-400 text-[10px] font-normal truncate max-w-[120px]">{o.description}</span>
+                              </button>
+                            ))}
+                        </div>
+                      )}
                     </td>
 
                     {/* Cost center dimension select */}
@@ -721,11 +1010,44 @@ export const CreateJournalEntry: React.FC = () => {
                   </tr>
                 ))}
               </tbody>
+
+              {/* Table Footer with Sum of columns and status indicator */}
+              <tfoot className="bg-zinc-50 border-t-2 border-zinc-200 select-none">
+                <tr className="font-bold text-sm text-zinc-700">
+                  {/* Total Debit */}
+                  <td className="p-2 border-r border-zinc-200 text-center font-black text-emerald-600 bg-emerald-50/10 shadow-inner">
+                    {formatNumber(totalDebit)}
+                  </td>
+                  {/* Total Credit */}
+                  <td className="p-2 border-r border-zinc-200 text-center font-black text-red-600 bg-red-50/10 shadow-inner">
+                    {formatNumber(totalCredit)}
+                  </td>
+                  {/* Status Indicator */}
+                  <td colSpan={4} className="p-2 border-r border-zinc-200 text-right bg-zinc-100/30">
+                    <div className="flex items-center gap-2">
+                      {difference < 0.01 && totalDebit > 0 ? (
+                        <div className="flex items-center gap-1.5 text-emerald-700 text-xs font-black">
+                          <CheckCircle2 size={16} className="text-emerald-600" />
+                          <span>{language === 'ar' ? 'متزن وجاهز للحفظ' : 'Balanced & Ready'}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-amber-700 text-xs font-black animate-pulse">
+                          <AlertCircle size={16} className="text-amber-600" />
+                          <span>{language === 'ar' ? 'غير متزن حالياً' : 'Currently unbalanced'}</span>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td colSpan={7} className="p-2 text-zinc-500 text-xs font-black text-center bg-zinc-100/30">
+                    {difference < 0.01 ? '' : `${language === 'ar' ? 'الفارق:' : 'Difference:'} ${formatNumber(difference)}`}
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
 
           {/* Add Row Button at the bottom of the table card */}
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6 pt-4">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6 pt-2">
             <button
               type="button"
               onClick={addItem}
@@ -734,22 +1056,6 @@ export const CreateJournalEntry: React.FC = () => {
               <Plus size={18} />
               <span>إضافة سطر جديد</span>
             </button>
-            
-            {/* Status alerts */}
-            <div className="flex items-center gap-4">
-              {difference >= 0.01 && (
-                <div className="flex items-center gap-2 text-amber-700 bg-amber-50 border border-amber-100 px-5 py-2.5 rounded-2xl text-xs font-bold animate-pulse">
-                  <AlertCircle size={16} />
-                  <span>القيد غير متزن حالياً (فرق التوازن: {formatNumber(difference)})</span>
-                </div>
-              )}
-              {difference < 0.01 && totalDebit > 0 && (
-                <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-100 px-5 py-2.5 rounded-2xl text-xs font-bold">
-                  <CheckCircle2 size={16} />
-                  <span>القيد متزن تماماً وجاهز للحفظ</span>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </form>
