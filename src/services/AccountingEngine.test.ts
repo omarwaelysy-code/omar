@@ -83,4 +83,88 @@ describe('AccountingEngine', () => {
     expect(bs.totalLiabilitiesEquity).toBe(1300); // 1000 (Capital) + 300 (Net Profit)
     expect(bs.isBalanced).toBe(true);
   });
+
+  describe('getSubPeriods', () => {
+    it('splits a date range into monthly sub-periods correctly', () => {
+      const periods = AccountingEngine.getSubPeriods('2026-01-15', '2026-04-10', 'monthly');
+      expect(periods).toHaveLength(4);
+      
+      expect(periods[0]).toEqual({
+        start: '2026-01-15',
+        end: '2026-01-31',
+        labelAr: 'يناير 2026',
+        labelEn: 'January 2026'
+      });
+      expect(periods[1]).toEqual({
+        start: '2026-02-01',
+        end: '2026-02-28',
+        labelAr: 'فبراير 2026',
+        labelEn: 'February 2026'
+      });
+      expect(periods[2]).toEqual({
+        start: '2026-03-01',
+        end: '2026-03-31',
+        labelAr: 'مارس 2026',
+        labelEn: 'March 2026'
+      });
+      expect(periods[3]).toEqual({
+        start: '2026-04-01',
+        end: '2026-04-10',
+        labelAr: 'أبريل 2026',
+        labelEn: 'April 2026'
+      });
+    });
+
+    it('splits a date range into quarterly sub-periods correctly', () => {
+      const periods = AccountingEngine.getSubPeriods('2026-02-01', '2026-08-15', 'quarterly');
+      expect(periods).toHaveLength(3); // Q1, Q2, Q3 overlapping
+      
+      // Q1 (intersection is Feb 1 to Mar 31)
+      expect(periods[0]).toEqual({
+        start: '2026-02-01',
+        end: '2026-03-31',
+        labelAr: 'الربع الأول 2026',
+        labelEn: 'Q1 2026'
+      });
+      // Q2 (intersection is Apr 1 to Jun 30)
+      expect(periods[1]).toEqual({
+        start: '2026-04-01',
+        end: '2026-06-30',
+        labelAr: 'الربع الثاني 2026',
+        labelEn: 'Q2 2026'
+      });
+      // Q3 (intersection is Jul 1 to Aug 15)
+      expect(periods[2]).toEqual({
+        start: '2026-07-01',
+        end: '2026-08-15',
+        labelAr: 'الربع الثالث 2026',
+        labelEn: 'Q3 2026'
+      });
+    });
+
+    it('splits a date range into yearly sub-periods correctly', () => {
+      const periods = AccountingEngine.getSubPeriods('2025-06-15', '2027-02-20', 'yearly');
+      expect(periods).toHaveLength(3); // 2025, 2026, 2027
+      
+      expect(periods[0]).toEqual({
+        start: '2025-06-15',
+        end: '2025-12-31',
+        labelAr: '2025',
+        labelEn: '2025'
+      });
+      expect(periods[1]).toEqual({
+        start: '2026-01-01',
+        end: '2026-12-31',
+        labelAr: '2026',
+        labelEn: '2026'
+      });
+      expect(periods[2]).toEqual({
+        start: '2027-01-01',
+        end: '2027-02-20',
+        labelAr: '2027',
+        labelEn: '2027'
+      });
+    });
+  });
 });
+

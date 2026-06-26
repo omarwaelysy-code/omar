@@ -198,6 +198,125 @@ export class AccountingEngine {
   }
 
   /**
+   * Calculates and returns sub-periods (start, end, labelAr, labelEn) based on the date range and view mode.
+   */
+  static getSubPeriods(
+    startDateStr: string,
+    endDateStr: string,
+    mode: 'single' | 'monthly' | 'quarterly' | 'yearly'
+  ): { start: string; end: string; labelAr: string; labelEn: string }[] {
+    const start = new Date(startDateStr);
+    const end = new Date(endDateStr);
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) {
+      return [];
+    }
+
+    const formatDateLocal = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const subPeriods: { start: string; end: string; labelAr: string; labelEn: string }[] = [];
+
+    if (mode === 'single') {
+      subPeriods.push({
+        start: startDateStr,
+        end: endDateStr,
+        labelAr: 'الفترة المحددة',
+        labelEn: 'Selected Period'
+      });
+      return subPeriods;
+    }
+
+    if (mode === 'monthly') {
+      let current = new Date(start.getFullYear(), start.getMonth(), 1);
+      const endLimit = new Date(end.getFullYear(), end.getMonth(), 1);
+
+      const arMonths = [
+        'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+        'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+      ];
+      const enMonths = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+
+      while (current <= endLimit) {
+        const year = current.getFullYear();
+        const month = current.getMonth();
+
+        const pStart = new Date(Math.max(start.getTime(), new Date(year, month, 1).getTime()));
+        const pEnd = new Date(Math.min(end.getTime(), new Date(year, month + 1, 0).getTime()));
+
+        const startStr = formatDateLocal(pStart);
+        const endStr = formatDateLocal(pEnd);
+
+        subPeriods.push({
+          start: startStr,
+          end: endStr,
+          labelAr: `${arMonths[month]} ${year}`,
+          labelEn: `${enMonths[month]} ${year}`
+        });
+
+        current = new Date(year, month + 1, 1);
+      }
+    } else if (mode === 'quarterly') {
+      const getQuarterStartMonth = (month: number) => Math.floor(month / 3) * 3;
+
+      let current = new Date(start.getFullYear(), getQuarterStartMonth(start.getMonth()), 1);
+      const endLimit = new Date(end.getFullYear(), getQuarterStartMonth(end.getMonth()), 1);
+
+      const arQuarters = ['الربع الأول', 'الربع الثاني', 'الربع الثالث', 'الربع الرابع'];
+      const enQuarters = ['Q1', 'Q2', 'Q3', 'Q4'];
+
+      while (current <= endLimit) {
+        const year = current.getFullYear();
+        const qStartMonth = current.getMonth();
+        const qIndex = qStartMonth / 3;
+
+        const pStart = new Date(Math.max(start.getTime(), new Date(year, qStartMonth, 1).getTime()));
+        const pEnd = new Date(Math.min(end.getTime(), new Date(year, qStartMonth + 3, 0).getTime()));
+
+        const startStr = formatDateLocal(pStart);
+        const endStr = formatDateLocal(pEnd);
+
+        subPeriods.push({
+          start: startStr,
+          end: endStr,
+          labelAr: `${arQuarters[qIndex]} ${year}`,
+          labelEn: `${enQuarters[qIndex]} ${year}`
+        });
+
+        current = new Date(year, qStartMonth + 3, 1);
+      }
+    } else if (mode === 'yearly') {
+      let currentYear = start.getFullYear();
+      const endYear = end.getFullYear();
+
+      while (currentYear <= endYear) {
+        const pStart = new Date(Math.max(start.getTime(), new Date(currentYear, 0, 1).getTime()));
+        const pEnd = new Date(Math.min(end.getTime(), new Date(currentYear, 11, 31).getTime()));
+
+        const startStr = formatDateLocal(pStart);
+        const endStr = formatDateLocal(pEnd);
+
+        subPeriods.push({
+          start: startStr,
+          end: endStr,
+          labelAr: `${currentYear}`,
+          labelEn: `${currentYear}`
+        });
+
+        currentYear++;
+      }
+    }
+
+    return subPeriods;
+  }
+
+  /**
    * Calculates Income Statement data.
    */
   static calculateIncomeStatement(
