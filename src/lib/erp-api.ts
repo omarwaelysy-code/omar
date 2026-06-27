@@ -2065,6 +2065,10 @@ modules.forEach(moduleName => {
           await InventoryMovementService.reverseMovement('purchase_return', id, client);
         }
 
+        if (moduleName === 'returns') {
+          await InventoryMovementService.reverseMovement('sales_return', id, client);
+        }
+
         if (transactionalModules.includes(moduleName)) {
           await reverseAndRecalculate(client, companyId || '', id);
         }
@@ -2638,6 +2642,8 @@ router.post('/returns', authenticateToken, async (req: AuthRequest, res) => {
       Object.values(rData)
     );
 
+    const movementLines: any[] = [];
+
     // Insert Items
     for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('return_items', item);
@@ -2673,6 +2679,18 @@ router.post('/returns', authenticateToken, async (req: AuthRequest, res) => {
               returnData.return_number || `RET-${returnId}`,
               returnData.date
             );
+
+            movementLines.push({
+              product_id: item.product_id,
+              unit_id: item.unit_id || item.unit || 'default',
+              quantity: quantity,
+              direction: 'IN',
+              unit_cost: returnUnitCost,
+              total_cost: quantity * returnUnitCost,
+              batch_id: item.batch_id || null,
+              serial_number: item.serial_number || null,
+              notes: item.notes || null
+            });
           }
         }
       }
@@ -2689,6 +2707,23 @@ router.post('/returns', authenticateToken, async (req: AuthRequest, res) => {
         const productIdsToSync = (items || []).filter((i: any) => i.product_id).map((i: any) => i.product_id);
     if (productIdsToSync.length > 0) {
       await syncProductsCostAndJEs(client, companyId, productIdsToSync);
+    }
+
+    // New Inventory Movement Engine integration (Phase 7)
+    if (movementLines.length > 0) {
+      await InventoryMovementService.createMovement({
+        company_id: returnData.company_id || companyId,
+        branch_id: returnData.branch_id || req.body.branch_id || null,
+        warehouse_id: returnData.warehouse_id || null,
+        movement_number: returnData.return_number || `RET-${returnId}`,
+        movement_type: 'sales_return',
+        source_document_type: 'sales_return',
+        source_document_id: returnId,
+        movement_date: returnData.date,
+        status: 'posted',
+        notes: returnData.notes || null,
+        created_by: req.user?.id || returnData.created_by || null
+      }, movementLines, client);
     }
 
     await client.query('COMMIT');
@@ -2734,10 +2769,12 @@ router.put('/returns/:id', authenticateToken, async (req: AuthRequest, res) => {
 
     await client.query('DELETE FROM return_items WHERE return_id = $1', [returnId]);
     await reverseAndRecalculate(client, companyId || '', returnId);
+    await InventoryMovementService.reverseMovement('sales_return', returnId, client);
 
     const returnDataFinal = returnData;
     const rData = returnDataFinal;
     const cogsLines: { account_id: string; account_name: string; debit: number; credit: number; description: string }[] = [];
+    const movementLines: any[] = [];
 for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('return_items', item);
       const itemId = uuidv4();
@@ -2772,6 +2809,18 @@ for (const item of (items || [])) {
               returnDataFinal.return_number || `RET-${returnId}`,
               returnDataFinal.date
             );
+
+            movementLines.push({
+              product_id: item.product_id,
+              unit_id: item.unit_id || item.unit || 'default',
+              quantity: quantity,
+              direction: 'IN',
+              unit_cost: returnUnitCost,
+              total_cost: quantity * returnUnitCost,
+              batch_id: item.batch_id || null,
+              serial_number: item.serial_number || null,
+              notes: item.notes || null
+            });
           }
         }
       }
@@ -2789,6 +2838,23 @@ for (const item of (items || [])) {
     const productIdsToSync = (items || []).filter((i: any) => i.product_id).map((i: any) => i.product_id);
     if (productIdsToSync.length > 0) {
       await syncProductsCostAndJEs(client, companyId, productIdsToSync);
+    }
+
+    // New Inventory Movement Engine integration (Phase 7)
+    if (movementLines.length > 0) {
+      await InventoryMovementService.createMovement({
+        company_id: returnData.company_id || companyId,
+        branch_id: returnData.branch_id || req.body.branch_id || null,
+        warehouse_id: returnData.warehouse_id || null,
+        movement_number: returnData.return_number || `RET-${returnId}`,
+        movement_type: 'sales_return',
+        source_document_type: 'sales_return',
+        source_document_id: returnId,
+        movement_date: returnData.date,
+        status: 'posted',
+        notes: returnData.notes || null,
+        created_by: req.user?.id || returnData.created_by || null
+      }, movementLines, client);
     }
 
     await client.query('COMMIT');
