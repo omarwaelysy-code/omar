@@ -17,7 +17,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
 import { useNavigation } from '../contexts/NavigationContext';
-import { printElement } from '../utils/pdfUtils';
+import { printElement, exportToPDF } from '../utils/pdfUtils';
 import { printDocument } from '../utils/printEngine';
 import { exportToExcel } from '../utils/excelUtils';
 
@@ -129,7 +129,7 @@ export const GoodsReceipts: React.FC = () => {
   const [showFiltersPanel, setShowFiltersPanel] = useState(false);
 
   const [page, setPage] = useState(1);
-  const [limit] = useState(10);
+  const [limit, setLimit] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -147,8 +147,34 @@ export const GoodsReceipts: React.FC = () => {
   const [selectedPOId, setSelectedPOId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { viewPreference, toggleViewPreference } = useViewPreference('goods_receipts');
+  const [view, setView] = useViewPreference('goods_receipts', 'table');
+  const toggleViewPreference = () => {
+    setView(view === 'table' ? 'card' : 'table');
+  };
+  const [companyData, setCompanyData] = useState<Company | null>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
   const receiptPrintRef = useRef<HTMLDivElement>(null);
+
+  const handleExportExcel = () => {
+    const formattedData = receipts.map(gr => ({
+      [gt('column_number')]: gr.receipt_number,
+      [gt('column_supplier')]: gr.supplier_name,
+      [gt('column_warehouse')]: gr.warehouse_name,
+      [gt('column_date')]: formatDate(gr.date),
+      [gt('column_origin')]: gr.document_origin,
+      [gt('column_status')]: gt(`status_${gr.status}`)
+    }));
+    exportToExcel(formattedData, { filename: 'Goods_Receipts_Report', sheetName: gt('title') });
+  };
+
+  const handleExportPDF = async () => {
+    if (tableRef.current) {
+      await exportToPDF(tableRef.current, { 
+        filename: 'Goods_Receipts_Report', 
+        orientation: 'landscape'
+      });
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -171,9 +197,9 @@ export const GoodsReceipts: React.FC = () => {
     if (filterDateFrom) filters['date_gte'] = filterDateFrom;
     if (filterDateTo) filters['date_lte'] = filterDateTo;
 
-    const unsubReceipts = dbService.subscribePaginated<GoodsReceipt>('goods_receipts', filters, (data, total) => {
-      setReceipts(data);
-      setTotalCount(total);
+    const unsubReceipts = dbService.subscribePaginated<GoodsReceipt>('goods_receipts', filters, (result) => {
+      setReceipts(result.data);
+      setTotalCount(result.total);
       setLoading(false);
     });
 
@@ -182,6 +208,7 @@ export const GoodsReceipts: React.FC = () => {
     dbService.list<Product>('products', { company_id: user.company_id }).then(setProducts);
     dbService.list<Warehouse>('warehouses', { company_id: user.company_id }).then(setWarehouses);
     dbService.list<Currency>('currencies', { company_id: user.company_id }).then(setCurrencies);
+    dbService.get<Company>('companies', user.company_id).then(setCompanyData).catch(err => console.error('Failed to load company:', err));
 
     return () => {
       unsubReceipts();
@@ -455,20 +482,12 @@ export const GoodsReceipts: React.FC = () => {
             className="p-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 rounded-2xl transition-all"
             title={language === 'ar' ? 'تغيير طريقة العرض' : 'Change View'}
           >
-            {viewPreference === 'list' ? <LayoutGrid size={18} /> : <List size={18} />}
+            {view === 'table' ? <LayoutGrid size={18} /> : <List size={18} />}
           </button>
 
           <ExportButtons
-            data={receipts}
-            columns={[
-              { header: gt('column_number'), key: 'receipt_number' },
-              { header: gt('column_supplier'), key: 'supplier_name' },
-              { header: gt('column_warehouse'), key: 'warehouse_name' },
-              { header: gt('column_date'), key: 'date' },
-              { header: gt('column_origin'), key: 'document_origin' },
-              { header: gt('column_status'), key: 'status' }
-            ]}
-            filename="goods_receipts"
+            onExportExcel={handleExportExcel}
+            onExportPDF={handleExportPDF}
           />
         </div>
       </div>
@@ -585,11 +604,11 @@ export const GoodsReceipts: React.FC = () => {
             {language === 'ar' ? 'ابدأ في تسجيل استلامات المخزن لتوثيق حركة الأصناف بدقة.' : 'Create your first goods receipt to log warehouse operations accurately.'}
           </p>
         </div>
-      ) : viewPreference === 'list' ? (
+      ) : view === 'table' ? (
         /* Table View */
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-right border-collapse">
+            <table ref={tableRef} className="w-full text-right border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100 text-slate-400 font-bold text-xs">
                   <th className="px-6 py-4">{gt('column_number')}</th>
@@ -674,7 +693,7 @@ export const GoodsReceipts: React.FC = () => {
               </tbody>
             </table>
           </div>
-          <PaginationControls page={page} limit={limit} totalCount={totalCount} onPageChange={setPage} />
+          <PaginationControls page={page} limit={limit} total={totalCount} onPageChange={setPage} onLimitChange={setLimit} />
         </div>
       ) : (
         /* Card View */
@@ -750,7 +769,7 @@ export const GoodsReceipts: React.FC = () => {
               </div>
             ))}
           </div>
-          <PaginationControls page={page} limit={limit} totalCount={totalCount} onPageChange={setPage} />
+          <PaginationControls page={page} limit={limit} total={totalCount} onPageChange={setPage} onLimitChange={setLimit} />
         </div>
       )}
 
@@ -807,7 +826,12 @@ export const GoodsReceipts: React.FC = () => {
 
                 {/* Print area */}
                 <div ref={receiptPrintRef} className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6 select-text">
-                  <CompanyInvoiceHeader documentType={gt('receipt')} documentNumber={viewReceipt.receipt_number} date={viewReceipt.date} />
+                  <CompanyInvoiceHeader 
+                    company={companyData} 
+                    documentNumber={viewReceipt.receipt_number} 
+                    documentDate={viewReceipt.date ? formatDate(viewReceipt.date) : ''} 
+                    title={gt('receipt')} 
+                  />
 
                   {/* Metadata */}
                   <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-slate-500 border-b border-slate-100 pb-5">
