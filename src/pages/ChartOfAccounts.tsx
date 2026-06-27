@@ -73,6 +73,37 @@ export const ChartOfAccounts: React.FC = () => {
     { id: 'other', label: 'أخرى / غير مصنف', statement: 'other' },
   ];
 
+  const subClassifications: Record<string, { id: string; label: string }[]> = {
+    asset: [
+      { id: 'cash_and_equivalents', label: language === 'ar' ? 'نقدية وما في حكمها' : 'Cash & Cash Equivalents' },
+      { id: 'receivables', label: language === 'ar' ? 'عملاء' : 'Customers / Receivables' },
+      { id: 'asset', label: language === 'ar' ? 'أصول أخرى' : 'Other Assets' },
+    ],
+    liability_equity: [
+      { id: 'payables', label: language === 'ar' ? 'موردين' : 'Suppliers / Payables' },
+      { id: 'liability', label: language === 'ar' ? 'التزامات' : 'Liabilities' },
+      { id: 'equity', label: language === 'ar' ? 'حقوق ملكية' : 'Equity' },
+      { id: 'liability_equity', label: language === 'ar' ? 'التزام/حقوق ملكية (مشترك)' : 'Liability/Equity (Joint)' },
+    ],
+    revenue: [
+      { id: 'revenue', label: language === 'ar' ? 'إيرادات النشاط' : 'Operating Revenues' },
+      { id: 'other_revenue', label: language === 'ar' ? 'إيرادات أخرى' : 'Other Revenues' },
+    ],
+    cost: [
+      { id: 'cost', label: language === 'ar' ? 'التكاليف' : 'Costs' },
+    ],
+    expense: [
+      { id: 'interest_expense', label: language === 'ar' ? 'فوائد مدينة' : 'Debit Interest' },
+      { id: 'depreciation', label: language === 'ar' ? 'اهلاكات' : 'Depreciation' },
+      { id: 'other_expense', label: language === 'ar' ? 'مصروفات اخرى' : 'Other Expenses' },
+      { id: 'expense', label: language === 'ar' ? 'مصروفات تشغيلية وعامة' : 'Operating & General Expenses' },
+    ]
+  };
+
+  const getTypesBySubCls = (subClsId: string) => {
+    return types.filter(t => t.classification === subClsId);
+  };
+
   const renderAccountTree = (parentId: string | null, typeId: string | null, level: number) => {
     const levelAccounts = accounts.filter(a => {
       // If we're looking for root accounts, they either have no parent_id or parent_id is empty/invalid
@@ -172,35 +203,74 @@ export const ChartOfAccounts: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            {classifications.filter(c => c.statement === 'balance_sheet').map(cls => (
-              <TreeItem key={cls.id} label={cls.label} icon={Folder} level={0} isOpenDefault={true}>
-                {filterTypesByCls(cls.id).map(type => (
-                  <TreeItem 
-                    key={type.id} 
-                    label={
-                      <div className="flex items-center gap-2 group/type">
-                        <span>{type.code} - {type.name}</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPendingAccountTypeEditId(type.id);
-                            setCurrentPage('account_types');
-                          }}
-                          className="p-1 text-zinc-400 hover:text-emerald-600 rounded hover:bg-zinc-200 opacity-0 group-hover/type:opacity-100 transition-opacity"
-                          title="تعديل نوع الحساب"
-                        >
-                          <Edit2 size={12} />
-                        </button>
-                      </div>
-                    } 
-                    icon={Folder} 
-                    level={1}
-                  >
-                    {renderAccountTree(null, type.id, 2)}
-                  </TreeItem>
-                ))}
-              </TreeItem>
-            ))}
+            {classifications.filter(c => c.statement === 'balance_sheet').map(cls => {
+              const hasSubClassifications = subClassifications[cls.id] !== undefined;
+              return (
+                <TreeItem key={cls.id} label={cls.label} icon={Folder} level={0} isOpenDefault={true}>
+                  {hasSubClassifications ? (
+                    subClassifications[cls.id].map(sub => {
+                      const subTypes = getTypesBySubCls(sub.id);
+                      if (subTypes.length === 0) return null;
+                      return (
+                        <TreeItem key={sub.id} label={sub.label} icon={Folder} level={1} isOpenDefault={true}>
+                          {subTypes.map(type => (
+                            <TreeItem 
+                              key={type.id} 
+                              label={
+                                <div className="flex items-center gap-2 group/type">
+                                  <span>{type.code} - {type.name}</span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPendingAccountTypeEditId(type.id);
+                                      setCurrentPage('account_types');
+                                    }}
+                                    className="p-1 text-zinc-400 hover:text-emerald-600 rounded hover:bg-zinc-200 opacity-0 group-hover/type:opacity-100 transition-opacity"
+                                    title="تعديل نوع الحساب"
+                                  >
+                                    <Edit2 size={12} />
+                                  </button>
+                                </div>
+                              } 
+                              icon={Folder} 
+                              level={2}
+                            >
+                              {renderAccountTree(null, type.id, 3)}
+                            </TreeItem>
+                          ))}
+                        </TreeItem>
+                      );
+                    })
+                  ) : (
+                    filterTypesByCls(cls.id).map(type => (
+                      <TreeItem 
+                        key={type.id} 
+                        label={
+                          <div className="flex items-center gap-2 group/type">
+                            <span>{type.code} - {type.name}</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPendingAccountTypeEditId(type.id);
+                                setCurrentPage('account_types');
+                              }}
+                              className="p-1 text-zinc-400 hover:text-emerald-600 rounded hover:bg-zinc-200 opacity-0 group-hover/type:opacity-100 transition-opacity"
+                              title="تعديل نوع الحساب"
+                            >
+                              <Edit2 size={12} />
+                            </button>
+                          </div>
+                        } 
+                        icon={Folder} 
+                        level={1}
+                      >
+                        {renderAccountTree(null, type.id, 2)}
+                      </TreeItem>
+                    ))
+                  )}
+                </TreeItem>
+              );
+            })}
             {renderOrphanedAccounts()}
           </div>
         </div>
@@ -215,35 +285,74 @@ export const ChartOfAccounts: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            {classifications.filter(c => c.statement === 'income_statement' || c.statement === 'other').map(cls => (
-              <TreeItem key={cls.id} label={cls.label} icon={Folder} level={0} isOpenDefault={true}>
-                {filterTypesByCls(cls.id).map(type => (
-                  <TreeItem 
-                    key={type.id} 
-                    label={
-                      <div className="flex items-center gap-2 group/type">
-                        <span>{type.code} - {type.name}</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPendingAccountTypeEditId(type.id);
-                            setCurrentPage('account_types');
-                          }}
-                          className="p-1 text-zinc-400 hover:text-emerald-600 rounded hover:bg-zinc-200 opacity-0 group-hover/type:opacity-100 transition-opacity"
-                          title={language === 'ar' ? 'تعديل نوع الحساب' : 'Edit Account Type'}
-                        >
-                          <Edit2 size={12} />
-                        </button>
-                      </div>
-                    } 
-                    icon={Folder} 
-                    level={1}
-                  >
-                    {renderAccountTree(null, type.id, 2)}
-                  </TreeItem>
-                ))}
-              </TreeItem>
-            ))}
+            {classifications.filter(c => c.statement === 'income_statement' || c.statement === 'other').map(cls => {
+              const hasSubClassifications = subClassifications[cls.id] !== undefined;
+              return (
+                <TreeItem key={cls.id} label={cls.label} icon={Folder} level={0} isOpenDefault={true}>
+                  {hasSubClassifications ? (
+                    subClassifications[cls.id].map(sub => {
+                      const subTypes = getTypesBySubCls(sub.id);
+                      if (subTypes.length === 0) return null;
+                      return (
+                        <TreeItem key={sub.id} label={sub.label} icon={Folder} level={1} isOpenDefault={true}>
+                          {subTypes.map(type => (
+                            <TreeItem 
+                              key={type.id} 
+                              label={
+                                <div className="flex items-center gap-2 group/type">
+                                  <span>{type.code} - {type.name}</span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPendingAccountTypeEditId(type.id);
+                                      setCurrentPage('account_types');
+                                    }}
+                                    className="p-1 text-zinc-400 hover:text-emerald-600 rounded hover:bg-zinc-200 opacity-0 group-hover/type:opacity-100 transition-opacity"
+                                    title={language === 'ar' ? 'تعديل نوع الحساب' : 'Edit Account Type'}
+                                  >
+                                    <Edit2 size={12} />
+                                  </button>
+                                </div>
+                              } 
+                              icon={Folder} 
+                              level={2}
+                            >
+                              {renderAccountTree(null, type.id, 3)}
+                            </TreeItem>
+                          ))}
+                        </TreeItem>
+                      );
+                    })
+                  ) : (
+                    filterTypesByCls(cls.id).map(type => (
+                      <TreeItem 
+                        key={type.id} 
+                        label={
+                          <div className="flex items-center gap-2 group/type">
+                            <span>{type.code} - {type.name}</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPendingAccountTypeEditId(type.id);
+                                setCurrentPage('account_types');
+                              }}
+                              className="p-1 text-zinc-400 hover:text-emerald-600 rounded hover:bg-zinc-200 opacity-0 group-hover/type:opacity-100 transition-opacity"
+                              title={language === 'ar' ? 'تعديل نوع الحساب' : 'Edit Account Type'}
+                            >
+                              <Edit2 size={12} />
+                            </button>
+                          </div>
+                        } 
+                        icon={Folder} 
+                        level={1}
+                      >
+                        {renderAccountTree(null, type.id, 2)}
+                      </TreeItem>
+                    ))
+                  )}
+                </TreeItem>
+              );
+            })}
           </div>
         </div>
       </div>
