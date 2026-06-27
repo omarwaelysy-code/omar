@@ -46,6 +46,7 @@ interface CompanyData {
   inventory_cost_method_level?: 'company' | 'item';
   vat_enabled: boolean;
   wht_enabled: boolean;
+  purchase_workflow_mode?: 'Simple' | 'Enterprise Strict' | 'Enterprise Flexible';
 }
 
 // Searchable Select Component
@@ -174,7 +175,8 @@ export function CompanySettings() {
     inventory_cost_method: 'wac',
     inventory_cost_method_level: 'item',
     vat_enabled: false,
-    wht_enabled: false
+    wht_enabled: false,
+    purchase_workflow_mode: 'Simple'
   });
 
   // ─── Exchange Rate Settings state ──────────────────────────────────────────────────
@@ -315,7 +317,8 @@ export function CompanySettings() {
             inventory_cost_method: settings.inventory_cost_method || 'wac',
             inventory_cost_method_level: 'item',
             vat_enabled: settings.vat_enabled || company.vat_enabled || false,
-            wht_enabled: settings.wht_enabled || company.wht_enabled || false
+            wht_enabled: settings.wht_enabled || company.wht_enabled || false,
+            purchase_workflow_mode: company.purchase_workflow_mode || settings.purchase_workflow_mode || 'Simple'
           });
 
           setErAutoUpdate(settings.er_auto_update || false);
@@ -359,7 +362,8 @@ export function CompanySettings() {
         inventory_cost_method_level: 'item',
         inventory_cost_method: data.inventory_cost_method || 'wac',
         vat_enabled: data.vat_enabled,
-        wht_enabled: data.wht_enabled
+        wht_enabled: data.wht_enabled,
+        purchase_workflow_mode: data.purchase_workflow_mode || 'Simple'
       };
 
       await dbService.update('companies', user.company_id, {
@@ -372,6 +376,7 @@ export function CompanySettings() {
         fiscal_year_end: fiscalYearEnd,
         vat_enabled: data.vat_enabled,
         wht_enabled: data.wht_enabled,
+        purchase_workflow_mode: data.purchase_workflow_mode || 'Simple',
         settings: newSettings
       });
       
@@ -760,6 +765,106 @@ export function CompanySettings() {
               </div>
             )}
 
+          </div>
+        </div>
+
+        {/* Card 3.5: Inventory Settings — إعدادات المخازن والمشتريات */}
+        <div className="bg-white p-8 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+          <div className="flex items-center gap-2 text-indigo-600 justify-end">
+            <span className="font-bold text-lg">{language === 'ar' ? 'إعدادات المخازن والمشتريات' : 'Inventory & Purchase Settings'}</span>
+            <TrendingUp className="w-5 h-5" />
+          </div>
+
+          <div className="space-y-4">
+            <label className="block text-sm font-semibold text-slate-500">
+              {language === 'ar' ? 'نمط سير عمل المشتريات (Purchase Workflow Mode)' : 'Purchase Workflow Mode'}
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Simple Mode */}
+              <div
+                onClick={() => setData(prev => ({ ...prev, purchase_workflow_mode: 'Simple' }))}
+                className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                  data.purchase_workflow_mode === 'Simple' || !data.purchase_workflow_mode
+                    ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
+                    : 'border-slate-100 bg-white hover:border-slate-200'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800 text-sm">
+                      {language === 'ar' ? 'مبسط (Simple)' : 'Simple'}
+                    </span>
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                      data.purchase_workflow_mode === 'Simple' || !data.purchase_workflow_mode ? 'border-indigo-600' : 'border-slate-300'
+                    }`}>
+                      {(data.purchase_workflow_mode === 'Simple' || !data.purchase_workflow_mode) && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                    {language === 'ar' 
+                      ? 'تحديث المخزن من الفاتورة مباشرة دون الحاجة لـ Goods Receipt.'
+                      : 'Update inventory directly from the purchase invoice without Goods Receipt.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Enterprise Flexible Mode */}
+              <div
+                onClick={() => setData(prev => ({ ...prev, purchase_workflow_mode: 'Enterprise Flexible' }))}
+                className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                  data.purchase_workflow_mode === 'Enterprise Flexible'
+                    ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
+                    : 'border-slate-100 bg-white hover:border-slate-200'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800 text-sm">
+                      {language === 'ar' ? 'مرن (Enterprise Flexible)' : 'Enterprise Flexible'}
+                    </span>
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                      data.purchase_workflow_mode === 'Enterprise Flexible' ? 'border-indigo-600' : 'border-slate-300'
+                    }`}>
+                      {data.purchase_workflow_mode === 'Enterprise Flexible' && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                    {language === 'ar' 
+                      ? 'يسمح بإنشاء فاتورة مباشرة، مع خيار توليد Goods Receipt تلقائياً.'
+                      : 'Allows creating invoices directly, with option to auto-generate Goods Receipt.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Enterprise Strict Mode */}
+              <div
+                onClick={() => setData(prev => ({ ...prev, purchase_workflow_mode: 'Enterprise Strict' }))}
+                className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                  data.purchase_workflow_mode === 'Enterprise Strict'
+                    ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
+                    : 'border-slate-100 bg-white hover:border-slate-200'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800 text-sm">
+                      {language === 'ar' ? 'صارم (Enterprise Strict)' : 'Enterprise Strict'}
+                    </span>
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                      data.purchase_workflow_mode === 'Enterprise Strict' ? 'border-indigo-600' : 'border-slate-300'
+                    }`}>
+                      {data.purchase_workflow_mode === 'Enterprise Strict' && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                    {language === 'ar' 
+                      ? 'يمنع إنشاء فاتورة مباشرة، يجب استلام البضائع أولاً وربط الفاتورة بالاستلام.'
+                      : 'Blocks direct invoices. Goods must be received first and linked to the invoice.'}
+                  </p>
+                </div>
+              </div>
+
+            </div>
           </div>
         </div>
 

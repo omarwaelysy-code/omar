@@ -30,6 +30,7 @@ import {
   Layers,
   ArrowDownToLine,
   ArrowUpFromLine,
+  PackageCheck,
   BookOpen,
   PieChart,
   Shield,
@@ -111,6 +112,7 @@ const getTabIcon = (id: string) => {
     case 'flexible_operations':
       return <Layers {...iconProps} />;
     case 'purchase_invoices': return <ArrowDownToLine {...iconProps} />;
+    case 'goods_receipts': return <PackageCheck {...iconProps} />;
     case 'receipts': return <Receipt {...iconProps} />;
     case 'operations': return <List {...iconProps} />;
     case 'departments':
@@ -334,6 +336,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         icon: ArrowDownToLine,
         subItems: [
           { id: 'purchase_invoices', label: t('nav.purchase_invoices'), icon: ArrowDownToLine },
+          ...(company?.purchase_workflow_mode && company.purchase_workflow_mode !== 'Simple' ? [
+            { id: 'goods_receipts', label: t('nav.goods_receipts') || (language === 'ar' ? 'استلام البضائع' : 'Goods Receipts'), icon: PackageCheck }
+          ] : []),
           { id: 'purchase_orders', label: t('nav.purchase_orders'), icon: FileText },
           { id: 'purchase_returns', label: t('nav.purchase_returns'), icon: RotateCcw },
           { id: 'supplier_discounts', label: t('nav.supplier_discounts'), icon: Tags },

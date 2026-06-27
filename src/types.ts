@@ -92,7 +92,9 @@ export interface Company {
     inventory_cost_method_level?: 'company' | 'item';
     vat_enabled?: boolean;
     wht_enabled?: boolean;
+    purchase_workflow_mode?: 'Simple' | 'Enterprise Strict' | 'Enterprise Flexible';
   };
+  purchase_workflow_mode?: 'Simple' | 'Enterprise Strict' | 'Enterprise Flexible';
 }
 
 export interface Currency {

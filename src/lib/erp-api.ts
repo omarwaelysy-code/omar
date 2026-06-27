@@ -14,7 +14,7 @@ import path from 'path';
 import * as XLSX from 'xlsx';
 import multer from 'multer';
 import { syncCOGSForJournalEntry } from './sync-cogs';
-import { recordPurchase, recordSale, recordSalesReturn, recordPurchaseReturn, recalculateProductStock, reverseAndRecalculate, recordTransfer, recordAdjustment } from './cost-engine';
+import { recordPurchase, recordSale, recordSalesReturn, recordPurchaseReturn, recalculateProductStock, reverseAndRecalculate, recordTransfer, recordAdjustment, recordGoodsReceipt } from './cost-engine';
 import { InventoryMovementService } from '../services/InventoryMovementService';
 
 export async function syncProductsCostAndJEs(client: any, companyId: string, productIds: string[]) {
@@ -967,7 +967,7 @@ const modules = [
   'sales_orders', 'sales_order_items', 'purchase_orders', 'purchase_order_items', 'employees',
   'warehouse_transfers', 'warehouse_transfer_items', 'opening_stock_balances', 'opening_stock_items',
   'stock_adjustments', 'stock_adjustment_items', 'templates', 'paper_sizes', 'template_versions', 'print_profiles',
-  'dashboards', 'widgets'
+  'dashboards', 'widgets', 'goods_receipts', 'goods_receipt_items', 'purchase_invoice_goods_receipts'
 ];
 
 // --- Flexible Operations Logic ---
@@ -1040,7 +1040,7 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
   }
 });
 
-const transactionalModules = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns', 'journal_entries', 'sales_orders', 'purchase_orders', 'warehouse_transfers', 'opening_stock_balances', 'stock_adjustments'];
+const transactionalModules = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns', 'journal_entries', 'sales_orders', 'purchase_orders', 'warehouse_transfers', 'opening_stock_balances', 'stock_adjustments', 'goods_receipts'];
 
 // Helper to validate ID format (simplified to check string)
 function isUUID(id: any): boolean {
@@ -1055,6 +1055,48 @@ function sendError(res: any, status: number, message: string, details?: any) {
     details: details || null,
     timestamp: new Date().toISOString()
   });
+}
+
+// Helper to update Purchase Order receipt status
+async function updatePOReceiptStatus(client: any, companyId: string, poId: string) {
+  const itemsRes = await client.query('SELECT quantity, COALESCE(received_quantity, 0) as received_quantity FROM purchase_order_items WHERE order_id = $1', [poId]);
+  let allReceived = true;
+  let anyReceived = false;
+  for (const item of itemsRes.rows) {
+    const qty = parseFloat(item.quantity || '0');
+    const rec = parseFloat(item.received_quantity || '0');
+    if (rec > 0) anyReceived = true;
+    if (rec < qty) allReceived = false;
+  }
+  let status = 'pending';
+  if (allReceived && itemsRes.rows.length > 0) status = 'received';
+  else if (anyReceived) status = 'partial';
+
+  await client.query(
+    'UPDATE purchase_orders SET receipt_status = $1 WHERE id = $2 AND company_id = $3',
+    [status, poId, companyId]
+  );
+}
+
+// Helper to update Purchase Order billing status
+async function updatePOBillingStatus(client: any, companyId: string, poId: string) {
+  const itemsRes = await client.query('SELECT quantity, COALESCE(invoiced_quantity, 0) as invoiced_quantity FROM purchase_order_items WHERE order_id = $1', [poId]);
+  let allBilled = true;
+  let anyBilled = false;
+  for (const item of itemsRes.rows) {
+    const qty = parseFloat(item.quantity || '0');
+    const inv = parseFloat(item.invoiced_quantity || '0');
+    if (inv > 0) anyBilled = true;
+    if (inv < qty) allBilled = false;
+  }
+  let status = 'pending';
+  if (allBilled && itemsRes.rows.length > 0) status = 'invoiced';
+  else if (anyBilled) status = 'partial';
+
+  await client.query(
+    'UPDATE purchase_orders SET billing_status = $1 WHERE id = $2 AND company_id = $3',
+    [status, poId, companyId]
+  );
 }
 
 // Helper to parse JSONB fields if they are returned as strings
@@ -1764,6 +1806,9 @@ modules.forEach(moduleName => {
     } else if (module === 'stock_adjustments') {
       itemsTable = 'stock_adjustment_items';
       foreignKey = 'adjustment_id';
+    } else if (module === 'goods_receipts') {
+      itemsTable = 'goods_receipt_items';
+      foreignKey = 'goods_receipt_id';
     }
 
     if (itemsTable) {
@@ -1835,6 +1880,9 @@ modules.forEach(moduleName => {
     } else if (module === 'stock_adjustments') {
       itemsTable = 'stock_adjustment_items';
       foreignKey = 'adjustment_id';
+    } else if (module === 'goods_receipts') {
+      itemsTable = 'goods_receipt_items';
+      foreignKey = 'goods_receipt_id';
     }
 
     if (itemsTable) {
@@ -2067,6 +2115,38 @@ modules.forEach(moduleName => {
 
         if (moduleName === 'returns') {
           await InventoryMovementService.reverseMovement('sales_return', id, client);
+        }
+
+        if (moduleName === 'warehouse_transfers') {
+          await InventoryMovementService.reverseMovement('warehouse_transfer', id, client);
+        }
+
+        if (moduleName === 'stock_adjustments') {
+          await InventoryMovementService.reverseMovement('stock_adjustment', id, client);
+        }
+
+        if (moduleName === 'opening_stock_balances') {
+          await InventoryMovementService.reverseMovement('opening_stock_balance', id, client);
+        }
+
+        if (moduleName === 'goods_receipts') {
+          // If linked to a PO, restore received_quantity
+          const itemsRes = await client.query('SELECT product_id, quantity FROM goods_receipt_items WHERE goods_receipt_id = $1', [id]);
+          const grRes = await client.query('SELECT source_document_type, source_document_id FROM goods_receipts WHERE id = $1', [id]);
+          if (grRes.rows.length > 0 && grRes.rows[0].source_document_type === 'purchase_order' && grRes.rows[0].source_document_id) {
+            const poId = grRes.rows[0].source_document_id;
+            for (const item of itemsRes.rows) {
+              await client.query(
+                `UPDATE purchase_order_items 
+                 SET received_quantity = COALESCE(received_quantity, 0) - $1 
+                 WHERE order_id = $2 AND product_id = $3`,
+                [parseFloat(item.quantity || '0'), poId, item.product_id]
+              );
+            }
+            await updatePOReceiptStatus(client, companyId || '', poId);
+          }
+
+          await InventoryMovementService.reverseMovement('goods_receipt', id, client);
         }
 
         if (transactionalModules.includes(moduleName)) {
@@ -2876,9 +2956,18 @@ router.post('/purchase_invoices', authenticateToken, async (req: AuthRequest, re
     if (!companyId) return sendError(res, 401, 'Unauthorized');
 
     await client.query('BEGIN');
+    const compRes = await client.query('SELECT purchase_workflow_mode FROM companies WHERE id = $1', [companyId]);
+    const workflowMode = compRes.rows[0]?.purchase_workflow_mode || 'Simple';
+
     const { items, ...rawInvoiceData } = req.body;
     const invoiceData = sanitizeData('purchase_invoices', rawInvoiceData);
     if (!invoiceData.company_id) invoiceData.company_id = companyId;
+
+    const goodsReceiptIds: string[] = req.body.goods_receipt_ids || [];
+    if (workflowMode === 'Enterprise Strict' && goodsReceiptIds.length === 0) {
+      await client.query('ROLLBACK');
+      return sendError(res, 400, 'الشركة تعمل بنظام الدورة الكاملة. يجب إنشاء استلام مخزون وربطه بالفاتورة أولاً.');
+    }
 
     const invoiceId = invoiceData.id || uuidv4();
     if (!isUUID(invoiceId)) return sendError(res, 400, 'Invalid Invoice ID format');
@@ -2892,8 +2981,7 @@ router.post('/purchase_invoices', authenticateToken, async (req: AuthRequest, re
       const orderNums = ordersRes.rows.map((r: any) => r.order_number);
       sourceOrdersStr = orderNums.join(', ');
       
-      // Update purchase_orders status and link invoice
-      await client.query(
+await client.query(
         `UPDATE purchase_orders 
          SET status = 'converted', invoice_id = $1, invoice_number = $2 
          WHERE id = ANY($3) AND company_id = $4`,
@@ -2901,6 +2989,127 @@ router.post('/purchase_invoices', authenticateToken, async (req: AuthRequest, re
       );
     }
     invoiceData.source_orders = sourceOrdersStr || null;
+
+    let finalGrIds = [...goodsReceiptIds];
+    if (workflowMode === 'Enterprise Flexible' && finalGrIds.length === 0 && req.body.auto_generate_gr) {
+      const receiptId = uuidv4();
+      const receiptNumber = await generateNextSequence(client, companyId, 'goods_receipts', invoiceData.date as string);
+      
+      const receiptData = {
+        id: receiptId,
+        company_id: companyId,
+        receipt_number: receiptNumber,
+        supplier_id: invoiceData.supplier_id || null,
+        supplier_name: invoiceData.supplier_name || null,
+        warehouse_id: invoiceData.warehouse_id || null,
+        warehouse_name: invoiceData.warehouse_name || null,
+        date: invoiceData.date,
+        notes: `إنشاء تلقائي من الفاتورة رقم ${invoiceData.invoice_number || receiptId}`,
+        status: 'posted',
+        document_origin: 'Purchase Invoice (Auto Generated)',
+        created_automatically: true,
+        source_document_type: 'purchase_invoice',
+        source_document_id: invoiceId,
+        source_document_number: invoiceData.invoice_number
+      };
+
+      const grKeys = Object.keys(receiptData);
+      const grValues = Object.values(receiptData);
+      const grPlaceholders = grKeys.map((_, i) => `$${i + 1}`).join(', ');
+
+      await client.query(
+        `INSERT INTO "goods_receipts" ("${grKeys.join('", "')}") VALUES (${grPlaceholders})`,
+        grValues
+      );
+
+      const grMovementLines: any[] = [];
+      const grProductsToSync: string[] = [];
+
+      for (const item of (items || [])) {
+        const sanitizedItem = sanitizeData('goods_receipt_items', item);
+        const itemId = uuidv4();
+        const itemData = {
+          ...sanitizedItem,
+          id: itemId,
+          goods_receipt_id: receiptId,
+          company_id: companyId,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          unit_cost: item.unit_price || item.unit_cost || 0,
+          total_cost: parseFloat(item.quantity || '0') * parseFloat(item.unit_price || item.unit_cost || '0')
+        };
+
+        const prodRes = await client.query('SELECT name, code, type, is_service FROM products WHERE id = $1', [item.product_id]);
+        if (prodRes.rows.length === 0) throw new Error(`Product not found: ${item.product_id}`);
+        const prod = prodRes.rows[0];
+        itemData.product_name = prod.name;
+        itemData.product_code = prod.code;
+
+        const qty = parseFloat(itemData.quantity || '0');
+        const cost = parseFloat(itemData.unit_cost || '0');
+
+        const itemKeys = Object.keys(itemData);
+        const itemValues = Object.values(itemData);
+        const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+
+        await client.query(
+          `INSERT INTO "goods_receipt_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
+          itemValues
+        );
+
+        if (prod.type !== 'service' && !prod.is_service && qty > 0) {
+          await recordGoodsReceipt(
+            client,
+            companyId,
+            receiptData.warehouse_id || null,
+            item.product_id,
+            qty,
+            cost,
+            receiptId,
+            receiptNumber,
+            receiptData.date as string
+          );
+
+          grMovementLines.push({
+            product_id: item.product_id,
+            unit_id: item.unit_id || item.unit || 'default',
+            quantity: qty,
+            direction: 'IN',
+            unit_cost: cost,
+            total_cost: qty * cost,
+            batch_id: item.batch_id || null,
+            serial_number: item.serial_number || null,
+            notes: item.notes || null
+          });
+
+          grProductsToSync.push(item.product_id);
+        }
+      }
+
+      if (grProductsToSync.length > 0) {
+        await syncProductsCostAndJEs(client, companyId, grProductsToSync);
+      }
+
+      if (grMovementLines.length > 0) {
+        await InventoryMovementService.createMovement({
+          company_id: companyId,
+          branch_id: invoiceData.branch_id || req.body.branch_id || null,
+          warehouse_id: receiptData.warehouse_id || null,
+          movement_number: receiptNumber,
+          movement_type: 'goods_receipt',
+          source_document_type: 'goods_receipt',
+          source_document_id: receiptId,
+          movement_date: receiptData.date,
+          status: 'posted',
+          notes: receiptData.notes || null,
+          created_by: req.user?.id || null
+        }, grMovementLines, client);
+      }
+
+      finalGrIds.push(receiptId);
+    }
+
+    const isLinkedToGR = finalGrIds.length > 0;
 
     // Insert Purchase Invoice
     const invData = { ...invoiceData, id: invoiceId };
@@ -2920,26 +3129,42 @@ router.post('/purchase_invoices', authenticateToken, async (req: AuthRequest, re
       const itemData = { ...sanitizedItem, id: itemId, invoice_id: invoiceId };
       if (invData.company_id) itemData.company_id = invData.company_id;
 
-      // Costing and stock update integration for purchases
-      const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
-      if (prodRes.rows.length > 0) {
-        const prod = prodRes.rows[0];
-        if (prod.type !== 'service' && !prod.is_service) {
-          const qty = parseFloat(item.quantity || '0');
-          const unitPrice = parseFloat(item.unit_price || '0');
-          if (qty > 0) {
-            await recordPurchase(
-              client,
-              companyId,
-              invData.warehouse_id || null,
-              item.product_id,
-              qty,
-              unitPrice,
-              invoiceId,
-              invoiceData.invoice_number || `PINV-${invoiceId}`,
-              invoiceData.date
-            );
+      // Costing and stock update integration for purchases (skip if linked to Goods Receipt)
+      if (!isLinkedToGR) {
+        const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
+        if (prodRes.rows.length > 0) {
+          const prod = prodRes.rows[0];
+          if (prod.type !== 'service' && !prod.is_service) {
+            const qty = parseFloat(item.quantity || '0');
+            const unitPrice = parseFloat(item.unit_price || '0');
+            if (qty > 0) {
+              await recordPurchase(
+                client,
+                companyId,
+                invData.warehouse_id || null,
+                item.product_id,
+                qty,
+                unitPrice,
+                invoiceId,
+                invoiceData.invoice_number || `PINV-${invoiceId}`,
+                invoiceData.date
+              );
+            }
           }
+        }
+      }
+
+      // If linked to PO, track invoiced_quantity
+      if (req.body.order_ids && req.body.order_ids.length > 0) {
+        const qty = parseFloat(item.quantity || '0');
+        for (const orderId of req.body.order_ids) {
+          await client.query(
+            `UPDATE purchase_order_items 
+             SET invoiced_quantity = COALESCE(invoiced_quantity, 0) + $1 
+             WHERE order_id = $2 AND product_id = $3`,
+            [qty, orderId, item.product_id]
+          );
+          await updatePOBillingStatus(client, companyId, orderId);
         }
       }
 
@@ -2957,46 +3182,56 @@ router.post('/purchase_invoices', authenticateToken, async (req: AuthRequest, re
       await syncProductsCostAndJEs(client, companyId, productIdsToSync);
     }
 
-    // New Inventory Movement Engine integration (Phase 2)
-    const movementLines: any[] = [];
-    for (const item of (items || [])) {
-      const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
-      if (prodRes.rows.length > 0) {
-        const prod = prodRes.rows[0];
-        if (prod.type !== 'service' && !prod.is_service) {
-          const qty = parseFloat(item.quantity || '0');
-          const unitPrice = parseFloat(item.unit_price || item.unit_cost || '0');
-          if (qty > 0) {
-            movementLines.push({
-              product_id: item.product_id,
-              unit_id: item.unit_id || item.unit || 'default',
-              quantity: qty,
-              direction: 'IN',
-              unit_cost: unitPrice,
-              total_cost: qty * unitPrice,
-              batch_id: item.batch_id || null,
-              serial_number: item.serial_number || null,
-              notes: item.notes || null
-            });
+    // New Inventory Movement Engine integration (Phase 2) - skip if linked to Goods Receipt
+    if (!isLinkedToGR) {
+      const movementLines: any[] = [];
+      for (const item of (items || [])) {
+        const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
+        if (prodRes.rows.length > 0) {
+          const prod = prodRes.rows[0];
+          if (prod.type !== 'service' && !prod.is_service) {
+            const qty = parseFloat(item.quantity || '0');
+            const unitPrice = parseFloat(item.unit_price || item.unit_cost || '0');
+            if (qty > 0) {
+              movementLines.push({
+                product_id: item.product_id,
+                unit_id: item.unit_id || item.unit || 'default',
+                quantity: qty,
+                direction: 'IN',
+                unit_cost: unitPrice,
+                total_cost: qty * unitPrice,
+                batch_id: item.batch_id || null,
+                serial_number: item.serial_number || null,
+                notes: item.notes || null
+              });
+            }
           }
         }
       }
-    }
 
-    if (movementLines.length > 0) {
-      await InventoryMovementService.createMovement({
-        company_id: invoiceData.company_id || companyId,
-        branch_id: invoiceData.branch_id || req.body.branch_id || null,
-        warehouse_id: invoiceData.warehouse_id || null,
-        movement_number: invoiceData.invoice_number || `PINV-${invoiceId}`,
-        movement_type: 'purchase',
-        source_document_type: 'purchase_invoice',
-        source_document_id: invoiceId,
-        movement_date: invoiceData.date,
-        status: 'posted',
-        notes: invoiceData.notes || null,
-        created_by: req.user?.id || invoiceData.created_by || null
-      }, movementLines, client);
+      if (movementLines.length > 0) {
+        await InventoryMovementService.createMovement({
+          company_id: invoiceData.company_id || companyId,
+          branch_id: invoiceData.branch_id || req.body.branch_id || null,
+          warehouse_id: invoiceData.warehouse_id || null,
+          movement_number: invoiceData.invoice_number || `PINV-${invoiceId}`,
+          movement_type: 'purchase',
+          source_document_type: 'purchase_invoice',
+          source_document_id: invoiceId,
+          movement_date: invoiceData.date,
+          status: 'posted',
+          notes: invoiceData.notes || null,
+          created_by: req.user?.id || invoiceData.created_by || null
+        }, movementLines, client);
+      }
+    } else {
+      // Insert into join table for linking Purchase Invoice and Goods Receipts
+      for (const grId of finalGrIds) {
+        await client.query(
+          `INSERT INTO purchase_invoice_goods_receipts (id, purchase_invoice_id, goods_receipt_id) VALUES ($1, $2, $3)`,
+          [uuidv4(), invoiceId, grId]
+        );
+      }
     }
 
     await client.query('COMMIT');
@@ -3019,6 +3254,36 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
 
     await client.query('BEGIN');
 
+    const compRes = await client.query('SELECT purchase_workflow_mode FROM companies WHERE id = $1', [companyId]);
+    const workflowMode = compRes.rows[0]?.purchase_workflow_mode || 'Simple';
+
+    const { items, id: bodyId, ...rawInvoiceData } = req.body;
+
+    const goodsReceiptIds: string[] = req.body.goods_receipt_ids || [];
+    if (workflowMode === 'Enterprise Strict' && goodsReceiptIds.length === 0) {
+      await client.query('ROLLBACK');
+      return sendError(res, 400, 'الشركة تعمل بنظام الدورة الكاملة. يجب إنشاء استلام مخزون وربطه بالفاتورة أولاً.');
+    }
+
+    // Deduct old invoiced quantities from old POs
+    const oldPOIdsRes = await client.query('SELECT id FROM purchase_orders WHERE invoice_id = $1 AND company_id = $2', [invoiceId, companyId]);
+    const oldPOIds = oldPOIdsRes.rows.map(r => r.id);
+    const oldItemsRes = await client.query('SELECT product_id, quantity FROM purchase_invoice_items WHERE invoice_id = $1', [invoiceId]);
+    for (const item of oldItemsRes.rows) {
+      const qty = parseFloat(item.quantity || '0');
+      for (const poId of oldPOIds) {
+        await client.query(
+          `UPDATE purchase_order_items 
+           SET invoiced_quantity = COALESCE(invoiced_quantity, 0) - $1 
+           WHERE order_id = $2 AND product_id = $3`,
+          [qty, poId, item.product_id]
+        );
+      }
+    }
+    for (const poId of oldPOIds) {
+      await updatePOBillingStatus(client, companyId || '', poId);
+    }
+
     // Reset currently linked purchase orders
     await client.query(
       `UPDATE purchase_orders 
@@ -3026,8 +3291,6 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
        WHERE invoice_id = $1 AND company_id = $2`,
       [invoiceId, companyId]
     );
-
-    const { items, id: bodyId, ...rawInvoiceData } = req.body;
 
     // Fetch and link new purchase orders
     let sourceOrdersStr = '';
@@ -3067,39 +3330,182 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
       return sendError(res, 404, 'Purchase Invoice not found or permission denied');
     }
 
-    await client.query('DELETE FROM purchase_invoice_items WHERE invoice_id = $1', [invoiceId]);
-    await reverseAndRecalculate(client, companyId || '', invoiceId);
-    await client.query('DELETE FROM "inventory_movements_v2" WHERE "source_document_type" = $1 AND "source_document_id" = $2', ['purchase_invoice', invoiceId]);
-    await client.query('UPDATE "inventory_transaction_journal" SET "status" = $1, "cancelled_at" = NOW(), "movement_id" = NULL WHERE "source_document_type" = $2 AND "source_document_id" = $3', ['Reversed', 'purchase_invoice', invoiceId]);
+    const prevLinkedRes = await client.query('SELECT 1 FROM purchase_invoice_goods_receipts WHERE purchase_invoice_id = $1', [invoiceId]);
+    const previouslyLinkedToGR = prevLinkedRes.rows.length > 0;
 
+    await client.query('DELETE FROM purchase_invoice_goods_receipts WHERE purchase_invoice_id = $1', [invoiceId]);
+    await client.query('DELETE FROM purchase_invoice_items WHERE invoice_id = $1', [invoiceId]);
+
+    if (!previouslyLinkedToGR) {
+      await reverseAndRecalculate(client, companyId || '', invoiceId);
+      await client.query('DELETE FROM "inventory_movements_v2" WHERE "source_document_type" = $1 AND "source_document_id" = $2', ['purchase_invoice', invoiceId]);
+      await client.query('UPDATE "inventory_transaction_journal" SET "status" = $1, "cancelled_at" = NOW(), "movement_id" = NULL WHERE "source_document_type" = $2 AND "source_document_id" = $3', ['Reversed', 'purchase_invoice', invoiceId]);
+    }
+
+    let finalGrIds = [...goodsReceiptIds];
+    if (workflowMode === 'Enterprise Flexible' && finalGrIds.length === 0 && req.body.auto_generate_gr) {
+      const receiptId = uuidv4();
+      const receiptNumber = await generateNextSequence(client, companyId, 'goods_receipts', invoiceData.date as string);
+      
+      const receiptData = {
+        id: receiptId,
+        company_id: companyId,
+        receipt_number: receiptNumber,
+        supplier_id: invoiceData.supplier_id || null,
+        supplier_name: invoiceData.supplier_name || null,
+        warehouse_id: invoiceData.warehouse_id || null,
+        warehouse_name: invoiceData.warehouse_name || null,
+        date: invoiceData.date,
+        notes: `إنشاء تلقائي من الفاتورة رقم ${invoiceData.invoice_number || receiptId}`,
+        status: 'posted',
+        document_origin: 'Purchase Invoice (Auto Generated)',
+        created_automatically: true,
+        source_document_type: 'purchase_invoice',
+        source_document_id: invoiceId,
+        source_document_number: invoiceData.invoice_number
+      };
+
+      const grKeys = Object.keys(receiptData);
+      const grValues = Object.values(receiptData);
+      const grPlaceholders = grKeys.map((_, i) => `$${i + 1}`).join(', ');
+
+      await client.query(
+        `INSERT INTO "goods_receipts" ("${grKeys.join('", "')}") VALUES (${grPlaceholders})`,
+        grValues
+      );
+
+      const grMovementLines: any[] = [];
+      const grProductsToSync: string[] = [];
+
+      for (const item of (items || [])) {
+        const sanitizedItem = sanitizeData('goods_receipt_items', item);
+        const itemId = uuidv4();
+        const itemData = {
+          ...sanitizedItem,
+          id: itemId,
+          goods_receipt_id: receiptId,
+          company_id: companyId,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          unit_cost: item.unit_price || item.unit_cost || 0,
+          total_cost: parseFloat(item.quantity || '0') * parseFloat(item.unit_price || item.unit_cost || '0')
+        };
+
+        const prodRes = await client.query('SELECT name, code, type, is_service FROM products WHERE id = $1', [item.product_id]);
+        if (prodRes.rows.length === 0) throw new Error(`Product not found: ${item.product_id}`);
+        const prod = prodRes.rows[0];
+        itemData.product_name = prod.name;
+        itemData.product_code = prod.code;
+
+        const qty = parseFloat(itemData.quantity || '0');
+        const cost = parseFloat(itemData.unit_cost || '0');
+
+        const itemKeys = Object.keys(itemData);
+        const itemValues = Object.values(itemData);
+        const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+
+        await client.query(
+          `INSERT INTO "goods_receipt_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
+          itemValues
+        );
+
+        if (prod.type !== 'service' && !prod.is_service && qty > 0) {
+          await recordGoodsReceipt(
+            client,
+            companyId,
+            receiptData.warehouse_id || null,
+            item.product_id,
+            qty,
+            cost,
+            receiptId,
+            receiptNumber,
+            receiptData.date as string
+          );
+
+          grMovementLines.push({
+            product_id: item.product_id,
+            unit_id: item.unit_id || item.unit || 'default',
+            quantity: qty,
+            direction: 'IN',
+            unit_cost: cost,
+            total_cost: qty * cost,
+            batch_id: item.batch_id || null,
+            serial_number: item.serial_number || null,
+            notes: item.notes || null
+          });
+
+          grProductsToSync.push(item.product_id);
+        }
+      }
+
+      if (grProductsToSync.length > 0) {
+        await syncProductsCostAndJEs(client, companyId, grProductsToSync);
+      }
+
+      if (grMovementLines.length > 0) {
+        await InventoryMovementService.createMovement({
+          company_id: companyId,
+          branch_id: invoiceData.branch_id || req.body.branch_id || null,
+          warehouse_id: receiptData.warehouse_id || null,
+          movement_number: receiptNumber,
+          movement_type: 'goods_receipt',
+          source_document_type: 'goods_receipt',
+          source_document_id: receiptId,
+          movement_date: receiptData.date,
+          status: 'posted',
+          notes: receiptData.notes || null,
+          created_by: req.user?.id || null
+        }, grMovementLines, client);
+      }
+
+      finalGrIds.push(receiptId);
+    }
+
+    const isLinkedToGR = finalGrIds.length > 0;
     const invData = invoiceData;
-    const cogsLines: { account_id: string; account_name: string; debit: number; credit: number; description: string }[] = [];
-for (const item of (items || [])) {
+
+    for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('purchase_invoice_items', item);
       const itemId = uuidv4();
       const itemData = { ...sanitizedItem, id: itemId, invoice_id: invoiceId };
       if (invData.company_id) itemData.company_id = invData.company_id;
 
-      // Costing and stock update integration for purchases
-      const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
-      if (prodRes.rows.length > 0) {
-        const prod = prodRes.rows[0];
-        if (prod.type !== 'service' && !prod.is_service) {
-          const qty = parseFloat(item.quantity || '0');
-          const unitPrice = parseFloat(item.unit_price || '0');
-          if (qty > 0) {
-            await recordPurchase(
-              client,
-              companyId,
-              invData.warehouse_id || null,
-              item.product_id,
-              qty,
-              unitPrice,
-              invoiceId,
-              invoiceData.invoice_number || `PINV-${invoiceId}`,
-              invoiceData.date
-            );
+      // Costing and stock update integration for purchases (skip if linked to Goods Receipt)
+      if (!isLinkedToGR) {
+        const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
+        if (prodRes.rows.length > 0) {
+          const prod = prodRes.rows[0];
+          if (prod.type !== 'service' && !prod.is_service) {
+            const qty = parseFloat(item.quantity || '0');
+            const unitPrice = parseFloat(item.unit_price || '0');
+            if (qty > 0) {
+              await recordPurchase(
+                client,
+                companyId,
+                invData.warehouse_id || null,
+                item.product_id,
+                qty,
+                unitPrice,
+                invoiceId,
+                invoiceData.invoice_number || `PINV-${invoiceId}`,
+                invoiceData.date
+              );
+            }
           }
+        }
+      }
+
+      // If linked to PO, track invoiced_quantity
+      if (req.body.order_ids && req.body.order_ids.length > 0) {
+        const qty = parseFloat(item.quantity || '0');
+        for (const orderId of req.body.order_ids) {
+          await client.query(
+            `UPDATE purchase_order_items 
+             SET invoiced_quantity = COALESCE(invoiced_quantity, 0) + $1 
+             WHERE order_id = $2 AND product_id = $3`,
+            [qty, orderId, item.product_id]
+          );
+          await updatePOBillingStatus(client, companyId, orderId);
         }
       }
 
@@ -3112,52 +3518,61 @@ for (const item of (items || [])) {
       );
     }
 
-    
     const productIdsToSync = (items || []).filter((i: any) => i.product_id).map((i: any) => i.product_id);
     if (productIdsToSync.length > 0) {
       await syncProductsCostAndJEs(client, companyId, productIdsToSync);
     }
 
-    // New Inventory Movement Engine integration (Phase 2)
-    const movementLines: any[] = [];
-    for (const item of (items || [])) {
-      const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
-      if (prodRes.rows.length > 0) {
-        const prod = prodRes.rows[0];
-        if (prod.type !== 'service' && !prod.is_service) {
-          const qty = parseFloat(item.quantity || '0');
-          const unitPrice = parseFloat(item.unit_price || item.unit_cost || '0');
-          if (qty > 0) {
-            movementLines.push({
-              product_id: item.product_id,
-              unit_id: item.unit_id || item.unit || 'default',
-              quantity: qty,
-              direction: 'IN',
-              unit_cost: unitPrice,
-              total_cost: qty * unitPrice,
-              batch_id: item.batch_id || null,
-              serial_number: item.serial_number || null,
-              notes: item.notes || null
-            });
+    // New Inventory Movement Engine integration (Phase 2) - skip if linked to Goods Receipt
+    if (!isLinkedToGR) {
+      const movementLines: any[] = [];
+      for (const item of (items || [])) {
+        const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
+        if (prodRes.rows.length > 0) {
+          const prod = prodRes.rows[0];
+          if (prod.type !== 'service' && !prod.is_service) {
+            const qty = parseFloat(item.quantity || '0');
+            const unitPrice = parseFloat(item.unit_price || item.unit_cost || '0');
+            if (qty > 0) {
+              movementLines.push({
+                product_id: item.product_id,
+                unit_id: item.unit_id || item.unit || 'default',
+                quantity: qty,
+                direction: 'IN',
+                unit_cost: unitPrice,
+                total_cost: qty * unitPrice,
+                batch_id: item.batch_id || null,
+                serial_number: item.serial_number || null,
+                notes: item.notes || null
+              });
+            }
           }
         }
       }
-    }
 
-    if (movementLines.length > 0) {
-      await InventoryMovementService.createMovement({
-        company_id: invoiceData.company_id || companyId,
-        branch_id: invoiceData.branch_id || req.body.branch_id || null,
-        warehouse_id: invoiceData.warehouse_id || null,
-        movement_number: invoiceData.invoice_number || `PINV-${invoiceId}`,
-        movement_type: 'purchase',
-        source_document_type: 'purchase_invoice',
-        source_document_id: invoiceId,
-        movement_date: invoiceData.date,
-        status: 'posted',
-        notes: invoiceData.notes || null,
-        created_by: req.user?.id || invoiceData.created_by || null
-      }, movementLines, client);
+      if (movementLines.length > 0) {
+        await InventoryMovementService.createMovement({
+          company_id: invoiceData.company_id || companyId,
+          branch_id: invoiceData.branch_id || req.body.branch_id || null,
+          warehouse_id: invoiceData.warehouse_id || null,
+          movement_number: invoiceData.invoice_number || `PINV-${invoiceId}`,
+          movement_type: 'purchase',
+          source_document_type: 'purchase_invoice',
+          source_document_id: invoiceId,
+          movement_date: invoiceData.date,
+          status: 'posted',
+          notes: invoiceData.notes || null,
+          created_by: req.user?.id || invoiceData.created_by || null
+        }, movementLines, client);
+      }
+    } else {
+      // Insert into join table for linking Purchase Invoice and Goods Receipts
+      for (const grId of finalGrIds) {
+        await client.query(
+          `INSERT INTO purchase_invoice_goods_receipts (id, purchase_invoice_id, goods_receipt_id) VALUES ($1, $2, $3)`,
+          [uuidv4(), invoiceId, grId]
+        );
+      }
     }
 
     await client.query('COMMIT');
@@ -4209,6 +4624,322 @@ router.put('/purchase_orders/:id', authenticateToken, async (req: AuthRequest, r
   }
 });
 
+// ==========================================
+// GOODS RECEIPTS
+// ==========================================
+router.post('/goods_receipts', authenticateToken, async (req: AuthRequest, res) => {
+  const client = await pool.connect();
+  try {
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
+    const { items, ...rawReceiptData } = req.body;
+    if (!rawReceiptData.date) return sendError(res, 400, 'date is required');
+
+    await client.query('BEGIN');
+
+    const receiptData = sanitizeData('goods_receipts', rawReceiptData);
+    if (!receiptData.company_id) receiptData.company_id = companyId;
+    const receiptId = receiptData.id || uuidv4();
+    receiptData.id = receiptId;
+
+    if (!receiptData.receipt_number) {
+      receiptData.receipt_number = await generateNextSequence(client, companyId, 'goods_receipts', receiptData.date as string);
+    }
+
+    const grKeys = Object.keys(receiptData);
+    const grValues = Object.values(receiptData);
+    const grPlaceholders = grKeys.map((_, i) => `$${i + 1}`).join(', ');
+
+    await client.query(
+      `INSERT INTO "goods_receipts" ("${grKeys.join('", "')}") VALUES (${grPlaceholders})`,
+      grValues
+    );
+
+    const movementLines: any[] = [];
+    const productsToSync: string[] = [];
+
+    for (const item of (items || [])) {
+      const sanitizedItem = sanitizeData('goods_receipt_items', item);
+      const itemId = uuidv4();
+      const itemData = { ...sanitizedItem, id: itemId, goods_receipt_id: receiptId, company_id: companyId };
+
+      const prodRes = await client.query('SELECT name, code, type, is_service FROM products WHERE id = $1', [item.product_id]);
+      if (prodRes.rows.length === 0) throw new Error(`Product not found: ${item.product_id}`);
+      const prod = prodRes.rows[0];
+      itemData.product_name = prod.name;
+      itemData.product_code = prod.code;
+
+      const qty = parseFloat(item.quantity || '0');
+      const cost = parseFloat(item.unit_cost || '0') || 0;
+      itemData.unit_cost = cost;
+      itemData.total_cost = qty * cost;
+
+      const itemKeys = Object.keys(itemData);
+      const itemValues = Object.values(itemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+
+      await client.query(
+        `INSERT INTO "goods_receipt_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
+        itemValues
+      );
+
+      // If linked to PO, update received_quantity
+      if (receiptData.source_document_type === 'purchase_order' && receiptData.source_document_id) {
+        await client.query(
+          `UPDATE purchase_order_items 
+           SET received_quantity = COALESCE(received_quantity, 0) + $1 
+           WHERE order_id = $2 AND product_id = $3`,
+          [qty, receiptData.source_document_id, item.product_id]
+        );
+      }
+
+      if (receiptData.status === 'posted' && prod.type !== 'service' && !prod.is_service && qty > 0) {
+        await recordGoodsReceipt(
+          client,
+          companyId,
+          receiptData.warehouse_id || null,
+          item.product_id,
+          qty,
+          cost,
+          receiptId,
+          receiptData.receipt_number,
+          receiptData.date as string
+        );
+
+        movementLines.push({
+          product_id: item.product_id,
+          unit_id: item.unit_id || item.unit || 'default',
+          quantity: qty,
+          direction: 'IN',
+          unit_cost: cost,
+          total_cost: qty * cost,
+          batch_id: item.batch_id || null,
+          serial_number: item.serial_number || null,
+          notes: item.notes || null
+        });
+
+        productsToSync.push(item.product_id);
+      }
+    }
+
+    if (receiptData.source_document_type === 'purchase_order' && receiptData.source_document_id) {
+      await updatePOReceiptStatus(client, companyId, receiptData.source_document_id);
+    }
+
+    if (productsToSync.length > 0) {
+      await syncProductsCostAndJEs(client, companyId, productsToSync);
+    }
+
+    // New Inventory Movement Engine integration
+    if (receiptData.status === 'posted' && movementLines.length > 0) {
+      await InventoryMovementService.createMovement({
+        company_id: receiptData.company_id || companyId,
+        branch_id: receiptData.branch_id || req.body.branch_id || null,
+        warehouse_id: receiptData.warehouse_id || null,
+        movement_number: receiptData.receipt_number || `GR-${receiptId}`,
+        movement_type: 'goods_receipt',
+        source_document_type: 'goods_receipt',
+        source_document_id: receiptId,
+        movement_date: receiptData.date,
+        status: 'posted',
+        notes: receiptData.notes || null,
+        created_by: req.user?.id || receiptData.created_by || null
+      }, movementLines, client);
+    }
+
+    await client.query('COMMIT');
+
+    logAudit({
+      company_id: companyId,
+      user_id: req.user?.id,
+      username: (req.user as any)?.username || req.user?.email,
+      user_email: req.user?.email,
+      action: 'CREATE',
+      module: 'GOODS_RECEIPTS',
+      details: `Created goods receipt: ${receiptData.receipt_number}`,
+      entity_type: 'goods_receipts',
+      entity_id: receiptId,
+      ip_address: getIp(req),
+      metadata: { receiptData }
+    });
+
+    res.status(201).json({ id: receiptId, receipt_number: receiptData.receipt_number });
+  } catch (error: any) {
+    if (client) await client.query('ROLLBACK');
+    console.error('Goods Receipt creation failed:', error);
+    sendError(res, 500, `Failed to create goods receipt: ${error.message}`, error.message);
+  } finally {
+    client.release();
+  }
+});
+
+router.put('/goods_receipts/:id', authenticateToken, async (req: AuthRequest, res) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
+    const { items, ...rawReceiptData } = req.body;
+    if (!rawReceiptData.date) return sendError(res, 400, 'date is required');
+
+    await client.query('BEGIN');
+
+    // Retrieve old state to deduct received quantities from PO
+    const oldItemsRes = await client.query('SELECT product_id, quantity FROM goods_receipt_items WHERE goods_receipt_id = $1', [id]);
+    const oldGrRes = await client.query('SELECT source_document_type, source_document_id FROM goods_receipts WHERE id = $1', [id]);
+    if (oldGrRes.rows.length > 0 && oldGrRes.rows[0].source_document_type === 'purchase_order' && oldGrRes.rows[0].source_document_id) {
+      const poId = oldGrRes.rows[0].source_document_id;
+      for (const item of oldItemsRes.rows) {
+        await client.query(
+          `UPDATE purchase_order_items 
+           SET received_quantity = COALESCE(received_quantity, 0) - $1 
+           WHERE order_id = $2 AND product_id = $3`,
+          [parseFloat(item.quantity || '0'), poId, item.product_id]
+        );
+      }
+    }
+
+    await reverseAndRecalculate(client, companyId, id);
+    await InventoryMovementService.reverseMovement('goods_receipt', id, client);
+    await client.query('DELETE FROM goods_receipt_items WHERE goods_receipt_id = $1', [id]);
+
+    const receiptData = sanitizeData('goods_receipts', rawReceiptData);
+    delete (receiptData as any).id;
+    delete (receiptData as any).company_id;
+
+    const grKeys = Object.keys(receiptData);
+    const grValues = Object.values(receiptData);
+    const setClause = grKeys.map((key, i) => `"${key}" = $${i + 1}`).join(', ');
+
+    await client.query(
+      `UPDATE "goods_receipts" SET ${setClause} WHERE id = $${grKeys.length + 1} AND company_id = $${grKeys.length + 2}`,
+      [...grValues, id, companyId]
+    );
+
+    const movementLines: any[] = [];
+    const productsToSync: string[] = [];
+
+    for (const item of (items || [])) {
+      const sanitizedItem = sanitizeData('goods_receipt_items', item);
+      const itemId = uuidv4();
+      const itemData = { ...sanitizedItem, id: itemId, goods_receipt_id: id, company_id: companyId };
+
+      const prodRes = await client.query('SELECT name, code, type, is_service FROM products WHERE id = $1', [item.product_id]);
+      if (prodRes.rows.length === 0) throw new Error(`Product not found: ${item.product_id}`);
+      const prod = prodRes.rows[0];
+      itemData.product_name = prod.name;
+      itemData.product_code = prod.code;
+
+      const qty = parseFloat(item.quantity || '0');
+      const cost = parseFloat(item.unit_cost || '0') || 0;
+      itemData.unit_cost = cost;
+      itemData.total_cost = qty * cost;
+
+      const itemKeys = Object.keys(itemData);
+      const itemValues = Object.values(itemData);
+      const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+
+      await client.query(
+        `INSERT INTO "goods_receipt_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
+        itemValues
+      );
+
+      // If linked to PO, update received_quantity
+      if (receiptData.source_document_type === 'purchase_order' && receiptData.source_document_id) {
+        await client.query(
+          `UPDATE purchase_order_items 
+           SET received_quantity = COALESCE(received_quantity, 0) + $1 
+           WHERE order_id = $2 AND product_id = $3`,
+          [qty, receiptData.source_document_id, item.product_id]
+        );
+      }
+
+      if (receiptData.status === 'posted' && prod.type !== 'service' && !prod.is_service && qty > 0) {
+        await recordGoodsReceipt(
+          client,
+          companyId,
+          receiptData.warehouse_id || null,
+          item.product_id,
+          qty,
+          cost,
+          id,
+          rawReceiptData.receipt_number,
+          receiptData.date as string
+        );
+
+        movementLines.push({
+          product_id: item.product_id,
+          unit_id: item.unit_id || item.unit || 'default',
+          quantity: qty,
+          direction: 'IN',
+          unit_cost: cost,
+          total_cost: qty * cost,
+          batch_id: item.batch_id || null,
+          serial_number: item.serial_number || null,
+          notes: item.notes || null
+        });
+
+        productsToSync.push(item.product_id);
+      }
+    }
+
+    if (receiptData.source_document_type === 'purchase_order' && receiptData.source_document_id) {
+      await updatePOReceiptStatus(client, companyId, receiptData.source_document_id);
+    }
+    // Also if old PO was different, update old PO status
+    if (oldGrRes.rows.length > 0 && oldGrRes.rows[0].source_document_type === 'purchase_order' && oldGrRes.rows[0].source_document_id && oldGrRes.rows[0].source_document_id !== receiptData.source_document_id) {
+      await updatePOReceiptStatus(client, companyId, oldGrRes.rows[0].source_document_id);
+    }
+
+    if (productsToSync.length > 0) {
+      await syncProductsCostAndJEs(client, companyId, productsToSync);
+    }
+
+    // New Inventory Movement Engine integration
+    if (receiptData.status === 'posted' && movementLines.length > 0) {
+      await InventoryMovementService.createMovement({
+        company_id: companyId,
+        branch_id: receiptData.branch_id || req.body.branch_id || null,
+        warehouse_id: receiptData.warehouse_id || null,
+        movement_number: rawReceiptData.receipt_number || `GR-${id}`,
+        movement_type: 'goods_receipt',
+        source_document_type: 'goods_receipt',
+        source_document_id: id,
+        movement_date: receiptData.date,
+        status: 'posted',
+        notes: receiptData.notes || null,
+        created_by: req.user?.id || receiptData.created_by || null
+      }, movementLines, client);
+    }
+
+    await client.query('COMMIT');
+
+    logAudit({
+      company_id: companyId,
+      user_id: req.user?.id,
+      username: (req.user as any)?.username || req.user?.email,
+      user_email: req.user?.email,
+      action: 'UPDATE',
+      module: 'GOODS_RECEIPTS',
+      details: `Updated goods receipt: ${rawReceiptData.receipt_number}`,
+      entity_type: 'goods_receipts',
+      entity_id: id,
+      ip_address: getIp(req),
+      metadata: { receiptData }
+    });
+
+    res.json({ success: true });
+  } catch (error: any) {
+    if (client) await client.query('ROLLBACK');
+    console.error('Goods Receipt update failed:', error);
+    sendError(res, 500, `Failed to update goods receipt: ${error.message}`, error.message);
+  } finally {
+    client.release();
+  }
+});
+
 router.post('/warehouse_transfers', authenticateToken, async (req: AuthRequest, res) => {
   const client = await pool.connect();
   try {
@@ -4246,6 +4977,9 @@ router.post('/warehouse_transfers', authenticateToken, async (req: AuthRequest, 
       `INSERT INTO "warehouse_transfers" ("${keys.join('", "')}") VALUES (${placeholders})`,
       values
     );
+
+    const fromMovementLines: any[] = [];
+    const toMovementLines: any[] = [];
 
     for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('warehouse_transfer_items', item);
@@ -4290,6 +5024,30 @@ router.post('/warehouse_transfers', authenticateToken, async (req: AuthRequest, 
           transferData.transfer_number,
           transferData.date
         );
+
+        fromMovementLines.push({
+          product_id: item.product_id,
+          unit_id: item.unit_id || item.unit || 'default',
+          quantity: quantity,
+          direction: 'OUT',
+          unit_cost: currentCost,
+          total_cost: quantity * currentCost,
+          batch_id: item.batch_id || null,
+          serial_number: item.serial_number || null,
+          notes: item.notes || null
+        });
+
+        toMovementLines.push({
+          product_id: item.product_id,
+          unit_id: item.unit_id || item.unit || 'default',
+          quantity: quantity,
+          direction: 'IN',
+          unit_cost: currentCost,
+          total_cost: quantity * currentCost,
+          batch_id: item.batch_id || null,
+          serial_number: item.serial_number || null,
+          notes: item.notes || null
+        });
       }
     }
 
@@ -4306,6 +5064,37 @@ router.post('/warehouse_transfers', authenticateToken, async (req: AuthRequest, 
       ip_address: getIp(req),
       metadata: transferData
     });
+
+    // New Inventory Movement Engine integration (Phase 8: Warehouse Transfer)
+    if (fromMovementLines.length > 0) {
+      await InventoryMovementService.createMovement({
+        company_id: transferData.company_id || companyId,
+        branch_id: transferData.branch_id || req.body.branch_id || null,
+        warehouse_id: transferData.from_warehouse_id || null,
+        movement_number: `${transferData.transfer_number}-OUT`,
+        movement_type: 'warehouse_transfer',
+        source_document_type: 'warehouse_transfer',
+        source_document_id: transferId,
+        movement_date: transferData.date,
+        status: 'posted',
+        notes: transferData.notes || null,
+        created_by: req.user?.id || transferData.created_by || null
+      }, fromMovementLines, client);
+
+      await InventoryMovementService.createMovement({
+        company_id: transferData.company_id || companyId,
+        branch_id: transferData.branch_id || req.body.branch_id || null,
+        warehouse_id: transferData.to_warehouse_id || null,
+        movement_number: `${transferData.transfer_number}-IN`,
+        movement_type: 'warehouse_transfer',
+        source_document_type: 'warehouse_transfer',
+        source_document_id: transferId,
+        movement_date: transferData.date,
+        status: 'posted',
+        notes: transferData.notes || null,
+        created_by: req.user?.id || transferData.created_by || null
+      }, toMovementLines, client);
+    }
 
     await client.query('COMMIT');
     res.status(201).json({ id: transferId, transfer_number: transferData.transfer_number });
@@ -4330,6 +5119,7 @@ router.put('/warehouse_transfers/:id', authenticateToken, async (req: AuthReques
     await client.query('BEGIN');
 
     await reverseAndRecalculate(client, companyId, id);
+    await InventoryMovementService.reverseMovement('warehouse_transfer', id, client);
     await client.query('DELETE FROM warehouse_transfer_items WHERE transfer_id = $1', [id]);
 
     const transferData = sanitizeData('warehouse_transfers', rawTransferData);
@@ -4350,6 +5140,9 @@ router.put('/warehouse_transfers/:id', authenticateToken, async (req: AuthReques
       `UPDATE "warehouse_transfers" SET ${setClause} WHERE id = $${keys.length + 1} AND company_id = $${keys.length + 2}`,
       [...values, id, companyId]
     );
+
+    const fromMovementLines: any[] = [];
+    const toMovementLines: any[] = [];
 
     for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('warehouse_transfer_items', item);
@@ -4392,6 +5185,30 @@ router.put('/warehouse_transfers/:id', authenticateToken, async (req: AuthReques
           rawTransferData.transfer_number,
           transferData.date
         );
+
+        fromMovementLines.push({
+          product_id: item.product_id,
+          unit_id: item.unit_id || item.unit || 'default',
+          quantity: quantity,
+          direction: 'OUT',
+          unit_cost: currentCost,
+          total_cost: quantity * currentCost,
+          batch_id: item.batch_id || null,
+          serial_number: item.serial_number || null,
+          notes: item.notes || null
+        });
+
+        toMovementLines.push({
+          product_id: item.product_id,
+          unit_id: item.unit_id || item.unit || 'default',
+          quantity: quantity,
+          direction: 'IN',
+          unit_cost: currentCost,
+          total_cost: quantity * currentCost,
+          batch_id: item.batch_id || null,
+          serial_number: item.serial_number || null,
+          notes: item.notes || null
+        });
       }
     }
 
@@ -4408,6 +5225,37 @@ router.put('/warehouse_transfers/:id', authenticateToken, async (req: AuthReques
       ip_address: getIp(req),
       metadata: transferData
     });
+
+    // New Inventory Movement Engine integration (Phase 8: Warehouse Transfer)
+    if (fromMovementLines.length > 0) {
+      await InventoryMovementService.createMovement({
+        company_id: transferData.company_id || companyId,
+        branch_id: transferData.branch_id || req.body.branch_id || null,
+        warehouse_id: transferData.from_warehouse_id || null,
+        movement_number: `${rawTransferData.transfer_number}-OUT`,
+        movement_type: 'warehouse_transfer',
+        source_document_type: 'warehouse_transfer',
+        source_document_id: id,
+        movement_date: transferData.date,
+        status: 'posted',
+        notes: transferData.notes || null,
+        created_by: req.user?.id || transferData.created_by || null
+      }, fromMovementLines, client);
+
+      await InventoryMovementService.createMovement({
+        company_id: transferData.company_id || companyId,
+        branch_id: transferData.branch_id || req.body.branch_id || null,
+        warehouse_id: transferData.to_warehouse_id || null,
+        movement_number: `${rawTransferData.transfer_number}-IN`,
+        movement_type: 'warehouse_transfer',
+        source_document_type: 'warehouse_transfer',
+        source_document_id: id,
+        movement_date: transferData.date,
+        status: 'posted',
+        notes: transferData.notes || null,
+        created_by: req.user?.id || transferData.created_by || null
+      }, toMovementLines, client);
+    }
 
     await client.query('COMMIT');
     res.json({ success: true });
@@ -4475,6 +5323,7 @@ router.post('/opening_stock_balances', authenticateToken, async (req: AuthReques
 
     let totalValue = 0;
     const productsToSync: string[] = [];
+    const movementLines: any[] = [];
 
     for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('opening_stock_items', item);
@@ -4522,6 +5371,18 @@ router.post('/opening_stock_balances', authenticateToken, async (req: AuthReques
           docData.date
         );
         productsToSync.push(item.product_id);
+
+        movementLines.push({
+          product_id: item.product_id,
+          unit_id: item.unit_id || item.unit || 'default',
+          quantity: qty,
+          direction: 'IN',
+          unit_cost: cost,
+          total_cost: qty * cost,
+          batch_id: item.batch_id || null,
+          serial_number: item.serial_number || null,
+          notes: item.notes || null
+        });
       }
     }
 
@@ -4651,6 +5512,23 @@ router.post('/opening_stock_balances', authenticateToken, async (req: AuthReques
       metadata: docData
     });
 
+    // New Inventory Movement Engine integration (Phase 8: Opening Stock Balance)
+    if (movementLines.length > 0) {
+      await InventoryMovementService.createMovement({
+        company_id: docData.company_id || companyId,
+        branch_id: docData.branch_id || req.body.branch_id || null,
+        warehouse_id: items[0]?.warehouse_id || docData.warehouse_id || null,
+        movement_number: docData.document_number || `OPB-${docId}`,
+        movement_type: 'opening_balance',
+        source_document_type: 'opening_stock_balance',
+        source_document_id: docId,
+        movement_date: docData.date,
+        status: 'posted',
+        notes: docData.notes || null,
+        created_by: req.user?.id || docData.created_by || null
+      }, movementLines, client);
+    }
+
     await client.query('COMMIT');
     res.status(201).json({ id: docId, document_number: docData.document_number });
   } catch (error: any) {
@@ -4674,6 +5552,7 @@ router.put('/opening_stock_balances/:id', authenticateToken, async (req: AuthReq
     await client.query('BEGIN');
 
     await reverseAndRecalculate(client, companyId, id);
+    await InventoryMovementService.reverseMovement('opening_stock_balance', id, client);
     await client.query('DELETE FROM opening_stock_items WHERE opening_stock_id = $1', [id]);
 
     const docData = sanitizeData('opening_stock_balances', rawDocData);
@@ -4690,6 +5569,7 @@ router.put('/opening_stock_balances/:id', authenticateToken, async (req: AuthReq
 
     let totalValue = 0;
     const productsToSync: string[] = [];
+    const movementLines: any[] = [];
 
     for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('opening_stock_items', item);
@@ -4737,6 +5617,18 @@ router.put('/opening_stock_balances/:id', authenticateToken, async (req: AuthReq
           docData.date
         );
         productsToSync.push(item.product_id);
+
+        movementLines.push({
+          product_id: item.product_id,
+          unit_id: item.unit_id || item.unit || 'default',
+          quantity: qty,
+          direction: 'IN',
+          unit_cost: cost,
+          total_cost: qty * cost,
+          batch_id: item.batch_id || null,
+          serial_number: item.serial_number || null,
+          notes: item.notes || null
+        });
       }
     }
 
@@ -4866,6 +5758,23 @@ router.put('/opening_stock_balances/:id', authenticateToken, async (req: AuthReq
       metadata: docData
     });
 
+    // New Inventory Movement Engine integration (Phase 8: Opening Stock Balance)
+    if (movementLines.length > 0) {
+      await InventoryMovementService.createMovement({
+        company_id: docData.company_id || companyId,
+        branch_id: docData.branch_id || req.body.branch_id || null,
+        warehouse_id: items[0]?.warehouse_id || docData.warehouse_id || null,
+        movement_number: rawDocData.document_number || `OPB-${id}`,
+        movement_type: 'opening_balance',
+        source_document_type: 'opening_stock_balance',
+        source_document_id: id,
+        movement_date: docData.date,
+        status: 'posted',
+        notes: docData.notes || null,
+        created_by: req.user?.id || docData.created_by || null
+      }, movementLines, client);
+    }
+
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
@@ -4912,6 +5821,7 @@ router.post('/stock_adjustments', authenticateToken, async (req: AuthRequest, re
 
     const productsToSync: string[] = [];
     const journalLines: { account_id: string; debit: number; credit: number; description: string }[] = [];
+    const movementLines: any[] = [];
 
     for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('stock_adjustment_items', item);
@@ -4959,6 +5869,18 @@ router.post('/stock_adjustments', authenticateToken, async (req: AuthRequest, re
         `INSERT INTO "stock_adjustment_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
         itemValues
       );
+
+      movementLines.push({
+        product_id: item.product_id,
+        unit_id: item.unit_id || item.unit || 'default',
+        quantity: Math.abs(qty),
+        direction: qty >= 0 ? 'IN' : 'OUT',
+        unit_cost: cost,
+        total_cost: totalCostValue,
+        batch_id: item.batch_id || null,
+        serial_number: item.serial_number || null,
+        notes: item.notes || null
+      });
 
       productsToSync.push(item.product_id);
 
@@ -5062,6 +5984,23 @@ router.post('/stock_adjustments', authenticateToken, async (req: AuthRequest, re
       metadata: docData
     });
 
+    // New Inventory Movement Engine integration (Phase 8: Stock Adjustment)
+    if (movementLines.length > 0) {
+      await InventoryMovementService.createMovement({
+        company_id: docData.company_id || companyId,
+        branch_id: docData.branch_id || req.body.branch_id || null,
+        warehouse_id: items[0]?.warehouse_id || docData.warehouse_id || null,
+        movement_number: docData.adjustment_number || `ADJ-${docId}`,
+        movement_type: 'inventory_adjustment',
+        source_document_type: 'stock_adjustment',
+        source_document_id: docId,
+        movement_date: docData.date,
+        status: 'posted',
+        notes: docData.notes || null,
+        created_by: req.user?.id || docData.created_by || null
+      }, movementLines, client);
+    }
+
     await client.query('COMMIT');
     res.status(201).json({ id: docId, adjustment_number: docData.adjustment_number });
   } catch (error: any) {
@@ -5085,6 +6024,7 @@ router.put('/stock_adjustments/:id', authenticateToken, async (req: AuthRequest,
     await client.query('BEGIN');
 
     await reverseAndRecalculate(client, companyId, id);
+    await InventoryMovementService.reverseMovement('stock_adjustment', id, client);
     await client.query('DELETE FROM stock_adjustment_items WHERE adjustment_id = $1', [id]);
 
     const docData = sanitizeData('stock_adjustments', rawDocData);
@@ -5101,6 +6041,7 @@ router.put('/stock_adjustments/:id', authenticateToken, async (req: AuthRequest,
 
     const productsToSync: string[] = [];
     const journalLines: { account_id: string; debit: number; credit: number; description: string }[] = [];
+    const movementLines: any[] = [];
 
     for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('stock_adjustment_items', item);
@@ -5147,6 +6088,18 @@ router.put('/stock_adjustments/:id', authenticateToken, async (req: AuthRequest,
         `INSERT INTO "stock_adjustment_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
         itemValues
       );
+
+      movementLines.push({
+        product_id: item.product_id,
+        unit_id: item.unit_id || item.unit || 'default',
+        quantity: Math.abs(qty),
+        direction: qty >= 0 ? 'IN' : 'OUT',
+        unit_cost: cost,
+        total_cost: totalCostValue,
+        batch_id: item.batch_id || null,
+        serial_number: item.serial_number || null,
+        notes: item.notes || null
+      });
 
       productsToSync.push(item.product_id);
 
@@ -5249,6 +6202,23 @@ router.put('/stock_adjustments/:id', authenticateToken, async (req: AuthRequest,
       ip_address: getIp(req),
       metadata: docData
     });
+
+    // New Inventory Movement Engine integration (Phase 8: Stock Adjustment)
+    if (movementLines.length > 0) {
+      await InventoryMovementService.createMovement({
+        company_id: docData.company_id || companyId,
+        branch_id: docData.branch_id || req.body.branch_id || null,
+        warehouse_id: items[0]?.warehouse_id || docData.warehouse_id || null,
+        movement_number: rawDocData.adjustment_number || `ADJ-${id}`,
+        movement_type: 'inventory_adjustment',
+        source_document_type: 'stock_adjustment',
+        source_document_id: id,
+        movement_date: docData.date,
+        status: 'posted',
+        notes: docData.notes || null,
+        created_by: req.user?.id || docData.created_by || null
+      }, movementLines, client);
+    }
 
     await client.query('COMMIT');
     res.json({ success: true });

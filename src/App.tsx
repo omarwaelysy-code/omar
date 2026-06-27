@@ -18,6 +18,7 @@ import { Receipts } from './pages/Receipts';
 import { PaymentVouchers } from './pages/PaymentVouchers';
 import { Returns } from './pages/Returns';
 import { PurchaseReturns } from './pages/PurchaseReturns';
+import { GoodsReceipts } from './pages/GoodsReceipts';
 import { CustomerDiscounts } from './pages/CustomerDiscounts';
 import { SupplierDiscounts } from './pages/SupplierDiscounts';
 import { CustomerSettlements } from './pages/CustomerSettlements';
@@ -180,6 +181,7 @@ export default function App() {
       case 'invoices': return <Invoices />;// Invoices page
       case 'sales_orders': return <SalesOrders />;
       case 'purchase_invoices': return <PurchaseInvoices />;
+      case 'goods_receipts': return <GoodsReceipts />;
       case 'purchase_orders': return <PurchaseOrders />;
       case 'receipts': return <Receipts />;
       case 'payment_vouchers': return <PaymentVouchers />;

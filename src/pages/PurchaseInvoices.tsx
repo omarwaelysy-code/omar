@@ -231,6 +231,24 @@ export const PurchaseInvoices: React.FC = () => {
   }[]>([]);
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [selectedGoodsReceiptIds, setSelectedGoodsReceiptIds] = useState<string[]>([]);
+  const [goodsReceipts, setGoodsReceipts] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (user && invoiceData.supplier_id) {
+      dbService.list<any>('goods_receipts', {
+        company_id: user.company_id,
+        supplier_id: invoiceData.supplier_id,
+        status: 'posted'
+      }).then(res => {
+        setGoodsReceipts(res);
+      }).catch(err => {
+        console.error('Error fetching goods receipts:', err);
+      });
+    } else {
+      setGoodsReceipts([]);
+    }
+  }, [invoiceData.supplier_id, user, isModalOpen]);
 
   useEffect(() => {
     if (user) {
@@ -1058,6 +1076,43 @@ export const PurchaseInvoices: React.FC = () => {
       };
       loadOrderForConversion();
     }
+
+    if (pendingViewDoc && pendingViewDoc.type === 'convert_goods_receipt' && user) {
+      const receiptId = pendingViewDoc.idOrNumber;
+      setPendingViewDoc(null);
+      
+      const loadReceiptForConversion = async () => {
+        try {
+          const receipt = await dbService.get<any>('goods_receipts', receiptId);
+          if (receipt) {
+            openModal();
+            setInvoiceData(prev => ({
+              ...prev,
+              supplier_id: receipt.supplier_id,
+              warehouse_id: receipt.warehouse_id || '',
+              notes: receipt.notes || ''
+            }));
+            setSelectedGoodsReceiptIds([receiptId]);
+
+            const mappedItems = (receipt.items || []).map((item: any) => ({
+              product_id: item.product_id,
+              product_name: item.product_name,
+              product_code: item.product_code || '',
+              product_image_url: item.product_image_url || '',
+              quantity: Number(item.quantity) || 0,
+              cost_price: Number(item.unit_cost) || 0,
+              total: Number(item.total_cost || (item.quantity * item.unit_cost)) || 0,
+              barcode: item.barcode || '',
+              image_url: item.product_image_url || ''
+            }));
+            setItems(mappedItems);
+          }
+        } catch (err) {
+          console.error("Error converting goods receipt", err);
+        }
+      };
+      loadReceiptForConversion();
+    }
   }, [pendingViewDoc, user, setPendingViewDoc]);
 
   useEffect(() => {
@@ -1728,7 +1783,27 @@ export const PurchaseInvoices: React.FC = () => {
 
     if (invoiceData.purchase_type === 'items' && !invoiceData.warehouse_id) {
       showNotification('يرجى اختيار المخزن', 'error');
+      setIsSubmitting(false);
       return;
+    }
+
+    const mode = companyData?.purchase_workflow_mode || 'Simple';
+    if (mode === 'Enterprise Strict' && selectedGoodsReceiptIds.length === 0) {
+      showNotification('الشركة تعمل بنظام الدورة الكاملة. يجب ربط الفاتورة بـ Goods Receipt أولاً.', 'error');
+      setIsSubmitting(false);
+      return;
+    }
+
+    let autoGenerateGr = false;
+    if (mode === 'Enterprise Flexible' && selectedGoodsReceiptIds.length === 0) {
+      const confirmGR = window.confirm(
+        language === 'ar'
+          ? 'لا يوجد استلام مخزون مرتبط بهذه الفاتورة. هل تريد إنشاء استلام مخزون تلقائياً وربطه بهذه الفاتورة؟'
+          : 'No Goods Receipt is linked to this invoice. Do you want to automatically generate a Goods Receipt and link it to this invoice?'
+      );
+      if (confirmGR) {
+        autoGenerateGr = true;
+      }
     }
 
     try {
@@ -1945,6 +2020,8 @@ export const PurchaseInvoices: React.FC = () => {
         supplier_name: supplier?.name || '',
         warehouse_id: invoiceData.warehouse_id || null,
         order_ids: selectedOrderIds,
+        goods_receipt_ids: selectedGoodsReceiptIds,
+        auto_generate_gr: autoGenerateGr,
         date: invoiceData.date, 
         subtotal,
         discount_amount,
@@ -2381,6 +2458,19 @@ export const PurchaseInvoices: React.FC = () => {
         
         if (!fullData) throw new Error('Purchase invoice not found');
 
+        // Load linked Goods Receipts
+        try {
+          const linksRes = await apiRequest('GET', `/purchase_invoice_goods_receipts?purchase_invoice_id=${invoice.id}`);
+          if (linksRes && Array.isArray(linksRes)) {
+            setSelectedGoodsReceiptIds(linksRes.map(l => l.goods_receipt_id));
+          } else {
+            setSelectedGoodsReceiptIds([]);
+          }
+        } catch (e) {
+          console.error('Failed to load linked goods receipts:', e);
+          setSelectedGoodsReceiptIds([]);
+        }
+
         setEditingInvoice(fullData);
         setInvoiceData({
           supplier_id: fullData.supplier_id.toString(),
@@ -2457,6 +2547,7 @@ export const PurchaseInvoices: React.FC = () => {
         purchase_type: 'items'
       });
       setItems([]);
+      setSelectedGoodsReceiptIds([]);
       setPaymentTerms('due_on_receipt');
       setPaymentTermsDays(0);
       setAdvancePercentage(0);
@@ -3274,6 +3365,61 @@ export const PurchaseInvoices: React.FC = () => {
 
                         {/* Second Row of metadata */}
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 mt-1 pt-1 border-t border-zinc-100">
+                          {/* Goods Receipt Linkage */}
+                          {companyData?.purchase_workflow_mode && companyData.purchase_workflow_mode !== 'Simple' && (
+                            <div className="col-span-2 md:col-span-3 lg:col-span-4 mb-1">
+                              <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">
+                                {language === 'ar' ? 'ربط استلام البضائع (Goods Receipts)' : 'Link Goods Receipts'}
+                              </label>
+                              <div className="flex flex-wrap gap-1 p-1 bg-zinc-50 border border-zinc-200 rounded-md min-h-[28px]">
+                                {goodsReceipts.length === 0 ? (
+                                  <span className="text-[10px] text-zinc-400 italic p-0.5">
+                                    {language === 'ar' ? 'لا توجد استلامات متاحة للمورد' : 'No receipts available for supplier'}
+                                  </span>
+                                ) : (
+                                  goodsReceipts.map(gr => {
+                                    const isSelected = selectedGoodsReceiptIds.includes(gr.id);
+                                    return (
+                                      <button
+                                        type="button"
+                                        key={gr.id}
+                                        onClick={() => {
+                                          if (isSelected) {
+                                            setSelectedGoodsReceiptIds(prev => prev.filter(id => id !== gr.id));
+                                          } else {
+                                            setSelectedGoodsReceiptIds(prev => [...prev, gr.id]);
+                                            const grItems = gr.items || [];
+                                            const mapped = grItems.map((item: any) => ({
+                                              product_id: item.product_id,
+                                              product_name: item.product_name,
+                                              product_code: item.product_code || '',
+                                              product_image_url: item.product_image_url || '',
+                                              quantity: Number(item.quantity) || 0,
+                                              cost_price: Number(item.unit_cost) || 0,
+                                              total: Number(item.total_cost || (item.quantity * item.unit_cost)) || 0,
+                                              barcode: item.barcode || '',
+                                              image_url: item.product_image_url || ''
+                                            }));
+                                            setItems(prev => {
+                                              const filtered = prev.filter(i => i.product_id);
+                                              return [...filtered, ...mapped];
+                                            });
+                                          }
+                                        }}
+                                        className={`text-[9px] font-bold px-2 py-0.5 rounded-full transition-all border ${
+                                          isSelected
+                                            ? 'bg-indigo-650 border-indigo-650 text-white shadow-sm'
+                                            : 'bg-white border-zinc-200 text-zinc-650 hover:bg-zinc-100'
+                                        }`}
+                                      >
+                                        {gr.receipt_number} ({gr.date ? gr.date.slice(0, 10) : ''})
+                                      </button>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            </div>
+                          )}
                           {/* Payment Terms or Method */}
                           {invoiceData.payment_type === 'cash' ? (
                             <div>

@@ -744,3 +744,63 @@ export async function recordTransfer(
 
   return { unitCost, totalCost };
 }
+
+export async function recordGoodsReceipt(
+  client: PoolClient,
+  companyId: string,
+  warehouseId: string | null,
+  productId: string,
+  quantity: number,
+  unitCost: number,
+  referenceId: string,
+  referenceNumber: string,
+  date: string
+): Promise<CostingResult> {
+  const method = await getCompanyCostMethod(client, companyId, productId);
+  const totalCost = quantity * unitCost;
+
+  const productRes = await client.query('SELECT cost_price, stock, weighted_average_cost FROM products WHERE id = $1', [productId]);
+  if (productRes.rows.length === 0) {
+    throw new Error(`Product not found: ${productId}`);
+  }
+  const product = productRes.rows[0];
+  const oldStock = parseFloat(product.stock || '0');
+  const oldCost = parseFloat(product.weighted_average_cost || '0') || parseFloat(product.cost_price || '0');
+
+  let newCost = oldCost;
+
+  const layerId = uuidv4();
+  await client.query(
+    `INSERT INTO inventory_layers (id, company_id, product_id, purchase_date, original_qty, qty_remaining, unit_cost, reference_type, reference_id, created_at, warehouse_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)`,
+    [layerId, companyId, productId, date, quantity, quantity, unitCost, 'goods_receipt', referenceId, warehouseId]
+  );
+
+  if (method === 'wac') {
+    const totalOldValue = oldStock * oldCost;
+    const totalNewValue = totalCost;
+    const newStock = oldStock + quantity;
+    if (newStock !== 0) {
+      newCost = (totalOldValue + totalNewValue) / newStock;
+    } else {
+      newCost = unitCost;
+    }
+  } else {
+    newCost = unitCost;
+  }
+
+  const movementId = uuidv4();
+  await client.query(
+    `INSERT INTO inventory_movements (id, company_id, product_id, movement_type, reference_id, reference_type, reference_number, date, quantity, unit_cost, total_cost, created_at, warehouse_id, cost_policy)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12, $13)`,
+    [movementId, companyId, productId, 'goods_receipt', referenceId, 'goods_receipt', referenceNumber, date, quantity, unitCost, totalCost, warehouseId, method]
+  );
+
+  await updateProductDetails(client, productId, quantity, newCost);
+
+  return {
+    unitCost,
+    totalCost,
+    methodUsed: method
+  };
+}
