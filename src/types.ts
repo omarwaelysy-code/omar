@@ -1115,4 +1115,90 @@ export interface WidgetTypeDefinition {
   description?: string;
 }
 
+export interface InventoryMovementType {
+  id: string;
+  name_en: string;
+  name_ar: string;
+  default_direction: 'IN' | 'OUT' | 'NONE';
+  description?: string;
+  created_at?: string;
+}
+
+export interface InventoryMovementV2 {
+  id: string;
+  company_id: string;
+  branch_id?: string | null;
+  warehouse_id?: string | null;
+  movement_number: string;
+  movement_type: string;
+  source_document_type?: string | null;
+  source_document_id?: string | null;
+  movement_date: string;
+  status: 'draft' | 'posted' | 'cancelled';
+  notes?: string | null;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  lines?: InventoryMovementLine[];
+}
+
+export interface InventoryMovementLine {
+  id: string;
+  movement_id: string;
+  product_id: string;
+  unit_id: string;
+  quantity: number;
+  direction: 'IN' | 'OUT';
+  unit_cost?: number;
+  total_cost?: number;
+  batch_id?: string | null;
+  serial_number?: string | null;
+  notes?: string | null;
+  before_quantity?: number;
+  after_quantity?: number;
+  before_cost?: number;
+  after_cost?: number;
+  created_at?: string;
+}
+
+export interface StockCardRecord {
+  id: string;
+  company_id: string;
+  warehouse_id?: string | null;
+  product_id: string;
+  movement_id: string;
+  movement_line_id: string;
+  movement_date: string;
+  quantity: number;
+  direction: 'IN' | 'OUT';
+  before_qty: number;
+  after_qty: number;
+  before_cost: number;
+  after_cost: number;
+  unit_cost: number;
+  total_cost: number;
+  created_at?: string;
+}
+
+export interface InventoryTransactionJournal {
+  id: string;
+  company_id: string;
+  warehouse_id?: string | null;
+  movement_id?: string | null;
+  movement_type: string;
+  source_document_type?: string | null;
+  source_document_id?: string | null;
+  reference_number: string;
+  status: 'Draft' | 'Posted' | 'Cancelled' | 'Reversed';
+  created_by?: string | null;
+  created_at?: string;
+  posted_at?: string | null;
+  cancelled_at?: string | null;
+  notes?: string | null;
+}
+
+
+
+
+
 

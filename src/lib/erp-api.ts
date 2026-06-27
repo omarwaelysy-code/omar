@@ -15,6 +15,7 @@ import * as XLSX from 'xlsx';
 import multer from 'multer';
 import { syncCOGSForJournalEntry } from './sync-cogs';
 import { recordPurchase, recordSale, recordSalesReturn, recordPurchaseReturn, recalculateProductStock, reverseAndRecalculate, recordTransfer, recordAdjustment } from './cost-engine';
+import { InventoryMovementService } from '../services/InventoryMovementService';
 
 export async function syncProductsCostAndJEs(client: any, companyId: string, productIds: string[]) {
   if (!productIds || productIds.length === 0) return;
@@ -2821,6 +2822,48 @@ router.post('/purchase_invoices', authenticateToken, async (req: AuthRequest, re
       await syncProductsCostAndJEs(client, companyId, productIdsToSync);
     }
 
+    // New Inventory Movement Engine integration (Phase 2)
+    const movementLines: any[] = [];
+    for (const item of (items || [])) {
+      const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
+      if (prodRes.rows.length > 0) {
+        const prod = prodRes.rows[0];
+        if (prod.type !== 'service' && !prod.is_service) {
+          const qty = parseFloat(item.quantity || '0');
+          const unitPrice = parseFloat(item.unit_price || item.unit_cost || '0');
+          if (qty > 0) {
+            movementLines.push({
+              product_id: item.product_id,
+              unit_id: item.unit_id || item.unit || 'default',
+              quantity: qty,
+              direction: 'IN',
+              unit_cost: unitPrice,
+              total_cost: qty * unitPrice,
+              batch_id: item.batch_id || null,
+              serial_number: item.serial_number || null,
+              notes: item.notes || null
+            });
+          }
+        }
+      }
+    }
+
+    if (movementLines.length > 0) {
+      await InventoryMovementService.createMovement({
+        company_id: invoiceData.company_id || companyId,
+        branch_id: invoiceData.branch_id || req.body.branch_id || null,
+        warehouse_id: invoiceData.warehouse_id || null,
+        movement_number: invoiceData.invoice_number || `PINV-${invoiceId}`,
+        movement_type: 'purchase',
+        source_document_type: 'purchase_invoice',
+        source_document_id: invoiceId,
+        movement_date: invoiceData.date,
+        status: 'posted',
+        notes: invoiceData.notes || null,
+        created_by: req.user?.id || invoiceData.created_by || null
+      }, movementLines, client);
+    }
+
     await client.query('COMMIT');
     res.status(201).json({ id: invoiceId });
   } catch (error: any) {
@@ -2891,6 +2934,8 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
 
     await client.query('DELETE FROM purchase_invoice_items WHERE invoice_id = $1', [invoiceId]);
     await reverseAndRecalculate(client, companyId || '', invoiceId);
+    await client.query('DELETE FROM "inventory_movements_v2" WHERE "source_document_type" = $1 AND "source_document_id" = $2', ['purchase_invoice', invoiceId]);
+    await client.query('UPDATE "inventory_transaction_journal" SET "status" = $1, "cancelled_at" = NOW(), "movement_id" = NULL WHERE "source_document_type" = $2 AND "source_document_id" = $3', ['Reversed', 'purchase_invoice', invoiceId]);
 
     const invData = invoiceData;
     const cogsLines: { account_id: string; account_name: string; debit: number; credit: number; description: string }[] = [];
@@ -2936,6 +2981,48 @@ for (const item of (items || [])) {
     const productIdsToSync = (items || []).filter((i: any) => i.product_id).map((i: any) => i.product_id);
     if (productIdsToSync.length > 0) {
       await syncProductsCostAndJEs(client, companyId, productIdsToSync);
+    }
+
+    // New Inventory Movement Engine integration (Phase 2)
+    const movementLines: any[] = [];
+    for (const item of (items || [])) {
+      const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
+      if (prodRes.rows.length > 0) {
+        const prod = prodRes.rows[0];
+        if (prod.type !== 'service' && !prod.is_service) {
+          const qty = parseFloat(item.quantity || '0');
+          const unitPrice = parseFloat(item.unit_price || item.unit_cost || '0');
+          if (qty > 0) {
+            movementLines.push({
+              product_id: item.product_id,
+              unit_id: item.unit_id || item.unit || 'default',
+              quantity: qty,
+              direction: 'IN',
+              unit_cost: unitPrice,
+              total_cost: qty * unitPrice,
+              batch_id: item.batch_id || null,
+              serial_number: item.serial_number || null,
+              notes: item.notes || null
+            });
+          }
+        }
+      }
+    }
+
+    if (movementLines.length > 0) {
+      await InventoryMovementService.createMovement({
+        company_id: invoiceData.company_id || companyId,
+        branch_id: invoiceData.branch_id || req.body.branch_id || null,
+        warehouse_id: invoiceData.warehouse_id || null,
+        movement_number: invoiceData.invoice_number || `PINV-${invoiceId}`,
+        movement_type: 'purchase',
+        source_document_type: 'purchase_invoice',
+        source_document_id: invoiceId,
+        movement_date: invoiceData.date,
+        status: 'posted',
+        notes: invoiceData.notes || null,
+        created_by: req.user?.id || invoiceData.created_by || null
+      }, movementLines, client);
     }
 
     await client.query('COMMIT');
@@ -5663,6 +5750,78 @@ router.post('/widgets/query', authenticateToken, async (req: AuthRequest, res) =
   } catch (error: any) {
     console.error('[ERP] POST /widgets/query error:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Inventory Transaction Journal API (Phase 4) ---
+router.get('/inventory_transaction_journal', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
+    const {
+      warehouse_id,
+      movement_type,
+      source_document_type,
+      source_document_id,
+      reference_number,
+      created_by,
+      status,
+      startDate,
+      endDate
+    } = req.query;
+
+    const params: any[] = [companyId];
+    const conditions: string[] = ['"company_id" = $1'];
+
+    if (warehouse_id) {
+      params.push(warehouse_id);
+      conditions.push(`"warehouse_id" = $${params.length}`);
+    }
+    if (movement_type) {
+      params.push(movement_type);
+      conditions.push(`"movement_type" = $${params.length}`);
+    }
+    if (source_document_type) {
+      params.push(source_document_type);
+      conditions.push(`"source_document_type" = $${params.length}`);
+    }
+    if (source_document_id) {
+      params.push(source_document_id);
+      conditions.push(`"source_document_id" = $${params.length}`);
+    }
+    if (reference_number) {
+      params.push(reference_number);
+      conditions.push(`"reference_number" = $${params.length}`);
+    }
+    if (created_by) {
+      params.push(created_by);
+      conditions.push(`"created_by" = $${params.length}`);
+    }
+    if (status) {
+      params.push(status);
+      conditions.push(`"status" = $${params.length}`);
+    }
+    if (startDate) {
+      params.push(startDate);
+      conditions.push(`"created_at" >= $${params.length}`);
+    }
+    if (endDate) {
+      params.push(endDate);
+      conditions.push(`"created_at" <= $${params.length}`);
+    }
+
+    const sql = `
+      SELECT * FROM "inventory_transaction_journal" 
+      WHERE ${conditions.join(' AND ')} 
+      ORDER BY "created_at" DESC
+    `;
+
+    const result = await pool.query(sql, params);
+    res.json(result.rows);
+  } catch (error: any) {
+    console.error('[ERP] GET /inventory_transaction_journal error:', error);
+    sendError(res, 500, 'Failed to fetch inventory transaction journal', error.message);
   }
 });
 
