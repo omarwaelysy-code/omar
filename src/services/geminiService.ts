@@ -296,10 +296,10 @@ export const parseAccountType = async (text: string) => {
         parts: [{
           text: `Parse the following text into an account type structure. 
       Text: "${text}"
-      Return JSON with: code, name, statementType ('income_statement' or 'balance_sheet'), classification ('asset', 'liability_equity', 'revenue', 'cost', 'expense').
+      Return JSON with: code, name, statementType ('income_statement' or 'balance_sheet'), classification ('asset', 'cash_and_equivalents', 'receivables', 'liability', 'payables', 'equity', 'liability_equity', 'revenue', 'other_revenue', 'cost', 'expense', 'interest_expense', 'depreciation', 'other_expense').
       Classification rules:
-      - If statementType is balance_sheet: classification must be 'asset' or 'liability_equity'.
-      - If statementType is income_statement: classification must be 'revenue', 'cost', or 'expense'.`
+      - If statementType is balance_sheet: classification must be 'asset', 'cash_and_equivalents', 'receivables', 'liability', 'payables', 'equity', or 'liability_equity'.
+      - If statementType is income_statement: classification must be 'revenue', 'other_revenue', 'cost', 'expense', 'interest_expense', 'depreciation', or 'other_expense'.`
         }]
       },
       config: {
@@ -310,7 +310,7 @@ export const parseAccountType = async (text: string) => {
             code: { type: Type.STRING },
             name: { type: Type.STRING },
             statementType: { type: Type.STRING, description: "Must be 'income_statement' or 'balance_sheet'" },
-            classification: { type: Type.STRING, description: "Must be 'asset', 'liability_equity', 'revenue', 'cost', or 'expense'" }
+            classification: { type: Type.STRING, description: "Must be 'asset', 'cash_and_equivalents', 'receivables', 'liability', 'payables', 'equity', 'liability_equity', 'revenue', 'other_revenue', 'cost', 'expense', 'interest_expense', 'depreciation', or 'other_expense'" }
           },
           required: ["code", "name", "statementType", "classification"]
         }
@@ -336,7 +336,7 @@ export const parseAccountTypesBulk = async (text: string) => {
         parts: [{
           text: `Parse the following text into a list of account types. 
       Text: "${text}"
-      Return JSON with an array named 'types'. Each element must have: code, name, statementType ('income_statement' or 'balance_sheet'), classification ('asset', 'liability_equity', 'revenue', 'cost', 'expense').`
+      Return JSON with an array named 'types'. Each element must have: code, name, statementType ('income_statement' or 'balance_sheet'), classification ('asset', 'cash_and_equivalents', 'receivables', 'liability', 'payables', 'equity', 'liability_equity', 'revenue', 'other_revenue', 'cost', 'expense', 'interest_expense', 'depreciation', 'other_expense').`
         }]
       },
       config: {

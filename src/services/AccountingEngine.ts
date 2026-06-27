@@ -337,17 +337,17 @@ export class AccountingEngine {
     const isIncomeStatementType = (type: AccountType | undefined) => {
       if (!type) return false;
       // Primary check: classification
-      if (['revenue', 'cost', 'expense'].includes(type.classification)) return true;
-      if (['asset', 'liability', 'equity', 'liability_equity'].includes(type.classification)) return false;
+      if (['revenue', 'cost', 'expense', 'interest_expense', 'depreciation', 'other_revenue', 'other_expense'].includes(type.classification)) return true;
+      if (['asset', 'liability', 'equity', 'liability_equity', 'cash_and_equivalents', 'receivables', 'payables'].includes(type.classification)) return false;
       // Secondary check: statement_type
       return type.statement_type === 'income_statement';
     };
 
     const isAccounts = mappedAccounts.filter(a => isIncomeStatementType(a.typeInfo));
     
-    const revenues = isAccounts.filter(a => a.typeInfo?.classification === 'revenue');
+    const revenues = isAccounts.filter(a => ['revenue', 'other_revenue'].includes(a.typeInfo?.classification || ''));
     const costs = isAccounts.filter(a => a.typeInfo?.classification === 'cost');
-    const expenses = isAccounts.filter(a => a.typeInfo?.classification === 'expense');
+    const expenses = isAccounts.filter(a => ['expense', 'interest_expense', 'depreciation', 'other_expense'].includes(a.typeInfo?.classification || ''));
 
     // Sign handling: Revenue is normally Credit, Cost/Expense normally Debit
     // For Income Statement we use MOVEMENTS in the period
@@ -393,8 +393,8 @@ export class AccountingEngine {
     const isBalanceSheetType = (type: AccountType | undefined) => {
       if (!type) return false;
       // Primary check: classification
-      if (['asset', 'liability', 'equity', 'liability_equity'].includes(type.classification)) return true;
-      if (['revenue', 'cost', 'expense'].includes(type.classification)) return false;
+      if (['asset', 'liability', 'equity', 'liability_equity', 'cash_and_equivalents', 'receivables', 'payables'].includes(type.classification)) return true;
+      if (['revenue', 'cost', 'expense', 'interest_expense', 'depreciation', 'other_revenue', 'other_expense'].includes(type.classification)) return false;
       // Secondary check: statement_type
       return type.statement_type === 'balance_sheet';
     };
@@ -404,8 +404,8 @@ export class AccountingEngine {
     // Calculate Net Profit for the entire period up to targetDate (Cumulative)
     const incomeStatement = this.calculateIncomeStatement(accounts, accountTypes, entries, startDate, endDate);
     
-    const assets = bsAccounts.filter(a => a.typeInfo?.classification === 'asset');
-    const liabilities = bsAccounts.filter(a => (a.typeInfo?.classification === 'liability' || a.typeInfo?.classification === 'liability_equity'));
+    const assets = bsAccounts.filter(a => ['asset', 'cash_and_equivalents', 'receivables'].includes(a.typeInfo?.classification || ''));
+    const liabilities = bsAccounts.filter(a => ['liability', 'liability_equity', 'payables'].includes(a.typeInfo?.classification || ''));
     const equity = bsAccounts.filter(a => a.typeInfo?.classification === 'equity');
 
     const totalAssets = assets.reduce((sum, a) => sum + (a.closing.debit - a.closing.credit), 0);

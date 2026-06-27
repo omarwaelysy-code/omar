@@ -84,6 +84,57 @@ describe('AccountingEngine', () => {
     expect(bs.isBalanced).toBe(true);
   });
 
+  it('correctly maps and sums new classifications in reports', () => {
+    const testTypes: AccountType[] = [
+      { id: 't_cash', code: '10', name: 'Cash equivalents', statement_type: 'balance_sheet', classification: 'cash_and_equivalents', company_id: 'c1' },
+      { id: 't_rec', code: '11', name: 'Receivables', statement_type: 'balance_sheet', classification: 'receivables', company_id: 'c1' },
+      { id: 't_pay', code: '20', name: 'Payables', statement_type: 'balance_sheet', classification: 'payables', company_id: 'c1' },
+      { id: 't_dep', code: '50', name: 'Depreciation', statement_type: 'income_statement', classification: 'depreciation', company_id: 'c1' },
+      { id: 't_other_rev', code: '41', name: 'Other Rev', statement_type: 'income_statement', classification: 'other_revenue', company_id: 'c1' }
+    ];
+
+    const testAccounts: Account[] = [
+      { id: 'a_cash', code: '101', name: 'Cash Box', type_id: 't_cash', company_id: 'c1', opening_balance: 500 },
+      { id: 'a_rec', code: '102', name: 'Client Account', type_id: 't_rec', company_id: 'c1', opening_balance: 300 },
+      { id: 'a_pay', code: '201', name: 'Supplier Account', type_id: 't_pay', company_id: 'c1', opening_balance: -200 },
+      { id: 'a_dep', code: '501', name: 'Asset Dep', type_id: 't_dep', company_id: 'c1', opening_balance: 0 },
+      { id: 'a_other_rev', code: '411', name: 'Interests', type_id: 't_other_rev', company_id: 'c1', opening_balance: 0 }
+    ];
+
+    const testEntries: JournalEntry[] = [
+      {
+        id: 'te1',
+        date: '2026-04-10',
+        description: 'Adj',
+        reference_id: 'r1',
+        reference_type: 'manual',
+        total_debit: 100,
+        total_credit: 100,
+        company_id: 'c1',
+        items: [
+          { account_id: 'a_dep', account_name: 'Asset Dep', debit: 60, credit: 0 },
+          { account_id: 'a_other_rev', account_name: 'Interests', debit: 0, credit: 100 },
+          { account_id: 'a_cash', account_name: 'Cash Box', debit: 40, credit: 0 }
+        ],
+        created_at: '',
+        created_by: ''
+      }
+    ];
+
+    const is = AccountingEngine.calculateIncomeStatement(testAccounts, testTypes, testEntries, '2026-04-01', '2026-04-30');
+    // totalRevenues should sum 'other_revenue' = 100
+    expect(is.totalRevenues).toBe(100);
+    // totalExpenses should sum 'depreciation' = 60
+    expect(is.totalExpenses).toBe(60);
+    expect(is.netProfit).toBe(40);
+
+    const bs = AccountingEngine.calculateBalanceSheet(testAccounts, testTypes, testEntries, '2026-04-30');
+    // Assets: 'cash_and_equivalents' (500 + 40 = 540) + 'receivables' (300) = 840
+    expect(bs.totalAssets).toBe(840);
+    // Liabilities: 'payables' (200) + Net Profit (40) = 240
+    expect(bs.totalLiabilitiesEquity).toBe(240); 
+  });
+
   describe('getSubPeriods', () => {
     it('splits a date range into monthly sub-periods correctly', () => {
       const periods = AccountingEngine.getSubPeriods('2026-01-15', '2026-04-10', 'monthly');

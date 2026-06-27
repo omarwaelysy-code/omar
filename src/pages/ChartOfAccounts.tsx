@@ -100,12 +100,24 @@ export const ChartOfAccounts: React.FC = () => {
 
   const filterTypesByCls = (clsId: string) => {
     if (clsId === 'other') {
-      const knownClassifications = ['asset', 'liability', 'equity', 'liability_equity', 'revenue', 'cost', 'expense'];
+      const knownClassifications = [
+        'asset', 'liability', 'equity', 'liability_equity', 'cash_and_equivalents', 'receivables', 'payables',
+        'revenue', 'cost', 'expense', 'interest_expense', 'depreciation', 'other_revenue', 'other_expense'
+      ];
       return types.filter(t => !t.classification || !knownClassifications.includes(t.classification));
     }
     return types.filter(t => {
       if (clsId === 'liability_equity') {
-        return ['liability', 'equity', 'liability_equity'].includes(t.classification);
+        return ['liability', 'equity', 'liability_equity', 'payables'].includes(t.classification);
+      }
+      if (clsId === 'asset') {
+        return ['asset', 'cash_and_equivalents', 'receivables'].includes(t.classification);
+      }
+      if (clsId === 'revenue') {
+        return ['revenue', 'other_revenue'].includes(t.classification);
+      }
+      if (clsId === 'expense') {
+        return ['expense', 'interest_expense', 'depreciation', 'other_expense'].includes(t.classification);
       }
       return t.classification === clsId;
     });

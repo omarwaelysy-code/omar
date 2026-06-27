@@ -32,9 +32,29 @@ export const AccountTypes: React.FC = () => {
     code: '',
     name: '',
     statement_type: 'balance_sheet' as 'income_statement' | 'balance_sheet',
-    classification: 'asset' as 'asset' | 'liability' | 'equity' | 'liability_equity' | 'revenue' | 'cost' | 'expense',
+    classification: 'asset' as 'asset' | 'liability' | 'equity' | 'liability_equity' | 'cash_and_equivalents' | 'receivables' | 'payables' | 'revenue' | 'cost' | 'expense' | 'interest_expense' | 'depreciation' | 'other_revenue' | 'other_expense',
     is_active: true
   });
+
+  const getClassificationLabel = (classification: string) => {
+    switch (classification) {
+      case 'asset': return language === 'ar' ? 'أصل' : 'Asset';
+      case 'liability': return language === 'ar' ? 'التزام' : 'Liability';
+      case 'equity': return language === 'ar' ? 'حقوق ملكية' : 'Equity';
+      case 'liability_equity': return language === 'ar' ? 'التزام/حقوق ملكية' : 'Liability/Equity';
+      case 'cash_and_equivalents': return language === 'ar' ? 'نقدية وما في حكمها' : 'Cash & Cash Equivalents';
+      case 'receivables': return language === 'ar' ? 'عملاء' : 'Customers / Receivables';
+      case 'payables': return language === 'ar' ? 'موردين' : 'Suppliers / Payables';
+      case 'revenue': return language === 'ar' ? 'إيراد' : 'Revenue';
+      case 'cost': return language === 'ar' ? 'تكلفة' : 'Cost';
+      case 'expense': return language === 'ar' ? 'مصروف' : 'Expense';
+      case 'interest_expense': return language === 'ar' ? 'فوائد مدينة' : 'Debit Interest';
+      case 'depreciation': return language === 'ar' ? 'اهلاكات' : 'Depreciation';
+      case 'other_revenue': return language === 'ar' ? 'ايرادات اخرى' : 'Other Revenues';
+      case 'other_expense': return language === 'ar' ? 'مصروفات اخرى' : 'Other Expenses';
+      default: return classification;
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -287,12 +307,7 @@ export const AccountTypes: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-zinc-500">
-                      {type.classification === 'asset' ? (language === 'ar' ? 'أصل' : 'Asset') : 
-                       type.classification === 'liability' ? (language === 'ar' ? 'التزام' : 'Liability') :
-                       type.classification === 'equity' ? (language === 'ar' ? 'حقوق ملكية' : 'Equity') :
-                       type.classification === 'liability_equity' ? (language === 'ar' ? 'التزام/حقوق ملكية' : 'Liability/Equity') :
-                       type.classification === 'revenue' ? (language === 'ar' ? 'إيراد' : 'Revenue') :
-                       type.classification === 'cost' ? (language === 'ar' ? 'تكلفة' : 'Cost') : (language === 'ar' ? 'مصروف' : 'Expense')}
+                      {getClassificationLabel(type.classification)}
                     </td>
                     <td className="px-6 py-4 text-left">
                       <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
@@ -353,12 +368,7 @@ export const AccountTypes: React.FC = () => {
                     {type.is_active !== false ? 'نشط' : 'غير نشط'}
                   </span>
                   <span className="inline-block text-[10px] font-bold text-zinc-600 bg-zinc-100 px-2 py-0.5 rounded-md uppercase tracking-wider">
-                    {type.classification === 'asset' ? 'أصل' : 
-                     type.classification === 'liability' ? 'التزام' :
-                     type.classification === 'equity' ? 'حقوق ملكية' :
-                     type.classification === 'liability_equity' ? 'التزام/حقوق ملكية' :
-                     type.classification === 'revenue' ? 'إيراد' :
-                     type.classification === 'cost' ? 'تكلفة' : 'مصروف'}
+                    {getClassificationLabel(type.classification)}
                   </span>
                 </div>
               </div>
@@ -481,15 +491,22 @@ export const AccountTypes: React.FC = () => {
                     {formData.statement_type === 'balance_sheet' ? (
                       <>
                         <option value="asset">{language === 'ar' ? 'أصل' : 'Asset'}</option>
+                        <option value="cash_and_equivalents">{language === 'ar' ? 'نقدية وما في حكمها' : 'Cash & Cash Equivalents'}</option>
+                        <option value="receivables">{language === 'ar' ? 'عملاء' : 'Customers / Receivables'}</option>
                         <option value="liability">{language === 'ar' ? 'التزام (خصوم)' : 'Liability'}</option>
+                        <option value="payables">{language === 'ar' ? 'موردين' : 'Suppliers / Payables'}</option>
                         <option value="equity">{language === 'ar' ? 'حقوق ملكية' : 'Equity'}</option>
                         <option value="liability_equity">{language === 'ar' ? 'التزام / حقوق ملكية (مشترك)' : 'Liability/Equity (Joint)'}</option>
                       </>
                     ) : (
                       <>
                         <option value="revenue">{language === 'ar' ? 'إيراد' : 'Revenue'}</option>
+                        <option value="other_revenue">{language === 'ar' ? 'ايرادات اخرى' : 'Other Revenues'}</option>
                         <option value="cost">{language === 'ar' ? 'تكلفة' : 'Cost'}</option>
                         <option value="expense">{language === 'ar' ? 'مصروف' : 'Expense'}</option>
+                        <option value="interest_expense">{language === 'ar' ? 'فوائد مدينة' : 'Debit Interest'}</option>
+                        <option value="depreciation">{language === 'ar' ? 'اهلاكات' : 'Depreciation'}</option>
+                        <option value="other_expense">{language === 'ar' ? 'مصروفات اخرى' : 'Other Expenses'}</option>
                       </>
                     )}
                   </select>
