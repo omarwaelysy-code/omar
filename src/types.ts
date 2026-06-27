@@ -602,7 +602,7 @@ export interface AccountType {
   code: string;
   name: string;
   statement_type: 'income_statement' | 'balance_sheet';
-  classification: 'asset' | 'liability' | 'equity' | 'revenue' | 'cost' | 'expense' | 'liability_equity'; // liability_equity kept for backward compatibility/choice
+  classification: 'asset' | 'liability' | 'equity' | 'revenue' | 'cost' | 'expense' | 'liability_equity' | 'cash_and_equivalents' | 'receivables' | 'payables' | 'interest_expense' | 'depreciation' | 'other_revenue' | 'other_expense'; // liability_equity kept for backward compatibility/choice
   company_id: string;
   is_active?: boolean;
 }
