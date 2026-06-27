@@ -243,4 +243,38 @@ describe('Purchase Workflow Mode & Goods Receipts Integration', () => {
     expect(serviceCallArgs[0].movement_type).toBe('goods_receipt');
     expect(serviceCallArgs[0].source_document_type).toBe('goods_receipt');
   });
+
+  it('Purchase Invoice with Foreign Currency: should multiply cost by exchange rate in movement lines', async () => {
+    const req = {
+      user: { company_id: 'comp-abc', id: 'user-xyz' },
+      body: {
+        supplier_id: 'supplier-1',
+        warehouse_id: 'wh-main',
+        invoice_number: 'PINV-FC-123',
+        date: '2026-06-27',
+        status: 'posted',
+        exchange_rate: 50.0,
+        currency_id: 'usd-123',
+        items: [
+          { product_id: 'prod-123', quantity: 9, unit_price: 150, unit: 'pcs' }
+        ]
+      }
+    };
+
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn()
+    };
+
+    await postInvoiceHandler(req, res);
+
+    expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(InventoryMovementService.createMovement).toHaveBeenCalledTimes(1);
+
+    const serviceCallArgs = vi.mocked(InventoryMovementService.createMovement).mock.calls[0];
+    const movementLines = serviceCallArgs[1];
+    expect(movementLines[0].unit_cost).toBe(150 * 50.0); // 7500 local currency
+    expect(movementLines[0].total_cost).toBe(9 * 150 * 50.0); // 67500 local currency
+  });
 });

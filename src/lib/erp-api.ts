@@ -3058,13 +3058,14 @@ await client.query(
         );
 
         if (prod.type !== 'service' && !prod.is_service && qty > 0) {
+          const localCost = cost * Number(invoiceData.exchange_rate || 1.0);
           await recordGoodsReceipt(
             client,
             companyId,
             receiptData.warehouse_id || null,
             item.product_id,
             qty,
-            cost,
+            localCost,
             receiptId,
             receiptNumber,
             receiptData.date as string
@@ -3075,8 +3076,8 @@ await client.query(
             unit_id: item.unit_id || item.unit || 'default',
             quantity: qty,
             direction: 'IN',
-            unit_cost: cost,
-            total_cost: qty * cost,
+            unit_cost: localCost,
+            total_cost: qty * localCost,
             batch_id: item.batch_id || null,
             serial_number: item.serial_number || null,
             notes: item.notes || null
@@ -3137,6 +3138,7 @@ await client.query(
           if (prod.type !== 'service' && !prod.is_service) {
             const qty = parseFloat(item.quantity || '0');
             const unitPrice = parseFloat(item.unit_price || '0');
+            const localUnitPrice = unitPrice * Number(invoiceData.exchange_rate || 1.0);
             if (qty > 0) {
               await recordPurchase(
                 client,
@@ -3144,7 +3146,7 @@ await client.query(
                 invData.warehouse_id || null,
                 item.product_id,
                 qty,
-                unitPrice,
+                localUnitPrice,
                 invoiceId,
                 invoiceData.invoice_number || `PINV-${invoiceId}`,
                 invoiceData.date
@@ -3192,14 +3194,15 @@ await client.query(
           if (prod.type !== 'service' && !prod.is_service) {
             const qty = parseFloat(item.quantity || '0');
             const unitPrice = parseFloat(item.unit_price || item.unit_cost || '0');
+            const localUnitPrice = unitPrice * Number(invoiceData.exchange_rate || 1.0);
             if (qty > 0) {
               movementLines.push({
                 product_id: item.product_id,
                 unit_id: item.unit_id || item.unit || 'default',
                 quantity: qty,
                 direction: 'IN',
-                unit_cost: unitPrice,
-                total_cost: qty * unitPrice,
+                unit_cost: localUnitPrice,
+                total_cost: qty * localUnitPrice,
                 batch_id: item.batch_id || null,
                 serial_number: item.serial_number || null,
                 notes: item.notes || null
@@ -3410,13 +3413,14 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
         );
 
         if (prod.type !== 'service' && !prod.is_service && qty > 0) {
+          const localCost = cost * Number(invoiceData.exchange_rate || 1.0);
           await recordGoodsReceipt(
             client,
             companyId,
             receiptData.warehouse_id || null,
             item.product_id,
             qty,
-            cost,
+            localCost,
             receiptId,
             receiptNumber,
             receiptData.date as string
@@ -3427,8 +3431,8 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
             unit_id: item.unit_id || item.unit || 'default',
             quantity: qty,
             direction: 'IN',
-            unit_cost: cost,
-            total_cost: qty * cost,
+            unit_cost: localCost,
+            total_cost: qty * localCost,
             batch_id: item.batch_id || null,
             serial_number: item.serial_number || null,
             notes: item.notes || null
@@ -3478,6 +3482,7 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
           if (prod.type !== 'service' && !prod.is_service) {
             const qty = parseFloat(item.quantity || '0');
             const unitPrice = parseFloat(item.unit_price || '0');
+            const localUnitPrice = unitPrice * Number(invoiceData.exchange_rate || 1.0);
             if (qty > 0) {
               await recordPurchase(
                 client,
@@ -3485,7 +3490,7 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
                 invData.warehouse_id || null,
                 item.product_id,
                 qty,
-                unitPrice,
+                localUnitPrice,
                 invoiceId,
                 invoiceData.invoice_number || `PINV-${invoiceId}`,
                 invoiceData.date
@@ -3533,14 +3538,15 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
           if (prod.type !== 'service' && !prod.is_service) {
             const qty = parseFloat(item.quantity || '0');
             const unitPrice = parseFloat(item.unit_price || item.unit_cost || '0');
+            const localUnitPrice = unitPrice * Number(invoiceData.exchange_rate || 1.0);
             if (qty > 0) {
               movementLines.push({
                 product_id: item.product_id,
                 unit_id: item.unit_id || item.unit || 'default',
                 quantity: qty,
                 direction: 'IN',
-                unit_cost: unitPrice,
-                total_cost: qty * unitPrice,
+                unit_cost: localUnitPrice,
+                total_cost: qty * localUnitPrice,
                 batch_id: item.batch_id || null,
                 serial_number: item.serial_number || null,
                 notes: item.notes || null
@@ -3629,13 +3635,14 @@ router.post('/purchase_returns', authenticateToken, async (req: AuthRequest, res
           if (qty > 0) {
             const returnUnitCost = parseFloat(item.unit_price || '0') || parseFloat(prod.weighted_average_cost || '0') || parseFloat(prod.cost_price || '0');
             itemData.unit_cost = returnUnitCost;
+            const localReturnUnitCost = returnUnitCost * Number(returnData.exchange_rate || 1.0);
             await recordPurchaseReturn(
               client,
               companyId,
               returnData.warehouse_id || null,
               item.product_id,
               qty,
-              returnUnitCost,
+              localReturnUnitCost,
               returnId,
               returnData.return_number || `PRET-${returnId}`,
               returnData.date
@@ -3646,8 +3653,8 @@ router.post('/purchase_returns', authenticateToken, async (req: AuthRequest, res
               unit_id: item.unit_id || item.unit || 'default',
               quantity: qty,
               direction: 'OUT',
-              unit_cost: returnUnitCost,
-              total_cost: qty * returnUnitCost,
+              unit_cost: localReturnUnitCost,
+              total_cost: qty * localReturnUnitCost,
               batch_id: item.batch_id || null,
               serial_number: item.serial_number || null,
               notes: item.notes || null
@@ -3745,13 +3752,14 @@ for (const item of (items || [])) {
           if (qty > 0) {
             const returnUnitCost = parseFloat(item.unit_price || '0') || parseFloat(prod.weighted_average_cost || '0') || parseFloat(prod.cost_price || '0');
             itemData.unit_cost = returnUnitCost;
+            const localReturnUnitCost = returnUnitCost * Number(returnDataFinal.exchange_rate || 1.0);
             await recordPurchaseReturn(
               client,
               companyId,
               returnDataFinal.warehouse_id || null,
               item.product_id,
               qty,
-              returnUnitCost,
+              localReturnUnitCost,
               returnId,
               returnDataFinal.return_number || `PRET-${returnId}`,
               returnDataFinal.date
@@ -3762,8 +3770,8 @@ for (const item of (items || [])) {
               unit_id: item.unit_id || item.unit || 'default',
               quantity: qty,
               direction: 'OUT',
-              unit_cost: returnUnitCost,
-              total_cost: qty * returnUnitCost,
+              unit_cost: localReturnUnitCost,
+              total_cost: qty * localReturnUnitCost,
               batch_id: item.batch_id || null,
               serial_number: item.serial_number || null,
               notes: item.notes || null
@@ -4659,6 +4667,14 @@ router.post('/goods_receipts', authenticateToken, async (req: AuthRequest, res) 
     const movementLines: any[] = [];
     const productsToSync: string[] = [];
 
+    let grRate = 1.0;
+    if (receiptData.source_document_type === 'purchase_order' && receiptData.source_document_id) {
+      const poRes = await client.query('SELECT exchange_rate FROM purchase_orders WHERE id = $1', [receiptData.source_document_id]);
+      if (poRes.rows.length > 0) {
+        grRate = Number(poRes.rows[0].exchange_rate || 1.0);
+      }
+    }
+
     for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('goods_receipt_items', item);
       const itemId = uuidv4();
@@ -4695,13 +4711,14 @@ router.post('/goods_receipts', authenticateToken, async (req: AuthRequest, res) 
       }
 
       if (receiptData.status === 'posted' && prod.type !== 'service' && !prod.is_service && qty > 0) {
+        const localCost = cost * grRate;
         await recordGoodsReceipt(
           client,
           companyId,
           receiptData.warehouse_id || null,
           item.product_id,
           qty,
-          cost,
+          localCost,
           receiptId,
           receiptData.receipt_number,
           receiptData.date as string
@@ -4712,8 +4729,8 @@ router.post('/goods_receipts', authenticateToken, async (req: AuthRequest, res) 
           unit_id: item.unit_id || item.unit || 'default',
           quantity: qty,
           direction: 'IN',
-          unit_cost: cost,
-          total_cost: qty * cost,
+          unit_cost: localCost,
+          total_cost: qty * localCost,
           batch_id: item.batch_id || null,
           serial_number: item.serial_number || null,
           notes: item.notes || null
@@ -4821,6 +4838,14 @@ router.put('/goods_receipts/:id', authenticateToken, async (req: AuthRequest, re
     const movementLines: any[] = [];
     const productsToSync: string[] = [];
 
+    let grRate = 1.0;
+    if (receiptData.source_document_type === 'purchase_order' && receiptData.source_document_id) {
+      const poRes = await client.query('SELECT exchange_rate FROM purchase_orders WHERE id = $1', [receiptData.source_document_id]);
+      if (poRes.rows.length > 0) {
+        grRate = Number(poRes.rows[0].exchange_rate || 1.0);
+      }
+    }
+
     for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('goods_receipt_items', item);
       const itemId = uuidv4();
@@ -4857,13 +4882,14 @@ router.put('/goods_receipts/:id', authenticateToken, async (req: AuthRequest, re
       }
 
       if (receiptData.status === 'posted' && prod.type !== 'service' && !prod.is_service && qty > 0) {
+        const localCost = cost * grRate;
         await recordGoodsReceipt(
           client,
           companyId,
           receiptData.warehouse_id || null,
           item.product_id,
           qty,
-          cost,
+          localCost,
           id,
           rawReceiptData.receipt_number,
           receiptData.date as string
@@ -4874,8 +4900,8 @@ router.put('/goods_receipts/:id', authenticateToken, async (req: AuthRequest, re
           unit_id: item.unit_id || item.unit || 'default',
           quantity: qty,
           direction: 'IN',
-          unit_cost: cost,
-          total_cost: qty * cost,
+          unit_cost: localCost,
+          total_cost: qty * localCost,
           batch_id: item.batch_id || null,
           serial_number: item.serial_number || null,
           notes: item.notes || null
