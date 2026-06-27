@@ -1134,7 +1134,7 @@ export interface InventoryMovementV2 {
   source_document_type?: string | null;
   source_document_id?: string | null;
   movement_date: string;
-  status: 'draft' | 'posted' | 'cancelled';
+  status: 'draft' | 'posted' | 'cancelled' | 'reversed';
   notes?: string | null;
   created_by?: string | null;
   created_at?: string;

@@ -299,4 +299,134 @@ export class InventoryMovementService {
       movement_date: r.movement_date instanceof Date ? r.movement_date.toISOString().split('T')[0] : r.movement_date
     }));
   }
+
+  /**
+   * Reverses an existing inventory movement by creating a matching movement in the opposite direction.
+   */
+  static async reverseMovement(
+    sourceDocumentType: string,
+    sourceDocumentId: string,
+    client: PoolClient | Pool
+  ): Promise<void> {
+    // 1. Fetch the active posted movement for this document
+    const { rows: moves } = await client.query(
+      `SELECT * FROM "inventory_movements_v2" 
+       WHERE "source_document_type" = $1 AND "source_document_id" = $2 AND "status" = 'posted'`,
+      [sourceDocumentType, sourceDocumentId]
+    );
+
+    if (moves.length === 0) return;
+
+    for (const originalMovement of moves) {
+      // Update original movement status to 'reversed'
+      await client.query(
+        `UPDATE "inventory_movements_v2" SET "status" = 'reversed', "updated_at" = NOW() WHERE "id" = $1`,
+        [originalMovement.id]
+      );
+
+      // Update original journal status to 'Reversed'
+      await client.query(
+        `UPDATE "inventory_transaction_journal" 
+         SET "status" = 'Reversed', "cancelled_at" = NOW() 
+         WHERE "movement_id" = $1`,
+        [originalMovement.id]
+      );
+
+      // Fetch original movement lines
+      const { rows: lines } = await client.query(
+        `SELECT * FROM "inventory_movement_lines" WHERE "movement_id" = $1`,
+        [originalMovement.id]
+      );
+
+      if (lines.length === 0) continue;
+
+      // 2. Create Reversal Movement Header
+      const reversalMovementId = uuidv4();
+      const reversalMovement: InventoryMovementV2 = {
+        id: reversalMovementId,
+        company_id: originalMovement.company_id,
+        branch_id: originalMovement.branch_id || null,
+        warehouse_id: originalMovement.warehouse_id || null,
+        movement_number: `${originalMovement.movement_number}-REV`,
+        movement_type: originalMovement.movement_type,
+        source_document_type: originalMovement.source_document_type || null,
+        source_document_id: originalMovement.source_document_id || null,
+        movement_date: new Date().toISOString().split('T')[0],
+        status: 'reversed',
+        notes: `Reversal of movement ${originalMovement.movement_number}`,
+        created_by: originalMovement.created_by || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      await client.query(
+        `INSERT INTO "inventory_movements_v2" (
+          id, company_id, branch_id, warehouse_id, movement_number, movement_type,
+          source_document_type, source_document_id, movement_date, status, notes,
+          created_by, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+        [
+          reversalMovement.id,
+          reversalMovement.company_id,
+          reversalMovement.branch_id,
+          reversalMovement.warehouse_id,
+          reversalMovement.movement_number,
+          reversalMovement.movement_type,
+          reversalMovement.source_document_type,
+          reversalMovement.source_document_id,
+          reversalMovement.movement_date,
+          reversalMovement.status,
+          reversalMovement.notes,
+          reversalMovement.created_by,
+          reversalMovement.created_at,
+          reversalMovement.updated_at
+        ]
+      );
+
+      // 3. Create Reversal Movement Lines with opposite directions
+      const reversalLines: InventoryMovementLine[] = [];
+      for (const origLine of lines) {
+        const revLineId = uuidv4();
+        const oppositeDirection = origLine.direction === 'OUT' ? 'IN' : 'OUT';
+        const revLine: InventoryMovementLine = {
+          id: revLineId,
+          movement_id: reversalMovementId,
+          product_id: origLine.product_id,
+          unit_id: origLine.unit_id,
+          quantity: parseFloat(origLine.quantity),
+          direction: oppositeDirection,
+          unit_cost: parseFloat(origLine.unit_cost || '0'),
+          total_cost: parseFloat(origLine.total_cost || '0'),
+          batch_id: origLine.batch_id || null,
+          serial_number: origLine.serial_number || null,
+          notes: `Reversal line`
+        };
+
+        await client.query(
+          `INSERT INTO "inventory_movement_lines" (
+            id, movement_id, product_id, unit_id, quantity, direction,
+            unit_cost, total_cost, batch_id, serial_number, notes
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+          [
+            revLine.id,
+            revLine.movement_id,
+            revLine.product_id,
+            revLine.unit_id,
+            revLine.quantity,
+            revLine.direction,
+            revLine.unit_cost,
+            revLine.total_cost,
+            revLine.batch_id,
+            revLine.serial_number,
+            revLine.notes
+          ]
+        );
+
+        reversalLines.push(revLine);
+      }
+
+      // 4. Post the reversal movement using the posting service
+      await InventoryPostingService.postMovement(reversalMovement, reversalLines, client);
+    }
+  }
 }

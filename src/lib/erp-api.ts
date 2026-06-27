@@ -72,7 +72,8 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // Helper to get remote IP safely
 function getIp(req: any): string {
-  return req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  if (!req || !req.headers) return 'unknown';
+  return req.headers['x-forwarded-for'] || (req.socket && req.socket.remoteAddress) || 'unknown';
 }
 
 function parseUserAgent(ua: string): { browser: string; os: string; device: string } {
@@ -2047,6 +2048,7 @@ modules.forEach(moduleName => {
              WHERE invoice_id = $1 AND company_id = $2`,
             [id, companyId]
           );
+          await InventoryMovementService.reverseMovement('sales_invoice', id, client);
         }
 
         if (moduleName === 'purchase_invoices') {
@@ -2056,6 +2058,7 @@ modules.forEach(moduleName => {
              WHERE invoice_id = $1 AND company_id = $2`,
             [id, companyId]
           );
+          await InventoryMovementService.reverseMovement('purchase_invoice', id, client);
         }
 
         if (transactionalModules.includes(moduleName)) {
@@ -2241,6 +2244,7 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
 
     console.log(`[ERP] Saving ${items?.length || 0} Invoice Items...`);
     const cogsLines: { account_id: string; account_name: string; debit: number; credit: number; description: string }[] = [];
+    const movementLines: any[] = [];
 
     // Insert Items
     for (const item of (items || [])) {
@@ -2271,6 +2275,18 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
             
             itemData.unit_cost = costInfo.unitCost;
             itemData.total_cost = costInfo.totalCost;
+
+            movementLines.push({
+              product_id: item.product_id,
+              unit_id: item.unit_id || item.unit || 'default',
+              quantity: quantity,
+              direction: 'OUT',
+              unit_cost: costInfo.unitCost,
+              total_cost: costInfo.totalCost,
+              batch_id: item.batch_id || null,
+              serial_number: item.serial_number || null,
+              notes: item.notes || null
+            });
             itemData.costing_method_used = costInfo.methodUsed;
 
             // Prepare perpetual queue / continuous inventory posting
@@ -2340,6 +2356,23 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
     const productIdsToSync = (items || []).filter((i: any) => i.product_id).map((i: any) => i.product_id);
     if (productIdsToSync.length > 0) {
       await syncProductsCostAndJEs(client, companyId, productIdsToSync);
+    }
+
+    // New Inventory Movement Engine integration (Phase 5)
+    if (movementLines.length > 0) {
+      await InventoryMovementService.createMovement({
+        company_id: invoiceData.company_id || companyId,
+        branch_id: invoiceData.branch_id || req.body.branch_id || null,
+        warehouse_id: invoiceData.warehouse_id || null,
+        movement_number: invoiceData.invoice_number || `INV-${invoiceId}`,
+        movement_type: 'sales',
+        source_document_type: 'sales_invoice',
+        source_document_id: invoiceId,
+        movement_date: invoiceData.date,
+        status: 'posted',
+        notes: invoiceData.notes || null,
+        created_by: req.user?.id || invoiceData.created_by || null
+      }, movementLines, client);
     }
 
     await client.query('COMMIT');
@@ -2431,10 +2464,13 @@ router.put('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
     // Sync Items
     await client.query('DELETE FROM invoice_items WHERE invoice_id = $1', [invoiceId]);
     await reverseAndRecalculate(client, companyId || '', invoiceId);
+    await InventoryMovementService.reverseMovement('sales_invoice', invoiceId, client);
 
     const invData = invoiceData;
     const cogsLines: { account_id: string; account_name: string; debit: number; credit: number; description: string }[] = [];
-for (const item of (items || [])) {
+    const movementLines: any[] = [];
+
+    for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('invoice_items', item);
       const itemId = uuidv4();
       const itemData = { ...sanitizedItem, id: itemId, invoice_id: invoiceId };
@@ -2462,6 +2498,18 @@ for (const item of (items || [])) {
             
             itemData.unit_cost = costInfo.unitCost;
             itemData.total_cost = costInfo.totalCost;
+
+            movementLines.push({
+              product_id: item.product_id,
+              unit_id: item.unit_id || item.unit || 'default',
+              quantity: quantity,
+              direction: 'OUT',
+              unit_cost: costInfo.unitCost,
+              total_cost: costInfo.totalCost,
+              batch_id: item.batch_id || null,
+              serial_number: item.serial_number || null,
+              notes: item.notes || null
+            });
             itemData.costing_method_used = costInfo.methodUsed;
 
             // Prepare perpetual queue / continuous inventory posting
@@ -2531,6 +2579,23 @@ for (const item of (items || [])) {
     const productIdsToSync = (items || []).filter((i: any) => i.product_id).map((i: any) => i.product_id);
     if (productIdsToSync.length > 0) {
       await syncProductsCostAndJEs(client, companyId, productIdsToSync);
+    }
+
+    // New Inventory Movement Engine integration (Phase 5)
+    if (movementLines.length > 0) {
+      await InventoryMovementService.createMovement({
+        company_id: invoiceData.company_id || companyId,
+        branch_id: invoiceData.branch_id || req.body.branch_id || null,
+        warehouse_id: invoiceData.warehouse_id || null,
+        movement_number: invoiceData.invoice_number || `INV-${invoiceId}`,
+        movement_type: 'sales',
+        source_document_type: 'sales_invoice',
+        source_document_id: invoiceId,
+        movement_date: invoiceData.date,
+        status: 'posted',
+        notes: invoiceData.notes || null,
+        created_by: req.user?.id || invoiceData.created_by || null
+      }, movementLines, client);
     }
 
     await client.query('COMMIT');

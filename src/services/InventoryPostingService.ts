@@ -41,7 +41,7 @@ export class InventoryPostingService {
         afterQty = beforeQty - quantity;
         // Constraint check: Negative stock is not allowed
         if (afterQty < 0) {
-          throw new Error(`Negative stock is not allowed. Product ID: ${productId}, Current Stock: ${beforeQty}, Attempted Draw: ${quantity}`);
+          throw new Error(`الكمية المطلوبة غير متوفرة في المخزن لهذا المنتج. الرصيد الحالي: ${beforeQty}، الكمية المطلوبة: ${quantity} (Negative stock is not allowed. Product ID: ${productId})`);
         }
         afterCost = beforeCost; // Cost remains unchanged on outflow under Moving Average
       }
