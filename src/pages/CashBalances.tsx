@@ -580,12 +580,13 @@ export const CashBalances: React.FC = () => {
                       const isInflow = col.type === 'inflow';
                       const isOutflow = col.type === 'outflow';
 
+                      const numVal = Number(value) || 0;
+
                       let textColor = 'text-zinc-900';
                       if (isInflow) textColor = 'text-emerald-600';
                       if (isOutflow) textColor = 'text-rose-600';
                       if (isBalance) {
-                        const num = Number(value) || 0;
-                        textColor = num >= 0 ? 'text-emerald-700 font-bold' : 'text-rose-600 font-bold';
+                        textColor = numVal >= 0 ? 'text-emerald-700 font-bold' : 'text-rose-600 font-bold';
                       }
 
                       return (
@@ -593,7 +594,7 @@ export const CashBalances: React.FC = () => {
                           key={col.id} 
                           className={`px-4 py-3.5 text-sm border-l border-zinc-100 ${isMeta ? 'font-medium' : 'text-center font-black'} ${textColor}`}
                         >
-                          {isMeta ? (value as string) : (value > 0.001 || value < -0.001 ? formatNumber(Number(value)) : '-')}
+                          {isMeta ? (value as string) : (numVal > 0.001 || numVal < -0.001 ? formatNumber(numVal) : '-')}
                         </td>
                       );
                     })}
