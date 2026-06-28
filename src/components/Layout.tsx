@@ -137,7 +137,7 @@ const getTabIcon = (id: string) => {
     case 'customer_balances':
     case 'sales_report':
     case 'supplier_balances':
-    case 'cash_report':
+    // case 'cash_report':
     case 'cash_balances':
     case 'expenses_report':
     case 'trial_balance':
@@ -410,7 +410,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'supplier_balances', label: t('nav.supplier_balances'), icon: BarChart3 },
           { id: 'div_purchases', isDivider: true },
           { id: 'h_cash', label: language === 'ar' ? 'النقدية والمصروفات' : 'Cash & Expenses', isHeader: true },
-          { id: 'cash_report', label: t('nav.cash_report'), icon: BarChart3 },
+          // { id: 'cash_report', label: t('nav.cash_report'), icon: BarChart3 },
           { id: 'cash_balances', label: t('nav.cash_balances'), icon: BarChart3 },
           { id: 'expenses_report', label: t('nav.expenses_report'), icon: BarChart3 },
           { id: 'div_cash', isDivider: true },

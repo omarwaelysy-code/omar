@@ -92,7 +92,7 @@ export const en = {
   'nav.sales_report': 'Sales Report',
   'nav.expenses_report': 'Expenses Report',
   'nav.cash_report': 'Cash Report',
-  'nav.cash_balances': 'Cash Balances',
+  'nav.cash_balances': 'Cash & Bank Report (Period)',
   'nav.admin': 'Administration',
   'nav.company_settings': 'Company Settings',
   'nav.users': 'User Management',

@@ -37,7 +37,7 @@ import { CustomerBalances } from './pages/CustomerBalances';
 import { SupplierBalances } from './pages/SupplierBalances';
 import { SalesReport } from './pages/SalesReport';
 import { ExpensesReport } from './pages/ExpensesReport';
-import { CashReport } from './pages/CashReport';
+// import { CashReport } from './pages/CashReport';
 import { CashBalances } from './pages/CashBalances';
 import { ActivityLogPage } from './pages/ActivityLog';
 import { CompanySettings } from './pages/CompanySettings';
@@ -205,7 +205,7 @@ export default function App() {
       case 'supplier_balances': return <SupplierBalances />;
       case 'sales_report': return <SalesReport />;
       case 'expenses_report': return <ExpensesReport />;
-      case 'cash_report': return <CashReport />;
+      // case 'cash_report': return <CashReport />;
       case 'cash_balances': return <CashBalances />;
       case 'account_types': return <AccountTypes />;
       case 'accounts': return <Accounts />;

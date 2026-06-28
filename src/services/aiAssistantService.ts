@@ -261,7 +261,6 @@ export async function processAIRequest(prompt: string, user: User): Promise<{ te
       - supplier_balances (أرصدة الموردين)
       - sales_report (تقرير المبيعات)
       - expenses_report (تقرير المصروفات)
-      - cash_report (تقرير الخزينة والبنك)
       - activity_log (سجل الأنشطة)
       - users (المستخدمين)
       - settings (الإعدادات)

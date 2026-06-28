@@ -58,7 +58,7 @@ export const Users: React.FC = () => {
     { id: 'supplier_balances', label: t('nav.supplier_balances') },
     { id: 'sales_report', label: t('nav.sales_report') },
     { id: 'expenses_report', label: t('nav.expenses_report') },
-    { id: 'cash_report', label: t('nav.cash_report') },
+    // { id: 'cash_report', label: t('nav.cash_report') },
     { id: 'cash_balances', label: t('nav.cash_balances') },
     { id: 'users', label: t('nav.users') },
     { id: 'backup_restore', label: t('nav.backup_restore') },

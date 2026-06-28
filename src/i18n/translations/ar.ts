@@ -93,7 +93,7 @@ export const ar = {
   'nav.sales_report': 'تقرير المبيعات',
   'nav.expenses_report': 'تقرير المصروفات',
   'nav.cash_report': 'تقرير الخزينة',
-  'nav.cash_balances': 'أرصدة الخزائن',
+  'nav.cash_balances': 'تقرير النقدية (الخزائن والبنوك)',
   'nav.admin': 'الإدارة',
   'nav.company_settings': 'بيانات الشركة',
   'nav.users': 'إدارة المستخدمين',

@@ -1,150 +1,34 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { PaymentMethod, JournalEntry } from '../types';
-import { Calendar, Download, Printer, Wallet, ArrowLeftRight, BarChart3, RefreshCcw } from 'lucide-react';
+import { Calendar, Download, Printer, Wallet, ArrowLeftRight, BarChart3, RefreshCcw, Search } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
 import { formatNumber } from '../utils/formatUtils';
 
-const isDefaultMethodForAccount = (method: any, sharingMethods: any[]) => {
-  if (sharingMethods.length === 1) return true;
-  const hasCashInName = (name: string) => {
-    const n = name.toLowerCase();
-    return n === 'كاش' || n === 'cash' || n === 'الخزينة الرئيسية' || n === 'الخزنة الرئيسية';
-  };
-  const cashMethod = sharingMethods.find(p => hasCashInName(p.name));
-  if (cashMethod) return method.id === cashMethod.id;
-  const sorted = [...sharingMethods].sort((a, b) => a.name.localeCompare(b.name));
-  return method.id === sorted[0].id;
-};
-
-const resolvePaymentMethodForLine = (
-  line: any,
-  paymentMethods: PaymentMethod[],
-  invoices?: any[],
-  purchaseInvoices?: any[]
-) => {
-  const sharingMethods = paymentMethods.filter(p => p.account_id === line.account_id);
-  if (sharingMethods.length === 0) return null;
-
-  // 1. Strict sub_account match
-  if (line.sub_account_id && line.sub_account_type === 'payment_method') {
-    const pm = sharingMethods.find(p => p.id === line.sub_account_id);
-    if (pm) return pm;
-  }
-
-  // 2. Opening Balance match
-  if (line.reference_type === 'opening_balance') {
-    const ref = line.reference_id || line.reference;
-    if (ref) {
-      const pm = sharingMethods.find(p => p.id === ref || p.code === ref || p.name === ref);
-      if (pm) return pm;
-    }
-  }
-
-  // 3. Invoice / Purchase Invoice lookup if arrays are provided
-  if (!line.sub_account_id && line.reference_id) {
-    if (line.reference_type === 'invoice' && invoices) {
-      const invoice = invoices.find(i => i.id === line.reference_id);
-      if (invoice && invoice.payment_type === 'cash' && invoice.payment_method_id) {
-        const pm = sharingMethods.find(p => p.id === invoice.payment_method_id);
-        if (pm) return pm;
-      }
-    } else if (line.reference_type === 'purchase_invoice' && purchaseInvoices) {
-      const pInvoice = purchaseInvoices.find(i => i.id === line.reference_id);
-      if (pInvoice && pInvoice.payment_type === 'cash' && pInvoice.payment_method_id) {
-        const pm = sharingMethods.find(p => p.id === pInvoice.payment_method_id);
-        if (pm) return pm;
-      }
-    }
-  }
-
-  // 4. If only one safe points to this account, it must be it
-  if (sharingMethods.length === 1) {
-    return sharingMethods[0];
-  }
-
-  const matchDesc = (desc: string, method: PaymentMethod) => {
-    if (!desc) return false;
-    const hasName = desc.includes(method.name) || (method.code && desc.includes(method.code));
-    if (!hasName) return false;
-
-    const longerMatch = sharingMethods.find(other => {
-      if (other.id === method.id) return false;
-      if (other.name.length <= method.name.length) return false;
-      if (!other.name.includes(method.name)) return false;
-      return desc.includes(other.name) || (other.code && desc.includes(other.code));
-    });
-    return !longerMatch;
-  };
-
-  let matchedMethod = null;
-  const descToUse = line.description || '';
-
-  // 5. Transfer matching
-  if (line.reference_type === 'transfer' || line.reference_type === 'cash_transfer' || descToUse.includes('تحويل')) {
-    for (const method of sharingMethods) {
-      let isMatch = false;
-      const isToUs = descToUse.includes(`إلى ${method.name}`) || descToUse.includes(`وارد ${method.name}`);
-      const isFromUs = descToUse.includes(`من ${method.name}`) || descToUse.includes(`صادر ${method.name}`);
-
-      const debit = Number(line.debit) || 0;
-      const credit = Number(line.credit) || 0;
-
-      if (debit > 0) isMatch = isToUs || (matchDesc(descToUse, method) && !isFromUs);
-      else if (credit > 0) isMatch = isFromUs || (matchDesc(descToUse, method) && !isToUs);
-      else isMatch = matchDesc(descToUse, method);
-
-      if (isMatch) {
-        matchedMethod = method;
-        break;
-      }
-    }
-  } else {
-    for (const method of sharingMethods) {
-      if (matchDesc(descToUse, method)) {
-        matchedMethod = method;
-        break;
-      }
-    }
-  }
-
-  if (matchedMethod) return matchedMethod;
-
-  // 6. Fallback to default safe
-  const defaultMethod = sharingMethods.find(method => isDefaultMethodForAccount(method, sharingMethods));
-  return defaultMethod || sharingMethods[0];
-};
-
 interface CashBalanceData {
   id: string;
+  code: string;
   name: string;
-  opening: {
-    in: number;
-    out: number;
-    balance: number;
-  };
-  movement: {
-    in: number;
-    out: number;
-  };
-  closing: {
-    in: number;
-    out: number;
-    balance: number;
-  };
+  openingBalance: number;
+  incoming: number;
+  outgoing: number;
+  balance: number;
 }
 
 export const CashBalances: React.FC = () => {
   const { user } = useAuth();
+  const { t, dir, language } = useLanguage();
   const reportRef = useRef<HTMLDivElement>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [dateRange, setDateRange] = useState({
-    start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+    start: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], // First day of current year
     end: new Date().toISOString().split('T')[0]
   });
   const [balances, setBalances] = useState<CashBalanceData[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -172,8 +56,6 @@ export const CashBalances: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       if (!user) return;
-      
-      // If we don't have payment methods yet, or the list is empty, we finish loading
       if (paymentMethods.length === 0) {
         if (!loading) return; 
         setLoading(false);
@@ -183,11 +65,9 @@ export const CashBalances: React.FC = () => {
       setError(null);
       setLoading(true);
       try {
-        const [paymentMethodsData, journalEntries, invoices, purchaseInvoices] = await Promise.all([
+        const [paymentMethodsData, journalEntries] = await Promise.all([
           dbService.list<PaymentMethod>('payment_methods', user.company_id),
-          dbService.list<JournalEntry>('journal_entries', user.company_id),
-          dbService.list<any>('invoices', user.company_id),
-          dbService.list<any>('purchase_invoices', user.company_id)
+          dbService.list<JournalEntry>('journal_entries', user.company_id)
         ]);
 
         const startStr = dateRange.start;
@@ -199,28 +79,16 @@ export const CashBalances: React.FC = () => {
           let movIn = 0;
           let movOut = 0;
 
-          // Process ALL journal entries for this method's account
+          // Process journal entries for this payment method
           journalEntries.forEach(je => {
             const jeDateStr = (je.date || '').slice(0, 10);
 
             je.items?.forEach((item: any) => {
-              const resolvedMethod = resolvePaymentMethodForLine(
-                {
-                  account_id: item.account_id,
-                  sub_account_id: item.sub_account_id,
-                  sub_account_type: item.sub_account_type,
-                  reference_type: je.reference_type,
-                  reference_id: je.reference_id,
-                  reference: je.reference_number,
-                  description: item.description || je.description,
-                  debit: Number(item.debit) || 0,
-                  credit: Number(item.credit) || 0
-                },
-                paymentMethodsData,
-                invoices,
-                purchaseInvoices
-              );
-              const isMatch = resolvedMethod?.id === method.id;
+              // Rule: account matches the payment method's account_id and sub_account matches the payment method's id
+              const isMatch = 
+                item.account_id === method.account_id &&
+                item.sub_account_type === 'payment_method' &&
+                item.sub_account_id === method.id;
 
               if (isMatch) {
                 const amountDebit = Number(item.debit || 0);
@@ -237,29 +105,19 @@ export const CashBalances: React.FC = () => {
             });
           });
 
-          const opBalance = opIn - opOut;
-          const clBalance = opBalance + (movIn - movOut);
-
-          const netOpIn = opBalance >= 0 ? opBalance : 0;
-          const netOpOut = opBalance < 0 ? Math.abs(opBalance) : 0;
+          // Beginning Balance = Method's Opening Balance + Debits before start - Credits before start
+          const baseOpening = Number(method.opening_balance || 0);
+          const beginningBalance = baseOpening + opIn - opOut;
+          const endingBalance = beginningBalance + movIn - movOut;
 
           return {
             id: method.id,
+            code: method.code || '-',
             name: method.name,
-            opening: {
-              in: netOpIn,
-              out: netOpOut,
-              balance: opBalance
-            },
-            movement: {
-              in: movIn,
-              out: movOut
-            },
-            closing: {
-              in: netOpIn + movIn,
-              out: netOpOut + movOut,
-              balance: clBalance
-            }
+            openingBalance: beginningBalance,
+            incoming: movIn,
+            outgoing: movOut,
+            balance: endingBalance
           };
         });
 
@@ -280,58 +138,60 @@ export const CashBalances: React.FC = () => {
     setRefreshTrigger(prev => prev + 1);
   };
 
-  const totals = balances.reduce((acc, b) => ({
-    opIn: Number(acc.opIn) + Number(b.opening.in),
-    opOut: Number(acc.opOut) + Number(b.opening.out),
-    movIn: Number(acc.movIn) + Number(b.movement.in),
-    movOut: Number(acc.movOut) + Number(b.movement.out),
-    clIn: Number(acc.clIn) + Number(b.closing.in),
-    clOut: Number(acc.clOut) + Number(b.closing.out),
-    clBal: Number(acc.clBal) + Number(b.closing.balance)
-  }), { opIn: 0, opOut: 0, movIn: 0, movOut: 0, clIn: 0, clOut: 0, clBal: 0 });
+  const filteredBalances = balances.filter(b => 
+    b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    b.code.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const totals = filteredBalances.reduce((acc, b) => ({
+    openingBalance: acc.openingBalance + b.openingBalance,
+    incoming: acc.incoming + b.incoming,
+    outgoing: acc.outgoing + b.outgoing,
+    balance: acc.balance + b.balance
+  }), { openingBalance: 0, incoming: 0, outgoing: 0, balance: 0 });
 
   const handleExportPDF = async () => {
     if (reportRef.current) {
       await exportToPDF(reportRef.current, { 
-        filename: 'Cash_Balances', 
+        filename: 'Cash_Balances_Report', 
         orientation: 'landscape',
-        reportTitle: 'ميزان مراجعة الخزائن والبنوك'
+        reportTitle: language === 'ar' ? 'تقرير النقدية (الخزائن والبنوك) خلال فترة' : 'Cash & Bank Report (Period)'
       });
     }
   };
 
   const handleExportExcel = () => {
-    const data = balances.map(b => ({
-      'الحساب': b.name,
-      'رصيد أول وارد': b.opening.in,
-      'رصيد أول صادر': b.opening.out,
-      'حركة وارد': b.movement.in,
-      'حركة صادر': b.movement.out,
-      'رصيد آخر وارد': b.closing.in,
-      'رصيد آخر صادر': b.closing.out,
-      'الرصيد النهائي': b.closing.balance
+    const data = filteredBalances.map(b => ({
+      [language === 'ar' ? 'كود طريقة السداد' : 'Payment Method Code']: b.code,
+      [language === 'ar' ? 'اسم طريقة السداد' : 'Payment Method Name']: b.name,
+      [language === 'ar' ? 'رصيد أول الفترة' : 'Beginning Balance']: b.openingBalance,
+      [language === 'ar' ? 'الوارد' : 'Incoming']: b.incoming,
+      [language === 'ar' ? 'المنصرف' : 'Outgoing']: b.outgoing,
+      [language === 'ar' ? 'الرصيد' : 'Balance']: b.balance
     }));
-    exportToExcel(data, { filename: 'Cash_Balances' });
+    exportToExcel(data, { filename: 'Cash_Balances_Report' });
   };
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
         <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-zinc-500 font-medium italic animate-pulse">جاري تحميل البيانات...</p>
+        <p className="text-zinc-500 font-medium italic animate-pulse">
+          {language === 'ar' ? 'جاري تحميل البيانات...' : 'Loading data...'}
+        </p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4 p-8 bg-emerald-50 rounded-3xl border border-emerald-100 italic">
-        <p className="text-emerald-600 font-bold">{error}</p>
+      <div className="flex flex-col items-center justify-center h-64 gap-4 p-8 bg-rose-50 rounded-3xl border border-rose-100 italic">
+        <p className="text-rose-600 font-bold">{error}</p>
         <button 
-          onClick={() => window.location.reload()}
-          className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all"
+          onClick={handleRefresh}
+          className="px-6 py-2 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-all"
         >
-          إعادة المحاولة
+          {language === 'ar' ? 'إعادة المحاولة' : 'Try Again'}
         </button>
       </div>
     );
@@ -339,25 +199,43 @@ export const CashBalances: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-zinc-900">ميزان مراجعة الخزائن</h2>
-          <p className="text-zinc-500 font-medium mt-1">عرض أرصدة وحركات كافة الخزائن والبنوك</p>
+          <h2 className="text-2xl font-black text-zinc-900">
+            {language === 'ar' ? 'تقرير النقدية (الخزائن والبنوك) خلال فترة' : 'Cash & Bank Report (Period)'}
+          </h2>
+          <p className="text-zinc-500 font-medium mt-1">
+            {language === 'ar' ? 'عرض أرصدة وحركات الخزائن والبنوك خلال فترة محددة' : 'View cash and bank balances and movements during a period'}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <button 
             onClick={handleRefresh}
-            className="p-3 bg-white border border-zinc-200 text-zinc-600 rounded-2xl hover:bg-zinc-50 hover:text-emerald-600 transition-all hover:scale-105 active:scale-95 shadow-sm"
-            title="تحديث البيانات"
+            className="p-3 bg-white border border-zinc-200 text-zinc-600 rounded-2xl hover:bg-zinc-50 hover:text-emerald-600 transition-all hover:scale-105 active:scale-95 shadow-sm cursor-pointer"
+            title={language === 'ar' ? 'تحديث البيانات' : 'Refresh Data'}
           >
             <RefreshCcw size={20} className={loading ? 'animate-spin' : ''} />
           </button>
-          <button onClick={handleExportPDF} className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 transition-all shadow-sm"><Printer size={20} /></button>
-          <button onClick={handleExportExcel} className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 transition-all shadow-sm"><Download size={20} /></button>
+          <button 
+            onClick={handleExportPDF} 
+            className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 transition-all shadow-sm cursor-pointer"
+            title={language === 'ar' ? 'طباعة PDF' : 'Export PDF'}
+          >
+            <Printer size={20} />
+          </button>
+          <button 
+            onClick={handleExportExcel} 
+            className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 transition-all shadow-sm cursor-pointer"
+            title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+          >
+            <Download size={20} />
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Filters */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="relative">
           <Calendar className="absolute right-3 top-3 text-zinc-400" size={20} />
           <input
@@ -376,54 +254,92 @@ export const CashBalances: React.FC = () => {
             onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
           />
         </div>
+        <div className="relative">
+          <Search className="absolute right-3 top-3 text-zinc-400" size={20} />
+          <input
+            type="text"
+            placeholder={language === 'ar' ? 'بحث باسم أو كود طريقة السداد...' : 'Search by name or code...'}
+            className="w-full pr-10 pl-4 py-3 bg-white border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
       </div>
 
+      {/* Table */}
       <div ref={reportRef} className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-right border-collapse">
             <thead>
-              <tr className="bg-zinc-100 border-b border-zinc-200">
-                <th rowSpan={2} className="px-6 py-4 text-sm font-bold text-zinc-700 border-l border-zinc-200">الحساب</th>
-                <th colSpan={2} className="px-6 py-2 text-sm font-bold text-zinc-700 text-center border-b border-zinc-200 border-l border-zinc-200">رصيد أول</th>
-                <th colSpan={2} className="px-6 py-2 text-sm font-bold text-zinc-700 text-center border-b border-zinc-200 border-l border-zinc-200">الحركة</th>
-                <th colSpan={2} className="px-6 py-2 text-sm font-bold text-zinc-700 text-center border-b border-zinc-200 border-l border-zinc-200">المجاميع</th>
-                <th rowSpan={2} className="px-6 py-4 text-sm font-bold text-zinc-700 text-center">الرصيد النهائي</th>
-              </tr>
               <tr className="bg-zinc-50 border-b border-zinc-200">
-                <th className="px-4 py-2 text-xs font-bold text-zinc-600 text-center border-l border-zinc-200">وارد</th>
-                <th className="px-4 py-2 text-xs font-bold text-zinc-600 text-center border-l border-zinc-200">صادر</th>
-                <th className="px-4 py-2 text-xs font-bold text-zinc-600 text-center border-l border-zinc-200">وارد</th>
-                <th className="px-4 py-2 text-xs font-bold text-zinc-600 text-center border-l border-zinc-200">صادر</th>
-                <th className="px-4 py-2 text-xs font-bold text-zinc-600 text-center border-l border-zinc-200">وارد</th>
-                <th className="px-4 py-2 text-xs font-bold text-zinc-600 text-center border-l border-zinc-200">صادر</th>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 border-l border-zinc-200">
+                  {language === 'ar' ? 'كود طريقة السداد' : 'Payment Method Code'}
+                </th>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 border-l border-zinc-200">
+                  {language === 'ar' ? 'اسم طريقة السداد' : 'Payment Method Name'}
+                </th>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center border-l border-zinc-200">
+                  {language === 'ar' ? 'رصيد أول الفترة' : 'Beginning Balance'}
+                </th>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center border-l border-zinc-200">
+                  {language === 'ar' ? 'الوارد' : 'Incoming'}
+                </th>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center border-l border-zinc-200">
+                  {language === 'ar' ? 'المنصرف' : 'Outgoing'}
+                </th>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center">
+                  {language === 'ar' ? 'الرصيد' : 'Balance'}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
-              {balances.map((b) => (
-                <tr key={b.id} className="hover:bg-zinc-50/50 transition-colors">
-                  <td className="px-6 py-4 text-sm font-bold text-zinc-900 border-l border-zinc-100">{b.name}</td>
-                  <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.opening.in > 0 ? formatNumber(b.opening.in) : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-zinc-500 text-center border-l border-zinc-100">{b.opening.out > 0 ? formatNumber(b.opening.out) : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.movement.in > 0 ? formatNumber(b.movement.in) : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-zinc-500 text-center border-l border-zinc-100">{b.movement.out > 0 ? formatNumber(b.movement.out) : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">{b.closing.in > 0 ? formatNumber(b.closing.in) : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-zinc-500 text-center border-l border-zinc-100">{b.closing.out > 0 ? formatNumber(b.closing.out) : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-center">
-                    <span className={b.closing.balance >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
-                      {formatNumber(b.closing.balance)}
-                    </span>
+              {filteredBalances.length > 0 ? (
+                filteredBalances.map((b) => (
+                  <tr key={b.id} className="hover:bg-zinc-50/50 transition-colors">
+                    <td className="px-6 py-4 text-sm font-medium text-zinc-500 border-l border-zinc-100">{b.code}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-zinc-900 border-l border-zinc-100">{b.name}</td>
+                    <td className="px-6 py-4 text-sm font-black text-center border-l border-zinc-100 text-zinc-600">
+                      {formatNumber(b.openingBalance)}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">
+                      {b.incoming > 0 ? formatNumber(b.incoming) : '-'}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-black text-rose-600 text-center border-l border-zinc-100">
+                      {b.outgoing > 0 ? formatNumber(b.outgoing) : '-'}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-black text-center">
+                      <span className={b.balance >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
+                        {formatNumber(b.balance)}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-zinc-400 italic">
+                    {language === 'ar' ? 'لا توجد بيانات تطابق البحث' : 'No data matching the search'}
                   </td>
                 </tr>
-              ))}
+              )}
+              {/* Totals Row */}
               <tr className="bg-zinc-900 text-white font-black">
-                <td className="px-6 py-4 text-sm text-center">الإجمالي</td>
-                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.opIn)}</td>
-                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.opOut)}</td>
-                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.movIn)}</td>
-                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.movOut)}</td>
-                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.clIn)}</td>
-                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.clOut)}</td>
-                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.clBal)}</td>
+                <td colSpan={2} className="px-6 py-4 text-sm text-center border-l border-zinc-800">
+                  {language === 'ar' ? 'الإجمالي' : 'Total'}
+                </td>
+                <td className="px-6 py-4 text-sm text-center border-l border-zinc-800">
+                  {formatNumber(totals.openingBalance)}
+                </td>
+                <td className="px-6 py-4 text-sm text-center border-l border-zinc-800 text-emerald-400">
+                  {formatNumber(totals.incoming)}
+                </td>
+                <td className="px-6 py-4 text-sm text-center border-l border-zinc-800 text-rose-400">
+                  {formatNumber(totals.outgoing)}
+                </td>
+                <td className="px-6 py-4 text-sm text-center">
+                  <span className={totals.balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                    {formatNumber(totals.balance)}
+                  </span>
+                </td>
               </tr>
             </tbody>
           </table>
