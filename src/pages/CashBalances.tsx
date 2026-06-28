@@ -14,7 +14,9 @@ interface CashBalanceData {
   name: string;
   openingBalance: number;
   incoming: number;
+  transferIn: number;
   outgoing: number;
+  transferOut: number;
   balance: number;
 }
 
@@ -78,10 +80,13 @@ export const CashBalances: React.FC = () => {
           let opOut = 0;
           let movIn = 0;
           let movOut = 0;
+          let transferIn = 0;
+          let transferOut = 0;
 
           // Process journal entries for this payment method
           journalEntries.forEach(je => {
             const jeDateStr = (je.date || '').slice(0, 10);
+            const isTransfer = je.reference_type === 'transfer' || je.reference_type === 'cash_transfer';
 
             je.items?.forEach((item: any) => {
               // Rule: account matches the payment method's account_id and sub_account matches the payment method's id
@@ -98,8 +103,13 @@ export const CashBalances: React.FC = () => {
                   opIn += amountDebit;
                   opOut += amountCredit;
                 } else if ((!startStr || jeDateStr >= startStr) && (!endStr || jeDateStr <= endStr)) {
-                  movIn += amountDebit;
-                  movOut += amountCredit;
+                  if (isTransfer) {
+                    transferIn += amountDebit;
+                    transferOut += amountCredit;
+                  } else {
+                    movIn += amountDebit;
+                    movOut += amountCredit;
+                  }
                 }
               }
             });
@@ -108,7 +118,7 @@ export const CashBalances: React.FC = () => {
           // Beginning Balance = Method's Opening Balance + Debits before start - Credits before start
           const baseOpening = Number(method.opening_balance || 0);
           const beginningBalance = baseOpening + opIn - opOut;
-          const endingBalance = beginningBalance + movIn - movOut;
+          const endingBalance = beginningBalance + movIn + transferIn - movOut - transferOut;
 
           return {
             id: method.id,
@@ -116,7 +126,9 @@ export const CashBalances: React.FC = () => {
             name: method.name,
             openingBalance: beginningBalance,
             incoming: movIn,
+            transferIn: transferIn,
             outgoing: movOut,
+            transferOut: transferOut,
             balance: endingBalance
           };
         });
@@ -146,9 +158,11 @@ export const CashBalances: React.FC = () => {
   const totals = filteredBalances.reduce((acc, b) => ({
     openingBalance: acc.openingBalance + b.openingBalance,
     incoming: acc.incoming + b.incoming,
+    transferIn: acc.transferIn + b.transferIn,
     outgoing: acc.outgoing + b.outgoing,
+    transferOut: acc.transferOut + b.transferOut,
     balance: acc.balance + b.balance
-  }), { openingBalance: 0, incoming: 0, outgoing: 0, balance: 0 });
+  }), { openingBalance: 0, incoming: 0, transferIn: 0, outgoing: 0, transferOut: 0, balance: 0 });
 
   const handleExportPDF = async () => {
     if (reportRef.current) {
@@ -166,7 +180,9 @@ export const CashBalances: React.FC = () => {
       [language === 'ar' ? 'اسم طريقة السداد' : 'Payment Method Name']: b.name,
       [language === 'ar' ? 'رصيد أول الفترة' : 'Beginning Balance']: b.openingBalance,
       [language === 'ar' ? 'الوارد' : 'Incoming']: b.incoming,
+      [language === 'ar' ? 'تحويل وارد' : 'Incoming Transfer']: b.transferIn,
       [language === 'ar' ? 'المنصرف' : 'Outgoing']: b.outgoing,
+      [language === 'ar' ? 'تحويل منصرف' : 'Outgoing Transfer']: b.transferOut,
       [language === 'ar' ? 'الرصيد' : 'Balance']: b.balance
     }));
     exportToExcel(data, { filename: 'Cash_Balances_Report' });
@@ -285,7 +301,13 @@ export const CashBalances: React.FC = () => {
                   {language === 'ar' ? 'الوارد' : 'Incoming'}
                 </th>
                 <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center border-l border-zinc-200">
+                  {language === 'ar' ? 'تحويل وارد' : 'Incoming Transfer'}
+                </th>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center border-l border-zinc-200">
                   {language === 'ar' ? 'المنصرف' : 'Outgoing'}
+                </th>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center border-l border-zinc-200">
+                  {language === 'ar' ? 'تحويل منصرف' : 'Outgoing Transfer'}
                 </th>
                 <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center">
                   {language === 'ar' ? 'الرصيد' : 'Balance'}
@@ -304,8 +326,14 @@ export const CashBalances: React.FC = () => {
                     <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100">
                       {b.incoming > 0 ? formatNumber(b.incoming) : '-'}
                     </td>
+                    <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center border-l border-zinc-100 bg-emerald-50/20">
+                      {b.transferIn > 0 ? formatNumber(b.transferIn) : '-'}
+                    </td>
                     <td className="px-6 py-4 text-sm font-black text-rose-600 text-center border-l border-zinc-100">
                       {b.outgoing > 0 ? formatNumber(b.outgoing) : '-'}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-black text-rose-600 text-center border-l border-zinc-100 bg-rose-50/20">
+                      {b.transferOut > 0 ? formatNumber(b.transferOut) : '-'}
                     </td>
                     <td className="px-6 py-4 text-sm font-black text-center">
                       <span className={b.balance >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
@@ -316,7 +344,7 @@ export const CashBalances: React.FC = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-zinc-400 italic">
+                  <td colSpan={8} className="px-6 py-8 text-center text-zinc-400 italic">
                     {language === 'ar' ? 'لا توجد بيانات تطابق البحث' : 'No data matching the search'}
                   </td>
                 </tr>
@@ -332,8 +360,14 @@ export const CashBalances: React.FC = () => {
                 <td className="px-6 py-4 text-sm text-center border-l border-zinc-800 text-emerald-400">
                   {formatNumber(totals.incoming)}
                 </td>
+                <td className="px-6 py-4 text-sm text-center border-l border-zinc-800 text-emerald-300">
+                  {formatNumber(totals.transferIn)}
+                </td>
                 <td className="px-6 py-4 text-sm text-center border-l border-zinc-800 text-rose-400">
                   {formatNumber(totals.outgoing)}
+                </td>
+                <td className="px-6 py-4 text-sm text-center border-l border-zinc-800 text-rose-300">
+                  {formatNumber(totals.transferOut)}
                 </td>
                 <td className="px-6 py-4 text-sm text-center">
                   <span className={totals.balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
