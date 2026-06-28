@@ -783,7 +783,9 @@ export class PostingService {
       credit: 0,
       description: isMulti
         ? `سند قبض رقم ${doc.voucher_number || doc.id.slice(-6)} إلى حساب: ${pm?.name || ''}`
-        : `تحصيل من العميل: ${doc.customer_name || ''}`
+        : `تحصيل من العميل: ${doc.customer_name || ''}`,
+      sub_account_id: pm?.id,
+      sub_account_type: 'payment_method'
     });
 
     return {
@@ -893,7 +895,9 @@ export class PostingService {
       credit: amount,
       description: isMulti
         ? `سند صرف رقم ${doc.voucher_number || doc.id.slice(-6)} من حساب: ${pm?.name || ''}`
-        : `صرف من: ${pm?.name || ''}`
+        : `صرف من: ${pm?.name || ''}`,
+      sub_account_id: pm?.id,
+      sub_account_type: 'payment_method'
     });
 
     return {

@@ -20,6 +20,106 @@ interface CashBalanceData {
   balance: number;
 }
 
+const resolvePaymentMethodForItem = (
+  item: any,
+  je: any,
+  paymentMethods: PaymentMethod[],
+  receiptVouchers: any[],
+  paymentVouchers: any[],
+  invoices: any[],
+  purchaseInvoices: any[],
+  returns: any[],
+  purchaseReturns: any[],
+  cashTransfers: any[]
+): PaymentMethod | null => {
+  // 1. Strict sub_account match
+  if (item.sub_account_type === 'payment_method' && item.sub_account_id) {
+    const pm = paymentMethods.find(p => p.id === item.sub_account_id);
+    if (pm) return pm;
+  }
+
+  // 2. Receipt Voucher lookup
+  if (je.reference_type === 'receipt' && je.reference_id) {
+    const rv = receiptVouchers.find(v => v.id === je.reference_id);
+    if (rv && rv.payment_method_id) {
+      const pm = paymentMethods.find(p => p.id === rv.payment_method_id);
+      if (pm) return pm;
+    }
+  }
+
+  // 3. Payment Voucher lookup
+  if (je.reference_type === 'payment' && je.reference_id) {
+    const pv = paymentVouchers.find(v => v.id === je.reference_id);
+    if (pv && pv.payment_method_id) {
+      const pm = paymentMethods.find(p => p.id === pv.payment_method_id);
+      if (pm) return pm;
+    }
+  }
+
+  // 4. Sales Invoice lookup
+  if (je.reference_type === 'invoice' && je.reference_id) {
+    const inv = invoices.find(v => v.id === je.reference_id);
+    if (inv && inv.payment_method_id) {
+      const pm = paymentMethods.find(p => p.id === inv.payment_method_id);
+      if (pm) return pm;
+    }
+  }
+
+  // 5. Purchase Invoice lookup
+  if (je.reference_type === 'purchase_invoice' && je.reference_id) {
+    const pinv = purchaseInvoices.find(v => v.id === je.reference_id);
+    if (pinv && pinv.payment_method_id) {
+      const pm = paymentMethods.find(p => p.id === pinv.payment_method_id);
+      if (pm) return pm;
+    }
+  }
+
+  // 6. Sales Return lookup
+  if (je.reference_type === 'return' && je.reference_id) {
+    const ret = returns.find(v => v.id === je.reference_id);
+    if (ret && ret.payment_method_id) {
+      const pm = paymentMethods.find(p => p.id === ret.payment_method_id);
+      if (pm) return pm;
+    }
+  }
+
+  // 7. Purchase Return lookup
+  if (je.reference_type === 'purchase_return' && je.reference_id) {
+    const pret = purchaseReturns.find(v => v.id === je.reference_id);
+    if (pret && pret.payment_method_id) {
+      const pm = paymentMethods.find(p => p.id === pret.payment_method_id);
+      if (pm) return pm;
+    }
+  }
+
+  // 8. Cash Transfer lookup
+  if ((je.reference_type === 'transfer' || je.reference_type === 'cash_transfer') && je.reference_id) {
+    const ct = cashTransfers.find(v => v.id === je.reference_id);
+    if (ct) {
+      const debit = Number(item.debit) || 0;
+      const pmId = debit > 0 ? ct.to_payment_method_id : ct.from_payment_method_id;
+      const pm = paymentMethods.find(p => p.id === pmId);
+      if (pm) return pm;
+    }
+  }
+
+  // 9. Account ID Fallback (if only one method shares this ledger account)
+  const sharingMethods = paymentMethods.filter(p => p.account_id === item.account_id);
+  if (sharingMethods.length === 1) {
+    return sharingMethods[0];
+  }
+
+  // 10. Fallback by description match
+  const desc = (item.description || je.description || '').toLowerCase();
+  for (const pm of sharingMethods) {
+    if (desc.includes(pm.name.toLowerCase()) || (pm.code && desc.includes(pm.code.toLowerCase()))) {
+      return pm;
+    }
+  }
+
+  return null;
+};
+
 export const CashBalances: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
@@ -67,9 +167,26 @@ export const CashBalances: React.FC = () => {
       setError(null);
       setLoading(true);
       try {
-        const [paymentMethodsData, journalEntries] = await Promise.all([
+        const [
+          paymentMethodsData,
+          journalEntries,
+          receiptVouchers,
+          paymentVouchers,
+          invoices,
+          purchaseInvoices,
+          returns,
+          purchaseReturns,
+          cashTransfers
+        ] = await Promise.all([
           dbService.list<PaymentMethod>('payment_methods', user.company_id),
-          dbService.list<JournalEntry>('journal_entries', user.company_id)
+          dbService.list<JournalEntry>('journal_entries', user.company_id),
+          dbService.list<any>('receipt_vouchers', user.company_id),
+          dbService.list<any>('payment_vouchers', user.company_id),
+          dbService.list<any>('invoices', user.company_id),
+          dbService.list<any>('purchase_invoices', user.company_id),
+          dbService.list<any>('returns', user.company_id),
+          dbService.list<any>('purchase_returns', user.company_id),
+          dbService.list<any>('cash_transfers', user.company_id)
         ]);
 
         const startStr = dateRange.start;
@@ -89,11 +206,21 @@ export const CashBalances: React.FC = () => {
             const isTransfer = je.reference_type === 'transfer' || je.reference_type === 'cash_transfer';
 
             je.items?.forEach((item: any) => {
-              // Rule: account matches the payment method's account_id and sub_account matches the payment method's id
-              const isMatch = 
-                item.account_id === method.account_id &&
-                item.sub_account_type === 'payment_method' &&
-                item.sub_account_id === method.id;
+              // Resolve payment method using our robust resolver
+              const resolvedMethod = resolvePaymentMethodForItem(
+                item,
+                je,
+                paymentMethodsData,
+                receiptVouchers,
+                paymentVouchers,
+                invoices,
+                purchaseInvoices,
+                returns,
+                purchaseReturns,
+                cashTransfers
+              );
+
+              const isMatch = resolvedMethod?.id === method.id;
 
               if (isMatch) {
                 const amountDebit = Number(item.debit || 0);
