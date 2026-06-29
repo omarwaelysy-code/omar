@@ -285,14 +285,14 @@ async function startServer() {
   // ERP API Routes
   app.use("/api/erp", erpRouter);
 
-  // Catch-all for API routes to prevent HTML response on missing endpoints
-  app.all("/api/*", (req, res) => {
-    res.status(404).json({ error: `API route not found: ${req.method} ${req.url}` });
-  });
-
   // Health check
   app.get("/api/health", (req, res) => {
     res.json({ status: "alive", version: "v2-robust-items-sync-bfd9ae1" });
+  });
+
+  // Catch-all for API routes to prevent HTML response on missing endpoints
+  app.all("/api/*", (req, res) => {
+    res.status(404).json({ error: `API route not found: ${req.method} ${req.url}` });
   });
 
   // Global Error Handler
