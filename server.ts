@@ -292,7 +292,7 @@ async function startServer() {
 
   // Health check
   app.get("/api/health", (req, res) => {
-    res.send("<h1>Server is Alive</h1><script>document.body.style.backgroundColor = 'lime';</script>");
+    res.json({ status: "alive", version: "v2-robust-items-sync-bfd9ae1" });
   });
 
   // Global Error Handler
