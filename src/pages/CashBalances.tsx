@@ -132,20 +132,7 @@ const resolvePaymentMethodForItem = (
     }
   }
 
-  // 11. Fallback to default method for this account
-  const defaultMethod = sharingMethods.find(method => {
-    if (sharingMethods.length === 1) return true;
-    const hasCashInName = (name: string) => {
-      const n = name.toLowerCase();
-      return n === 'كاش' || n === 'cash' || n === 'الخزينة الرئيسية' || n === 'الخزنة الرئيسية';
-    };
-    const cashMethod = sharingMethods.find(p => hasCashInName(p.name));
-    if (cashMethod) return method.id === cashMethod.id;
-    const sorted = [...sharingMethods].sort((a, b) => a.name.localeCompare(b.name));
-    return method.id === sorted[0].id;
-  });
-
-  return defaultMethod || sharingMethods[0];
+  return null;
 };
 
 export const CashBalances: React.FC = () => {
