@@ -2550,7 +2550,7 @@ router.put('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
     }
 
     // Sync Items
-    if (items !== undefined) {
+    if (items && Array.isArray(items) && items.length > 0) {
     await client.query('DELETE FROM invoice_items WHERE invoice_id = $1', [invoiceId]);
         await reverseAndRecalculate(client, companyId || '', invoiceId);
         await InventoryMovementService.reverseMovement('sales_invoice', invoiceId, client);
@@ -2848,7 +2848,7 @@ router.put('/returns/:id', authenticateToken, async (req: AuthRequest, res) => {
       return sendError(res, 404, 'Return not found or permission denied');
     }
 
-    if (items !== undefined) {
+    if (items && Array.isArray(items) && items.length > 0) {
     await client.query('DELETE FROM return_items WHERE return_id = $1', [returnId]);
         await reverseAndRecalculate(client, companyId || '', returnId);
         await InventoryMovementService.reverseMovement('sales_return', returnId, client);
@@ -3338,7 +3338,7 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
     const prevLinkedRes = await client.query('SELECT 1 FROM purchase_invoice_goods_receipts WHERE purchase_invoice_id = $1', [invoiceId]);
     const previouslyLinkedToGR = prevLinkedRes.rows.length > 0;
 
-    if (items !== undefined) {
+    if (items && Array.isArray(items) && items.length > 0) {
     await client.query('DELETE FROM purchase_invoice_goods_receipts WHERE purchase_invoice_id = $1', [invoiceId]);
         await client.query('DELETE FROM purchase_invoice_items WHERE invoice_id = $1', [invoiceId]);
     
@@ -3732,7 +3732,7 @@ router.put('/purchase_returns/:id', authenticateToken, async (req: AuthRequest, 
       return sendError(res, 404, 'Purchase Return not found or permission denied');
     }
 
-    if (items !== undefined) {
+    if (items && Array.isArray(items) && items.length > 0) {
     await client.query('DELETE FROM purchase_return_items WHERE return_id = $1', [returnId]);
         await reverseAndRecalculate(client, companyId || '', returnId);
         await InventoryMovementService.reverseMovement('purchase_return', returnId, client);
