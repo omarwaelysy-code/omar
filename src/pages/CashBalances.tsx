@@ -43,9 +43,14 @@ const resolvePaymentMethodForItem = (
   purchaseReturns: any[],
   cashTransfers: any[]
 ): PaymentMethod | null => {
+  // Prerequisite: The ledger account MUST match the payment method's account_id.
+  // Non-cash/bank lines (like customer accounts, supplier accounts, VAT, revenue) are ignored.
+  const sharingMethods = paymentMethods.filter(p => p.account_id === item.account_id);
+  if (sharingMethods.length === 0) return null;
+
   // 1. Strict sub_account match
   if (item.sub_account_type === 'payment_method' && item.sub_account_id) {
-    const pm = paymentMethods.find(p => p.id === item.sub_account_id);
+    const pm = sharingMethods.find(p => p.id === item.sub_account_id);
     if (pm) return pm;
   }
 
@@ -53,7 +58,7 @@ const resolvePaymentMethodForItem = (
   if (je.reference_type === 'receipt' && je.reference_id) {
     const rv = receiptVouchers.find(v => v.id === je.reference_id);
     if (rv && rv.payment_method_id) {
-      const pm = paymentMethods.find(p => p.id === rv.payment_method_id);
+      const pm = sharingMethods.find(p => p.id === rv.payment_method_id);
       if (pm) return pm;
     }
   }
@@ -62,7 +67,7 @@ const resolvePaymentMethodForItem = (
   if (je.reference_type === 'payment' && je.reference_id) {
     const pv = paymentVouchers.find(v => v.id === je.reference_id);
     if (pv && pv.payment_method_id) {
-      const pm = paymentMethods.find(p => p.id === pv.payment_method_id);
+      const pm = sharingMethods.find(p => p.id === pv.payment_method_id);
       if (pm) return pm;
     }
   }
@@ -71,7 +76,7 @@ const resolvePaymentMethodForItem = (
   if (je.reference_type === 'invoice' && je.reference_id) {
     const inv = invoices.find(v => v.id === je.reference_id);
     if (inv && inv.payment_method_id) {
-      const pm = paymentMethods.find(p => p.id === inv.payment_method_id);
+      const pm = sharingMethods.find(p => p.id === inv.payment_method_id);
       if (pm) return pm;
     }
   }
@@ -80,7 +85,7 @@ const resolvePaymentMethodForItem = (
   if (je.reference_type === 'purchase_invoice' && je.reference_id) {
     const pinv = purchaseInvoices.find(v => v.id === je.reference_id);
     if (pinv && pinv.payment_method_id) {
-      const pm = paymentMethods.find(p => p.id === pinv.payment_method_id);
+      const pm = sharingMethods.find(p => p.id === pinv.payment_method_id);
       if (pm) return pm;
     }
   }
@@ -89,7 +94,7 @@ const resolvePaymentMethodForItem = (
   if (je.reference_type === 'return' && je.reference_id) {
     const ret = returns.find(v => v.id === je.reference_id);
     if (ret && ret.payment_method_id) {
-      const pm = paymentMethods.find(p => p.id === ret.payment_method_id);
+      const pm = sharingMethods.find(p => p.id === ret.payment_method_id);
       if (pm) return pm;
     }
   }
@@ -98,7 +103,7 @@ const resolvePaymentMethodForItem = (
   if (je.reference_type === 'purchase_return' && je.reference_id) {
     const pret = purchaseReturns.find(v => v.id === je.reference_id);
     if (pret && pret.payment_method_id) {
-      const pm = paymentMethods.find(p => p.id === pret.payment_method_id);
+      const pm = sharingMethods.find(p => p.id === pret.payment_method_id);
       if (pm) return pm;
     }
   }
@@ -109,13 +114,12 @@ const resolvePaymentMethodForItem = (
     if (ct) {
       const debit = Number(item.debit) || 0;
       const pmId = debit > 0 ? ct.to_payment_method_id : ct.from_payment_method_id;
-      const pm = paymentMethods.find(p => p.id === pmId);
+      const pm = sharingMethods.find(p => p.id === pmId);
       if (pm) return pm;
     }
   }
 
   // 9. Account ID Fallback (if only one method shares this ledger account)
-  const sharingMethods = paymentMethods.filter(p => p.account_id === item.account_id);
   if (sharingMethods.length === 1) {
     return sharingMethods[0];
   }
@@ -128,7 +132,20 @@ const resolvePaymentMethodForItem = (
     }
   }
 
-  return null;
+  // 11. Fallback to default method for this account
+  const defaultMethod = sharingMethods.find(method => {
+    if (sharingMethods.length === 1) return true;
+    const hasCashInName = (name: string) => {
+      const n = name.toLowerCase();
+      return n === 'كاش' || n === 'cash' || n === 'الخزينة الرئيسية' || n === 'الخزنة الرئيسية';
+    };
+    const cashMethod = sharingMethods.find(p => hasCashInName(p.name));
+    if (cashMethod) return method.id === cashMethod.id;
+    const sorted = [...sharingMethods].sort((a, b) => a.name.localeCompare(b.name));
+    return method.id === sorted[0].id;
+  });
+
+  return defaultMethod || sharingMethods[0];
 };
 
 export const CashBalances: React.FC = () => {
