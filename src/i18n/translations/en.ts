@@ -21,6 +21,7 @@ export const en = {
   'nav.sales_orders': 'Sales Orders',
   'nav.returns': 'Sales Returns',
   'nav.purchase_invoices': 'Purchase Invoices',
+  'nav.goods_receipts': 'Goods Receipts',
   'nav.purchase_orders': 'Purchase Orders',
   'nav.purchase_returns': 'Purchase Returns',
   'nav.customer_discounts': 'Customer Discounts',

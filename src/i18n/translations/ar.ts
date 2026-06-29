@@ -21,6 +21,7 @@ export const ar = {
   'nav.sales_orders': 'أوامر بيع',
   'nav.returns': 'مرتجع مبيعات',
   'nav.purchase_invoices': 'فواتير مشتريات',
+  'nav.goods_receipts': 'إذن استلام المخزون',
   'nav.purchase_orders': 'أوامر شراء',
   'nav.purchase_returns': 'مرتجع مشتريات',
   'nav.customer_discounts': 'خصم عملاء',

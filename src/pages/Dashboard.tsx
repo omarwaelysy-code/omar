@@ -1260,7 +1260,7 @@ const getErpPagesDirectory = (t: (key: string) => string): ERPPageItem[] => {
       category = 'sales';
     } else if (['suppliers', 'purchase_invoices', 'purchase_orders', 'purchase_returns', 'supplier_discounts', 'supplier_settlements', 'supplier_statement', 'supplier_balances'].includes(key)) {
       category = 'purchases';
-    } else if (['products', 'warehouses', 'item_groups', 'warehouse_transfers', 'opening_stock_balances', 'stock_adjustments', 'stock_card_report', 'stock_balances_report', 'general_stock_movements_report'].includes(key)) {
+    } else if (['products', 'warehouses', 'item_groups', 'warehouse_transfers', 'opening_stock_balances', 'stock_adjustments', 'stock_card_report', 'stock_balances_report', 'general_stock_movements_report', 'goods_receipts'].includes(key)) {
       category = 'inventory';
     }
 
@@ -1273,6 +1273,7 @@ const getErpPagesDirectory = (t: (key: string) => string): ERPPageItem[] => {
     else if (key === 'suppliers') defaultIcon = 'Truck';
     else if (key === 'products') defaultIcon = 'Package';
     else if (key === 'warehouses') defaultIcon = 'Home';
+    else if (key === 'goods_receipts') defaultIcon = 'PackageCheck';
     else if (key === 'employees') defaultIcon = 'User';
     else if (key === 'expenses') defaultIcon = 'Zap';
     else if (key === 'payment_methods') defaultIcon = 'CreditCard';

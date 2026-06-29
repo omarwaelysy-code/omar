@@ -38,6 +38,7 @@ export const pageLabels: { [key: string]: string } = {
   'invoices': 'فواتير مبيعات',
   'sales_orders': 'أوامر بيع',
   'purchase_invoices': 'فواتير مشتريات',
+  'goods_receipts': 'إذن استلام المخزون',
   'purchase_orders': 'أوامر شراء',
   'receipts': 'سندات القبض',
   'payment_vouchers': 'سندات الصرف',

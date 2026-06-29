@@ -313,6 +313,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'products', label: t('nav.products'), icon: Package },
           { id: 'item_groups', label: t('nav.item_groups'), icon: Folder },
           { id: 'warehouses', label: t('nav.warehouses'), icon: Home },
+          { id: 'goods_receipts', label: t('nav.goods_receipts') || 'إذن استلام المخزون', icon: PackageCheck },
           { id: 'warehouse_transfers', label: t('nav.warehouse_transfers') || 'تحويل بين المخازن', icon: ArrowLeftRight },
           { id: 'opening_stock_balances', label: t('nav.opening_stock_balances') || 'أرصدة أول المدة للمخزون', icon: ListPlus },
           { id: 'stock_adjustments', label: t('nav.stock_adjustments') || 'تسوية الأصناف', icon: Sliders }

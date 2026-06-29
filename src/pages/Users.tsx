@@ -37,6 +37,7 @@ export const Users: React.FC = () => {
     { id: 'invoices', label: t('nav.invoices') },
     { id: 'returns', label: t('nav.returns') },
     { id: 'purchase_invoices', label: t('nav.purchase_invoices') },
+    { id: 'goods_receipts', label: t('nav.goods_receipts') || 'إذن استلام المخزون' },
     { id: 'purchase_returns', label: t('nav.purchase_returns') },
     { id: 'customer_discounts', label: t('nav.customer_discounts') },
     { id: 'supplier_discounts', label: t('nav.supplier_discounts') },
