@@ -951,7 +951,7 @@ export const SupplierSettlements: React.FC = () => {
               const hasMatch = inv.settlements.some((s: any) => s.settlement_number === settlementNo);
               if (hasMatch) {
                 const updated = inv.settlements.filter((s: any) => s.settlement_number !== settlementNo);
-                await dbService.update('purchase_invoices', inv.id, { ...inv, settlements: updated });
+                await dbService.update('purchase_invoices', inv.id, { settlements: updated });
               }
             }
           }
@@ -1079,7 +1079,7 @@ export const SupplierSettlements: React.FC = () => {
 
       // Execute Updates in DB
       for (const [id, inv] of invoiceUpdates.entries()) {
-        await dbService.update('purchase_invoices', id, inv);
+        await dbService.update('purchase_invoices', id, { settlements: inv.settlements });
       }
       for (const [id, v] of voucherUpdates.entries()) {
         await dbService.update('payment_vouchers', id, v);
@@ -1172,7 +1172,7 @@ export const SupplierSettlements: React.FC = () => {
           const hasMatch = inv.settlements.some((s: any) => s.settlement_number === settlementNumber);
           if (hasMatch) {
             const updated = inv.settlements.filter((s: any) => s.settlement_number !== settlementNumber);
-            await dbService.update('purchase_invoices', inv.id, { ...inv, settlements: updated });
+            await dbService.update('purchase_invoices', inv.id, { settlements: updated });
           }
         }
       }
