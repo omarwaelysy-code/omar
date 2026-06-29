@@ -629,16 +629,28 @@ export const CashBalances: React.FC = () => {
       });
       exportToExcel(data, { filename: 'Cash_Balances_Report' });
     } else {
-      const data = statementData.lines.map(l => ({
-        [language === 'ar' ? 'التاريخ' : 'Date']: l.date,
-        [language === 'ar' ? 'رقم القيد' : 'Journal Entry']: l.entryNumber,
-        [language === 'ar' ? 'نوع الحركة' : 'Type']: getTransactionTypeLabel(l.referenceType),
-        [language === 'ar' ? 'المرجع' : 'Reference']: l.referenceNumber,
-        [language === 'ar' ? 'البيان' : 'Description']: l.description,
-        [language === 'ar' ? 'القبض (مدين)' : 'Receipt (Debit)']: l.debit || 0,
-        [language === 'ar' ? 'الصرف (دائن)' : 'Payment (Credit)']: l.credit || 0,
-        [language === 'ar' ? 'الرصيد' : 'Balance']: l.runningBalance
-      }));
+      const data = [
+        {
+          [language === 'ar' ? 'التاريخ' : 'Date']: dateRange.start || '-',
+          [language === 'ar' ? 'رقم القيد' : 'Journal Entry']: '-',
+          [language === 'ar' ? 'نوع الحركة' : 'Type']: language === 'ar' ? 'رصيد منقول' : 'Balance Forward',
+          [language === 'ar' ? 'المرجع' : 'Reference']: '-',
+          [language === 'ar' ? 'البيان' : 'Description']: language === 'ar' ? 'رصيد أول الفترة' : 'Beginning Balance',
+          [language === 'ar' ? 'القبض (مدين)' : 'Receipt (Debit)']: '-',
+          [language === 'ar' ? 'الصرف (دائن)' : 'Payment (Credit)']: '-',
+          [language === 'ar' ? 'الرصيد' : 'Balance']: statementData.beginningBalance
+        },
+        ...statementData.lines.map(l => ({
+          [language === 'ar' ? 'التاريخ' : 'Date']: l.date,
+          [language === 'ar' ? 'رقم القيد' : 'Journal Entry']: l.entryNumber,
+          [language === 'ar' ? 'نوع الحركة' : 'Type']: getTransactionTypeLabel(l.referenceType),
+          [language === 'ar' ? 'المرجع' : 'Reference']: l.referenceNumber,
+          [language === 'ar' ? 'البيان' : 'Description']: l.description,
+          [language === 'ar' ? 'القبض (مدين)' : 'Receipt (Debit)']: l.debit || 0,
+          [language === 'ar' ? 'الصرف (دائن)' : 'Payment (Credit)']: l.credit || 0,
+          [language === 'ar' ? 'الرصيد' : 'Balance']: l.runningBalance
+        }))
+      ];
       exportToExcel(data, { filename: `Statement_${paymentMethods.find(m => m.id === selectedMethodId)?.name}` });
     }
   };
@@ -958,54 +970,78 @@ export const CashBalances: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
-                  {statementData.lines.length > 0 ? (
-                    statementData.lines.map((l, idx) => (
-                      <tr key={idx} className="hover:bg-zinc-50/50 transition-colors">
-                        <td className="px-4 py-3.5 text-sm text-zinc-500 border-l border-zinc-100 font-medium">
-                          {l.date}
+                  {statementData.lines.length > 0 || statementData.beginningBalance !== 0 ? (
+                    <>
+                      {/* Beginning Balance Row (رصيد منقول) */}
+                      <tr className="bg-zinc-50/50 font-bold text-zinc-500 italic">
+                        <td className="px-4 py-3 text-sm border-l border-zinc-100 font-medium">
+                          {dateRange.start || '-'}
                         </td>
-                        <td className="px-4 py-3.5 text-sm border-l border-zinc-100 font-bold text-indigo-600">
-                          <button 
-                            onClick={() => {
-                              setPendingViewDoc({ type: 'journal', idOrNumber: l.entryNumber });
-                              setCurrentPage('journal_entries');
-                            }}
-                            className="hover:underline flex items-center gap-1 cursor-pointer"
-                          >
-                            {l.entryNumber}
-                            <ExternalLink size={12} />
-                          </button>
+                        <td className="px-4 py-3 text-sm border-l border-zinc-100">-</td>
+                        <td className="px-4 py-3 text-sm border-l border-zinc-100 font-bold text-indigo-600">
+                          {language === 'ar' ? 'رصيد منقول' : 'Balance Forward'}
                         </td>
-                        <td className="px-4 py-3.5 text-sm text-zinc-600 border-l border-zinc-100 font-bold">
-                          {getTransactionTypeLabel(l.referenceType)}
+                        <td className="px-4 py-3 text-sm border-l border-zinc-100">-</td>
+                        <td className="px-4 py-3 text-sm border-l border-zinc-100 text-zinc-400">
+                          {language === 'ar' ? 'رصيد أول الفترة' : 'Beginning Balance'}
                         </td>
-                        <td className="px-4 py-3.5 text-sm border-l border-zinc-100 font-bold text-indigo-600">
-                          {l.referenceNumber !== '-' ? (
-                            <button 
-                              onClick={() => handleTransactionClick(l.referenceType, l.referenceNumber)}
-                              className="hover:underline flex items-center gap-1 cursor-pointer"
-                            >
-                              {l.referenceNumber}
-                              <ExternalLink size={12} />
-                            </button>
-                          ) : '-'}
-                        </td>
-                        <td className="px-4 py-3.5 text-sm text-zinc-800 border-l border-zinc-100 max-w-[240px] truncate" title={l.description}>
-                          {l.description}
-                        </td>
-                        <td className="px-4 py-3.5 text-sm text-emerald-600 text-center border-l border-zinc-100 font-black">
-                          {l.debit > 0 ? formatNumber(l.debit) : '-'}
-                        </td>
-                        <td className="px-4 py-3.5 text-sm text-rose-600 text-center border-l border-zinc-100 font-black">
-                          {l.credit > 0 ? formatNumber(l.credit) : '-'}
-                        </td>
-                        <td className="px-4 py-3.5 text-sm text-center font-black">
-                          <span className={l.runningBalance >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
-                            {formatNumber(l.runningBalance)}
+                        <td className="px-4 py-3 text-sm text-center border-l border-zinc-100 font-black text-zinc-400">-</td>
+                        <td className="px-4 py-3 text-sm text-center border-l border-zinc-100 font-black text-zinc-400">-</td>
+                        <td className="px-4 py-3 text-sm text-center font-black">
+                          <span className={statementData.beginningBalance >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
+                            {formatNumber(statementData.beginningBalance)}
                           </span>
                         </td>
                       </tr>
-                    ))
+                      
+                      {statementData.lines.map((l, idx) => (
+                        <tr key={idx} className="hover:bg-zinc-50/50 transition-colors">
+                          <td className="px-4 py-3.5 text-sm text-zinc-500 border-l border-zinc-100 font-medium">
+                            {l.date}
+                          </td>
+                          <td className="px-4 py-3.5 text-sm border-l border-zinc-100 font-bold text-indigo-600">
+                            <button 
+                              onClick={() => {
+                                setPendingViewDoc({ type: 'journal', idOrNumber: l.entryNumber });
+                                setCurrentPage('journal_entries');
+                              }}
+                              className="hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                              {l.entryNumber}
+                              <ExternalLink size={12} />
+                            </button>
+                          </td>
+                          <td className="px-4 py-3.5 text-sm text-zinc-600 border-l border-zinc-100 font-bold">
+                            {getTransactionTypeLabel(l.referenceType)}
+                          </td>
+                          <td className="px-4 py-3.5 text-sm border-l border-zinc-100 font-bold text-indigo-600">
+                            {l.referenceNumber !== '-' ? (
+                              <button 
+                                onClick={() => handleTransactionClick(l.referenceType, l.referenceNumber)}
+                                className="hover:underline flex items-center gap-1 cursor-pointer"
+                              >
+                                {l.referenceNumber}
+                                <ExternalLink size={12} />
+                              </button>
+                            ) : '-'}
+                          </td>
+                          <td className="px-4 py-3.5 text-sm text-zinc-800 border-l border-zinc-100 max-w-[240px] truncate" title={l.description}>
+                            {l.description}
+                          </td>
+                          <td className="px-4 py-3.5 text-sm text-emerald-600 text-center border-l border-zinc-100 font-black">
+                            {l.debit > 0 ? formatNumber(l.debit) : '-'}
+                          </td>
+                          <td className="px-4 py-3.5 text-sm text-rose-600 text-center border-l border-zinc-100 font-black">
+                            {l.credit > 0 ? formatNumber(l.credit) : '-'}
+                          </td>
+                          <td className="px-4 py-3.5 text-sm text-center font-black">
+                            <span className={l.runningBalance >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
+                              {formatNumber(l.runningBalance)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </>
                   ) : (
                     <tr>
                       <td colSpan={8} className="px-6 py-8 text-center text-zinc-400 italic">
