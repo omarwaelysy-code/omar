@@ -95,7 +95,9 @@ export const PaymentMethods: React.FC = () => {
               account_name: selectedAccount?.name || '',
               debit: isNegative ? 0 : absBalance,
               credit: isNegative ? absBalance : 0,
-              description: 'رصيد افتتاحي'
+              description: 'رصيد افتتاحي',
+              sub_account_id: id,
+              sub_account_type: 'payment_method'
             },
             {
               account_id: formData.counter_account_id,
