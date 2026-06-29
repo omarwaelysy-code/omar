@@ -28,6 +28,7 @@ export const PaymentMethods: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
+  const [isBalanceFocused, setIsBalanceFocused] = useState(false);
   
   const [formData, setFormData] = useState({
     code: '',
@@ -136,8 +137,8 @@ export const PaymentMethods: React.FC = () => {
       setFormData({
         code: method.code,
         name: method.name,
-        opening_balance: method.opening_balance,
-        opening_balance_date: method.opening_balance_date || new Date().toISOString().slice(0, 10),
+        opening_balance: Number(method.opening_balance) || 0,
+        opening_balance_date: method.opening_balance_date ? new Date(method.opening_balance_date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
         account_id: method.account_id || '',
         counter_account_id: method.counter_account_id || ''
       });
@@ -428,7 +429,23 @@ export const PaymentMethods: React.FC = () => {
                               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1 text-right">{language === 'ar' ? 'الرصيد الحالي' : 'Opening Balance'}</label>
                               <div className="relative group">
                                 <Wallet className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-emerald-400`} size={24} />
-                                <input type="number" step="0.01" className="w-full pr-16 pl-6 py-5 bg-white border border-emerald-100 rounded-[2.5rem] text-4xl font-black text-emerald-600 outline-none focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-sm" value={formData.opening_balance} onChange={(e) => setFormData({ ...formData, opening_balance: parseFloat(e.target.value) || 0 })} />
+                                <input
+                                  type={isBalanceFocused ? "number" : "text"}
+                                  step="0.01"
+                                  className="w-full pr-16 pl-6 py-5 bg-white border border-emerald-100 rounded-[2.5rem] text-4xl font-black text-emerald-600 outline-none focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-sm"
+                                  style={{ direction: 'ltr', textAlign: 'right' }}
+                                  value={
+                                    isBalanceFocused
+                                      ? (formData.opening_balance === 0 ? '' : formData.opening_balance)
+                                      : (formData.opening_balance < 0 ? '-' : '') + formatNumber(Math.abs(formData.opening_balance))
+                                  }
+                                  onFocus={() => setIsBalanceFocused(true)}
+                                  onBlur={() => setIsBalanceFocused(false)}
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value);
+                                    setFormData({ ...formData, opening_balance: isNaN(val) ? 0 : val });
+                                  }}
+                                />
                               </div>
                            </div>
                            <div className="space-y-4">
