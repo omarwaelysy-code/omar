@@ -14,6 +14,10 @@ export default defineConfig(({mode}) => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
+        ...(process.env.VITEST ? {
+          'react-barcode': path.resolve(__dirname, 'src/tests/mocks/dummyComponent.tsx'),
+          'react-qr-code': path.resolve(__dirname, 'src/tests/mocks/dummyComponent.tsx'),
+        } : {}),
       },
     },
     server: {
@@ -26,8 +30,12 @@ export default defineConfig(({mode}) => {
       environment: 'jsdom',
       setupFiles: './src/tests/setup.ts',
       pool: 'forks',
-      forks: {
-        isolate: false
+      maxWorkers: 1,
+      poolOptions: {
+        forks: {
+          isolate: true,
+          execArgv: ['--max-old-space-size=4096']
+        }
       }
     },
   };

@@ -15,3 +15,12 @@ Object.defineProperty(window, 'matchMedia', {
     dispatchEvent: vi.fn(),
   })),
 });
+
+// Global mocks to avoid canvas/JSDOM import memory leaks
+vi.mock('react-barcode', () => ({
+  default: () => null
+}));
+
+vi.mock('react-qr-code', () => ({
+  default: () => null
+}));

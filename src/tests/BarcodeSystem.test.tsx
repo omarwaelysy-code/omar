@@ -1,101 +1,136 @@
-import { vi } from 'vitest';
+import React from 'react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { Products } from '../pages/Products';
+import { dbService } from '../services/dbService';
+
+// Mock values defined outside to preserve reference identity and prevent infinite render loops
+const mockUser = {
+  id: 'test-user-id',
+  username: 'testuser',
+  email: 'test@example.com',
+  company_id: 'test-company-id',
+  role: 'admin'
+};
+
+const mockAuthValue = {
+  user: mockUser,
+  isAuthenticated: true,
+  isSuperAdmin: false,
+  isCompanyAdmin: true,
+  hasPermission: () => true
+};
+
+const mockNavigationValue = {
+  activeTabId: 'products',
+  setCurrentPage: vi.fn(),
+  setPendingViewDoc: vi.fn()
+};
+
+const mockLanguageValue = {
+  language: 'ar',
+  t: (key: string) => {
+    const keys: { [k: string]: string } = {
+      'products.title': 'الأصناف والمخزون',
+      'products.add': 'إضافة صنف',
+      'products.edit': 'تعديل صنف',
+      'products.form_barcode': 'الباركود',
+      'common.save': 'حفظ',
+      'common.cancel': 'إلغاء',
+      'common.confirm_delete': 'هل أنت متأكد من الحذف؟',
+      'common.deleted_successfully': 'تم الحذف بنجاح'
+    };
+    return keys[key] || key;
+  },
+  dir: 'rtl'
+};
+
+const mockNotificationValue = {
+  showNotification: vi.fn(),
+  addPersistentNotification: vi.fn(),
+  notifications: [],
+  unreadCount: 0,
+  markAsRead: vi.fn(),
+  dismissNotification: vi.fn(),
+  markAllAsRead: vi.fn(),
+  clearAll: vi.fn(),
+  isCenterOpen: false,
+  setIsCenterOpen: vi.fn()
+};
+
+const mockPermissionsValue = {
+  canView: true,
+  canCreate: true,
+  canDelete: true
+};
+
+const mockViewPreferenceValue = ['table', vi.fn()] as const;
 
 // 1. Mock libraries and modules first (hoisted)
 vi.stubGlobal('print', vi.fn());
 
-vi.mock('react-barcode', () => {
-  return {
-    default: ({ value, format }: any) => {
-      return (
-        <div data-testid="mock-barcode" data-value={value} data-format={format}>
-          Barcode: {value}
-        </div>
-      );
-    }
-  };
-});
+vi.mock('react-barcode', () => ({
+  default: () => null
+}));
 
-vi.mock('react-qr-code', () => {
-  return {
-    default: ({ value, size }: any) => {
-      return (
-        <div data-testid="mock-qrcode" data-value={value} data-size={size}>
-          QRCode: {value}
-        </div>
-      );
-    }
-  };
-});
+vi.mock('react-qr-code', () => ({
+  default: () => null
+}));
+
+vi.mock('../utils/pdfUtils', () => ({
+  exportToPDF: vi.fn(),
+  printElement: vi.fn()
+}));
+
+vi.mock('../utils/excelUtils', () => ({
+  exportToExcel: vi.fn(),
+  formatDataForExcel: vi.fn()
+}));
 
 vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({
-    user: {
-      id: 'test-user-id',
-      username: 'testuser',
-      email: 'test@example.com',
-      company_id: 'test-company-id',
-      role: 'admin'
-    },
-    isAuthenticated: true,
-    isSuperAdmin: false,
-    isCompanyAdmin: true,
-    hasPermission: () => true
-  })
+  useAuth: () => mockAuthValue
 }));
 
 vi.mock('../contexts/NavigationContext', () => ({
-  useNavigation: () => ({
-    activeTabId: 'products',
-    setCurrentPage: vi.fn(),
-    setPendingViewDoc: vi.fn()
-  })
+  useNavigation: () => mockNavigationValue
 }));
 
 vi.mock('../contexts/LanguageContext', () => ({
-  useLanguage: () => ({
-    language: 'ar',
-    t: (key: string) => {
-      const keys: { [k: string]: string } = {
-        'products.title': 'الأصناف والمخزون',
-        'products.add': 'إضافة صنف',
-        'products.edit': 'تعديل صنف',
-        'products.form_barcode': 'الباركود',
-        'common.save': 'حفظ',
-        'common.cancel': 'إلغاء',
-        'common.confirm_delete': 'هل أنت متأكد من الحذف؟',
-        'common.deleted_successfully': 'تم الحذف بنجاح'
-      };
-      return keys[key] || key;
-    },
-    dir: 'rtl'
-  })
+  useLanguage: () => mockLanguageValue
 }));
 
 vi.mock('../contexts/NotificationContext', () => ({
-  useNotification: () => ({
-    showNotification: vi.fn(),
-    addPersistentNotification: vi.fn(),
-    notifications: [],
-    unreadCount: 0,
-    markAsRead: vi.fn(),
-    dismissNotification: vi.fn(),
-    markAllAsRead: vi.fn(),
-    clearAll: vi.fn(),
-    isCenterOpen: false,
-    setIsCenterOpen: vi.fn()
-  })
+  useNotification: () => mockNotificationValue
 }));
 
 vi.mock('../hooks/usePermissions', () => ({
-  usePermissions: () => ({
-    canView: true,
-    canCreate: true,
-    canDelete: true
-  })
+  usePermissions: () => mockPermissionsValue
 }));
 
 vi.mock('../hooks/useViewPreference', () => ({
-  useViewPreference: () => ['table', vi.fn()]
+  useViewPreference: () => mockViewPreferenceValue
+}));
+
+vi.mock('../components/PageActivityLog', () => ({
+  PageActivityLog: () => null
+}));
+
+vi.mock('../components/InlineActivityLog', () => ({
+  InlineActivityLog: () => null
+}));
+
+vi.mock('../components/PaginationControls', () => ({
+  PaginationControls: () => null
+}));
+
+vi.mock('../components/ExportButtons', () => ({
+  ExportButtons: () => null
+}));
+
+vi.mock('../components/FormattedNumberInput', () => ({
+  FormattedNumberInput: ({ value, onChange, ...props }: any) => (
+    <input type="number" value={value} onChange={(e) => onChange && onChange(Number(e.target.value))} {...props} />
+  )
 }));
 
 vi.mock('../services/dbService', () => ({
@@ -135,7 +170,11 @@ vi.mock('../services/dbService', () => ({
               displayValue: true
             },
             is_active: true,
-            company_id: 'test-company-id'
+            company_id: 'test-company-id',
+            item_group_id: 'group-1',
+            revenue_account_id: 'acc-revenue',
+            cost_account_id: 'acc-cost',
+            inventory_account_id: 'acc-inventory'
           },
           {
             id: 'prod-2',
@@ -146,13 +185,23 @@ vi.mock('../services/dbService', () => ({
             cost_price: 140,
             barcode: '9876543210',
             is_active: true,
-            company_id: 'test-company-id'
+            company_id: 'test-company-id',
+            item_group_id: 'group-1',
+            revenue_account_id: 'acc-revenue',
+            cost_account_id: 'acc-cost',
+            inventory_account_id: 'acc-inventory'
           }
         ]);
       } else if (collection === 'accounts') {
-        callback([]);
+        callback([
+          { id: 'acc-revenue', name: 'Revenue Account' },
+          { id: 'acc-cost', name: 'Cost Account' },
+          { id: 'acc-inventory', name: 'Inventory Account' }
+        ]);
       } else if (collection === 'item_groups') {
-        callback([]);
+        callback([
+          { id: 'group-1', name: 'Default Group' }
+        ]);
       }
       return () => {};
     })
@@ -180,13 +229,6 @@ vi.mock('motion/react', () => ({
   },
   AnimatePresence: ({ children }: any) => <>{children}</>
 }));
-
-// 2. Import React and components AFTER mocking
-import React from 'react';
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { Products } from '../pages/Products';
-import { dbService } from '../services/dbService';
 
 describe('Barcode System integration in Products screen', () => {
   beforeEach(() => {
@@ -225,7 +267,7 @@ describe('Barcode System integration in Products screen', () => {
     expect(screen.getByText('نوع الباركود')).toBeInTheDocument();
     expect(screen.getByText('الهوامش (بكسل)')).toBeInTheDocument();
     
-    const cancelBtn = screen.getByRole('button', { name: /cancel/i || /إلغاء/i || /common.cancel/i });
+    const cancelBtn = screen.getByRole('button', { name: /cancel|إلغاء/i });
     fireEvent.click(cancelBtn);
   });
 
@@ -239,14 +281,14 @@ describe('Barcode System integration in Products screen', () => {
 
     fireEvent.click(screen.getByTitle('إعدادات الباركود'));
 
-    const heightInput = screen.getByLabelText(/ارتفاع الباركود/i || /Barcode Height/i) as HTMLInputElement;
+    const heightInput = screen.getByText(/ارتفاع الباركود/i).parentElement?.querySelector('input') as HTMLInputElement;
     fireEvent.change(heightInput, { target: { value: '75' } });
 
-    const saveSettingsBtn = screen.getByRole('button', { name: /save/i || /حفظ/i || /common.save/i });
+    const saveSettingsBtn = screen.getAllByRole('button', { name: /save|حفظ/i }).find(btn => !btn.getAttribute('form')) as HTMLButtonElement;
     fireEvent.click(saveSettingsBtn);
 
-    const saveProductBtn = screen.getByRole('button', { name: /common.save/i || /حفظ/i });
-    fireEvent.click(saveProductBtn);
+    const form = document.getElementById('product-form') as HTMLFormElement;
+    fireEvent.submit(form);
 
     await waitFor(() => {
       expect(dbService.update).toHaveBeenCalled();
@@ -269,7 +311,7 @@ describe('Barcode System integration in Products screen', () => {
 
     expect(screen.getByText('خيارات طباعة الباركود')).toBeInTheDocument();
 
-    const executePrintBtn = screen.getByRole('button', { name: /طباعة/i || /Print/i });
+    const executePrintBtn = screen.getByRole('button', { name: /^طباعة$|^Print$/ });
     fireEvent.click(executePrintBtn);
 
     await waitFor(() => {
@@ -296,7 +338,7 @@ describe('Barcode System integration in Products screen', () => {
     fireEvent.click(bulkPrintBtn);
     expect(screen.getByText('طباعة باركود جماعية')).toBeInTheDocument();
 
-    const executeBulkPrintBtn = screen.getByRole('button', { name: /طباعة/i || /Print/i });
+    const executeBulkPrintBtn = screen.getByRole('button', { name: /^طباعة$|^Print$/ });
     fireEvent.click(executeBulkPrintBtn);
 
     await waitFor(() => {
