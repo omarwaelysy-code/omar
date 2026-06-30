@@ -23,6 +23,8 @@
     "@types/pg": "^8.20.0",
     "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^5.0.4",
+    "@zxing/browser": "^0.2.0",
+    "@zxing/library": "^0.22.0",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "cors": "^2.8.6",

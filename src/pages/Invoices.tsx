@@ -33,6 +33,9 @@ import { InvoiceSchema, JournalEntrySchema } from '../lib/schemas';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
 import { useNavigation } from '../contexts/NavigationContext';
+import { BarcodeScanner } from '../components/BarcodeScanner';
+import type { BarcodeScannerSettings } from '../hooks/useBarcodeScanner';
+import { DEFAULT_BARCODE_SETTINGS } from '../hooks/useBarcodeScanner';
 
 export const Invoices: React.FC = () => {
   const { t, dir, language } = useLanguage();
@@ -178,6 +181,9 @@ export const Invoices: React.FC = () => {
   const [companyCurrencies, setCompanyCurrencies] = useState<Currency[]>([]);
   const [selectedCurrencyId, setSelectedCurrencyId] = useState<string>('');
   const [exchangeRate, setExchangeRate] = useState<number>(1);
+  // Barcode scanner state
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [barcodeContinuousMode, setBarcodeContinuousMode] = useState(false);
   const [exchangeRateType, setExchangeRateType] = useState<'manual' | 'auto'>('manual');
   const [view, setView] = useViewPreference('invoices', 'table');
   const [invoiceType, setInvoiceType] = useState<'items' | 'services'>('items');
@@ -1578,6 +1584,43 @@ export const Invoices: React.FC = () => {
       department_id: selectedDepartmentId || null,
       cost_center_id: selectedCostCenterId || null
     }]);
+  };
+
+  // ── Barcode scanner handlers ────────────────────────────────────────────
+  const barcodeSettings: BarcodeScannerSettings = {
+    ...DEFAULT_BARCODE_SETTINGS,
+    ...(companyData?.settings?.barcode_scanner || {}),
+  };
+
+  const addItemByBarcode = (product: any) => {
+    if (barcodeSettings.auto_increase_quantity) {
+      const existingIndex = items.findIndex(i => i.product_id === product.id);
+      if (existingIndex !== -1) {
+        setItems(prev => prev.map((item, idx) =>
+          idx === existingIndex
+            ? { ...item, quantity: item.quantity + 1, total: (item.quantity + 1) * item.unit_price }
+            : item
+        ));
+        if (barcodeSettings.show_success_message) {
+          showNotification(
+            language === 'ar'
+              ? `تمت زيادة كمية: ${product.name}`
+              : `Quantity increased: ${product.name}`,
+            'success'
+          );
+        }
+        return;
+      }
+    }
+    addItem(product.id);
+    if (barcodeSettings.show_success_message) {
+      showNotification(
+        language === 'ar'
+          ? `تمت إضافة: ${product.name}`
+          : `Added: ${product.name}`,
+        'success'
+      );
+    }
   };
 
   const removeItem = (index: number) => {
@@ -4497,15 +4540,43 @@ export const Invoices: React.FC = () => {
                           <h2 className="font-semibold text-zinc-900 text-[11px]">{t('invoices.form_items')}</h2>
                         </div>
 
-                        <button 
-                          type="button"
-                          onClick={() => addEmptyRow()}
-                          className="px-2 py-0.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-sm text-[10px]"
-                        >
-                          <Plus size={10} />
-                          {t('invoices.form_add_item')}
-                        </button>
-                      </div>
+                        <div className="flex items-center gap-1">
+                            {/* Barcode scanner buttons */}
+                            {(barcodeSettings.enable_camera_scanner || barcodeSettings.enable_hid_scanner) && (
+                              <>
+                                <button
+                                  type="button"
+                                  title={language === 'ar' ? 'قراءة باركود' : 'Scan Barcode'}
+                                  onClick={() => { setBarcodeContinuousMode(false); setShowBarcodeScanner(true); }}
+                                  className="px-2 py-0.5 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 transition-all flex items-center gap-1 shadow-sm text-[10px]"
+                                >
+                                  <span>📷</span>
+                                  <span>{language === 'ar' ? 'باركود' : 'Scan'}</span>
+                                </button>
+                                {barcodeSettings.enable_continuous_mode && (
+                                  <button
+                                    type="button"
+                                    title={language === 'ar' ? 'قراءة مستمرة' : 'Continuous Scan'}
+                                    onClick={() => { setBarcodeContinuousMode(true); setShowBarcodeScanner(true); }}
+                                    className="px-2 py-0.5 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all flex items-center gap-1 shadow-sm text-[10px]"
+                                  >
+                                    <span>📷📷</span>
+                                    <span>{language === 'ar' ? 'مستمر' : 'Continuous'}</span>
+                                  </button>
+                                )}
+                              </>
+                            )}
+
+                            <button 
+                              type="button"
+                              onClick={() => addEmptyRow()}
+                              className="px-2 py-0.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-sm text-[10px]"
+                            >
+                              <Plus size={10} />
+                              {t('invoices.form_add_item')}
+                            </button>
+                          </div>
+                        </div>
 
                       <div className="overflow-x-auto rounded-xl border border-zinc-200 overflow-hidden">
                         <table className="w-full text-sm text-right border-collapse table-fixed min-w-[1150px]">
@@ -6228,6 +6299,37 @@ export const Invoices: React.FC = () => {
         }} 
         documentId={activityLogDocumentId}
       />
+
+      {/* Barcode Scanner Modal */}
+      {showBarcodeScanner && (
+        <BarcodeScanner
+          products={products}
+          continuousMode={barcodeContinuousMode}
+          settings={barcodeSettings}
+          language={language}
+          onProductFound={(product) => {
+            addItemByBarcode(product);
+          }}
+          onProductNotFound={(barcode) => {
+            showNotification(
+              language === 'ar'
+                ? `الباركود غير مسجل بالنظام: ${barcode}`
+                : `Barcode not found: ${barcode}`,
+              'error'
+            );
+          }}
+          onMultipleFound={(barcode) => {
+            showNotification(
+              language === 'ar'
+                ? `يوجد أكثر من صنف بنفس الباركود: ${barcode}`
+                : `Multiple products with same barcode: ${barcode}`,
+              'error'
+            );
+          }}
+          onClose={() => setShowBarcodeScanner(false)}
+        />
+      )}
     </div>
   );
 };
+

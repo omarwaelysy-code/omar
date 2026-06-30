@@ -21,7 +21,8 @@ import {
   Zap,
   CheckCircle2,
   XCircle,
-  TrendingUp
+  TrendingUp,
+  ScanLine
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -188,6 +189,17 @@ export function CompanySettings() {
   const [erConnStatus,   setErConnStatus]   = useState<'idle' | 'ok' | 'error'>('idle');
   const [erLastResult,   setErLastResult]   = useState<string | null>(null);
 
+  // ─── Barcode Scanner Settings state ────────────────────────────────────────────────
+  const [barcodeSettings, setBarcodeSettings] = useState({
+    enable_camera_scanner: true,
+    enable_hid_scanner: true,
+    enable_continuous_mode: true,
+    play_sound_on_success: true,
+    prevent_unknown_items: true,
+    auto_increase_quantity: true,
+    show_success_message: true,
+  });
+
   const formatSyncDateTime = () => {
     const now = new Date();
     const day = String(now.getDate()).padStart(2, '0');
@@ -326,6 +338,18 @@ export function CompanySettings() {
           setErLastUpdate(settings.er_last_update || null);
           setErConnStatus(settings.er_conn_status || 'idle');
           setErLastResult(settings.er_last_result || null);
+
+          // Load barcode scanner settings
+          const bs = settings.barcode_scanner || {};
+          setBarcodeSettings({
+            enable_camera_scanner: bs.enable_camera_scanner !== false,
+            enable_hid_scanner: bs.enable_hid_scanner !== false,
+            enable_continuous_mode: bs.enable_continuous_mode !== false,
+            play_sound_on_success: bs.play_sound_on_success !== false,
+            prevent_unknown_items: bs.prevent_unknown_items !== false,
+            auto_increase_quantity: bs.auto_increase_quantity !== false,
+            show_success_message: bs.show_success_message !== false,
+          });
       }
     } catch (error) {
       console.error('Failed to load company data:', error);
@@ -363,7 +387,8 @@ export function CompanySettings() {
         inventory_cost_method: data.inventory_cost_method || 'wac',
         vat_enabled: data.vat_enabled,
         wht_enabled: data.wht_enabled,
-        purchase_workflow_mode: data.purchase_workflow_mode || 'Simple'
+        purchase_workflow_mode: data.purchase_workflow_mode || 'Simple',
+        barcode_scanner: barcodeSettings,
       };
 
       await dbService.update('companies', user.company_id, {
@@ -865,6 +890,100 @@ export function CompanySettings() {
               </div>
 
             </div>
+          </div>
+        </div>
+
+        {/* Card 3.6: Barcode Scanner Settings — إعدادات قراءة الباركود */}
+        <div className="bg-white p-8 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+          <div className="flex items-center gap-2 text-indigo-600 justify-end">
+            <span className="font-bold text-lg">
+              {language === 'ar' ? 'إعدادات قراءة الباركود' : 'Barcode Scanner Settings'}
+            </span>
+            <ScanLine className="w-5 h-5" />
+          </div>
+
+          <div className="space-y-4">
+            {([
+              {
+                key: 'enable_camera_scanner',
+                labelAr: 'تفعيل استخدام كاميرا الباركود',
+                labelEn: 'Enable Camera Barcode Scanner',
+                descAr: 'يسمح بفتح الكاميرا لمسح الباركود داخل الفواتير.',
+                descEn: 'Allow opening the camera to scan barcodes in invoices.',
+              },
+              {
+                key: 'enable_hid_scanner',
+                labelAr: 'تفعيل Barcode Scanner (USB / Bluetooth)',
+                labelEn: 'Enable USB / Bluetooth Barcode Scanner',
+                descAr: 'يدعم القارئات المتصلة عبر USB أو Bluetooth تلقائياً.',
+                descEn: 'Auto-detect USB and Bluetooth barcode readers.',
+              },
+              {
+                key: 'enable_continuous_mode',
+                labelAr: 'تفعيل وضع القراءة المستمرة',
+                labelEn: 'Enable Continuous Scan Mode',
+                descAr: 'تبقى الكاميرا مفتوحة لمسح أكثر من صنف متتالياً.',
+                descEn: 'Keep the camera open to scan multiple items in sequence.',
+              },
+              {
+                key: 'play_sound_on_success',
+                labelAr: 'تشغيل صوت عند نجاح القراءة',
+                labelEn: 'Play Sound on Successful Scan',
+                descAr: 'يصدر صوت Beep قصير عند كل قراءة ناجحة.',
+                descEn: 'Plays a short beep on every successful scan.',
+              },
+              {
+                key: 'prevent_unknown_items',
+                labelAr: 'منع إضافة أصناف غير معروفة',
+                labelEn: 'Block Unknown Barcodes',
+                descAr: 'لا يضيف أي صنف إذا لم يعثر على الباركود في قاعدة البيانات.',
+                descEn: 'Block adding items when barcode is not found in database.',
+              },
+              {
+                key: 'auto_increase_quantity',
+                labelAr: 'زيادة الكمية تلقائياً عند تكرار القراءة',
+                labelEn: 'Auto-Increase Quantity on Duplicate Scan',
+                descAr: 'إذا كان الصنف موجوداً بالفاتورة تزداد كميته بدلاً من إضافة سطر جديد.',
+                descEn: 'If item already in invoice, increase its quantity instead of adding a new line.',
+              },
+              {
+                key: 'show_success_message',
+                labelAr: 'إظهار رسالة نجاح بعد القراءة',
+                labelEn: 'Show Success Notification After Scan',
+                descAr: 'يعرض إشعار مؤقت بعد إضافة الصنف بنجاح.',
+                descEn: 'Shows a brief toast notification after successfully adding an item.',
+              },
+            ] as const).map(({ key, labelAr, labelEn, descAr, descEn }) => (
+              <div
+                key={key}
+                className="flex items-center justify-between cursor-pointer select-none p-4 rounded-2xl border border-slate-100 hover:bg-slate-50 transition-colors"
+                onClick={() =>
+                  setBarcodeSettings((prev) => ({ ...prev, [key]: !prev[key] }))
+                }
+              >
+                <div className="flex flex-col gap-0.5 flex-1">
+                  <span className="font-bold text-slate-800 text-sm">
+                    {language === 'ar' ? labelAr : labelEn}
+                  </span>
+                  <span className="text-xs text-slate-400 font-medium">
+                    {language === 'ar' ? descAr : descEn}
+                  </span>
+                </div>
+                <div
+                  className={`relative w-14 h-8 rounded-full transition-all duration-300 shadow-inner ms-4 flex-shrink-0 ${
+                    barcodeSettings[key] ? 'bg-indigo-600' : 'bg-slate-200'
+                  }`}
+                >
+                  <div
+                    className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
+                      dir === 'rtl'
+                        ? barcodeSettings[key] ? 'translate-x-[-120%]' : 'translate-x-[-10%]'
+                        : barcodeSettings[key] ? 'translate-x-[120%]' : 'translate-x-[10%]'
+                    }`}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 

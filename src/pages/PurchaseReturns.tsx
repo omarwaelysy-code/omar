@@ -27,6 +27,9 @@ import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { PaginationControls } from '../components/PaginationControls';
 import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
 import { useNavigation } from '../contexts/NavigationContext';
+import { BarcodeScanner } from '../components/BarcodeScanner';
+import { DEFAULT_BARCODE_SETTINGS } from '../hooks/useBarcodeScanner';
+import type { BarcodeScannerSettings } from '../hooks/useBarcodeScanner';
 
 export const PurchaseReturns: React.FC = () => {
   const { user } = useAuth();
@@ -50,6 +53,9 @@ export const PurchaseReturns: React.FC = () => {
   const [selectedCurrencyId, setSelectedCurrencyId] = useState<string>('');
   const [exchangeRate, setExchangeRate] = useState<number>(1);
   const [exchangeRateType, setExchangeRateType] = useState<'manual' | 'auto'>('manual');
+  // Barcode scanner state
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [barcodeContinuousMode, setBarcodeContinuousMode] = useState(false);
 
   // UI state
   const [loading, setLoading] = useState(true);
@@ -626,6 +632,79 @@ export const PurchaseReturns: React.FC = () => {
 
     generatePreview();
   }, [isModalOpen, items, returnData.supplier_id, returnData.date, returnData.payment_type, returnData.payment_method_id, discount, user, suppliers, products, accounts]);
+
+  const barcodeSettings: BarcodeScannerSettings = {
+    ...DEFAULT_BARCODE_SETTINGS,
+    ...(company?.settings?.barcode_scanner || {}),
+  };
+
+  const addItemByBarcode = (product: any) => {
+    if (barcodeSettings.auto_increase_quantity) {
+      const existingIndex = items.findIndex((i: any) => i.product_id === product.id);
+      if (existingIndex !== -1) {
+        setItems((prev: any[]) => prev.map((item: any, idx: number) => {
+          if (idx === existingIndex) {
+            const qty = item.quantity + 1;
+            const total = Number((qty * item.unit_price).toFixed(4));
+            const vat_amount = isVatEnabled ? Number((total * (item.vat_rate / 100)).toFixed(4)) : 0;
+            return { ...item, quantity: qty, total, vat_amount };
+          }
+          return item;
+        }));
+        if (barcodeSettings.show_success_message) {
+          showNotification(
+            language === 'ar'
+              ? `تمت زيادة كمية: ${product.name}`
+              : `Quantity increased: ${product.name}`,
+            'success'
+          );
+        }
+        return;
+      }
+    }
+
+    const baseCurrency = company?.settings?.currency || 'EGP';
+    const selectedCurr = companyCurrencies.find(c => c.id === selectedCurrencyId);
+    const isForeign = selectedCurr && selectedCurr.code.toLowerCase() !== baseCurrency.toLowerCase();
+    
+    let price = product.cost_price || 0;
+    if (isForeign && exchangeRate > 0) {
+      price = Number((price / exchangeRate).toFixed(4));
+    }
+
+    const total = price;
+    const vat_rate = product.vat_rate || 0;
+    const vat_amount = isVatEnabled ? Number((total * (vat_rate / 100)).toFixed(4)) : 0;
+
+    setItems((prev: any[]) => [
+      ...prev,
+      {
+        product_id: product.id,
+        product_name: product.name,
+        product_code: product.code,
+        product_image_url: product.image_url || '',
+        barcode: product.barcode || '',
+        image_url: product.image_url || '',
+        quantity: 1,
+        unit_price: price,
+        total,
+        vat_rate,
+        vat_amount,
+        operation_id: selectedOperationId || null,
+        department_id: selectedDepartmentId || null,
+        cost_center_id: selectedCostCenterId || null,
+      }
+    ]);
+
+    if (barcodeSettings.show_success_message) {
+      showNotification(
+        language === 'ar'
+          ? `تمت إضافة: ${product.name}`
+          : `Added: ${product.name}`,
+        'success'
+      );
+    }
+  };
 
   const addEmptyRow = () => {
     setItems((prev) => [
@@ -2548,14 +2627,39 @@ export const PurchaseReturns: React.FC = () => {
                     <h2 className="font-semibold text-zinc-900 text-xs">{language === 'ar' ? 'الأصناف المرتجعة' : 'Returned Items'}</h2>
                   </div>
 
-                  <button 
-                    type="button"
-                    onClick={() => addEmptyRow()}
-                    className="px-3 py-1 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-sm text-xs"
-                  >
-                    <Plus size={12} />
-                    إضافة صف جديد
-                  </button>
+                  <div className="flex gap-1.5">
+                    {/* Barcode scanner buttons */}
+                    {(barcodeSettings.enable_camera_scanner || barcodeSettings.enable_hid_scanner) && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => { setBarcodeContinuousMode(false); setShowBarcodeScanner(true); }}
+                          className="px-3 py-1 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 transition-all flex items-center gap-1 shadow-sm text-xs cursor-pointer"
+                        >
+                          <span>📷</span>
+                          <span>{language === 'ar' ? 'باركود' : 'Scan'}</span>
+                        </button>
+                        {barcodeSettings.enable_continuous_mode && (
+                          <button
+                            type="button"
+                            onClick={() => { setBarcodeContinuousMode(true); setShowBarcodeScanner(true); }}
+                            className="px-3 py-1 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all flex items-center gap-1 shadow-sm text-xs cursor-pointer"
+                          >
+                            <span>📷📷</span>
+                            <span>{language === 'ar' ? 'مستمر' : 'Continuous'}</span>
+                          </button>
+                        )}
+                      </>
+                    )}
+                    <button 
+                      type="button"
+                      onClick={() => addEmptyRow()}
+                      className="px-3 py-1 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-sm text-xs"
+                    >
+                      <Plus size={12} />
+                      إضافة صف جديد
+                    </button>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto rounded-xl border border-zinc-200 overflow-hidden">
@@ -3845,6 +3949,34 @@ export const PurchaseReturns: React.FC = () => {
         category="purchase_returns"
         documentId={activityLogDocumentId}
       />
+
+      {/* Barcode Scanner Modal */}
+      {showBarcodeScanner && (
+        <BarcodeScanner
+          products={products}
+          continuousMode={barcodeContinuousMode}
+          settings={barcodeSettings}
+          language={language}
+          onProductFound={(product) => addItemByBarcode(product)}
+          onProductNotFound={(barcode) => {
+            showNotification(
+              language === 'ar'
+                ? `الباركود غير مسجل بالنظام: ${barcode}`
+                : `Barcode not found: ${barcode}`,
+              'error'
+            );
+          }}
+          onMultipleFound={(barcode) => {
+            showNotification(
+              language === 'ar'
+                ? `يوجد أكثر من صنف بنفس الباركود: ${barcode}`
+                : `Multiple products with same barcode: ${barcode}`,
+              'error'
+            );
+          }}
+          onClose={() => setShowBarcodeScanner(false)}
+        />
+      )}
     </div>
   );
 };

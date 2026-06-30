@@ -21,6 +21,9 @@ import { ActivityLog, Company } from '../types';
 import { PaginationControls } from '../components/PaginationControls';
 import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
 import { useNavigation } from '../contexts/NavigationContext';
+import { BarcodeScanner } from '../components/BarcodeScanner';
+import { DEFAULT_BARCODE_SETTINGS } from '../hooks/useBarcodeScanner';
+import type { BarcodeScannerSettings } from '../hooks/useBarcodeScanner';
 
 export const Returns: React.FC = () => {
   const { user } = useAuth();
@@ -79,6 +82,9 @@ export const Returns: React.FC = () => {
   const [selectedCurrencyId, setSelectedCurrencyId] = useState<string>('');
   const [exchangeRate, setExchangeRate] = useState<number>(1);
   const [exchangeRateType, setExchangeRateType] = useState<'manual' | 'auto'>('manual');
+  // Barcode scanner state
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [barcodeContinuousMode, setBarcodeContinuousMode] = useState(false);
   const isMultiCurrencyEnabled = company?.settings?.enable_multi_currency || (company as any)?.enable_multi_currency || false;
   const prevExchangeRateRef = useRef<number>(1);
 
@@ -723,6 +729,43 @@ export const Returns: React.FC = () => {
       unit_price: foreignPrice,
       total: foreignPrice
     }]);
+  };
+
+  // ── Barcode scanner handlers ────────────────────────────────────────
+  const barcodeSettings: BarcodeScannerSettings = {
+    ...DEFAULT_BARCODE_SETTINGS,
+    ...(company?.settings?.barcode_scanner || {}),
+  };
+
+  const addItemByBarcode = (product: any) => {
+    if (barcodeSettings.auto_increase_quantity) {
+      const existingIndex = items.findIndex((i: any) => i.product_id === product.id);
+      if (existingIndex !== -1) {
+        setItems((prev: any[]) => prev.map((item: any, idx: number) =>
+          idx === existingIndex
+            ? { ...item, quantity: item.quantity + 1, total: (item.quantity + 1) * item.unit_price }
+            : item
+        ));
+        if (barcodeSettings.show_success_message) {
+          showNotification(
+            language === 'ar'
+              ? `تمت زيادة كمية: ${product.name}`
+              : `Quantity increased: ${product.name}`,
+            'success'
+          );
+        }
+        return;
+      }
+    }
+    addItem(product.id);
+    if (barcodeSettings.show_success_message) {
+      showNotification(
+        language === 'ar'
+          ? `تمت إضافة: ${product.name}`
+          : `Added: ${product.name}`,
+        'success'
+      );
+    }
   };
 
   const addEmptyRow = () => {
@@ -2410,6 +2453,29 @@ export const Returns: React.FC = () => {
                       <h2 className="font-semibold text-zinc-900 text-[10px]">{language === 'ar' ? 'أصناف المرتجع' : 'Return Items'}</h2>
                     </div>
                     <div className="flex gap-1.5">
+                      {/* Barcode scanner buttons */}
+                      {(barcodeSettings.enable_camera_scanner || barcodeSettings.enable_hid_scanner) && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => { setBarcodeContinuousMode(false); setShowBarcodeScanner(true); }}
+                            className="px-2.5 py-0.5 bg-purple-600 text-white rounded text-[10px] font-bold border border-purple-600 hover:bg-purple-700 transition-all cursor-pointer flex items-center gap-1"
+                          >
+                            <span>📷</span>
+                            <span>{language === 'ar' ? 'باركود' : 'Scan'}</span>
+                          </button>
+                          {barcodeSettings.enable_continuous_mode && (
+                            <button
+                              type="button"
+                              onClick={() => { setBarcodeContinuousMode(true); setShowBarcodeScanner(true); }}
+                              className="px-2.5 py-0.5 bg-indigo-600 text-white rounded text-[10px] font-bold border border-indigo-600 hover:bg-indigo-700 transition-all cursor-pointer flex items-center gap-1"
+                            >
+                              <span>📷📷</span>
+                              <span>{language === 'ar' ? 'مستمر' : 'Continuous'}</span>
+                            </button>
+                          )}
+                        </>
+                      )}
                       <button
                         type="button"
                         onClick={() => setIsProductModalOpen(true)}
@@ -3430,6 +3496,34 @@ export const Returns: React.FC = () => {
         category="returns"
         documentId={activityLogDocumentId}
       />
+
+      {/* Barcode Scanner Modal */}
+      {showBarcodeScanner && (
+        <BarcodeScanner
+          products={products}
+          continuousMode={barcodeContinuousMode}
+          settings={barcodeSettings}
+          language={language}
+          onProductFound={(product) => addItemByBarcode(product)}
+          onProductNotFound={(barcode) => {
+            showNotification(
+              language === 'ar'
+                ? `الباركود غير مسجل بالنظام: ${barcode}`
+                : `Barcode not found: ${barcode}`,
+              'error'
+            );
+          }}
+          onMultipleFound={(barcode) => {
+            showNotification(
+              language === 'ar'
+                ? `يوجد أكثر من صنف بنفس الباركود: ${barcode}`
+                : `Multiple products with same barcode: ${barcode}`,
+              'error'
+            );
+          }}
+          onClose={() => setShowBarcodeScanner(false)}
+        />
+      )}
     </div>
   );
 };

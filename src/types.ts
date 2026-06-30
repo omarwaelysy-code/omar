@@ -93,6 +93,7 @@ export interface Company {
     vat_enabled?: boolean;
     wht_enabled?: boolean;
     purchase_workflow_mode?: 'Simple' | 'Enterprise Strict' | 'Enterprise Flexible';
+    barcode_scanner?: any;
   };
   purchase_workflow_mode?: 'Simple' | 'Enterprise Strict' | 'Enterprise Flexible';
 }
