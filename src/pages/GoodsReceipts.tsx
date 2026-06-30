@@ -8,7 +8,7 @@ import {
   Lock, LayoutGrid, List, ChevronDown, ChevronUp, History, Coins, CheckCheck, ExternalLink, RotateCcw, Save, Copy, Layers, Filter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { dbService, apiRequest } from '../services/dbService';
+import { dbService } from '../services/dbService';
 import { ExportButtons } from '../components/ExportButtons';
 import { PaginationControls } from '../components/PaginationControls';
 import { usePermissions } from '../hooks/usePermissions';
@@ -394,10 +394,10 @@ export const GoodsReceipts: React.FC = () => {
       };
 
       if (editingReceipt) {
-        await apiRequest('PUT', `/goods_receipts/${editingReceipt.id}`, payload);
+        await dbService.update('goods_receipts', editingReceipt.id, payload);
         showNotification(gt('updated_success'), 'success');
       } else {
-        await apiRequest('POST', `/goods_receipts`, payload);
+        await dbService.add('goods_receipts', payload);
         showNotification(gt('saved_success'), 'success');
       }
 
@@ -413,7 +413,7 @@ export const GoodsReceipts: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (!window.confirm(language === 'ar' ? 'هل أنت متأكد من حذف هذا الاستلام؟' : 'Are you sure you want to delete this receipt?')) return;
     try {
-      await apiRequest('DELETE', `/goods_receipts/${id}`);
+      await dbService.delete('goods_receipts', id);
       showNotification(gt('deleted_success'), 'success');
     } catch (err: any) {
       console.error(err);

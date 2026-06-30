@@ -204,7 +204,8 @@ async function startServer() {
       'CREATE INDEX IF NOT EXISTS idx_purchase_return_items_return_id ON purchase_return_items(return_id)',
       'CREATE TABLE IF NOT EXISTS "attendance" ("id" VARCHAR(36) PRIMARY KEY, "company_id" VARCHAR(36), "employee_id" VARCHAR(36), "employee_name" VARCHAR(255), "date" DATE, "check_in" TIMESTAMP, "check_out" TIMESTAMP, "status" VARCHAR(50), "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)',
       'CREATE TABLE IF NOT EXISTS "payroll" ("id" VARCHAR(36) PRIMARY KEY, "company_id" VARCHAR(36), "employee_id" VARCHAR(36), "employee_name" VARCHAR(255), "month" INTEGER, "year" INTEGER, "date" DATE, "basic_salary" DECIMAL(18, 4) DEFAULT 0, "allowances" DECIMAL(18, 4) DEFAULT 0, "deductions" DECIMAL(18, 4) DEFAULT 0, "net_salary" DECIMAL(18, 4) DEFAULT 0, "status" VARCHAR(50), "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)',
-      'CREATE TABLE IF NOT EXISTS "assets" ("id" VARCHAR(36) PRIMARY KEY, "company_id" VARCHAR(36), "code" VARCHAR(100), "name" VARCHAR(255) NOT NULL, "category" VARCHAR(100), "purchase_date" DATE, "purchase_cost" DECIMAL(18, 4) DEFAULT 0, "current_value" DECIMAL(18, 4) DEFAULT 0, "depreciation_rate" DECIMAL(5, 2) DEFAULT 0, "status" VARCHAR(50), "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)'
+      'CREATE TABLE IF NOT EXISTS "assets" ("id" VARCHAR(36) PRIMARY KEY, "company_id" VARCHAR(36), "code" VARCHAR(100), "name" VARCHAR(255) NOT NULL, "category" VARCHAR(100), "purchase_date" DATE, "purchase_cost" DECIMAL(18, 4) DEFAULT 0, "current_value" DECIMAL(18, 4) DEFAULT 0, "depreciation_rate" DECIMAL(5, 2) DEFAULT 0, "status" VARCHAR(50), "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)',
+      'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "barcode_settings" JSONB'
     ];
     
     for (const q of syncQueries) {

@@ -281,6 +281,7 @@ export interface Product {
   item_group_id?: string;
   item_group_name?: string;
   company_id: string;
+  barcode_settings?: any;
   is_active?: boolean;
 }
 

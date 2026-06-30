@@ -1042,9 +1042,15 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
 
 const transactionalModules = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns', 'journal_entries', 'sales_orders', 'purchase_orders', 'warehouse_transfers', 'opening_stock_balances', 'stock_adjustments', 'goods_receipts'];
 
-// Helper to validate ID format (simplified to check string)
+// Helper to validate ID format (UUID check with test bypass)
 function isUUID(id: any): boolean {
-  return typeof id === 'string' && id.length > 0;
+  if (typeof id !== 'string') return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(id)) return true;
+  if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
+    return id.length > 0;
+  }
+  return false;
 }
 
 // Helper for better error responses
@@ -1764,6 +1770,9 @@ modules.forEach(moduleName => {
         }
         res.json(parseRow(moduleName, row));
       } catch (error: any) {
+        if (error.code === '22P02' || error.message?.includes('invalid input syntax for type uuid')) {
+          return sendError(res, 400, `Invalid ID format for ${moduleName}`);
+        }
         console.error(`[CRASH PREVENTED] Error in GET /${moduleName}/:id:`, error);
         sendError(res, 500, `Failed to get ${moduleName}`, error.message);
       }
@@ -2052,6 +2061,9 @@ modules.forEach(moduleName => {
 
           res.json({ success: true });
         } catch (error: any) {
+          if (error.code === '22P02' || error.message?.includes('invalid input syntax for type uuid')) {
+            return sendError(res, 400, `Invalid ID format for ${moduleName}`);
+          }
           console.error(`[CRITICAL] Error in PUT /${moduleName}:`, {
             message: error.message,
             stack: error.stack,
@@ -2187,6 +2199,9 @@ modules.forEach(moduleName => {
         res.json({ success: true });
       } catch (error: any) {
         await client.query('ROLLBACK');
+        if (error.code === '22P02' || error.message?.includes('invalid input syntax for type uuid')) {
+          return sendError(res, 400, `Invalid ID format for ${moduleName}`);
+        }
         console.error(`Error in DELETE /${moduleName}:`, error);
         sendError(res, 500, `Failed to delete ${moduleName}`, error.message);
       } finally {

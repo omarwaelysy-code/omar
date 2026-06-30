@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Plus, Trash2, X, Package, History, ChevronRight, ChevronLeft, 
   Wallet, Layers, Hash, User, Calendar, Paperclip, LayoutGrid, List,
-  Lock, Camera, Printer, Download, FileText, RefreshCw, AlertCircle
+  Lock, Camera, Printer, Download, FileText, RefreshCw, AlertCircle, Settings
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Barcode from 'react-barcode';
+import QRCode from 'react-qr-code';
 import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,7 +21,7 @@ import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
-import { formatNumber } from '../utils/formatUtils';
+import { formatNumber, formatMoney } from '../utils/formatUtils';
 import { FormattedNumberInput } from '../components/FormattedNumberInput';
 
 interface ItemGroup {
@@ -30,6 +31,118 @@ interface ItemGroup {
   code: string;
   type: string;
 }
+
+const DEFAULT_BARCODE_SETTINGS = {
+  type: 'CODE128',
+  width: 2,
+  height: 50,
+  fontSize: 14,
+  displayValue: true,
+  marginTop: 10,
+  marginBottom: 10,
+  marginLeft: 10,
+  marginRight: 10
+};
+
+const isValidBarcodeValue = (value: string, format: string): boolean => {
+  if (!value) return false;
+  if (format === 'EAN13') {
+    return /^\d{12,13}$/.test(value);
+  }
+  if (format === 'EAN8') {
+    return /^\d{7,8}$/.test(value);
+  }
+  if (format === 'CODE39') {
+    return /^[A-Z0-9\-\.\ \$\/\+\%]+$/.test(value);
+  }
+  return true;
+};
+
+const getProductBarcodeSettings = (product: any) => {
+  if (!product || !product.barcode_settings) {
+    return DEFAULT_BARCODE_SETTINGS;
+  }
+  if (typeof product.barcode_settings === 'string') {
+    try {
+      return { ...DEFAULT_BARCODE_SETTINGS, ...JSON.parse(product.barcode_settings) };
+    } catch {
+      return DEFAULT_BARCODE_SETTINGS;
+    }
+  }
+  return { ...DEFAULT_BARCODE_SETTINGS, ...product.barcode_settings };
+};
+
+const BarcodeLabel: React.FC<{
+  product: Product;
+  settings: any;
+  printSettings: any;
+}> = ({ product, settings, printSettings }) => {
+  const barcodeValue = product.barcode || '';
+  const barcodeType = settings.type || 'CODE128';
+  const isValid = isValidBarcodeValue(barcodeValue, barcodeType);
+
+  return (
+    <div className="barcode-label-item bg-white text-black font-sans leading-none flex flex-col items-center justify-center">
+      {printSettings.showName && (
+        <div style={{ 
+          fontSize: `${Math.max(8, (settings.fontSize || 14) - 4)}px`, 
+          fontWeight: 'bold', 
+          marginBottom: '4px',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          width: '100%',
+          textAlign: 'center'
+        }}>
+          {product.name}
+        </div>
+      )}
+      
+      {isValid ? (
+        barcodeType === 'QR_CODE' ? (
+          <QRCode 
+            value={barcodeValue} 
+            size={Number(settings.height) || 50} 
+            style={{ 
+              marginTop: `${settings.marginTop || 5}px`,
+              marginBottom: `${settings.marginBottom || 5}px`,
+              marginLeft: `${settings.marginLeft || 5}px`,
+              marginRight: `${settings.marginRight || 5}px`
+            }} 
+          />
+        ) : (
+          <Barcode 
+            value={barcodeValue} 
+            format={barcodeType as any} 
+            width={Number(settings.width) || 2} 
+            height={Number(settings.height) || 45} 
+            fontSize={Number(settings.fontSize) || 12} 
+            displayValue={printSettings.showText} 
+            marginTop={Number(settings.marginTop) || 5} 
+            marginBottom={Number(settings.marginBottom) || 5} 
+            marginLeft={Number(settings.marginLeft) || 5} 
+            marginRight={Number(settings.marginRight) || 5} 
+          />
+        )
+      ) : (
+        <div className="text-red-500 font-bold text-center" style={{ fontSize: '10px' }}>
+          محتوى باركود غير صالح
+        </div>
+      )}
+
+      {printSettings.showPrice && product.sale_price !== undefined && (
+        <div style={{ 
+          fontSize: `${Number(settings.fontSize) || 12}px`, 
+          fontWeight: 'bold', 
+          marginTop: '4px',
+          textAlign: 'center'
+        }}>
+          {formatMoney(product.sale_price)}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const Products: React.FC = () => {
   const { user } = useAuth();
@@ -65,6 +178,32 @@ export const Products: React.FC = () => {
   const tableRef = useRef<HTMLTableElement>(null);
   const isVatEnabled = company?.settings?.vat_enabled || company?.vat_enabled || false;
 
+  // Barcode Systems States
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [isBarcodeSettingsOpen, setIsBarcodeSettingsOpen] = useState(false);
+  const [isPrintBarcodeOpen, setIsPrintBarcodeOpen] = useState(false);
+  const [isBulkPrintOpen, setIsBulkPrintOpen] = useState(false);
+  const [printQueue, setPrintQueue] = useState<{ product: Product; settings: any }[]>([]);
+  const [tempBarcodeSettings, setTempBarcodeSettings] = useState({
+    type: 'CODE128',
+    width: 2,
+    height: 50,
+    fontSize: 14,
+    displayValue: true,
+    marginTop: 10,
+    marginBottom: 10,
+    marginLeft: 10,
+    marginRight: 10
+  });
+  const [printConfig, setPrintConfig] = useState({
+    copies: 1,
+    size: '50×25 mm',
+    showName: true,
+    showPrice: true,
+    showText: true,
+    printer: 'system_default'
+  });
+
   const [formData, setFormData] = useState({ 
     code: '', 
     name: '', 
@@ -86,6 +225,7 @@ export const Products: React.FC = () => {
     vat_rate: 0,
     counter_account_id: '',
     item_group_id: '',
+    barcode_settings: null as any,
     is_active: true
   });
 
@@ -306,7 +446,7 @@ export const Products: React.FC = () => {
       sale_price: 0, cost_price: 0, description: '', image_url: '', 
       barcode: '', stock: 0, min_stock: 0, revenue_account_id: '', 
       cost_account_id: '', inventory_account_id: '', inventory_cost_method: 'wac', vat_account_id: '',
-      vat_rate: 0, counter_account_id: '', item_group_id: '', is_active: true
+      vat_rate: 0, counter_account_id: '', item_group_id: '', barcode_settings: null as any, is_active: true
     });
     setDateFrom('');
     setDateTo('');
@@ -335,6 +475,7 @@ export const Products: React.FC = () => {
         vat_rate: product.vat_rate || 0,
         counter_account_id: product.counter_account_id || '',
         item_group_id: product.item_group_id || '',
+        barcode_settings: product.barcode_settings || null,
         is_active: product.is_active !== false
       } as any);
     } else {
@@ -347,6 +488,191 @@ export const Products: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     resetForm();
+  };
+
+  // Barcode Handlers
+  const handleOpenBarcodeSettings = () => {
+    const settings = formData.barcode_settings || DEFAULT_BARCODE_SETTINGS;
+    setTempBarcodeSettings(getProductBarcodeSettings({ barcode_settings: settings }));
+    setIsBarcodeSettingsOpen(true);
+  };
+
+  const handleSaveBarcodeSettings = () => {
+    setFormData(prev => ({
+      ...prev,
+      barcode_settings: tempBarcodeSettings
+    }));
+    setIsBarcodeSettingsOpen(false);
+    showNotification('تم حفظ إعدادات الباركود للصنف مؤقتاً. يرجى حفظ الصنف لتأكيد التغييرات.', 'info');
+  };
+
+  const handleOpenPrintBarcode = () => {
+    if (!formData.barcode) {
+      showNotification('يرجى إدخال رمز باركود أولاً للطباعة', 'error');
+      return;
+    }
+    setPrintConfig({
+      copies: 1,
+      size: '50×25 mm',
+      showName: true,
+      showPrice: true,
+      showText: true,
+      printer: 'system_default'
+    });
+    setIsPrintBarcodeOpen(true);
+  };
+
+  const handleOpenBulkPrint = () => {
+    setPrintConfig({
+      copies: 1,
+      size: '50×25 mm',
+      showName: true,
+      showPrice: true,
+      showText: true,
+      printer: 'system_default'
+    });
+    setIsBulkPrintOpen(true);
+  };
+
+  const triggerBrowserPrint = () => {
+    const style = document.createElement('style');
+    style.id = 'barcode-print-styles';
+    
+    const sizeCss = printConfig.size === 'A4'
+      ? `@page { size: A4; margin: 10mm; }`
+      : `@page { size: ${printConfig.size.replace('×', ' ').replace(' mm', '')}; margin: 0; }`;
+
+    const colsCount = printConfig.size === 'A4' ? 4 : 1;
+
+    style.innerHTML = `
+      @media print {
+        body > *:not(#print-barcodes-section) {
+          display: none !important;
+        }
+        #print-barcodes-section {
+          display: ${printConfig.size === 'A4' ? 'grid' : 'block'} !important;
+          width: 100% !important;
+          height: auto !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          direction: rtl !important;
+          background: white !important;
+          ${printConfig.size === 'A4' ? `
+            grid-template-columns: repeat(${colsCount}, 1fr);
+            gap: 15px;
+            padding: 10px;
+          ` : ''}
+        }
+        ${sizeCss}
+        .barcode-label-item {
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          overflow: hidden;
+          background: white !important;
+          color: black !important;
+          page-break-inside: avoid;
+          ${printConfig.size === 'A4' ? `
+            border: 1px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 12px;
+            height: 52mm;
+            justify-content: space-between;
+          ` : `
+            width: ${printConfig.size.split('×')[0]}mm;
+            height: ${printConfig.size.split('×')[1].replace(' mm', '')}mm;
+            page-break-after: always;
+            padding: 2mm;
+          `}
+        }
+        /* Ensure SVGs print cleanly */
+        .barcode-label-item svg {
+          max-width: 90% !important;
+          height: auto !important;
+        }
+      }
+    `;
+    
+    document.head.appendChild(style);
+
+    window.print();
+
+    setTimeout(() => {
+      const stylesNode = document.getElementById('barcode-print-styles');
+      if (stylesNode) {
+        stylesNode.remove();
+      }
+      setPrintQueue([]);
+    }, 1000);
+  };
+
+  const handleExecutePrint = () => {
+    if (!formData.barcode) {
+      showNotification('لا يوجد باركود لطباعته', 'error');
+      return;
+    }
+
+    const resolvedSettings = formData.barcode_settings || DEFAULT_BARCODE_SETTINGS;
+    
+    if (!isValidBarcodeValue(formData.barcode, resolvedSettings.type)) {
+      showNotification('رمز الباركود الحالي غير متوافق مع النوع المحدد', 'error');
+      return;
+    }
+
+    const items = [];
+    const productMock = {
+      ...formData,
+      id: editingProduct?.id || 'new_product'
+    } as Product;
+
+    for (let i = 0; i < printConfig.copies; i++) {
+      items.push({
+        product: productMock,
+        settings: resolvedSettings
+      });
+    }
+
+    setPrintQueue(items);
+    setIsPrintBarcodeOpen(false);
+
+    setTimeout(() => {
+      triggerBrowserPrint();
+    }, 300);
+  };
+
+  const handleExecuteBulkPrint = () => {
+    const items: any[] = [];
+    
+    for (const id of selectedProductIds) {
+      const prod = products.find(p => p.id === id);
+      if (prod && prod.barcode) {
+        const resolvedSettings = getProductBarcodeSettings(prod);
+        if (isValidBarcodeValue(prod.barcode, resolvedSettings.type)) {
+          for (let i = 0; i < printConfig.copies; i++) {
+            items.push({
+              product: prod,
+              settings: resolvedSettings
+            });
+          }
+        }
+      }
+    }
+
+    if (items.length === 0) {
+      showNotification('لم يتم العثور على رموز باركود صالحة للطباعة في الأصناف المحددة', 'error');
+      return;
+    }
+
+    setPrintQueue(items);
+    setIsBulkPrintOpen(false);
+    setSelectedProductIds([]); // Clear selection after print trigger
+
+    setTimeout(() => {
+      triggerBrowserPrint();
+    }, 300);
   };
 
   const handleExportExcel = () => {
@@ -564,6 +890,15 @@ export const Products: React.FC = () => {
                   <RefreshCw size={20} />
                   <span>{t('products.recalculate')}</span>
                 </button>
+                {selectedProductIds.length > 0 && (
+                  <button 
+                    onClick={handleOpenBulkPrint}
+                    className="px-6 h-14 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/10 transition-all active:scale-95 font-bold gap-2 text-sm animate-in fade-in duration-200"
+                  >
+                    <Printer size={20} />
+                    <span>{language === 'ar' ? `طباعة الباركود (${selectedProductIds.length})` : `Print Barcodes (${selectedProductIds.length})`}</span>
+                  </button>
+                )}
                 <ExportButtons onExportExcel={handleExportExcel} onExportPDF={handleExportPDF} />
                 {canCreate && (
                   <button 
@@ -605,7 +940,21 @@ export const Products: React.FC = () => {
                     <table ref={tableRef} className="w-full">
                       <thead className="bg-slate-50/50 rounded-2xl">
                         <tr className="text-slate-400 text-[10px] uppercase font-black tracking-[0.2em]">
-                          <th className={`px-8 py-6 rounded-s-2xl ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_code')}</th>
+                          <th className="px-6 py-6 rounded-s-2xl text-center animate-in fade-in" style={{ width: '60px' }}>
+                            <input 
+                              type="checkbox" 
+                              className="w-5 h-5 rounded border-slate-200 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer" 
+                              checked={filteredProducts.length > 0 && selectedProductIds.length === filteredProducts.length} 
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedProductIds(filteredProducts.map(p => p.id));
+                                } else {
+                                  setSelectedProductIds([]);
+                                }
+                              }} 
+                            />
+                          </th>
+                          <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_code')}</th>
                           <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_name')}</th>
                           <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_sale_price')}</th>
                           <th className={`px-8 py-6 rounded-e-2xl ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
@@ -613,13 +962,27 @@ export const Products: React.FC = () => {
                       </thead>
                       <tbody className="divide-y divide-slate-50">
                         {loading ? (
-                          <tr><td colSpan={4} className="py-20 text-center"><div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>
+                          <tr><td colSpan={5} className="py-20 text-center"><div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>
                         ) : filteredProducts.map((product) => (
                           <tr 
                             key={product.id} 
                             onClick={() => openModal(product)}
                             className="hover:bg-slate-50 transition-all group cursor-pointer"
                           >
+                            <td className="px-6 py-5 text-center" onClick={(e) => e.stopPropagation()}>
+                              <input 
+                                type="checkbox" 
+                                className="w-5 h-5 rounded border-slate-200 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer" 
+                                checked={selectedProductIds.includes(product.id)} 
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedProductIds(prev => [...prev, product.id]);
+                                  } else {
+                                    setSelectedProductIds(prev => prev.filter(id => id !== product.id));
+                                  }
+                                }} 
+                              />
+                            </td>
                             <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               <span className="font-mono text-[10px] bg-slate-100 px-3 py-1 rounded-lg text-slate-500 font-black border border-slate-200 group-hover:border-emerald-200 transition-all">{product.code}</span>
                             </td>
@@ -687,15 +1050,31 @@ export const Products: React.FC = () => {
                         onClick={() => openModal(product)} 
                         className="p-8 space-y-6 rounded-[3rem] border bg-white border-slate-100 hover:border-emerald-200 hover:shadow-2xl transition-all cursor-pointer group relative overflow-hidden"
                       >
-                        <div className="flex justify-between items-start">
-                          <div className="flex flex-col gap-2 text-right">
-                            <span className="font-mono text-[10px] bg-slate-50 px-3 py-1 rounded-lg text-slate-400 font-black w-fit border border-slate-100 uppercase tracking-widest">{product.code}</span>
-                            <h4 className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors text-2xl tracking-tighter leading-none italic serif">{product.name}</h4>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none">{t(`products.type_${product.type}`)}</span>
-                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${product.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                                {product.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
-                              </span>
+                        <div className="flex justify-between items-start gap-4">
+                          <div className="flex gap-4">
+                            <div onClick={(e) => e.stopPropagation()} className="pt-1">
+                              <input 
+                                type="checkbox" 
+                                className="w-5 h-5 rounded border-slate-200 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer shadow-sm" 
+                                checked={selectedProductIds.includes(product.id)} 
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedProductIds(prev => [...prev, product.id]);
+                                  } else {
+                                    setSelectedProductIds(prev => prev.filter(id => id !== product.id));
+                                  }
+                                }} 
+                              />
+                            </div>
+                            <div className="flex flex-col gap-2 text-right">
+                              <span className="font-mono text-[10px] bg-slate-50 px-3 py-1 rounded-lg text-slate-400 font-black w-fit border border-slate-100 uppercase tracking-widest">{product.code}</span>
+                              <h4 className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors text-2xl tracking-tighter leading-none italic serif">{product.name}</h4>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none">{t(`products.type_${product.type}`)}</span>
+                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${product.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                  {product.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
+                                </span>
+                              </div>
                             </div>
                           </div>
                           <div className="w-20 h-20 rounded-[2rem] bg-slate-50 text-slate-300 flex items-center justify-center overflow-hidden border border-slate-100 group-hover:scale-105 transition-all shadow-inner">
@@ -1123,13 +1502,43 @@ export const Products: React.FC = () => {
                            <div className="space-y-8">
                               <div className="space-y-4">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('products.form_barcode')}</label>
-                                <input type="text" className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner" value={formData.barcode} onChange={(e) => setFormData({ ...formData, barcode: e.target.value })} />
+                                 <div className="flex items-center gap-3">
+                                   <input type="text" className="flex-1 px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner" value={formData.barcode} onChange={(e) => setFormData({ ...formData, barcode: e.target.value })} />
+                                   <button type="button" onClick={handleOpenBarcodeSettings} className="p-5 bg-slate-50 hover:bg-slate-100 border border-slate-100 text-slate-600 rounded-[2rem] transition-all flex items-center justify-center shadow-sm" title={language === 'ar' ? 'إعدادات الباركود' : 'Barcode Settings'}>
+                                     <Settings size={20} />
+                                   </button>
+                                   <button type="button" disabled={!formData.barcode} onClick={handleOpenPrintBarcode} className="p-5 bg-slate-50 hover:bg-slate-100 border border-slate-100 text-slate-600 rounded-[2rem] transition-all flex items-center justify-center shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" title={language === 'ar' ? 'طباعة الباركود' : 'Print Barcode'}>
+                                     <Printer size={20} />
+                                   </button>
+                                 </div>
                               </div>
                               {formData.barcode && (
-                                 <div className="p-10 bg-white border border-slate-100 rounded-[3.5rem] flex justify-center shadow-sm">
-                                    <Barcode value={formData.barcode} width={2} height={80} fontSize={16} />
-                                 </div>
-                              )}
+                                  <div className="p-10 bg-white border border-slate-100 rounded-[3.5rem] flex justify-center shadow-sm overflow-hidden">
+                                     {(() => {
+                                       const s = getProductBarcodeSettings(formData);
+                                       const isValid = isValidBarcodeValue(formData.barcode, s.type);
+                                       if (!isValid) {
+                                         return <div className="text-rose-500 font-bold text-sm text-center">{language === 'ar' ? 'رمز باركود غير صالح لهذا النوع' : 'Invalid barcode for this type'}</div>;
+                                       }
+                                       return s.type === 'QR_CODE' ? (
+                                         <QRCode value={formData.barcode} size={Number(s.height) || 50} />
+                                       ) : (
+                                         <Barcode 
+                                           value={formData.barcode} 
+                                           format={s.type as any} 
+                                           width={Number(s.width) || 2} 
+                                           height={Number(s.height) || 55} 
+                                           fontSize={Number(s.fontSize) || 12} 
+                                           displayValue={s.displayValue}
+                                           marginTop={Number(s.marginTop) || 5}
+                                           marginBottom={Number(s.marginBottom) || 5}
+                                           marginLeft={Number(s.marginLeft) || 5}
+                                           marginRight={Number(s.marginRight) || 5}
+                                         />
+                                       );
+                                     })()}
+                                  </div>
+                               )}
                            </div>
                         </div>
                      </div>
@@ -1552,7 +1961,480 @@ export const Products: React.FC = () => {
         )}
       </AnimatePresence>
 
+      
       <PageActivityLog category="products" isOpen={isActivityLogOpen} onClose={() => setIsActivityLogOpen(false)} />
+
+      {/* Hidden section for printing barcodes */}
+      {printQueue.length > 0 && (
+        <div id="print-barcodes-section" className="hidden">
+          {printQueue.map((item, index) => (
+            <BarcodeLabel 
+              key={`${item.product.id || 'new'}-${index}`} 
+              product={item.product} 
+              settings={item.settings} 
+              printSettings={printConfig} 
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Barcode Settings Modal */}
+      {isBarcodeSettingsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200" dir={dir}>
+            {/* Modal Header */}
+            <div className="p-8 border-b border-slate-50 flex items-center justify-between">
+              <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+                <Settings className="text-emerald-600" />
+                {language === 'ar' ? 'إعدادات الباركود' : 'Barcode Settings'}
+              </h3>
+              <button onClick={() => setIsBarcodeSettingsOpen(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
+                <X size={20} className="text-slate-400" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-8 overflow-y-auto space-y-8 flex-1">
+              {/* Live Preview */}
+              <div className="p-6 bg-slate-50 border border-slate-100 rounded-3xl flex flex-col items-center justify-center min-h-[160px] relative">
+                <span className="absolute top-3 right-3 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white px-2.5 py-1 rounded-full border border-slate-100">
+                  {language === 'ar' ? 'معاينة حية' : 'Live Preview'}
+                </span>
+                <div className="bg-white p-6 rounded-2xl border border-slate-100/50 shadow-sm flex items-center justify-center min-w-[200px] overflow-hidden">
+                  {formData.barcode ? (
+                    isValidBarcodeValue(formData.barcode, tempBarcodeSettings.type) ? (
+                      tempBarcodeSettings.type === 'QR_CODE' ? (
+                        <QRCode 
+                          value={formData.barcode} 
+                          size={Number(tempBarcodeSettings.height) || 50} 
+                          style={{
+                            marginTop: `${tempBarcodeSettings.marginTop}px`,
+                            marginBottom: `${tempBarcodeSettings.marginBottom}px`,
+                            marginLeft: `${tempBarcodeSettings.marginLeft}px`,
+                            marginRight: `${tempBarcodeSettings.marginRight}px`
+                          }}
+                        />
+                      ) : (
+                        <Barcode 
+                          value={formData.barcode} 
+                          format={tempBarcodeSettings.type as any} 
+                          width={Number(tempBarcodeSettings.width) || 2} 
+                          height={Number(tempBarcodeSettings.height) || 50} 
+                          fontSize={Number(tempBarcodeSettings.fontSize) || 14} 
+                          displayValue={tempBarcodeSettings.displayValue} 
+                          marginTop={Number(tempBarcodeSettings.marginTop) || 10}
+                          marginBottom={Number(tempBarcodeSettings.marginBottom) || 10}
+                          marginLeft={Number(tempBarcodeSettings.marginLeft) || 10}
+                          marginRight={Number(tempBarcodeSettings.marginRight) || 10}
+                        />
+                      )
+                    ) : (
+                      <div className="text-rose-500 font-bold text-sm text-center p-4">
+                        {language === 'ar' 
+                          ? `القيمة "${formData.barcode}" غير صالحة للترميز من نوع ${tempBarcodeSettings.type}` 
+                          : `Value "${formData.barcode}" is invalid for ${tempBarcodeSettings.type}`}
+                      </div>
+                    )
+                  ) : (
+                    <span className="text-sm text-slate-400 italic">
+                      {language === 'ar' ? 'أدخل رقم باركود أولاً لرؤية المعاينة' : 'Enter barcode value to see preview'}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Inputs Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-right">
+                {/* Barcode Type */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{language === 'ar' ? 'نوع الباركود' : 'Barcode Type'}</label>
+                  <select 
+                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-base font-bold outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner"
+                    value={tempBarcodeSettings.type}
+                    onChange={(e) => setTempBarcodeSettings({ ...tempBarcodeSettings, type: e.target.value })}
+                  >
+                    <option value="CODE128">Code128</option>
+                    <option value="EAN13">EAN13</option>
+                    <option value="EAN8">EAN8</option>
+                    <option value="CODE39">Code39</option>
+                    <option value="QR_CODE">QR Code</option>
+                  </select>
+                </div>
+
+                {/* Width */}
+                {tempBarcodeSettings.type !== 'QR_CODE' && (
+                  <div className="space-y-2">
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{language === 'ar' ? 'عرض خطوط الباركود' : 'Barcode Width'}</label>
+                    <input 
+                      type="number" min="1" max="4"
+                      className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-base font-bold outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner"
+                      value={tempBarcodeSettings.width}
+                      onChange={(e) => setTempBarcodeSettings({ ...tempBarcodeSettings, width: Math.max(1, parseInt(e.target.value) || 2) })}
+                    />
+                  </div>
+                )}
+
+                {/* Height / Size */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">
+                    {tempBarcodeSettings.type === 'QR_CODE' 
+                      ? (language === 'ar' ? 'حجم الـ QR Code (بكسل)' : 'QR Code Size (px)')
+                      : (language === 'ar' ? 'ارتفاع الباركود (بكسل)' : 'Barcode Height (px)')}
+                  </label>
+                  <input 
+                    type="number" min="10" max="150"
+                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-base font-bold outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner"
+                    value={tempBarcodeSettings.height}
+                    onChange={(e) => setTempBarcodeSettings({ ...tempBarcodeSettings, height: Math.max(10, parseInt(e.target.value) || 50) })}
+                  />
+                </div>
+
+                {/* Font Size */}
+                {tempBarcodeSettings.type !== 'QR_CODE' && (
+                  <div className="space-y-2">
+                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{language === 'ar' ? 'حجم الخط' : 'Font Size'}</label>
+                    <input 
+                      type="number" min="8" max="24"
+                      className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-base font-bold outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner"
+                      value={tempBarcodeSettings.fontSize}
+                      onChange={(e) => setTempBarcodeSettings({ ...tempBarcodeSettings, fontSize: Math.max(8, parseInt(e.target.value) || 14) })}
+                    />
+                  </div>
+                )}
+
+                {/* Display Value */}
+                {tempBarcodeSettings.type !== 'QR_CODE' && (
+                  <div className="flex items-center gap-3 pt-6">
+                    <input 
+                      type="checkbox" id="display-value"
+                      className="w-5 h-5 rounded border-slate-200 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer"
+                      checked={tempBarcodeSettings.displayValue}
+                      onChange={(e) => setTempBarcodeSettings({ ...tempBarcodeSettings, displayValue: e.target.checked })}
+                    />
+                    <label htmlFor="display-value" className="text-sm font-bold text-slate-700 select-none cursor-pointer">
+                      {language === 'ar' ? 'إظهار الرقم أسفل الباركود' : 'Show value below barcode'}
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* Margins */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-black text-slate-800 border-b border-slate-50 pb-2">{language === 'ar' ? 'الهوامش (بكسل)' : 'Margins (px)'}</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-right">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-400 block uppercase tracking-widest">{language === 'ar' ? 'أعلى' : 'Top'}</label>
+                    <input 
+                      type="number" min="0" max="50"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none"
+                      value={tempBarcodeSettings.marginTop}
+                      onChange={(e) => setTempBarcodeSettings({ ...tempBarcodeSettings, marginTop: Math.max(0, parseInt(e.target.value) || 0) })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-400 block uppercase tracking-widest">{language === 'ar' ? 'أسفل' : 'Bottom'}</label>
+                    <input 
+                      type="number" min="0" max="50"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none"
+                      value={tempBarcodeSettings.marginBottom}
+                      onChange={(e) => setTempBarcodeSettings({ ...tempBarcodeSettings, marginBottom: Math.max(0, parseInt(e.target.value) || 0) })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-400 block uppercase tracking-widest">{language === 'ar' ? 'يسار' : 'Left'}</label>
+                    <input 
+                      type="number" min="0" max="50"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none"
+                      value={tempBarcodeSettings.marginLeft}
+                      onChange={(e) => setTempBarcodeSettings({ ...tempBarcodeSettings, marginLeft: Math.max(0, parseInt(e.target.value) || 0) })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-400 block uppercase tracking-widest">{language === 'ar' ? 'يمين' : 'Right'}</label>
+                    <input 
+                      type="number" min="0" max="50"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none"
+                      value={tempBarcodeSettings.marginRight}
+                      onChange={(e) => setTempBarcodeSettings({ ...tempBarcodeSettings, marginRight: Math.max(0, parseInt(e.target.value) || 0) })}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="p-8 border-t border-slate-50 bg-slate-50/50 flex items-center justify-end gap-4">
+              <button 
+                onClick={() => setIsBarcodeSettingsOpen(false)}
+                className="px-6 py-4 bg-white border border-slate-100 hover:bg-slate-50 rounded-2xl text-sm font-black text-slate-500 shadow-sm transition-all"
+              >
+                {t('common.cancel')}
+              </button>
+              <button 
+                onClick={handleSaveBarcodeSettings}
+                className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-sm font-black shadow-lg shadow-emerald-500/10 transition-all"
+              >
+                {t('common.save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Single Print Barcode Modal */}
+      {isPrintBarcodeOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200" dir={dir}>
+            {/* Modal Header */}
+            <div className="p-8 border-b border-slate-50 flex items-center justify-between">
+              <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+                <Printer className="text-emerald-600" />
+                {language === 'ar' ? 'خيارات طباعة الباركود' : 'Print Barcode Options'}
+              </h3>
+              <button onClick={() => setIsPrintBarcodeOpen(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
+                <X size={20} className="text-slate-400" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-8 overflow-y-auto space-y-6 text-right">
+              {/* Quantity */}
+              <div className="space-y-2">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{language === 'ar' ? 'عدد النسخ' : 'Number of copies'}</label>
+                <input 
+                  type="number" min="1" max="1000"
+                  className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-base font-bold outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner"
+                  value={printConfig.copies}
+                  onChange={(e) => setPrintConfig({ ...printConfig, copies: Math.max(1, parseInt(e.target.value) || 1) })}
+                />
+              </div>
+
+              {/* Size Selection */}
+              <div className="space-y-2">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{language === 'ar' ? 'مقاس الملصق' : 'Label Size'}</label>
+                <select 
+                  className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-base font-bold outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner"
+                  value={printConfig.size}
+                  onChange={(e) => setPrintConfig({ ...printConfig, size: e.target.value })}
+                >
+                  <option value="40×20 mm">40×20 mm</option>
+                  <option value="50×25 mm">50×25 mm</option>
+                  <option value="60×30 mm">60×30 mm</option>
+                  <option value="A4">A4 (Grid / شبكة ملصقات)</option>
+                </select>
+              </div>
+
+              {/* Visibility Options */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-2">{language === 'ar' ? 'خيارات إضافية' : 'Additional Options'}</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="checkbox" id="show-name"
+                      className="w-5 h-5 rounded border-slate-200 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer"
+                      checked={printConfig.showName}
+                      onChange={(e) => setPrintConfig({ ...printConfig, showName: e.target.checked })}
+                    />
+                    <label htmlFor="show-name" className="text-sm font-bold text-slate-700 select-none cursor-pointer">
+                      {language === 'ar' ? 'إظهار اسم الصنف' : 'Show product name'}
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="checkbox" id="show-price"
+                      className="w-5 h-5 rounded border-slate-200 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer"
+                      checked={printConfig.showPrice}
+                      onChange={(e) => setPrintConfig({ ...printConfig, showPrice: e.target.checked })}
+                    />
+                    <label htmlFor="show-price" className="text-sm font-bold text-slate-700 select-none cursor-pointer">
+                      {language === 'ar' ? 'إظهار السعر' : 'Show price'}
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="checkbox" id="show-text"
+                      className="w-5 h-5 rounded border-slate-200 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer"
+                      checked={printConfig.showText}
+                      onChange={(e) => setPrintConfig({ ...printConfig, showText: e.target.checked })}
+                    />
+                    <label htmlFor="show-text" className="text-sm font-bold text-slate-700 select-none cursor-pointer">
+                      {language === 'ar' ? 'إظهار رقم الباركود' : 'Show barcode text'}
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Printer Selection */}
+              <div className="space-y-2">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{language === 'ar' ? 'اختيار الطابعة' : 'Select Printer'}</label>
+                <select 
+                  className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-base font-bold outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner"
+                  value={printConfig.printer}
+                  onChange={(e) => setPrintConfig({ ...printConfig, printer: e.target.value })}
+                >
+                  <option value="system_default">{language === 'ar' ? 'طابعة الويندوز الافتراضية' : 'Default Windows Printer'}</option>
+                  <option value="label_printer">{language === 'ar' ? 'طابعة ملصقات باركود حرارية' : 'Thermal Label Printer'}</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="p-8 border-t border-slate-50 bg-slate-50/50 flex items-center justify-end gap-4">
+              <button 
+                onClick={() => setIsPrintBarcodeOpen(false)}
+                className="px-6 py-4 bg-white border border-slate-100 hover:bg-slate-50 rounded-2xl text-sm font-black text-slate-500 shadow-sm transition-all"
+              >
+                {t('common.cancel')}
+              </button>
+              <button 
+                onClick={handleExecutePrint}
+                className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-sm font-black shadow-lg shadow-emerald-500/10 transition-all flex items-center gap-2"
+              >
+                <Printer size={16} />
+                {language === 'ar' ? 'طباعة' : 'Print'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Print Barcode Modal */}
+      {isBulkPrintOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200" dir={dir}>
+            {/* Modal Header */}
+            <div className="p-8 border-b border-slate-50 flex items-center justify-between">
+              <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+                <Printer className="text-emerald-600" />
+                {language === 'ar' ? 'طباعة باركود جماعية' : 'Bulk Print Barcodes'}
+              </h3>
+              <button onClick={() => setIsBulkPrintOpen(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
+                <X size={20} className="text-slate-400" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-8 overflow-y-auto space-y-6 text-right">
+              {/* Selected Products List Summary */}
+              <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl space-y-2">
+                <span className="text-[10px] font-black text-slate-400 block uppercase tracking-widest">{language === 'ar' ? 'الأصناف المحددة' : 'Selected Products'}</span>
+                <div className="max-h-[120px] overflow-y-auto divide-y divide-slate-100 text-sm font-bold text-slate-700">
+                  {selectedProductIds.map(id => {
+                    const prod = products.find(p => p.id === id);
+                    return prod ? (
+                      <div key={id} className="py-2 flex justify-between">
+                        <span>{prod.name}</span>
+                        <span className="text-slate-400 font-mono">{prod.code}</span>
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+
+              {/* Quantity */}
+              <div className="space-y-2">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{language === 'ar' ? 'عدد النسخ لكل صنف' : 'Copies per product'}</label>
+                <input 
+                  type="number" min="1" max="100"
+                  className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-base font-bold outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner"
+                  value={printConfig.copies}
+                  onChange={(e) => setPrintConfig({ ...printConfig, copies: Math.max(1, parseInt(e.target.value) || 1) })}
+                />
+              </div>
+
+              {/* Size Selection */}
+              <div className="space-y-2">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{language === 'ar' ? 'مقاس الملصق' : 'Label Size'}</label>
+                <select 
+                  className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-base font-bold outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner"
+                  value={printConfig.size}
+                  onChange={(e) => setPrintConfig({ ...printConfig, size: e.target.value })}
+                >
+                  <option value="40×20 mm">40×20 mm</option>
+                  <option value="50×25 mm">50×25 mm</option>
+                  <option value="60×30 mm">60×30 mm</option>
+                  <option value="A4">A4 (Grid / شبكة ملصقات)</option>
+                </select>
+              </div>
+
+              {/* Visibility Options */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-2">{language === 'ar' ? 'خيارات إضافية' : 'Additional Options'}</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="checkbox" id="bulk-show-name"
+                      className="w-5 h-5 rounded border-slate-200 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer"
+                      checked={printConfig.showName}
+                      onChange={(e) => setPrintConfig({ ...printConfig, showName: e.target.checked })}
+                    />
+                    <label htmlFor="bulk-show-name" className="text-sm font-bold text-slate-700 select-none cursor-pointer">
+                      {language === 'ar' ? 'إظهار اسم الصنف' : 'Show product name'}
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="checkbox" id="bulk-show-price"
+                      className="w-5 h-5 rounded border-slate-200 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer"
+                      checked={printConfig.showPrice}
+                      onChange={(e) => setPrintConfig({ ...printConfig, showPrice: e.target.checked })}
+                    />
+                    <label htmlFor="bulk-show-price" className="text-sm font-bold text-slate-700 select-none cursor-pointer">
+                      {language === 'ar' ? 'إظهار السعر' : 'Show price'}
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="checkbox" id="bulk-show-text"
+                      className="w-5 h-5 rounded border-slate-200 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer"
+                      checked={printConfig.showText}
+                      onChange={(e) => setPrintConfig({ ...printConfig, showText: e.target.checked })}
+                    />
+                    <label htmlFor="bulk-show-text" className="text-sm font-bold text-slate-700 select-none cursor-pointer">
+                      {language === 'ar' ? 'إظهار رقم الباركود' : 'Show barcode text'}
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Printer Selection */}
+              <div className="space-y-2">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">{language === 'ar' ? 'اختيار الطابعة' : 'Select Printer'}</label>
+                <select 
+                  className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-base font-bold outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner"
+                  value={printConfig.printer}
+                  onChange={(e) => setPrintConfig({ ...printConfig, printer: e.target.value })}
+                >
+                  <option value="system_default">{language === 'ar' ? 'طابعة الويندوز الافتراضية' : 'Default Windows Printer'}</option>
+                  <option value="label_printer">{language === 'ar' ? 'طابعة ملصقات باركود حرارية' : 'Thermal Label Printer'}</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="p-8 border-t border-slate-50 bg-slate-50/50 flex items-center justify-end gap-4">
+              <button 
+                onClick={() => setIsBulkPrintOpen(false)}
+                className="px-6 py-4 bg-white border border-slate-100 hover:bg-slate-50 rounded-2xl text-sm font-black text-slate-500 shadow-sm transition-all"
+              >
+                {t('common.cancel')}
+              </button>
+              <button 
+                onClick={handleExecuteBulkPrint}
+                className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-sm font-black shadow-lg shadow-emerald-500/10 transition-all flex items-center gap-2"
+              >
+                <Printer size={16} />
+                {language === 'ar' ? 'طباعة' : 'Print'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
