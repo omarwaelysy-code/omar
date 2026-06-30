@@ -1196,6 +1196,7 @@ export async function generateNextSequence(client: any, companyId: string, modul
     case 'opening_stock_balances': numField = 'document_number'; prefix = 'OPB'; break;
     case 'stock_adjustments': numField = 'adjustment_number'; prefix = 'ADJ'; break;
     case 'cash_transfers': numField = 'transfer_number'; prefix = 'CT'; break;
+    case 'goods_receipts': numField = 'receipt_number'; prefix = 'GR'; break;
   }
 
   if (moduleName === 'employees') {
