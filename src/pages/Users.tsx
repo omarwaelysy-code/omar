@@ -385,9 +385,17 @@ export const Users: React.FC = () => {
 
   // Toggle Role Assignment in User Permissions Modal
   const toggleUserRoleAssignment = (roleId: string) => {
-    setTempUserRoleIds(prev => 
-      prev.includes(roleId) ? prev.filter(id => id !== roleId) : [...prev, roleId]
-    );
+    setTempUserRoleIds(prev => {
+      const prevVal = prev as any;
+      const roleIds = Array.isArray(prevVal) 
+        ? prevVal 
+        : (typeof prevVal === 'string' 
+            ? (prevVal.startsWith('[') ? JSON.parse(prevVal) : (prevVal ? [prevVal] : [])) 
+            : []);
+      return roleIds.includes(roleId) ? roleIds.filter((id: string) => id !== roleId) : [...roleIds, roleId];
+    });
+
+
   };
 
   // Restore defaults (clear overrides)
@@ -416,6 +424,12 @@ export const Users: React.FC = () => {
       : (typeof idsVal === 'string' 
           ? (idsVal.startsWith('[') ? JSON.parse(idsVal) : (idsVal ? [idsVal] : [])) 
           : []);
+    console.log("getUserAssignedRoleNames details:", {
+      typeofVal: typeof idsVal,
+      value: idsVal,
+      isArray: Array.isArray(idsVal),
+      parsedIds: ids
+    });
     return roles.filter(r => ids.includes(r.id)).map(r => r.name).join('، ') || 'لا يوجد أدوار';
   };
 
@@ -1232,7 +1246,12 @@ export const Users: React.FC = () => {
                                             <span className="text-xs font-black text-slate-500">السجلات المسموح بها للمستخدم:</span>
                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                               {listResources.map(item => {
-                                                const isChecked = activeAllowedIds.includes(item.id);
+                                                 console.log("CHECKLIST EXCEPTION GUARD:", {
+                                                   typeofValue: typeof activeAllowedIds,
+                                                   value: activeAllowedIds,
+                                                   isArray: Array.isArray(activeAllowedIds)
+                                                 });
+                                                 const isChecked = Array.isArray(activeAllowedIds) && activeAllowedIds.includes(item.id);
                                                 const isChangeDisabled = permissionsTargetType === 'user' && userOverrideRestrict !== true;
 
                                                 return (
