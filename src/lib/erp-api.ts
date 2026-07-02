@@ -2638,6 +2638,21 @@ modules.forEach(moduleName => {
           }
         }
 
+        if (moduleName === 'goods_receipts') {
+          const linkedRes = await client.query(
+            `SELECT pi.invoice_number 
+             FROM purchase_invoice_goods_receipts pigr 
+             JOIN purchase_invoices pi ON pigr.purchase_invoice_id = pi.id 
+             WHERE pigr.goods_receipt_id = $1`,
+            [id]
+          );
+          if (linkedRes.rows.length > 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, `لا يمكن حذف إذن الاستلام هذا لأنه مرتبط بفاتورة المشتريات رقم ${linkedRes.rows[0].invoice_number}. يرجى حذف الفاتورة أولاً.`);
+          }
+        }
+
         if (moduleName === 'invoices') {
           await client.query(
             `UPDATE sales_orders 
@@ -3642,8 +3657,8 @@ export async function allocatePurchaseInvoiceBillingToGoodsReceipts(
 
     let billingStatus = 'uninvoiced';
     if (grItemsList.length > 0) {
-      const allFullyBilled = grItemsList.every(i => i.remaining_quantity === 0);
-      const allUnbilled = grItemsList.every(i => i.billed_quantity === 0);
+      const allFullyBilled = grItemsList.every(i => i.remaining_quantity <= 0.0001);
+      const allUnbilled = grItemsList.every(i => i.billed_quantity <= 0.0001);
       if (allFullyBilled) {
         billingStatus = 'fully_invoiced';
       } else if (allUnbilled) {
@@ -3749,8 +3764,8 @@ export async function revertPurchaseInvoiceBillingFromGoodsReceipts(
 
     let billingStatus = 'uninvoiced';
     if (grItemsList.length > 0) {
-      const allFullyBilled = grItemsList.every(i => i.remaining_quantity === 0);
-      const allUnbilled = grItemsList.every(i => i.billed_quantity === 0);
+      const allFullyBilled = grItemsList.every(i => i.remaining_quantity <= 0.0001);
+      const allUnbilled = grItemsList.every(i => i.billed_quantity <= 0.0001);
       if (allFullyBilled) {
         billingStatus = 'fully_invoiced';
       } else if (allUnbilled) {
@@ -5663,6 +5678,21 @@ router.put('/goods_receipts/:id', authenticateToken, async (req: AuthRequest, re
 
     await client.query('BEGIN');
 
+    const linkCheck = await client.query(
+      `SELECT pi.invoice_number 
+       FROM purchase_invoice_goods_receipts pigr 
+       JOIN purchase_invoices pi ON pigr.purchase_invoice_id = pi.id 
+       WHERE pigr.goods_receipt_id = $1`,
+      [id]
+    );
+    if (linkCheck.rows.length > 0) {
+      if (rawReceiptData.status === 'draft') {
+        await client.query('ROLLBACK');
+        client.release();
+        return sendError(res, 400, `لا يمكن إلغاء أو تحويل إذن الاستلام هذا إلى مسودة لأنه مرتبط بفاتورة المشتريات رقم ${linkCheck.rows[0].invoice_number}. يرجى حذف أو فك ارتباط الفاتورة أولاً.`);
+      }
+    }
+
     // Retrieve old state to deduct received quantities from PO
     const oldItemsRes = await client.query('SELECT product_id, quantity, billed_quantity FROM goods_receipt_items WHERE goods_receipt_id = $1', [id]);
     const billedMap = new Map();
@@ -5817,8 +5847,8 @@ router.put('/goods_receipts/:id', authenticateToken, async (req: AuthRequest, re
 
       let billingStatus = 'uninvoiced';
       if (grItemsList.length > 0) {
-        const allFullyBilled = grItemsList.every((i: any) => i.remaining_quantity === 0);
-        const allUnbilled = grItemsList.every((i: any) => i.billed_quantity === 0);
+        const allFullyBilled = grItemsList.every((i: any) => i.remaining_quantity <= 0.0001);
+        const allUnbilled = grItemsList.every((i: any) => i.billed_quantity <= 0.0001);
         if (allFullyBilled) {
           billingStatus = 'fully_invoiced';
         } else if (allUnbilled) {

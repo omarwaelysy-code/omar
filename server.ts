@@ -252,6 +252,144 @@ async function startServer() {
       .catch((e) => {
         console.error("⚠️ Failed to load backfill module:", e.message);
       });
+
+    // Auto-reconcile Goods Receipt quantities and statuses on startup (in background)
+    setTimeout(async () => {
+      console.log("🔄 Reconciling Goods Receipt quantities and statuses in background...");
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        
+        // 1. Reconcile all Auto-Generated Goods Receipts
+        await client.query(`
+          UPDATE goods_receipt_items 
+          SET billed_quantity = quantity, remaining_quantity = 0 
+          WHERE goods_receipt_id IN (
+            SELECT id FROM goods_receipts 
+            WHERE document_origin = 'Purchase Invoice (Auto Generated)'
+          )
+        `);
+        await client.query(`
+          UPDATE goods_receipts 
+          SET billing_status = 'fully_invoiced' 
+          WHERE document_origin = 'Purchase Invoice (Auto Generated)'
+        `);
+
+        // 2. Reset manual Goods Receipts
+        await client.query(`
+          UPDATE goods_receipt_items 
+          SET billed_quantity = 0, remaining_quantity = quantity 
+          WHERE goods_receipt_id IN (
+            SELECT id FROM goods_receipts 
+            WHERE document_origin IS NULL OR document_origin != 'Purchase Invoice (Auto Generated)'
+          )
+        `);
+        await client.query(`
+          UPDATE goods_receipts 
+          SET billing_status = 'uninvoiced' 
+          WHERE document_origin IS NULL OR document_origin != 'Purchase Invoice (Auto Generated)'
+        `);
+
+        // 3. Re-allocate manual links FIFO-style
+        const linksRes = await client.query(`
+          SELECT pigr.purchase_invoice_id, pigr.goods_receipt_id, pi.date, pi.company_id
+          FROM purchase_invoice_goods_receipts pigr
+          JOIN purchase_invoices pi ON pigr.purchase_invoice_id = pi.id
+          JOIN goods_receipts gr ON pigr.goods_receipt_id = gr.id
+          WHERE gr.document_origin IS NULL OR gr.document_origin != 'Purchase Invoice (Auto Generated)'
+          ORDER BY pi.date ASC, pi.created_at ASC
+        `);
+
+        const links = linksRes.rows;
+        for (const link of links) {
+          const invoiceId = link.purchase_invoice_id;
+          const grId = link.goods_receipt_id;
+
+          const invItemsRes = await client.query(
+            "SELECT product_id, quantity FROM purchase_invoice_items WHERE invoice_id = $1",
+            [invoiceId]
+          );
+          const invoiceItems = invItemsRes.rows;
+
+          const grItemsRes = await client.query(
+            "SELECT id, product_id, quantity, billed_quantity, remaining_quantity FROM goods_receipt_items WHERE goods_receipt_id = $1",
+            [grId]
+          );
+          const grItems = grItemsRes.rows.map((item: any) => ({
+            ...item,
+            quantity: parseFloat(item.quantity || '0'),
+            billed_quantity: parseFloat(item.billed_quantity || '0'),
+            remaining_quantity: parseFloat(item.remaining_quantity !== null && item.remaining_quantity !== undefined ? item.remaining_quantity : (item.quantity || '0'))
+          }));
+
+          for (const invItem of invoiceItems) {
+            const prodId = invItem.product_id;
+            const invoiceQty = parseFloat(invItem.quantity || '0');
+            if (invoiceQty <= 0) continue;
+
+            let unallocatedQty = invoiceQty;
+            for (const grItem of grItems) {
+              if (grItem.product_id !== prodId) continue;
+              if (unallocatedQty <= 0) break;
+
+              const availableToBill = grItem.remaining_quantity;
+              if (availableToBill <= 0) continue;
+
+              const allocation = Math.min(unallocatedQty, availableToBill);
+              grItem.billed_quantity = parseFloat((grItem.billed_quantity + allocation).toFixed(4));
+              grItem.remaining_quantity = parseFloat((grItem.remaining_quantity - allocation).toFixed(4));
+              unallocatedQty = parseFloat((unallocatedQty - allocation).toFixed(4));
+
+              await client.query(
+                "UPDATE goods_receipt_items SET billed_quantity = $1, remaining_quantity = $2 WHERE id = $3",
+                [grItem.billed_quantity, grItem.remaining_quantity, grItem.id]
+              );
+            }
+          }
+        }
+
+        // 4. Recalculate overall billing status for all Goods Receipts
+        const allGrsRes = await client.query("SELECT id FROM goods_receipts");
+        for (const gr of allGrsRes.rows) {
+          const grId = gr.id;
+          const itemsRes = await client.query(
+            "SELECT quantity, billed_quantity, remaining_quantity FROM goods_receipt_items WHERE goods_receipt_id = $1",
+            [grId]
+          );
+          const grItemsList = itemsRes.rows.map((item: any) => ({
+            quantity: parseFloat(item.quantity || '0'),
+            billed_quantity: parseFloat(item.billed_quantity || '0'),
+            remaining_quantity: parseFloat(item.remaining_quantity !== null && item.remaining_quantity !== undefined ? item.remaining_quantity : (item.quantity || '0'))
+          }));
+
+          let billingStatus = 'uninvoiced';
+          if (grItemsList.length > 0) {
+            const allFullyBilled = grItemsList.every((i: any) => i.remaining_quantity <= 0.0001);
+            const allUnbilled = grItemsList.every((i: any) => i.billed_quantity <= 0.0001);
+            if (allFullyBilled) {
+              billingStatus = 'fully_invoiced';
+            } else if (allUnbilled) {
+              billingStatus = 'uninvoiced';
+            } else {
+              billingStatus = 'partially_invoiced';
+            }
+          }
+
+          await client.query(
+            "UPDATE goods_receipts SET billing_status = $1 WHERE id = $2",
+            [billingStatus, grId]
+          );
+        }
+
+        await client.query('COMMIT');
+        console.log("✅ Goods Receipt reconciliation complete.");
+      } catch (err: any) {
+        await client.query('ROLLBACK');
+        console.error("⚠️ Failed to reconcile Goods Receipts:", err.message);
+      } finally {
+        client.release();
+      }
+    }, 0);
     
     // Auto-fix orphaned movements on startup (in background)
     setTimeout(async () => {

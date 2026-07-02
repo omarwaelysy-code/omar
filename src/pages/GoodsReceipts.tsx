@@ -392,8 +392,8 @@ export const GoodsReceipts: React.FC = () => {
       const po = pendingPOs.find(o => o.id === selectedPOId);
 
       const payload = {
-        supplier_id: supplierId,
-        supplier_name: supplier?.name || '',
+        supplier_id: supplierId || null,
+        supplier_name: supplier?.name || null,
         warehouse_id: warehouseId,
         warehouse_name: wh?.name || '',
         date: receiptDate,
@@ -938,8 +938,6 @@ export const GoodsReceipts: React.FC = () => {
                             <th className="px-4 py-3">{language === 'ar' ? 'المستلمة' : 'Received'}</th>
                             <th className="px-4 py-3">{language === 'ar' ? 'المفوترة' : 'Billed'}</th>
                             <th className="px-4 py-3">{language === 'ar' ? 'المتبقية' : 'Remaining'}</th>
-                            <th className="px-4 py-3">{gt('column_cost')}</th>
-                            <th className="px-4 py-3">{gt('column_total')}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50 font-semibold text-slate-600">
@@ -958,8 +956,6 @@ export const GoodsReceipts: React.FC = () => {
                               <td className="px-4 py-3 font-bold text-amber-600">
                                 {item.remaining_quantity !== null && item.remaining_quantity !== undefined ? item.remaining_quantity : item.quantity} <span className="text-slate-400 text-[10px]">{item.unit}</span>
                               </td>
-                              <td className="px-4 py-3">{formatMoney(item.unit_cost)}</td>
-                              <td className="px-4 py-3 font-bold text-slate-800">{formatMoney(item.total_cost || (item.quantity * item.unit_cost))}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1045,9 +1041,8 @@ export const GoodsReceipts: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Supplier */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-2">{gt('form_supplier')}*</label>
+                    <label className="block text-xs font-bold text-slate-400 mb-2">{gt('form_supplier')}</label>
                     <select
-                      required
                       className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-slate-700 font-semibold focus:ring-2 focus:ring-indigo-500/20 transition-all text-sm cursor-pointer outline-none"
                       value={supplierId}
                       onChange={e => setSupplierId(e.target.value)}
@@ -1135,7 +1130,6 @@ export const GoodsReceipts: React.FC = () => {
                           <th className="px-4 py-3">{gt('column_quantity')}</th>
                           {selectedPOId && <th className="px-4 py-3">{gt('column_po_qty')}</th>}
                           {selectedPOId && <th className="px-4 py-3">{gt('column_prev_received')}</th>}
-                          <th className="px-4 py-3">{gt('column_cost')}</th>
                           <th className="px-4 py-3">{gt('column_batch')}</th>
                           <th className="px-4 py-3">{gt('column_serial')}</th>
                           <th className="px-4 py-3"></th>
@@ -1176,17 +1170,6 @@ export const GoodsReceipts: React.FC = () => {
                             {selectedPOId && (
                               <td className="px-4 py-2 text-slate-500 font-bold">{item.previously_received}</td>
                             )}
-                            <td className="px-4 py-2">
-                              <input
-                                required
-                                type="number"
-                                step="any"
-                                min="0"
-                                className="w-24 px-2 py-1.5 bg-slate-50 border-none rounded-xl text-slate-700 font-bold focus:ring-1 focus:ring-indigo-500/20 outline-none"
-                                value={item.unit_cost}
-                                onChange={e => handleItemChange(index, 'unit_cost', parseFloat(e.target.value) || 0)}
-                              />
-                            </td>
                             <td className="px-4 py-2">
                               <input
                                 type="text"
