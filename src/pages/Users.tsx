@@ -1104,7 +1104,12 @@ export const Users: React.FC = () => {
                                         : 'allowed_bank_ids';
 
                                     const isRestrictedRole = tempPermissions[modId]?.[restrictionKey] === true;
-                                    const allowedIdsRole = tempPermissions[modId]?.[allowedIdsKey] || [];
+                                     const allowedIdsRoleRaw = tempPermissions[modId]?.[allowedIdsKey] || [];
+                                     const allowedIdsRole = Array.isArray(allowedIdsRoleRaw)
+                                       ? allowedIdsRoleRaw
+                                       : (typeof allowedIdsRoleRaw === 'string'
+                                           ? (allowedIdsRoleRaw.startsWith('[') ? JSON.parse(allowedIdsRoleRaw) : (allowedIdsRoleRaw ? [allowedIdsRoleRaw] : []))
+                                           : []);
 
                                     // Inherit references
                                     const isRestrictedInherited = getInheritedPermissionState(modId, restrictionKey) === true;
@@ -1118,9 +1123,14 @@ export const Users: React.FC = () => {
                                       ? userOverrideRestrict 
                                       : isRestrictedInherited;
 
-                                    const activeAllowedIds = userOverrideRestrict !== undefined 
-                                      ? (tempPermissions[modId]?.[allowedIdsKey] || []) 
-                                      : allowedIdsInherited;
+                                     const activeAllowedIdsRaw = userOverrideRestrict !== undefined
+                                       ? (tempPermissions[modId]?.[allowedIdsKey] || [])
+                                       : allowedIdsInherited;
+                                     const activeAllowedIds = Array.isArray(activeAllowedIdsRaw)
+                                       ? activeAllowedIdsRaw
+                                       : (typeof activeAllowedIdsRaw === 'string'
+                                           ? (activeAllowedIdsRaw.startsWith('[') ? JSON.parse(activeAllowedIdsRaw) : (activeAllowedIdsRaw ? [activeAllowedIdsRaw] : []))
+                                           : []);
 
                                     // Fetch list records
                                     const listResources = perm.selectionType === 'warehouses' 
