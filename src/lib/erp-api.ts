@@ -3812,8 +3812,10 @@ await client.query(
     invoiceData.source_orders = sourceOrdersStr || null;
 
     let finalGrIds = [...goodsReceiptIds];
+    let autoGenReceiptId = null;
     if (workflowMode === 'Enterprise Flexible' && finalGrIds.length === 0 && req.body.auto_generate_gr) {
       const receiptId = uuidv4();
+      autoGenReceiptId = receiptId;
       const receiptNumber = await generateNextSequence(client, companyId, 'goods_receipts', invoiceData.date as string);
       
       const receiptData = {
@@ -4058,6 +4060,19 @@ await client.query(
           [uuidv4(), invoiceId, grId]
         );
       }
+      // Allocate quantities FIFO style
+      const manualGrIds = finalGrIds.filter(id => id !== autoGenReceiptId);
+      if (manualGrIds.length > 0) {
+        await allocatePurchaseInvoiceBillingToGoodsReceipts(
+          client,
+          companyId,
+          invoiceId,
+          manualGrIds,
+          items,
+          invoiceData.supplier_id || null,
+          invoiceData.supplier_name || null
+        );
+      }
     }
 
     await client.query('COMMIT');
@@ -4084,6 +4099,9 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
     const workflowMode = compRes.rows[0]?.purchase_workflow_mode || 'Simple';
 
     const { items, id: bodyId, ...rawInvoiceData } = req.body;
+
+    // Revert previous Goods Receipt billing allocations before deleting old items
+    await revertPurchaseInvoiceBillingFromGoodsReceipts(client, companyId || '', invoiceId);
 
     const goodsReceiptIds: string[] = req.body.goods_receipt_ids || [];
     if (workflowMode === 'Enterprise Strict' && goodsReceiptIds.length === 0) {
@@ -4170,8 +4188,10 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
         }
     
         let finalGrIds = [...goodsReceiptIds];
+        let autoGenReceiptId = null;
         if (workflowMode === 'Enterprise Flexible' && finalGrIds.length === 0 && req.body.auto_generate_gr) {
           const receiptId = uuidv4();
+          autoGenReceiptId = receiptId;
           const receiptNumber = await generateNextSequence(client, companyId, 'goods_receipts', invoiceData.date as string);
           
           const receiptData = {
@@ -4403,6 +4423,19 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
             await client.query(
               `INSERT INTO purchase_invoice_goods_receipts (id, purchase_invoice_id, goods_receipt_id) VALUES ($1, $2, $3)`,
               [uuidv4(), invoiceId, grId]
+            );
+          }
+          // Allocate quantities FIFO style
+          const manualGrIds = finalGrIds.filter(id => id !== autoGenReceiptId);
+          if (manualGrIds.length > 0) {
+            await allocatePurchaseInvoiceBillingToGoodsReceipts(
+              client,
+              companyId,
+              invoiceId,
+              manualGrIds,
+              items,
+              invoiceData.supplier_id || null,
+              invoiceData.supplier_name || null
             );
           }
         }
