@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -506,7 +506,7 @@ export const Users: React.FC = () => {
           </div>
           <div>
             <h2 className="text-3xl font-black text-slate-900 tracking-tighter italic serif">{language === 'ar' ? 'الصلاحيات والأدوار' : 'Permissions & Roles'}</h2>
-            <p className="text-slate-500 font-medium mt-1">{language === 'ar' ? 'تعديل صلاحيات {language === 'ar' ? 'المستخدمين' : 'Users'} و{language === 'ar' ? 'الأدوار الوظيفية' : 'Job Roles'} داخل النظام بالكامل' : 'Modify user permissions and job roles across the entire system'}</p>
+            <p className="text-slate-500 font-medium mt-1">{language === 'ar' ? 'تعديل صلاحيات المستخدمين والأدوار الوظيفية داخل النظام بالكامل' : 'Modify user permissions and job roles across the entire system'}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -868,16 +868,16 @@ export const Users: React.FC = () => {
                         <span className="text-slate-500">{language === 'ar' ? 'تحديد أعمدة كاملة بضغطة واحدة:' : 'Select entire columns with one click:'}</span>
                         <div className="flex gap-2">
                           <button type="button" onClick={() => toggleColumnAll('view', true)} className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg">{language === 'ar' ? 'تحديد كل العرض' : 'Select All View'}</button>
-                          <button type="button" onClick={() => toggleColumnAll('view', false)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-750 rounded-lg">{language === 'ar' ? '{language === 'ar' ? 'إلغاء' : 'Cancel'} كل العرض' : 'Clear All View'}</button>
+                          <button type="button" onClick={() => toggleColumnAll('view', false)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-750 rounded-lg">{language === 'ar' ? 'إلغاء كل العرض' : 'Clear All View'}</button>
                           <span className="border-l border-slate-200 mx-1"></span>
                           <button type="button" onClick={() => toggleColumnAll('create', true)} className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg">{language === 'ar' ? 'تحديد كل الإضافة' : 'Select All Create'}</button>
-                          <button type="button" onClick={() => toggleColumnAll('create', false)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-750 rounded-lg">{language === 'ar' ? '{language === 'ar' ? 'إلغاء' : 'Cancel'} كل الإضافة' : 'Clear All Create'}</button>
+                          <button type="button" onClick={() => toggleColumnAll('create', false)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-750 rounded-lg">{language === 'ar' ? 'إلغاء كل الإضافة' : 'Clear All Create'}</button>
                           <span className="border-l border-slate-200 mx-1"></span>
                           <button type="button" onClick={() => toggleColumnAll('edit', true)} className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg">{language === 'ar' ? 'تحديد كل التعديل' : 'Select All Edit'}</button>
-                          <button type="button" onClick={() => toggleColumnAll('edit', false)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-750 rounded-lg">{language === 'ar' ? '{language === 'ar' ? 'إلغاء' : 'Cancel'} كل التعديل' : 'Clear All Edit'}</button>
+                          <button type="button" onClick={() => toggleColumnAll('edit', false)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-750 rounded-lg">{language === 'ar' ? 'إلغاء كل التعديل' : 'Clear All Edit'}</button>
                           <span className="border-l border-slate-200 mx-1"></span>
                           <button type="button" onClick={() => toggleColumnAll('delete', true)} className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg">{language === 'ar' ? 'تحديد كل الحذف' : 'Select All Delete'}</button>
-                          <button type="button" onClick={() => toggleColumnAll('delete', false)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-750 rounded-lg">{language === 'ar' ? '{language === 'ar' ? 'إلغاء' : 'Cancel'} كل الحذف' : 'Clear All Delete'}</button>
+                          <button type="button" onClick={() => toggleColumnAll('delete', false)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-750 rounded-lg">{language === 'ar' ? 'إلغاء كل الحذف' : 'Clear All Delete'}</button>
                         </div>
                       </div>
 
@@ -938,7 +938,7 @@ export const Users: React.FC = () => {
                                           <span className="text-[10px] text-slate-350 font-mono font-bold tracking-tight">({modId})</span>
                                           <div className="relative group inline-block">
                                             <HelpCircle className="w-4 h-4 text-slate-400 cursor-pointer" />
-                                            <div className="absolute z-[100] hidden group-hover:block bg-slate-900 text-white text-xs rounded-xl p-3 w-64 shadow-xl border border-slate-700 -top-2 right-6 ${language === 'ar' ? 'dir-rtl text-right' : 'dir-ltr text-left'} font-medium leading-relaxed">
+                        <div className={`absolute z-[100] hidden group-hover:block bg-slate-900 text-white text-xs rounded-xl p-3 w-64 shadow-xl border border-slate-700 -top-2 right-6 ${language === 'ar' ? 'dir-rtl text-right' : 'dir-ltr text-left'} font-medium leading-relaxed`}>
                                               {language === 'ar' ? `لوحة أو مستند ${meta.labelAr} لتسجيل وإدارة ومتابعة العمليات.` : `Page/Document ${meta.labelEn}.`}
                                             </div>
                                           </div>
@@ -977,7 +977,7 @@ export const Users: React.FC = () => {
                                                       {overrideValue !== undefined ? (
                                                         <span className="w-1.5 h-1.5 bg-blue-500 rounded-full absolute -top-1 -left-1" title={language === 'ar' ? "صلاحية مخصصة (تم تعديلها يدوياً)" : "Custom permission (modified manually)"} />
                                                       ) : inherited ? (
-                                                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full absolute -top-1 -left-1" title="موروث من {language === 'ar' ? 'الأدوار الوظيفية' : 'Job Roles'} للمستخدم" />
+                                                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full absolute -top-1 -left-1" title={language === 'ar' ? "موروث من الأدوار الوظيفية للمستخدم" : "Inherited from user job roles"} />
                                                       ) : null}
                                                     </>
                                                   )}
@@ -1030,7 +1030,7 @@ export const Users: React.FC = () => {
                                                     </button>
                                                     
                                                     {descObj && (
-                                                      <div className="absolute z-[110] hidden group-hover/tooltip:block bg-slate-900 text-white text-[10px] rounded-lg p-2.5 w-56 shadow-2xl border border-slate-700 -top-2 right-6 ${language === 'ar' ? 'dir-rtl text-right' : 'dir-ltr text-left'} font-medium leading-relaxed">
+                        <div className={`absolute z-[110] hidden group-hover/tooltip:block bg-slate-900 text-white text-[10px] rounded-lg p-2.5 w-56 shadow-2xl border border-slate-700 -top-2 right-6 ${language === 'ar' ? 'dir-rtl text-right' : 'dir-ltr text-left'} font-medium leading-relaxed`}>
                                                         {language === 'ar' ? descObj.descAr : descObj.descEn}
                                                       </div>
                                                     )}
