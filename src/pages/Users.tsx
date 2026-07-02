@@ -410,19 +410,36 @@ export const Users: React.FC = () => {
 
   // Calculations for UI state
   const getUserAssignedRoleNames = (user: User) => {
-    const ids = user.role_ids || [];
+    const idsVal = user.role_ids as any;
+    const ids = Array.isArray(idsVal) 
+      ? idsVal 
+      : (typeof idsVal === 'string' 
+          ? (idsVal.startsWith('[') ? JSON.parse(idsVal) : (idsVal ? [idsVal] : [])) 
+          : []);
     return roles.filter(r => ids.includes(r.id)).map(r => r.name).join('، ') || 'لا يوجد أدوار';
   };
 
   const getInheritedPermissionState = (modId: string, permKey: string) => {
     if (permissionsTargetType === 'role') return false;
-    const assignedRoles = roles.filter(r => tempUserRoleIds.includes(r.id));
+    const roleIdsVal = tempUserRoleIds as any;
+    const roleIds = Array.isArray(roleIdsVal) 
+      ? roleIdsVal 
+      : (typeof roleIdsVal === 'string' 
+          ? (roleIdsVal.startsWith('[') ? JSON.parse(roleIdsVal) : (roleIdsVal ? [roleIdsVal] : [])) 
+          : []);
+    const assignedRoles = roles.filter(r => roleIds.includes(r.id));
     return assignedRoles.some(r => r.permissions[modId]?.[permKey] === true);
   };
 
   const getInheritedListState = (modId: string, listKey: string): string[] => {
     if (permissionsTargetType === 'role') return [];
-    const assignedRoles = roles.filter(r => tempUserRoleIds.includes(r.id));
+    const roleIdsVal = tempUserRoleIds as any;
+    const roleIds = Array.isArray(roleIdsVal) 
+      ? roleIdsVal 
+      : (typeof roleIdsVal === 'string' 
+          ? (roleIdsVal.startsWith('[') ? JSON.parse(roleIdsVal) : (roleIdsVal ? [roleIdsVal] : [])) 
+          : []);
+    const assignedRoles = roles.filter(r => roleIds.includes(r.id));
     const merged: string[] = [];
     assignedRoles.forEach(r => {
       const ids = r.permissions?.[modId]?.[listKey] || [];

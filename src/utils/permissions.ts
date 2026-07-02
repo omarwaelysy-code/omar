@@ -164,7 +164,12 @@ export function computeEffectivePermissions(user: any, companyRoles: any[]): any
   }
 
   const result = getInitialPermissionsState();
-  const roleIds = user.role_ids || [];
+  const roleIdsVal = user.role_ids as any;
+  const roleIds = Array.isArray(roleIdsVal) 
+    ? roleIdsVal 
+    : (typeof roleIdsVal === 'string' 
+        ? (roleIdsVal.startsWith('[') ? JSON.parse(roleIdsVal) : (roleIdsVal ? [roleIdsVal] : [])) 
+        : []);
 
   // 1. Build union of roles' permissions
   const assignedRoles = companyRoles.filter(r => roleIds.includes(r.id));

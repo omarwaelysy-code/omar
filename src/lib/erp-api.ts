@@ -1545,7 +1545,7 @@ async function updatePOBillingStatus(client: any, companyId: string, poId: strin
 // Helper to parse JSONB fields if they are returned as strings
 function parseRow(table: string, row: any) {
   if (!row) return row;
-  const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features', 'options', 'settlements', 'filters'];
+  const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features', 'options', 'settlements', 'filters', 'role_ids'];
   
   const parsed = { ...row };
   jsonbFields.forEach(field => {
@@ -1571,7 +1571,7 @@ function sanitizeData(table: string, data: any) {
   if (!allowedKeys) return data;
   
   const sanitized: any = {};
-  const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features', 'value', 'options', 'settlements', 'filters'];
+  const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features', 'value', 'options', 'settlements', 'filters', 'role_ids'];
 
   allowedKeys.forEach(key => {
     if (key in data) {
