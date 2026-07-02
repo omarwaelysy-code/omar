@@ -204,7 +204,7 @@ export const MODULE_PERMISSIONS_META: { [moduleId: string]: { labelAr: string; l
   expenses: { labelAr: 'بنود المصروفات', labelEn: 'Expenses list', hasCrud: true },
   payment_methods: { labelAr: 'طرق السداد', labelEn: 'Payment Methods', hasCrud: true },
   currencies: { labelAr: 'العملات وأسعار الصرف', labelEn: 'Currencies', hasCrud: true },
-  departments: { labelAr: 'الأقسام الإدارية', labelEn: 'Departments', hasCrud: true },
+  departments: { labelAr: 'الإدارات', labelEn: 'Departments', hasCrud: true },
   cost_centers: { labelAr: 'مراكز التكلفة', labelEn: 'Cost Centers', hasCrud: true },
   // Sales
   quotations: { labelAr: 'عروض الأسعار', labelEn: 'Quotations', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy'] },
@@ -335,13 +335,13 @@ export const DOCUMENT_BUSINESS_PERMISSIONS: { [moduleId: string]: BusinessPermis
     { id: 'restrict_banks', labelAr: 'تقييد المستخدم بحسابات بنكية محددة', labelEn: 'Restrict Bank Accounts', type: 'selection', selectionType: 'banks', descriptionAr: 'تحديد الحسابات البنكية المسموح للمستخدم إيداع أو صرف الأموال منها.', descriptionEn: 'Limits user access to specific bank accounts.' }
   ],
   departments: [
-    { id: 'restrict_departments', labelAr: 'تقييد المستخدم بأقسام محددة', labelEn: 'Restrict Departments', type: 'selection', selectionType: 'departments', descriptionAr: 'تحديد الأقسام الإدارية المسموح للمستخدم رؤيتها والتعامل معها.', descriptionEn: 'Limits user access to specific departments.' }
+    { id: 'restrict_departments', labelAr: 'تقييد المستخدم بإدارات محددة', labelEn: 'Restrict Departments', type: 'selection', selectionType: 'departments', descriptionAr: 'تحديد الإدارات المسموح للمستخدم رؤيتها والتعامل معها.', descriptionEn: 'Limits user access to specific departments.' }
   ],
   cost_centers: [
-    { id: 'restrict_cost_centers', labelAr: 'تقييد المستخدم بمراكز تكلفة محددة', labelEn: 'Restrict Cost Centers', type: 'selection', selectionType: 'cost_centers', descriptionAr: 'تحديد مراكز التكلفة المسموح للمستخدم التعامل معها ورؤيتها.', descriptionEn: 'Limits user access to specific cost centers.' }
+    { id: 'restrict_cost_centers', labelAr: 'تقييد المستخدم بمراكز تكلفة محددة', labelEn: 'Restrict Cost Centers', type: 'selection', selectionType: 'cost_centers', descriptionAr: 'تحديد مراكز التكلفة المسموح للمستخدم رؤيتها والتعامل معها.', descriptionEn: 'Limits user access to specific cost centers.' }
   ],
   payment_methods: [
-    { id: 'restrict_payment_methods', labelAr: 'تقييد المستخدم بطرق سداد محددة', labelEn: 'Restrict Payment Methods', type: 'selection', selectionType: 'payment_methods', descriptionAr: 'تحديد طرق السداد المسموح للمستخدم التعامل معها ورؤيتها.', descriptionEn: 'Limits user access to specific payment methods.' }
+    { id: 'restrict_payment_methods', labelAr: 'تقييد المستخدم بطرق سداد محددة', labelEn: 'Restrict Payment Methods', type: 'selection', selectionType: 'payment_methods', descriptionAr: 'تحديد طرق السداد المسموح للمستخدم رؤيتها والتعامل معها.', descriptionEn: 'Limits user access to specific payment methods.' }
   ],
   journal_entries: [
     { id: 'create', labelAr: 'إنشاء قيد', labelEn: 'Create Entry', type: 'boolean', descriptionAr: 'السماح بإنشاء قيود يومية جديدة.', descriptionEn: 'Allows creating journal entries.' },
