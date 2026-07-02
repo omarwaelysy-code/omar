@@ -1253,9 +1253,16 @@ const getList = async (table: string, filters: any) => {
   }
   
   // Default sorting for report tables
-  const reportTables = ['journal_entries', 'invoices', 'receipt_vouchers', 'payment_vouchers', 'purchase_invoices', 'purchase_returns', 'returns'];
+  const reportTables = ['journal_entries', 'invoices', 'receipt_vouchers', 'payment_vouchers', 'purchase_invoices', 'purchase_returns', 'returns', 'goods_receipts'];
   if (reportTables.includes(table)) {
-    sql += ' ORDER BY date DESC, id DESC';
+    let numField = 'id';
+    if (table === 'goods_receipts') numField = 'receipt_number';
+    else if (table === 'invoices' || table === 'purchase_invoices') numField = 'invoice_number';
+    else if (table === 'receipt_vouchers' || table === 'payment_vouchers') numField = 'voucher_number';
+    else if (table === 'returns' || table === 'purchase_returns') numField = 'return_number';
+    else if (table === 'journal_entries') numField = 'entry_number';
+
+    sql += ` ORDER BY date DESC, "${numField}" DESC`;
   } else if (filters._sort) {
     // Honour explicit _sort / _order meta-params when present (e.g. exchange_rates?_sort=rate_date&_order=desc)
     const col   = String(filters._sort).replace(/[^a-zA-Z0-9_]/g, '');   // sanitise
@@ -2159,6 +2166,14 @@ modules.forEach(moduleName => {
               finalSort += `, "date" DESC`;
             } else {
               finalSort += `, "date" DESC, "invoice_number" DESC`;
+            }
+          } else if (moduleName === 'goods_receipts') {
+            if (sortBy === 'date' || sortBy === 'operation_date') {
+              finalSort += `, "receipt_number" ${sortOrder.toUpperCase()}`;
+            } else if (sortBy === 'receipt_number') {
+              finalSort += `, "date" DESC`;
+            } else {
+              finalSort += `, "date" DESC, "receipt_number" DESC`;
             }
           } else {
             if (sortBy === 'date' || sortBy === 'operation_date') {
