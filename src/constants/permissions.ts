@@ -117,13 +117,13 @@ export const SPECIAL_PERMISSIONS_DESC: { [key: string]: { ar: string; en: string
     descEn: 'Allows copying an existing document to quickly create a new one.'
   },
   edit_approved: {
-    ar: 'تعديل معتمد',
+    ar: 'تعديل بعد الاعتماد',
     en: 'Edit Approved',
     descAr: 'يسمح بتعديل البيانات داخل مستند أو سجل تم اعتماده مسبقاً.',
     descEn: 'Allows editing data inside an already approved document.'
   },
   delete_approved: {
-    ar: 'حذف معتمد',
+    ar: 'حذف بعد الاعتماد',
     en: 'Delete Approved',
     descAr: 'يسمح بحذف مستند أو سجل تم اعتماده مسبقاً من النظام.',
     descEn: 'Allows deleting an already approved document.'
@@ -201,9 +201,9 @@ export const MODULE_PERMISSIONS_META: { [moduleId: string]: { labelAr: string; l
   products: { labelAr: 'الأصناف والمنتجات', labelEn: 'Products', hasCrud: true, special: ['view_cost', 'edit_cost_price', 'change_prices', 'allow_negative', 'manual_stock_adjust', 'recalculate_cost', 'print', 'export_pdf', 'export_excel'] },
   item_groups: { labelAr: 'مجموعات الأصناف', labelEn: 'Item Groups', hasCrud: true },
   employees: { labelAr: 'الموظفين', labelEn: 'Employees', hasCrud: true },
-  expenses: { labelAr: 'بنود المصروفات', labelEn: 'Expenses list', hasCrud: true },
+  expenses: { labelAr: 'بنود المصروفات', labelEn: 'Expenses List', hasCrud: true },
   payment_methods: { labelAr: 'طرق السداد', labelEn: 'Payment Methods', hasCrud: true },
-  currencies: { labelAr: 'العملات وأسعار الصرف', labelEn: 'Currencies', hasCrud: true },
+  currencies: { labelAr: 'العملات وأسعار الصرف', labelEn: 'Currencies & Exchange Rates', hasCrud: true },
   departments: { labelAr: 'الإدارات', labelEn: 'Departments', hasCrud: true },
   cost_centers: { labelAr: 'مراكز التكلفة', labelEn: 'Cost Centers', hasCrud: true },
   // Sales
@@ -220,7 +220,7 @@ export const MODULE_PERMISSIONS_META: { [moduleId: string]: { labelAr: string; l
   supplier_discounts: { labelAr: 'خصم الموردين', labelEn: 'Supplier Discounts', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel'] },
   supplier_settlements: { labelAr: 'تسويات الموردين', labelEn: 'Supplier Settlements', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'edit_approved', 'delete_approved'] },
   // Warehouses
-  warehouses: { labelAr: 'المستودعات والمخازن', labelEn: 'Warehouses', hasCrud: true, special: ['manual_stock_adjust', 'perform_inventory'] },
+  warehouses: { labelAr: 'المستودعات والمخازن', labelEn: 'Warehouses & Stores', hasCrud: true, special: ['manual_stock_adjust', 'perform_inventory'] },
   goods_receipts: { labelAr: 'إذن استلام المخزون', labelEn: 'Goods Receipts', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved'] },
   warehouse_transfers: { labelAr: 'حوالات المستودعات', labelEn: 'Warehouse Transfers', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'edit_approved', 'delete_approved'] },
   opening_stock_balances: { labelAr: 'أرصدة أول المدة للمخزون', labelEn: 'Opening Stock Balances', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'edit_approved', 'delete_approved', 'manual_stock_adjust'] },
@@ -245,28 +245,28 @@ export const MODULE_PERMISSIONS_META: { [moduleId: string]: { labelAr: string; l
   supplier_balances: { labelAr: 'تقرير أرصدة الموردين', labelEn: 'Supplier Balances Report', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
   sales_report: { labelAr: 'تقرير المبيعات والربحية', labelEn: 'Sales Report', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
   expenses_report: { labelAr: 'تقرير المصروفات', labelEn: 'Expenses Report', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
-  cash_report: { labelAr: 'تقرير حركة الخزينة البنكية', labelEn: 'Cash Book Report', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
+  cash_report: { labelAr: 'تقرير حركة الخزينة البنكية', labelEn: 'Cash & Bank Book Report', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
   general_ledger_report: { labelAr: 'تقرير دفتر الأستاذ العام', labelEn: 'General Ledger Report', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
   trial_balance: { labelAr: 'تقرير ميزان المراجعة', labelEn: 'Trial Balance Report', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
   income_statement: { labelAr: 'قائمة الدخل', labelEn: 'Income Statement', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
   balance_sheet: { labelAr: 'الميزانية العمومية والمركز المالي', labelEn: 'Balance Sheet', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
   stock_card_report: { labelAr: 'تقرير كارت حركة الصنف', labelEn: 'Stock Card Report', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
   stock_balances_report: { labelAr: 'تقرير أرصدة المخزون الحالية', labelEn: 'Stock Balances Report', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
-  general_stock_movements_report: { labelAr: 'تقرير حركات المخازن التفصيلي', labelEn: 'Detailed Stock Movements', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
+  general_stock_movements_report: { labelAr: 'تقرير حركات المخازن التفصيلي', labelEn: 'Detailed Stock Movements Report', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
   // Management
-  users: { labelAr: 'إدارة المستخدمين والصلاحيات', labelEn: 'Users Management', hasCrud: true },
-  companies: { labelAr: 'إدارة الشركات والفروع', labelEn: 'Companies Management', hasCrud: true },
+  users: { labelAr: 'إدارة المستخدمين والصلاحيات', labelEn: 'Users & Permissions Management', hasCrud: true },
+  companies: { labelAr: 'إدارة الشركات والفروع', labelEn: 'Companies & Branches Management', hasCrud: true },
   activity_log: { labelAr: 'سجل النشاط العام', labelEn: 'Activity Log', hasCrud: true },
-  audit_logs: { labelAr: 'سجل الرقابة والأمن', labelEn: 'Audit logs', hasCrud: true },
+  audit_logs: { labelAr: 'سجل الرقابة والأمن', labelEn: 'Audit Logs', hasCrud: true },
   system_check: { labelAr: 'فحص سلامة النظام', labelEn: 'System Check', hasCrud: true },
   // Settings
-  company_settings: { labelAr: 'إعدادات الشركة والمالية', labelEn: 'Company Settings', hasCrud: true, special: ['open_closed_period'] },
-  discount_settings: { labelAr: 'إعدادات الخصومات والأسعار', labelEn: 'Discount Settings', hasCrud: true },
+  company_settings: { labelAr: 'إعدادات الشركة والمالية', labelEn: 'Company & Financial Settings', hasCrud: true, special: ['open_closed_period'] },
+  discount_settings: { labelAr: 'إعدادات الخصومات والأسعار', labelEn: 'Discount & Price Settings', hasCrud: true },
   backup_restore: { labelAr: 'النسخ الاحتياطي والاستعادة', labelEn: 'Backup & Restore', hasCrud: true },
   templates: { labelAr: 'قوالب المطبوعات', labelEn: 'Print Templates', hasCrud: true },
   create_template: { labelAr: 'مصمم قوالب المطبوعات', labelEn: 'Print Template Designer', hasCrud: true },
   operation_categories: { labelAr: 'فئات الحسابات الإدارية', labelEn: 'Operation Categories', hasCrud: true },
-  operation_fields: { labelAr: 'تعريف الحقول الإضافية', labelEn: 'Operation Fields', hasCrud: true },
+  operation_fields: { labelAr: 'تعريف الحقول الإضافية', labelEn: 'Custom Operation Fields', hasCrud: true },
   operations: { labelAr: 'حركات الحسابات الإدارية', labelEn: 'Operation Transactions', hasCrud: true }
 };
 
@@ -289,7 +289,7 @@ export const DOCUMENT_BUSINESS_PERMISSIONS: { [moduleId: string]: BusinessPermis
     { id: 'edit_invoice_date', labelAr: 'تعديل تاريخ الفاتورة', labelEn: 'Edit Invoice Date', type: 'boolean', descriptionAr: 'السماح بتغيير تاريخ الفاتورة يدوياً.', descriptionEn: 'Allows editing invoice date.' },
     { id: 'change_warehouse', labelAr: 'تغيير المخزن', labelEn: 'Change Warehouse', type: 'boolean', descriptionAr: 'السماح بتغيير مخزن الصرف الافتراضي في الفاتورة.', descriptionEn: 'Allows selecting a different source warehouse in invoices.' },
     { id: 'change_salesman', labelAr: 'تغيير مندوب البيع', labelEn: 'Change Salesman', type: 'boolean', descriptionAr: 'السماح بتغيير مندوب البيع المسئول عن الفاتورة.', descriptionEn: 'Allows changing salesperson.' },
-    { id: 'change_customer_after_items', labelAr: 'تغيير العميل بعد إضافة الأصناف', labelEn: 'Change Customer after adding items', type: 'boolean', descriptionAr: 'السماح بتعديل العميل بعد بدء إضافة الأصناف في الفاتورة.', descriptionEn: 'Allows changing customer after selecting invoice items.' },
+    { id: 'change_customer_after_items', labelAr: 'تغيير العميل بعد إضافة الأصناف', labelEn: 'Change Customer After Adding Items', type: 'boolean', descriptionAr: 'السماح بتعديل العميل بعد بدء إضافة الأصناف في الفاتورة.', descriptionEn: 'Allows changing customer after selecting invoice items.' },
     { id: 'view_cost', labelAr: 'رؤية تكلفة الصنف', labelEn: 'View Item Cost', type: 'boolean', descriptionAr: 'عرض تكلفة شراء الصنف داخل الفاتورة.', descriptionEn: 'Allows viewing item cost in invoices.' },
     { id: 'view_profit_margin', labelAr: 'رؤية هامش الربح', labelEn: 'View Profit Margin', type: 'boolean', descriptionAr: 'عرض هامش الربحية والأرباح الإجمالية للفاتورة.', descriptionEn: 'Allows viewing profit margins.' },
     { id: 'edit_cost_price', labelAr: 'تعديل تكلفة الصنف', labelEn: 'Edit Cost Price', type: 'boolean', descriptionAr: 'السماح بتعديل تكلفة الصنف يدوياً.', descriptionEn: 'Allows manual editing of item cost.' },
