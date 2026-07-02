@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -222,7 +222,7 @@ export const Users: React.FC = () => {
         role_ids: []
       });
 
-      await dbService.logActivity(currentUser.id, currentUser.username, currentUser.company_id, 'إضافة مستخدم', `إضافة مستخدم جديد: ${cleanEmail}`, 'users', newUser.id);
+      await dbService.logActivity(currentUser.id, currentUser.username, currentUser.company_id, 'إضافة مستخدم', `{language === 'ar' ? 'إضافة مستخدم جديد' : 'Add New User'}: ${cleanEmail}`, 'users', newUser.id);
       showNotification(t('users.add_success') || 'تمت إضافة المستخدم بنجاح', 'success');
       setIsUserModalOpen(false);
       setUserFormData({ email: '', password: '', role: 'user' });
@@ -277,7 +277,7 @@ export const Users: React.FC = () => {
           company_id: currentUser.company_id
         });
         
-        await dbService.logActivity(currentUser.id, currentUser.username, currentUser.company_id, 'إضافة دور', `إضافة دور جديد: ${roleFormData.name}`, 'roles', newRoleId);
+        await dbService.logActivity(currentUser.id, currentUser.username, currentUser.company_id, 'إضافة دور', `{language === 'ar' ? 'إضافة دور جديد' : 'Add New Role'}: ${roleFormData.name}`, 'roles', newRoleId);
         showNotification('تمت إضافة الدور بنجاح');
       }
       setIsRoleModalOpen(false);
@@ -384,7 +384,7 @@ export const Users: React.FC = () => {
           currentUser.username, 
           currentUser.company_id, 
           'تعديل صلاحيات دور', 
-          `تعديل صلاحيات الدور: ${selectedRole.name}`, 
+          `{language === 'ar' ? 'تعديل صلاحيات الدور' : 'Edit Role Permissions'}: ${selectedRole.name}`, 
           'roles', 
           selectedRole.id
         );
@@ -497,7 +497,7 @@ export const Users: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 text-right" dir="rtl">
+    <div className={`space-y-6 animate-in fade-in duration-500 ${language === 'ar' ? 'text-right' : 'text-left'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
       {/* Title Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
@@ -505,8 +505,8 @@ export const Users: React.FC = () => {
             <Lock size={28} />
           </div>
           <div>
-            <h2 className="text-3xl font-black text-slate-900 tracking-tighter italic serif">الصلاحيات والأدوار</h2>
-            <p className="text-slate-500 font-medium mt-1">تعديل صلاحيات المستخدمين والأدوار الوظيفية داخل النظام بالكامل</p>
+            <h2 className="text-3xl font-black text-slate-900 tracking-tighter italic serif">{language === 'ar' ? 'الصلاحيات والأدوار' : 'Permissions & Roles'}</h2>
+            <p className="text-slate-500 font-medium mt-1">{language === 'ar' ? 'تعديل صلاحيات {language === 'ar' ? 'المستخدمين' : 'Users'} و{language === 'ar' ? 'الأدوار الوظيفية' : 'Job Roles'} داخل النظام بالكامل' : 'Modify user permissions and job roles across the entire system'}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -518,7 +518,7 @@ export const Users: React.FC = () => {
             className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
           >
             <History size={20} />
-            <span>سجل الرقابة</span>
+            <span>{language === 'ar' ? 'سجل الرقابة' : 'Audit Log'}</span>
           </button>
           
           {activeTab === 'users' ? (
@@ -527,7 +527,7 @@ export const Users: React.FC = () => {
               className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95"
             >
               <Plus size={20} />
-              إضافة مستخدم جديد
+              {language === 'ar' ? 'إضافة مستخدم جديد' : 'Add New User'}
             </button>
           ) : (
             <button 
@@ -539,7 +539,7 @@ export const Users: React.FC = () => {
               className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95"
             >
               <Plus size={20} />
-              إضافة دور جديد
+              {language === 'ar' ? 'إضافة دور جديد' : 'Add New Role'}
             </button>
           )}
         </div>
@@ -553,7 +553,7 @@ export const Users: React.FC = () => {
             activeTab === 'users' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600'
           }`}
         >
-          المستخدمين
+          {language === 'ar' ? 'المستخدمين' : 'Users'}
         </button>
         <button 
           onClick={() => setActiveTab('roles')} 
@@ -561,7 +561,7 @@ export const Users: React.FC = () => {
             activeTab === 'roles' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600'
           }`}
         >
-          الأدوار الوظيفية
+          {language === 'ar' ? 'الأدوار الوظيفية' : 'Job Roles'}
         </button>
       </div>
 
@@ -572,12 +572,12 @@ export const Users: React.FC = () => {
           <div className="relative w-full max-w-md">
             <input 
               type="text"
-              placeholder="البحث عن مستخدم..."
-              className="premium-input pr-12 w-full font-bold"
+              placeholder={language === 'ar' ? 'البحث عن مستخدم...' : 'Search for user...'}
+              className={`premium-input w-full font-bold ${language === 'ar' ? 'pr-12' : 'pl-12'}`}
               value={userSearchTerm}
               onChange={e => setUserSearchTerm(e.target.value)}
             />
-            <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-450" size={20} />
+            <Search className={`absolute top-1/2 -translate-y-1/2 text-slate-450 ${language === 'ar' ? 'right-4' : 'left-4'}`} size={20} />
           </div>
 
           {/* Users Grid */}
@@ -596,11 +596,11 @@ export const Users: React.FC = () => {
                       
                       <div className="flex flex-wrap gap-1 mt-2">
                         <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-black">
-                          {user.role === 'admin' ? 'مدير عام' : user.role === 'manager' ? 'مدير' : 'مستخدم'}
+                          {user.role === 'admin' ? (language === 'ar' ? 'مدير عام' : 'Super Admin') : user.role === 'manager' ? (language === 'ar' ? 'مدير' : 'Manager') : (language === 'ar' ? 'مستخدم' : 'User')}
                         </span>
                         {user.role !== 'admin' && (
                           <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-black border border-emerald-100/50 truncate max-w-[150px]" title={getUserAssignedRoleNames(user)}>
-                            أدوار: {getUserAssignedRoleNames(user)}
+                            {language === 'ar' ? 'أدوار' : 'Roles'}: {getUserAssignedRoleNames(user)}
                           </span>
                         )}
                       </div>
@@ -613,7 +613,7 @@ export const Users: React.FC = () => {
                       className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all active:scale-95"
                     >
                       <Lock size={14} />
-                      تعديل الصلاحيات والأدوار
+                      {language === 'ar' ? 'تعديل الصلاحيات والأدوار' : 'Edit Permissions & Roles'}
                     </button>
                     {user.id !== currentUser?.id && (
                       <button 
@@ -622,7 +622,7 @@ export const Users: React.FC = () => {
                           setIsDeleteModalOpen(true);
                         }}
                         className="p-3 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all active:scale-90"
-                        title="حذف المستخدم"
+                        title={language === 'ar' ? "حذف المستخدم" : "Delete User"}
                       >
                         <Trash2 size={18} />
                       </button>
@@ -636,7 +636,7 @@ export const Users: React.FC = () => {
                         setIsActivityLogOpen(true);
                       }}
                       className="p-2 text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
-                      title="سجل تعديلات المستخدم"
+                      title={language === 'ar' ? "سجل تعديلات المستخدم" : "User Edit Log"}
                     >
                       <History size={18} />
                     </button>
@@ -658,10 +658,10 @@ export const Users: React.FC = () => {
                     </div>
                     <div>
                       <h4 className="font-black text-lg text-slate-900 leading-tight">{role.name}</h4>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase">دور وظيفي</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase">{language === 'ar' ? 'دور وظيفي' : 'Job Role'}</p>
                     </div>
                   </div>
-                  <p className="text-sm text-slate-500 font-medium leading-relaxed min-h-[40px]">{role.description || 'لا يوجد وصف لهذا الدور'}</p>
+                  <p className="text-sm text-slate-500 font-medium leading-relaxed min-h-[40px]">{role.description || (language === 'ar' ? 'لا يوجد وصف لهذا الدور' : 'No description for this role')}</p>
                 </div>
                 
                 <div className="mt-6 flex items-center gap-2 pt-2 border-t border-slate-50">
@@ -670,7 +670,7 @@ export const Users: React.FC = () => {
                     className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all active:scale-95"
                   >
                     <Lock size={14} />
-                    تعديل صلاحيات الدور
+                    {language === 'ar' ? 'تعديل صلاحيات الدور' : 'Edit Role Permissions'}
                   </button>
                   <button 
                     onClick={() => {
@@ -679,7 +679,7 @@ export const Users: React.FC = () => {
                       setIsRoleModalOpen(true);
                     }}
                     className="p-3 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all active:scale-90"
-                    title="تعديل الدور"
+                    title={language === 'ar' ? "تعديل الدور" : "Edit Role"}
                   >
                     <Edit2 size={16} />
                   </button>
@@ -689,7 +689,7 @@ export const Users: React.FC = () => {
                       setIsRoleDeleteModalOpen(true);
                     }}
                     className="p-3 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all active:scale-90"
-                    title="حذف الدور"
+                    title={language === 'ar' ? "حذف الدور" : "Delete Role"}
                   >
                     <Trash2 size={16} />
                   </button>
@@ -703,7 +703,7 @@ export const Users: React.FC = () => {
       {/* Permissions & Roles Custom Modal */}
       {isPermissionsModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 md:p-8 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-6xl h-full max-h-[90vh] rounded-[2rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 border border-slate-200">
+          <div className="bg-white w-full max-w-6xl h-full max-h-[90vh] rounded-[2rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 border border-slate-200" dir={language === 'ar' ? 'rtl' : 'ltr'}>
             {/* Modal Header */}
             <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
               <div className="flex items-center gap-4">
@@ -713,10 +713,10 @@ export const Users: React.FC = () => {
                 <div>
                   <h3 className="text-xl font-black text-slate-900">
                     {permissionsTargetType === 'user' && selectedUser 
-                      ? `صلاحيات وأدوار المستخدم: ${selectedUser.username}` 
-                      : `صلاحيات الدور الوظيفي: ${selectedRole?.name}`}
+                      ? `${language === 'ar' ? 'صلاحيات وأدوار المستخدم:' : 'User Permissions & Roles:'} ${selectedUser.username}` 
+                      : `${language === 'ar' ? 'صلاحيات الدور الوظيفي:' : 'Job Role Permissions:'} ${selectedRole?.name}`}
                   </h3>
-                  <p className="text-[11px] text-slate-500 font-bold uppercase tracking-tight">حدد الصلاحيات العامة والخاصة والأدوار الوظيفية</p>
+                  <p className="text-[11px] text-slate-500 font-bold uppercase tracking-tight">حدد الصلاحيات العامة والخاصة و{language === 'ar' ? 'الأدوار الوظيفية' : 'Job Roles'}</p>
                 </div>
               </div>
               <button onClick={() => setIsPermissionsModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded-full transition-all">
@@ -732,8 +732,8 @@ export const Users: React.FC = () => {
                     <Shield size={40} className="shrink-0" />
                   </div>
                   <div className="max-w-md">
-                    <h4 className="font-black text-2xl tracking-tight mb-2">مدير عام للنظام</h4>
-                    <p className="text-sm font-bold opacity-70 leading-relaxed">المشرفين العامين يمتلكون تلقائياً صلاحيات كاملة على كل الشاشات والمستندات ولا يمكن تقييد صلاحياتهم.</p>
+                    <h4 className="font-black text-2xl tracking-tight mb-2">{language === 'ar' ? 'مدير عام للنظام' : 'System Administrator'}</h4>
+                    <p className="text-sm font-bold opacity-70 leading-relaxed">{language === 'ar' ? '\u0627\u0644\u0645\u0634\u0631\u0641\u064a\u0646 \u0627\u0644\u0639\u0627\u0645\u064a\u0646 \u064a\u0645\u062a\u0644\u0643\u0648\u0646 \u062a\u0644\u062a\u0627\u0626\u064a\u0627\u064b \u0635\u0644\u0627\u062d\u064a\u0627\u062a \u0643\u0627\u0645\u0644\u0629 \u0639\u0644\u0649 \u0643\u0644 \u0627\u0644\u0634\u0627\u0634\u0627\u062a \u0648\u0627\u0644\u0645\u0633\u062a\u0646\u062f\u0627\u062a \u0648\u0644\u0627 \u064a\u0645\u0643\u0646 \u062a\u0642\u064a\u064a\u062f \u0635\u0644\u0627\u062d\u064a\u0627\u062a\u0647\u0645.' : 'Administrators possess full permissions over all screens and documents and cannot be restricted.'}</p>
                   </div>
                 </div>
               ) : (
@@ -744,7 +744,7 @@ export const Users: React.FC = () => {
                     <div className="relative">
                       <input 
                         type="text"
-                        placeholder="البحث السريع عن شاشة أو صلاحية..."
+                        placeholder={language === 'ar' ? 'البحث السريع عن شاشة أو صلاحية...' : 'Quick search for screen or permission...'}
                         className="premium-input pr-10 w-full text-xs font-bold py-3"
                         value={permSearchTerm}
                         onChange={e => setPermSearchTerm(e.target.value)}
@@ -755,7 +755,7 @@ export const Users: React.FC = () => {
                     {/* Copy Permissions */}
                     {permissionsTargetType === 'user' && (
                       <div className="flex items-center gap-2">
-                        <label className="text-xs font-bold text-slate-500 whitespace-nowrap">نسخ من:</label>
+                        <label className="text-xs font-bold text-slate-500 whitespace-nowrap">{language === 'ar' ? 'نسخ من:' : 'Copy from:'}</label>
                         <select 
                           className="premium-input py-2.5 text-xs font-bold w-full bg-slate-50"
                           defaultValue=""
@@ -766,7 +766,7 @@ export const Users: React.FC = () => {
                             }
                           }}
                         >
-                          <option value="">-- اختر مستخدماً للنسخ --</option>
+                          <option value="">{language === 'ar' ? '-- اختر مستخدماً للنسخ --' : '-- Choose a user to copy --'}</option>
                           {users
                             .filter(u => u.id !== selectedUser?.id && u.role !== 'admin')
                             .map(u => (
@@ -784,7 +784,7 @@ export const Users: React.FC = () => {
                           className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-650 border border-slate-250 rounded-xl text-xs font-bold transition-all"
                         >
                           <RefreshCw size={14} />
-                          استعادة قيم الأدوار الافتراضية
+                          {language === 'ar' ? 'استعادة قيم الأدوار الافتراضية' : 'Restore Default Role Values'}
                         </button>
                       </div>
                     )}
@@ -795,9 +795,9 @@ export const Users: React.FC = () => {
                     <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                       <h4 className="font-black text-sm text-slate-900 flex items-center gap-2">
                         <Shield className="text-emerald-600" size={18} />
-                        الأدوار الوظيفية للمستخدم
+                        {language === 'ar' ? '\u0627\u0644\u0623\u062f\u0648\u0627\u0631 \u0627\u0644\u0648\u0638\u064a\u0641\u064a\u0629 \u0644\u0644\u0645\u0633\u062a\u062e\u062f\u0645' : 'User Job Roles'}
                       </h4>
-                      <p className="text-xs text-slate-550">قم بتحديد دور واحد أو أكثر للمستخدم ليقوم بوراثة صلاحياته تلقائياً، ويمكنك تعيين صلاحيات مخصصة بالأسفل.</p>
+                      <p className="text-xs text-slate-550">{language === 'ar' ? '\u0642\u0645 \u0628\u062a\u062d\u062f\u064a\u062f \u062f\u0648\u0631 \u0648\u0627\u062d\u062f \u0623\u0648 \u0623\u0643\u062b\u0631 \u0644\u0644\u0645\u0633\u062a\u062e\u062f\u0645 \u0644\u064a\u0642\u0648\u0645 \u0628\u0648\u0631\u0627\u062b\u0629 \u0635\u0644\u0627\u062d\u064a\u0627\u062a\u0647 \u062a\u0644\u0642\u0627\u0626\u064a\u0627\u064b\u060c \u0648\u064a\u0645\u0643\u0646\u0643 \u062a\u0639\u064a\u064a\u0646 \u0635\u0644\u0627\u062d\u064a\u0627\u062a \u0645\u062e\u0635\u0635\u0629 \u0628\u0627\u0644\u0623\u0633\u0641\u0644.' : 'Select one or more job roles for the user to inherit their permissions automatically. You can customize permissions below.'}</p>
                       
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         {roles.map(role => (
@@ -846,7 +846,7 @@ export const Users: React.FC = () => {
                           : 'text-slate-500 hover:text-slate-900'
                       }`}
                     >
-                      صلاحيات الشاشات الأساسية (CRUD)
+                      {language === 'ar' ? 'صلاحيات الشاشات الأساسية (CRUD)' : 'Basic Screen Permissions (CRUD)'}
                     </button>
                     <button
                       type="button"
@@ -857,7 +857,7 @@ export const Users: React.FC = () => {
                           : 'text-slate-500 hover:text-slate-900'
                       }`}
                     >
-                      صلاحيات المستندات والحقول (Business Permissions)
+                      {language === 'ar' ? 'صلاحيات المستندات والحقول (Business Permissions)' : 'Document & Field Permissions (Business Permissions)'}
                     </button>
                   </div>
 
@@ -865,19 +865,19 @@ export const Users: React.FC = () => {
                     <div className="space-y-6">
                       {/* Batch Select Actions Columns */}
                       <div className="bg-white p-4 rounded-xl border border-slate-200 text-xs font-bold flex flex-wrap gap-4 items-center justify-between shadow-sm">
-                        <span className="text-slate-500">تحديد أعمدة كاملة بضغطة واحدة:</span>
+                        <span className="text-slate-500">{language === 'ar' ? 'تحديد أعمدة كاملة بضغطة واحدة:' : 'Select entire columns with one click:'}</span>
                         <div className="flex gap-2">
-                          <button type="button" onClick={() => toggleColumnAll('view', true)} className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg">تحديد كل العرض</button>
-                          <button type="button" onClick={() => toggleColumnAll('view', false)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-750 rounded-lg">إلغاء كل العرض</button>
+                          <button type="button" onClick={() => toggleColumnAll('view', true)} className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg">{language === 'ar' ? 'تحديد كل العرض' : 'Select All View'}</button>
+                          <button type="button" onClick={() => toggleColumnAll('view', false)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-750 rounded-lg">{language === 'ar' ? '{language === 'ar' ? 'إلغاء' : 'Cancel'} كل العرض' : 'Clear All View'}</button>
                           <span className="border-l border-slate-200 mx-1"></span>
-                          <button type="button" onClick={() => toggleColumnAll('create', true)} className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg">تحديد كل الإضافة</button>
-                          <button type="button" onClick={() => toggleColumnAll('create', false)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-750 rounded-lg">إلغاء كل الإضافة</button>
+                          <button type="button" onClick={() => toggleColumnAll('create', true)} className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg">{language === 'ar' ? 'تحديد كل الإضافة' : 'Select All Create'}</button>
+                          <button type="button" onClick={() => toggleColumnAll('create', false)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-750 rounded-lg">{language === 'ar' ? '{language === 'ar' ? 'إلغاء' : 'Cancel'} كل الإضافة' : 'Clear All Create'}</button>
                           <span className="border-l border-slate-200 mx-1"></span>
-                          <button type="button" onClick={() => toggleColumnAll('edit', true)} className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg">تحديد كل التعديل</button>
-                          <button type="button" onClick={() => toggleColumnAll('edit', false)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-750 rounded-lg">إلغاء كل التعديل</button>
+                          <button type="button" onClick={() => toggleColumnAll('edit', true)} className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg">{language === 'ar' ? 'تحديد كل التعديل' : 'Select All Edit'}</button>
+                          <button type="button" onClick={() => toggleColumnAll('edit', false)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-750 rounded-lg">{language === 'ar' ? '{language === 'ar' ? 'إلغاء' : 'Cancel'} كل التعديل' : 'Clear All Edit'}</button>
                           <span className="border-l border-slate-200 mx-1"></span>
-                          <button type="button" onClick={() => toggleColumnAll('delete', true)} className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg">تحديد كل الحذف</button>
-                          <button type="button" onClick={() => toggleColumnAll('delete', false)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-750 rounded-lg">إلغاء كل الحذف</button>
+                          <button type="button" onClick={() => toggleColumnAll('delete', true)} className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg">{language === 'ar' ? 'تحديد كل الحذف' : 'Select All Delete'}</button>
+                          <button type="button" onClick={() => toggleColumnAll('delete', false)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-750 rounded-lg">{language === 'ar' ? '{language === 'ar' ? 'إلغاء' : 'Cancel'} كل الحذف' : 'Clear All Delete'}</button>
                         </div>
                       </div>
 
@@ -897,7 +897,7 @@ export const Users: React.FC = () => {
                                 className="p-5 flex items-center justify-between bg-slate-50/50 hover:bg-slate-50 cursor-pointer border-b border-slate-100 transition-all select-none"
                               >
                                 <div className="flex items-center gap-3">
-                                  <span className="font-black text-slate-800 text-base">{group.nameAr}</span>
+                                  <span className="font-black text-slate-800 text-base">{language === 'ar' ? group.nameAr : group.nameEn}</span>
                                   <span className="text-[10px] text-slate-400 font-bold uppercase font-mono">({matchedModules.length})</span>
                                 </div>
                                 
@@ -908,14 +908,14 @@ export const Users: React.FC = () => {
                                     onClick={() => toggleSectionAll(group.modules, true)}
                                     className="text-xs text-emerald-650 hover:text-emerald-700 font-bold bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-sm hover:bg-slate-50 transition-all active:scale-95"
                                   >
-                                    تحديد الكل بالقسم
+                                    {language === 'ar' ? 'تحديد الكل بالقسم' : 'Select All in Section'}
                                   </button>
                                   <button 
                                     type="button"
                                     onClick={() => toggleSectionAll(group.modules, false)}
                                     className="text-xs text-slate-600 hover:text-slate-800 font-bold bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-sm hover:bg-slate-50 transition-all active:scale-95"
                                   >
-                                    إلغاء الكل بالقسم
+                                    {language === 'ar' ? 'إلغاء الكل بالقسم' : 'Clear All in Section'}
                                   </button>
                                   <div className="text-slate-300">|</div>
                                   <div className="text-slate-400 transition-transform duration-200">
@@ -934,11 +934,11 @@ export const Users: React.FC = () => {
                                     return (
                                       <div key={modId} className="p-4 bg-slate-50/40 rounded-2xl border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
                                         <div className="flex items-center gap-2 max-w-sm">
-                                          <span className="font-bold text-sm text-slate-900">{meta.labelAr}</span>
+                                          <span className="font-bold text-sm text-slate-900">{language === 'ar' ? meta.labelAr : meta.labelEn}</span>
                                           <span className="text-[10px] text-slate-350 font-mono font-bold tracking-tight">({modId})</span>
                                           <div className="relative group inline-block">
                                             <HelpCircle className="w-4 h-4 text-slate-400 cursor-pointer" />
-                                            <div className="absolute z-[100] hidden group-hover:block bg-slate-900 text-white text-xs rounded-xl p-3 w-64 shadow-xl border border-slate-700 -top-2 right-6 dir-rtl text-right font-medium leading-relaxed">
+                                            <div className="absolute z-[100] hidden group-hover:block bg-slate-900 text-white text-xs rounded-xl p-3 w-64 shadow-xl border border-slate-700 -top-2 right-6 ${language === 'ar' ? 'dir-rtl text-right' : 'dir-ltr text-left'} font-medium leading-relaxed">
                                               {language === 'ar' ? `لوحة أو مستند ${meta.labelAr} لتسجيل وإدارة ومتابعة العمليات.` : `Page/Document ${meta.labelEn}.`}
                                             </div>
                                           </div>
@@ -950,7 +950,7 @@ export const Users: React.FC = () => {
                                               const inherited = getInheritedPermissionState(modId, actionKey);
                                               const overrideValue = tempPermissions[modId]?.[actionKey];
                                               const effectiveValue = overrideValue !== undefined ? overrideValue : inherited;
-                                              const labelMap = { view: 'عرض', create: 'إضافة', edit: 'تعديل', delete: 'حذف' };
+                                              const labelMap = language === 'ar' ? { view: 'عرض', create: 'إضافة', edit: 'تعديل', delete: 'حذف' } : { view: 'View', create: 'Create', edit: 'Edit', delete: 'Delete' };
 
                                               return (
                                                 <button
@@ -975,9 +975,9 @@ export const Users: React.FC = () => {
                                                   {permissionsTargetType === 'user' && (
                                                     <>
                                                       {overrideValue !== undefined ? (
-                                                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full absolute -top-1 -left-1" title="صلاحية مخصصة (تم تعديلها يدوياً)" />
+                                                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full absolute -top-1 -left-1" title={language === 'ar' ? "صلاحية مخصصة (تم تعديلها يدوياً)" : "Custom permission (modified manually)"} />
                                                       ) : inherited ? (
-                                                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full absolute -top-1 -left-1" title="موروث من الأدوار الوظيفية للمستخدم" />
+                                                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full absolute -top-1 -left-1" title="موروث من {language === 'ar' ? 'الأدوار الوظيفية' : 'Job Roles'} للمستخدم" />
                                                       ) : null}
                                                     </>
                                                   )}
@@ -986,12 +986,12 @@ export const Users: React.FC = () => {
                                             })}
                                           </div>
                                         ) : (
-                                          <div className="text-xs text-slate-400 italic">هذه الشاشة/التقرير لا تدعم الإدخال الأساسي CRUD</div>
+                                          <div className="text-xs text-slate-400 italic">{language === 'ar' ? 'هذه الشاشة/التقرير لا تدعم الإدخال الأساسي CRUD' : 'This screen/report does not support basic CRUD entry'}</div>
                                         )}
 
                                         {meta.special && meta.special.length > 0 && (
                                           <div className="w-full mt-3 p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-2">
-                                            <span className="text-[9px] text-slate-450 font-bold uppercase tracking-wider block">تراخيص إضافية:</span>
+                                            <span className="text-[9px] text-slate-455 font-bold uppercase tracking-wider block">{language === 'ar' ? 'تراخيص إضافية:' : 'Additional Permissions:'}</span>
                                             <div className="flex flex-wrap gap-2">
                                               {meta.special.map(spKey => {
                                                 const descObj = SPECIAL_PERMISSIONS_DESC[spKey];
@@ -1016,7 +1016,7 @@ export const Users: React.FC = () => {
                                                         onChange={() => {}}
                                                         className="w-3.5 h-3.5 accent-purple-600 pointer-events-none rounded"
                                                       />
-                                                      <span>{descObj?.ar || spKey}</span>
+                                                      <span>{(language === 'ar' ? descObj?.ar : descObj?.en) || spKey}</span>
                                                       
                                                       {permissionsTargetType === 'user' && (
                                                         <>
@@ -1030,8 +1030,8 @@ export const Users: React.FC = () => {
                                                     </button>
                                                     
                                                     {descObj && (
-                                                      <div className="absolute z-[110] hidden group-hover/tooltip:block bg-slate-900 text-white text-[10px] rounded-lg p-2.5 w-56 shadow-2xl border border-slate-700 -top-2 right-6 dir-rtl text-right font-medium leading-relaxed">
-                                                        {descObj.descAr}
+                                                      <div className="absolute z-[110] hidden group-hover/tooltip:block bg-slate-900 text-white text-[10px] rounded-lg p-2.5 w-56 shadow-2xl border border-slate-700 -top-2 right-6 ${language === 'ar' ? 'dir-rtl text-right' : 'dir-ltr text-left'} font-medium leading-relaxed">
+                                                        {language === 'ar' ? descObj.descAr : descObj.descEn}
                                                       </div>
                                                     )}
                                                   </div>
@@ -1052,10 +1052,10 @@ export const Users: React.FC = () => {
                     </div>
                   ) : (
                     /* Document specific permissions tab */
-                    <div className="space-y-4 text-right">
+                    <div className={`space-y-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                       {Object.keys(DOCUMENT_BUSINESS_PERMISSIONS).map(modId => {
                         const permList = DOCUMENT_BUSINESS_PERMISSIONS[modId];
-                        const labelAr = MODULE_PERMISSIONS_META[modId]?.labelAr || modId;
+                        const label = language === 'ar' ? (MODULE_PERMISSIONS_META[modId]?.labelAr || modId) : (MODULE_PERMISSIONS_META[modId]?.labelEn || modId);
                         const isExpanded = !!expandedSections[`doc_${modId}`];
 
                         return (
@@ -1067,7 +1067,7 @@ export const Users: React.FC = () => {
                               className="p-5 flex items-center justify-between bg-slate-50/50 hover:bg-slate-50 cursor-pointer border-b border-slate-100 transition-all select-none"
                             >
                               <div className="flex items-center gap-3">
-                                <span className="font-black text-slate-800 text-base">{labelAr}</span>
+                                <span className="font-black text-slate-800 text-base">{label}</span>
                                 <span className="text-[10px] text-slate-400 font-bold uppercase font-mono">({permList.length})</span>
                               </div>
                               <div className="text-slate-400">
@@ -1086,9 +1086,9 @@ export const Users: React.FC = () => {
 
                                     return (
                                       <div key={perm.id} className="pt-4 first:pt-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                        <div className="max-w-xl text-right">
-                                          <h5 className="font-extrabold text-sm text-slate-900">{perm.labelAr}</h5>
-                                          <p className="text-xs text-slate-455 mt-1 leading-relaxed">{perm.descriptionAr}</p>
+                                        <div className={`max-w-xl ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                                          <h5 className="font-extrabold text-sm text-slate-900">{language === 'ar' ? perm.labelAr : perm.labelEn}</h5>
+                                          <p className="text-xs text-slate-455 mt-1 leading-relaxed">{language === 'ar' ? perm.descriptionAr : perm.descriptionEn}</p>
                                         </div>
 
                                         <div>
@@ -1114,9 +1114,9 @@ export const Users: React.FC = () => {
                                                   : 'border-slate-200 bg-white text-slate-700'
                                               }`}
                                             >
-                                              <option value="inherit">موروث ({roleVal ? 'سماح' : 'منع'})</option>
-                                              <option value="true">سماح (نعم)</option>
-                                              <option value="false">منع (لا)</option>
+                                              <option value="inherit">{language === 'ar' ? `موروث (${roleVal ? 'سماح' : 'منع'})` : `Inherited (${roleVal ? 'Allow' : 'Deny'})`}</option>
+                                              <option value="true">{language === 'ar' ? 'سماح (نعم)' : 'Allow (Yes)'}</option>
+                                              <option value="false">{language === 'ar' ? 'منع (لا)' : 'Deny (No)'}</option>
                                             </select>
                                           ) : (
                                             <button
@@ -1145,7 +1145,7 @@ export const Users: React.FC = () => {
                                                 onChange={() => {}}
                                                 className="pointer-events-none"
                                               />
-                                              مسموح
+                                              {language === 'ar' ? 'مسموح' : 'Allowed'}
                                             </button>
                                           )}
                                         </div>
@@ -1215,9 +1215,9 @@ export const Users: React.FC = () => {
                                     return (
                                       <div key={perm.id} className="pt-4 first:pt-0 flex flex-col gap-4">
                                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                          <div className="max-w-xl text-right">
-                                            <h5 className="font-extrabold text-sm text-slate-900">{perm.labelAr}</h5>
-                                            <p className="text-xs text-slate-455 mt-1 leading-relaxed">{perm.descriptionAr}</p>
+                                          <div className={`max-w-xl ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                                            <h5 className="font-extrabold text-sm text-slate-900">{language === 'ar' ? perm.labelAr : perm.labelEn}</h5>
+                                            <p className="text-xs text-slate-455 mt-1 leading-relaxed">{language === 'ar' ? perm.descriptionAr : perm.descriptionEn}</p>
                                           </div>
 
                                           <div>
@@ -1260,9 +1260,9 @@ export const Users: React.FC = () => {
                                                     : 'border-slate-200 bg-white text-slate-700'
                                                 }`}
                                               >
-                                                <option value="inherit">موروث ({isRestrictedInherited ? 'تقييد' : 'سماح بالكل'})</option>
-                                                <option value="restrict">تخصيص (تقييد بسجلات محددة)</option>
-                                                <option value="all">سماح بالكل (غير مقيد)</option>
+                                                <option value="inherit">{language === 'ar' ? `موروث (${isRestrictedInherited ? 'تقييد' : 'سماح بالكل'})` : `Inherited (${isRestrictedInherited ? 'Restricted' : 'Allow All'})`}</option>
+                                                <option value="restrict">{language === 'ar' ? 'تخصيص (تقييد بسجلات محددة)' : 'Customize (Restrict to specific records)'}</option>
+                                                <option value="all">{language === 'ar' ? 'سماح بالكل (غير مقيد)' : 'Allow All (Unrestricted)'}</option>
                                               </select>
                                             ) : (
                                               <button
@@ -1293,7 +1293,7 @@ export const Users: React.FC = () => {
                                                   onChange={() => {}}
                                                   className="pointer-events-none"
                                                 />
-                                                تقييد الوصول
+                                                {language === 'ar' ? 'تقييد الوصول' : 'Restrict Access'}
                                               </button>
                                             )}
                                           </div>
@@ -1301,8 +1301,8 @@ export const Users: React.FC = () => {
 
                                         {/* Records Checklist */}
                                         {activeRestrict && (
-                                          <div className="bg-slate-50/60 p-5 rounded-2xl border border-slate-200 text-right space-y-3">
-                                            <span className="text-xs font-black text-slate-500">السجلات المسموح بها للمستخدم:</span>
+                                          <div className={`bg-slate-50/60 p-5 rounded-2xl border border-slate-200 space-y-3 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                                            <span className="text-xs font-black text-slate-500">{language === 'ar' ? 'السجلات المسموح بها للمستخدم:' : 'Allowed records for this user:'}</span>
                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                               {listResources.map(item => {
                                                  console.log("====================\nSTEP 5 & 6 (Users.tsx - Permission Checklist Rendering)\n====================");
@@ -1356,7 +1356,7 @@ export const Users: React.FC = () => {
                                               })}
                                             </div>
                                             {listResources.length === 0 && (
-                                              <p className="text-xs font-bold text-slate-400 text-center">لا توجد سجلات مسجلة حالياً.</p>
+                                              <p className="text-xs font-bold text-slate-400 text-center">{language === 'ar' ? 'لا توجد سجلات مسجلة حالياً.' : 'No records registered currently.'}</p>
                                             )}
                                           </div>
                                         )}
@@ -1379,14 +1379,14 @@ export const Users: React.FC = () => {
             <div className="p-6 border-t border-slate-100 bg-white flex flex-col md:flex-row items-center justify-between gap-4 shrink-0">
               <div className="flex items-center gap-2 text-slate-400">
                 <AlertCircle size={16} />
-                <span className="text-[10px] font-bold uppercase tracking-tight">سيتم تطبيق التغييرات فور الحفظ وتحديث الجلسات.</span>
+                <span className="text-[10px] font-bold uppercase tracking-tight">{language === 'ar' ? 'سيتم تطبيق التغييرات فور الحفظ وتحديث الجلسات.' : 'Changes will take effect immediately upon saving.'}</span>
               </div>
               <div className="flex gap-3 w-full md:w-auto">
                 <button 
                   onClick={() => setIsPermissionsModalOpen(false)}
                   className="flex-1 md:flex-none px-6 py-3 bg-slate-50 text-slate-650 border border-slate-200 rounded-2xl font-bold hover:bg-slate-100 transition-all"
                 >
-                  إلغاء
+                  {language === 'ar' ? 'إلغاء' : 'Cancel'}
                 </button>
                 {!(permissionsTargetType === 'user' && selectedUser?.role === 'admin') && (
                   <button 
@@ -1394,7 +1394,7 @@ export const Users: React.FC = () => {
                     disabled={loading}
                     className="flex-1 md:flex-none px-8 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 disabled:opacity-50 active:scale-95"
                   >
-                    {loading ? 'جاري الحفظ...' : 'حفظ التعديلات وتطبيقها'}
+                    {loading ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...') : (language === 'ar' ? 'حفظ التعديلات وتطبيقها' : 'Save & Apply Changes')}
                   </button>
                 )}
               </div>
@@ -1408,12 +1408,12 @@ export const Users: React.FC = () => {
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col border border-slate-200">
             <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-white shrink-0">
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight">إنشاء حساب مستخدم جديد</h3>
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight">{language === 'ar' ? 'إنشاء حساب مستخدم جديد' : 'Create New User Account'}</h3>
               <button onClick={() => setIsUserModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded-full transition-all"><X size={24} /></button>
             </div>
-            <form onSubmit={handleCreateUser} className="p-8 space-y-6 flex-1 text-right">
+            <form onSubmit={handleCreateUser} className={`p-8 space-y-6 flex-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
               <div className="space-y-2">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">البريد الإلكتروني / اسم المستخدم</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'البريد الإلكتروني / اسم المستخدم' : 'Email / Username'}</label>
                 <input
                   required
                   type="email"
@@ -1424,7 +1424,7 @@ export const Users: React.FC = () => {
                 />
               </div>
               <div className="space-y-2">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">كلمة المرور الافتراضية</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'كلمة المرور الافتراضية' : 'Default Password'}</label>
                 <input
                   required
                   type="password"
@@ -1436,16 +1436,16 @@ export const Users: React.FC = () => {
                 />
               </div>
               <div className="space-y-2">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">الرتبة في النظام</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'الرتبة في النظام' : 'System Role'}</label>
                 <select 
                   required
                   className="premium-input font-bold appearance-none bg-no-repeat bg-[1rem_center] w-full"
                   value={userFormData.role}
                   onChange={(e) => setUserFormData({ ...userFormData, role: e.target.value as any })}
                 >
-                  <option value="user">مستخدم قياسي (يرث من صلاحيات الأدوار)</option>
-                  <option value="manager">مدير قسم (لديه صلاحية واسعة تلقائياً)</option>
-                  <option value="admin">مدير عام للشركة (له كامل صلاحيات النظام)</option>
+                  <option value="user">{language === 'ar' ? 'مستخدم قياسي (يرث من صلاحيات الأدوار)' : 'Standard User (Inherits from Roles)'}</option>
+                  <option value="manager">{language === 'ar' ? 'مدير قسم (لديه صلاحية واسعة تلقائياً)' : 'Department Manager (Has broad permissions automatically)'}</option>
+                  <option value="admin">{language === 'ar' ? 'مدير عام للشركة (له كامل صلاحيات النظام)' : 'Super Admin (Has full system permissions)'}</option>
                 </select>
               </div>
               <div className="pt-4">
@@ -1454,7 +1454,7 @@ export const Users: React.FC = () => {
                   disabled={loading}
                   className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold text-lg hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 disabled:opacity-50 active:scale-95"
                 >
-                  {loading ? 'جاري المعالجة...' : 'تأكيد إنشاء الحساب'}
+                  {loading ? (language === 'ar' ? 'جاري المعالجة...' : 'Processing...') : (language === 'ar' ? 'تأكيد إنشاء الحساب' : 'Confirm Account Creation')}
                 </button>
               </div>
             </form>
@@ -1469,8 +1469,8 @@ export const Users: React.FC = () => {
             <div className="w-20 h-20 bg-red-50 text-red-650 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner animate-bounce">
               <Trash2 size={32} />
             </div>
-            <h3 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">تأكيد حذف الحساب</h3>
-            <p className="text-slate-500 mb-8 font-medium">هل أنت متأكد من رغبتك في حذف حساب هذا المستخدم نهائياً؟ لا يمكن التراجع عن هذا الإجراء.</p>
+            <h3 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">{language === 'ar' ? 'تأكيد حذف الحساب' : 'Confirm Account Deletion'}</h3>
+            <p className="text-slate-500 mb-8 font-medium">{language === 'ar' ? 'هل أنت متأكد من رغبتك في حذف حساب هذا المستخدم نهائياً؟ لا يمكن التراجع عن هذا الإجراء.' : 'Are you sure you want to permanently delete this user account? This action cannot be undone.'}</p>
             <div className="flex gap-3">
               <button 
                 onClick={() => {
@@ -1479,13 +1479,13 @@ export const Users: React.FC = () => {
                 }}
                 className="flex-1 py-4 bg-slate-50 text-slate-600 rounded-2xl font-bold hover:bg-slate-100 transition-all active:scale-95"
               >
-                إلغاء
+                {language === 'ar' ? 'إلغاء' : 'Cancel'}
               </button>
               <button 
                 onClick={confirmDeleteUser}
                 className="flex-1 py-4 bg-red-650 text-white rounded-2xl font-bold hover:bg-red-700 transition-all shadow-xl shadow-red-500/20 active:scale-95"
               >
-                حذف الحساب
+                {language === 'ar' ? 'حذف الحساب' : 'Delete Account'}
               </button>
             </div>
           </div>
@@ -1498,29 +1498,29 @@ export const Users: React.FC = () => {
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col border border-slate-200">
             <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-white shrink-0">
               <h3 className="text-2xl font-black text-slate-900 tracking-tight">
-                {editingRole ? 'تعديل بيانات الدور الوظيفي' : 'إنشاء دور وظيفي جديد'}
+                {editingRole ? (language === 'ar' ? 'تعديل بيانات الدور الوظيفي' : 'Edit Job Role Details') : (language === 'ar' ? 'إنشاء دور وظيفي جديد' : 'Create New Job Role')}
               </h3>
               <button onClick={() => setIsRoleModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded-full transition-all"><X size={24} /></button>
             </div>
-            <form onSubmit={handleSaveRole} className="p-8 space-y-6 flex-1 text-right">
+            <form onSubmit={handleSaveRole} className={`p-8 space-y-6 flex-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
               <div className="space-y-2">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">اسم الدور الوظيفي</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'اسم الدور الوظيفي' : 'Job Role Name'}</label>
                 <input
                   required
                   type="text"
                   className="premium-input font-bold w-full"
                   value={roleFormData.name}
                   onChange={(e) => setRoleFormData({ ...roleFormData, name: e.target.value })}
-                  placeholder="مثال: مدير المبيعات، كاشير الفروع..."
+                  placeholder={language === 'ar' ? 'مثال: مدير المبيعات، كاشير الفروع...' : 'e.g., Sales Manager, Branch Cashier...'}
                 />
               </div>
               <div className="space-y-2">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">الوصف العام للدور</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'الوصف العام للدور' : 'General Role Description'}</label>
                 <textarea
                   className="premium-input font-bold w-full min-h-[100px] py-4"
                   value={roleFormData.description}
                   onChange={(e) => setRoleFormData({ ...roleFormData, description: e.target.value })}
-                  placeholder="اكتب وصفاً مختصراً يوضح طبيعة هذا الدور والهدف منه..."
+                  placeholder={language === 'ar' ? 'اكتب وصفاً مختصراً يوضح طبيعة هذا الدور والهدف منه...' : 'Write a brief description explaining the nature and purpose of this role...'}
                 />
               </div>
               <div className="pt-4">
@@ -1529,7 +1529,7 @@ export const Users: React.FC = () => {
                   disabled={loading}
                   className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold text-lg hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 disabled:opacity-50 active:scale-95"
                 >
-                  {loading ? 'جاري المعالجة...' : editingRole ? 'حفظ التعديلات' : 'تأكيد إنشاء الدور'}
+                  {loading ? (language === 'ar' ? 'جاري المعالجة...' : 'Processing...') : editingRole ? (language === 'ar' ? 'حفظ التعديلات' : 'Save Changes') : (language === 'ar' ? 'تأكيد إنشاء الدور' : 'Confirm Role Creation')}
                 </button>
               </div>
             </form>
@@ -1544,8 +1544,8 @@ export const Users: React.FC = () => {
             <div className="w-20 h-20 bg-red-50 text-red-650 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner animate-bounce">
               <Trash2 size={32} />
             </div>
-            <h3 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">حذف الدور الوظيفي</h3>
-            <p className="text-slate-500 mb-8 font-medium">هل أنت متأكد من رغبتك في حذف هذا الدور نهائياً؟ سيتم إلغاء ارتباطه بجميع المستخدمين الذين ينتمون إليه حالياً.</p>
+            <h3 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">{language === 'ar' ? 'حذف الدور الوظيفي' : 'Delete Job Role'}</h3>
+            <p className="text-slate-500 mb-8 font-medium">{language === 'ar' ? '\u0647\u0644 \u0623\u0646\u062a \u0645\u062a\u0623\u0643\u062f \u0645\u0646 \u0631\u063a\u0628\u062a\u0643 \u0641\u064a \u062d\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u062f\u0648\u0631 \u0646\u0647\u0627\u0626\u064a\u0627\u064b\u061f \u0633\u064a\u062a\u0645 \u0625\u0644\u063a\u0627\u0621 \u0627\u0631\u062a\u0628\u0627\u0637\u0647 \u0628\u062c\u0645\u064a\u0639 \u0627\u0644\u0645\u0633\u062a\u062e\u062f\u0645\u064a\u0646 \u0627\u0644\u0630\u064a\u0646 \u064a\u0646\u062a\u0645\u0648\u0646 \u0625\u0644\u064a\u0647 \u062d\u0627\u0644\u064a\u0627\u064b.' : 'Are you sure you want to permanently delete this role? Its association with all users belonging to it will be removed.'}</p>
             <div className="flex gap-3">
               <button 
                 onClick={() => {
@@ -1554,13 +1554,13 @@ export const Users: React.FC = () => {
                 }}
                 className="flex-1 py-4 bg-slate-50 text-slate-600 rounded-2xl font-bold hover:bg-slate-100 transition-all active:scale-95"
               >
-                إلغاء
+                {language === 'ar' ? 'إلغاء' : 'Cancel'}
               </button>
               <button 
                 onClick={confirmDeleteRole}
                 className="flex-1 py-4 bg-red-650 text-white rounded-2xl font-bold hover:bg-red-700 transition-all shadow-xl shadow-red-500/20 active:scale-95"
               >
-                تأكيد حذف الدور
+                {language === 'ar' ? 'تأكيد حذف الدور' : 'Confirm Role Deletion'}
               </button>
             </div>
           </div>
