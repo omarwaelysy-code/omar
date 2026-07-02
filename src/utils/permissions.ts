@@ -165,6 +165,17 @@ export function computeEffectivePermissions(user: any, companyRoles: any[]): any
 
   const result = getInitialPermissionsState();
   const roleIdsVal = user.role_ids as any;
+  
+  console.log("====================\nSTEP 11 & 12 (permissions.ts)\n====================");
+  console.log("اسم الملف: permissions.ts");
+  console.log("اسم الدالة: computeEffectivePermissions");
+  console.log("VALUE =", roleIdsVal);
+  console.log("TYPE =", typeof roleIdsVal);
+  console.log("IS ARRAY =", Array.isArray(roleIdsVal));
+  console.log("Null؟", roleIdsVal === null);
+  console.log("Undefined؟", roleIdsVal === undefined);
+  console.trace();
+
   const roleIds = Array.isArray(roleIdsVal) 
     ? roleIdsVal 
     : (typeof roleIdsVal === 'string' 

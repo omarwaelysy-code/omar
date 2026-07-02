@@ -303,10 +303,21 @@ export const Users: React.FC = () => {
 
   // Open Permissions
   const openUserPermissions = (user: User) => {
+    console.log("====================\nSTEP 1 & 2 (Users.tsx - openUserPermissions)\n====================");
+    console.log("اسم الملف: Users.tsx");
+    console.log("اسم الدالة: openUserPermissions");
+    console.log("نوع البيانات للـ role_ids:", typeof user.role_ids);
+    console.log("القيمة:", user.role_ids);
+    console.log("Array؟", Array.isArray(user.role_ids));
+    console.log("Object؟", typeof user.role_ids === 'object' && user.role_ids !== null && !Array.isArray(user.role_ids));
+    console.log("Null؟", user.role_ids === null);
+    console.log("Undefined؟", user.role_ids === undefined);
+
     setSelectedUser(user);
     setPermissionsTargetType('user');
     setTempPermissions(JSON.parse(JSON.stringify(user.permissions || {})));
-    setTempUserRoleIds(user.role_ids || []);
+    const cleanRoleIds = Array.isArray(user.role_ids) ? user.role_ids : [];
+    setTempUserRoleIds(cleanRoleIds);
     setIsPermissionsModalOpen(true);
   };
 
@@ -320,11 +331,22 @@ export const Users: React.FC = () => {
   const savePermissions = async () => {
     if (!currentUser) return;
     setLoading(true);
+
+    console.log("====================\nSTEP 7, 8 & 9 (Users.tsx - savePermissions)\n====================");
+    console.log("اسم الملف: Users.tsx");
+    console.log("اسم الدالة: savePermissions");
+    console.log("نوع البيانات للـ tempUserRoleIds:", typeof tempUserRoleIds);
+    console.log("القيمة:", tempUserRoleIds);
+    console.log("Array؟", Array.isArray(tempUserRoleIds));
+    console.log("Object؟", typeof tempUserRoleIds === 'object' && tempUserRoleIds !== null && !Array.isArray(tempUserRoleIds));
+    console.trace();
+
+    const cleanSaveRoleIds = Array.isArray(tempUserRoleIds) ? tempUserRoleIds : [];
     try {
       if (permissionsTargetType === 'user' && selectedUser) {
         await dbService.update('users', selectedUser.id, {
           permissions: tempPermissions,
-          role_ids: tempUserRoleIds
+          role_ids: cleanSaveRoleIds
         });
         
         await dbService.logActivity(
@@ -774,7 +796,10 @@ export const Users: React.FC = () => {
                           <label 
                             key={role.id}
                             className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer hover:bg-slate-50 transition-all ${
-                              tempUserRoleIds.includes(role.id) 
+                              (() => {
+                                const roleIdsVal = tempUserRoleIds;
+                                return Array.isArray(roleIdsVal) && roleIdsVal.includes(role.id);
+                              })() 
                                 ? 'border-emerald-500 bg-emerald-50/40 text-emerald-900 font-bold' 
                                 : 'border-slate-200 text-slate-700'
                             }`}
@@ -782,7 +807,17 @@ export const Users: React.FC = () => {
                             <span className="text-xs">{role.name}</span>
                             <input 
                               type="checkbox"
-                              checked={tempUserRoleIds.includes(role.id)}
+                              checked={(() => {
+                                const roleIdsVal = tempUserRoleIds;
+                                console.log("====================\nSTEP 5 & 6 (Users.tsx - Role Checkbox Rendering)\n====================");
+                                console.log("اسم الملف: Users.tsx");
+                                console.log("موضع الدالة: checked attribute of role checkbox");
+                                console.log("VALUE =", roleIdsVal);
+                                console.log("TYPE =", typeof roleIdsVal);
+                                console.log("IS ARRAY =", Array.isArray(roleIdsVal));
+                                console.trace();
+                                return Array.isArray(roleIdsVal) && roleIdsVal.includes(role.id);
+                              })()}
                               onChange={() => toggleUserRoleAssignment(role.id)}
                               className="w-4 h-4 accent-emerald-600"
                             />
@@ -1246,11 +1281,13 @@ export const Users: React.FC = () => {
                                             <span className="text-xs font-black text-slate-500">السجلات المسموح بها للمستخدم:</span>
                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                               {listResources.map(item => {
-                                                 console.log("CHECKLIST EXCEPTION GUARD:", {
-                                                   typeofValue: typeof activeAllowedIds,
-                                                   value: activeAllowedIds,
-                                                   isArray: Array.isArray(activeAllowedIds)
-                                                 });
+                                                 console.log("====================\nSTEP 5 & 6 (Users.tsx - Permission Checklist Rendering)\n====================");
+                                                 console.log("اسم الملف: Users.tsx");
+                                                 console.log("موضع الدالة: isChecked calculation for permission checklist");
+                                                 console.log("VALUE =", activeAllowedIds);
+                                                 console.log("TYPE =", typeof activeAllowedIds);
+                                                 console.log("IS ARRAY =", Array.isArray(activeAllowedIds));
+                                                 console.trace();
                                                  const isChecked = Array.isArray(activeAllowedIds) && activeAllowedIds.includes(item.id);
                                                 const isChangeDisabled = permissionsTargetType === 'user' && userOverrideRestrict !== true;
 
