@@ -11,7 +11,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'logo_url', 'website', 'country', 'currency', 'fiscal_year_end',
     'subscription_status', 'subscription_plan', 'subscription_start',
     'subscription_end', 'subscription_expiry', 'subscription_days', 'users_limit', 
-    'transactions_limit', 'company_status', 'features', 'settings', 'vat_enabled', 'wht_enabled', 'purchase_workflow_mode', 'created_at', 'updated_at'
+    'transactions_limit', 'company_status', 'features', 'settings', 'vat_enabled', 'wht_enabled', 'purchase_workflow_mode', 'goods_receipt_matching_mode', 'created_at', 'updated_at'
   ],
   users: [
     'id', 'username', 'name', 'email', 'password_hash', 'mobile', 'role', 'company_id',
@@ -255,10 +255,10 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'id', 'company_id', 'code', 'name', 'category', 'purchase_date', 'purchase_cost', 'current_value', 'depreciation_rate', 'status', 'created_at'
   ],
   goods_receipts: [
-    'id', 'company_id', 'receipt_number', 'supplier_id', 'supplier_name', 'warehouse_id', 'warehouse_name', 'date', 'notes', 'status', 'document_origin', 'created_automatically', 'source_document_type', 'source_document_id', 'source_document_number', 'created_by', 'created_at', 'updated_at'
+    'id', 'company_id', 'receipt_number', 'supplier_id', 'supplier_name', 'warehouse_id', 'warehouse_name', 'date', 'notes', 'status', 'document_origin', 'created_automatically', 'source_document_type', 'source_document_id', 'source_document_number', 'created_by', 'billing_status', 'created_at', 'updated_at'
   ],
   goods_receipt_items: [
-    'id', 'goods_receipt_id', 'company_id', 'product_id', 'product_name', 'product_code', 'unit', 'quantity', 'unit_cost', 'total_cost', 'batch_id', 'serial_number', 'notes', 'created_at'
+    'id', 'goods_receipt_id', 'company_id', 'product_id', 'product_name', 'product_code', 'unit', 'quantity', 'unit_cost', 'total_cost', 'batch_id', 'serial_number', 'notes', 'billed_quantity', 'remaining_quantity', 'created_at'
   ],
   purchase_invoice_goods_receipts: [
     'id', 'purchase_invoice_id', 'goods_receipt_id', 'created_at'

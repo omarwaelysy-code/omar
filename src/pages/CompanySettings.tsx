@@ -48,6 +48,7 @@ interface CompanyData {
   vat_enabled: boolean;
   wht_enabled: boolean;
   purchase_workflow_mode?: 'Simple' | 'Enterprise Strict' | 'Enterprise Flexible';
+  goods_receipt_matching_mode?: 'SupplierProduct' | 'ProductOnly' | 'SupplierProductWarehouse' | 'SmartMatching';
 }
 
 // Searchable Select Component
@@ -177,7 +178,8 @@ export function CompanySettings() {
     inventory_cost_method_level: 'item',
     vat_enabled: false,
     wht_enabled: false,
-    purchase_workflow_mode: 'Simple'
+    purchase_workflow_mode: 'Simple',
+    goods_receipt_matching_mode: 'SmartMatching'
   });
 
   // ─── Exchange Rate Settings state ──────────────────────────────────────────────────
@@ -330,7 +332,8 @@ export function CompanySettings() {
             inventory_cost_method_level: 'item',
             vat_enabled: settings.vat_enabled || company.vat_enabled || false,
             wht_enabled: settings.wht_enabled || company.wht_enabled || false,
-            purchase_workflow_mode: company.purchase_workflow_mode || settings.purchase_workflow_mode || 'Simple'
+            purchase_workflow_mode: company.purchase_workflow_mode || settings.purchase_workflow_mode || 'Simple',
+            goods_receipt_matching_mode: company.goods_receipt_matching_mode || 'SmartMatching'
           });
 
           setErAutoUpdate(settings.er_auto_update || false);
@@ -388,6 +391,7 @@ export function CompanySettings() {
         vat_enabled: data.vat_enabled,
         wht_enabled: data.wht_enabled,
         purchase_workflow_mode: data.purchase_workflow_mode || 'Simple',
+        goods_receipt_matching_mode: data.goods_receipt_matching_mode || 'SmartMatching',
         barcode_scanner: barcodeSettings,
       };
 
@@ -402,6 +406,7 @@ export function CompanySettings() {
         vat_enabled: data.vat_enabled,
         wht_enabled: data.wht_enabled,
         purchase_workflow_mode: data.purchase_workflow_mode || 'Simple',
+        goods_receipt_matching_mode: data.goods_receipt_matching_mode || 'SmartMatching',
         settings: newSettings
       });
       
@@ -889,6 +894,127 @@ export function CompanySettings() {
                 </div>
               </div>
 
+            </div>
+          </div>
+
+          <hr className="border-slate-100" />
+
+          <div className="space-y-4">
+            <label className="block text-sm font-semibold text-slate-500">
+              {language === 'ar' ? 'نمط مطابقة إذن الاستلام بفاتورة المشتريات (Goods Receipt Matching Mode)' : 'Goods Receipt Matching Mode'}
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {/* Supplier + Product */}
+              <div
+                onClick={() => setData(prev => ({ ...prev, goods_receipt_matching_mode: 'SupplierProduct' }))}
+                className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                  data.goods_receipt_matching_mode === 'SupplierProduct'
+                    ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
+                    : 'border-slate-100 bg-white hover:border-slate-200'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800 text-sm">
+                      {language === 'ar' ? 'المورد + الصنف' : 'Supplier + Product'}
+                    </span>
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                      data.goods_receipt_matching_mode === 'SupplierProduct' ? 'border-indigo-600' : 'border-slate-300'
+                    }`}>
+                      {data.goods_receipt_matching_mode === 'SupplierProduct' && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                    {language === 'ar' 
+                      ? 'تتم المطابقة بواسطة المورد والصنف المستلم.'
+                      : 'Matches by Supplier and received Product.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Product Only */}
+              <div
+                onClick={() => setData(prev => ({ ...prev, goods_receipt_matching_mode: 'ProductOnly' }))}
+                className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                  data.goods_receipt_matching_mode === 'ProductOnly'
+                    ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
+                    : 'border-slate-100 bg-white hover:border-slate-200'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800 text-sm">
+                      {language === 'ar' ? 'الصنف فقط' : 'Product Only'}
+                    </span>
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                      data.goods_receipt_matching_mode === 'ProductOnly' ? 'border-indigo-600' : 'border-slate-300'
+                    }`}>
+                      {data.goods_receipt_matching_mode === 'ProductOnly' && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                    {language === 'ar' 
+                      ? 'تتم المطابقة بواسطة الصنف فقط، متجاهلاً المورد.'
+                      : 'Matches by Product only, ignoring the Supplier.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Supplier + Product + Warehouse */}
+              <div
+                onClick={() => setData(prev => ({ ...prev, goods_receipt_matching_mode: 'SupplierProductWarehouse' }))}
+                className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                  data.goods_receipt_matching_mode === 'SupplierProductWarehouse'
+                    ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
+                    : 'border-slate-100 bg-white hover:border-slate-200'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800 text-sm">
+                      {language === 'ar' ? 'المورد + الصنف + المخزن' : 'Supplier + Product + Warehouse'}
+                    </span>
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                      data.goods_receipt_matching_mode === 'SupplierProductWarehouse' ? 'border-indigo-600' : 'border-slate-300'
+                    }`}>
+                      {data.goods_receipt_matching_mode === 'SupplierProductWarehouse' && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                    {language === 'ar' 
+                      ? 'تتم المطابقة بواسطة المورد، الصنف، والمخزن المستلم.'
+                      : 'Matches by Supplier, Product, and Warehouse.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Smart Matching */}
+              <div
+                onClick={() => setData(prev => ({ ...prev, goods_receipt_matching_mode: 'SmartMatching' }))}
+                className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                  data.goods_receipt_matching_mode === 'SmartMatching' || !data.goods_receipt_matching_mode
+                    ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
+                    : 'border-slate-100 bg-white hover:border-slate-200'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800 text-sm">
+                      {language === 'ar' ? 'مطابقة ذكية (Smart)' : 'Smart Matching'}
+                    </span>
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                      data.goods_receipt_matching_mode === 'SmartMatching' || !data.goods_receipt_matching_mode ? 'border-indigo-600' : 'border-slate-300'
+                    }`}>
+                      {(data.goods_receipt_matching_mode === 'SmartMatching' || !data.goods_receipt_matching_mode) && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                    {language === 'ar' 
+                      ? 'المطابقة تلقائياً بالصنف والمورد والمخزن والكمية المستلمة.'
+                      : 'Automatically matches by supplier, product, warehouse, and remaining quantity.'}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -99,6 +99,7 @@ export interface Company {
     barcode_scanner?: any;
   };
   purchase_workflow_mode?: 'Simple' | 'Enterprise Strict' | 'Enterprise Flexible';
+  goods_receipt_matching_mode?: 'SupplierProduct' | 'ProductOnly' | 'SupplierProductWarehouse' | 'SmartMatching';
 }
 
 export interface Currency {

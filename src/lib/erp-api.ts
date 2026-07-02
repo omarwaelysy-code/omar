@@ -3545,6 +3545,230 @@ router.put('/returns/:id', authenticateToken, async (req: AuthRequest, res) => {
   }
 });
 
+
+export async function allocatePurchaseInvoiceBillingToGoodsReceipts(
+  client: any,
+  companyId: string,
+  invoiceId: string,
+  goodsReceiptIds: string[],
+  items: any[],
+  supplierId: string | null,
+  supplierName: string | null
+) {
+  if (!goodsReceiptIds || goodsReceiptIds.length === 0) return;
+
+  // Fetch all goods_receipt_items for these Goods Receipts
+  const grItemsRes = await client.query(
+    `SELECT id, goods_receipt_id, product_id, quantity, billed_quantity, remaining_quantity 
+     FROM goods_receipt_items 
+     WHERE goods_receipt_id = ANY($1) 
+     ORDER BY created_at ASC`,
+    [goodsReceiptIds]
+  );
+  const grItems = grItemsRes.rows;
+
+  // Group goods_receipt_items by product_id
+  const grItemsByProduct = new Map();
+  for (const item of grItems) {
+    const prodId = item.product_id;
+    if (!grItemsByProduct.has(prodId)) {
+      grItemsByProduct.set(prodId, []);
+    }
+    grItemsByProduct.get(prodId).push({
+      ...item,
+      quantity: parseFloat(item.quantity || '0'),
+      billed_quantity: parseFloat(item.billed_quantity || '0'),
+      remaining_quantity: parseFloat(item.remaining_quantity !== null && item.remaining_quantity !== undefined ? item.remaining_quantity : (item.quantity || '0'))
+    });
+  }
+
+  // Allocate quantities FIFO style
+  for (const item of items) {
+    const prodId = item.product_id;
+    const invoiceQty = parseFloat(item.quantity || '0');
+    if (invoiceQty <= 0) continue;
+
+    const grProds = grItemsByProduct.get(prodId) || [];
+    let unallocatedQty = invoiceQty;
+
+    for (const grItem of grProds) {
+      if (unallocatedQty <= 0) break;
+      const availableToBill = grItem.remaining_quantity;
+      if (availableToBill <= 0) continue;
+
+      const allocation = Math.min(unallocatedQty, availableToBill);
+      grItem.billed_quantity += allocation;
+      grItem.remaining_quantity -= allocation;
+      unallocatedQty -= allocation;
+
+      await client.query(
+        `UPDATE goods_receipt_items 
+         SET billed_quantity = $1, remaining_quantity = $2 
+         WHERE id = $3`,
+        [grItem.billed_quantity, grItem.remaining_quantity, grItem.id]
+      );
+    }
+  }
+
+  // Update supplier and billing status of the linked Goods Receipts
+  for (const grId of goodsReceiptIds) {
+    const grRes = await client.query(
+      `SELECT supplier_id FROM goods_receipts WHERE id = $1`,
+      [grId]
+    );
+    if (grRes.rows.length > 0) {
+      const currentSupplierId = grRes.rows[0].supplier_id;
+      if (!currentSupplierId && supplierId) {
+        await client.query(
+          `UPDATE goods_receipts 
+           SET supplier_id = $1, supplier_name = $2 
+           WHERE id = $3`,
+          [supplierId, supplierName, grId]
+        );
+      }
+    }
+
+    const itemsRes = await client.query(
+      `SELECT quantity, billed_quantity, remaining_quantity 
+       FROM goods_receipt_items 
+       WHERE goods_receipt_id = $1`,
+      [grId]
+    );
+    const grItemsList = itemsRes.rows.map(item => ({
+      quantity: parseFloat(item.quantity || '0'),
+      billed_quantity: parseFloat(item.billed_quantity || '0'),
+      remaining_quantity: parseFloat(item.remaining_quantity !== null && item.remaining_quantity !== undefined ? item.remaining_quantity : (item.quantity || '0'))
+    }));
+
+    let billingStatus = 'uninvoiced';
+    if (grItemsList.length > 0) {
+      const allFullyBilled = grItemsList.every(i => i.remaining_quantity === 0);
+      const allUnbilled = grItemsList.every(i => i.billed_quantity === 0);
+      if (allFullyBilled) {
+        billingStatus = 'fully_invoiced';
+      } else if (allUnbilled) {
+        billingStatus = 'uninvoiced';
+      } else {
+        billingStatus = 'partially_invoiced';
+      }
+    }
+
+    await client.query(
+      `UPDATE goods_receipts 
+       SET billing_status = $1 
+       WHERE id = $2`,
+      [billingStatus, grId]
+    );
+  }
+}
+
+export async function revertPurchaseInvoiceBillingFromGoodsReceipts(
+  client: any,
+  companyId: string,
+  invoiceId: string
+) {
+  // Find all previously linked Goods Receipts
+  const linksRes = await client.query(
+    `SELECT goods_receipt_id FROM purchase_invoice_goods_receipts WHERE purchase_invoice_id = $1`,
+    [invoiceId]
+  );
+  const goodsReceiptIds = linksRes.rows.map(r => r.goods_receipt_id);
+  if (goodsReceiptIds.length === 0) return;
+
+  // Fetch current invoice items
+  const itemsRes = await client.query(
+    `SELECT product_id, quantity FROM purchase_invoice_items WHERE invoice_id = $1`,
+    [invoiceId]
+  );
+  const items = itemsRes.rows;
+
+  // Fetch all goods_receipt_items (LIFO for rollback, matching FIFO allocation)
+  const grItemsRes = await client.query(
+    `SELECT id, goods_receipt_id, product_id, quantity, billed_quantity, remaining_quantity 
+     FROM goods_receipt_items 
+     WHERE goods_receipt_id = ANY($1) 
+     ORDER BY created_at DESC`,
+    [goodsReceiptIds]
+  );
+  const grItems = grItemsRes.rows;
+
+  const grItemsByProduct = new Map();
+  for (const item of grItems) {
+    const prodId = item.product_id;
+    if (!grItemsByProduct.has(prodId)) {
+      grItemsByProduct.set(prodId, []);
+    }
+    grItemsByProduct.get(prodId).push({
+      ...item,
+      quantity: parseFloat(item.quantity || '0'),
+      billed_quantity: parseFloat(item.billed_quantity || '0'),
+      remaining_quantity: parseFloat(item.remaining_quantity !== null && item.remaining_quantity !== undefined ? item.remaining_quantity : (item.quantity || '0'))
+    });
+  }
+
+  for (const item of items) {
+    const prodId = item.product_id;
+    const invoiceQty = parseFloat(item.quantity || '0');
+    if (invoiceQty <= 0) continue;
+
+    const grProds = grItemsByProduct.get(prodId) || [];
+    let quantityToRestore = invoiceQty;
+
+    for (const grItem of grProds) {
+      if (quantityToRestore <= 0) break;
+      const billedOnItem = grItem.billed_quantity;
+      if (billedOnItem <= 0) continue;
+
+      const restoration = Math.min(quantityToRestore, billedOnItem);
+      grItem.billed_quantity -= restoration;
+      grItem.remaining_quantity += restoration;
+      quantityToRestore -= restoration;
+
+      await client.query(
+        `UPDATE goods_receipt_items 
+         SET billed_quantity = $1, remaining_quantity = $2 
+         WHERE id = $3`,
+        [grItem.billed_quantity, grItem.remaining_quantity, grItem.id]
+      );
+    }
+  }
+
+  // Update billing_status for each Goods Receipt
+  for (const grId of goodsReceiptIds) {
+    const itemsRes = await client.query(
+      `SELECT quantity, billed_quantity, remaining_quantity 
+       FROM goods_receipt_items 
+       WHERE goods_receipt_id = $1`,
+      [grId]
+    );
+    const grItemsList = itemsRes.rows.map(item => ({
+      quantity: parseFloat(item.quantity || '0'),
+      billed_quantity: parseFloat(item.billed_quantity || '0'),
+      remaining_quantity: parseFloat(item.remaining_quantity !== null && item.remaining_quantity !== undefined ? item.remaining_quantity : (item.quantity || '0'))
+    }));
+
+    let billingStatus = 'uninvoiced';
+    if (grItemsList.length > 0) {
+      const allFullyBilled = grItemsList.every(i => i.remaining_quantity === 0);
+      const allUnbilled = grItemsList.every(i => i.billed_quantity === 0);
+      if (allFullyBilled) {
+        billingStatus = 'fully_invoiced';
+      } else if (allUnbilled) {
+        billingStatus = 'uninvoiced';
+      } else {
+        billingStatus = 'partially_invoiced';
+      }
+    }
+
+    await client.query(
+      `UPDATE goods_receipts 
+       SET billing_status = $1 
+       WHERE id = $2`,
+      [billingStatus, grId]
+    );
+  }
+}
+
 // --- Purchase Invoices with Items (Transaction) ---
 router.post('/purchase_invoices', authenticateToken, async (req: AuthRequest, res) => {
   const client = await pool.connect();
@@ -3633,7 +3857,9 @@ await client.query(
           product_id: item.product_id,
           quantity: item.quantity,
           unit_cost: item.unit_price || item.unit_cost || 0,
-          total_cost: parseFloat(item.quantity || '0') * parseFloat(item.unit_price || item.unit_cost || '0')
+          total_cost: parseFloat(item.quantity || '0') * parseFloat(item.unit_price || item.unit_cost || '0'),
+          billed_quantity: parseFloat(item.quantity || '0'),
+          remaining_quantity: 0
         };
 
         const prodRes = await client.query('SELECT name, code, type, is_service FROM products WHERE id = $1', [item.product_id]);
@@ -3989,7 +4215,9 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
               product_id: item.product_id,
               quantity: item.quantity,
               unit_cost: item.unit_price || item.unit_cost || 0,
-              total_cost: parseFloat(item.quantity || '0') * parseFloat(item.unit_price || item.unit_cost || '0')
+              total_cost: parseFloat(item.quantity || '0') * parseFloat(item.unit_price || item.unit_cost || '0'),
+              billed_quantity: parseFloat(item.quantity || '0'),
+              remaining_quantity: 0
             };
     
             const prodRes = await client.query('SELECT name, code, type, is_service FROM products WHERE id = $1', [item.product_id]);
@@ -5277,7 +5505,7 @@ router.post('/goods_receipts', authenticateToken, async (req: AuthRequest, res) 
     for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('goods_receipt_items', item);
       const itemId = uuidv4();
-      const itemData = { ...sanitizedItem, id: itemId, goods_receipt_id: receiptId, company_id: companyId };
+      const itemData = { ...sanitizedItem, id: itemId, goods_receipt_id: receiptId, company_id: companyId, billed_quantity: 0, remaining_quantity: item.quantity };
 
       const prodRes = await client.query('SELECT name, code, type, is_service FROM products WHERE id = $1', [item.product_id]);
       if (prodRes.rows.length === 0) throw new Error(`Product not found: ${item.product_id}`);
@@ -5403,7 +5631,11 @@ router.put('/goods_receipts/:id', authenticateToken, async (req: AuthRequest, re
     await client.query('BEGIN');
 
     // Retrieve old state to deduct received quantities from PO
-    const oldItemsRes = await client.query('SELECT product_id, quantity FROM goods_receipt_items WHERE goods_receipt_id = $1', [id]);
+    const oldItemsRes = await client.query('SELECT product_id, quantity, billed_quantity FROM goods_receipt_items WHERE goods_receipt_id = $1', [id]);
+    const billedMap = new Map();
+    oldItemsRes.rows.forEach((item: any) => {
+      billedMap.set(item.product_id, parseFloat(item.billed_quantity || '0'));
+    });
     const oldGrRes = await client.query('SELECT source_document_type, source_document_id FROM goods_receipts WHERE id = $1', [id]);
     if (oldGrRes.rows.length > 0 && oldGrRes.rows[0].source_document_type === 'purchase_order' && oldGrRes.rows[0].source_document_id) {
       const poId = oldGrRes.rows[0].source_document_id;
@@ -5448,7 +5680,7 @@ router.put('/goods_receipts/:id', authenticateToken, async (req: AuthRequest, re
     for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('goods_receipt_items', item);
       const itemId = uuidv4();
-      const itemData = { ...sanitizedItem, id: itemId, goods_receipt_id: id, company_id: companyId };
+      const itemData = { ...sanitizedItem, id: itemId, goods_receipt_id: id, company_id: companyId, billed_quantity: (typeof billedMap !== 'undefined' && billedMap.get(item.product_id)) || 0, remaining_quantity: Math.max(0, parseFloat(item.quantity || '0') - ((typeof billedMap !== 'undefined' && billedMap.get(item.product_id)) || 0)) };
 
       const prodRes = await client.query('SELECT name, code, type, is_service FROM products WHERE id = $1', [item.product_id]);
       if (prodRes.rows.length === 0) throw new Error(`Product not found: ${item.product_id}`);
@@ -5537,6 +5769,32 @@ router.put('/goods_receipts/:id', authenticateToken, async (req: AuthRequest, re
         notes: receiptData.notes || null,
         created_by: req.user?.id || receiptData.created_by || null
       }, movementLines, client);
+    }
+
+    {
+      const grItemsListRes = await client.query(
+        'SELECT quantity, billed_quantity, remaining_quantity FROM goods_receipt_items WHERE goods_receipt_id = $1',
+        [id]
+      );
+      const grItemsList = grItemsListRes.rows.map((item: any) => ({
+        quantity: parseFloat(item.quantity || '0'),
+        billed_quantity: parseFloat(item.billed_quantity || '0'),
+        remaining_quantity: parseFloat(item.remaining_quantity !== null && item.remaining_quantity !== undefined ? item.remaining_quantity : (item.quantity || '0'))
+      }));
+
+      let billingStatus = 'uninvoiced';
+      if (grItemsList.length > 0) {
+        const allFullyBilled = grItemsList.every((i: any) => i.remaining_quantity === 0);
+        const allUnbilled = grItemsList.every((i: any) => i.billed_quantity === 0);
+        if (allFullyBilled) {
+          billingStatus = 'fully_invoiced';
+        } else if (allUnbilled) {
+          billingStatus = 'uninvoiced';
+        } else {
+          billingStatus = 'partially_invoiced';
+        }
+      }
+      await client.query('UPDATE goods_receipts SET billing_status = $1 WHERE id = $2', [billingStatus, id]);
     }
 
     await client.query('COMMIT');

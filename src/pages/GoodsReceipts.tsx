@@ -33,6 +33,8 @@ interface GoodsReceiptItem {
   batch_id?: string | null;
   serial_number?: string | null;
   notes?: string | null;
+  billed_quantity?: number;
+  remaining_quantity?: number;
   // UI helpers
   po_quantity?: number;
   previously_received?: number;
@@ -41,8 +43,8 @@ interface GoodsReceiptItem {
 interface GoodsReceipt {
   id: string;
   receipt_number: string;
-  supplier_id: string;
-  supplier_name: string;
+  supplier_id?: string | null;
+  supplier_name?: string | null;
   warehouse_id: string;
   warehouse_name: string;
   date: string;
@@ -54,6 +56,7 @@ interface GoodsReceipt {
   source_document_id?: string | null;
   source_document_number?: string | null;
   created_by?: string;
+  billing_status?: string;
   created_at?: string;
   items?: GoodsReceiptItem[];
 }
@@ -137,6 +140,7 @@ export const GoodsReceipts: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingReceipt, setEditingReceipt] = useState<GoodsReceipt | null>(null);
   const [viewReceipt, setViewReceipt] = useState<GoodsReceipt | null>(null);
+  const [linkedInvoices, setLinkedInvoices] = useState<any[]>([]);
   
   const [supplierId, setSupplierId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
@@ -214,6 +218,28 @@ export const GoodsReceipts: React.FC = () => {
       unsubReceipts();
     };
   }, [user, page, searchQuery, filterOrigin, filterAuto, filterSupplier, filterWarehouse, filterStatus, filterDateFrom, filterDateTo, limit]);
+
+  useEffect(() => {
+    if (viewReceipt && user) {
+      dbService.list('purchase_invoice_goods_receipts', { goods_receipt_id: viewReceipt.id })
+        .then(async (junctions) => {
+          const invoiceIds = junctions.map((j: any) => j.purchase_invoice_id);
+          if (invoiceIds.length > 0) {
+            const invoices = await dbService.list('purchase_invoices', { company_id: user.company_id });
+            const filtered = invoices.filter((inv: any) => invoiceIds.includes(inv.id));
+            setLinkedInvoices(filtered);
+          } else {
+            setLinkedInvoices([]);
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching linked invoices:', err);
+          setLinkedInvoices([]);
+        });
+    } else {
+      setLinkedInvoices([]);
+    }
+  }, [viewReceipt, user]);
 
   // Fetch pending POs when supplier changes in modal
   useEffect(() => {
@@ -617,6 +643,7 @@ export const GoodsReceipts: React.FC = () => {
                   <th className="px-6 py-4">{gt('column_date')}</th>
                   <th className="px-6 py-4">{gt('column_origin')}</th>
                   <th className="px-6 py-4">{gt('column_status')}</th>
+                  <th className="px-6 py-4">{language === 'ar' ? 'حالة الفوترة' : 'Billing Status'}</th>
                   <th className="px-6 py-4"></th>
                 </tr>
               </thead>
@@ -640,6 +667,28 @@ export const GoodsReceipts: React.FC = () => {
                       <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${gr.status === 'posted' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-650'}`}>
                         {gt(`status_${gr.status}`)}
                       </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {(() => {
+                        const bStatus = gr.billing_status || 'uninvoiced';
+                        let label = language === 'ar' ? 'غير مفوتر' : 'Uninvoiced';
+                        let colorClass = 'bg-slate-100 text-slate-600';
+                        if (bStatus === 'partially_invoiced') {
+                          label = language === 'ar' ? 'مفوتر جزئياً' : 'Partially Invoiced';
+                          colorClass = 'bg-blue-50 text-blue-600';
+                        } else if (bStatus === 'fully_invoiced') {
+                          label = language === 'ar' ? 'مفوتر بالكامل' : 'Fully Invoiced';
+                          colorClass = 'bg-emerald-50 text-emerald-600';
+                        } else if (bStatus === 'supplier_assigned') {
+                          label = language === 'ar' ? 'تم تعيين المورد' : 'Supplier Assigned';
+                          colorClass = 'bg-indigo-50 text-indigo-600';
+                        }
+                        return (
+                          <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${colorClass}`}>
+                            {label}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -834,10 +883,10 @@ export const GoodsReceipts: React.FC = () => {
                   />
 
                   {/* Metadata */}
-                  <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-slate-500 border-b border-slate-100 pb-5">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-xs font-semibold text-slate-500 border-b border-slate-100 pb-5">
                     <div>
                       <span className="text-[10px] text-slate-400 block mb-1">{gt('form_supplier')}</span>
-                      <span className="text-slate-800 font-bold">{viewReceipt.supplier_name}</span>
+                      <span className="text-slate-800 font-bold">{viewReceipt.supplier_name || (language === 'ar' ? 'غير محدد' : 'Not Specified')}</span>
                     </div>
                     <div>
                       <span className="text-[10px] text-slate-400 block mb-1">{gt('form_warehouse')}</span>
@@ -853,6 +902,29 @@ export const GoodsReceipts: React.FC = () => {
                         {gt(`status_${viewReceipt.status}`)}
                       </span>
                     </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block mb-1">{language === 'ar' ? 'حالة الفوترة' : 'Billing Status'}</span>
+                      {(() => {
+                        const bStatus = viewReceipt.billing_status || 'uninvoiced';
+                        let label = language === 'ar' ? 'غير مفوتر' : 'Uninvoiced';
+                        let colorClass = 'bg-slate-100 text-slate-600';
+                        if (bStatus === 'partially_invoiced') {
+                          label = language === 'ar' ? 'مفوتر جزئياً' : 'Partially Invoiced';
+                          colorClass = 'bg-blue-50 text-blue-600';
+                        } else if (bStatus === 'fully_invoiced') {
+                          label = language === 'ar' ? 'مفوتر بالكامل' : 'Fully Invoiced';
+                          colorClass = 'bg-emerald-50 text-emerald-600';
+                        } else if (bStatus === 'supplier_assigned') {
+                          label = language === 'ar' ? 'تم تعيين المورد' : 'Supplier Assigned';
+                          colorClass = 'bg-indigo-50 text-indigo-600';
+                        }
+                        return (
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${colorClass}`}>
+                            {label}
+                          </span>
+                        );
+                      })()}
+                    </div>
                   </div>
 
                   {/* Items */}
@@ -863,7 +935,9 @@ export const GoodsReceipts: React.FC = () => {
                         <thead>
                           <tr className="bg-slate-50 border-b border-slate-100 text-slate-400 font-bold">
                             <th className="px-4 py-3">{gt('column_product')}</th>
-                            <th className="px-4 py-3">{gt('column_quantity')}</th>
+                            <th className="px-4 py-3">{language === 'ar' ? 'المستلمة' : 'Received'}</th>
+                            <th className="px-4 py-3">{language === 'ar' ? 'المفوترة' : 'Billed'}</th>
+                            <th className="px-4 py-3">{language === 'ar' ? 'المتبقية' : 'Remaining'}</th>
                             <th className="px-4 py-3">{gt('column_cost')}</th>
                             <th className="px-4 py-3">{gt('column_total')}</th>
                           </tr>
@@ -877,6 +951,12 @@ export const GoodsReceipts: React.FC = () => {
                               </td>
                               <td className="px-4 py-3 font-bold text-slate-800">
                                 {item.quantity} <span className="text-slate-400 text-[10px]">{item.unit}</span>
+                              </td>
+                              <td className="px-4 py-3 font-bold text-blue-600">
+                                {item.billed_quantity || 0} <span className="text-slate-400 text-[10px]">{item.unit}</span>
+                              </td>
+                              <td className="px-4 py-3 font-bold text-amber-600">
+                                {item.remaining_quantity !== null && item.remaining_quantity !== undefined ? item.remaining_quantity : item.quantity} <span className="text-slate-400 text-[10px]">{item.unit}</span>
                               </td>
                               <td className="px-4 py-3">{formatMoney(item.unit_cost)}</td>
                               <td className="px-4 py-3 font-bold text-slate-800">{formatMoney(item.total_cost || (item.quantity * item.unit_cost))}</td>
@@ -892,6 +972,35 @@ export const GoodsReceipts: React.FC = () => {
                     <div className="pt-4 border-t border-slate-100 text-xs text-slate-500 font-medium leading-relaxed">
                       <span className="font-bold text-slate-700 block mb-1">{gt('form_notes')}</span>
                       <p className="bg-slate-50 p-4 rounded-2xl">{viewReceipt.notes}</p>
+                    </div>
+                  )}
+
+                  {/* Linked Invoices */}
+                  {linkedInvoices.length > 0 && (
+                    <div className="pt-4 border-t border-slate-100 text-xs text-slate-500 font-medium leading-relaxed">
+                      <span className="font-bold text-slate-700 block mb-2">
+                        {language === 'ar' ? 'الفواتير المرتبطة' : 'Linked Invoices'}
+                      </span>
+                      <div className="space-y-2">
+                        {linkedInvoices.map((inv: any) => (
+                          <div 
+                            key={inv.id}
+                            className="flex items-center justify-between bg-slate-50 p-3 rounded-2xl border border-slate-100"
+                          >
+                            <div className="flex flex-col gap-1 text-right">
+                              <span className="font-bold text-slate-800 text-sm">
+                                {inv.invoice_number}
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                {formatDate(inv.date)} - {inv.supplier_name}
+                              </span>
+                            </div>
+                            <div className="text-left font-bold text-slate-800">
+                              {formatMoney(inv.total_amount)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>

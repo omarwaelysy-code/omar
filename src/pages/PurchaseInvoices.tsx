@@ -234,27 +234,89 @@ export const PurchaseInvoices: React.FC = () => {
     vat_rate?: number;
     vat_amount?: number;
     total: number;
+    unit?: string;
+    warehouse_id?: string;
+    batch_id?: string | null;
+    serial_number?: string | null;
   }[]>([]);
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [selectedGoodsReceiptIds, setSelectedGoodsReceiptIds] = useState<string[]>([]);
   const [goodsReceipts, setGoodsReceipts] = useState<any[]>([]);
+  const [linkedGrs, setLinkedInvoicedGrs] = useState<any[]>([]);
+  const [isMatchingModalOpen, setIsMatchingModalOpen] = useState(false);
+  const [matchingReceipts, setMatchingReceipts] = useState<any[]>([]);
 
   useEffect(() => {
     if (user && invoiceData.supplier_id) {
-      dbService.list<any>('goods_receipts', {
-        company_id: user.company_id,
-        supplier_id: invoiceData.supplier_id,
-        status: 'posted'
-      }).then(res => {
-        setGoodsReceipts(res);
+      Promise.all([
+        dbService.list('goods_receipts', {
+          company_id: user.company_id,
+          status: 'posted'
+        }),
+        dbService.list('goods_receipt_items', {
+          company_id: user.company_id
+        })
+      ]).then(([grs, itemsList]) => {
+        const itemsByGr = new Map();
+        itemsList.forEach((it: any) => {
+          if (!itemsByGr.has(it.goods_receipt_id)) {
+            itemsByGr.set(it.goods_receipt_id, []);
+          }
+          itemsByGr.get(it.goods_receipt_id).push(it);
+        });
+
+        const filteredGrs = grs
+          .map((gr: any) => ({
+            ...gr,
+            items: itemsByGr.get(gr.id) || []
+          }))
+          .filter((gr: any) => {
+            const supplierMatch = !gr.supplier_id || gr.supplier_id === invoiceData.supplier_id;
+            if (!supplierMatch) return false;
+
+            if (gr.billing_status === 'fully_invoiced') return false;
+
+            const hasRemaining = gr.items.some((it: any) => {
+              const rem = it.remaining_quantity !== null && it.remaining_quantity !== undefined 
+                ? Number(it.remaining_quantity) 
+                : Number(it.quantity);
+              return rem > 0;
+            });
+            return hasRemaining;
+          });
+
+        setGoodsReceipts(filteredGrs);
       }).catch(err => {
         console.error('Error fetching goods receipts:', err);
+        setGoodsReceipts([]);
       });
     } else {
       setGoodsReceipts([]);
     }
   }, [invoiceData.supplier_id, user, isModalOpen]);
+
+  useEffect(() => {
+    if (viewInvoice && user) {
+      dbService.list('purchase_invoice_goods_receipts', { purchase_invoice_id: viewInvoice.id })
+        .then(async (junctions) => {
+          const grIds = junctions.map((j: any) => j.goods_receipt_id);
+          if (grIds.length > 0) {
+            const allGrs = await dbService.list('goods_receipts', { company_id: user.company_id });
+            const filtered = allGrs.filter((gr: any) => grIds.includes(gr.id));
+            setLinkedInvoicedGrs(filtered);
+          } else {
+            setLinkedInvoicedGrs([]);
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching linked goods receipts:', err);
+          setLinkedInvoicedGrs([]);
+        });
+    } else {
+      setLinkedInvoicedGrs([]);
+    }
+  }, [viewInvoice, user]);
 
   useEffect(() => {
     if (user) {
@@ -1488,9 +1550,94 @@ export const PurchaseInvoices: React.FC = () => {
     setItems(prev => prev.filter((_, i) => i !== index));
   };
 
+  const getSelectedGrsRemainingQty = (productId: string) => {
+    let total = 0;
+    const selectedGrs = goodsReceipts.filter(gr => selectedGoodsReceiptIds.includes(gr.id));
+    selectedGrs.forEach(gr => {
+      const item = (gr.items || []).find((it: any) => it.product_id === productId);
+      if (item) {
+        total += item.remaining_quantity !== null && item.remaining_quantity !== undefined 
+          ? Number(item.remaining_quantity) 
+          : Number(item.quantity);
+      }
+    });
+    return total;
+  };
+
+  const handleProductSelect = (index: number, val: string) => {
+    const matchingGr = goodsReceipts.find(gr => {
+      return (gr.items || []).some((it: any) => {
+        const rem = it.remaining_quantity !== null && it.remaining_quantity !== undefined 
+          ? Number(it.remaining_quantity) 
+          : Number(it.quantity);
+        return it.product_id === val && rem > 0;
+      });
+    });
+
+    if (matchingGr) {
+      const confirmLink = window.confirm(
+        language === 'ar' 
+          ? 'تم العثور على إذن استلام مطابق لهذا الصنف. هل تريد ربطه؟' 
+          : 'A matching Goods Receipt is found for this product. Do you want to link it?'
+      );
+      if (confirmLink) {
+        setSelectedGoodsReceiptIds(prev => prev.includes(matchingGr.id) ? prev : [...prev, matchingGr.id]);
+        
+        const grItem = (matchingGr.items || []).find((it: any) => it.product_id === val);
+        if (grItem) {
+          const rem = grItem.remaining_quantity !== null && grItem.remaining_quantity !== undefined 
+            ? Number(grItem.remaining_quantity) 
+            : Number(grItem.quantity);
+          
+          setItems(prev => {
+            const newItems = [...prev];
+            const rate = Number(exchangeRate) || 1;
+            const costVal = Number((grItem.unit_cost / rate).toFixed(4));
+            
+            newItems[index] = {
+              ...newItems[index],
+              product_id: val,
+              product_name: grItem.product_name,
+              product_code: grItem.product_code || '',
+              quantity: rem,
+              cost_price: costVal,
+              total: Number((rem * costVal).toFixed(4)),
+              unit: grItem.unit || '',
+              warehouse_id: matchingGr.warehouse_id || '',
+              batch_id: grItem.batch_id || null,
+              serial_number: grItem.serial_number || null,
+              vat_rate: grItem.vat_rate || 0,
+              vat_amount: Number(((rem * costVal) * ((grItem.vat_rate || 0) / 100)).toFixed(4))
+            };
+            return newItems;
+          });
+          return;
+        }
+      }
+    }
+
+    updateItem(index, 'product_id', val);
+  };
+
   const updateItem = (index: number, field: string, value: any) => {
     setItems(prev => {
       const newItems = [...prev];
+      
+      if (field === 'quantity' && selectedGoodsReceiptIds.length > 0 && newItems[index].product_id) {
+        const remQty = getSelectedGrsRemainingQty(newItems[index].product_id);
+        if (value > remQty) {
+          const confirmExceed = window.confirm(
+            language === 'ar'
+              ? `الكمية المدخلة (${value}) أكبر من الكمية المتبقية في أذون الاستلام المرتبطة (${remQty}). هل تريد الاستمرار بهذه الكمية؟`
+              : `Entered quantity (${value}) exceeds the remaining quantity in the linked Goods Receipts (${remQty}). Do you want to proceed with this quantity?`
+          );
+          if (!confirmExceed) {
+            newItems[index].quantity = remQty;
+            value = remQty;
+          }
+        }
+      }
+
       (newItems[index] as any)[field] = value;
       
       if (field === 'product_id' && invoiceData.purchase_type === 'items') {
@@ -1847,6 +1994,50 @@ export const PurchaseInvoices: React.FC = () => {
     }
 
     const mode = companyData?.purchase_workflow_mode || 'Simple';
+    if (selectedGoodsReceiptIds.length === 0) {
+      const matchingMode = companyData?.goods_receipt_matching_mode || 'SmartMatching';
+      const invoiceProductIds = validItems.map(i => i.product_id).filter(Boolean);
+      
+      const matches = goodsReceipts.filter(gr => {
+        const grProductIds = (gr.items || []).map((it: any) => it.product_id);
+        const hasProductIntersection = grProductIds.some((id: string) => invoiceProductIds.includes(id));
+        if (!hasProductIntersection) return false;
+
+        if (matchingMode === 'SupplierProduct') {
+          return gr.supplier_id === invoiceData.supplier_id;
+        }
+        if (matchingMode === 'ProductOnly') {
+          return true;
+        }
+        if (matchingMode === 'SupplierProductWarehouse') {
+          return gr.supplier_id === invoiceData.supplier_id && gr.warehouse_id === invoiceData.warehouse_id;
+        }
+        if (matchingMode === 'SmartMatching') {
+          if (gr.supplier_id) {
+            const supplierMatch = gr.supplier_id === invoiceData.supplier_id;
+            const warehouseMatch = !invoiceData.warehouse_id || gr.warehouse_id === invoiceData.warehouse_id;
+            return supplierMatch && warehouseMatch;
+          }
+          const warehouseMatch = !invoiceData.warehouse_id || gr.warehouse_id === invoiceData.warehouse_id;
+          const hasRemaining = (gr.items || []).some((it: any) => {
+            const rem = it.remaining_quantity !== null && it.remaining_quantity !== undefined 
+              ? Number(it.remaining_quantity) 
+              : Number(it.quantity);
+            return invoiceProductIds.includes(it.product_id) && rem > 0;
+          });
+          return warehouseMatch && hasRemaining;
+        }
+        return false;
+      });
+
+      if (matches.length > 0) {
+        setMatchingReceipts(matches);
+        setIsMatchingModalOpen(true);
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
     if (mode === 'Enterprise Strict' && selectedGoodsReceiptIds.length === 0) {
       showNotification('الشركة تعمل بنظام الدورة الكاملة. يجب ربط الفاتورة بـ Goods Receipt أولاً.', 'error');
       setIsSubmitting(false);
@@ -3791,7 +3982,7 @@ export const PurchaseInvoices: React.FC = () => {
                                             if (e.target.value === 'new_product') {
                                               setIsProductModalOpen(true);
                                             } else {
-                                              updateItem(index, 'product_id', e.target.value);
+                                              handleProductSelect(index, e.target.value);
                                             }
                                           }}
                                         >
@@ -4722,6 +4913,37 @@ export const PurchaseInvoices: React.FC = () => {
                   );
                 })()}
 
+                {/* Linked Goods Receipts */}
+                {linkedGrs.length > 0 && (
+                  <div className="space-y-3 mt-8">
+                    <h4 className="font-bold text-slate-800 text-sm border-b border-slate-150 pb-2">
+                      {language === 'ar' ? 'أذون الاستلام المرتبطة' : 'Linked Goods Receipts'}
+                    </h4>
+                    <div className="space-y-2">
+                      {linkedGrs.map((gr: any) => (
+                        <div 
+                          key={gr.id}
+                          className="flex items-center justify-between bg-slate-50 p-3 rounded-2xl border border-slate-100"
+                        >
+                          <div className="flex flex-col gap-1 text-right text-xs">
+                            <span className="font-bold text-slate-800 text-sm">
+                              {gr.receipt_number}
+                            </span>
+                            <span className="text-[10px] text-slate-405">
+                              {formatDate(gr.date)} - {gr.warehouse_name}
+                            </span>
+                          </div>
+                          <div className="text-left">
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-655">
+                              {gr.document_origin}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-4" data-html2canvas-ignore>
                   <button 
                     onClick={() => {
@@ -5429,6 +5651,165 @@ export const PurchaseInvoices: React.FC = () => {
           }}
           onClose={() => setShowBarcodeScanner(false)}
         />
+      )}
+
+      {/* Smart Goods Receipt Matching Modal */}
+      {isMatchingModalOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl p-6 flex flex-col max-h-[85vh] overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center border-b border-zinc-150 pb-4 mb-4">
+              <h3 className={`text-lg font-bold text-zinc-900 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
+                {language === 'ar' ? 'أذون الاستلام المطابقة' : 'Matching Goods Receipts'}
+              </h3>
+              <button 
+                onClick={() => setIsMatchingModalOpen(false)}
+                className="p-1 hover:bg-zinc-100 rounded-lg text-zinc-400 hover:text-zinc-600 transition-all"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            <p className={`text-xs text-zinc-550 mb-4 leading-relaxed ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
+              {language === 'ar'
+                ? 'تم العثور على أذون استلام مطابقة لأصناف الفاتورة. يرجى اختيار الأذون التي ترغب في ربطها بالفاتورة:'
+                : 'Matching Goods Receipts have been found for the invoice items. Please select the receipts you want to link:'}
+            </p>
+
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              {matchingReceipts.map(gr => {
+                const isSelected = selectedGoodsReceiptIds.includes(gr.id);
+                return (
+                  <div 
+                    key={gr.id}
+                    className={`p-4 rounded-2xl border transition-all ${
+                      isSelected 
+                        ? 'border-indigo-650 bg-indigo-50/10 shadow-sm' 
+                        : 'border-zinc-200 bg-white hover:border-zinc-300'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3 justify-between mb-3">
+                      <label className="flex items-center gap-3 cursor-pointer select-none">
+                        <input 
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            if (gr.supplier_id && gr.supplier_id !== invoiceData.supplier_id) {
+                              alert(
+                                language === 'ar'
+                                  ? 'لا يمكن ربط الفاتورة بهذا إذن الاستلام لأن المورد مختلف.'
+                                  : 'Cannot link the invoice to this goods receipt because the supplier is different.'
+                              );
+                              return;
+                            }
+                            if (e.target.checked) {
+                              setSelectedGoodsReceiptIds(prev => [...prev, gr.id]);
+                            } else {
+                              setSelectedGoodsReceiptIds(prev => prev.filter(id => id !== gr.id));
+                            }
+                          }}
+                          className="w-4 h-4 rounded text-indigo-650 accent-indigo-650"
+                        />
+                        <div className="flex flex-col text-right">
+                          <span className="font-bold text-zinc-800 text-sm">{gr.receipt_number}</span>
+                          <span className="text-[10px] text-zinc-400">{formatDate(gr.date)}</span>
+                        </div>
+                      </label>
+                      <div className="text-left text-[11px] font-semibold text-zinc-500 space-y-1">
+                        <div>
+                          {language === 'ar' ? 'المخزن:' : 'Warehouse:'} <span className="text-zinc-800 font-bold">{gr.warehouse_name}</span>
+                        </div>
+                        {gr.supplier_name && (
+                          <div>
+                            {language === 'ar' ? 'المورد:' : 'Supplier:'} <span className="text-zinc-800 font-bold">{gr.supplier_name}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="overflow-hidden border border-zinc-150 rounded-xl">
+                      <table className="w-full text-xs text-right border-collapse bg-zinc-50/20">
+                        <thead>
+                          <tr className="bg-zinc-50 text-zinc-500 font-bold border-b border-zinc-200">
+                            <th className="px-3 py-2 text-right">{language === 'ar' ? 'الصنف' : 'Product'}</th>
+                            <th className="px-3 py-2 text-center">{language === 'ar' ? 'المستلمة' : 'Received'}</th>
+                            <th className="px-3 py-2 text-center">{language === 'ar' ? 'المفوترة' : 'Billed'}</th>
+                            <th className="px-3 py-2 text-center">{language === 'ar' ? 'المتبقية' : 'Remaining'}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-100 text-zinc-600 font-medium">
+                          {(gr.items || []).map((it: any, idx: number) => {
+                            const rem = it.remaining_quantity !== null && it.remaining_quantity !== undefined 
+                              ? Number(it.remaining_quantity) 
+                              : Number(it.quantity);
+                            return (
+                              <tr key={idx} className="hover:bg-zinc-50/50">
+                                <td className="px-3 py-2 text-right font-bold text-zinc-800">{it.product_name}</td>
+                                <td className="px-3 py-2 text-center">{it.quantity}</td>
+                                <td className="px-3 py-2 text-center text-blue-600 font-bold">{it.billed_quantity || 0}</td>
+                                <td className="px-3 py-2 text-center text-amber-600 font-bold">{rem}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex gap-4 pt-4 border-t border-zinc-150 mt-4">
+              <button 
+                onClick={() => {
+                  const grs = matchingReceipts.filter(gr => selectedGoodsReceiptIds.includes(gr.id));
+                  const mappedItems: any[] = [];
+                  grs.forEach(gr => {
+                    (gr.items || []).forEach((item: any) => {
+                      const rem = item.remaining_quantity !== null && item.remaining_quantity !== undefined 
+                        ? Number(item.remaining_quantity) 
+                        : Number(item.quantity);
+                      if (rem > 0) {
+                        mappedItems.push({
+                          product_id: item.product_id,
+                          product_name: item.product_name,
+                          product_code: item.product_code || '',
+                          product_image_url: item.product_image_url || '',
+                          quantity: rem,
+                          cost_price: Number(item.unit_cost) || 0,
+                          total: rem * (Number(item.unit_cost) || 0),
+                          unit: item.unit || '',
+                          warehouse_id: gr.warehouse_id || '',
+                          batch_id: item.batch_id || null,
+                          serial_number: item.serial_number || null,
+                          operation_id: selectedOperationId || null,
+                          department_id: selectedDepartmentId || null,
+                          cost_center_id: selectedCostCenterId || null,
+                          vat_rate: 0,
+                          vat_amount: 0
+                        });
+                      }
+                    });
+                  });
+                  setItems(prev => {
+                    const filtered = prev.filter(i => i.product_id);
+                    return [...filtered, ...mappedItems];
+                  });
+                  setIsMatchingModalOpen(false);
+                }}
+                disabled={selectedGoodsReceiptIds.length === 0}
+                className="flex-1 py-4 bg-indigo-650 hover:bg-indigo-700 text-white rounded-2xl font-bold transition-all disabled:opacity-50 shadow-lg shadow-indigo-650/20 active:scale-95"
+              >
+                {language === 'ar' ? 'تأكيد الربط واستيراد الأصناف' : 'Confirm Link & Import Items'}
+              </button>
+              <button 
+                onClick={() => setIsMatchingModalOpen(false)}
+                className="px-8 py-4 bg-zinc-100 text-zinc-650 hover:bg-zinc-200 rounded-2xl font-bold transition-all active:scale-95"
+              >
+                {language === 'ar' ? 'تخطي' : 'Skip'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
