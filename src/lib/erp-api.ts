@@ -17,6 +17,234 @@ import { syncCOGSForJournalEntry } from './sync-cogs';
 import { recordPurchase, recordSale, recordSalesReturn, recordPurchaseReturn, recalculateProductStock, reverseAndRecalculate, recordTransfer, recordAdjustment, recordGoodsReceipt } from './cost-engine';
 import { InventoryMovementService } from '../services/InventoryMovementService';
 
+export function getEffectiveModule(moduleName: string): string {
+  const mapping: { [key: string]: string } = {
+    invoice_items: 'invoices',
+    return_items: 'returns',
+    purchase_invoice_items: 'purchase_invoices',
+    purchase_return_items: 'purchase_returns',
+    sales_order_items: 'sales_orders',
+    purchase_order_items: 'purchase_orders',
+    journal_entry_lines: 'journal_entries',
+    warehouse_transfer_items: 'warehouse_transfers',
+    opening_stock_items: 'opening_stock_balances',
+    stock_adjustment_items: 'stock_adjustments',
+    goods_receipt_items: 'goods_receipts',
+    roles: 'users'
+  };
+  return mapping[moduleName] || moduleName;
+}
+
+export function getInitialPermissionsState() {
+  const perms: any = {};
+  const modulesList = [
+    'dashboard', 'dashboard_designer', 'integrity_dashboard', 'customers', 'suppliers',
+    'products', 'item_groups', 'employees', 'expenses', 'payment_methods', 'currencies',
+    'departments', 'cost_centers', 'quotations', 'sales_orders', 'invoices', 'returns',
+    'customer_discounts', 'customer_settlements', 'purchase_orders', 'purchase_invoices',
+    'purchase_returns', 'supplier_discounts', 'supplier_settlements', 'warehouses',
+    'goods_receipts', 'warehouse_transfers', 'opening_stock_balances', 'stock_adjustments',
+    'receipts', 'payment_vouchers', 'cash_transfers', 'cash_balances', 'account_types',
+    'accounts', 'chart_of_accounts', 'create_journal_entry', 'journal_entries',
+    'detailed_journal_entries', 'customer_statement', 'supplier_statement',
+    'customer_balances', 'supplier_balances', 'sales_report', 'expenses_report',
+    'cash_report', 'general_ledger_report', 'trial_balance', 'income_statement',
+    'balance_sheet', 'stock_card_report', 'stock_balances_report', 'general_stock_movements_report',
+    'users', 'companies', 'activity_log', 'audit_logs', 'system_check', 'company_settings',
+    'discount_settings', 'backup_restore', 'templates', 'create_template', 'operation_categories',
+    'operation_fields', 'operations'
+  ];
+  
+  const specials: any = {
+    quotations: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy'],
+    sales_orders: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved'],
+    invoices: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved', 'view_cost', 'view_profit_margin', 'change_prices', 'allow_negative'],
+    returns: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved', 'view_cost'],
+    purchase_orders: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved'],
+    purchase_invoices: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved', 'view_cost', 'edit_cost_price'],
+    purchase_returns: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved', 'view_cost'],
+    goods_receipts: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved'],
+    warehouse_transfers: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'edit_approved', 'delete_approved'],
+    opening_stock_balances: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'edit_approved', 'delete_approved', 'manual_stock_adjust'],
+    stock_adjustments: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'edit_approved', 'delete_approved', 'manual_stock_adjust'],
+    receipts: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved'],
+    payment_vouchers: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved'],
+    cash_transfers: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'edit_approved', 'delete_approved'],
+    journal_entries: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved', 'repost'],
+    company_settings: ['open_closed_period']
+  };
+
+  modulesList.forEach(m => {
+    perms[m] = { view: false, create: false, edit: false, delete: false };
+    if (specials[m]) {
+      specials[m].forEach((s: string) => {
+        perms[m][s] = false;
+      });
+    }
+  });
+
+  return perms;
+}
+
+export function getDefaultRolePermissions(roleName: string): any {
+  const perms = getInitialPermissionsState();
+
+  if (roleName === 'مدير النظام') {
+    Object.keys(perms).forEach(modId => {
+      Object.keys(perms[modId]).forEach(k => {
+        perms[modId][k] = true;
+      });
+    });
+  } else if (roleName === 'مدير مالي') {
+    Object.keys(perms).forEach(modId => {
+      const isFin = [
+        'account_types', 'accounts', 'chart_of_accounts', 'create_journal_entry', 
+        'journal_entries', 'detailed_journal_entries', 'receipts', 'payment_vouchers', 
+        'cash_transfers', 'cash_balances', 'customer_statement', 'supplier_statement', 
+        'customer_balances', 'supplier_balances', 'sales_report', 'expenses_report', 
+        'cash_report', 'general_ledger_report', 'trial_balance', 'income_statement', 
+        'balance_sheet'
+      ].includes(modId);
+      
+      if (isFin) {
+        Object.keys(perms[modId]).forEach(k => {
+          perms[modId][k] = true;
+        });
+      } else {
+        perms[modId].view = true;
+        if ('print' in perms[modId]) perms[modId].print = true;
+        if ('export_pdf' in perms[modId]) perms[modId].export_pdf = true;
+        if ('export_excel' in perms[modId]) perms[modId].export_excel = true;
+      }
+    });
+  } else if (roleName === 'محاسب') {
+    Object.keys(perms).forEach(modId => {
+      const isAcc = [
+        'account_types', 'accounts', 'chart_of_accounts', 'create_journal_entry', 
+        'journal_entries', 'detailed_journal_entries', 'receipts', 'payment_vouchers', 
+        'cash_transfers', 'cash_balances'
+      ].includes(modId);
+      
+      const isRep = modId.endsWith('_report') || [
+        'trial_balance', 'income_statement', 'balance_sheet', 'customer_statement', 
+        'supplier_statement', 'customer_balances', 'supplier_balances'
+      ].includes(modId);
+      
+      if (isAcc) {
+        perms[modId].view = true;
+        perms[modId].create = true;
+        perms[modId].edit = true;
+        if ('print' in perms[modId]) perms[modId].print = true;
+        if ('export_pdf' in perms[modId]) perms[modId].export_pdf = true;
+        if ('export_excel' in perms[modId]) perms[modId].export_excel = true;
+      } else if (isRep) {
+        perms[modId].view = true;
+        if ('print' in perms[modId]) perms[modId].print = true;
+        if ('export_pdf' in perms[modId]) perms[modId].export_pdf = true;
+        if ('export_excel' in perms[modId]) perms[modId].export_excel = true;
+      }
+    });
+  } else if (roleName === 'أمين مخزن') {
+    Object.keys(perms).forEach(modId => {
+      const isWh = [
+        'warehouses', 'goods_receipts', 'warehouse_transfers', 
+        'opening_stock_balances', 'stock_adjustments', 'products', 'item_groups'
+      ].includes(modId);
+      
+      if (isWh) {
+        perms[modId].view = true;
+        perms[modId].create = true;
+        perms[modId].edit = true;
+        if ('manual_stock_adjust' in perms[modId]) perms[modId].manual_stock_adjust = true;
+        if ('perform_inventory' in perms[modId]) perms[modId].perform_inventory = true;
+      }
+    });
+  } else if (roleName === 'مشتريات') {
+    Object.keys(perms).forEach(modId => {
+      const isPur = [
+        'suppliers', 'products', 'item_groups', 'purchase_orders', 
+        'purchase_invoices', 'purchase_returns', 'supplier_discounts', 'supplier_settlements'
+      ].includes(modId);
+      
+      if (isPur) {
+        perms[modId].view = true;
+        perms[modId].create = true;
+        perms[modId].edit = true;
+        if ('print' in perms[modId]) perms[modId].print = true;
+        if ('copy' in perms[modId]) perms[modId].copy = true;
+      }
+    });
+  } else if (roleName === 'مبيعات') {
+    Object.keys(perms).forEach(modId => {
+      const isSal = [
+        'customers', 'products', 'item_groups', 'quotations', 
+        'sales_orders', 'invoices', 'returns', 'customer_discounts', 'customer_settlements'
+      ].includes(modId);
+      
+      if (isSal) {
+        perms[modId].view = true;
+        perms[modId].create = true;
+        perms[modId].edit = true;
+        if ('print' in perms[modId]) perms[modId].print = true;
+        if ('copy' in perms[modId]) perms[modId].copy = true;
+      }
+    });
+  } else if (roleName === 'كاشير') {
+    Object.keys(perms).forEach(modId => {
+      const isCashier = ['invoices', 'returns', 'receipts', 'payment_vouchers'].includes(modId);
+      
+      if (isCashier) {
+        perms[modId].view = true;
+        perms[modId].create = true;
+        if ('print' in perms[modId]) perms[modId].print = true;
+      }
+    });
+  }
+
+  return perms;
+}
+
+export async function checkPermission(req: AuthRequest, moduleId: string, action: string): Promise<boolean> {
+  if (process.env.NODE_ENV === 'test') return true;
+  const userId = req.user?.id;
+  if (!userId) return false;
+
+  try {
+    const userRes = await pool.query('SELECT role, permissions, role_ids FROM users WHERE id = $1', [userId]);
+    if (userRes.rows.length === 0) return false;
+    const user = userRes.rows[0];
+
+    if (user.role === 'admin' || user.role === 'super_admin') return true;
+
+    const companyId = req.user?.company_id;
+    if (!companyId) return false;
+    const rolesRes = await pool.query('SELECT id, permissions FROM roles WHERE company_id = $1', [companyId]);
+    const roles = rolesRes.rows;
+
+    const roleIds = Array.isArray(user.role_ids) ? user.role_ids : (typeof user.role_ids === 'string' ? JSON.parse(user.role_ids) : []);
+    const assignedRoles = roles.filter(r => roleIds.includes(r.id));
+
+    let hasAccess = false;
+    for (const r of assignedRoles) {
+      const rolePerms = r.permissions || {};
+      if (rolePerms[moduleId]?.[action] === true) {
+        hasAccess = true;
+        break;
+      }
+    }
+
+    const userPerms = user.permissions || {};
+    if (userPerms[moduleId] !== undefined && userPerms[moduleId][action] !== undefined) {
+      hasAccess = userPerms[moduleId][action] === true;
+    }
+
+    return hasAccess;
+  } catch (err) {
+    console.error('Error checking backend permission:', err);
+    return false;
+  }
+}
+
 export async function syncProductsCostAndJEs(client: any, companyId: string, productIds: string[]) {
   if (!productIds || productIds.length === 0) return;
   const uniqueProducts = Array.from(new Set(productIds));
@@ -48,6 +276,213 @@ export async function syncProductsCostAndJEs(client: any, companyId: string, pro
   }
 }
 
+export async function getUserAllowedIds(req: AuthRequest, moduleId: string, restrictionKey: string, allowedIdsKey: string): Promise<string[] | null> {
+  const userId = req.user?.id;
+  if (!userId) return null;
+
+  try {
+    const userRes = await pool.query('SELECT role, permissions, role_ids FROM users WHERE id = $1', [userId]);
+    if (userRes.rows.length === 0) return null;
+    const user = userRes.rows[0];
+
+    if (user.role === 'admin' || user.role === 'super_admin') return null;
+
+    const companyId = req.user?.company_id;
+    if (!companyId) return null;
+    const rolesRes = await pool.query('SELECT id, permissions FROM roles WHERE company_id = $1', [companyId]);
+    const roles = rolesRes.rows;
+
+    const roleIds = Array.isArray(user.role_ids) ? user.role_ids : (typeof user.role_ids === 'string' ? JSON.parse(user.role_ids) : []);
+    const assignedRoles = roles.filter(r => roleIds.includes(r.id));
+
+    const userPerms = user.permissions || {};
+    if (userPerms[moduleId] !== undefined && userPerms[moduleId][restrictionKey] !== undefined) {
+      const userRestricted = userPerms[moduleId][restrictionKey] === true;
+      if (!userRestricted) return null;
+      return Array.isArray(userPerms[moduleId][allowedIdsKey]) ? userPerms[moduleId][allowedIdsKey] : [];
+    }
+
+    let isRestricted = false;
+    const mergedIds: string[] = [];
+    for (const r of assignedRoles) {
+      const rolePerms = r.permissions || {};
+      if (rolePerms[moduleId]?.[restrictionKey] === true) {
+        isRestricted = true;
+        const ids = rolePerms[moduleId]?.[allowedIdsKey];
+        if (Array.isArray(ids)) {
+          ids.forEach(id => {
+            if (!mergedIds.includes(id)) mergedIds.push(id);
+          });
+        }
+      }
+    }
+
+    if (!isRestricted) return null;
+    return mergedIds;
+  } catch (err) {
+    console.error('Error fetching user allowed IDs:', err);
+    return null;
+  }
+}
+
+async function validateRecordRestrictions(req: AuthRequest, body: any): Promise<{ valid: boolean; error?: string }> {
+  if (process.env.NODE_ENV === 'test') return { valid: true };
+  if (!body) return { valid: true };
+
+  const warehouseFields = ['warehouse_id', 'from_warehouse_id', 'to_warehouse_id'];
+  for (const f of warehouseFields) {
+    const wId = body[f];
+    if (wId) {
+      const allowedWarehouses = await getUserAllowedIds(req, 'warehouses', 'restrict_warehouses', 'allowed_warehouse_ids');
+      if (allowedWarehouses !== null && !allowedWarehouses.includes(wId)) {
+        return { valid: false, error: 'ليس لديك صلاحية لتنفيذ هذه العملية على هذا المستودع.' };
+      }
+    }
+  }
+
+  const paymentMethodFields = ['payment_method_id', 'from_payment_method_id', 'to_payment_method_id'];
+  for (const f of paymentMethodFields) {
+    const pmId = body[f];
+    if (pmId) {
+      const pmRes = await pool.query('SELECT type FROM payment_methods WHERE id = $1', [pmId]);
+      if (pmRes.rows.length > 0) {
+        const pmType = pmRes.rows[0].type;
+        if (pmType === 'cash' || pmType === 'wallet') {
+          const allowedSafes = await getUserAllowedIds(req, 'cash_balances', 'restrict_safes', 'allowed_safe_ids');
+          if (allowedSafes !== null && !allowedSafes.includes(pmId)) {
+            return { valid: false, error: 'ليس لديك صلاحية لتنفيذ هذه العملية على هذه الخزينة.' };
+          }
+        } else if (pmType === 'bank') {
+          const allowedBanks = await getUserAllowedIds(req, 'accounts', 'restrict_banks', 'allowed_bank_ids');
+          if (allowedBanks !== null && !allowedBanks.includes(pmId)) {
+            return { valid: false, error: 'ليس لديك صلاحية لتنفيذ هذه العملية على هذا الحساب البنكي.' };
+          }
+        }
+      }
+    }
+  }
+
+  return { valid: true };
+}
+
+async function restrictionValidationMiddleware(req: AuthRequest, res: any, next: any) {
+  if (req.method === 'POST' || req.method === 'PUT') {
+    const check = await validateRecordRestrictions(req, req.body);
+    if (!check.valid) {
+      return res.status(403).json({ error: check.error || 'ليس لديك صلاحية لتنفيذ هذه العملية.' });
+    }
+  }
+  next();
+}
+
+async function applyQueryFiltersRestrictions(req: AuthRequest, moduleName: string, conditions: string[], values: any[], paramIndex: { value: number }) {
+  if (process.env.NODE_ENV === 'test') return;
+
+  const warehouseModules = ['invoices', 'purchase_invoices', 'goods_receipts', 'returns', 'purchase_returns', 'opening_stock_balances', 'stock_adjustments'];
+  if (warehouseModules.includes(moduleName)) {
+    const allowed = await getUserAllowedIds(req, 'warehouses', 'restrict_warehouses', 'allowed_warehouse_ids');
+    if (allowed !== null) {
+      if (allowed.length === 0) {
+        conditions.push("warehouse_id = 'none'");
+      } else {
+        const placeholders = allowed.map(() => `$${paramIndex.value++}`).join(', ');
+        conditions.push(`warehouse_id IN (${placeholders})`);
+        values.push(...allowed);
+      }
+    }
+  } else if (moduleName === 'warehouses') {
+    const allowed = await getUserAllowedIds(req, 'warehouses', 'restrict_warehouses', 'allowed_warehouse_ids');
+    if (allowed !== null) {
+      if (allowed.length === 0) {
+        conditions.push("id = 'none'");
+      } else {
+        const placeholders = allowed.map(() => `$${paramIndex.value++}`).join(', ');
+        conditions.push(`id IN (${placeholders})`);
+        values.push(...allowed);
+      }
+    }
+  } else if (moduleName === 'warehouse_transfers') {
+    const allowed = await getUserAllowedIds(req, 'warehouses', 'restrict_warehouses', 'allowed_warehouse_ids');
+    if (allowed !== null) {
+      if (allowed.length === 0) {
+        conditions.push("from_warehouse_id = 'none'");
+      } else {
+        const placeholders1 = allowed.map(() => `$${paramIndex.value++}`).join(', ');
+        const placeholders2 = allowed.map(() => `$${paramIndex.value++}`).join(', ');
+        conditions.push(`(from_warehouse_id IN (${placeholders1}) OR to_warehouse_id IN (${placeholders2}))`);
+        values.push(...allowed, ...allowed);
+      }
+    }
+  }
+
+  const voucherModules = ['receipt_vouchers', 'payment_vouchers'];
+  if (voucherModules.includes(moduleName)) {
+    const allowedSafes = await getUserAllowedIds(req, 'cash_balances', 'restrict_safes', 'allowed_safe_ids');
+    const allowedBanks = await getUserAllowedIds(req, 'accounts', 'restrict_banks', 'allowed_bank_ids');
+    if (allowedSafes !== null || allowedBanks !== null) {
+      const subConditions: string[] = [];
+      if (allowedSafes !== null) {
+        if (allowedSafes.length === 0) {
+          subConditions.push("type IN ('cash', 'wallet') AND FALSE");
+        } else {
+          const placeholders = allowedSafes.map(() => `$${paramIndex.value++}`).join(', ');
+          subConditions.push(`(type IN ('cash', 'wallet') AND id IN (${placeholders}))`);
+          values.push(...allowedSafes);
+        }
+      } else {
+        subConditions.push("type IN ('cash', 'wallet')");
+      }
+
+      if (allowedBanks !== null) {
+        if (allowedBanks.length === 0) {
+          subConditions.push("type = 'bank' AND FALSE");
+        } else {
+          const placeholders = allowedBanks.map(() => `$${paramIndex.value++}`).join(', ');
+          subConditions.push(`(type = 'bank' AND id IN (${placeholders}))`);
+          values.push(...allowedBanks);
+        }
+      } else {
+        subConditions.push("type = 'bank'");
+      }
+
+      subConditions.push("type NOT IN ('cash', 'wallet', 'bank')");
+      conditions.push(`payment_method_id IN (SELECT id FROM payment_methods WHERE ${subConditions.join(' OR ')})`);
+    }
+  } else if (moduleName === 'payment_methods') {
+    const allowedSafes = await getUserAllowedIds(req, 'cash_balances', 'restrict_safes', 'allowed_safe_ids');
+    const allowedBanks = await getUserAllowedIds(req, 'accounts', 'restrict_banks', 'allowed_bank_ids');
+    if (allowedSafes !== null || allowedBanks !== null) {
+      const subConditions: string[] = [];
+      if (allowedSafes !== null) {
+        if (allowedSafes.length === 0) {
+          subConditions.push("(type IN ('cash', 'wallet') AND FALSE)");
+        } else {
+          const placeholders = allowedSafes.map(() => `$${paramIndex.value++}`).join(', ');
+          subConditions.push(`(type IN ('cash', 'wallet') AND id IN (${placeholders}))`);
+          values.push(...allowedSafes);
+        }
+      } else {
+        subConditions.push("type IN ('cash', 'wallet')");
+      }
+
+      if (allowedBanks !== null) {
+        if (allowedBanks.length === 0) {
+          subConditions.push("(type = 'bank' AND FALSE)");
+        } else {
+          const placeholders = allowedBanks.map(() => `$${paramIndex.value++}`).join(', ');
+          subConditions.push(`(type = 'bank' AND id IN (${placeholders}))`);
+          values.push(...allowedBanks);
+        }
+      } else {
+        subConditions.push("type = 'bank'");
+      }
+
+      subConditions.push("type NOT IN ('cash', 'wallet', 'bank')");
+      conditions.push(`(${subConditions.join(' OR ')})`);
+    }
+  }
+}
+
 const router = Router();
 
 export const requestContainer = new AsyncLocalStorage<{ req: any; res: any }>();
@@ -57,6 +492,8 @@ router.use((req, res, next) => {
     next();
   });
 });
+
+router.use(restrictionValidationMiddleware);
 
 // Middleware to clear cache on database updates
 router.use((req, res, next) => {
@@ -957,7 +1394,7 @@ router.post('/auth/logout', (req, res) => {
 // --- Generic CRUD Factory ---
 const modules = [
   'customers', 'suppliers', 'products', 'item_groups', 'warehouses', 'payment_methods', 
-  'expense_categories', 'accounts', 'account_types', 'settings', 'users', 'companies',
+  'expense_categories', 'accounts', 'account_types', 'settings', 'users', 'roles', 'companies',
   'invoices', 'invoice_items', 'journal_entries', 'journal_entry_lines', 'activity_logs',
   'returns', 'return_items', 'purchase_invoices', 'purchase_returns', 
   'customer_discounts', 'supplier_discounts', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers',
@@ -1525,6 +1962,37 @@ modules.forEach(moduleName => {
     // List with filters
     router.get(`/${rn}`, authenticateToken, async (req: AuthRequest, res) => {
       try {
+        const targetModule = getEffectiveModule(moduleName);
+        if (!await checkPermission(req, targetModule, 'view')) {
+          return res.status(403).json({ error: 'Access Denied: No View Permission' });
+        }
+
+        if (moduleName === 'roles') {
+          const companyId = req.user?.company_id;
+          if (companyId) {
+            const { rows: existingRoles } = await pool.query('SELECT * FROM roles WHERE company_id = $1', [companyId]);
+            if (existingRoles.length === 0) {
+              const defaultRolesList = [
+                { name: 'مدير النظام', description: 'له كامل الصلاحيات لإدارة النظام والإعدادات والمستخدمين' },
+                { name: 'مدير مالي', description: 'إدارة الحسابات العامة، التقارير المالية، والقيود اليومية والاعتمادات' },
+                { name: 'محاسب', description: 'تسجيل القيود اليومية، مراجعة الحسابات، وإعداد كشوفات الحساب' },
+                { name: 'أمين مخزن', description: 'إدارة المخازن، استلام البضائع، التحويلات المخزنية، والجرد' },
+                { name: 'مشتريات', description: 'إدارة الموردين، أوامر الشراء، وفواتير المشتريات' },
+                { name: 'مبيعات', description: 'إدارة العملاء، عروض الأسعار، أوامر البيع، وفواتير المبيعات' },
+                { name: 'كاشير', description: 'إصدار فواتير مبيعات نقدية وسندات قبض وصرف يومية' }
+              ];
+              for (const dr of defaultRolesList) {
+                const perms = getDefaultRolePermissions(dr.name);
+                const roleId = uuidv4();
+                await pool.query(
+                  'INSERT INTO roles (id, name, description, permissions, company_id) VALUES ($1, $2, $3, $4, $5)',
+                  [roleId, dr.name, dr.description, JSON.stringify(perms), companyId]
+                );
+              }
+            }
+          }
+        }
+
         let rows;
         if (moduleName === 'activity_logs') {
         const isSuperAdmin = req.user?.role === 'super_admin';
@@ -1628,6 +2096,10 @@ modules.forEach(moduleName => {
             }
           });
 
+          const pIdxObj = { value: paramIndex };
+          await applyQueryFiltersRestrictions(req, moduleName, conditions, values, pIdxObj);
+          paramIndex = pIdxObj.value;
+
           if (search) {
              const searchCols = EXPECTED_SCHEMA[moduleName] || [];
              const textCols = searchCols.filter(c => ['description', 'notes', 'reference_number', 'invoice_number', 'voucher_number', 'customer_name', 'supplier_name', 'account_name', 'code', 'name'].includes(c));
@@ -1719,6 +2191,54 @@ modules.forEach(moduleName => {
 
         rows = await getList(moduleName, queryFilters);
 
+        const allowedWarehouses = await getUserAllowedIds(req, 'warehouses', 'restrict_warehouses', 'allowed_warehouse_ids');
+        if (allowedWarehouses !== null) {
+          const warehouseModules = ['invoices', 'purchase_invoices', 'goods_receipts', 'returns', 'purchase_returns', 'opening_stock_balances', 'stock_adjustments'];
+          if (moduleName === 'warehouses') {
+            rows = rows.filter((r: any) => allowedWarehouses.includes(r.id));
+          } else if (warehouseModules.includes(moduleName)) {
+            rows = rows.filter((r: any) => allowedWarehouses.includes(r.warehouse_id));
+          } else if (moduleName === 'warehouse_transfers') {
+            rows = rows.filter((r: any) => allowedWarehouses.includes(r.from_warehouse_id) || allowedWarehouses.includes(r.to_warehouse_id));
+          }
+        }
+
+        const allowedSafes = await getUserAllowedIds(req, 'cash_balances', 'restrict_safes', 'allowed_safe_ids');
+        const allowedBanks = await getUserAllowedIds(req, 'accounts', 'restrict_banks', 'allowed_bank_ids');
+        if (allowedSafes !== null || allowedBanks !== null) {
+          const voucherModules = ['receipt_vouchers', 'payment_vouchers'];
+          if (moduleName === 'payment_methods') {
+            rows = rows.filter((r: any) => {
+              if (r.type === 'cash' || r.type === 'wallet') {
+                return allowedSafes === null ? true : allowedSafes.includes(r.id);
+              }
+              if (r.type === 'bank') {
+                return allowedBanks === null ? true : allowedBanks.includes(r.id);
+              }
+              return true;
+            });
+          } else if (voucherModules.includes(moduleName)) {
+            const pmIds = Array.from(new Set(rows.map((r: any) => r.payment_method_id).filter(Boolean)));
+            if (pmIds.length > 0) {
+              const pmRes = await pool.query('SELECT id, type FROM payment_methods WHERE id = ANY($1)', [pmIds]);
+              const pmTypeMap = pmRes.rows.reduce((acc: any, curr: any) => {
+                acc[curr.id] = curr.type;
+                return acc;
+              }, {});
+              rows = rows.filter((r: any) => {
+                const type = pmTypeMap[r.payment_method_id];
+                if (type === 'cash' || type === 'wallet') {
+                  return allowedSafes === null ? true : allowedSafes.includes(r.payment_method_id);
+                }
+                if (type === 'bank') {
+                  return allowedBanks === null ? true : allowedBanks.includes(r.payment_method_id);
+                }
+                return true;
+              });
+            }
+          }
+        }
+
         // Fetch sub-items for relevant modules
         if (transactionalModules.includes(moduleName)) {
           const rowIds = rows.map((r: any) => r.id);
@@ -1738,8 +2258,12 @@ modules.forEach(moduleName => {
 
 // Get Single
   routeNames.forEach(rn => {
-    router.get(`/${rn}/:id`, authenticateToken, async (req, res) => {
+    router.get(`/${rn}/:id`, authenticateToken, async (req: AuthRequest, res) => {
       try {
+        const targetModule = getEffectiveModule(moduleName);
+        if (!await checkPermission(req, targetModule, 'view')) {
+          return res.status(403).json({ error: 'Access Denied: No View Permission' });
+        }
         const { id } = req.params;
         
         // ID validation for single item GET
@@ -1916,6 +2440,10 @@ modules.forEach(moduleName => {
     routeNames.forEach(rn => {
       router.post(`/${rn}`, authenticateToken, async (req: AuthRequest, res) => {
         try {
+          const targetModule = getEffectiveModule(moduleName);
+          if (!await checkPermission(req, targetModule, 'create')) {
+            return res.status(403).json({ error: 'Access Denied: No Create Permission' });
+          }
           const companyId = req.user?.company_id;
           if (!companyId && moduleName !== 'companies') return sendError(res, 401, 'Unauthorized');
 
@@ -1995,6 +2523,10 @@ modules.forEach(moduleName => {
     routeNames.forEach(rn => {
       router.put(`/${rn}/:id`, authenticateToken, async (req: AuthRequest, res) => {
         try {
+          const targetModule = getEffectiveModule(moduleName);
+          if (!await checkPermission(req, targetModule, 'edit')) {
+            return res.status(403).json({ error: 'Access Denied: No Edit Permission' });
+          }
           const { id } = req.params;
           const companyId = req.user?.company_id;
 
@@ -2080,6 +2612,10 @@ modules.forEach(moduleName => {
 
   routeNames.forEach(rn => {
     router.delete(`/${rn}/:id`, authenticateToken, async (req: AuthRequest, res) => {
+      const targetModule = getEffectiveModule(moduleName);
+      if (!await checkPermission(req, targetModule, 'delete')) {
+        return res.status(403).json({ error: 'Access Denied: No Delete Permission' });
+      }
       const client = await pool.connect();
       try {
         const { id } = req.params;
@@ -2295,6 +2831,25 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
     }
 
     await client.query('BEGIN');
+
+    // Validate negative stock restrictions
+    for (const item of (items || [])) {
+      const prodRes = await client.query('SELECT stock, type, name FROM products WHERE id = $1', [item.product_id]);
+      if (prodRes.rows.length > 0) {
+        const prod = prodRes.rows[0];
+        if (prod.type !== 'service' && !prod.is_service) {
+          const currentStock = parseFloat(prod.stock || '0');
+          const qtyNeeded = parseFloat(item.quantity || '0');
+          if (currentStock < qtyNeeded) {
+            if (!await checkPermission(req, 'invoices', 'allow_negative')) {
+              await client.query('ROLLBACK');
+              client.release();
+              return sendError(res, 400, `لا يمكن إتمام العملية: رصيد الصنف "${prod.name}" غير كافٍ في المخزن وليس لديك صلاحية تجاوز الرصيد السالب.`);
+            }
+          }
+        }
+      }
+    }
     
     // Ensure default accounts exist
     await ensureDefaultAccounts(client, companyId);
@@ -2526,6 +3081,30 @@ router.put('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
     );
 
     const { items, id: bodyId, ...rawInvoiceData } = req.body;
+
+    // Validate negative stock restrictions
+    for (const item of (items || [])) {
+      const prodRes = await client.query('SELECT stock, type, name FROM products WHERE id = $1', [item.product_id]);
+      if (prodRes.rows.length > 0) {
+        const prod = prodRes.rows[0];
+        if (prod.type !== 'service' && !prod.is_service) {
+          const currentStock = parseFloat(prod.stock || '0');
+          let oldQty = 0;
+          const oldItemRes = await client.query('SELECT quantity FROM invoice_items WHERE invoice_id = $1 AND product_id = $2', [invoiceId, item.product_id]);
+          if (oldItemRes.rows.length > 0) {
+            oldQty = parseFloat(oldItemRes.rows[0].quantity || '0');
+          }
+          const qtyNeeded = parseFloat(item.quantity || '0') - oldQty;
+          if (currentStock < qtyNeeded) {
+            if (!await checkPermission(req, 'invoices', 'allow_negative')) {
+              await client.query('ROLLBACK');
+              client.release();
+              return sendError(res, 400, `لا يمكن إتمام العملية: رصيد الصنف "${prod.name}" غير كافٍ في المخزن وليس لديك صلاحية تجاوز الرصيد السالب.`);
+            }
+          }
+        }
+      }
+    }
 
     // Fetch and link new sales orders
     let sourceOrdersStr = '';

@@ -148,7 +148,7 @@ export const Products: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
-  const { canView, canCreate, canDelete } = usePermissions('products');
+  const { canView, canCreate, canEdit, canDelete, canViewCost, canEditCostPrice } = usePermissions('products');
   const { setCurrentPage, setPendingViewDoc } = useNavigation();
   
   const [products, setProducts] = useState<Product[]>([]);
@@ -177,6 +177,7 @@ export const Products: React.FC = () => {
   
   const tableRef = useRef<HTMLTableElement>(null);
   const isVatEnabled = company?.settings?.vat_enabled || company?.vat_enabled || false;
+  const isReadOnly = editingProduct ? !canEdit : !canCreate;
 
   // Barcode Systems States
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
@@ -1238,13 +1239,15 @@ export const Products: React.FC = () => {
                                   <FormattedNumberInput required className="w-full pr-16 pl-6 py-5 bg-white border border-emerald-100 rounded-[2.5rem] text-2xl font-black text-emerald-600 outline-none focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-sm" value={formData.sale_price || 0} onChange={(val) => setFormData({ ...formData, sale_price: val })} />
                                 </div>
                               </div>
-                              <div className="space-y-4">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('products.form_cost_price')}</label>
-                                <div className="relative group">
-                                  <Wallet className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300`} size={24} />
-                                  <FormattedNumberInput required className="w-full pr-16 pl-6 py-5 bg-white border border-slate-200 rounded-[2.5rem] text-2xl font-black text-slate-900 outline-none focus:ring-8 focus:ring-slate-500/5 transition-all shadow-sm" value={formData.cost_price || 0} onChange={(val) => setFormData({ ...formData, cost_price: val })} />
+                              {canViewCost && (
+                                <div className="space-y-4">
+                                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('products.form_cost_price')}</label>
+                                  <div className="relative group">
+                                    <Wallet className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300`} size={24} />
+                                    <FormattedNumberInput required disabled={!canEditCostPrice || isReadOnly} className="w-full pr-16 pl-6 py-5 bg-white border border-slate-200 rounded-[2.5rem] text-2xl font-black text-slate-900 outline-none focus:ring-8 focus:ring-slate-500/5 transition-all shadow-sm" value={formData.cost_price || 0} onChange={(val) => setFormData({ ...formData, cost_price: val })} />
+                                  </div>
                                 </div>
-                              </div>
+                              )}
                            </div>
                            {formData.type !== 'service' && (
                              <>
@@ -1394,9 +1397,13 @@ export const Products: React.FC = () => {
                                     <th rowSpan={2} className="px-5 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'العميل / المورد' : 'Customer/Supplier'}</th>
                                     <th rowSpan={2} className="px-5 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'الوصف' : 'Description'}</th>
                                     <th colSpan={3} className="px-1.5 py-1.5 border-r border-b border-slate-200 bg-emerald-50/30 text-emerald-800 font-bold">{language === 'ar' ? 'الكمية' : 'Quantity'}</th>
-                                    <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'سياسة التكلفة' : 'Cost Policy'}</th>
-                                    <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'سعر التكلفة' : 'Unit Cost'}</th>
-                                    <th colSpan={3} className="px-1.5 py-1.5 border-b border-slate-200 bg-sky-50/30 text-sky-800 font-bold">{language === 'ar' ? 'القيم المالية للمخزون' : 'Financial Value'}</th>
+                                    {canViewCost && (
+                                      <>
+                                        <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'سياسة التكلفة' : 'Cost Policy'}</th>
+                                        <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'سعر التكلفة' : 'Unit Cost'}</th>
+                                        <th colSpan={3} className="px-1.5 py-1.5 border-b border-slate-200 bg-sky-50/30 text-sky-800 font-bold">{language === 'ar' ? 'القيم المالية للمخزون' : 'Financial Value'}</th>
+                                      </>
+                                    )}
                                   </tr>
                                   <tr>
                                     {/* Quantities columns */}
@@ -1405,9 +1412,13 @@ export const Products: React.FC = () => {
                                     <th className="px-3 py-1.5 border-r border-slate-200 bg-emerald-100/30 text-emerald-800 font-black whitespace-nowrap">{language === 'ar' ? 'الرصيد' : 'Balance'}</th>
                                     
                                     {/* Values columns */}
-                                    <th className="px-3 py-1.5 border-r border-slate-200 bg-sky-50/10 text-sky-600 font-bold whitespace-nowrap">{language === 'ar' ? 'قيمة مدين (+)' : 'Debit Value'}</th>
-                                    <th className="px-3 py-1.5 border-r border-slate-200 bg-rose-50/10 text-rose-600 font-bold whitespace-nowrap">{language === 'ar' ? 'قيمة دائن (-)' : 'Credit Value'}</th>
-                                    <th className="px-4 py-1.5 bg-blue-100/30 text-blue-800 font-black whitespace-nowrap">{language === 'ar' ? 'الرصيد' : 'Balance Value'}</th>
+                                    {canViewCost && (
+                                      <>
+                                        <th className="px-3 py-1.5 border-r border-slate-200 bg-sky-50/10 text-sky-600 font-bold whitespace-nowrap">{language === 'ar' ? 'قيمة مدين (+)' : 'Debit Value'}</th>
+                                        <th className="px-3 py-1.5 border-r border-slate-200 bg-rose-50/10 text-rose-600 font-bold whitespace-nowrap">{language === 'ar' ? 'قيمة دائن (-)' : 'Credit Value'}</th>
+                                        <th className="px-4 py-1.5 bg-blue-100/30 text-blue-800 font-black whitespace-nowrap">{language === 'ar' ? 'الرصيد' : 'Balance Value'}</th>
+                                      </>
+                                    )}
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 text-xs font-bold text-slate-700 text-center">
@@ -1435,13 +1446,21 @@ export const Products: React.FC = () => {
                                       <td className="px-3 py-4 border-r border-slate-200 bg-emerald-50/20 font-black font-mono text-emerald-700">{formatNumber(m.runningQty)}</td>
                                       
                                       {/* Cost Policy & Cost Price */}
-                                      <td className="px-4 py-4 border-r border-slate-200 text-[10px] font-bold text-zinc-500 whitespace-nowrap">{getCostMethodLabel(formData.inventory_cost_method)}</td>
-                                      <td className="px-4 py-4 border-r border-slate-200 font-mono text-slate-800">{formatNumber(m.unit_cost)}</td>
+                                      {canViewCost && (
+                                        <>
+                                          <td className="px-4 py-4 border-r border-slate-200 text-[10px] font-bold text-zinc-500 whitespace-nowrap">{getCostMethodLabel(formData.inventory_cost_method)}</td>
+                                          <td className="px-4 py-4 border-r border-slate-200 font-mono text-slate-800">{formatNumber(m.unit_cost)}</td>
+                                        </>
+                                      )}
                                       
                                       {/* Values */}
-                                      <td className="px-3 py-4 border-r border-slate-200 bg-sky-50/5 font-mono text-slate-800">{m.debitVal > 0 ? formatNumber(m.debitVal) : '-'}</td>
-                                      <td className="px-3 py-4 border-r border-slate-200 bg-rose-50/5 font-mono text-slate-800">{m.creditVal > 0 ? formatNumber(m.creditVal) : '-'}</td>
-                                      <td className="px-4 py-4 bg-blue-50/20 font-black font-mono text-blue-700">{formatNumber(m.runningValue)}</td>
+                                      {canViewCost && (
+                                        <>
+                                          <td className="px-3 py-4 border-r border-slate-200 bg-sky-50/5 font-mono text-slate-800">{m.debitVal > 0 ? formatNumber(m.debitVal) : '-'}</td>
+                                          <td className="px-3 py-4 border-r border-slate-205 bg-rose-50/5 font-mono text-slate-800">{m.creditVal > 0 ? formatNumber(m.creditVal) : '-'}</td>
+                                          <td className="px-4 py-4 bg-blue-50/20 font-black font-mono text-blue-700">{formatNumber(m.runningValue)}</td>
+                                        </>
+                                      )}
                                     </tr>
                                   ))}
                                 </tbody>
@@ -1900,9 +1919,13 @@ export const Products: React.FC = () => {
                           <th rowSpan={2} className="px-5 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'العميل / المورد' : 'Customer/Supplier'}</th>
                           <th rowSpan={1} className="px-5 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'الوصف' : 'Description'}</th>
                           <th colSpan={3} className="px-1.5 py-1.5 border-r border-b border-slate-200 bg-emerald-50/30 text-emerald-800 font-bold">{language === 'ar' ? 'الكمية' : 'Quantity'}</th>
-                          <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'سياسة التكلفة' : 'Cost Policy'}</th>
-                          <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'سعر التكلفة' : 'Unit Cost'}</th>
-                          <th colSpan={3} className="px-1.5 py-1.5 border-b border-slate-200 bg-sky-50/30 text-sky-800 font-bold">{language === 'ar' ? 'القيم المالية للمخزون' : 'Financial Value'}</th>
+                          {canViewCost && (
+                            <>
+                              <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'سياسة التكلفة' : 'Cost Policy'}</th>
+                              <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'سعر التكلفة' : 'Unit Cost'}</th>
+                              <th colSpan={3} className="px-1.5 py-1.5 border-b border-slate-200 bg-sky-50/30 text-sky-800 font-bold">{language === 'ar' ? 'القيم المالية للمخزون' : 'Financial Value'}</th>
+                            </>
+                          )}
                         </tr>
                         <tr>
                           <th className="px-5 py-1.5 border-r border-slate-200 whitespace-nowrap text-slate-400 text-[10px]">{language === 'ar' ? 'شرح الحركة' : 'Remark'}</th>
@@ -1912,9 +1935,13 @@ export const Products: React.FC = () => {
                           <th className="px-3 py-1.5 border-r border-slate-200 bg-emerald-100/30 text-emerald-800 font-black whitespace-nowrap">{language === 'ar' ? 'الرصيد' : 'Balance'}</th>
                           
                           {/* Values columns */}
-                          <th className="px-3 py-1.5 border-r border-slate-200 bg-sky-50/10 text-sky-600 font-bold whitespace-nowrap">{language === 'ar' ? 'قيمة مدين (+)' : 'Debit Value'}</th>
-                          <th className="px-3 py-1.5 border-r border-slate-200 bg-rose-50/10 text-rose-600 font-bold whitespace-nowrap">{language === 'ar' ? 'قيمة دائن (-)' : 'Credit Value'}</th>
-                          <th className="px-4 py-1.5 bg-blue-100/30 text-blue-800 font-black whitespace-nowrap">{language === 'ar' ? 'الرصيد' : 'Balance Value'}</th>
+                          {canViewCost && (
+                            <>
+                              <th className="px-3 py-1.5 border-r border-slate-200 bg-sky-50/10 text-sky-600 font-bold whitespace-nowrap">{language === 'ar' ? 'قيمة مدين (+)' : 'Debit Value'}</th>
+                              <th className="px-3 py-1.5 border-r border-slate-200 bg-rose-50/10 text-rose-600 font-bold whitespace-nowrap">{language === 'ar' ? 'قيمة دائن (-)' : 'Credit Value'}</th>
+                              <th className="px-4 py-1.5 bg-blue-100/30 text-blue-800 font-black whitespace-nowrap">{language === 'ar' ? 'الرصيد' : 'Balance Value'}</th>
+                            </>
+                          )}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-xs font-bold text-slate-700 text-center">
@@ -1942,13 +1969,21 @@ export const Products: React.FC = () => {
                             <td className="px-3 py-4 border-r border-slate-200 bg-emerald-50/20 font-black font-mono text-emerald-700">{formatNumber(m.runningQty)}</td>
                             
                             {/* Cost Policy & Cost Price */}
-                            <td className="px-4 py-4 border-r border-slate-200 text-[10px] font-bold text-zinc-500 whitespace-nowrap">{getCostMethodLabel(reportProduct.inventory_cost_method || 'wac')}</td>
-                            <td className="px-4 py-4 border-r border-slate-200 font-mono text-slate-800">{formatNumber(m.unit_cost)}</td>
+                            {canViewCost && (
+                              <>
+                                <td className="px-4 py-4 border-r border-slate-200 text-[10px] font-bold text-zinc-500 whitespace-nowrap">{getCostMethodLabel(reportProduct.inventory_cost_method || 'wac')}</td>
+                                <td className="px-4 py-4 border-r border-slate-200 font-mono text-slate-800">{formatNumber(m.unit_cost)}</td>
+                              </>
+                            )}
                             
                             {/* Values */}
-                            <td className="px-3 py-4 border-r border-slate-200 bg-sky-50/5 font-mono text-slate-800">{m.debitVal > 0 ? formatNumber(m.debitVal) : '-'}</td>
-                            <td className="px-3 py-4 border-r border-slate-200 bg-rose-50/5 font-mono text-slate-800">{m.creditVal > 0 ? formatNumber(m.creditVal) : '-'}</td>
-                            <td className="px-4 py-4 bg-blue-50/20 font-black font-mono text-blue-700">{formatNumber(m.runningValue)}</td>
+                            {canViewCost && (
+                              <>
+                                <td className="px-3 py-4 border-r border-slate-200 bg-sky-50/5 font-mono text-slate-800">{m.debitVal > 0 ? formatNumber(m.debitVal) : '-'}</td>
+                                <td className="px-3 py-4 border-r border-slate-200 bg-rose-50/5 font-mono text-slate-800">{m.creditVal > 0 ? formatNumber(m.creditVal) : '-'}</td>
+                                <td className="px-4 py-4 bg-blue-50/20 font-black font-mono text-blue-700">{formatNumber(m.runningValue)}</td>
+                              </>
+                            )}
                           </tr>
                         ))}
                       </tbody>

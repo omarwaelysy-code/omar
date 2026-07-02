@@ -40,7 +40,7 @@ import { DEFAULT_BARCODE_SETTINGS } from '../hooks/useBarcodeScanner';
 export const Invoices: React.FC = () => {
   const { t, dir, language } = useLanguage();
   const { user } = useAuth();
-  const { canView, canCreate, canEdit, canDelete } = usePermissions('invoices');
+  const { canView, canCreate, canEdit, canDelete, canChangePrices, hasBusinessPermission } = usePermissions('invoices');
   const { showNotification } = useNotification();
   const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
 
@@ -3971,7 +3971,8 @@ export const Invoices: React.FC = () => {
                               <span className="font-medium">{t('invoices.summary_discount')}</span>
                               <input 
                                 type="number" 
-                                className="w-11 bg-white border border-zinc-200 rounded px-1 py-0.5 text-center font-bold text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-[10px]"
+                                disabled={!hasBusinessPermission("edit_discount")}
+                                className="w-11 bg-white border border-zinc-200 rounded px-1 py-0.5 text-center font-bold text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
                                 value={Number(discount)}
                                 onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
                               />
@@ -4011,7 +4012,8 @@ export const Invoices: React.FC = () => {
                             <input
                               required
                               type="date"
-                              className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px]"
+                              disabled={!hasBusinessPermission("edit_invoice_date")}
+                              className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] disabled:opacity-75 disabled:cursor-not-allowed"
                               value={date}
                               onChange={(e) => setDate(e.target.value)}
                             />
@@ -4022,7 +4024,8 @@ export const Invoices: React.FC = () => {
                             <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{t('invoices.form_customer')}</label>
                             <select 
                               required
-                              className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer"
+                              disabled={items.length > 0 && !hasBusinessPermission("change_customer_after_items")}
+                              className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed"
                               value={selectedCustomerId}
                               onChange={(e) => {
                                 if (e.target.value === 'new_customer') {
@@ -4046,7 +4049,8 @@ export const Invoices: React.FC = () => {
                               <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
                               <select 
                                 required
-                                className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer"
+                                disabled={!hasBusinessPermission("change_warehouse")}
+                                className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed"
                                 value={selectedWarehouseId}
                                 onChange={(e) => setSelectedWarehouseId(e.target.value)}
                               >
@@ -4867,8 +4871,9 @@ export const Invoices: React.FC = () => {
                                       <input 
                                         type="number" 
                                         min={0}
+                                        disabled={!hasBusinessPermission("edit_tax")}
                                         max={100}
-                                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs"
+                                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs disabled:opacity-75 disabled:cursor-not-allowed"
                                         value={item.vat_rate !== undefined && item.vat_rate !== null ? Number(item.vat_rate) : 0}
                                         onChange={(e) => updateItem(index, 'vat_rate', parseFloat(e.target.value) || 0)}
                                       />

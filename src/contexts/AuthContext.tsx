@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, ModulePermissions } from '../types';
 import { dbService } from '../services/dbService';
+import { computeEffectivePermissions } from '../utils/permissions';
 
 interface AuthContextType {
   user: User | null;
@@ -15,6 +16,7 @@ interface AuthContextType {
   isManager: boolean;
   isStandardUser: boolean;
   hasPermission: (moduleId: string, action: keyof ModulePermissions) => boolean;
+  fetchProfile: (userId: string, email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -72,16 +74,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const memberships: User[] = [];
       for (const userData of membershipsData) {
         let companyName = 'شركة غير معروفة';
+        let effectivePerms = userData.permissions || {};
         
         if (userData.company_id) {
           const company = await dbService.get<any>('companies', userData.company_id);
           if (company) {
             companyName = company.name;
           }
+          
+          try {
+            const companyRoles = await dbService.list<any>('roles', userData.company_id);
+            effectivePerms = computeEffectivePermissions(userData, companyRoles);
+          } catch (roleErr) {
+            console.error('Error computing effective permissions for membership:', roleErr);
+          }
         }
         
         memberships.push({
           ...userData,
+          permissions: effectivePerms,
           company_name: companyName
         });
       }
@@ -220,7 +231,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isCompanyAdmin,
     isManager,
     isStandardUser,
-    hasPermission
+    hasPermission,
+    fetchProfile
   }), [user, userMemberships, loading, isAuthenticated, isSuperAdmin, isCompanyAdmin, isManager, isStandardUser, hasPermission]);
 
   return (

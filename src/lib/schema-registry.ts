@@ -15,7 +15,10 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   users: [
     'id', 'username', 'name', 'email', 'password_hash', 'mobile', 'role', 'company_id',
-    'status', 'temp_password', 'permissions', 'must_change_password', 'created_at'
+    'status', 'temp_password', 'permissions', 'must_change_password', 'created_at', 'role_ids'
+  ],
+  roles: [
+    'id', 'name', 'description', 'permissions', 'company_id'
   ],
   customers: [
     'id', 'company_id', 'account_id', 'account_name', 'code', 'name', 'email', 'mobile', 'address', 

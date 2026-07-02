@@ -3,6 +3,7 @@ export interface ModulePermissions {
   create: boolean;
   edit: boolean;
   delete: boolean;
+  [key: string]: boolean;
 }
 
 export interface UserPermissions {
@@ -19,6 +20,8 @@ export interface User {
   company_id: string;
   company_name?: string;
   permissions?: UserPermissions;
+  role_ids?: string[];
+  manual_permissions?: UserPermissions;
   status: 'active' | 'inactive';
   must_change_password?: boolean;
   temp_password?: string;
