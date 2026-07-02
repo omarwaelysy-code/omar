@@ -275,7 +275,7 @@ export interface BusinessPermissionMeta {
   labelAr: string;
   labelEn: string;
   type: 'boolean' | 'selection';
-  selectionType?: 'warehouses' | 'cash_balances' | 'banks';
+  selectionType?: 'warehouses' | 'cash_balances' | 'banks' | 'departments' | 'cost_centers' | 'payment_methods';
   descriptionAr: string;
   descriptionEn: string;
 }
@@ -333,6 +333,15 @@ export const DOCUMENT_BUSINESS_PERMISSIONS: { [moduleId: string]: BusinessPermis
   ],
   accounts: [
     { id: 'restrict_banks', labelAr: 'تقييد المستخدم بحسابات بنكية محددة', labelEn: 'Restrict Bank Accounts', type: 'selection', selectionType: 'banks', descriptionAr: 'تحديد الحسابات البنكية المسموح للمستخدم إيداع أو صرف الأموال منها.', descriptionEn: 'Limits user access to specific bank accounts.' }
+  ],
+  departments: [
+    { id: 'restrict_departments', labelAr: 'تقييد المستخدم بأقسام محددة', labelEn: 'Restrict Departments', type: 'selection', selectionType: 'departments', descriptionAr: 'تحديد الأقسام الإدارية المسموح للمستخدم رؤيتها والتعامل معها.', descriptionEn: 'Limits user access to specific departments.' }
+  ],
+  cost_centers: [
+    { id: 'restrict_cost_centers', labelAr: 'تقييد المستخدم بمراكز تكلفة محددة', labelEn: 'Restrict Cost Centers', type: 'selection', selectionType: 'cost_centers', descriptionAr: 'تحديد مراكز التكلفة المسموح للمستخدم التعامل معها ورؤيتها.', descriptionEn: 'Limits user access to specific cost centers.' }
+  ],
+  payment_methods: [
+    { id: 'restrict_payment_methods', labelAr: 'تقييد المستخدم بطرق سداد محددة', labelEn: 'Restrict Payment Methods', type: 'selection', selectionType: 'payment_methods', descriptionAr: 'تحديد طرق السداد المسموح للمستخدم التعامل معها ورؤيتها.', descriptionEn: 'Limits user access to specific payment methods.' }
   ],
   journal_entries: [
     { id: 'create', labelAr: 'إنشاء قيد', labelEn: 'Create Entry', type: 'boolean', descriptionAr: 'السماح بإنشاء قيود يومية جديدة.', descriptionEn: 'Allows creating journal entries.' },

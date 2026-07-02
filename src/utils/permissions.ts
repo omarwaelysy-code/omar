@@ -160,6 +160,9 @@ export function computeEffectivePermissions(user: any, companyRoles: any[]): any
     if (perms.warehouses) perms.warehouses.restrict_warehouses = false;
     if (perms.cash_balances) perms.cash_balances.restrict_safes = false;
     if (perms.accounts) perms.accounts.restrict_banks = false;
+    if (perms.departments) perms.departments.restrict_departments = false;
+    if (perms.cost_centers) perms.cost_centers.restrict_cost_centers = false;
+    if (perms.payment_methods) perms.payment_methods.restrict_payment_methods = false;
     return perms;
   }
 

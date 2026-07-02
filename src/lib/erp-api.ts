@@ -344,6 +344,10 @@ async function validateRecordRestrictions(req: AuthRequest, body: any): Promise<
   for (const f of paymentMethodFields) {
     const pmId = body[f];
     if (pmId) {
+      const allowedPaymentMethods = await getUserAllowedIds(req, 'payment_methods', 'restrict_payment_methods', 'allowed_payment_method_ids');
+      if (allowedPaymentMethods !== null && !allowedPaymentMethods.includes(pmId)) {
+        return { valid: false, error: 'ليس لديك صلاحية لتنفيذ هذه العملية على طريقة السداد هذه.' };
+      }
       const pmRes = await pool.query('SELECT type FROM payment_methods WHERE id = $1', [pmId]);
       if (pmRes.rows.length > 0) {
         const pmType = pmRes.rows[0].type;
@@ -479,6 +483,39 @@ async function applyQueryFiltersRestrictions(req: AuthRequest, moduleName: strin
 
       subConditions.push("type NOT IN ('cash', 'wallet', 'bank')");
       conditions.push(`(${subConditions.join(' OR ')})`);
+    }
+
+    const allowedPMs = await getUserAllowedIds(req, 'payment_methods', 'restrict_payment_methods', 'allowed_payment_method_ids');
+    if (allowedPMs !== null) {
+      if (allowedPMs.length === 0) {
+        conditions.push("id = 'none'");
+      } else {
+        const placeholders = allowedPMs.map(() => `$${paramIndex.value++}`).join(', ');
+        conditions.push(`id IN (${placeholders})`);
+        values.push(...allowedPMs);
+      }
+    }
+  } else if (moduleName === 'departments') {
+    const allowed = await getUserAllowedIds(req, 'departments', 'restrict_departments', 'allowed_department_ids');
+    if (allowed !== null) {
+      if (allowed.length === 0) {
+        conditions.push("id = 'none'");
+      } else {
+        const placeholders = allowed.map(() => `$${paramIndex.value++}`).join(', ');
+        conditions.push(`id IN (${placeholders})`);
+        values.push(...allowed);
+      }
+    }
+  } else if (moduleName === 'cost_centers') {
+    const allowed = await getUserAllowedIds(req, 'cost_centers', 'restrict_cost_centers', 'allowed_cost_center_ids');
+    if (allowed !== null) {
+      if (allowed.length === 0) {
+        conditions.push("id = 'none'");
+      } else {
+        const placeholders = allowed.map(() => `$${paramIndex.value++}`).join(', ');
+        conditions.push(`id IN (${placeholders})`);
+        values.push(...allowed);
+      }
     }
   }
 }

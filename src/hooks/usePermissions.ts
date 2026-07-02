@@ -35,7 +35,6 @@ export const usePermissions = (moduleId: string) => {
       return !!user.permissions[moduleId][permissionId];
     },
     
-    // Selection allowed lists
     allowedWarehouseIds: (user?.permissions?.['warehouses']?.allowed_warehouse_ids || []) as string[],
     isWarehouseRestricted: !!user?.permissions?.['warehouses']?.restrict_warehouses,
     
@@ -44,6 +43,15 @@ export const usePermissions = (moduleId: string) => {
     
     allowedBankIds: (user?.permissions?.['accounts']?.allowed_bank_ids || []) as string[],
     isBankRestricted: !!user?.permissions?.['accounts']?.restrict_banks,
+
+    allowedDepartmentIds: (user?.permissions?.['departments']?.allowed_department_ids || []) as string[],
+    isDepartmentRestricted: !!user?.permissions?.['departments']?.restrict_departments,
+
+    allowedCostCenterIds: (user?.permissions?.['cost_centers']?.allowed_cost_center_ids || []) as string[],
+    isCostCenterRestricted: !!user?.permissions?.['cost_centers']?.restrict_cost_centers,
+
+    allowedPaymentMethodIds: (user?.permissions?.['payment_methods']?.allowed_payment_method_ids || []) as string[],
+    isPaymentMethodRestricted: !!user?.permissions?.['payment_methods']?.restrict_payment_methods,
   });
 
   if (!user) return getInitialState(false);

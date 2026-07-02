@@ -56,6 +56,8 @@ export const Users: React.FC = () => {
   const [permissionsTab, setPermissionsTab] = useState<'basic' | 'documents'>('basic');
   const [warehousesList, setWarehousesList] = useState<any[]>([]);
   const [paymentMethodsList, setPaymentMethodsList] = useState<any[]>([]);
+  const [departmentsList, setDepartmentsList] = useState<any[]>([]);
+  const [costCentersList, setCostCentersList] = useState<any[]>([]);
   
   // Accordions and filters state
   const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
@@ -91,6 +93,12 @@ export const Users: React.FC = () => {
       dbService.list('payment_methods', currentUser.company_id)
         .then(setPaymentMethodsList)
         .catch(err => console.error("Error loading payment methods for permissions:", err));
+      dbService.list('departments', currentUser.company_id)
+        .then(setDepartmentsList)
+        .catch(err => console.error("Error loading departments for permissions:", err));
+      dbService.list('cost_centers', currentUser.company_id)
+        .then(setCostCentersList)
+        .catch(err => console.error("Error loading cost centers for permissions:", err));
     }
   }, [isPermissionsModalOpen, currentUser]);
 
@@ -1150,7 +1158,15 @@ export const Users: React.FC = () => {
                                       ? 'allowed_warehouse_ids' 
                                       : perm.selectionType === 'cash_balances' 
                                         ? 'allowed_safe_ids' 
-                                        : 'allowed_bank_ids';
+                                        : perm.selectionType === 'banks'
+                                          ? 'allowed_bank_ids'
+                                          : perm.selectionType === 'departments'
+                                            ? 'allowed_department_ids'
+                                            : perm.selectionType === 'cost_centers'
+                                              ? 'allowed_cost_center_ids'
+                                              : perm.selectionType === 'payment_methods'
+                                                ? 'allowed_payment_method_ids'
+                                                : '';
 
                                     const isRestrictedRole = tempPermissions[modId]?.[restrictionKey] === true;
                                      const allowedIdsRoleRaw = tempPermissions[modId]?.[allowedIdsKey] || [];
@@ -1183,10 +1199,18 @@ export const Users: React.FC = () => {
 
                                     // Fetch list records
                                     const listResources = perm.selectionType === 'warehouses' 
-                                      ? warehousesList 
-                                      : perm.selectionType === 'cash_balances'
-                                        ? paymentMethodsList.filter(pm => pm.type === 'cash' || pm.type === 'wallet')
-                                        : paymentMethodsList.filter(pm => pm.type === 'bank');
+                                       ? warehousesList 
+                                       : perm.selectionType === 'cash_balances'
+                                         ? paymentMethodsList.filter(pm => pm.type === 'cash' || pm.type === 'wallet')
+                                         : perm.selectionType === 'banks'
+                                           ? paymentMethodsList.filter(pm => pm.type === 'bank')
+                                           : perm.selectionType === 'departments'
+                                             ? departmentsList
+                                             : perm.selectionType === 'cost_centers'
+                                               ? costCentersList
+                                               : perm.selectionType === 'payment_methods'
+                                                 ? paymentMethodsList
+                                                 : [];
 
                                     return (
                                       <div key={perm.id} className="pt-4 first:pt-0 flex flex-col gap-4">
