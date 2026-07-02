@@ -578,7 +578,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
       {/* Desktop Top Navigation */}
       <header className="hidden md:flex sticky top-0 z-[150] bg-white border-b border-slate-200 h-16 items-center px-4 xl:px-8 shadow-sm">
-        <div className={`flex items-center gap-2 xl:gap-4 ${dir === 'rtl' ? 'ml-2 xl:ml-6' : 'mr-2 xl:mr-6'}`}>
+        <div className={`flex items-center gap-1.5 xl:gap-3 ${dir === 'rtl' ? 'ml-1.5 xl:ml-4' : 'mr-1.5 xl:mr-4'}`}>
           {company?.logo_url ? (
             <div className="flex items-center gap-2 xl:gap-3">
               <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 p-1 flex items-center justify-center">
@@ -596,7 +596,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           )}
         </div>
 
-        <nav className="flex items-center gap-1 flex-1">
+        <nav className="flex items-center gap-0.5 flex-1">
           {filteredNavItems.map((item: any) => {
             const isActive = item.subItems 
               ? item.subItems.some((sub: any) => sub.id === currentPage)
@@ -604,10 +604,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             
             if (item.subItems) {
               return (
-                <div key={item.id} className="relative group px-0.5">
+                <div key={item.id} className="relative group px-px">
                   <button
                     className={`
-                      flex items-center gap-1.5 xl:gap-2 px-1.5 xl:px-3 py-1.5 rounded-lg transition-all font-semibold text-xs xl:text-sm
+                      flex items-center gap-1 xl:gap-1.5 px-1 xl:px-1.5 py-1.5 rounded-lg transition-all font-semibold text-xs xl:text-sm
                       ${isActive ? 'bg-brand-primary/10 text-brand-primary' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                     `}
                   >
@@ -659,7 +659,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 key={item.id}
                 onClick={() => handleNavClick(item.id, item.label, item.path)}
                 className={`
-                  flex items-center gap-1.5 xl:gap-2 px-1.5 xl:px-3 py-1.5 rounded-lg transition-all font-semibold text-xs xl:text-sm
+                  flex items-center gap-1 xl:gap-1.5 px-1 xl:px-1.5 py-1.5 rounded-lg transition-all font-semibold text-xs xl:text-sm
                   ${currentPage === item.id ? 'bg-brand-primary text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                 `}
               >
@@ -670,7 +670,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           })}
         </nav>
 
-        <div className={`flex items-center gap-1.5 xl:gap-3 ${dir === 'rtl' ? 'mr-auto' : 'ml-auto'}`}>
+        <div className={`flex items-center gap-1 xl:gap-2 ${dir === 'rtl' ? 'mr-auto' : 'ml-auto'}`}>
           <button 
             onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
             className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-all group flex items-center gap-2"
