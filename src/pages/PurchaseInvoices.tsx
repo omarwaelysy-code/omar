@@ -248,7 +248,7 @@ export const PurchaseInvoices: React.FC = () => {
   const [matchingReceipts, setMatchingReceipts] = useState<any[]>([]);
 
   useEffect(() => {
-    if (user && invoiceData.supplier_id) {
+    if (user) {
       Promise.all([
         dbService.list('goods_receipts', {
           company_id: user.company_id,
@@ -272,7 +272,10 @@ export const PurchaseInvoices: React.FC = () => {
             items: itemsByGr.get(gr.id) || []
           }))
           .filter((gr: any) => {
-            const supplierMatch = !gr.supplier_id || gr.supplier_id === invoiceData.supplier_id;
+            const supplierMatch = !gr.supplier_id || 
+              gr.supplier_id === 'null' || 
+              gr.supplier_id === '' || 
+              (invoiceData.supplier_id && gr.supplier_id === invoiceData.supplier_id);
             if (!supplierMatch) return false;
 
             if (gr.billing_status === 'fully_invoiced') return false;
