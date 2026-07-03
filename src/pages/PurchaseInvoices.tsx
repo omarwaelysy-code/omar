@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -9,7 +9,7 @@ import {
   Eye, History, Printer, ArrowRight, ArrowLeft, Minimize2, 
   Maximize2, Phone, Mail, MapPin, Wallet, Layers, Paperclip, 
   Tag, Box, LayoutGrid, List, Receipt, ChevronDown, ChevronLeft, ChevronRight,
-  Coins, CheckCheck, ExternalLink, RotateCcw, ChevronUp, Copy
+  Coins, CheckCheck, ExternalLink, RotateCcw, ChevronUp, Copy, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Barcode from 'react-barcode';
@@ -65,6 +65,7 @@ export const PurchaseInvoices: React.FC = () => {
   const [isExpenseCategoryModalOpen, setIsExpenseCategoryModalOpen] = useState(false);
   const [isPaymentMethodModalOpen, setIsPaymentMethodModalOpen] = useState(false);
   const [showSidePanel, setShowSidePanel] = useState(false);
+  const [showAiInput, setShowAiInput] = useState(false);
   const [isPanelExpanded, setIsPanelExpanded] = useState(false);
   const [previewJournalEntry, setPreviewJournalEntry] = useState<any | null>(null);
   const [previewActivityLog, setPreviewActivityLog] = useState<any | null>(null);
