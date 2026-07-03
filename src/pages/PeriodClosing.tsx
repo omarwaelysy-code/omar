@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Lock, Unlock, ShieldAlert, Calendar, KeyRound, CheckCircle2, 
-  XCircle, Search, RefreshCw, AlertTriangle, ShieldCheck, Edit3 
+  XCircle, Search, RefreshCw, AlertTriangle, ShieldCheck, Edit3, 
+  FileText, Database as DatabaseIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService, apiRequest } from '../services/dbService';
@@ -36,13 +37,27 @@ const moduleLabels: Record<string, { ar: string; en: string }> = {
   item_groups: { ar: 'مجموعات الأصناف', en: 'Item Groups' },
   employees: { ar: 'الموظفين', en: 'Employees' },
   expenses: { ar: 'بنود المصروفات', en: 'Expenses' },
+  expense_categories: { ar: 'تصنيفات المصروفات', en: 'Expense Categories' },
   payment_methods: { ar: 'طرق السداد', en: 'Payment Methods' },
   warehouses: { ar: 'المستودعات والمخازن', en: 'Warehouses' },
   account_types: { ar: 'أنواع الحسابات', en: 'Account Types' },
   accounts: { ar: 'دليل الحسابات', en: 'Accounts' },
   operations: { ar: 'حركات الحسابات الإدارية', en: 'Operation Transactions' },
+  operation_categories: { ar: 'تصنيفات العمليات الإدارية', en: 'Operation Categories' },
+  operation_fields: { ar: 'حقول العمليات الإدارية', en: 'Custom Operation Fields' },
   departments: { ar: 'الإدارات والهيكل', en: 'Departments' },
-  cost_centers: { ar: 'مراكز التكلفة', en: 'Cost Centers' }
+  cost_centers: { ar: 'مراكز التكلفة', en: 'Cost Centers' },
+  currencies: { ar: 'العملات وأسعار الصرف', en: 'Currencies' },
+  exchange_rates: { ar: 'أسعار صرف العملات', en: 'Exchange Rates' }
+};
+
+const isMasterDataModule = (name: string): boolean => {
+  return [
+    'customers', 'suppliers', 'products', 'item_groups', 'employees', 
+    'warehouses', 'payment_methods', 'expense_categories', 'accounts', 
+    'account_types', 'operation_categories', 'operation_fields', 
+    'departments', 'cost_centers', 'currencies', 'exchange_rates'
+  ].includes(name);
 };
 
 export function PeriodClosing() {
@@ -53,10 +68,15 @@ export function PeriodClosing() {
   const [closings, setClosings] = useState<PeriodClosingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState<'transactions' | 'master_data'>('transactions');
   
-  // Bulk Closing State
-  const [bulkDate, setBulkDate] = useState('');
-  const [bulkPassword, setBulkPassword] = useState('');
+  // Bulk Closing States
+  const [txBulkDate, setTxBulkDate] = useState('');
+  const [txBulkPassword, setTxBulkPassword] = useState('');
+  
+  const [mdBulkDate, setMdBulkDate] = useState('');
+  const [mdBulkPassword, setMdBulkPassword] = useState('');
+  
   const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
 
   // Individual Modal State
@@ -130,9 +150,12 @@ export function PeriodClosing() {
     }
   };
 
-  const handleBulkSubmit = async (e: React.FormEvent) => {
+  const handleBulkSubmit = async (e: React.FormEvent, type: 'transactions' | 'master_data') => {
     e.preventDefault();
-    if (!bulkDate || !bulkPassword) {
+    const date = type === 'transactions' ? txBulkDate : mdBulkDate;
+    const password = type === 'transactions' ? txBulkPassword : mdBulkPassword;
+
+    if (!date || !password) {
       showNotification(
         language === 'ar' ? 'الرجاء إدخال التاريخ وكلمة المرور للإغلاق الجماعي' : 'Please provide date and password for bulk close', 
         'error'
@@ -142,18 +165,23 @@ export function PeriodClosing() {
 
     setIsBulkSubmitting(true);
     try {
-      await apiRequest('/period_closings', 'POST', {
-        module_name: 'all',
-        closing_date: bulkDate,
-        password: bulkPassword,
+      const moduleNameParam = type === 'transactions' ? 'all_transactions' : 'all_master_data';
+      const response = await apiRequest<{ message?: string }>('/period_closings', 'POST', {
+        module_name: moduleNameParam,
+        closing_date: date,
+        password: password,
         is_closed: true
       });
 
       showNotification(
-        language === 'ar' ? 'تم تطبيق الإغلاق الجماعي على جميع الحركات بنجاح' : 'Bulk closing applied to all modules successfully', 
+        response.message || (language === 'ar' ? 'تم تطبيق الإغلاق الجماعي بنجاح' : 'Bulk closing applied successfully'), 
         'success'
       );
-      setBulkPassword('');
+      if (type === 'transactions') {
+        setTxBulkPassword('');
+      } else {
+        setMdBulkPassword('');
+      }
       fetchClosings();
     } catch (error: any) {
       showNotification(error.message || 'Error in bulk closing', 'error');
@@ -182,7 +210,12 @@ export function PeriodClosing() {
     }
   };
 
-  const filteredClosings = closings.filter(c => {
+  // Filter closings based on active tab and search term
+  const displayedClosings = closings.filter(c => {
+    const isMD = isMasterDataModule(c.module_name);
+    if (activeTab === 'transactions' && isMD) return false;
+    if (activeTab === 'master_data' && !isMD) return false;
+
     const label = moduleLabels[c.module_name];
     const nameAr = label ? label.ar : c.module_name;
     const nameEn = label ? label.en : c.module_name;
@@ -207,8 +240,8 @@ export function PeriodClosing() {
           </div>
           <p className="text-zinc-500">
             {language === 'ar' 
-              ? 'تأمين وحماية البيانات المحاسبية والعمليات من التغيير بعد اعتمادها بكلمة مرور.' 
-              : 'Secure and protect accounting data and operations from modification post-approval.'}
+              ? 'تأمين وحماية العمليات المالية والبيانات الأساسية من التعديل بكلمة مرور.' 
+              : 'Secure and protect financial transactions and master data from editing with password.'}
           </p>
         </div>
         <button 
@@ -220,63 +253,139 @@ export function PeriodClosing() {
         </button>
       </div>
 
-      {/* Bulk Closing widget */}
-      <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/5 p-6 rounded-[2rem] border border-emerald-100/50 shadow-md space-y-4">
+      {/* Tabs Switcher */}
+      <div className="flex border-b border-zinc-200 gap-2">
+        <button
+          onClick={() => { setActiveTab('transactions'); setSearchTerm(''); }}
+          className={`flex items-center gap-2 px-6 py-3 font-bold text-sm transition-all border-b-2 ${
+            activeTab === 'transactions'
+              ? 'border-emerald-600 text-emerald-600'
+              : 'border-transparent text-zinc-500 hover:text-zinc-700'
+          }`}
+        >
+          <FileText size={16} />
+          {language === 'ar' ? 'العمليات والمستندات المالية' : 'Transactions & Financials'}
+        </button>
+        <button
+          onClick={() => { setActiveTab('master_data'); setSearchTerm(''); }}
+          className={`flex items-center gap-2 px-6 py-3 font-bold text-sm transition-all border-b-2 ${
+            activeTab === 'master_data'
+              ? 'border-emerald-600 text-emerald-600'
+              : 'border-transparent text-zinc-500 hover:text-zinc-700'
+          }`}
+        >
+          <DatabaseIcon size={16} />
+          {language === 'ar' ? 'البيانات الأساسية والتعريفات' : 'Master Data & Settings'}
+        </button>
+      </div>
+
+      {/* Bulk Closing widget (Changes dynamically per tab) */}
+      <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/5 p-6 rounded-[2rem] border border-emerald-100/50 shadow-md space-y-4 animate-in fade-in duration-300">
         <div className="flex items-center gap-2 mb-2">
           <ShieldAlert className="text-emerald-600" size={20} />
           <h3 className="text-sm font-black text-zinc-900">
-            {language === 'ar' ? 'إغلاق جماعي لجميع حركات النظام' : 'Bulk Period Closing (All Modules)'}
+            {activeTab === 'transactions' 
+              ? (language === 'ar' ? 'إغلاق جماعي لجميع العمليات والمستندات المالية' : 'Bulk Close All Transactions & Financial Documents')
+              : (language === 'ar' ? 'إغلاق جماعي لجميع البيانات الأساسية والتعريفات' : 'Bulk Close All Master Data & Lookups')}
           </h3>
         </div>
         
-        <form onSubmit={handleBulkSubmit} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 items-end">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-black text-zinc-500 uppercase tracking-widest flex items-center gap-1">
-              <Calendar size={12} />
-              {language === 'ar' ? 'إغلاق الحركات حتى تاريخ' : 'Close transactions up to'}
-            </label>
-            <input 
-              type="date"
-              value={bulkDate}
-              onChange={(e) => setBulkDate(e.target.value)}
-              className="w-full px-4 py-2.5 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-semibold text-sm"
-              required
-            />
-          </div>
+        {activeTab === 'transactions' ? (
+          <form onSubmit={(e) => handleBulkSubmit(e, 'transactions')} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 items-end">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-black text-zinc-500 uppercase tracking-widest flex items-center gap-1">
+                <Calendar size={12} />
+                {language === 'ar' ? 'إغلاق الحركات حتى تاريخ' : 'Close transactions up to'}
+              </label>
+              <input 
+                type="date"
+                value={txBulkDate}
+                onChange={(e) => setTxBulkDate(e.target.value)}
+                className="w-full px-4 py-2.5 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-semibold text-sm"
+                required
+              />
+            </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-black text-zinc-500 uppercase tracking-widest flex items-center gap-1">
-              <KeyRound size={12} />
-              {language === 'ar' ? 'كلمة مرور إغلاق الفترة' : 'Closing Password'}
-            </label>
-            <input 
-              type="password"
-              placeholder="••••••••"
-              value={bulkPassword}
-              onChange={(e) => setBulkPassword(e.target.value)}
-              className="w-full px-4 py-2.5 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm font-mono"
-              required
-            />
-          </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-black text-zinc-500 uppercase tracking-widest flex items-center gap-1">
+                <KeyRound size={12} />
+                {language === 'ar' ? 'كلمة مرور إغلاق الفترة' : 'Closing Password'}
+              </label>
+              <input 
+                type="password"
+                placeholder="••••••••"
+                value={txBulkPassword}
+                onChange={(e) => setTxBulkPassword(e.target.value)}
+                className="w-full px-4 py-2.5 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm font-mono"
+                required
+              />
+            </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={isBulkSubmitting}
-              className="w-full flex items-center justify-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all font-bold text-sm shadow-md shadow-emerald-500/10 disabled:opacity-50"
-            >
-              {isBulkSubmitting ? (
-                <RefreshCw className="animate-spin" size={16} />
-              ) : (
-                <Lock size={16} />
-              )}
-              {language === 'ar' ? 'إغلاق جميع الحركات' : 'Close All Modules'}
-            </button>
-          </div>
-        </form>
+            <div>
+              <button
+                type="submit"
+                disabled={isBulkSubmitting}
+                className="w-full flex items-center justify-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all font-bold text-sm shadow-md shadow-emerald-500/10 disabled:opacity-50"
+              >
+                {isBulkSubmitting ? (
+                  <RefreshCw className="animate-spin" size={16} />
+                ) : (
+                  <Lock size={16} />
+                )}
+                {language === 'ar' ? 'إغلاق العمليات جماعياً' : 'Bulk Close Transactions'}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={(e) => handleBulkSubmit(e, 'master_data')} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 items-end">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-black text-zinc-500 uppercase tracking-widest flex items-center gap-1">
+                <Calendar size={12} />
+                {language === 'ar' ? 'إغلاق البيانات حتى تاريخ' : 'Close master data up to'}
+              </label>
+              <input 
+                type="date"
+                value={mdBulkDate}
+                onChange={(e) => setMdBulkDate(e.target.value)}
+                className="w-full px-4 py-2.5 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-semibold text-sm"
+                required
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-black text-zinc-500 uppercase tracking-widest flex items-center gap-1">
+                <KeyRound size={12} />
+                {language === 'ar' ? 'كلمة مرور إغلاق البيانات' : 'Closing Password'}
+              </label>
+              <input 
+                type="password"
+                placeholder="••••••••"
+                value={mdBulkPassword}
+                onChange={(e) => setMdBulkPassword(e.target.value)}
+                className="w-full px-4 py-2.5 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm font-mono"
+                required
+              />
+            </div>
+
+            <div>
+              <button
+                type="submit"
+                disabled={isBulkSubmitting}
+                className="w-full flex items-center justify-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all font-bold text-sm shadow-md shadow-emerald-500/10 disabled:opacity-50"
+              >
+                {isBulkSubmitting ? (
+                  <RefreshCw className="animate-spin" size={16} />
+                ) : (
+                  <Lock size={16} />
+                )}
+                {language === 'ar' ? 'إغلاق البيانات جماعياً' : 'Bulk Close Master Data'}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
 
-      {/* Main Grid/Search */}
+      {/* Main Table Container */}
       <div className="bg-white p-6 rounded-[2rem] border border-zinc-100 shadow-xl shadow-zinc-100/50 space-y-4">
         
         {/* Search Toolbar */}
@@ -311,14 +420,14 @@ export function PeriodClosing() {
                     <td colSpan={6} className="px-6 py-4.5 h-14 bg-zinc-50/10" />
                   </tr>
                 ))
-              ) : filteredClosings.length === 0 ? (
+              ) : displayedClosings.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-16 text-center text-zinc-400 italic">
                     <AlertTriangle size={32} className="mx-auto mb-2 opacity-30" />
                     <span>{language === 'ar' ? 'لا توجد حركات مطابقة للبحث' : 'No matching operations found'}</span>
                   </td>
                 </tr>
-              ) : filteredClosings.map((closing, idx) => {
+              ) : displayedClosings.map((closing, idx) => {
                 const label = moduleLabels[closing.module_name];
                 const displayName = language === 'ar' ? (label ? label.ar : closing.module_name) : (label ? label.en : closing.module_name);
                 

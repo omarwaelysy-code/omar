@@ -1127,7 +1127,7 @@ router.post('/period_closings', authenticateToken, async (req: AuthRequest, res)
     const companyId = req.user?.company_id;
     if (!companyId) return sendError(res, 401, 'Unauthorized');
 
-    if (module_name === 'all') {
+    if (['all', 'all_transactions', 'all_master_data'].includes(module_name)) {
       if (!await checkPermission(req, 'period_closing', 'bulk_close')) {
         return res.status(403).json({ error: 'Access Denied: No Bulk Close Permission' });
       }
@@ -1154,12 +1154,31 @@ router.post('/period_closings', authenticateToken, async (req: AuthRequest, res)
         'settings', 'print_profiles', 'template_versions', 'dashboards', 'widgets'
       ].includes(m));
 
-    if (module_name === 'all') {
+    if (['all', 'all_transactions', 'all_master_data'].includes(module_name)) {
       if (!password) {
         return sendError(res, 400, 'كلمة المرور مطلوبة للإغلاق الجماعي');
       }
+
+      const isMasterDataModule = (name: string): boolean => {
+        return [
+          'customers', 'suppliers', 'products', 'item_groups', 'employees', 
+          'warehouses', 'payment_methods', 'expense_categories', 'accounts', 
+          'account_types', 'operation_categories', 'operation_fields', 
+          'departments', 'cost_centers', 'currencies', 'exchange_rates'
+        ].includes(name);
+      };
+
+      let targets = clossableModules;
+      let label = 'جميع الفترات';
+      if (module_name === 'all_transactions') {
+        targets = clossableModules.filter(m => !isMasterDataModule(m));
+        label = 'العمليات والمستندات المالية';
+      } else if (module_name === 'all_master_data') {
+        targets = clossableModules.filter(m => isMasterDataModule(m));
+        label = 'البيانات الأساسية';
+      }
       
-      for (const m of clossableModules) {
+      for (const m of targets) {
         const id = uuidv4();
         await pool.query(
           `INSERT INTO period_closings (id, company_id, module_name, closing_date, password_hash, is_closed)
@@ -1177,13 +1196,13 @@ router.post('/period_closings', authenticateToken, async (req: AuthRequest, res)
         user_email: req.user?.email,
         action: 'PERIOD_BULK_CLOSE',
         module: 'PERIOD_CLOSING',
-        details: `إغلاق جماعي لجميع الفترات حتى تاريخ ${closing_date}`,
+        details: `إغلاق جماعي لـ ${label} حتى تاريخ ${closing_date}`,
         entity_type: 'period_closings',
         ip_address: getIp(req),
         success: true
       });
 
-      return res.json({ success: true, message: 'تم إغلاق جميع الفترات بنجاح' });
+      return res.json({ success: true, message: `تم إغلاق ${label} بنجاح` });
     } else {
       if (!clossableModules.includes(module_name)) {
         return sendError(res, 400, 'حركة غير صالحة للإغلاق');
