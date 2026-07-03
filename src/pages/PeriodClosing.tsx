@@ -108,6 +108,32 @@ export function PeriodClosing() {
     }
   }, [user]);
 
+  // Pre-populate date in inputs if all modules share the same closing date and are closed
+  useEffect(() => {
+    if (closings.length > 0) {
+      const txs = closings.filter(c => !isMasterDataModule(c.module_name));
+      const mds = closings.filter(c => isMasterDataModule(c.module_name));
+      
+      if (txs.length > 0) {
+        const first = txs[0];
+        const firstDate = first.closing_date;
+        const allSame = txs.every(t => t.closing_date === firstDate && t.is_closed);
+        if (allSame && firstDate) {
+          setTxBulkDate(firstDate);
+        }
+      }
+      
+      if (mds.length > 0) {
+        const first = mds[0];
+        const firstDate = first.closing_date;
+        const allSame = mds.every(m => m.closing_date === firstDate && m.is_closed);
+        if (allSame && firstDate) {
+          setMdBulkDate(firstDate);
+        }
+      }
+    }
+  }, [closings]);
+
   const handleOpenModal = (record: PeriodClosingRecord) => {
     setActiveModule(record.module_name);
     setModalDate(record.closing_date || new Date().toISOString().slice(0, 10));
@@ -185,6 +211,41 @@ export function PeriodClosing() {
       fetchClosings();
     } catch (error: any) {
       showNotification(error.message || 'Error in bulk closing', 'error');
+    } finally {
+      setIsBulkSubmitting(false);
+    }
+  };
+
+  const handleBulkReopen = async (type: 'transactions' | 'master_data') => {
+    const isAr = language === 'ar';
+    const label = type === 'transactions' 
+      ? (isAr ? 'العمليات والمستندات المالية' : 'Transactions & Financials')
+      : (isAr ? 'البيانات الأساسية والتعريفات' : 'Master Data & Settings');
+      
+    const confirmMsg = isAr
+      ? `هل أنت متأكد من إلغاء إغلاق جميع حركات (${label}) وإعادة فتح الفترات دفعة واحدة؟`
+      : `Are you sure you want to cancel bulk closing for all (${label}) and reopen periods at once?`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsBulkSubmitting(true);
+    try {
+      const targetParam = type === 'transactions' ? 'all_transactions' : 'all_master_data';
+      const response = await apiRequest<{ message?: string }>(`/period_closings/${targetParam}`, 'DELETE');
+      showNotification(
+        response.message || (isAr ? 'تم إلغاء الإغلاق الجماعي بنجاح' : 'Bulk closing cancelled successfully'), 
+        'success'
+      );
+      if (type === 'transactions') {
+        setTxBulkDate('');
+        setTxBulkPassword('');
+      } else {
+        setMdBulkDate('');
+        setMdBulkPassword('');
+      }
+      fetchClosings();
+    } catch (error: any) {
+      showNotification(error.message || 'Error in bulk reopening', 'error');
     } finally {
       setIsBulkSubmitting(false);
     }
@@ -321,18 +382,27 @@ export function PeriodClosing() {
               />
             </div>
 
-            <div>
+            <div className="flex gap-2">
               <button
                 type="submit"
                 disabled={isBulkSubmitting}
-                className="w-full flex items-center justify-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all font-bold text-sm shadow-md shadow-emerald-500/10 disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all font-bold text-sm shadow-md shadow-emerald-500/10 disabled:opacity-50"
               >
                 {isBulkSubmitting ? (
                   <RefreshCw className="animate-spin" size={16} />
                 ) : (
                   <Lock size={16} />
                 )}
-                {language === 'ar' ? 'إغلاق العمليات جماعياً' : 'Bulk Close Transactions'}
+                {language === 'ar' ? 'إغلاق جماعي' : 'Bulk Close'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBulkReopen('transactions')}
+                disabled={isBulkSubmitting}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-650 rounded-xl transition-all font-bold text-sm border border-red-200 disabled:opacity-50"
+              >
+                <Unlock size={16} />
+                {language === 'ar' ? 'إلغاء الإغلاق الجماعي' : 'Bulk Reopen'}
               </button>
             </div>
           </form>
@@ -367,18 +437,27 @@ export function PeriodClosing() {
               />
             </div>
 
-            <div>
+            <div className="flex gap-2">
               <button
                 type="submit"
                 disabled={isBulkSubmitting}
-                className="w-full flex items-center justify-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all font-bold text-sm shadow-md shadow-emerald-500/10 disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all font-bold text-sm shadow-md shadow-emerald-500/10 disabled:opacity-50"
               >
                 {isBulkSubmitting ? (
                   <RefreshCw className="animate-spin" size={16} />
                 ) : (
                   <Lock size={16} />
                 )}
-                {language === 'ar' ? 'إغلاق البيانات جماعياً' : 'Bulk Close Master Data'}
+                {language === 'ar' ? 'إغلاق جماعي' : 'Bulk Close'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBulkReopen('master_data')}
+                disabled={isBulkSubmitting}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-650 rounded-xl transition-all font-bold text-sm border border-red-200 disabled:opacity-50"
+              >
+                <Unlock size={16} />
+                {language === 'ar' ? 'إلغاء الإغلاق الجماعي' : 'Bulk Reopen'}
               </button>
             </div>
           </form>
@@ -478,7 +557,7 @@ export function PeriodClosing() {
                         {closing.closing_date && (
                           <button
                             onClick={() => handleOpenPeriod(closing.module_name)}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition-all font-bold text-xs"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-650 rounded-xl transition-all font-bold text-xs"
                           >
                             <Unlock size={12} />
                             {language === 'ar' ? 'فتح الفترة' : 'Open Period'}

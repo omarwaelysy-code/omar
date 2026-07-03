@@ -897,78 +897,92 @@ const TABLES_TO_BACKUP = [
 ];
 
 // --- Period Closing Helpers and Middleware ---
-async function getTransactionDate(moduleName: string, body: any, id?: string): Promise<string> {
-  if (body && body.date) {
-    const d = body.date instanceof Date ? body.date.toISOString().slice(0, 10) : String(body.date);
-    return d.slice(0, 10);
+function parseToStandardDateStr(dStr: any): string {
+  if (!dStr) return '';
+  if (dStr instanceof Date) {
+    return dStr.toISOString().slice(0, 10);
   }
-  if (body && body.created_at) {
-    const d = body.created_at instanceof Date ? body.created_at.toISOString().slice(0, 10) : String(body.created_at);
-    return d.slice(0, 10);
+  const s = String(dStr).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    return s.slice(0, 10);
   }
-  if (body && body.timestamp) {
-    const d = body.timestamp instanceof Date ? body.timestamp.toISOString().slice(0, 10) : String(body.timestamp);
-    return d.slice(0, 10);
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(s)) {
+    const parts = s.split('/');
+    const day = parts[0].padStart(2, '0');
+    const month = parts[1].padStart(2, '0');
+    const year = parts[2].slice(0, 4);
+    return `${year}-${month}-${day}`;
   }
-  
-  const parentKeys = {
-    invoice_items: ['invoice_id', 'invoices'],
-    return_items: ['return_id', 'returns'],
-    purchase_invoice_items: ['invoice_id', 'purchase_invoices'],
-    purchase_return_items: ['return_id', 'purchase_returns'],
-    sales_order_items: ['order_id', 'sales_orders'],
-    purchase_order_items: ['order_id', 'purchase_orders'],
-    journal_entry_lines: ['journal_entry_id', 'journal_entries'],
-    warehouse_transfer_items: ['transfer_id', 'warehouse_transfers'],
-    opening_stock_items: ['opening_stock_id', 'opening_stock_balances'],
-    stock_adjustment_items: ['adjustment_id', 'stock_adjustments'],
-    goods_receipt_items: ['goods_receipt_id', 'goods_receipts']
-  } as any;
+  try {
+    const parsed = new Date(s);
+    if (!isNaN(parsed.getTime())) {
+      return parsed.toISOString().slice(0, 10);
+    }
+  } catch (e) {}
+  return s.slice(0, 10);
+}
 
-  if (body) {
-    const relation = parentKeys[moduleName];
-    if (relation && body[relation[0]]) {
-      const parentRes = await pool.query(`SELECT date FROM "${relation[1]}" WHERE id = $1`, [body[relation[0]]]);
-      if (parentRes.rows.length > 0 && parentRes.rows[0].date) {
-        const d = parentRes.rows[0].date instanceof Date ? parentRes.rows[0].date.toISOString().slice(0, 10) : String(parentRes.rows[0].date);
-        return d.slice(0, 10);
+async function getTransactionDate(moduleName: string, body: any, id?: string): Promise<string> {
+  let rawDate = '';
+  if (body && body.date) {
+    rawDate = body.date;
+  } else if (body && body.created_at) {
+    rawDate = body.created_at;
+  } else if (body && body.timestamp) {
+    rawDate = body.timestamp;
+  } else {
+    const parentKeys = {
+      invoice_items: ['invoice_id', 'invoices'],
+      return_items: ['return_id', 'returns'],
+      purchase_invoice_items: ['invoice_id', 'purchase_invoices'],
+      purchase_return_items: ['return_id', 'purchase_returns'],
+      sales_order_items: ['order_id', 'sales_orders'],
+      purchase_order_items: ['order_id', 'purchase_orders'],
+      journal_entry_lines: ['journal_entry_id', 'journal_entries'],
+      warehouse_transfer_items: ['transfer_id', 'warehouse_transfers'],
+      opening_stock_items: ['opening_stock_id', 'opening_stock_balances'],
+      stock_adjustment_items: ['adjustment_id', 'stock_adjustments'],
+      goods_receipt_items: ['goods_receipt_id', 'goods_receipts']
+    } as any;
+
+    if (body) {
+      const relation = parentKeys[moduleName];
+      if (relation && body[relation[0]]) {
+        const parentRes = await pool.query(`SELECT date FROM "${relation[1]}" WHERE id = $1`, [body[relation[0]]]);
+        if (parentRes.rows.length > 0 && parentRes.rows[0].date) {
+          rawDate = parentRes.rows[0].date;
+        }
       }
     }
-  }
 
-  if (id) {
-    try {
-      const res = await pool.query(`SELECT * FROM "${moduleName}" WHERE id = $1`, [id]);
-      if (res.rows.length > 0) {
-        const row = res.rows[0];
-        if (row.date) {
-          const d = row.date instanceof Date ? row.date.toISOString().slice(0, 10) : String(row.date);
-          return d.slice(0, 10);
-        }
-        if (row.created_at) {
-          const d = row.created_at instanceof Date ? row.created_at.toISOString().slice(0, 10) : String(row.created_at);
-          return d.slice(0, 10);
-        }
-        if (row.timestamp) {
-          const d = row.timestamp instanceof Date ? row.timestamp.toISOString().slice(0, 10) : String(row.timestamp);
-          return d.slice(0, 10);
-        }
-
-        const relation = parentKeys[moduleName];
-        if (relation && row[relation[0]]) {
-          const parentRes = await pool.query(`SELECT date FROM "${relation[1]}" WHERE id = $1`, [row[relation[0]]]);
-          if (parentRes.rows.length > 0 && parentRes.rows[0].date) {
-            const d = parentRes.rows[0].date instanceof Date ? parentRes.rows[0].date.toISOString().slice(0, 10) : String(parentRes.rows[0].date);
-            return d.slice(0, 10);
+    if (!rawDate && id) {
+      try {
+        const res = await pool.query(`SELECT * FROM "${moduleName}" WHERE id = $1`, [id]);
+        if (res.rows.length > 0) {
+          const row = res.rows[0];
+          if (row.date) {
+            rawDate = row.date;
+          } else if (row.created_at) {
+            rawDate = row.created_at;
+          } else if (row.timestamp) {
+            rawDate = row.timestamp;
+          } else {
+            const relation = parentKeys[moduleName];
+            if (relation && row[relation[0]]) {
+              const parentRes = await pool.query(`SELECT date FROM "${relation[1]}" WHERE id = $1`, [row[relation[0]]]);
+              if (parentRes.rows.length > 0 && parentRes.rows[0].date) {
+                rawDate = parentRes.rows[0].date;
+              }
+            }
           }
         }
+      } catch (e) {
+        // Table might not exist or ID format invalid
       }
-    } catch (e) {
-      // Table might not exist or ID format invalid
     }
   }
 
-  return new Date().toISOString().slice(0, 10);
+  return parseToStandardDateStr(rawDate || new Date());
 }
 
 async function isPeriodClosed(companyId: string, moduleName: string, dateStr: string): Promise<{ closed: boolean, closingDate?: string, passwordHash?: string }> {
@@ -981,9 +995,10 @@ async function isPeriodClosed(companyId: string, moduleName: string, dateStr: st
   if (res.rows.length > 0) {
     const pc = res.rows[0];
     if (pc.is_closed) {
-      const closingDate = pc.closing_date instanceof Date ? pc.closing_date.toISOString().slice(0, 10) : String(pc.closing_date);
-      if (dateStr <= closingDate.slice(0, 10)) {
-        return { closed: true, closingDate: closingDate.slice(0, 10), passwordHash: pc.password_hash };
+      const closingDateStr = parseToStandardDateStr(pc.closing_date);
+      const targetDateStr = parseToStandardDateStr(dateStr);
+      if (targetDateStr && closingDateStr && targetDateStr <= closingDateStr) {
+        return { closed: true, closingDate: closingDateStr, passwordHash: pc.password_hash };
       }
     }
   }
@@ -1001,6 +1016,21 @@ async function checkPeriodClosingMiddleware(req: AuthRequest, res: any, next: an
   let moduleName = pathParts[0];
   if (['auth', 'system', 'utils', 'widgets', 'dashboards', 'currencies', 'period_closings'].includes(moduleName)) {
     return next();
+  }
+
+  // Populate req.user from JWT if not set
+  if (!req.user) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (token) {
+      try {
+        const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        req.user = decoded;
+      } catch (e) {
+        // Let authenticateToken catch it later
+      }
+    }
   }
 
   const id = req.params.id || pathParts[1];
@@ -1263,6 +1293,54 @@ router.delete('/period_closings/:moduleName', authenticateToken, async (req: Aut
 
     if (!await checkPermission(req, 'period_closing', 'delete')) {
       return res.status(403).json({ error: 'Access Denied: No Delete Permission' });
+    }
+
+    if (moduleName === 'all_transactions' || moduleName === 'all_master_data') {
+      const isMasterDataModule = (name: string): boolean => {
+        return [
+          'customers', 'suppliers', 'products', 'item_groups', 'employees', 
+          'warehouses', 'payment_methods', 'expense_categories', 'accounts', 
+          'account_types', 'operation_categories', 'operation_fields', 
+          'departments', 'cost_centers', 'currencies', 'exchange_rates'
+        ].includes(name);
+      };
+
+      const clossableModules = Array.from(new Set(modules.map(getEffectiveModule)))
+        .filter(m => ![
+          'users', 'roles', 'companies', 'activity_logs', 'audit_logs', 
+          'system_config', 'period_closings', 'migrations', 'paper_sizes', 
+          'settings', 'print_profiles', 'template_versions', 'dashboards', 'widgets'
+        ].includes(m));
+
+      let targets = clossableModules;
+      let label = 'جميع الفترات';
+      if (moduleName === 'all_transactions') {
+        targets = clossableModules.filter(m => !isMasterDataModule(m));
+        label = 'العمليات والمستندات المالية';
+      } else if (moduleName === 'all_master_data') {
+        targets = clossableModules.filter(m => isMasterDataModule(m));
+        label = 'البيانات الأساسية';
+      }
+
+      await pool.query(
+        'DELETE FROM period_closings WHERE company_id = $1 AND module_name = ANY($2)',
+        [companyId, targets]
+      );
+
+      logAudit({
+        company_id: companyId,
+        user_id: req.user?.id,
+        username: (req.user as any)?.username || req.user?.email,
+        user_email: req.user?.email,
+        action: 'PERIOD_BULK_REOPEN',
+        module: 'PERIOD_CLOSING',
+        details: `إلغاء إغلاق جماعي لـ ${label} وفتح جميع الفترات`,
+        entity_type: 'period_closings',
+        ip_address: getIp(req),
+        success: true
+      });
+
+      return res.json({ success: true, message: `تم إلغاء إغلاق ${label} بنجاح` });
     }
 
     const { rowCount } = await pool.query(
