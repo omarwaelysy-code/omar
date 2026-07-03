@@ -2060,7 +2060,7 @@ modules.forEach(moduleName => {
         const hasCreatedAt = colCheck.rows.length > 0;
         const orderBy = hasCreatedAt ? 'created_at DESC' : 'id DESC';
         
-        query += ` ORDER BY ${orderBy} LIMIT 500`;
+        query += ` ORDER BY ${orderBy}`;
         
         const queryResult = await pool.query(query, params);
         rows = queryResult.rows;
@@ -2087,7 +2087,7 @@ modules.forEach(moduleName => {
         const hasCreatedAt = colCheck.rows.length > 0;
         const orderBy = hasCreatedAt ? 'created_at DESC' : 'id DESC';
 
-        query += ` ORDER BY ${orderBy} LIMIT 500`;
+        query += ` ORDER BY ${orderBy}`;
         const queryResult = await pool.query(query, params);
         rows = queryResult.rows;
       } else {
