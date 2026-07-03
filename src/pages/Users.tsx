@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { User, UserPermissions, ModulePermissions } from '../types';
 import { 
-  Search, Plus, Trash2, X, Shield, User as UserIcon, History, Lock, Check, 
-  AlertCircle, Edit2, ChevronDown, ChevronUp, Copy, HelpCircle, RefreshCw, Info 
+  Search, Plus, Trash2, X, Shield, User as UserIcon, History, Lock, Check, CheckCheck,
+  AlertCircle, Edit2, ChevronDown, ChevronUp, Copy, HelpCircle, RefreshCw, Info,
+  ChevronLeft, ChevronRight, Save
 } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
@@ -567,234 +568,53 @@ export const Users: React.FC = () => {
     return merged;
   };
 
-  return (
-    <div className={`space-y-6 animate-in fade-in duration-500 ${language === 'ar' ? 'text-right' : 'text-left'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      {/* Title Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 bg-emerald-600 text-white rounded-3xl flex items-center justify-center shadow-xl shadow-emerald-500/20">
-            <Lock size={28} />
-          </div>
-          <div>
-            <h2 className="text-3xl font-black text-slate-900 tracking-tighter italic serif">{language === 'ar' ? 'الصلاحيات والأدوار' : 'Permissions & Roles'}</h2>
-            <p className="text-slate-500 font-medium mt-1">{language === 'ar' ? 'تعديل صلاحيات المستخدمين والأدوار الوظيفية داخل النظام بالكامل' : 'Modify user permissions and job roles across the entire system'}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => {
-              setActivityLogDocumentId(undefined);
-              setIsActivityLogOpen(true);
-            }}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
-          >
-            <History size={20} />
-            <span>{language === 'ar' ? 'سجل الرقابة' : 'Audit Log'}</span>
-          </button>
-          
-          {activeTab === 'users' ? (
-            <button 
-              onClick={() => setIsUserModalOpen(true)}
-              className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95"
+  if (isPermissionsModalOpen) {
+    return (
+      <div className="bg-white w-full rounded-3xl border border-slate-200 shadow-md overflow-hidden flex flex-col min-h-[80vh] relative animate-in slide-in-from-bottom-4 duration-300" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        {/* Permissions & Roles View Header */}
+        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 sticky top-0 z-[70] flex-wrap gap-4 shrink-0">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsPermissionsModalOpen(false)}
+              className="flex items-center gap-1 px-3 py-1.5 bg-white text-slate-650 border border-slate-200 hover:bg-slate-50 hover:text-slate-900 rounded-xl transition-all font-bold text-xs shadow-sm"
             >
-              <Plus size={20} />
-              {language === 'ar' ? 'إضافة مستخدم جديد' : 'Add New User'}
+              {language === 'ar' ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+              <span>{language === 'ar' ? '\u0627\u0644\u0639\u0648\u062f\u0629 \u0644\u0644\u0642\u0627\u0626\u0645\u0629' : 'Return to List'}</span>
             </button>
-          ) : (
-            <button 
-              onClick={() => {
-                setEditingRole(null);
-                setRoleFormData({ name: '', description: '' });
-                setIsRoleModalOpen(true);
-              }}
-              className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95"
-            >
-              <Plus size={20} />
-              {language === 'ar' ? 'إضافة دور جديد' : 'Add New Role'}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-6 border-b border-slate-200">
-        <button 
-          onClick={() => setActiveTab('users')} 
-          className={`pb-4 px-2 font-black text-lg border-b-4 transition-all relative ${
-            activeTab === 'users' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          {language === 'ar' ? 'المستخدمين' : 'Users'}
-        </button>
-        <button 
-          onClick={() => setActiveTab('roles')} 
-          className={`pb-4 px-2 font-black text-lg border-b-4 transition-all relative ${
-            activeTab === 'roles' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          {language === 'ar' ? 'الأدوار الوظيفية' : 'Job Roles'}
-        </button>
-      </div>
-
-      {/* Content Panel */}
-      {activeTab === 'users' ? (
-        <div className="space-y-6">
-          {/* User Search Input */}
-          <div className="relative w-full max-w-md">
-            <input 
-              type="text"
-              placeholder={language === 'ar' ? 'البحث عن مستخدم...' : 'Search for user...'}
-              className={`premium-input w-full font-bold ${language === 'ar' ? 'pr-12' : 'pl-12'}`}
-              value={userSearchTerm}
-              onChange={e => setUserSearchTerm(e.target.value)}
-            />
-            <Search className={`absolute top-1/2 -translate-y-1/2 text-slate-450 ${language === 'ar' ? 'right-4' : 'left-4'}`} size={20} />
-          </div>
-
-          {/* Users Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {users
-              .filter(u => u.username.toLowerCase().includes(userSearchTerm.toLowerCase()) || u.email?.toLowerCase().includes(userSearchTerm.toLowerCase()))
-              .map((user) => (
-                <div key={user.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all group relative">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${user.role === 'admin' ? 'bg-emerald-50 text-emerald-600 shadow-inner' : user.role === 'manager' ? 'bg-blue-50 text-blue-600 shadow-inner' : 'bg-slate-50 text-slate-400 shadow-inner'}`}>
-                      {user.role === 'admin' ? <Shield size={24} /> : <UserIcon size={24} />}
-                    </div>
-                    <div className="text-right flex-1 min-w-0">
-                      <h4 className="font-bold text-slate-900 truncate">{user.username}</h4>
-                      <p className="text-[10px] text-slate-450 font-mono mt-0.5 truncate">{user.email}</p>
-                      
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-black">
-                          {user.role === 'admin' ? (language === 'ar' ? 'مدير عام' : 'Super Admin') : user.role === 'manager' ? (language === 'ar' ? 'مدير' : 'Manager') : (language === 'ar' ? 'مستخدم' : 'User')}
-                        </span>
-                        {user.role !== 'admin' && (
-                          <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-black border border-emerald-100/50 truncate max-w-[150px]" title={getUserAssignedRoleNames(user)}>
-                            {language === 'ar' ? 'أدوار' : 'Roles'}: {getUserAssignedRoleNames(user)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-6 flex items-center gap-2">
-                    <button 
-                      onClick={() => openUserPermissions(user)}
-                      className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all active:scale-95"
-                    >
-                      <Lock size={14} />
-                      {language === 'ar' ? 'تعديل الصلاحيات والأدوار' : 'Edit Permissions & Roles'}
-                    </button>
-                    {user.id !== currentUser?.id && (
-                      <button 
-                        onClick={() => {
-                          setUserToDelete(user.id);
-                          setIsDeleteModalOpen(true);
-                        }}
-                        className="p-3 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all active:scale-90"
-                        title={language === 'ar' ? "حذف المستخدم" : "Delete User"}
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="absolute top-6 left-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                      onClick={() => {
-                        setActivityLogDocumentId(user.id);
-                        setIsActivityLogOpen(true);
-                      }}
-                      className="p-2 text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
-                      title={language === 'ar' ? "سجل تعديلات المستخدم" : "User Edit Log"}
-                    >
-                      <History size={18} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {/* Roles Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {roles.map((role) => (
-              <div key={role.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all group relative flex flex-col justify-between">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-slate-50 text-slate-500 rounded-xl flex items-center justify-center font-bold shadow-inner">
-                      <Shield size={20} />
-                    </div>
-                    <div>
-                      <h4 className="font-black text-lg text-slate-900 leading-tight">{translateRoleName(role.name, language)}</h4>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase">{language === 'ar' ? 'دور وظيفي' : 'Job Role'}</p>
-                    </div>
-                  </div>
-                  <p className="text-sm text-slate-500 font-medium leading-relaxed min-h-[40px]">{translateRoleDesc(role.description, language) || (language === 'ar' ? '\u0644\u0627 \u064a\u0648\u062c\u062f \u0648\u0635\u0641 \u0644\u0647\u0630\u0627 \u0627\u0644\u062f\u0648\u0631' : 'No description for this role')}</p>
-                </div>
-                
-                <div className="mt-6 flex items-center gap-2 pt-2 border-t border-slate-50">
-                  <button 
-                    onClick={() => openRolePermissions(role)}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all active:scale-95"
-                  >
-                    <Lock size={14} />
-                    {language === 'ar' ? 'تعديل صلاحيات الدور' : 'Edit Role Permissions'}
-                  </button>
-                  <button 
-                    onClick={() => {
-                      setEditingRole(role);
-                      setRoleFormData({ name: role.name, description: role.description });
-                      setIsRoleModalOpen(true);
-                    }}
-                    className="p-3 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all active:scale-90"
-                    title={language === 'ar' ? "تعديل الدور" : "Edit Role"}
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                  <button 
-                    onClick={() => {
-                      setRoleToDelete(role.id);
-                      setIsRoleDeleteModalOpen(true);
-                    }}
-                    className="p-3 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all active:scale-90"
-                    title={language === 'ar' ? "حذف الدور" : "Delete Role"}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Permissions & Roles Custom Modal */}
-      {isPermissionsModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 md:p-8 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-6xl h-full max-h-[90vh] rounded-[2rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 border border-slate-200" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-            {/* Modal Header */}
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-emerald-650 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
-                  <Lock size={24} />
-                </div>
-                <div>
-                  <h3 className="text-xl font-black text-slate-900">
-                    {permissionsTargetType === 'user' && selectedUser 
-                      ? `${language === 'ar' ? 'صلاحيات وأدوار المستخدم:' : 'User Permissions & Roles:'} ${selectedUser.username}` 
-                      : `${language === 'ar' ? '\u0635\u0644\u0627\u062d\u064a\u0627\u062a \u0627\u0644\u062f\u0648\u0631 \u0627\u0644\u0648\u0638\u064a\u0641\u064a:' : 'Job Role Permissions:'} ${translateRoleName(selectedRole?.name || '', language)}`}
-                  </h3>
-                  <p className="text-[11px] text-slate-500 font-bold uppercase tracking-tight">حدد الصلاحيات العامة والخاصة و{language === 'ar' ? 'الأدوار الوظيفية' : 'Job Roles'}</p>
-                </div>
-              </div>
-              <button onClick={() => setIsPermissionsModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded-full transition-all">
-                <X size={24} />
-              </button>
+            <div className="w-px h-6 bg-slate-200" />
+            <div>
+              <h3 className="text-lg font-black text-slate-900 leading-tight">
+                {permissionsTargetType === 'user' && selectedUser 
+                  ? `${language === 'ar' ? '\u0635\u0644\u0627\u062d\u064a\u0627\u062a \u0648\u0623\u062f\u0648\u0627\u0631 \u0627\u0644\u0645\u0633\u062a\u062e\u062f\u0645:' : 'User Permissions & Roles:'} ${selectedUser.username}` 
+                  : `${language === 'ar' ? '\u0635\u0644\u0627\u062d\u064a\u0627\u062a \u0627\u0644\u062f\u0648\u0631 \u0627\u0644\u0648\u0638\u064a\u0641\u064a:' : 'Job Role Permissions:'} ${translateRoleName(selectedRole?.name || '', language)}`}
+              </h3>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight mt-0.5">{language === 'ar' ? '\u062d\u062f\u062f \u0627\u0644\u0635\u0644\u0627\u062d\u064a\u0627\u062a \u0627\u0644\u0639\u0627\u0645\u0629 \u0648\u0627\u0644\u062e\u0627\u0635\u0629 \u0648\u0627\u0644\u0623\u062f\u0648\u0627\u0631 \u0627\u0644\u0648\u0638\u064a\u0641\u064a\u0629' : 'Select general & business permissions and job roles'}</p>
             </div>
+          </div>
 
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsPermissionsModalOpen(false)}
+              className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all border border-slate-200 active:scale-95 text-xs"
+            >
+              {language === 'ar' ? '\u0625\u0644\u063a\u0627\u0621' : 'Cancel'}
+            </button>
+            {!(permissionsTargetType === 'user' && selectedUser?.role === 'admin') && (
+              <button
+                onClick={savePermissions}
+                disabled={loading}
+                className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 transition-all shadow-md active:scale-95 text-xs flex items-center gap-2"
+              >
+                {loading ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Save size={14} />
+                )}
+                <span>{loading ? (language === 'ar' ? '\u062c\u0627\u0631\u064a \u0627\u0644\u062d\u0641\u0638...' : 'Saving...') : (language === 'ar' ? '\u062d\u0641\u0638 \u0627\u0644\u062a\u0639\u062f\u064a\u0644\u0627\u062a \u0648\u062a\u0637\u0628\u064a\u0642\u0647\u0627' : 'Save & Apply Changes')}</span>
+              </button>
+            )}
+          </div>
+        </div>
             {/* Modal Body */}
             <div className="flex-1 overflow-y-auto p-6 bg-slate-50/40 custom-scrollbar space-y-6">
               {permissionsTargetType === 'user' && selectedUser && selectedUser.role === 'admin' ? (
@@ -1446,6 +1266,7 @@ export const Users: React.FC = () => {
               )}
             </div>
 
+
             {/* Modal Footer */}
             <div className="p-6 border-t border-slate-100 bg-white flex flex-col md:flex-row items-center justify-between gap-4 shrink-0">
               <div className="flex items-center gap-2 text-slate-400">
@@ -1470,9 +1291,216 @@ export const Users: React.FC = () => {
                 )}
               </div>
             </div>
+
+
+      </div>
+    );
+  }
+
+  return (
+    <div className={`space-y-6 animate-in fade-in duration-500 ${language === 'ar' ? 'text-right' : 'text-left'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      {/* Title Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 bg-emerald-600 text-white rounded-3xl flex items-center justify-center shadow-xl shadow-emerald-500/20">
+            <Lock size={28} />
+          </div>
+          <div>
+            <h2 className="text-3xl font-black text-slate-900 tracking-tighter italic serif">{language === 'ar' ? 'الصلاحيات والأدوار' : 'Permissions & Roles'}</h2>
+            <p className="text-slate-500 font-medium mt-1">{language === 'ar' ? 'تعديل صلاحيات المستخدمين والأدوار الوظيفية داخل النظام بالكامل' : 'Modify user permissions and job roles across the entire system'}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => {
+              setActivityLogDocumentId(undefined);
+              setIsActivityLogOpen(true);
+            }}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+          >
+            <History size={20} />
+            <span>{language === 'ar' ? 'سجل الرقابة' : 'Audit Log'}</span>
+          </button>
+          
+          {activeTab === 'users' ? (
+            <button 
+              onClick={() => setIsUserModalOpen(true)}
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95"
+            >
+              <Plus size={20} />
+              {language === 'ar' ? 'إضافة مستخدم جديد' : 'Add New User'}
+            </button>
+          ) : (
+            <button 
+              onClick={() => {
+                setEditingRole(null);
+                setRoleFormData({ name: '', description: '' });
+                setIsRoleModalOpen(true);
+              }}
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95"
+            >
+              <Plus size={20} />
+              {language === 'ar' ? 'إضافة دور جديد' : 'Add New Role'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-6 border-b border-slate-200">
+        <button 
+          onClick={() => setActiveTab('users')} 
+          className={`pb-4 px-2 font-black text-lg border-b-4 transition-all relative ${
+            activeTab === 'users' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          {language === 'ar' ? 'المستخدمين' : 'Users'}
+        </button>
+        <button 
+          onClick={() => setActiveTab('roles')} 
+          className={`pb-4 px-2 font-black text-lg border-b-4 transition-all relative ${
+            activeTab === 'roles' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          {language === 'ar' ? 'الأدوار الوظيفية' : 'Job Roles'}
+        </button>
+      </div>
+
+      {/* Content Panel */}
+      {activeTab === 'users' ? (
+        <div className="space-y-6">
+          {/* User Search Input */}
+          <div className="relative w-full max-w-md">
+            <input 
+              type="text"
+              placeholder={language === 'ar' ? 'البحث عن مستخدم...' : 'Search for user...'}
+              className={`premium-input w-full font-bold ${language === 'ar' ? 'pr-12' : 'pl-12'}`}
+              value={userSearchTerm}
+              onChange={e => setUserSearchTerm(e.target.value)}
+            />
+            <Search className={`absolute top-1/2 -translate-y-1/2 text-slate-450 ${language === 'ar' ? 'right-4' : 'left-4'}`} size={20} />
+          </div>
+
+          {/* Users Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {users
+              .filter(u => u.username.toLowerCase().includes(userSearchTerm.toLowerCase()) || u.email?.toLowerCase().includes(userSearchTerm.toLowerCase()))
+              .map((user) => (
+                <div key={user.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all group relative">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${user.role === 'admin' ? 'bg-emerald-50 text-emerald-600 shadow-inner' : user.role === 'manager' ? 'bg-blue-50 text-blue-600 shadow-inner' : 'bg-slate-50 text-slate-400 shadow-inner'}`}>
+                      {user.role === 'admin' ? <Shield size={24} /> : <UserIcon size={24} />}
+                    </div>
+                    <div className="text-right flex-1 min-w-0">
+                      <h4 className="font-bold text-slate-900 truncate">{user.username}</h4>
+                      <p className="text-[10px] text-slate-450 font-mono mt-0.5 truncate">{user.email}</p>
+                      
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-black">
+                          {user.role === 'admin' ? (language === 'ar' ? 'مدير عام' : 'Super Admin') : user.role === 'manager' ? (language === 'ar' ? 'مدير' : 'Manager') : (language === 'ar' ? 'مستخدم' : 'User')}
+                        </span>
+                        {user.role !== 'admin' && (
+                          <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-black border border-emerald-100/50 truncate max-w-[150px]" title={getUserAssignedRoleNames(user)}>
+                            {language === 'ar' ? 'أدوار' : 'Roles'}: {getUserAssignedRoleNames(user)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-6 flex items-center gap-2">
+                    <button 
+                      onClick={() => openUserPermissions(user)}
+                      className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all active:scale-95"
+                    >
+                      <Lock size={14} />
+                      {language === 'ar' ? 'تعديل الصلاحيات والأدوار' : 'Edit Permissions & Roles'}
+                    </button>
+                    {user.id !== currentUser?.id && (
+                      <button 
+                        onClick={() => {
+                          setUserToDelete(user.id);
+                          setIsDeleteModalOpen(true);
+                        }}
+                        className="p-3 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all active:scale-90"
+                        title={language === 'ar' ? "حذف المستخدم" : "Delete User"}
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="absolute top-6 left-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={() => {
+                        setActivityLogDocumentId(user.id);
+                        setIsActivityLogOpen(true);
+                      }}
+                      className="p-2 text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
+                      title={language === 'ar' ? "سجل تعديلات المستخدم" : "User Edit Log"}
+                    >
+                      <History size={18} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Roles Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {roles.map((role) => (
+              <div key={role.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all group relative flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-slate-50 text-slate-500 rounded-xl flex items-center justify-center font-bold shadow-inner">
+                      <Shield size={20} />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-lg text-slate-900 leading-tight">{translateRoleName(role.name, language)}</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase">{language === 'ar' ? 'دور وظيفي' : 'Job Role'}</p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-500 font-medium leading-relaxed min-h-[40px]">{translateRoleDesc(role.description, language) || (language === 'ar' ? '\u0644\u0627 \u064a\u0648\u062c\u062f \u0648\u0635\u0641 \u0644\u0647\u0630\u0627 \u0627\u0644\u062f\u0648\u0631' : 'No description for this role')}</p>
+                </div>
+                
+                <div className="mt-6 flex items-center gap-2 pt-2 border-t border-slate-50">
+                  <button 
+                    onClick={() => openRolePermissions(role)}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all active:scale-95"
+                  >
+                    <Lock size={14} />
+                    {language === 'ar' ? 'تعديل صلاحيات الدور' : 'Edit Role Permissions'}
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setEditingRole(role);
+                      setRoleFormData({ name: role.name, description: role.description });
+                      setIsRoleModalOpen(true);
+                    }}
+                    className="p-3 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all active:scale-90"
+                    title={language === 'ar' ? "تعديل الدور" : "Edit Role"}
+                  >
+                    <Edit2 size={16} />
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setRoleToDelete(role.id);
+                      setIsRoleDeleteModalOpen(true);
+                    }}
+                    className="p-3 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all active:scale-90"
+                    title={language === 'ar' ? "حذف الدور" : "Delete Role"}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
+
 
       {/* New/Edit User Modal */}
       {isUserModalOpen && (
