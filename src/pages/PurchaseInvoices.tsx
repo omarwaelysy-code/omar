@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -3363,105 +3363,176 @@ export const PurchaseInvoices: React.FC = () => {
   ) : (
     <div className="bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
       {/* Form Header */}
-      <div className="p-4 md:p-6 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70]">
-        <div className="flex items-center gap-3">
-          <button 
-            type="button"
-            onClick={closeModal} 
-            className="flex items-center gap-2 px-4 py-2 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all font-black text-sm"
-          >
-            {t('dir') === 'rtl' ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
-            <span>{t('dir') === 'rtl' ? 'العودة للقائمة' : 'Back to List'}</span>
-          </button>
-          {editingInvoice && (
+      <div className="p-2 md:p-2.5 md:px-4 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70] flex-wrap gap-2" dir={dir}>
+        {/* Right side (start in RTL): Actions: Save, Cancel, Return to List */}
+        <div className="flex flex-col items-start gap-1 shrink-0">
+          <div className="flex items-center gap-2">
             <button 
               type="button"
-              onClick={handleCopyInvoice} 
-              className="flex items-center gap-1.5 px-3 py-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-xs border border-emerald-200 shadow-sm cursor-pointer"
+              onClick={closeModal} 
+              className="flex items-center gap-1 px-2.5 py-0.5 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap"
             >
-              <Copy size={14} />
-              <span>{t('dir') === 'rtl' ? 'نسخ' : 'Copy'}</span>
+              {dir === 'rtl' ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+              <span>{language === 'ar' ? '\u0627\u0644\u0639\u0648\u062f\u0629 \u0644\u0644\u0642\u0627\u0626\u0645\u0629' : 'Return to List'}</span>
             </button>
-          )}
-        </div>
-
-        <div className="flex-1 flex justify-center">
-          <button 
-            type="button"
-            onClick={() => setShowSidePanel(!showSidePanel)}
-            className={`flex items-center gap-3 px-6 py-2.5 rounded-2xl text-sm font-black transition-all border shadow-sm ${showSidePanel ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'}`}
-          >
-            <History size={18} />
-            <span>{t('dir') === 'rtl' ? 'قيد اليومية \\ سجل التعديلات' : 'Journal Entry / Edit Log'}</span>
-          </button>
-        </div>
-
-        <div className="flex items-center gap-4">
-          {editingInvoice && (
-            <div className="hidden lg:flex items-center gap-2 bg-zinc-100 p-1.5 rounded-2xl">
+            {editingInvoice && (
               <button 
                 type="button"
-                onClick={handleBackInvoice}
-                className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
-                disabled={purchaseInvoices.findIndex(inv => inv.id === editingInvoice.id) === purchaseInvoices.length - 1}
+                onClick={handleCopyInvoice} 
+                className="flex items-center gap-1 px-2 py-0.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
               >
-                {t('dir') === 'rtl' ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-                {t('common.previous')}
+                <Copy size={11} />
+                <span>{language === 'ar' ? '\u0646\u0633\u062e' : 'Copy'}</span>
               </button>
-              <button 
-                type="button"
-                onClick={handleNextInvoice}
-                className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
-                disabled={purchaseInvoices.findIndex(inv => inv.id === editingInvoice.id) === 0}
-              >
-                {t('common.next')}
-                {t('dir') === 'rtl' ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-              </button>
+            )}
+            <button 
+              type="button"
+              onClick={() => setShowSidePanel(!showSidePanel)}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-xl text-[11px] font-bold transition-all border ${showSidePanel ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-white text-zinc-500 border-zinc-200 hover:bg-zinc-50'}`}
+            >
+              <History size={11} />
+              <span>{language === 'ar' ? '\u0642\u064a\u062f \u0627\u0644\u064a\u0648\u0645\u064a\u0629 / \u0633\u062c\u0644 \u0627\u0644\u062a\u0639\u062f\u064a\u0644\u0627\u062a' : 'Journal / Logs'}</span>
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button 
+              type="button"
+              onClick={closeModal}
+              className="w-20 py-1 rounded-lg bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-all flex items-center gap-1 justify-center active:scale-95 border border-zinc-200 shadow-sm text-[11px] whitespace-nowrap font-sans"
+            >
+              <RotateCcw size={12} />
+              <span>{language === 'ar' ? '\u0625\u0644\u063a\u0627\u0621' : 'Cancel'}</span>
+            </button>
+            <button 
+              type="submit"
+              form="purchase-invoice-form"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="w-20 py-1 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1 justify-center active:scale-95 shadow-sm text-[11px] whitespace-nowrap font-sans"
+            >
+              {isSubmitting ? (
+                <div className="w-3.5 h-3.5 border border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Save size={12} />
+              )}
+              <span>{language === 'ar' ? '\u062d\u0641\u0638' : 'Save'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Left side (end in RTL): Document Info: Title, Invoice No, Linked Journal, and Status Badge */}
+        <div className="flex items-center gap-4 flex-wrap">
+          {/* Text Info Column */}
+          <div className="flex flex-col gap-1 items-start">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h3 className="text-sm md:text-base font-black text-slate-900 tracking-tight leading-none font-sans">
+                {editingInvoice ? (language === 'ar' ? '\u062a\u0639\u062f\u064a\u0644 \u0641\u0627\u062a\u0648\u0631\u0629 \u0627\u0644\u0645\u0634\u062a\u0631\u064a\u0627\u062a' : 'Edit Purchase Invoice') : (language === 'ar' ? '\u0625\u0646\u0634\u0627\u0621 \u0641\u0627\u062a\u0648\u0631\u0629 \u0645\u0634\u062a\u0631\u064a\u0627\u062a \u062c\u062f\u064a\u062f\u0629' : 'Create New Purchase Invoice')}
+              </h3>
+              <span className="text-[11px] font-mono font-black text-slate-800 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-lg select-all shadow-sm">
+                {invoiceNumber}
+              </span>
             </div>
-          )}
-          <h3 className="text-xl md:text-2xl font-black text-zinc-900 tracking-tight">
-            {editingInvoice ? t('pi.edit_invoice') : t('pi.add_invoice')}
-          </h3>
+
+            {editingInvoice?.entry_number ? (
+              <div className="flex items-center gap-1 text-emerald-700 text-[10px] font-bold font-mono leading-none mt-0.5">
+                <span className="text-emerald-500 font-sans font-bold">{language === 'ar' ? '\u0627\u0644\u0642\u064a\u062f \u0627\u0644\u0645\u0631\u062a\u0628\u0637:' : 'Linked JE:'}</span>
+                <span className="bg-emerald-50 px-1 py-0.5 rounded border border-emerald-100 font-black">{editingInvoice.entry_number}</span>
+              </div>
+            ) : (
+              <div className="text-[9px] font-bold text-zinc-400 mt-0.5">
+                {language === 'ar' ? '\u0627\u0644\u0642\u064a\u062f \u0627\u0644\u0645\u0631\u062a\u0628\u0637: \u0644\u0627 \u064a\u0648\u062c\u062f \u0642\u064a\u062f \u0645\u0631\u062a\u0628\u0637 \u0628\u0639\u062f' : 'Linked JE: No journal entry linked yet'}
+              </div>
+            )}
+          </div>
+
+          {/* Payment Status Badge */}
+          <div className="flex items-center">
+            {(() => {
+              const isCash = invoiceData.payment_type === 'cash';
+              if (isCash) {
+                return (
+                  <div className="px-2.5 py-1 border-2 border-emerald-600 text-emerald-600 bg-emerald-50/50 font-black text-[11px] uppercase rounded-xl select-none tracking-wider shadow-sm flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+                    {language === 'ar' ? '\u0641\u0627\u062a\u0648\u0631\u0629 \u0646\u0642\u062f\u064a\u0629' : 'Cash Invoice'}
+                  </div>
+                );
+              }
+              
+              if (editingInvoice) {
+                const status = getPaymentStatus(editingInvoice);
+                const statusLabels = {
+                  paid: language === 'ar' ? '\u0645\u062f\u0641\u0648\u0639\u0629' : 'Paid',
+                  partial: language === 'ar' ? '\u0645\u062f\u0641\u0648\u0639\u0629 \u062c\u0632\u0626\u064a\u0627\u064b' : 'Partially Paid',
+                  unpaid: language === 'ar' ? '\u063a\u064a\u0631 \u0645\u062f\u0641\u0648\u0639\u0629' : 'Unpaid'
+                };
+                const statusColors = {
+                  paid: 'border-emerald-600 text-emerald-600 bg-emerald-50/50',
+                  partial: 'border-blue-600 text-blue-600 bg-blue-50/50',
+                  unpaid: 'border-rose-600 text-rose-600 bg-rose-50/50 font-black'
+                };
+                const colorClass = statusColors[status] || statusColors.unpaid;
+                return (
+                  <div className={`px-2.5 py-1 border-2 ${colorClass} font-black text-[11px] uppercase rounded-xl select-none tracking-wider shadow-sm flex items-center gap-1`}>
+                    <span className={`w-2 h-2 rounded-full ${status === 'paid' ? 'bg-emerald-600 animate-pulse' : status === 'partial' ? 'bg-blue-600' : 'bg-rose-600 animate-ping'}`}></span>
+                    {statusLabels[status]}
+                  </div>
+                );
+              } else {
+                return (
+                  <div className="px-2.5 py-1 border-2 border-blue-600 text-blue-600 bg-blue-50/50 font-black text-[11px] uppercase rounded-xl select-none tracking-wider shadow-sm flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                    {language === 'ar' ? '\u0641\u0627\u062a\u0648\u0631\u0629 \u062a\u0622\u062c\u0644\u0629' : 'Credit Invoice'}
+                  </div>
+                );
+              }
+            })()}
+          </div>
         </div>
-      </div>
-            
-            <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row h-full relative">
-              {/* Side Panel for Activity Log and Journal Entry */}
+      </div><div className="flex-1 flex flex-col h-full relative overflow-hidden">
+              
+              {/* AI Drawer (Smart Creation) sliding from the right */}
               <AnimatePresence>
-                {showSidePanel && (
+                {showAiInput && (
                   <motion.div 
-                    initial={{ x: t('dir') === 'rtl' ? '100%' : '-100%' }}
+                    initial={{ x: dir === 'rtl' ? '-100%' : '100%' }}
                     animate={{ x: 0 }}
-                    exit={{ x: t('dir') === 'rtl' ? '100%' : '-100%' }}
+                    exit={{ x: dir === 'rtl' ? '-100%' : '100%' }}
                     transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                      className={`absolute inset-y-0 ${t('dir') === 'rtl' ? 'right-0 border-l' : 'left-0 border-r'} z-50 w-full lg:w-80 shadow-2xl lg:shadow-none lg:relative lg:inset-auto`}
+                    className={`absolute inset-y-0 ${dir === 'rtl' ? 'left-0' : 'right-0'} z-50 w-full lg:w-[480px] shadow-2xl border-l border-zinc-100 bg-white flex flex-col`}
                   >
-                    <div className="h-full bg-white border-zinc-100 flex flex-col">
-                      <div className="p-4 border-b border-zinc-100 flex items-center justify-between lg:hidden">
-                        <h3 className="font-bold text-zinc-900">{t('common.audit_log')}</h3>
-                        <button onClick={() => setShowSidePanel(false)} className="p-2 text-zinc-400 hover:text-zinc-600">
-                          <X size={20} />
-                        </button>
+                    <div className="p-4 border-b border-zinc-100 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-indigo-600 font-bold">
+                        <Sparkles size={20} className="animate-pulse" />
+                        <span className="text-sm font-black">{language === 'ar' ? '\u0627\u0644\u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0630\u0643\u064a \u0628\u0627\u0644\u0630\u0643\u0627\u0621 \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064a' : 'Smart AI Creation'}</span>
                       </div>
-                      <div className="flex-1 overflow-hidden">
-                        <TransactionSidePanel 
-                          documentId={editingInvoice?.id || ''} 
-                          category="purchase_invoices" 
-                          previewJournalEntry={previewJournalEntry}
-                          previewActivityLog={previewActivityLog}
-                        />
-                      </div>
+                      <button onClick={() => setShowAiInput(false)} className="p-2 text-zinc-400 hover:text-zinc-655 rounded-lg hover:bg-zinc-50 transition-all">
+                        <X size={20} />
+                      </button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 bg-zinc-50/50">
+                      <SmartAIInput 
+                        onDataExtracted={applyAiData}
+                        transactionType="purchase_invoice"
+                      />
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
 
+              {/* Floating button on the side to toggle AI Smart Creation */}
+              <button
+                type="button"
+                onClick={() => setShowAiInput(!showAiInput)}
+                className={`absolute ${dir === 'rtl' ? 'left-0 rounded-r-xl border-l-0' : 'right-0 rounded-l-xl border-r-0'} top-1/4 z-[60] flex items-center gap-2 px-2 py-3 bg-indigo-600 text-white font-black text-[10px] shadow-lg hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all [writing-mode:vertical-lr] border border-indigo-500 ${showAiInput ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+                style={{ direction: 'ltr' }}
+              >
+                <Sparkles size={12} className="animate-bounce mb-1" />
+                <span>{language === 'ar' ? '\u0627\u0644\u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0630\u0643\u064a \u0628\u0627\u0644\u0630\u0643\u0627\u0621 \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064a' : 'Smart AI Creation'}</span>
+              </button>
+
               <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32 md:pb-8">
-              <div className="flex flex-col lg:flex-row gap-6">
-                <div className="flex-1">
-                  <SmartAIInput transactionType="purchase_invoice" onDataExtracted={applyAiData} />
-                  <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Unified Totals & Metadata Form single card layout */}
+                <form id="purchase-invoice-form" onSubmit={handleSubmit} className="space-y-6">
+                                      {/* Unified Totals & Metadata Form single card layout */}
                     <section className="bg-white p-2 md:p-2.5 rounded-xl border border-zinc-200 shadow-sm grid grid-cols-1 lg:grid-cols-4 gap-2 lg:gap-2.5 items-stretch relative">
                       {editingInvoice && (
                         <div className={`absolute ${dir === 'rtl' ? 'left-12' : 'right-12'} top-4 z-20 pointer-events-none select-none opacity-80 transform -rotate-12`}>
@@ -4533,28 +4604,33 @@ export const PurchaseInvoices: React.FC = () => {
                       );
                     })()}
 
-                    <div className="pt-6 flex gap-4 sticky bottom-0 bg-white/80 backdrop-blur-md pb-4 md:pb-0 z-20 border-t border-slate-100">
-                      <button 
-                        type="button"
-                        onClick={closeModal}
-                        className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all border border-slate-200 active:scale-95"
-                      >
-                        {t('common.cancel')}
-                      </button>
-                      <button 
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="flex-[2] py-3 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-wider hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-3"
-                      >
-                        {isSubmitting ? (
-                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Save className="w-5 h-5" />
-                        )}
-                        {editingInvoice ? t('pi.edit_invoice') : t('pi.add_invoice')}
-                      </button>
+                    </form>
+
+                  {/* Journal Entry and Edit Log at the bottom */}
+                  {showSidePanel && (
+                    <div className="bg-white p-4 rounded-2xl border border-zinc-200 shadow-sm mt-6">
+                      <div className="flex items-center justify-between pb-3 border-b border-zinc-100 mb-4">
+                        <h3 className="font-black text-sm text-zinc-800 flex items-center gap-2">
+                          <History size={16} className="text-emerald-600" />
+                          {language === 'ar' ? '\u0642\u064a\u062f \u0627\u0644\u064a\u0648\u0645\u064a\u0629 / \u0633\u062c\u0644 \u0627\u0644\u062a\u0639\u062f\u064a\u0644\u0627\u062a' : 'Journal Entry / Edit Log'}
+                        </h3>
+                        <button 
+                          type="button" 
+                          onClick={() => setShowSidePanel(false)} 
+                          className="p-1 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-50 rounded transition-all"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                      <TransactionSidePanel 
+                        documentId={editingInvoice?.id || ''} 
+                        category="purchase_invoices" 
+                        previewJournalEntry={previewJournalEntry}
+                        previewActivityLog={previewActivityLog}
+                        layout="bottom"
+                      />
                     </div>
-                  </form>
+                  )}
 
                   {/* Floating Autocomplete Popover */}
                   {activeSearch && popoverRect && (
@@ -4666,8 +4742,6 @@ export const PurchaseInvoices: React.FC = () => {
                       })()}
                     </div>
                   )}
-                </div>
-              </div>
             </div>
           </div>
     </div>
