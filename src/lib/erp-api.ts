@@ -2053,13 +2053,7 @@ modules.forEach(moduleName => {
           params.push(companyId);
         }
         
-        const colCheck = await pool.query(`
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_name = 'activity_logs' AND column_name = 'created_at'
-        `);
-        const hasCreatedAt = colCheck.rows.length > 0;
-        const orderBy = hasCreatedAt ? 'created_at DESC' : 'id DESC';
-        
+        const orderBy = 'id DESC';
         query += ` ORDER BY ${orderBy}`;
         
         const queryResult = await pool.query(query, params);
@@ -2080,13 +2074,7 @@ modules.forEach(moduleName => {
           params.push(companyId);
         }
 
-        const colCheck = await pool.query(`
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_name = 'audit_logs' AND column_name = 'created_at'
-        `);
-        const hasCreatedAt = colCheck.rows.length > 0;
-        const orderBy = hasCreatedAt ? 'created_at DESC' : 'id DESC';
-
+        const orderBy = 'created_at DESC';
         query += ` ORDER BY ${orderBy}`;
         const queryResult = await pool.query(query, params);
         rows = queryResult.rows;

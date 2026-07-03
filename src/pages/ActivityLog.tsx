@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ActivityLog } from '../types';
 import { 
   Search, Clock, User, Activity, Filter, RefreshCw, Layers, 
-  ShieldCheck, ExternalLink, ChevronLeft, ChevronRight, Calendar, 
+  ShieldCheck, ExternalLink, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Calendar, 
   Download, FileSpreadsheet, Printer, CheckCircle2, XCircle, 
   Smartphone, Monitor, Tablet, Globe, RotateCcw 
 } from 'lucide-react';
@@ -35,7 +35,7 @@ export const ActivityLogPage: React.FC = () => {
   const [ipFilter, setIpFilter] = useState('');
 
   const [page, setPage] = useState(1);
-  const itemsPerPage = 50;
+  const [itemsPerPage, setItemsPerPage] = useState(50);
 
   const fetchLogs = async () => {
     if (!user) return;
@@ -292,6 +292,90 @@ export const ActivityLogPage: React.FC = () => {
     return <Monitor size={14} className="text-zinc-500" />;
   };
 
+  const renderPagination = (position: 'top' | 'bottom') => {
+    if (totalPages <= 1) return null;
+    return (
+      <div className={`p-6 bg-zinc-50/50 flex items-center justify-between print:hidden ${
+        position === 'top' ? 'border-b border-zinc-100' : 'border-t border-zinc-100'
+      }`}>
+        <div className="flex items-center gap-2 text-xs text-zinc-500 font-medium">
+          <span>{language === 'ar' ? 'عرض' : 'Show'}</span>
+          <select
+            value={itemsPerPage}
+            onChange={(e) => {
+              const val = e.target.value === 'all' ? filteredLogs.length : parseInt(e.target.value, 10);
+              setItemsPerPage(val);
+              setPage(1);
+            }}
+            className="bg-white border border-zinc-200 rounded-lg px-2 py-1 text-xs font-black text-zinc-900 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+          >
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={200}>200</option>
+            <option value={500}>500</option>
+            <option value="all">{language === 'ar' ? 'الكل' : 'All'}</option>
+          </select>
+          {language === 'ar' ? (
+            <span>من أصل <span className="font-black text-zinc-900">{filteredLogs.length}</span> سجل</span>
+          ) : (
+            <span>of <span className="font-black text-zinc-900">{filteredLogs.length}</span> logs</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button 
+            onClick={() => setPage(language === 'ar' ? totalPages : 1)}
+            disabled={language === 'ar' ? page === totalPages : page === 1}
+            className="p-2 bg-white border border-zinc-200 rounded-xl hover:bg-zinc-50 disabled:opacity-30 disabled:pointer-events-none transition-all"
+            title={language === 'ar' ? "الصفحة الأخيرة" : "First Page"}
+          >
+            <ChevronsLeft size={16} />
+          </button>
+          
+          <button 
+            onClick={() => setPage(p => language === 'ar' ? Math.min(totalPages, p + 1) : Math.max(1, p - 1))}
+            disabled={language === 'ar' ? page === totalPages : page === 1}
+            className="p-2 bg-white border border-zinc-200 rounded-xl hover:bg-zinc-50 disabled:opacity-30 disabled:pointer-events-none transition-all"
+          >
+            <ChevronLeft size={16} />
+          </button>
+
+          <div className="flex items-center gap-1">
+            {[...Array(totalPages)].map((_, i) => (
+              <button
+                key={i + 1}
+                onClick={() => setPage(i + 1)}
+                className={`w-8 h-8 rounded-xl font-bold text-xs transition-all ${
+                  page === i + 1 
+                    ? 'bg-emerald-600 text-white shadow-md' 
+                    : 'bg-white border border-zinc-200 text-zinc-500 hover:border-emerald-300 hover:text-emerald-600'
+                }`}
+              >
+                {i + 1}
+              </button>
+            )).slice(Math.max(0, page - 3), Math.min(totalPages, page + 2))}
+          </div>
+
+          <button 
+            onClick={() => setPage(p => language === 'ar' ? Math.max(1, p - 1) : Math.min(totalPages, p + 1))}
+            disabled={language === 'ar' ? page === 1 : page === totalPages}
+            className="p-2 bg-white border border-zinc-200 rounded-xl hover:bg-zinc-50 disabled:opacity-30 disabled:pointer-events-none transition-all"
+          >
+            <ChevronRight size={16} />
+          </button>
+
+          <button 
+            onClick={() => setPage(language === 'ar' ? 1 : totalPages)}
+            disabled={language === 'ar' ? page === 1 : page === totalPages}
+            className="p-2 bg-white border border-zinc-200 rounded-xl hover:bg-zinc-50 disabled:opacity-30 disabled:pointer-events-none transition-all"
+            title={language === 'ar' ? "الصفحة الأولى" : "Last Page"}
+          >
+            <ChevronsRight size={16} />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-10 print:bg-white print:p-0 print:space-y-4" dir={dir}>
       
@@ -519,6 +603,7 @@ export const ActivityLogPage: React.FC = () => {
 
       {/* Main Table Grid */}
       <div className="bg-white rounded-[2rem] border border-zinc-100 shadow-xl shadow-zinc-100/50 overflow-hidden print:border-none print:shadow-none">
+        {renderPagination('top')}
         <div className="overflow-x-auto">
           <table className="w-full text-right border-collapse min-w-[1100px] print:min-w-full">
             <thead>
@@ -702,48 +787,7 @@ export const ActivityLogPage: React.FC = () => {
         </div>
 
         {/* Pagination Bar */}
-        {totalPages > 1 && (
-          <div className="p-6 bg-zinc-50/50 border-t border-zinc-100 flex items-center justify-between print:hidden">
-            <div className="text-xs text-zinc-500 font-medium">
-              {language === 'ar' ? (
-                <>عرض <span className="font-black text-zinc-900">{paginatedLogs.length}</span> من أصل <span className="font-black text-zinc-900">{filteredLogs.length}</span> سجل</>
-              ) : (
-                <>Showing <span className="font-black text-zinc-900">{paginatedLogs.length}</span> of <span className="font-black text-zinc-900">{filteredLogs.length}</span> logs</>
-              )}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button 
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="p-2 bg-white border border-zinc-200 rounded-xl hover:bg-zinc-50 disabled:opacity-30 disabled:pointer-events-none transition-all"
-              >
-                {language === 'ar' ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-              </button>
-              <div className="flex items-center gap-1">
-                {[...Array(totalPages)].map((_, i) => (
-                  <button
-                    key={i + 1}
-                    onClick={() => setPage(i + 1)}
-                    className={`w-8 h-8 rounded-xl font-bold text-xs transition-all ${
-                      page === i + 1 
-                        ? 'bg-emerald-600 text-white shadow-md' 
-                        : 'bg-white border border-zinc-200 text-zinc-500 hover:border-emerald-300 hover:text-emerald-600'
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                )).slice(Math.max(0, page - 3), Math.min(totalPages, page + 2))}
-              </div>
-              <button 
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="p-2 bg-white border border-zinc-200 rounded-xl hover:bg-zinc-50 disabled:opacity-30 disabled:pointer-events-none transition-all"
-              >
-                {language === 'ar' ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-              </button>
-            </div>
-          </div>
-        )}
+        {renderPagination('bottom')}
       </div>
 
       {/* Styled Printable layout */}
