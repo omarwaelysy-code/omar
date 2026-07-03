@@ -148,6 +148,7 @@ const getTabIcon = (id: string) => {
     case 'system_check':
       return <ShieldCheck {...iconProps} />;
     case 'backup_restore': return <Database {...iconProps} />;
+    case 'period_closing': return <Lock {...iconProps} />;
     case 'templates':
     case 'create_template':
       return <LayoutTemplate {...iconProps} />;
@@ -429,6 +430,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         subItems: [
           { id: 'company_settings', label: t('nav.company_settings'), icon: Building2 },
           { id: 'users', label: t('nav.users'), icon: UsersIcon },
+          { id: 'period_closing', label: language === 'ar' ? 'إغلاق الفترات المحاسبية' : 'Period Closing', icon: Lock },
           { id: 'integrity_dashboard', label: t('nav.integrity_check') || 'Integrity Check', icon: ShieldCheck },
           { id: 'backup_restore', label: t('nav.backup_restore'), icon: Database },
           { id: 'activity_log', label: t('nav.activity_log'), icon: History },

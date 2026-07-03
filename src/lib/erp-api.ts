@@ -52,10 +52,11 @@ export function getInitialPermissionsState() {
     'balance_sheet', 'stock_card_report', 'stock_balances_report', 'general_stock_movements_report',
     'users', 'companies', 'activity_log', 'audit_logs', 'system_check', 'company_settings',
     'discount_settings', 'backup_restore', 'templates', 'create_template', 'operation_categories',
-    'operation_fields', 'operations'
+    'operation_fields', 'operations', 'period_closing'
   ];
   
   const specials: any = {
+    period_closing: ['reopen', 'bulk_close', 'bypass'],
     quotations: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy'],
     sales_orders: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved'],
     invoices: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved', 'view_cost', 'view_profit_margin', 'change_prices', 'allow_negative'],
@@ -768,10 +769,11 @@ async function logAudit(params: {
   entity_id?: string;
   ip_address?: string;
   metadata?: any;
+  success?: boolean;
 }) {
   const {
     company_id, user_id, username, user_email, action, module, 
-    details, entity_type, entity_id, ip_address, metadata
+    details, entity_type, entity_id, ip_address, metadata, success
   } = params;
 
   // Retrieve current request context
@@ -781,7 +783,7 @@ async function logAudit(params: {
   let reqDevice = null;
   let reqBranch = null;
   let reqExecutionTime = 0;
-  let reqSuccess = true;
+  let reqSuccess = success !== undefined ? success : true;
 
   if (context) {
     const { req } = context;
@@ -893,6 +895,383 @@ const TABLES_TO_BACKUP = [
   'currencies',
   'exchange_rates'
 ];
+
+// --- Period Closing Helpers and Middleware ---
+async function getTransactionDate(moduleName: string, body: any, id?: string): Promise<string> {
+  if (body && body.date) {
+    const d = body.date instanceof Date ? body.date.toISOString().slice(0, 10) : String(body.date);
+    return d.slice(0, 10);
+  }
+  if (body && body.created_at) {
+    const d = body.created_at instanceof Date ? body.created_at.toISOString().slice(0, 10) : String(body.created_at);
+    return d.slice(0, 10);
+  }
+  if (body && body.timestamp) {
+    const d = body.timestamp instanceof Date ? body.timestamp.toISOString().slice(0, 10) : String(body.timestamp);
+    return d.slice(0, 10);
+  }
+  
+  const parentKeys = {
+    invoice_items: ['invoice_id', 'invoices'],
+    return_items: ['return_id', 'returns'],
+    purchase_invoice_items: ['invoice_id', 'purchase_invoices'],
+    purchase_return_items: ['return_id', 'purchase_returns'],
+    sales_order_items: ['order_id', 'sales_orders'],
+    purchase_order_items: ['order_id', 'purchase_orders'],
+    journal_entry_lines: ['journal_entry_id', 'journal_entries'],
+    warehouse_transfer_items: ['transfer_id', 'warehouse_transfers'],
+    opening_stock_items: ['opening_stock_id', 'opening_stock_balances'],
+    stock_adjustment_items: ['adjustment_id', 'stock_adjustments'],
+    goods_receipt_items: ['goods_receipt_id', 'goods_receipts']
+  } as any;
+
+  if (body) {
+    const relation = parentKeys[moduleName];
+    if (relation && body[relation[0]]) {
+      const parentRes = await pool.query(`SELECT date FROM "${relation[1]}" WHERE id = $1`, [body[relation[0]]]);
+      if (parentRes.rows.length > 0 && parentRes.rows[0].date) {
+        const d = parentRes.rows[0].date instanceof Date ? parentRes.rows[0].date.toISOString().slice(0, 10) : String(parentRes.rows[0].date);
+        return d.slice(0, 10);
+      }
+    }
+  }
+
+  if (id) {
+    try {
+      const res = await pool.query(`SELECT * FROM "${moduleName}" WHERE id = $1`, [id]);
+      if (res.rows.length > 0) {
+        const row = res.rows[0];
+        if (row.date) {
+          const d = row.date instanceof Date ? row.date.toISOString().slice(0, 10) : String(row.date);
+          return d.slice(0, 10);
+        }
+        if (row.created_at) {
+          const d = row.created_at instanceof Date ? row.created_at.toISOString().slice(0, 10) : String(row.created_at);
+          return d.slice(0, 10);
+        }
+        if (row.timestamp) {
+          const d = row.timestamp instanceof Date ? row.timestamp.toISOString().slice(0, 10) : String(row.timestamp);
+          return d.slice(0, 10);
+        }
+
+        const relation = parentKeys[moduleName];
+        if (relation && row[relation[0]]) {
+          const parentRes = await pool.query(`SELECT date FROM "${relation[1]}" WHERE id = $1`, [row[relation[0]]]);
+          if (parentRes.rows.length > 0 && parentRes.rows[0].date) {
+            const d = parentRes.rows[0].date instanceof Date ? parentRes.rows[0].date.toISOString().slice(0, 10) : String(parentRes.rows[0].date);
+            return d.slice(0, 10);
+          }
+        }
+      }
+    } catch (e) {
+      // Table might not exist or ID format invalid
+    }
+  }
+
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function isPeriodClosed(companyId: string, moduleName: string, dateStr: string): Promise<{ closed: boolean, closingDate?: string, passwordHash?: string }> {
+  const effectiveModule = getEffectiveModule(moduleName);
+  const res = await pool.query(
+    `SELECT closing_date, password_hash, is_closed FROM period_closings 
+     WHERE company_id = $1 AND module_name = $2`,
+    [companyId, effectiveModule]
+  );
+  if (res.rows.length > 0) {
+    const pc = res.rows[0];
+    if (pc.is_closed) {
+      const closingDate = pc.closing_date instanceof Date ? pc.closing_date.toISOString().slice(0, 10) : String(pc.closing_date);
+      if (dateStr <= closingDate.slice(0, 10)) {
+        return { closed: true, closingDate: closingDate.slice(0, 10), passwordHash: pc.password_hash };
+      }
+    }
+  }
+  return { closed: false };
+}
+
+async function checkPeriodClosingMiddleware(req: AuthRequest, res: any, next: any) {
+  if (req.method === 'GET') {
+    return next();
+  }
+
+  const pathParts = req.path.split('/').filter(Boolean);
+  if (pathParts.length === 0) return next();
+  
+  let moduleName = pathParts[0];
+  if (['auth', 'system', 'utils', 'widgets', 'dashboards', 'currencies', 'period_closings'].includes(moduleName)) {
+    return next();
+  }
+
+  const id = req.params.id || pathParts[1];
+  const companyId = req.user?.company_id;
+  if (!companyId) return next();
+
+  const effectiveModule = getEffectiveModule(moduleName);
+  const excludedModules = [
+    'users', 'roles', 'companies', 'activity_logs', 'audit_logs', 
+    'system_config', 'period_closings', 'migrations', 'paper_sizes', 
+    'settings', 'print_profiles', 'template_versions'
+  ];
+  if (excludedModules.includes(effectiveModule)) {
+    return next();
+  }
+
+  try {
+    const txDate = await getTransactionDate(moduleName, req.body, id);
+    const { closed, closingDate, passwordHash } = await isPeriodClosed(companyId, moduleName, txDate);
+    
+    if (closed && passwordHash) {
+      const closingPassword = req.headers['x-closing-password'] 
+        ? decodeURIComponent(req.headers['x-closing-password'] as string)
+        : req.body?.closing_password;
+      
+      if (!closingPassword) {
+        return res.status(403).json({ 
+          error: 'PERIOD_CLOSED', 
+          message: 'هذه الفترة مغلقة محاسبياً. يرجى إدخال كلمة مرور الإغلاق لتجاوز هذا القيد.',
+          closingDate 
+        });
+      }
+      
+      const isMatch = await bcrypt.compare(String(closingPassword), passwordHash);
+      if (!isMatch) {
+        logAudit({
+          company_id: companyId,
+          user_id: req.user?.id,
+          username: (req.user as any)?.username || req.user?.email,
+          user_email: req.user?.email,
+          action: 'PERIOD_BYPASS_FAILED',
+          module: effectiveModule.toUpperCase(),
+          details: `محاولة فاشلة لتجاوز إغلاق الفترة لـ ${moduleName} (تاريخ الحركة: ${txDate}، تاريخ الإغلاق: ${closingDate})`,
+          entity_type: 'period_closings',
+          ip_address: getIp(req),
+          success: false
+        });
+
+        return res.status(403).json({ 
+          error: 'INVALID_CLOSING_PASSWORD', 
+          message: 'كلمة مرور إغلاق الفترة غير صحيحة. تم تسجيل هذه المحاولة.'
+        });
+      }
+
+      logAudit({
+        company_id: companyId,
+        user_id: req.user?.id,
+        username: (req.user as any)?.username || req.user?.email,
+        user_email: req.user?.email,
+        action: 'PERIOD_BYPASS_SUCCESS',
+        module: effectiveModule.toUpperCase(),
+        details: `تم تجاوز إغلاق الفترة بنجاح لـ ${moduleName} (تاريخ الحركة: ${txDate}، تاريخ الإغلاق: ${closingDate})`,
+        entity_type: 'period_closings',
+        ip_address: getIp(req),
+        success: true
+      });
+      
+      if (req.body) {
+        delete req.body.closing_password;
+      }
+    }
+    
+    next();
+  } catch (err) {
+    console.error('Error in period closing middleware:', err);
+    next();
+  }
+}
+
+router.use(checkPeriodClosingMiddleware as any);
+
+// --- Period Closings Endpoints ---
+router.get('/period_closings', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    if (!await checkPermission(req, 'period_closing', 'view')) {
+      return res.status(403).json({ error: 'Access Denied: No View Permission' });
+    }
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
+    const clossableModules = Array.from(new Set(modules.map(getEffectiveModule)))
+      .filter(m => ![
+        'users', 'roles', 'companies', 'activity_logs', 'audit_logs', 
+        'system_config', 'period_closings', 'migrations', 'paper_sizes', 
+        'settings', 'print_profiles', 'template_versions', 'dashboards', 'widgets'
+      ].includes(m));
+
+    const { rows: closings } = await pool.query(
+      'SELECT module_name, closing_date, is_closed FROM period_closings WHERE company_id = $1',
+      [companyId]
+    );
+
+    const closingsMap = new Map(closings.map(c => [c.module_name, c]));
+
+    const result = clossableModules.map(m => {
+      const dbRecord = closingsMap.get(m);
+      return {
+        module_name: m,
+        closing_date: dbRecord ? (dbRecord.closing_date instanceof Date ? dbRecord.closing_date.toISOString().slice(0, 10) : String(dbRecord.closing_date)).slice(0, 10) : '',
+        is_closed: dbRecord ? dbRecord.is_closed : false
+      };
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in GET /period_closings:', error);
+    sendError(res, 500, error.message);
+  }
+});
+
+router.post('/period_closings', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { module_name, closing_date, password, is_closed } = req.body;
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
+    if (module_name === 'all') {
+      if (!await checkPermission(req, 'period_closing', 'bulk_close')) {
+        return res.status(403).json({ error: 'Access Denied: No Bulk Close Permission' });
+      }
+    } else {
+      const action = is_closed === false ? 'reopen' : 'create';
+      if (!await checkPermission(req, 'period_closing', action)) {
+        return res.status(403).json({ error: `Access Denied: No ${action} Permission` });
+      }
+    }
+
+    if (!closing_date) {
+      return sendError(res, 400, 'التاريخ مطلوب');
+    }
+
+    let passwordHash = '';
+    if (password) {
+      passwordHash = await bcrypt.hash(password, 10);
+    }
+
+    const clossableModules = Array.from(new Set(modules.map(getEffectiveModule)))
+      .filter(m => ![
+        'users', 'roles', 'companies', 'activity_logs', 'audit_logs', 
+        'system_config', 'period_closings', 'migrations', 'paper_sizes', 
+        'settings', 'print_profiles', 'template_versions', 'dashboards', 'widgets'
+      ].includes(m));
+
+    if (module_name === 'all') {
+      if (!password) {
+        return sendError(res, 400, 'كلمة المرور مطلوبة للإغلاق الجماعي');
+      }
+      
+      for (const m of clossableModules) {
+        const id = uuidv4();
+        await pool.query(
+          `INSERT INTO period_closings (id, company_id, module_name, closing_date, password_hash, is_closed)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (company_id, module_name)
+           DO UPDATE SET closing_date = EXCLUDED.closing_date, password_hash = EXCLUDED.password_hash, is_closed = EXCLUDED.is_closed, updated_at = CURRENT_TIMESTAMP`,
+          [id, companyId, m, closing_date, passwordHash, true]
+        );
+      }
+
+      logAudit({
+        company_id: companyId,
+        user_id: req.user?.id,
+        username: (req.user as any)?.username || req.user?.email,
+        user_email: req.user?.email,
+        action: 'PERIOD_BULK_CLOSE',
+        module: 'PERIOD_CLOSING',
+        details: `إغلاق جماعي لجميع الفترات حتى تاريخ ${closing_date}`,
+        entity_type: 'period_closings',
+        ip_address: getIp(req),
+        success: true
+      });
+
+      return res.json({ success: true, message: 'تم إغلاق جميع الفترات بنجاح' });
+    } else {
+      if (!clossableModules.includes(module_name)) {
+        return sendError(res, 400, 'حركة غير صالحة للإغلاق');
+      }
+
+      const existing = await pool.query(
+        'SELECT password_hash FROM period_closings WHERE company_id = $1 AND module_name = $2',
+        [companyId, module_name]
+      );
+      
+      if (existing.rows.length === 0 && is_closed !== false && !password) {
+        return sendError(res, 400, 'كلمة المرور مطلوبة لتهيئة إغلاق هذه الفترة');
+      }
+
+      const finalHash = password ? passwordHash : (existing.rows[0]?.password_hash || '');
+      const finalIsClosed = is_closed !== undefined ? is_closed : true;
+      const id = uuidv4();
+
+      await pool.query(
+        `INSERT INTO period_closings (id, company_id, module_name, closing_date, password_hash, is_closed)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (company_id, module_name)
+         DO UPDATE SET closing_date = EXCLUDED.closing_date, password_hash = EXCLUDED.password_hash, is_closed = EXCLUDED.is_closed, updated_at = CURRENT_TIMESTAMP`,
+        [id, companyId, module_name, closing_date, finalHash, finalIsClosed]
+      );
+
+      const auditAction = finalIsClosed ? (existing.rows.length === 0 ? 'PERIOD_CLOSE_CREATE' : 'PERIOD_CLOSE_UPDATE') : 'PERIOD_CLOSE_REOPEN';
+      const detailsMsg = finalIsClosed 
+        ? `إغلاق فترة حركة ${module_name} حتى تاريخ ${closing_date}` 
+        : `إعادة فتح فترة حركة ${module_name} (إلغاء الإغلاق)`;
+
+      logAudit({
+        company_id: companyId,
+        user_id: req.user?.id,
+        username: (req.user as any)?.username || req.user?.email,
+        user_email: req.user?.email,
+        action: auditAction,
+        module: module_name.toUpperCase(),
+        details: detailsMsg,
+        entity_type: 'period_closings',
+        ip_address: getIp(req),
+        success: true
+      });
+
+      return res.json({ success: true });
+    }
+  } catch (error: any) {
+    console.error('Error in POST /period_closings:', error);
+    sendError(res, 500, error.message);
+  }
+});
+
+router.delete('/period_closings/:moduleName', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { moduleName } = req.params;
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
+    if (!await checkPermission(req, 'period_closing', 'delete')) {
+      return res.status(403).json({ error: 'Access Denied: No Delete Permission' });
+    }
+
+    const { rowCount } = await pool.query(
+      'DELETE FROM period_closings WHERE company_id = $1 AND module_name = $2',
+      [companyId, moduleName]
+    );
+
+    if (rowCount > 0) {
+      logAudit({
+        company_id: companyId,
+        user_id: req.user?.id,
+        username: (req.user as any)?.username || req.user?.email,
+        user_email: req.user?.email,
+        action: 'PERIOD_CLOSE_DELETE',
+        module: moduleName.toUpperCase(),
+        details: `حذف إغلاق فترة حركة ${moduleName} بالكامل`,
+        entity_type: 'period_closings',
+        ip_address: getIp(req),
+        success: true
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error in DELETE /period_closings:', error);
+    sendError(res, 500, error.message);
+  }
+});
 
 // --- System Diagnostics ---
 router.get('/system/check', authenticateToken, authorizeRoles('super_admin'), async (req, res) => {

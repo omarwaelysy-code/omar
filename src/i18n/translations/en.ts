@@ -106,6 +106,7 @@ export const en = {
   'nav.integrity_check': 'System Integrity',
   'nav.audit_logs': 'Audit Logs',
   'nav.currencies': 'Currency Management',
+  'nav.period_closing': 'Period Closing',
 
   // Common
   'common.logout': 'Logout',

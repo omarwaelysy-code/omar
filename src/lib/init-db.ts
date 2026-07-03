@@ -157,6 +157,20 @@ export async function initDatabase() {
       );
     `, 'audit_logs table');
 
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "period_closings" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) NOT NULL,
+        "module_name" VARCHAR(100) NOT NULL,
+        "closing_date" DATE NOT NULL,
+        "password_hash" VARCHAR(255) NOT NULL,
+        "is_closed" BOOLEAN DEFAULT TRUE,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "unique_company_module" UNIQUE("company_id", "module_name")
+      );
+    `, 'period_closings table');
+
     // Phase 2: Accounts
     await safeQuery(`
       CREATE TABLE IF NOT EXISTS "account_types" (

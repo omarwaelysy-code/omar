@@ -107,6 +107,7 @@ export const ar = {
   'nav.integrity_check': 'تحقق من سلامة البيانات',
   'nav.audit_logs': 'سجلات الرقابة',
   'nav.currencies': 'إدارة العملات',
+  'nav.period_closing': 'إغلاق الفترات المحاسبية',
 
   // Common
   'common.logout': 'تسجيل الخروج',

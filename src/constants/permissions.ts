@@ -69,7 +69,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     id: 'management',
     nameAr: 'الإدارة',
     nameEn: 'Management',
-    modules: ['users', 'companies', 'activity_log', 'audit_logs', 'system_check']
+    modules: ['users', 'companies', 'activity_log', 'audit_logs', 'system_check', 'period_closing']
   },
   {
     id: 'settings',
@@ -187,6 +187,24 @@ export const SPECIAL_PERMISSIONS_DESC: { [key: string]: { ar: string; en: string
     en: 'Edit Cost Price',
     descAr: 'يسمح بتعديل سعر تكلفة الشراء أو المتوسط الافتراضي للأصناف يدويًا.',
     descEn: 'Allows modifying default cost price or average cost for items manually.'
+  },
+  reopen: {
+    ar: 'فتح الفترة',
+    en: 'Reopen Period',
+    descAr: 'يسمح بفتح فترة محاسبية مغلقة وإلغاء حالة الإغلاق للحركة.',
+    descEn: 'Allows reopening a closed period and resetting the closing status.'
+  },
+  bulk_close: {
+    ar: 'إغلاق جماعي',
+    en: 'Bulk Close',
+    descAr: 'يسمح بتنفيذ إغلاق الفترات لجميع حركات ومستندات النظام دفعة واحدة.',
+    descEn: 'Allows executing bulk period closing for all transactions at once.'
+  },
+  bypass: {
+    ar: 'تجاوز الإغلاق بكلمة سر',
+    en: 'Bypass Closing with Password',
+    descAr: 'يسمح بتخطي منع إدخال الحركات في الفترات المغلقة باستخدام كلمة سر تجاوز الإغلاق.',
+    descEn: 'Allows bypassing the restriction of adding transactions in closed periods using bypass password.'
   }
 };
 
@@ -259,6 +277,7 @@ export const MODULE_PERMISSIONS_META: { [moduleId: string]: { labelAr: string; l
   activity_log: { labelAr: 'سجل النشاط العام', labelEn: 'Activity Log', hasCrud: true },
   audit_logs: { labelAr: 'سجل الرقابة والأمن', labelEn: 'Audit Logs', hasCrud: true },
   system_check: { labelAr: 'فحص سلامة النظام', labelEn: 'System Check', hasCrud: true },
+  period_closing: { labelAr: 'إغلاق الفترات المحاسبية', labelEn: 'Period Closing', hasCrud: true, special: ['reopen', 'bulk_close', 'bypass'] },
   // Settings
   company_settings: { labelAr: 'إعدادات الشركة والمالية', labelEn: 'Company & Financial Settings', hasCrud: true, special: ['open_closed_period'] },
   discount_settings: { labelAr: 'إعدادات الخصومات والأسعار', labelEn: 'Discount & Price Settings', hasCrud: true },

@@ -30,7 +30,37 @@ export async function apiRequest<T>(path: string, method: string = 'GET', body?:
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Unknown API error' }));
-      throw new Error(error.error || `API Request failed with status ${response.status}`);
+      
+      if (error.error === 'PERIOD_CLOSED') {
+        const isAr = localStorage.getItem('app_language') === 'ar';
+        const promptMsg = isAr 
+          ? `⚠️ هذه الفترة مغلقة محاسبياً حتى تاريخ ${error.closingDate}.\nالرجاء إدخال كلمة مرور الإغلاق لتجاوز المنع وحفظ العملية:`
+          : `⚠️ Accounting period is closed until ${error.closingDate}.\nPlease enter the closing password to bypass and save:`;
+          
+        const password = window.prompt(promptMsg);
+        if (password !== null && password !== '') {
+          const retryResponse = await fetch(`${API_BASE}${path}`, {
+            method,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': token ? `Bearer ${token}` : '',
+              'x-closing-password': encodeURIComponent(password)
+            },
+            body: body ? JSON.stringify(body) : undefined,
+            signal: controller.signal
+          });
+          
+          if (retryResponse.ok) {
+            clearTimeout(timeoutId);
+            return retryResponse.json();
+          } else {
+            const retryError = await retryResponse.json().catch(() => ({ error: 'Unknown API error' }));
+            throw new Error(retryError.message || retryError.error || `API Request failed with status ${retryResponse.status}`);
+          }
+        }
+      }
+      
+      throw new Error(error.message || error.error || `API Request failed with status ${response.status}`);
     }
 
     return response.json();

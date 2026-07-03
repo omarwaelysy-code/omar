@@ -55,6 +55,7 @@ import { BalanceSheet } from './pages/BalanceSheet';
 import { IntegrityDashboard } from './pages/IntegrityDashboard';
 import { DiscountSettings } from './pages/DiscountSettings';
 import { BackupRestore } from './pages/BackupRestore';
+import { PeriodClosing } from './pages/PeriodClosing';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { DashboardBuilder } from './pages/DashboardBuilder';
@@ -219,6 +220,7 @@ export default function App() {
       case 'balance_sheet': return <BalanceSheet />;
       case 'discount_settings': return <DiscountSettings />;
       case 'backup_restore': return <BackupRestore />;
+      case 'period_closing': return <PeriodClosing />;
       case 'integrity_dashboard': return <IntegrityDashboard />;
       case 'activity_log': return <ActivityLogPage />;
       case 'company_settings': return <CompanySettings />;
