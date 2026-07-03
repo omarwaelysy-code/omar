@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -568,9 +568,11 @@ export const Users: React.FC = () => {
     return merged;
   };
 
-  if (isPermissionsModalOpen) {
-    return (
-      <div className="bg-white w-full rounded-3xl border border-slate-200 shadow-md overflow-hidden flex flex-col min-h-[80vh] relative animate-in slide-in-from-bottom-4 duration-300" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+  return (
+    <div className={`space-y-6 animate-in fade-in duration-500 ${language === 'ar' ? 'text-right' : 'text-left'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      {isPermissionsModalOpen ? (
+        /* Inline Permissions Screen Container */
+        <div className="bg-white w-full rounded-3xl border border-slate-200 shadow-md overflow-hidden flex flex-col min-h-[80vh] relative animate-in slide-in-from-bottom-4 duration-300" dir={language === 'ar' ? 'rtl' : 'ltr'}>
         {/* Permissions & Roles View Header */}
         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 sticky top-0 z-[70] flex-wrap gap-4 shrink-0">
           <div className="flex items-center gap-4">
@@ -579,16 +581,16 @@ export const Users: React.FC = () => {
               className="flex items-center gap-1 px-3 py-1.5 bg-white text-slate-650 border border-slate-200 hover:bg-slate-50 hover:text-slate-900 rounded-xl transition-all font-bold text-xs shadow-sm"
             >
               {language === 'ar' ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-              <span>{language === 'ar' ? '\u0627\u0644\u0639\u0648\u062f\u0629 \u0644\u0644\u0642\u0627\u0626\u0645\u0629' : 'Return to List'}</span>
+              <span>{language === 'ar' ? 'العودة للقائمة' : 'Return to List'}</span>
             </button>
             <div className="w-px h-6 bg-slate-200" />
             <div>
               <h3 className="text-lg font-black text-slate-900 leading-tight">
                 {permissionsTargetType === 'user' && selectedUser 
-                  ? `${language === 'ar' ? '\u0635\u0644\u0627\u062d\u064a\u0627\u062a \u0648\u0623\u062f\u0648\u0627\u0631 \u0627\u0644\u0645\u0633\u062a\u062e\u062f\u0645:' : 'User Permissions & Roles:'} ${selectedUser.username}` 
-                  : `${language === 'ar' ? '\u0635\u0644\u0627\u062d\u064a\u0627\u062a \u0627\u0644\u062f\u0648\u0631 \u0627\u0644\u0648\u0638\u064a\u0641\u064a:' : 'Job Role Permissions:'} ${translateRoleName(selectedRole?.name || '', language)}`}
+                  ? `${language === 'ar' ? 'صلاحيات وأدوار المستخدم:' : 'User Permissions & Roles:'} ${selectedUser.username}` 
+                  : `${language === 'ar' ? 'صلاحيات الدور الوظيفي:' : 'Job Role Permissions:'} ${translateRoleName(selectedRole?.name || '', language)}`}
               </h3>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight mt-0.5">{language === 'ar' ? '\u062d\u062f\u062f \u0627\u0644\u0635\u0644\u0627\u062d\u064a\u0627\u062a \u0627\u0644\u0639\u0627\u0645\u0629 \u0648\u0627\u0644\u062e\u0627\u0635\u0629 \u0648\u0627\u0644\u0623\u062f\u0648\u0627\u0631 \u0627\u0644\u0648\u0638\u064a\u0641\u064a\u0629' : 'Select general & business permissions and job roles'}</p>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight mt-0.5">{language === 'ar' ? 'حدد الصلاحيات العامة والخاصة والأدوار الوظيفية' : 'Select general & business permissions and job roles'}</p>
             </div>
           </div>
 
@@ -597,7 +599,7 @@ export const Users: React.FC = () => {
               onClick={() => setIsPermissionsModalOpen(false)}
               className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all border border-slate-200 active:scale-95 text-xs"
             >
-              {language === 'ar' ? '\u0625\u0644\u063a\u0627\u0621' : 'Cancel'}
+              {language === 'ar' ? 'إلغاء' : 'Cancel'}
             </button>
             {!(permissionsTargetType === 'user' && selectedUser?.role === 'admin') && (
               <button
@@ -610,12 +612,14 @@ export const Users: React.FC = () => {
                 ) : (
                   <Save size={14} />
                 )}
-                <span>{loading ? (language === 'ar' ? '\u062c\u0627\u0631\u064a \u0627\u0644\u062d\u0641\u0638...' : 'Saving...') : (language === 'ar' ? '\u062d\u0641\u0638 \u0627\u0644\u062a\u0639\u062f\u064a\u0644\u0627\u062a \u0648\u062a\u0637\u0628\u064a\u0642\u0647\u0627' : 'Save & Apply Changes')}</span>
+                <span>{loading ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...') : (language === 'ar' ? 'حفظ التعديلات وتطبيقها' : 'Save & Apply Changes')}</span>
               </button>
             )}
           </div>
         </div>
-            {/* Modal Body */}
+
+          {/* Modal Body & Footer */}
+          {/* Modal Body */}
             <div className="flex-1 overflow-y-auto p-6 bg-slate-50/40 custom-scrollbar space-y-6">
               {permissionsTargetType === 'user' && selectedUser && selectedUser.role === 'admin' ? (
                 <div className="bg-emerald-50/50 border border-emerald-100 p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-4 text-emerald-700">
@@ -1266,7 +1270,6 @@ export const Users: React.FC = () => {
               )}
             </div>
 
-
             {/* Modal Footer */}
             <div className="p-6 border-t border-slate-100 bg-white flex flex-col md:flex-row items-center justify-between gap-4 shrink-0">
               <div className="flex items-center gap-2 text-slate-400">
@@ -1291,15 +1294,11 @@ export const Users: React.FC = () => {
                 )}
               </div>
             </div>
-
-
-      </div>
-    );
-  }
-
-  return (
-    <div className={`space-y-6 animate-in fade-in duration-500 ${language === 'ar' ? 'text-right' : 'text-left'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      {/* Title Header */}
+        </div>
+      ) : (
+        /* Users & Job Roles List Screen */
+        <>
+          {/* Title Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 bg-emerald-600 text-white rounded-3xl flex items-center justify-center shadow-xl shadow-emerald-500/20">
@@ -1500,7 +1499,8 @@ export const Users: React.FC = () => {
           </div>
         </div>
       )}
-
+        </>
+      )}
 
       {/* New/Edit User Modal */}
       {isUserModalOpen && (
