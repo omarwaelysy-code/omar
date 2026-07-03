@@ -4,7 +4,7 @@ import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { User, UserPermissions, ModulePermissions } from '../types';
 import { 
-  Search, Plus, Trash2, X, Shield, User as UserIcon, History, Lock, Check, CheckCheck,
+  Search, Plus, Trash2, X, Shield, User as UserIcon, History, Lock, Check,
   AlertCircle, Edit2, ChevronDown, ChevronUp, Copy, HelpCircle, RefreshCw, Info,
   ChevronLeft, ChevronRight, Save
 } from 'lucide-react';
@@ -618,7 +618,6 @@ export const Users: React.FC = () => {
           </div>
         </div>
 
-          {/* Modal Body & Footer */}
           {/* Modal Body */}
             <div className="flex-1 overflow-y-auto p-6 bg-slate-50/40 custom-scrollbar space-y-6">
               {permissionsTargetType === 'user' && selectedUser && selectedUser.role === 'admin' ? (
@@ -1499,7 +1498,7 @@ export const Users: React.FC = () => {
           </div>
         </div>
       )}
-        </>
+      </>
       )}
 
       {/* New/Edit User Modal */}
