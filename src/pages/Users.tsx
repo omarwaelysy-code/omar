@@ -19,6 +19,77 @@ interface Role {
   permissions: UserPermissions;
 }
 
+const ROLE_NAME_TRANSLATIONS: Record<string, { ar: string; en: string }> = {
+  'مدير النظام': { ar: 'مدير النظام', en: 'System Admin' },
+  'مدير مالي': { ar: 'مدير مالي', en: 'Financial Manager' },
+  'محاسب': { ar: 'محاسب', en: 'Accountant' },
+  'أمين مخزن': { ar: 'أمين مخزن', en: 'Warehouse Keeper' },
+  'مشتريات': { ar: 'مشتريات', en: 'Purchasing' },
+  'مبيعات': { ar: 'مبيعات', en: 'Sales' },
+  'كاشير': { ar: 'كاشير', en: 'Cashier' }
+};
+
+const ROLE_DESC_TRANSLATIONS: Record<string, { ar: string; en: string }> = {
+  'له كامل الصلاحيات لإدارة النظام والإعدادات والمستخدمين': {
+    ar: 'له كامل الصلاحيات لإدارة النظام والإعدادات والمستخدمين',
+    en: 'Has full permissions to manage the system, settings, and users'
+  },
+  'إدارة الحسابات العامة، التقارير المالية، والقيود اليومية والاعتمادات': {
+    ar: 'إدارة الحسابات العامة، التقارير المالية، والقيود اليومية والاعتمادات',
+    en: 'Manage general ledger, financial reports, journal entries, and approvals'
+  },
+  'إدارة الحسابات العامة التقارير المالية، والقيود اليومية والاعتمادات': {
+    ar: 'إدارة الحسابات العامة التقارير المالية، والقيود اليومية والاعتمادات',
+    en: 'Manage general ledger, financial reports, journal entries, and approvals'
+  },
+  'تسجيل القيود اليومية، مراجعة الحسابات، وإعداد كشوفات الحساب': {
+    ar: 'تسجيل القيود اليومية، مراجعة الحسابات، وإعداد كشوفات الحساب',
+    en: 'Record journal entries, audit accounts, and prepare account statements'
+  },
+  'تسجيل القيود اليومية مراجعة الحسابات، وإعداد كشوفات الحساب': {
+    ar: 'تسجيل القيود اليومية مراجعة الحسابات، وإعداد كشوفات الحساب',
+    en: 'Record journal entries, audit accounts, and prepare account statements'
+  },
+  'إدارة المخازن، استلام البضائع، التحويلات المخزنية، والجرد': {
+    ar: 'إدارة المخازن، استلام البضائع، التحويلات المخزنية، والجرد',
+    en: 'Manage warehouses, receive goods, warehouse transfers, and inventory'
+  },
+  'إدارة المخازن، استلام البضائع، التحويلات المخزنية والجرد': {
+    ar: 'إدارة المخازن، استلام البضائع، التحويلات المخزنية والجرد',
+    en: 'Manage warehouses, receive goods, warehouse transfers, and inventory'
+  },
+  'إدارة الموردين، أوامر الشراء، وفواتير المشتريات': {
+    ar: 'إدارة الموردين، أوامر الشراء، وفواتير المشتريات',
+    en: 'Manage suppliers, purchase orders, and purchase invoices'
+  },
+  'إدارة الموردين، أوامر الشراء وفواتير المشتريات': {
+    ar: 'إدارة الموردين، أوامر الشراء وفواتير المشتريات',
+    en: 'Manage suppliers, purchase orders, and purchase invoices'
+  },
+  'إدارة العملاء، عروض الأسعار، أوامر البيع، وفواتير المبيعات': {
+    ar: 'إدارة العملاء، عروض الأسعار، أوامر البيع، وفواتير المبيعات',
+    en: 'Manage customers, price offers, sales orders, and sales invoices'
+  },
+  'إدارة العملاء، عروض الأسعار، أوامر البيع وفواتير المبيعات': {
+    ar: 'إدارة العملاء، عروض الأسعار، أوامر البيع وفواتير المبيعات',
+    en: 'Manage customers, price offers, sales orders, and sales invoices'
+  },
+  'إصدار فواتير مبيعات نقدية وسندات قبض وصرف يومية': {
+    ar: 'إصدار فواتير مبيعات نقدية وسندات قبض وصرف يومية',
+    en: 'Issue cash sales invoices, daily receipt and payment vouchers'
+  }
+};
+
+const translateRoleName = (name: string, lang: string) => {
+  if (!name) return '';
+  return lang === 'ar' ? (ROLE_NAME_TRANSLATIONS[name]?.ar || name) : (ROLE_NAME_TRANSLATIONS[name]?.en || name);
+};
+
+const translateRoleDesc = (desc: string, lang: string) => {
+  if (!desc) return '';
+  return lang === 'ar' ? (ROLE_DESC_TRANSLATIONS[desc]?.ar || desc) : (ROLE_DESC_TRANSLATIONS[desc]?.en || desc);
+};
+
 export const Users: React.FC = () => {
   const { user: currentUser, fetchProfile } = useAuth();
   const { showNotification } = useNotification();
@@ -384,7 +455,7 @@ export const Users: React.FC = () => {
           currentUser.username, 
           currentUser.company_id, 
           'تعديل صلاحيات دور', 
-          `{language === 'ar' ? 'تعديل صلاحيات الدور' : 'Edit Role Permissions'}: ${selectedRole.name}`, 
+          `{language === 'ar' ? '\u062a\u0639\u062f\u064a\u0644 \u0635\u0644\u0627\u062d\u064a\u0627\u062a \u0627\u0644\u062f\u0648\u0631' : 'Edit Role Permissions'}: ${translateRoleName(selectedRole.name, language)}`,
           'roles', 
           selectedRole.id
         );
@@ -460,7 +531,7 @@ export const Users: React.FC = () => {
       isArray: Array.isArray(idsVal),
       parsedIds: ids
     });
-    return roles.filter(r => ids.includes(r.id)).map(r => r.name).join('، ') || 'لا يوجد أدوار';
+    return roles.filter(r => ids.includes(r.id)).map(r => translateRoleName(r.name, language)).join(language === 'ar' ? '\u060c ' : ', ') || (language === 'ar' ? '\u0644\u0627 \u064a\u0648\u062c\u062f \u0623\u062f\u0648\u0627\u0631' : 'No roles');
   };
 
   const getInheritedPermissionState = (modId: string, permKey: string) => {
@@ -657,11 +728,11 @@ export const Users: React.FC = () => {
                       <Shield size={20} />
                     </div>
                     <div>
-                      <h4 className="font-black text-lg text-slate-900 leading-tight">{role.name}</h4>
+                      <h4 className="font-black text-lg text-slate-900 leading-tight">{translateRoleName(role.name, language)}</h4>
                       <p className="text-[10px] text-slate-400 font-bold uppercase">{language === 'ar' ? 'دور وظيفي' : 'Job Role'}</p>
                     </div>
                   </div>
-                  <p className="text-sm text-slate-500 font-medium leading-relaxed min-h-[40px]">{role.description || (language === 'ar' ? 'لا يوجد وصف لهذا الدور' : 'No description for this role')}</p>
+                  <p className="text-sm text-slate-500 font-medium leading-relaxed min-h-[40px]">{translateRoleDesc(role.description, language) || (language === 'ar' ? '\u0644\u0627 \u064a\u0648\u062c\u062f \u0648\u0635\u0641 \u0644\u0647\u0630\u0627 \u0627\u0644\u062f\u0648\u0631' : 'No description for this role')}</p>
                 </div>
                 
                 <div className="mt-6 flex items-center gap-2 pt-2 border-t border-slate-50">
@@ -714,7 +785,7 @@ export const Users: React.FC = () => {
                   <h3 className="text-xl font-black text-slate-900">
                     {permissionsTargetType === 'user' && selectedUser 
                       ? `${language === 'ar' ? 'صلاحيات وأدوار المستخدم:' : 'User Permissions & Roles:'} ${selectedUser.username}` 
-                      : `${language === 'ar' ? 'صلاحيات الدور الوظيفي:' : 'Job Role Permissions:'} ${selectedRole?.name}`}
+                      : `${language === 'ar' ? '\u0635\u0644\u0627\u062d\u064a\u0627\u062a \u0627\u0644\u062f\u0648\u0631 \u0627\u0644\u0648\u0638\u064a\u0641\u064a:' : 'Job Role Permissions:'} ${translateRoleName(selectedRole?.name || '', language)}`}
                   </h3>
                   <p className="text-[11px] text-slate-500 font-bold uppercase tracking-tight">حدد الصلاحيات العامة والخاصة و{language === 'ar' ? 'الأدوار الوظيفية' : 'Job Roles'}</p>
                 </div>
@@ -812,7 +883,7 @@ export const Users: React.FC = () => {
                                 : 'border-slate-200 text-slate-700'
                             }`}
                           >
-                            <span className="text-xs">{role.name}</span>
+                            <span className="text-xs">{translateRoleName(role.name, language)}</span>
                             <input 
                               type="checkbox"
                               checked={(() => {
