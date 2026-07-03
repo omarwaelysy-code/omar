@@ -596,7 +596,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           )}
         </div>
 
-        <nav className="flex items-center gap-0.5 flex-1">
+        <nav className="flex items-center gap-px xl:gap-0.5 flex-1">
           {filteredNavItems.map((item: any) => {
             const isActive = item.subItems 
               ? item.subItems.some((sub: any) => sub.id === currentPage)
@@ -607,13 +607,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 <div key={item.id} className="relative group px-px">
                   <button
                     className={`
-                      flex items-center gap-1 xl:gap-1.5 px-1 xl:px-1.5 py-1.5 rounded-lg transition-all font-semibold text-xs xl:text-sm
+                      flex items-center gap-0.5 xl:gap-1 px-1 xl:px-1 py-1 rounded-lg transition-all font-semibold text-[11px] xl:text-xs
                       ${isActive ? 'bg-brand-primary/10 text-brand-primary' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                     `}
                   >
-                    <item.icon size={16} />
+                    <item.icon size={14} className="shrink-0" />
                     <span>{item.label}</span>
-                    <ChevronDown size={14} className="opacity-50 group-hover:rotate-180 transition-transform" />
+                    <ChevronDown size={12} className="opacity-50 group-hover:rotate-180 transition-transform shrink-0" />
                   </button>
                   
                   {/* Dropdown */}
@@ -621,9 +621,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                     <div className="bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 min-w-[260px]">
                       {item.subItems.map((sub: any) => {
                         if (sub.isDivider) {
-                          return (
-                            <div key={sub.id} className="h-px bg-slate-100 my-1.5 mx-2" />
-                          );
+                           return (
+                             <div key={sub.id} className="h-px bg-slate-100 my-1.5 mx-2" />
+                           );
                         }
                         if (sub.isHeader) {
                           return (
@@ -659,21 +659,21 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 key={item.id}
                 onClick={() => handleNavClick(item.id, item.label, item.path)}
                 className={`
-                  flex items-center gap-1 xl:gap-1.5 px-1 xl:px-1.5 py-1.5 rounded-lg transition-all font-semibold text-xs xl:text-sm
+                  flex items-center gap-0.5 xl:gap-1 px-1 xl:px-1 py-1 rounded-lg transition-all font-semibold text-[11px] xl:text-xs
                   ${currentPage === item.id ? 'bg-brand-primary text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                 `}
               >
-                <item.icon size={16} />
+                <item.icon size={14} className="shrink-0" />
                 <span>{item.label}</span>
               </button>
             );
           })}
         </nav>
 
-        <div className={`flex items-center gap-1 xl:gap-2 ${dir === 'rtl' ? 'mr-auto' : 'ml-auto'}`}>
+        <div className={`flex items-center gap-0.5 xl:gap-1.5 ${dir === 'rtl' ? 'mr-auto' : 'ml-auto'}`}>
           <button 
             onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
-            className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-all group flex items-center gap-2"
+            className="p-1 text-slate-500 hover:bg-slate-100 rounded-lg transition-all group flex items-center gap-1"
             title={language === 'ar' ? 'English' : 'العربية'}
           >
             <Languages size={18} />
@@ -682,7 +682,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
           <button 
             onClick={() => setIsCenterOpen(true)}
-            className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-all group"
+            className="relative p-1 text-slate-500 hover:bg-slate-100 rounded-lg transition-all group"
           >
             <Bell size={18} />
             {unreadCount > 0 && (
@@ -699,7 +699,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             <div className="relative">
               <button
                 onClick={() => setIsCompanyMenuOpen(!isCompanyMenuOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all border border-slate-200 shadow-sm"
+                className="flex items-center gap-1 px-2 py-1 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all border border-slate-200 shadow-sm"
               >
                 <Building2 size={16} className="text-emerald-600" />
                 <span className="text-xs font-bold text-slate-600 truncate max-w-[60px] xl:max-w-[120px]">
@@ -755,10 +755,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             </div>
           )}
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 xl:gap-2">
             <div className={`hidden xl:block ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-              <p className="font-bold text-sm text-slate-800 leading-none">{user?.username}</p>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+              <p className="font-bold text-xs text-slate-800 leading-none">{user?.username}</p>
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">
                 {isSuperAdmin ? t('common.role_super_admin') : isCompanyAdmin ? t('common.role_company_admin') : t('common.role_user')}
               </p>
             </div>
@@ -769,7 +769,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
           <button 
             onClick={logout}
-            className="p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-all group"
+            className="p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-all group"
             title={t('common.logout')}
           >
             <LogOut size={18} />
