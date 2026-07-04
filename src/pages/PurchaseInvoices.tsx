@@ -2705,11 +2705,10 @@ export const PurchaseInvoices: React.FC = () => {
 
   const openModal = async (invoice?: any) => {
     if (invoice) {
-      console.log('[EDIT] Opening edit modal for purchase invoice ID:', invoice.id);
+
       try {
         const fullData = await dbService.get<any>('purchase_invoices', invoice.id);
-        console.log('[EDIT] Purchase invoice details from API:', fullData);
-        
+
         if (!fullData) throw new Error('Purchase invoice not found');
 
         // Load linked Goods Receipts
@@ -2777,7 +2776,7 @@ export const PurchaseInvoices: React.FC = () => {
         }
         setRowSettlementDates(datesDict);
         isInitialLoad.current = true;
-        console.log('[EDIT] Form updated with purchase invoice:', fullData.id);
+
       } catch (error: any) {
         console.error('[EDIT] Error loading purchase invoice:', error);
         showNotification('فشل تحميل بيانات فاتورة الشراء', 'error');

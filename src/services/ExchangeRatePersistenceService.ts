@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ExchangeRatePersistenceService  –  Phase 3
  *
  * Orchestrates:
@@ -102,7 +102,6 @@ export class ExchangeRatePersistenceService {
     const updatedByVal = updatedBy || 'Automatic';
     
     // ── Step 1: Fetch rates from external API ─────────────────────────────
-    console.log(`${TAG} Starting fetch-and-persist cycle (base=${fetchOptions.baseCurrency ?? 'EGP'})…`);
 
     const fetchResult = await ExchangeRateService.fetchLatestRates(fetchOptions);
 
@@ -150,8 +149,6 @@ export class ExchangeRatePersistenceService {
       for (const row of currencyRows) {
         codeToId.set(row.code, row.id);
       }
-
-      console.log(`${TAG} Loaded ${codeToId.size} currencies from DB for matching.`);
 
       // Process each fetched rate
       for (const fetchedRate of rates) {
@@ -206,7 +203,6 @@ export class ExchangeRatePersistenceService {
       await client.query('COMMIT');
 
       const summary = `Inserted: ${inserted}, Updated: ${updated}, Skipped: ${skipped} (base=${baseCurrency}, date=${rateDate})`;
-      console.log(`${TAG} ✅ Transaction committed. ${summary}`);
 
       // Log success to history
       if (companyId) {

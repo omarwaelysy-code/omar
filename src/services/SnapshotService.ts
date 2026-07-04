@@ -1,4 +1,4 @@
-import { dbService } from './dbService';
+﻿import { dbService } from './dbService';
 import { JournalEntry, Account, AccountType } from '../types';
 
 export interface DatabaseSnapshot {
@@ -14,8 +14,7 @@ export interface DatabaseSnapshot {
 
 export class SnapshotService {
   static async createSnapshot(companyId: string): Promise<DatabaseSnapshot> {
-    console.log(`[SnapshotService] Creating point-in-time snapshot for company ${companyId}`);
-    
+
     const [accounts, journal_entries, account_types] = await Promise.all([
       dbService.list<Account>('accounts', companyId),
       dbService.list<JournalEntry>('journal_entries', companyId),

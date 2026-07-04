@@ -360,27 +360,31 @@ export const GeneralLedger: React.FC = () => {
 
   const selectedAccount = accounts.find(a => a.id === selectedAccountId);
 
-  const { lines: ledgerData, openingBalance: startBalance } = selectedAccount
-    ? AccountingEngine.calculateLedger(
-        selectedAccount,
-        entries,
-        dateRange.start,
-        dateRange.end,
-        selectedEntityIds,
-        customers,
-        suppliers
-      )
-    : { lines: [], openingBalance: 0 };
+  const { ledgerData, startBalance, totals, currentBalance } = React.useMemo(() => {
+    const { lines: ledgerData, openingBalance: startBalance } = selectedAccount
+      ? AccountingEngine.calculateLedger(
+          selectedAccount,
+          entries,
+          dateRange.start,
+          dateRange.end,
+          selectedEntityIds,
+          customers,
+          suppliers
+        )
+      : { lines: [], openingBalance: 0 };
 
-  const totals = ledgerData.reduce((acc, tx) => ({
-    debit: acc.debit + tx.debit,
-    credit: acc.credit + tx.credit
-  }), { 
-    debit: startBalance > 0 ? startBalance : 0, 
-    credit: startBalance < 0 ? Math.abs(startBalance) : 0 
-  });
+    const totals = ledgerData.reduce((acc, tx) => ({
+      debit: acc.debit + tx.debit,
+      credit: acc.credit + tx.credit
+    }), { 
+      debit: startBalance > 0 ? startBalance : 0, 
+      credit: startBalance < 0 ? Math.abs(startBalance) : 0 
+    });
 
-  const currentBalance = ledgerData.length > 0 ? ledgerData[ledgerData.length - 1].balance : startBalance;
+    const currentBalance = ledgerData.length > 0 ? ledgerData[ledgerData.length - 1].balance : startBalance;
+
+    return { ledgerData, startBalance, totals, currentBalance };
+  }, [selectedAccount, entries, dateRange.start, dateRange.end, selectedEntityIds, customers, suppliers]);
 
   const getSubAccountOrProductSingle = (line: any) => {
     const desc = line.description || '';

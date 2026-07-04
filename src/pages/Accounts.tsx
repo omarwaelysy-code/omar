@@ -74,7 +74,7 @@ export const Accounts: React.FC = () => {
   });
 
   useEffect(() => {
-    if (user) {
+    if (user?.company_id) {
       const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
       const unsubTypes = dbService.subscribe<AccountType>('account_types', user.company_id, setTypes);
       setLoading(false);
@@ -83,7 +83,7 @@ export const Accounts: React.FC = () => {
         unsubTypes();
       };
     }
-  }, [user]);
+  }, [user?.company_id]);
 
   const handleAiParse = async () => {
     if (!aiText.trim()) return;
@@ -177,13 +177,12 @@ export const Accounts: React.FC = () => {
   };
 
   const openModal = (account?: Account) => {
-    console.log('[ERP] Data from API/List:', account);
+
     if (account) {
       // Robust boolean conversion for Postgres (handles true, 'true', 1, 't', etc.)
       const rawVal = (account as any).required_sub_account;
       const requiredSubAccount = rawVal === true || rawVal === 'true' || rawVal === 1 || rawVal === 't' || rawVal === '1';
-      
-      console.log('[ERP] required_sub_account raw:', rawVal, 'parsed:', requiredSubAccount);
+
       setEditingAccount(account);
       const newFormData = {
         code: account.code,
@@ -195,7 +194,7 @@ export const Accounts: React.FC = () => {
         is_active: account.is_active !== false,
         account_usage: account.account_usage || 'other'
       };
-      console.log('[ERP] Form State being set:', newFormData);
+
       setFormData(newFormData);
     } else {
       setEditingAccount(null);

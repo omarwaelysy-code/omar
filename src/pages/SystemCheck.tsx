@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { ShieldCheck, AlertTriangle, Database, CheckCircle, RefreshCw, Server, Search, Check } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -44,7 +44,7 @@ export const SystemCheck: React.FC = () => {
     setFixing(true);
     setMessage(null);
     try {
-      console.log('Starting system fix...');
+
       const token = localStorage.getItem('auth_token');
       const response = await fetch('/api/erp/system/fix', {
         method: 'POST',

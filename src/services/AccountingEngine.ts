@@ -1,4 +1,4 @@
-import { JournalEntry, Account, TrialBalanceItem, LedgerLine, AccountType, Customer, Supplier } from '../types';
+﻿import { JournalEntry, Account, TrialBalanceItem, LedgerLine, AccountType, Customer, Supplier } from '../types';
 
 export class AccountingEngine {
   /**
@@ -63,7 +63,7 @@ export class AccountingEngine {
       };
     });
     const endTime = performance.now();
-    console.debug(`[AccountingPerformance] TrialBalance calculated in ${(endTime - startTime).toFixed(2)}ms for ${accounts.length} accounts and ${entries.length} entries`);
+
     return result;
   }
 

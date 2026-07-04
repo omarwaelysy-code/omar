@@ -1,4 +1,4 @@
-import { dbService } from './dbService';
+﻿import { dbService } from './dbService';
 import { TransactionManager, TransactionStep } from './TransactionManager';
 import { Account, JournalEntry, Invoice, PaymentVoucher, ReceiptVoucher } from '../types';
 import { AccountSchema, JournalEntrySchema, InvoiceSchema } from '../lib/schemas';
@@ -118,8 +118,7 @@ export class ScenarioTestingService {
 
       // 3. Purchase Inventory
       // ... Followed by Sales, then Payments ...
-      
-      console.log('Seeding complete for company:', companyId);
+
       return { success: true };
     } catch (error) {
       console.error('Seeding failed:', error);

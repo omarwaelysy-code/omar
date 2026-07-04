@@ -22,7 +22,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  console.log("AuthProvider: Rendering...");
+
   const [user, setUser] = useState<User | null>(null);
   const [userMemberships, setUserMemberships] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,8 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (userId: string, email: string) => {
     try {
-      console.log('AuthContext: Fetching profile for ID:', userId);
-      
+
       // Query all user documents that have this email or ID
       let membershipsData: any[] = await dbService.query('users', [
         { field: 'email', operator: '==', value: email }
@@ -201,10 +200,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isManager = user?.role === 'manager';
   const isStandardUser = user?.role === 'user';
 
-  const hasPermission = (moduleId: string, action: keyof ModulePermissions): boolean => {
+  const hasPermission = React.useCallback((moduleId: string, action: keyof ModulePermissions): boolean => {
     if (isSuperAdmin || isCompanyAdmin) return true;
     if (isManager) {
-      // Managers can view and create but maybe not delete
       if (action === 'delete') return false;
       return true;
     }
@@ -215,7 +213,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     const modulePerms = user.permissions[moduleId];
     return modulePerms ? modulePerms[action] : false;
-  };
+  }, [isSuperAdmin, isCompanyAdmin, isManager, user]);
 
   const isAuthenticated = !!user && (isSuperAdmin || !!user.company_id);
 

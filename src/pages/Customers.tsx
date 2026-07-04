@@ -86,7 +86,7 @@ export const Customers: React.FC = () => {
   const [discounts, setDiscounts] = useState<any[]>([]);
 
   useEffect(() => {
-    if (user) {
+    if (user?.company_id) {
       const unsubscribe = dbService.subscribe<Customer>('customers', user.company_id, (data) => {
         setCustomers(data);
         setLoading(false);
@@ -112,7 +112,7 @@ export const Customers: React.FC = () => {
         unsubscribeDiscounts();
       };
     }
-  }, [user]);
+  }, [user?.company_id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -305,11 +305,10 @@ export const Customers: React.FC = () => {
 
   const openModal = async (customer: Customer | null = null) => {
     if (customer) {
-      console.log('[EDIT] Opening edit modal for customer ID:', customer.id);
+
       try {
         const fullData = await dbService.get<Customer>('customers', customer.id);
-        console.log('[EDIT] Customer details from API:', fullData);
-        
+
         if (!fullData) throw new Error('Customer not found');
 
         setEditingCustomer(fullData);
@@ -330,7 +329,7 @@ export const Customers: React.FC = () => {
           advance_percentage: fullData.advance_percentage || 0,
           is_active: fullData.is_active !== false
         });
-        console.log('[EDIT] Form updated with customer:', fullData.id);
+
       } catch (error: any) {
         console.error('[EDIT] Error loading customer:', error);
         showNotification('فشل تحميل بيانات العميل', 'error');

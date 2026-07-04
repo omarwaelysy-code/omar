@@ -1,8 +1,8 @@
-import crypto from 'crypto';
+﻿import crypto from 'crypto';
 import { generateNextSequence } from './erp-api';
 
 export async function backfillMissingJournalEntries(pool: any) {
-  console.log("🔄 [BACKFILL] STARTING BACKFILL OF MISSING JOURNAL ENTRIES...");
+
   const client = await pool.connect();
   try {
     // 0. Rename any legacy JE-BF- journal entries to match the standard format
@@ -14,7 +14,7 @@ export async function backfillMissingJournalEntries(pool: any) {
     `);
     
     if (legacyEntries.rows.length > 0) {
-      console.log(`🔄 [BACKFILL] Found ${legacyEntries.rows.length} legacy JE-BF- entries. Renaming to standard sequence...`);
+
       for (const entry of legacyEntries.rows) {
         const nextNum = await generateNextSequence(client, entry.company_id, 'journal_entries', entry.date);
         await client.query(`
@@ -22,7 +22,7 @@ export async function backfillMissingJournalEntries(pool: any) {
           SET entry_number = $1 
           WHERE id = $2
         `, [nextNum, entry.id]);
-        console.log(`   [BACKFILL] Renamed legacy entry: ${entry.entry_number} -> ${nextNum}`);
+
       }
     }
 
@@ -33,12 +33,9 @@ export async function backfillMissingJournalEntries(pool: any) {
       LEFT JOIN journal_entries je ON je.reference_id = pi.id AND je.reference_type = 'purchase_invoice'
       WHERE je.id IS NULL
     `);
-    
-    console.log(`🔎 [BACKFILL] Found ${missingInvoicesRes.rows.length} purchase invoices missing journal entries.`);
-    
+
     for (const invoice of missingInvoicesRes.rows) {
-      console.log(`⚙️ [BACKFILL] Backfilling JE for Purchase Invoice ${invoice.invoice_number} (ID: ${invoice.id})...`);
-      
+
       const invoiceId = invoice.id;
       const companyId = invoice.company_id;
       const invoiceNumber = invoice.invoice_number;
@@ -217,7 +214,7 @@ export async function backfillMissingJournalEntries(pool: any) {
       }
 
       await client.query('COMMIT');
-      console.log(`✅ [BACKFILL] Backfilled JE for Purchase Invoice ${invoiceNumber} successfully.`);
+
     }
 
     // 2. Find all sales invoices that don't have journal entries
@@ -227,13 +224,10 @@ export async function backfillMissingJournalEntries(pool: any) {
       LEFT JOIN journal_entries je ON je.reference_id = i.id AND je.reference_type = 'invoice'
       WHERE je.id IS NULL
     `);
-    
-    console.log(`🔎 [BACKFILL] Found ${missingSalesInvoicesRes.rows.length} sales invoices missing journal entries.`);
-    
+
     for (const invoice of missingSalesInvoicesRes.rows) {
       try {
-        console.log(`⚙️ [BACKFILL] Backfilling JE for Sales Invoice ${invoice.invoice_number} (ID: ${invoice.id})...`);
-        
+
         const invoiceId = invoice.id;
         const companyId = invoice.company_id;
         const invoiceNumber = invoice.invoice_number;
@@ -420,7 +414,7 @@ export async function backfillMissingJournalEntries(pool: any) {
         }
 
         await client.query('COMMIT');
-        console.log(`✅ [BACKFILL] Backfilled JE for Sales Invoice ${invoiceNumber} successfully.`);
+
       } catch (invErr: any) {
         if (client) await client.query('ROLLBACK');
         console.error(`❌ [BACKFILL] Failed backfilling JE for Sales Invoice ${invoice.invoice_number}:`, invErr.message);

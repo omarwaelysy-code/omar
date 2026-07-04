@@ -1421,11 +1421,10 @@ export const PaymentVouchers: React.FC = () => {
   };
 
   const openEditModal = async (voucher: any) => {
-    console.log('[EDIT] Opening edit modal for payment voucher ID:', voucher.id);
+
     try {
       const fullData = await dbService.get<any>('payment_vouchers', voucher.id);
-      console.log('[EDIT] Payment voucher details from API:', fullData);
-      
+
       if (!fullData) throw new Error('Payment voucher not found');
 
       setInternalRef(fullData.internal_reference || fullData.voucher_number || '');
@@ -1582,7 +1581,7 @@ export const PaymentVouchers: React.FC = () => {
       }
       setRowSettlementDates(datesDict);
       setIsModalOpen(true);
-      console.log('[EDIT] Form updated with payment voucher:', fullData.id);
+
     } catch (error: any) {
       console.error('[EDIT] Error loading payment voucher:', error);
       showNotification(language === 'ar' ? 'فشل تحميل بيانات السند' : 'Failed to load voucher details', 'error');

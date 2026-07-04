@@ -1,4 +1,4 @@
-import pg from 'pg';
+﻿import pg from 'pg';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -29,7 +29,6 @@ const pool = new Pool({
 });
 
 // Debug connection info
-console.log(`PostgreSQL Pool created for host: ${process.env.DB_HOST || 'localhost'} (port: ${process.env.DB_PORT || '5432'})`);
 
 // Enhanced query function with logging and error handling
 const originalQuery = pool.query.bind(pool);
@@ -44,7 +43,7 @@ pool.query = (async (text: any, params: any) => {
     // Low-level query logging (excluding heavy queries if needed)
     if (process.env.NODE_ENV !== 'production' || duration > 100) {
       const sqlSnippet = typeof text === 'string' ? text.substring(0, 100).replace(/\n/g, ' ') : 'Complex Query';
-      console.log(`[DB] Query (${duration}ms): ${sqlSnippet}...`);
+
     }
     
     return res;

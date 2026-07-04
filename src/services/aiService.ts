@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+﻿import { GoogleGenAI } from "@google/genai";
 
 const getAI = () => {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -7,7 +7,7 @@ const getAI = () => {
     throw new Error("GEMINI_API_KEY is not defined in the environment.");
   }
   // Log presence of key (masked)
-  console.log(`GEMINI_API_KEY is present: ${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`);
+
   return new GoogleGenAI({ apiKey });
 };
 

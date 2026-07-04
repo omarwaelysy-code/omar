@@ -86,7 +86,7 @@ export const Suppliers: React.FC = () => {
   const [discounts, setDiscounts] = useState<any[]>([]);
 
   useEffect(() => {
-    if (user) {
+    if (user?.company_id) {
       const unsubscribe = dbService.subscribe<Supplier>('suppliers', user.company_id, (data) => {
         setSuppliers(data);
         setLoading(false);
@@ -112,7 +112,7 @@ export const Suppliers: React.FC = () => {
         unsubscribeDiscounts();
       };
     }
-  }, [user]);
+  }, [user?.company_id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -305,11 +305,10 @@ export const Suppliers: React.FC = () => {
 
   const openModal = async (supplier?: Supplier) => {
     if (supplier) {
-      console.log('[EDIT] Opening edit modal for supplier ID:', supplier.id);
+
       try {
         const fullData = await dbService.get<Supplier>('suppliers', supplier.id);
-        console.log('[EDIT] Supplier details from API:', fullData);
-        
+
         if (!fullData) throw new Error('Supplier not found');
 
         setEditingSupplier(fullData);
@@ -330,7 +329,7 @@ export const Suppliers: React.FC = () => {
           advance_percentage: fullData.advance_percentage || 0,
           is_active: fullData.is_active !== false
         });
-        console.log('[EDIT] Form updated with supplier:', fullData.id);
+
       } catch (error: any) {
         console.error('[EDIT] Error loading supplier:', error);
         showNotification('فشل تحميل بيانات المورد', 'error');

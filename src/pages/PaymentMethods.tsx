@@ -41,7 +41,7 @@ export const PaymentMethods: React.FC = () => {
   });
 
   useEffect(() => {
-    if (user) {
+    if (user?.company_id) {
       const unsub = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setMethods);
       const unsubscribeAccounts = dbService.subscribe<Account>('accounts', user.company_id, (data) => {
         setAccounts(data);
@@ -52,7 +52,7 @@ export const PaymentMethods: React.FC = () => {
         unsubscribeAccounts();
       };
     }
-  }, [user]);
+  }, [user?.company_id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

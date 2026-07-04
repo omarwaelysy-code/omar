@@ -1,4 +1,4 @@
-import html2pdf from 'html2pdf.js';
+﻿import html2pdf from 'html2pdf.js';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { formatDate } from './formatUtils';
@@ -12,7 +12,6 @@ interface PDFOptions {
 
 export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => {
   const { filename, margin = 10, orientation = 'portrait', reportTitle } = options;
-  console.log('PDF Export: Starting professional export for', filename);
 
   if (!element) {
     console.error('PDF Export: Element not found');

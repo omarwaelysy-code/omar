@@ -1231,11 +1231,10 @@ export const Receipts: React.FC = () => {
   };
 
   const openEditModal = async (receipt: ReceiptVoucher) => {
-    console.log('[EDIT] Opening edit modal for receipt ID:', receipt.id);
+
     try {
       const fullData = await dbService.get<ReceiptVoucher>('receipt_vouchers', receipt.id);
-      console.log('[EDIT] Receipt details from API:', fullData);
-      
+
       if (!fullData) throw new Error('Receipt not found');
 
       setInternalRef(fullData.voucher_number || '');
@@ -1335,7 +1334,7 @@ export const Receipts: React.FC = () => {
         });
       }
       setRowSettlementDates(datesDict);
-      console.log('[EDIT] Form updated with receipt:', fullData.id);
+
     } catch (error: any) {
       console.error('[EDIT] Error loading receipt:', error);
       showNotification(language === 'ar' ? 'فشل تحميل بيانات سند القبض' : 'Failed to load voucher details', 'error');

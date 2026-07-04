@@ -10,14 +10,8 @@ import { ItemGroups } from './pages/ItemGroups';
 import { Suppliers } from './pages/Suppliers';
 import { Expenses } from './pages/Expenses';
 import { PaymentMethods } from './pages/PaymentMethods';
-import { Invoices } from './pages/Invoices';
-import { PurchaseInvoices } from './pages/PurchaseInvoices';
 import { SalesOrders } from './pages/SalesOrders';
 import { PurchaseOrders } from './pages/PurchaseOrders';
-import { Receipts } from './pages/Receipts';
-import { PaymentVouchers } from './pages/PaymentVouchers';
-import { Returns } from './pages/Returns';
-import { PurchaseReturns } from './pages/PurchaseReturns';
 import { GoodsReceipts } from './pages/GoodsReceipts';
 import { CustomerDiscounts } from './pages/CustomerDiscounts';
 import { SupplierDiscounts } from './pages/SupplierDiscounts';
@@ -32,26 +26,17 @@ import { CustomerStatement } from './pages/CustomerStatement';
 import { SupplierStatement } from './pages/SupplierStatement';
 import { StockCardReport } from './pages/StockCardReport';
 import { StockBalancesReport } from './pages/StockBalancesReport';
-import { GeneralStockMovementsReport } from './pages/GeneralStockMovementsReport';
 import { CustomerBalances } from './pages/CustomerBalances';
 import { SupplierBalances } from './pages/SupplierBalances';
-import { SalesReport } from './pages/SalesReport';
 import { ExpensesReport } from './pages/ExpensesReport';
 // import { CashReport } from './pages/CashReport';
 import { CashBalances } from './pages/CashBalances';
-import { ActivityLogPage } from './pages/ActivityLog';
 import { CompanySettings } from './pages/CompanySettings';
 import Currencies from './pages/Currencies';
 import { AccountTypes } from './pages/AccountTypes';
 import { Accounts } from './pages/Accounts';
 import { ChartOfAccounts } from './pages/ChartOfAccounts';
 import { JournalEntries } from './pages/JournalEntries';
-import { DetailedJournalEntries } from './pages/DetailedJournalEntries';
-import { CreateJournalEntry } from './pages/CreateJournalEntry';
-import { GeneralLedger } from './pages/GeneralLedger';
-import { TrialBalance } from './pages/TrialBalance';
-import { IncomeStatement } from './pages/IncomeStatement';
-import { BalanceSheet } from './pages/BalanceSheet';
 import { IntegrityDashboard } from './pages/IntegrityDashboard';
 import { DiscountSettings } from './pages/DiscountSettings';
 import { BackupRestore } from './pages/BackupRestore';
@@ -59,6 +44,23 @@ import { PeriodClosing } from './pages/PeriodClosing';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { DashboardBuilder } from './pages/DashboardBuilder';
+
+// Lazy load heavy screens for optimized bundle size & faster initial load
+const Invoices = React.lazy(() => import('./pages/Invoices').then(m => ({ default: m.Invoices })));
+const PurchaseInvoices = React.lazy(() => import('./pages/PurchaseInvoices').then(m => ({ default: m.PurchaseInvoices })));
+const Receipts = React.lazy(() => import('./pages/Receipts').then(m => ({ default: m.Receipts })));
+const PaymentVouchers = React.lazy(() => import('./pages/PaymentVouchers').then(m => ({ default: m.PaymentVouchers })));
+const Returns = React.lazy(() => import('./pages/Returns').then(m => ({ default: m.Returns })));
+const PurchaseReturns = React.lazy(() => import('./pages/PurchaseReturns').then(m => ({ default: m.PurchaseReturns })));
+const GeneralStockMovementsReport = React.lazy(() => import('./pages/GeneralStockMovementsReport').then(m => ({ default: m.GeneralStockMovementsReport })));
+const SalesReport = React.lazy(() => import('./pages/SalesReport').then(m => ({ default: m.SalesReport })));
+const ActivityLogPage = React.lazy(() => import('./pages/ActivityLog').then(m => ({ default: m.ActivityLogPage })));
+const DetailedJournalEntries = React.lazy(() => import('./pages/DetailedJournalEntries').then(m => ({ default: m.DetailedJournalEntries })));
+const CreateJournalEntry = React.lazy(() => import('./pages/CreateJournalEntry').then(m => ({ default: m.CreateJournalEntry })));
+const GeneralLedger = React.lazy(() => import('./pages/GeneralLedger').then(m => ({ default: m.GeneralLedger })));
+const TrialBalance = React.lazy(() => import('./pages/TrialBalance').then(m => ({ default: m.TrialBalance })));
+const IncomeStatement = React.lazy(() => import('./pages/IncomeStatement').then(m => ({ default: m.IncomeStatement })));
+const BalanceSheet = React.lazy(() => import('./pages/BalanceSheet').then(m => ({ default: m.BalanceSheet })));
 
 import { useNavigation } from './contexts/NavigationContext';
 import { useLanguage } from './contexts/LanguageContext';
@@ -143,7 +145,13 @@ export default function App() {
                         key={tab.id} 
                         className={activeTabId === tab.id ? 'block' : 'hidden'}
                       >
-                        {getPageComponent(tab.id)}
+                        <React.Suspense fallback={
+                          <div className="flex items-center justify-center p-20 w-full h-full min-h-[300px]">
+                            <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                          </div>
+                        }>
+                          {getPageComponent(tab.id)}
+                        </React.Suspense>
                       </div>
                     ))
                   )}

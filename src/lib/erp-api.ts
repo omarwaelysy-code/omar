@@ -1,4 +1,4 @@
-import { Router } from 'express';
+﻿import { Router } from 'express';
 import { AsyncLocalStorage } from 'async_hooks';
 import pool from './postgres';
 import { v4 as uuidv4 } from 'uuid';
@@ -249,8 +249,7 @@ export async function checkPermission(req: AuthRequest, moduleId: string, action
 export async function syncProductsCostAndJEs(client: any, companyId: string, productIds: string[]) {
   if (!productIds || productIds.length === 0) return;
   const uniqueProducts = Array.from(new Set(productIds));
-  console.log(`[ERP] Auto-Syncing COGS and JEs for ${uniqueProducts.length} products...`);
-  
+
   for (const pid of uniqueProducts) {
     await recalculateProductStock(client, companyId, pid);
   }
@@ -1933,8 +1932,6 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
     const { categoryId } = req.params;
     const companyId = req.user?.company_id;
 
-    console.log(`[DEBUG] Fetching fields for category: ${categoryId}, company: ${companyId}`);
-
     if (!companyId) return res.status(401).json({ error: 'Unauthorized' });
 
     // 1. Get the category and its parents (recursive query)
@@ -1953,9 +1950,9 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
     if (categoryId && categoryId !== 'null' && categoryId !== 'undefined' && categoryId !== '') {
       const { rows: treeRows } = await pool.query(categoryQuery, [categoryId, companyId]);
       categoryIds = treeRows.map(r => r.id);
-      console.log(`[DEBUG] Category IDs found in tree for ${categoryId}:`, categoryIds);
+
     } else {
-      console.log(`[DEBUG] No category selected or categoryId invalid: ${categoryId}`);
+
     }
 
     // 2. Fetch fields: 
@@ -1982,13 +1979,11 @@ router.get('/operation_fields/by-category/:categoryId', authenticateToken, async
     }
     fieldsQuery += `) ORDER BY f.sort_order ASC, f.name ASC`;
 
-    console.log(`[DEBUG] Fields Query:`, fieldsQuery);
-    console.log(`[DEBUG] Params:`, JSON.stringify(params));
 
     const { rows: fields } = await pool.query(fieldsQuery, params);
-    console.log(`[DEBUG] Found ${fields.length} dynamic fields.`);
+
     if (fields.length > 0) {
-      console.log(`[DEBUG] First field sample:`, JSON.stringify(fields[0]));
+
     }
     res.json(fields.map(f => parseRow('operation_fields', f)));
   } catch (error: any) {
@@ -3282,8 +3277,7 @@ modules.forEach(moduleName => {
 // --- Invoices with Items (Transaction) ---
 // Helper to ensure default accounts exist for a company
 async function ensureDefaultAccounts(client: any, companyId: string) {
-  console.log(`[ERP] Ensuring default accounts for company: ${companyId}`);
-  
+
   // 1. Get or create a basic account type if needed (Assets, Liabilities, etc.)
   const { rows: accountTypes } = await client.query(
     'SELECT id, name, classification FROM account_types WHERE company_id = $1',
@@ -3291,7 +3285,7 @@ async function ensureDefaultAccounts(client: any, companyId: string) {
   );
   
   if (accountTypes.length === 0) {
-    console.log('[ERP] No account types found. Creating defaults...');
+
     const types = [
       { id: uuidv4(), name: 'الأصول', code: '1', classification: 'asset', statement_type: 'balance_sheet' },
       { id: uuidv4(), name: 'الالتزامات', code: '2', classification: 'liability', statement_type: 'balance_sheet' },
@@ -3331,7 +3325,7 @@ async function ensureDefaultAccounts(client: any, companyId: string) {
     );
     
     if (existing.length === 0) {
-      console.log(`[ERP] Creating account: ${acc.name}`);
+
       const typeId = getType(acc.classification);
       if (typeId) {
         await client.query(
@@ -3349,8 +3343,6 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
     const companyId = req.user?.company_id;
     if (!companyId) return sendError(res, 401, 'Unauthorized');
 
-    console.log(`[ERP] Starting Invoice Creation for company: ${companyId}`);
-    console.log('[ERP] Request Body:', JSON.stringify(req.body, null, 2));
 
     const { items, ...rawInvoiceData } = req.body;
     
@@ -3420,7 +3412,6 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
     
     invoiceData.source_orders = sourceOrdersStr || null;
 
-    console.log('[ERP] Saving Invoice Header...');
     // Insert Invoice
     const invData = { ...invoiceData, id: invoiceId };
     const invKeys = Object.keys(invData);
@@ -3432,7 +3423,6 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
       invValues
     );
 
-    console.log(`[ERP] Saving ${items?.length || 0} Invoice Items...`);
     const cogsLines: { account_id: string; account_name: string; debit: number; credit: number; description: string }[] = [];
     const movementLines: any[] = [];
 
@@ -3566,7 +3556,6 @@ router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
     }
 
     await client.query('COMMIT');
-    console.log(`[ERP] Invoice ${invoiceId} created successfully.`);
 
     // Audit Log
     logAudit({
@@ -5274,7 +5263,7 @@ router.post('/journal_entries', authenticateToken, async (req: AuthRequest, res)
 
     
     if (['invoice', 'return', 'sales_return'].includes(finalEntryData.reference_type)) {
-       console.log('[ERP] Auto-Syncing COGS for Journal Entry', entryId);
+
        await syncCOGSForJournalEntry(client, companyId, entryId, finalEntryData.reference_id, finalEntryData.reference_type);
     }
 
@@ -5432,8 +5421,7 @@ router.post('/operations/complex', authenticateToken, async (req: AuthRequest, r
     const finalOpData = { ...opData, id: opId, company_id: companyId };
     
     // Log final data for debugging
-    console.log('[DEBUG] Creating operation with data:', JSON.stringify(finalOpData));
-    
+
     const opKeys = Object.keys(finalOpData);
     const opValues = Object.values(finalOpData);
     const opPlaceholders = opKeys.map((_, i) => `$${i + 1}`).join(', ');
@@ -5445,7 +5433,7 @@ router.post('/operations/complex', authenticateToken, async (req: AuthRequest, r
 
     // 3. Create Field Values
     if (field_values && Array.isArray(field_values)) {
-      console.log(`[DEBUG] Inserting ${field_values.length} field values for operation ${opId}`);
+
       for (const fv of field_values) {
         if (!fv.field_id) {
           console.warn('[WARN] Skipping invalid field_id:', fv.field_id);
@@ -5642,8 +5630,6 @@ router.post('/inventory/recalculate_all', async (req: any, res) => {
       duplicates.rows.forEach(r => badReferenceIds.add(r.reference_id));
     }
 
-    console.log(`[ERP] Recalculate: Found ${badReferenceIds.size} bad references. Fixing...`);
-
     const productsToRecalc = new Set<string>();
     
     // Fetch all products that need recalculation
@@ -5698,14 +5684,13 @@ router.post('/inventory/recalculate_all', async (req: any, res) => {
     }
 
     // Now recalculate stock for only the modified products
-    console.log(`[ERP] Recalculate: Recalculating WAC for ${productsToRecalc.size} products in company ${companyId}...`);
+
     for (const pid of productsToRecalc) {
         await recalculateProductStock(client, companyId, pid);
     }
     
     // Sync COGS journal entries with latest inventory movement costs
-    console.log('[ERP] Recalculate: Syncing COGS into Journal Entries (JS fallback logic)...');
-    
+
     // 1. Fetch all related Journal Entries
     const jeRes = await client.query(`
       SELECT id, reference_id, reference_type 
@@ -7718,8 +7703,6 @@ router.post('/currencies/update-rates', authenticateToken, async (req: AuthReque
       }
     }
     const companyId = req.user?.company_id || 'SYSTEM';
-
-    console.log(`[ERP] /currencies/update-rates called by user=${req.user?.id} base=${baseCurrency} company=${companyId} by=${updatedBy}`);
 
     const result = await ExchangeRatePersistenceService.persistLatestRates(
       { baseCurrency },

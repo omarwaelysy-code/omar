@@ -1512,11 +1512,10 @@ export const PurchaseReturns: React.FC = () => {
   };
 
   const handleEdit = async (ret: any) => {
-    console.log('[EDIT] Opening edit modal for purchase return ID:', ret.id);
+
     try {
       const fullData = await dbService.get<any>('purchase_returns', ret.id);
-      console.log('[EDIT] Purchase return details from API:', fullData);
-      
+
       if (!fullData) throw new Error('Return details not found');
 
       setEditingReturn(fullData);
@@ -1556,7 +1555,7 @@ export const PurchaseReturns: React.FC = () => {
         cost_center_id: item.cost_center_id || null
       })));
       setIsModalOpen(true);
-      console.log('[EDIT] Form updated with purchase return:', fullData.id);
+
     } catch (error: any) {
       console.error('[EDIT] Error loading purchase return:', error);
       showNotification(language === 'ar' ? 'فشل تحميل بيانات المرتجع' : 'Failed to load return details', 'error');

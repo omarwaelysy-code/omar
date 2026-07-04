@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { dbService } from '../services/dbService';
 import { Company, User, ActivityLog, AuditLog, SystemConfig } from '../types';
@@ -284,7 +284,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
 
         if (sendEmailOnCreate) {
           // Simulate sending email
-          console.log(`Sending welcome email to ${formData.email} with password ${tempPassword}`);
+
         }
 
         setTempPasswordData({ email: formData.email || '', password: tempPassword });

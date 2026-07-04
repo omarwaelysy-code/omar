@@ -1385,11 +1385,10 @@ export const Returns: React.FC = () => {
 
   const openModal = async (ret?: Return) => {
     if (ret) {
-      console.log('[EDIT] Opening edit modal for sales return ID:', ret.id);
+
       try {
         const fullData = await dbService.get<Return>('returns', ret.id);
-        console.log('[EDIT] Sales return details from API:', fullData);
-        
+
         if (!fullData) throw new Error('Return details not found');
 
         setEditingReturn(fullData);
@@ -1409,7 +1408,7 @@ export const Returns: React.FC = () => {
         setSelectedCurrencyId(fullData.currency_id || '');
         setExchangeRate(fullData.exchange_rate || 1);
         setExchangeRateType(fullData.exchange_rate_type || 'auto');
-        console.log('[EDIT] Form updated with sales return:', fullData.id);
+
       } catch (error: any) {
         console.error('[EDIT] Error loading return:', error);
         showNotification('فشل تحميل بيانات المرتجع', 'error');

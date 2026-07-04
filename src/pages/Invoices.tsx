@@ -2833,12 +2833,11 @@ export const Invoices: React.FC = () => {
   };
 
   const openEditModal = async (invoice: Invoice) => {
-    console.log('[EDIT] Opening Edit Modal for ID:', invoice.id);
+
     try {
       // Fetch latest full data to be sure we have everything including items
       const fullData = await dbService.get<Invoice>('invoices', invoice.id);
-      console.log('[EDIT] Full data received from API:', fullData);
-      
+
       if (!fullData) throw new Error('Could not fetch invoice details');
 
       setEditingInvoice(fullData);

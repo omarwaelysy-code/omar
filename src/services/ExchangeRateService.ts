@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ExchangeRateService
  *
  * Fetches the latest foreign-exchange rates from the exchangerate.host public API
@@ -89,8 +89,6 @@ export class ExchangeRateService {
 
     // open.er-api.com path: /v6/latest/{BASE_CODE}
     const url = `${API_BASE_URL}/${encodeURIComponent(baseCurrency)}`;
-
-    console.log(`${SERVICE_TAG} Fetching latest rates | base=${baseCurrency} timeout=${timeoutMs}ms url=${url}`);
 
     // ── Build AbortController for network timeout ──────────────────────────
     const controller = new AbortController();

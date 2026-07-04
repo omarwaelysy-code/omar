@@ -1,9 +1,9 @@
-import fs from 'fs';
+﻿import fs from 'fs';
 import path from 'path';
 import pool from './postgres';
 
 export async function runMigrations() {
-  console.log('🔄 Running Database Migrations...');
+
   let appliedCount = 0;
   
   const client = await pool.connect();
@@ -36,7 +36,7 @@ export async function runMigrations() {
     const migrationsDir = path.join(dbDir, 'migrations');
 
     // 0. Programmatic Column Migrations (Requested by User)
-    console.log('🛠️ Checking for required columns...');
+
     const columnsToSync = [
       { table: 'journal_entries', column: 'entry_number', type: 'VARCHAR(50)' },
       { table: 'receipt_vouchers', column: 'account_id', type: 'VARCHAR(36) REFERENCES accounts(id)' },
@@ -142,10 +142,10 @@ export async function runMigrations() {
       `, [item.table, item.column]);
 
       if (colRows.length === 0) {
-        console.log(`🚀 Adding missing column: "${item.table}"."${item.column}"...`);
+
         try {
           await client.query(`ALTER TABLE "${item.table}" ADD COLUMN IF NOT EXISTS "${item.column}" ${item.type}`);
-          console.log(`✅ Column "${item.table}"."${item.column}" added successfully.`);
+
           appliedCount++;
         } catch (colError: any) {
           console.error(`❌ Failed to add column "${item.table}"."${item.column}":`, colError.message);
@@ -162,7 +162,7 @@ export async function runMigrations() {
 
     // 1. Run Master Migration
     if (fs.existsSync(masterMigrationPath)) {
-      console.log('📦 Checking Master Migration...');
+
       const sql = fs.readFileSync(masterMigrationPath, 'utf8');
       
       // We run master migration EVERY TIME because it uses "IF NOT EXISTS"
@@ -175,8 +175,7 @@ export async function runMigrations() {
         if (rows.length === 0) {
           await client.query('INSERT INTO migrations (name) VALUES ($1)', ['master-migration']);
         }
-        
-        console.log('✅ Master Migration synced.');
+
       } catch (masterError) {
         console.warn('⚠️ Master Migration sync warning (non-fatal):', masterError instanceof Error ? masterError.message : masterError);
         // We don't fail the whole process for master errors because it might have partial successes
@@ -192,11 +191,11 @@ export async function runMigrations() {
       for (const file of files) {
         const { rows } = await client.query('SELECT id FROM migrations WHERE name = $1', [file]);
         if (rows.length === 0) {
-          console.log(`🚀 Applying Migration: ${file}...`);
+
           const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
           await client.query(sql);
           await client.query('INSERT INTO migrations (name) VALUES ($1)', [file]);
-          console.log(`✅ Migration ${file} applied successfully.`);
+
           appliedCount++;
         }
       }

@@ -1,4 +1,4 @@
-import { dbService } from './dbService';
+﻿import { dbService } from './dbService';
 import { TransactionManager, TransactionStep } from './TransactionManager';
 import { JournalEntrySchema } from '../lib/schemas';
 
@@ -11,8 +11,6 @@ export class LoadTestScenario {
   static async runBurst(companyId: string, userId: string, iterations: number = 100) {
     const tm = new TransactionManager();
     const startTime = performance.now();
-    
-    console.log(`[LoadTest] Starting burst of ${iterations} parallel transactions...`);
 
     const promises = Array.from({ length: iterations }).map((_, i) => {
       const amount = Math.floor(Math.random() * 1000) + 1;
@@ -42,8 +40,6 @@ export class LoadTestScenario {
     const succeeded = results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(r => r.status === 'rejected').length;
 
-    console.log(`[LoadTest] Burst completed in ${(endTime - startTime).toFixed(2)}ms`);
-    console.log(`[LoadTest] Success: ${succeeded}, Failed: ${failed}`);
 
     return {
       duration: endTime - startTime,

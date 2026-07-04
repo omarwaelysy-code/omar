@@ -1,4 +1,4 @@
-import pool from './postgres';
+﻿import pool from './postgres';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -7,8 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
  * This script is designed to be idempotent and migration-safe.
  */
 export async function initDatabase() {
-  console.log('🚀 [PostgreSQL] Initializing ERP V2 Core System...');
-  
+
   let client;
   let retries = 5;
   let delay = 2000;
@@ -16,7 +15,7 @@ export async function initDatabase() {
   while (retries > 0) {
     try {
       client = await pool.connect();
-      console.log('✅ Connected to PostgreSQL.');
+
       break;
     } catch (err: any) {
       retries--;
@@ -62,7 +61,6 @@ export async function initDatabase() {
     };
 
     // 1. Core Tables Initialization
-    console.log('  - Building Tables...');
 
     // Phase 1: Identity
     await safeQuery(`
@@ -875,7 +873,6 @@ export async function initDatabase() {
     `, 'operation_field_values table');
 
     // 2. Safe Indices
-    console.log('  - Securing Indices...');
 
     await safeQuery(`
       ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "weighted_average_cost" DECIMAL(18, 4) DEFAULT 0;
@@ -1045,12 +1042,9 @@ export async function initDatabase() {
     await safeQuery('CREATE INDEX IF NOT EXISTS "idx_payroll_company" ON "payroll"("company_id");', 'idx_payroll_company');
     await safeQuery('CREATE INDEX IF NOT EXISTS "idx_assets_company" ON "assets"("company_id");', 'idx_assets_company');
 
-    console.log('✅ Base Schema Guardrails active.');
-
     // Seeding
     await seedDatabase(client);
 
-    console.log('🔥 [PostgreSQL] Initialized Successfully.');
   } catch (error) {
     if (client) await client.query('ROLLBACK');
     console.error('❌ Schema Initialization Failed (System will continue):');
@@ -1062,8 +1056,7 @@ export async function initDatabase() {
 }
 
 async function seedDatabase(client: any) {
-  console.log('  - Seeding System Defaults...');
-  
+
   // 1. Ensure 'SYSTEM' Company Exists
   try {
     const { rows: companyRows } = await client.query('SELECT id FROM companies WHERE id = $1', ['SYSTEM']);
@@ -1110,7 +1103,7 @@ async function seedDatabase(client: any) {
     const defaultTemplateId = 'system-default-dashboard';
     const { rows: dashRows } = await client.query('SELECT id FROM dashboards WHERE id = $1', [defaultTemplateId]);
     if (dashRows.length === 0) {
-      console.log('    - Seeding Default Dashboard Template...');
+
       await client.query(`
         INSERT INTO dashboards (id, company_id, owner_user_id, name, description, is_default, is_system, icon)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -1162,7 +1155,7 @@ async function seedDatabase(client: any) {
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         `, [w.id, defaultTemplateId, w.widget_type, w.title, w.x, w.y, w.w, w.h, JSON.stringify(w.settings), JSON.stringify(w.filters), w.order]);
       }
-      console.log('    - Default Dashboard Template widgets seeded.');
+
     }
   } catch (e) {
     console.warn('    ! Dashboard template seeding failed:', e);

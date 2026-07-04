@@ -1,4 +1,4 @@
-import { dbService } from './dbService';
+﻿import { dbService } from './dbService';
 import { z } from 'zod';
 
 export interface TransactionStep {
@@ -56,7 +56,7 @@ export class TransactionManager {
       try {
         await dbService.delete(item.collection, item.id);
         if (process.env.NODE_ENV !== 'test') {
-          console.log(`[Rollback] Successful: ${item.collection}:${item.id}`);
+
         }
       } catch (err) {
         console.error(`[Rollback] Failed for ${item.collection}:${item.id}`, err);
