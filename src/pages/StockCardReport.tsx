@@ -32,10 +32,13 @@ export const StockCardReport: React.FC = () => {
   const [filterPartner, setFilterPartner] = useState('');
 
   const [movements, setMovements] = useState<any[]>([]);
+  const [goodsReceipts, setGoodsReceipts] = useState<any[]>([]);
+  const [goodsReceiptItems, setGoodsReceiptItems] = useState<any[]>([]);
   const [docMap, setDocMap] = useState<Record<string, DocMapInfo>>({});
   const [loading, setLoading] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
 
+  const printableAreaRef = useRef<HTMLDivElement>(null);
   const reportTableRef = useRef<HTMLTableElement>(null);
 
   // Load all products and warehouses for dropdown selection
@@ -101,12 +104,14 @@ export const StockCardReport: React.FC = () => {
         product_id: selectedProductId 
       });
 
-      const [invs, pinvs, rets, prets, jes] = await Promise.all([
+      const [invs, pinvs, rets, prets, jes, grs, grItems] = await Promise.all([
         dbService.list<any>('invoices', { company_id: user.company_id }),
         dbService.list<any>('purchase_invoices', { company_id: user.company_id }),
         dbService.list<any>('returns', { company_id: user.company_id }),
         dbService.list<any>('purchase_returns', { company_id: user.company_id }),
-        dbService.list<any>('journal_entries', { company_id: user.company_id })
+        dbService.list<any>('journal_entries', { company_id: user.company_id }),
+        dbService.list<any>('goods_receipts', { company_id: user.company_id }),
+        dbService.list<any>('goods_receipt_items', { company_id: user.company_id, product_id: selectedProductId })
       ]);
 
       const jeMap: Record<string, string> = {};
@@ -149,6 +154,8 @@ export const StockCardReport: React.FC = () => {
 
       setDocMap(map);
       setMovements(mvs || []);
+      setGoodsReceipts(grs || []);
+      setGoodsReceiptItems(grItems || []);
     } catch (e) {
       console.error("Failed to load product movements", e);
     } finally {
@@ -161,6 +168,8 @@ export const StockCardReport: React.FC = () => {
       loadMovementData();
     } else {
       setMovements([]);
+      setGoodsReceipts([]);
+      setGoodsReceiptItems([]);
     }
   }, [selectedProductId]);
 
@@ -196,7 +205,9 @@ export const StockCardReport: React.FC = () => {
   };
 
   // Processing movements calculation sequentially to get correct running balances
-  const sortedMovements = [...movements].sort((a, b) => {
+  const sortedMovements = [...movements]
+    .filter(m => m.movement_type !== 'goods_receipt')
+    .sort((a, b) => {
     const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
     if (dateDiff !== 0) return dateDiff;
     
@@ -301,8 +312,8 @@ export const StockCardReport: React.FC = () => {
   };
 
   const handleExportStockCardPDF = async () => {
-    if (reportTableRef.current && selectedProduct) {
-      await exportToPDF(reportTableRef.current, {
+    if (printableAreaRef.current && selectedProduct) {
+      await exportToPDF(printableAreaRef.current, {
         filename: `Stock_Card_${selectedProduct.name}`,
         reportTitle: language === 'ar' 
           ? `كارت حركة وتكلفة الصنف: ${selectedProduct.name} (${selectedProduct.code})` 
@@ -538,110 +549,280 @@ export const StockCardReport: React.FC = () => {
         )}
 
         {/* Ledger Document Output Area inside Card View styling */}
-        {selectedProductId && (
-          <div id="stock-card-report-printable-area" className="border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm bg-white p-6 md:p-8">
-            <div className="text-center mb-8 border-b border-zinc-100 pb-6">
-              <h3 className="text-2xl font-black text-slate-900 mb-2">
-                {language === 'ar' ? 'كارت حركة وتكلفة الصنف' : 'Product Stock Card Report'}
-              </h3>
-              <div className="flex justify-center flex-wrap gap-8 text-sm text-slate-500 mt-3 font-semibold">
-                <p>{language === 'ar' ? 'الصنف:' : 'Product:'} <span className="font-bold text-slate-900">{selectedProduct?.name}</span></p>
-                <p>{language === 'ar' ? 'الرمز:' : 'Code:'} <span className="font-bold font-mono text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md text-xs">{selectedProduct?.code}</span></p>
-                <p>{language === 'ar' ? 'الفترة:' : 'Period:'} <span className="font-bold text-slate-900">{dateFrom || (language === 'ar' ? 'البداية' : 'Start')}</span> {language === 'ar' ? 'إلى' : 'to'} <span className="font-bold text-slate-900">{dateTo}</span></p>
+        {selectedProductId && (() => {
+          const uninvoicedReceipts = goodsReceiptItems
+            .filter(item => {
+              const gr = goodsReceipts.find(g => g.id === item.goods_receipt_id);
+              return gr && gr.status === 'posted' && parseFloat(item.remaining_quantity || '0') > 0.0001;
+            })
+            .map(item => {
+              const gr = goodsReceipts.find(g => g.id === item.goods_receipt_id);
+              const qty = parseFloat(item.quantity || '0');
+              const billedQty = parseFloat(item.billed_quantity || '0');
+              const remainingQty = parseFloat(item.remaining_quantity || '0');
+              const unitCost = parseFloat(item.unit_cost || '0');
+              const remainingValue = remainingQty * unitCost;
+              return {
+                ...item,
+                receipt_number: gr?.receipt_number || '',
+                date: gr?.date || '',
+                supplier_name: gr?.supplier_name || '',
+                quantity: qty,
+                billed_quantity: billedQty,
+                remaining_quantity: remainingQty,
+                unit_cost: unitCost,
+                remainingValue
+              };
+            })
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+          const finalInvoicedQty = movementsWithBalances.length > 0 ? movementsWithBalances[movementsWithBalances.length - 1].runningQty : 0;
+          const finalInvoicedValue = movementsWithBalances.length > 0 ? movementsWithBalances[movementsWithBalances.length - 1].runningValue : 0;
+          const invoicedUnitCost = Math.abs(finalInvoicedQty) > 0.0001 ? (finalInvoicedValue / finalInvoicedQty) : 0;
+
+          const totalUninvoicedQty = uninvoicedReceipts.reduce((acc, curr) => acc + curr.remaining_quantity, 0);
+          const totalUninvoicedValue = uninvoicedReceipts.reduce((acc, curr) => acc + curr.remainingValue, 0);
+          const uninvoicedUnitCost = Math.abs(totalUninvoicedQty) > 0.0001 ? (totalUninvoicedValue / totalUninvoicedQty) : 0;
+
+          const totalPhysicalQty = finalInvoicedQty + totalUninvoicedQty;
+          const totalPhysicalValue = finalInvoicedValue + totalUninvoicedValue;
+          const totalPhysicalUnitCost = Math.abs(totalPhysicalQty) > 0.0001 ? (totalPhysicalValue / totalPhysicalQty) : 0;
+
+          return (
+            <div id="stock-card-report-printable-area" ref={printableAreaRef} className="border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm bg-white p-6 md:p-8 space-y-8">
+              {/* Header */}
+              <div className="text-center mb-8 border-b border-zinc-100 pb-6">
+                <h3 className="text-2xl font-black text-slate-900 mb-2">
+                  {language === 'ar' ? 'كارت حركة وتكلفة الصنف' : 'Product Stock Card Report'}
+                </h3>
+                <div className="flex justify-center flex-wrap gap-8 text-sm text-slate-500 mt-3 font-semibold">
+                  <p>{language === 'ar' ? 'الصنف:' : 'Product:'} <span className="font-bold text-slate-900">{selectedProduct?.name}</span></p>
+                  <p>{language === 'ar' ? 'الرمز:' : 'Code:'} <span className="font-bold font-mono text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md text-xs">{selectedProduct?.code}</span></p>
+                  <p>{language === 'ar' ? 'الفترة:' : 'Period:'} <span className="font-bold text-slate-900">{dateFrom || (language === 'ar' ? 'البداية' : 'Start')}</span> {language === 'ar' ? 'إلى' : 'to'} <span className="font-bold text-slate-900">{dateTo}</span></p>
+                </div>
+              </div>
+
+              {/* Main Ledger Table */}
+              <div>
+                <div className="text-right mb-4">
+                  <h4 className="text-lg font-black text-slate-800">
+                    {language === 'ar' ? 'حركات المخزون المفوترة (المنتهية)' : 'Invoiced Stock Movements'}
+                  </h4>
+                </div>
+                
+                {loading ? (
+                  <div className="py-20 text-center">
+                    <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  </div>
+                ) : filteredMovements.length === 0 ? (
+                  <div className="p-16 text-center border-2 border-dashed border-slate-100 rounded-[2.5rem] bg-slate-50/20">
+                    <History className="w-14 h-14 text-slate-300 mx-auto mb-4 animate-pulse" />
+                    <p className="text-slate-400 font-extrabold text-lg">{language === 'ar' ? 'لا توجد حركات مسجلة لهذا الصنف تطابق الفلاتر المحددة' : 'No recorded movements matching the filters for this product'}</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto custom-scrollbar">
+                    <table ref={reportTableRef} className="w-full min-w-[1250px] border-collapse bg-white text-center text-xs">
+                      <thead className="bg-slate-50 text-[10px] uppercase font-black tracking-widest text-slate-400 border-b border-slate-200">
+                        <tr>
+                          <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                          <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'رقم الحركة' : 'Movement No.'}</th>
+                          <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</th>
+                          <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'نوع الحركة' : 'Type'}</th>
+                          <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'المخزن' : 'Warehouse'}</th>
+                          <th rowSpan={2} className="px-5 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'العميل / المورد' : 'Customer/Supplier'}</th>
+                          <th rowSpan={1} className="px-5 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'الوصف' : 'Description'}</th>
+                          <th colSpan={3} className="px-1.5 py-1.5 border-r border-b border-slate-200 bg-emerald-50/30 text-emerald-800 font-bold">{language === 'ar' ? 'الكمية' : 'Quantity'}</th>
+                          <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'سياسة التكلفة' : 'Cost Policy'}</th>
+                          <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'سعر التكلفة' : 'Unit Cost'}</th>
+                          <th colSpan={3} className="px-1.5 py-1.5 border-b border-slate-200 bg-sky-50/30 text-sky-800 font-bold">{language === 'ar' ? 'القيم المالية للمخزون' : 'Financial Value'}</th>
+                        </tr>
+                        <tr>
+                          <th className="px-5 py-1.5 border-r border-slate-200 text-slate-400 text-[10px] whitespace-nowrap">{language === 'ar' ? 'شرح الحركة' : 'Remark'}</th>
+                          <th className="px-3 py-1.5 border-r border-slate-200 bg-emerald-50/10 text-emerald-600 font-bold whitespace-nowrap">{language === 'ar' ? 'الوارد (+)' : 'In (+)'}</th>
+                          <th className="px-3 py-1.5 border-r border-slate-200 bg-rose-50/10 text-rose-600 font-bold whitespace-nowrap">{language === 'ar' ? 'المصرف (-)' : 'Out (-)'}</th>
+                          <th className="px-3 py-1.5 border-r border-slate-200 bg-emerald-100/30 text-emerald-800 font-black whitespace-nowrap">{language === 'ar' ? 'الرصيد' : 'Balance'}</th>
+                          <th className="px-3 py-1.5 border-r border-slate-200 bg-sky-50/10 text-sky-600 font-bold whitespace-nowrap">{language === 'ar' ? 'قيمة مدين (+)' : 'Debit Value'}</th>
+                          <th className="px-3 py-1.5 border-r border-slate-200 bg-rose-50/10 text-rose-600 font-bold whitespace-nowrap">{language === 'ar' ? 'قيمة دائن (-)' : 'Credit Value'}</th>
+                          <th className="px-4 py-1.5 bg-blue-100/30 text-blue-800 font-black whitespace-nowrap">{language === 'ar' ? 'الرصيد' : 'Balance Value'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-700 font-bold">
+                        {filteredMovements.map((m, index) => (
+                          <tr key={m.id || index} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-4 border-r border-slate-200 font-mono whitespace-nowrap">{m.date.slice(0, 10)}</td>
+                            <td className="px-4 py-4 border-r border-slate-200 font-mono text-slate-500 whitespace-nowrap">{m.reference_number}</td>
+                            <td className="px-4 py-4 border-r border-slate-200 whitespace-nowrap">
+                              {m.entry_number ? (
+                                <span 
+                                  onClick={() => {
+                                    setPendingViewDoc({ type: 'journal', idOrNumber: m.entry_number });
+                                    setCurrentPage('journal_entries');
+                                  }}
+                                  className="px-3 py-1 bg-zinc-100 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 whitespace-nowrap"
+                                >
+                                  {m.entry_number}
+                                </span>
+                              ) : '-'}
+                            </td>
+                            <td className="px-4 py-4 border-r border-slate-200 whitespace-nowrap">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                m.movement_type === 'purchase' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                                m.movement_type === 'sale' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
+                                m.movement_type === 'sales_return' ? 'bg-teal-50 text-teal-700 border border-teal-100' :
+                                'bg-amber-50 text-amber-700 border border-amber-100'
+                              }`}>
+                                {getMovementTypeLabel(m.movement_type)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-4 border-r border-slate-200 text-slate-600 whitespace-nowrap">{m.warehouseName}</td>
+                            <td className="px-5 py-4 border-r border-slate-200 text-slate-800 font-black whitespace-nowrap">{m.partner || '-'}</td>
+                            <td className="px-5 py-4 border-r border-slate-200 text-right text-slate-500 whitespace-normal max-w-[200px] truncate" title={m.description}>{m.description || '-'}</td>
+                            
+                            {/* Quantities */}
+                            <td className="px-3 py-4 border-r border-slate-200 bg-emerald-50/5 font-mono text-slate-800">{m.qtyIn > 0 ? formatNumber(m.qtyIn) : '-'}</td>
+                            <td className="px-3 py-4 border-r border-slate-200 bg-rose-50/5 font-mono text-slate-800">{m.qtyOut > 0 ? formatNumber(m.qtyOut) : '-'}</td>
+                            <td className="px-3 py-4 border-r border-slate-200 bg-emerald-50/20 font-black font-mono text-emerald-700">{formatNumber(m.runningQty)}</td>
+                            
+                            {/* Cost Policy & Cost Price */}
+                            <td className="px-4 py-4 border-r border-slate-200 text-[10px] text-slate-500 whitespace-nowrap">
+                              {getMovementCostPolicyLabel(m.movement_type, m.cost_policy || selectedProduct?.inventory_cost_method || 'wac')}
+                            </td>
+                            <td className="px-4 py-4 border-r border-slate-200 font-mono text-slate-800">{formatNumber(m.unit_cost)}</td>
+                            
+                            {/* Values */}
+                            <td className="px-3 py-4 border-r border-slate-200 bg-sky-50/5 font-mono text-slate-800">{m.debitVal > 0 ? formatNumber(m.debitVal) : '-'}</td>
+                            <td className="px-3 py-4 border-r border-slate-200 bg-rose-50/5 font-mono text-slate-800">{m.creditVal > 0 ? formatNumber(m.creditVal) : '-'}</td>
+                            <td className="px-4 py-4 bg-blue-50/20 font-black font-mono text-blue-700">{formatNumber(m.runningValue)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Table 2: Goods Receipts Not Invoiced (GRNI) */}
+              <div className="pt-6 border-t border-slate-100">
+                <div className="text-right mb-4">
+                  <h4 className="text-lg font-black text-slate-800">
+                    {language === 'ar' ? 'إيصالات استلام البضائع غير المفوترة (GRNI)' : 'Goods Receipts Not Invoiced (GRNI)'}
+                  </h4>
+                  <p className="text-slate-400 text-xs font-bold mt-1">
+                    {language === 'ar' 
+                      ? 'الاستلامات المخزنية الموثقة التي لم تصدر لها فواتير شراء بعد (أو المتبقي منها)' 
+                      : 'Posted goods receipts that have not been fully invoiced yet'}
+                  </p>
+                </div>
+
+                {uninvoicedReceipts.length === 0 ? (
+                  <div className="p-8 text-center border border-dashed border-slate-100 rounded-2xl bg-slate-50/20">
+                    <p className="text-slate-400 font-bold text-xs">
+                      {language === 'ar' ? 'لا توجد إيصالات استلام غير مفوترة لهذا الصنف' : 'No uninvoiced goods receipts for this product'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto custom-scrollbar">
+                    <table className="w-full min-w-[1250px] border-collapse bg-white text-center text-xs">
+                      <thead className="bg-slate-50 text-[10px] uppercase font-black tracking-widest text-slate-400 border-b border-slate-200">
+                        <tr>
+                          <th className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'تاريخ الاستلام' : 'Receipt Date'}</th>
+                          <th className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'رقم الإذن' : 'Receipt No.'}</th>
+                          <th className="px-5 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'المورد' : 'Supplier'}</th>
+                          <th className="px-3 py-3 border-r border-slate-200 bg-emerald-50/20 text-emerald-800 font-bold whitespace-nowrap">{language === 'ar' ? 'الكمية المستلمة' : 'Received Qty'}</th>
+                          <th className="px-3 py-3 border-r border-slate-200 bg-blue-50/20 text-blue-800 font-bold whitespace-nowrap">{language === 'ar' ? 'الكمية المفوترة' : 'Billed Qty'}</th>
+                          <th className="px-3 py-3 border-r border-slate-200 bg-amber-50/20 text-amber-800 font-black whitespace-nowrap">{language === 'ar' ? 'الكمية المتبقية' : 'Remaining Qty'}</th>
+                          <th className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'سعر التكلفة الاسترشادي' : 'Unit Cost'}</th>
+                          <th className="px-4 py-3 bg-rose-50/20 text-rose-800 font-black whitespace-nowrap">{language === 'ar' ? 'قيمة الاستلام المتبقية' : 'Remaining Value'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-700 font-bold">
+                        {uninvoicedReceipts.map((item, idx) => (
+                          <tr key={item.id || idx} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-4 border-r border-slate-200 font-mono whitespace-nowrap">{item.date.slice(0, 10)}</td>
+                            <td className="px-4 py-4 border-r border-slate-200 font-mono text-slate-500 whitespace-nowrap">{item.receipt_number}</td>
+                            <td className="px-5 py-4 border-r border-slate-200 text-slate-800 font-black whitespace-nowrap">{item.supplier_name || '-'}</td>
+                            <td className="px-3 py-4 border-r border-slate-200 bg-emerald-50/5 font-mono text-slate-800">{formatNumber(item.quantity)}</td>
+                            <td className="px-3 py-4 border-r border-slate-200 bg-blue-50/5 font-mono text-slate-800">{formatNumber(item.billed_quantity)}</td>
+                            <td className="px-3 py-4 border-r border-slate-200 bg-amber-50/10 font-black font-mono text-amber-700">{formatNumber(item.remaining_quantity)}</td>
+                            <td className="px-4 py-4 border-r border-slate-200 font-mono text-slate-800">{formatNumber(item.unit_cost)}</td>
+                            <td className="px-4 py-4 bg-rose-50/10 font-black font-mono text-rose-700">{formatNumber(item.remainingValue)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Section 3: Final Inventory Balance (الرصيد النهائي) */}
+              <div className="pt-6 border-t border-slate-100">
+                <div className="text-right mb-4">
+                  <h4 className="text-lg font-black text-slate-800">
+                    {language === 'ar' ? 'ملخص الرصيد النهائي للمخزون' : 'Final Stock Balance Summary'}
+                  </h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                  {/* 1. Invoiced stock */}
+                  <div className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm text-right space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-slate-400">{language === 'ar' ? 'الرصيد المفوتر (المنتهي)' : 'Invoiced Balance'}</span>
+                      <span className="w-2.5 h-2.5 bg-blue-500 rounded-full"></span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-800 font-mono">
+                      {formatNumber(finalInvoicedQty)} <span className="text-xs text-slate-400 font-bold">{selectedProduct?.unit || ''}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-bold text-slate-500 pt-2 border-t border-slate-100">
+                      <span>{language === 'ar' ? 'متوسط التكلفة:' : 'Avg Cost:'}</span>
+                      <span className="font-mono text-slate-700">{formatNumber(invoicedUnitCost)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-bold text-slate-500">
+                      <span>{language === 'ar' ? 'إجمالي القيمة:' : 'Total Value:'}</span>
+                      <span className="font-mono text-blue-600">{formatNumber(finalInvoicedValue)}</span>
+                    </div>
+                  </div>
+
+                  {/* 2. Uninvoiced stock */}
+                  <div className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm text-right space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-slate-400">{language === 'ar' ? 'استلامات غير مفوترة' : 'Uninvoiced Receipts'}</span>
+                      <span className="w-2.5 h-2.5 bg-amber-500 rounded-full"></span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-800 font-mono">
+                      {formatNumber(totalUninvoicedQty)} <span className="text-xs text-slate-400 font-bold">{selectedProduct?.unit || ''}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-bold text-slate-500 pt-2 border-t border-slate-100">
+                      <span>{language === 'ar' ? 'متوسط التكلفة:' : 'Avg Cost:'}</span>
+                      <span className="font-mono text-slate-700">{formatNumber(uninvoicedUnitCost)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-bold text-slate-500">
+                      <span>{language === 'ar' ? 'إجمالي القيمة:' : 'Total Value:'}</span>
+                      <span className="font-mono text-amber-600">{formatNumber(totalUninvoicedValue)}</span>
+                    </div>
+                  </div>
+
+                  {/* 3. Net Physical stock */}
+                  <div className="bg-emerald-600 p-5 rounded-2xl shadow-sm text-right text-white space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-emerald-100">{language === 'ar' ? 'إجمالي الرصيد الفعلي (الفيزيائي)' : 'Total Physical Balance'}</span>
+                      <span className="w-2.5 h-2.5 bg-white rounded-full animate-ping"></span>
+                    </div>
+                    <div className="text-2xl font-black font-mono">
+                      {formatNumber(totalPhysicalQty)} <span className="text-xs text-emerald-100 font-bold">{selectedProduct?.unit || ''}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-bold text-emerald-100 pt-2 border-t border-emerald-500">
+                      <span>{language === 'ar' ? 'متوسط التكلفة:' : 'Avg Cost:'}</span>
+                      <span className="font-mono text-white">{formatNumber(totalPhysicalUnitCost)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-bold text-emerald-100">
+                      <span>{language === 'ar' ? 'إجمالي القيمة:' : 'Total Value:'}</span>
+                      <span className="font-mono text-white">{formatNumber(totalPhysicalValue)}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-
-            {loading ? (
-              <div className="py-20 text-center">
-                <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-              </div>
-            ) : filteredMovements.length === 0 ? (
-              <div className="p-16 text-center border-2 border-dashed border-slate-100 rounded-[2.5rem] bg-slate-50/20">
-                <History className="w-14 h-14 text-slate-300 mx-auto mb-4 animate-pulse" />
-                <p className="text-slate-400 font-extrabold text-lg">{language === 'ar' ? 'لا توجد حركات مسجلة لهذا الصنف تطابق الفلاتر المحددة' : 'No recorded movements matching the filters for this product'}</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto custom-scrollbar">
-                <table ref={reportTableRef} className="w-full min-w-[1250px] border-collapse bg-white text-center text-xs">
-                  <thead className="bg-slate-50 text-[10px] uppercase font-black tracking-widest text-slate-400 border-b border-slate-200">
-                    <tr>
-                      <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
-                      <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'رقم الحركة' : 'Movement No.'}</th>
-                      <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</th>
-                      <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'نوع الحركة' : 'Type'}</th>
-                      <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'المخزن' : 'Warehouse'}</th>
-                      <th rowSpan={2} className="px-5 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'العميل / المورد' : 'Customer/Supplier'}</th>
-                      <th rowSpan={1} className="px-5 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'الوصف' : 'Description'}</th>
-                      <th colSpan={3} className="px-1.5 py-1.5 border-r border-b border-slate-200 bg-emerald-50/30 text-emerald-800 font-bold">{language === 'ar' ? 'الكمية' : 'Quantity'}</th>
-                      <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'سياسة التكلفة' : 'Cost Policy'}</th>
-                      <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'سعر التكلفة' : 'Unit Cost'}</th>
-                      <th colSpan={3} className="px-1.5 py-1.5 border-b border-slate-200 bg-sky-50/30 text-sky-800 font-bold">{language === 'ar' ? 'القيم المالية للمخزون' : 'Financial Value'}</th>
-                    </tr>
-                    <tr>
-                      <th className="px-5 py-1.5 border-r border-slate-200 text-slate-400 text-[10px] whitespace-nowrap">{language === 'ar' ? 'شرح الحركة' : 'Remark'}</th>
-                      <th className="px-3 py-1.5 border-r border-slate-200 bg-emerald-50/10 text-emerald-600 font-bold whitespace-nowrap">{language === 'ar' ? 'الوارد (+)' : 'In (+)'}</th>
-                      <th className="px-3 py-1.5 border-r border-slate-200 bg-rose-50/10 text-rose-600 font-bold whitespace-nowrap">{language === 'ar' ? 'المصرف (-)' : 'Out (-)'}</th>
-                      <th className="px-3 py-1.5 border-r border-slate-200 bg-emerald-100/30 text-emerald-800 font-black whitespace-nowrap">{language === 'ar' ? 'الرصيد' : 'Balance'}</th>
-                      <th className="px-3 py-1.5 border-r border-slate-200 bg-sky-50/10 text-sky-600 font-bold whitespace-nowrap">{language === 'ar' ? 'قيمة مدين (+)' : 'Debit Value'}</th>
-                      <th className="px-3 py-1.5 border-r border-slate-200 bg-rose-50/10 text-rose-600 font-bold whitespace-nowrap">{language === 'ar' ? 'قيمة دائن (-)' : 'Credit Value'}</th>
-                      <th className="px-4 py-1.5 bg-blue-100/30 text-blue-800 font-black whitespace-nowrap">{language === 'ar' ? 'الرصيد' : 'Balance Value'}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-700 font-bold">
-                    {filteredMovements.map((m, index) => (
-                      <tr key={m.id || index} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-4 py-4 border-r border-slate-200 font-mono whitespace-nowrap">{m.date.slice(0, 10)}</td>
-                        <td className="px-4 py-4 border-r border-slate-200 font-mono text-slate-500 whitespace-nowrap">{m.reference_number}</td>
-                        <td className="px-4 py-4 border-r border-slate-200 whitespace-nowrap">
-                          {m.entry_number ? (
-                            <span 
-                              onClick={() => {
-                                setPendingViewDoc({ type: 'journal', idOrNumber: m.entry_number });
-                                setCurrentPage('journal_entries');
-                              }}
-                              className="px-3 py-1 bg-zinc-100 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 whitespace-nowrap"
-                            >
-                              {m.entry_number}
-                            </span>
-                          ) : '-'}
-                        </td>
-                        <td className="px-4 py-4 border-r border-slate-200 whitespace-nowrap">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            m.movement_type === 'purchase' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                            m.movement_type === 'sale' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
-                            m.movement_type === 'sales_return' ? 'bg-teal-50 text-teal-700 border border-teal-100' :
-                            'bg-amber-50 text-amber-700 border border-amber-100'
-                          }`}>
-                            {getMovementTypeLabel(m.movement_type)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 border-r border-slate-200 text-slate-600 whitespace-nowrap">{m.warehouseName}</td>
-                        <td className="px-5 py-4 border-r border-slate-200 text-slate-800 font-black whitespace-nowrap">{m.partner || '-'}</td>
-                        <td className="px-5 py-4 border-r border-slate-200 text-right text-slate-500 whitespace-normal max-w-[200px] truncate" title={m.description}>{m.description || '-'}</td>
-                        
-                        {/* Quantities */}
-                        <td className="px-3 py-4 border-r border-slate-200 bg-emerald-50/5 font-mono text-slate-800">{m.qtyIn > 0 ? formatNumber(m.qtyIn) : '-'}</td>
-                        <td className="px-3 py-4 border-r border-slate-200 bg-rose-50/5 font-mono text-slate-800">{m.qtyOut > 0 ? formatNumber(m.qtyOut) : '-'}</td>
-                        <td className="px-3 py-4 border-r border-slate-200 bg-emerald-50/20 font-black font-mono text-emerald-700">{formatNumber(m.runningQty)}</td>
-                        
-                        {/* Cost Policy & Cost Price */}
-                        <td className="px-4 py-4 border-r border-slate-200 text-[10px] text-slate-500 whitespace-nowrap">
-                          {getMovementCostPolicyLabel(m.movement_type, m.cost_policy || selectedProduct?.inventory_cost_method || 'wac')}
-                        </td>
-                        <td className="px-4 py-4 border-r border-slate-200 font-mono text-slate-800">{formatNumber(m.unit_cost)}</td>
-                        
-                        {/* Values */}
-                        <td className="px-3 py-4 border-r border-slate-200 bg-sky-50/5 font-mono text-slate-800">{m.debitVal > 0 ? formatNumber(m.debitVal) : '-'}</td>
-                        <td className="px-3 py-4 border-r border-slate-200 bg-rose-50/5 font-mono text-slate-800">{m.creditVal > 0 ? formatNumber(m.creditVal) : '-'}</td>
-                        <td className="px-4 py-4 bg-blue-50/20 font-black font-mono text-blue-700">{formatNumber(m.runningValue)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );
