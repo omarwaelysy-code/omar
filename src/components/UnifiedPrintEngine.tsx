@@ -333,7 +333,6 @@ export function UnifiedPrintEngine() {
         <head>
           <title>${titleText}</title>
           <style>
-            @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
             body {
               font-family: "Cairo", sans-serif;
               margin: 0;
@@ -353,12 +352,14 @@ export function UnifiedPrintEngine() {
         <body dir="${dir}">
           ${printArea.innerHTML}
           <script>
-            window.onload = function() {
+            setTimeout(function() {
               window.print();
               setTimeout(function() {
-                window.parent.document.body.removeChild(window.frameElement);
+                try {
+                  window.parent.document.body.removeChild(window.frameElement);
+                } catch (e) {}
               }, 100);
-            };
+            }, 300);
           </script>
         </body>
       </html>
@@ -382,7 +383,13 @@ export function UnifiedPrintEngine() {
       ],
       filename: `${operationType}_${documentData?.invoice_number || documentData?.voucher_number || documentData?.entry_number || documentData?.order_number || 'doc'}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: selectedProfile?.dpi === 203 ? 1.8 : 2.5, useCORS: true, logging: false },
+      html2canvas: { 
+        scale: selectedProfile?.dpi === 203 ? 1.8 : 2.5, 
+        useCORS: true, 
+        allowTaint: true,
+        removeContainer: true,
+        logging: false 
+      },
       jsPDF: { 
         unit: 'mm', 
         format: activePaperSizeId === 'custom' ? [actualWidthMm, actualHeightMm] : activePaperSizeId, 

@@ -1,4 +1,4 @@
-﻿import html2pdf from 'html2pdf.js';
+import html2pdf from 'html2pdf.js';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { formatDate } from './formatUtils';
@@ -145,7 +145,6 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
   // 8. Inject styling tag to guarantee font availability inside tempContainer
   const fontStyle = document.createElement('style');
   fontStyle.innerHTML = `
-    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
     #pdf-temp-container, #pdf-temp-container * { 
       font-family: "Cairo", sans-serif !important;
     }
@@ -160,7 +159,8 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
     html2canvas: { 
       scale: 2, 
       useCORS: true,
-      letterRendering: true,
+      allowTaint: true,
+      removeContainer: true,
       logging: false,
       backgroundColor: '#ffffff',
       windowWidth: targetWidth
