@@ -3662,7 +3662,7 @@ router.put('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
     const invValues = Object.values(invoiceData);
     const invSetClause = invKeys.map((key, i) => `"${key}" = $${i + 1}`).join(', ');
     
-    let query = `UPDATE "invoices" SET ${invSetClause} WHERE id = $${invKeys.length + 1}`;
+    let query = `UPDATE "invoices" SET ${invSetClause}, "updated_at" = CURRENT_TIMESTAMP WHERE id = $${invKeys.length + 1}`;
     let params = [...invValues, invoiceId];
     if (companyId) {
       query += ` AND company_id = $${invKeys.length + 2}`;

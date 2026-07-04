@@ -416,7 +416,8 @@ export async function initDatabase() {
         "created_by" VARCHAR(36),
         "customer_name" VARCHAR(255),
         "payment_method_name" VARCHAR(255),
-        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `, 'invoices table');
 

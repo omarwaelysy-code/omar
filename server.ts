@@ -28,6 +28,7 @@ async function startServer() {
       'ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "operation_id" VARCHAR(36)',
       'ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "department_id" VARCHAR(36)',
       'ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "cost_center_id" VARCHAR(36)',
+      'ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
       'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "operation_id" VARCHAR(36)',
       'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "department_id" VARCHAR(36)',
       'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "cost_center_id" VARCHAR(36)',

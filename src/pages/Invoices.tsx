@@ -45,6 +45,8 @@ export const Invoices: React.FC = () => {
   const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
+  const [isExportingPDFSelected, setIsExportingPDFSelected] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [operations, setOperations] = useState<Operation[]>([]);
@@ -204,6 +206,10 @@ export const Invoices: React.FC = () => {
     base_amount: true,
     remaining: true,
     entry_number: true,
+    created_date: false,
+    created_time: false,
+    updated_date: false,
+    updated_time: false,
   });
 
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
@@ -221,6 +227,10 @@ export const Invoices: React.FC = () => {
     base_amount: 150,
     remaining: 120,
     entry_number: 150,
+    created_date: 110,
+    created_time: 90,
+    updated_date: 110,
+    updated_time: 90,
   });
 
   useEffect(() => {
@@ -2637,8 +2647,12 @@ export const Invoices: React.FC = () => {
     }
   };
 
-  const handleExportExcel = () => {
-    const dataToExport = filteredInvoices.map(inv => {
+  const handleExportExcel = (onlySelected: boolean = false) => {
+    const listToExport = onlySelected
+      ? filteredInvoices.filter(inv => selectedInvoiceIds.includes(inv.id))
+      : filteredInvoices;
+
+    const dataToExport = listToExport.map(inv => {
       const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
       const currencyCode = inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP');
       const isForeign = currencyCode.toLowerCase() !== baseCode;
@@ -2671,7 +2685,11 @@ export const Invoices: React.FC = () => {
         formatted_tax_amount: inv.tax_amount * (Number(inv.exchange_rate) || 1),
         formatted_base_amount: inv.total_amount * (Number(inv.exchange_rate) || 1),
         formatted_remaining: remainingLocal,
-        formatted_entry_number: inv.entry_number || '-'
+        formatted_entry_number: inv.entry_number || '-',
+        formatted_created_date: formatTimestampDate(inv.created_at),
+        formatted_created_time: formatTimestampTime(inv.created_at),
+        formatted_updated_date: formatTimestampDate(inv.updated_at || inv.created_at),
+        formatted_updated_time: formatTimestampTime(inv.updated_at || inv.created_at),
       };
     });
 
@@ -2690,6 +2708,10 @@ export const Invoices: React.FC = () => {
     if (visibleColumns.base_amount) keyMap['formatted_base_amount'] = 'القيمة المعادلة بالعملة المحلية';
     if (visibleColumns.remaining) keyMap['formatted_remaining'] = 'الباقي من الفاتورة';
     if (visibleColumns.entry_number) keyMap['formatted_entry_number'] = 'رقم القيد';
+    if (visibleColumns.created_date) keyMap['formatted_created_date'] = 'تاريخ الإنشاء';
+    if (visibleColumns.created_time) keyMap['formatted_created_time'] = 'وقت الإنشاء';
+    if (visibleColumns.updated_date) keyMap['formatted_updated_date'] = 'تاريخ آخر تعديل';
+    if (visibleColumns.updated_time) keyMap['formatted_updated_time'] = 'وقت آخر تعديل';
 
     const formattedData = formatDataForExcel(dataToExport, keyMap);
     exportToExcel(formattedData, { filename: 'Invoices_Report', sheetName: 'الفواتير' });
@@ -2749,13 +2771,27 @@ export const Invoices: React.FC = () => {
     }
   };
 
-  const handleExportPDF = async () => {
-    if (tableRef.current) {
-      await exportToPDFUtil(tableRef.current, { 
-        filename: 'Invoices_Report', 
-        orientation: 'landscape',
-        reportTitle: 'قائمة الفواتير'
-      });
+  const handleExportPDF = async (onlySelected: boolean = false) => {
+    if (onlySelected) {
+      setIsExportingPDFSelected(true);
+      setTimeout(async () => {
+        if (tableRef.current) {
+          await exportToPDFUtil(tableRef.current, { 
+            filename: 'Invoices_Report_Selected', 
+            orientation: 'landscape',
+            reportTitle: 'قائمة الفواتير المحددة'
+          });
+        }
+        setIsExportingPDFSelected(false);
+      }, 100);
+    } else {
+      if (tableRef.current) {
+        await exportToPDFUtil(tableRef.current, { 
+          filename: 'Invoices_Report', 
+          orientation: 'landscape',
+          reportTitle: 'قائمة الفواتير'
+        });
+      }
     }
   };
 
@@ -2954,6 +2990,53 @@ export const Invoices: React.FC = () => {
     i.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const formatTimestampDate = (tsStr: any) => {
+    if (!tsStr) return '-';
+    const d = new Date(tsStr);
+    if (isNaN(d.getTime())) return '-';
+    return formatDate(d);
+  };
+
+  const formatTimestampTime = (tsStr: any) => {
+    if (!tsStr) return '-';
+    const d = new Date(tsStr);
+    if (isNaN(d.getTime())) return '-';
+    return d.toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+  };
+
+  const selectedTotals = React.useMemo(() => {
+    const selectedInvoices = filteredInvoices.filter(inv => selectedInvoiceIds.includes(inv.id));
+    const total_amount = selectedInvoices.reduce((sum, inv) => sum + (Number(inv.total_amount) || 0), 0);
+    const total_discount = selectedInvoices.reduce((sum, inv) => sum + (Number(inv.discount_amount) || 0), 0);
+    const net_amount = total_amount - total_discount;
+    return { total_amount, total_discount, net_amount };
+  }, [selectedInvoiceIds, filteredInvoices]);
+
+  const isAllSelected = filteredInvoices.length > 0 && filteredInvoices.every(inv => selectedInvoiceIds.includes(inv.id));
+
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      const visibleIds = filteredInvoices.map(inv => inv.id);
+      setSelectedInvoiceIds(prev => prev.filter(id => !visibleIds.includes(id)));
+    } else {
+      const visibleIds = filteredInvoices.map(inv => inv.id);
+      setSelectedInvoiceIds(prev => {
+        const newSelection = [...prev];
+        visibleIds.forEach(id => {
+          if (!newSelection.includes(id)) {
+            newSelection.push(id);
+          }
+        });
+        return newSelection;
+      });
+    }
+  };
+
   if (!canView) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] text-slate-500 gap-4">
@@ -2978,10 +3061,26 @@ export const Invoices: React.FC = () => {
               <h2 className="text-3xl font-bold tracking-tight text-slate-900 italic serif">{t('invoices.title')}</h2>
               <p className="text-slate-500">{t('invoices.subtitle')}</p>
               {(serverSummary.total_amount !== undefined) && (
-                <div className="mt-2 flex items-center gap-4 text-sm">
-                  <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">إجمالي الفواتير: {formatMoney(serverSummary.total_amount)} {(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
-                  <span className="bg-red-50 text-red-700 px-3 py-1 rounded-full border border-red-100 font-bold">إجمالي الخصومات: {formatMoney(serverSummary.total_discount || 0)} {(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
-                  <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100 font-bold">الصافي: {formatMoney((serverSummary.total_amount || 0) - (serverSummary.total_discount || 0))} {(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
+                <div className="mt-2 flex flex-col gap-2">
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">إجمالي الفواتير: {formatMoney(serverSummary.total_amount)} {(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
+                    <span className="bg-red-50 text-red-700 px-3 py-1 rounded-full border border-red-100 font-bold">إجمالي الخصومات: {formatMoney(serverSummary.total_discount || 0)} {(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
+                    <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100 font-bold">الصافي: {formatMoney((serverSummary.total_amount || 0) - (serverSummary.total_discount || 0))} {(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
+                  </div>
+                  {selectedInvoiceIds.length > 0 && (
+                    <div className="flex items-center gap-4 text-sm animate-in slide-in-from-top-1 duration-200">
+                      <span className="bg-zinc-100 text-zinc-700 px-3.5 py-1.5 rounded-full border border-zinc-200 font-bold flex items-center gap-1.5 shadow-sm">
+                        <span>مجموع المحدد ({selectedInvoiceIds.length}):</span>
+                        <span className="text-emerald-700">{formatMoney(selectedTotals.total_amount)}</span>
+                        <span className="text-zinc-300 font-normal">/</span>
+                        <span>الخصم:</span>
+                        <span className="text-red-650">{formatMoney(selectedTotals.total_discount)}</span>
+                        <span className="text-zinc-300 font-normal">/</span>
+                        <span className="text-blue-700">الصافي: {formatMoney(selectedTotals.net_amount)}</span>
+                        <span className="text-zinc-500 font-mono text-[10px]">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2995,8 +3094,11 @@ export const Invoices: React.FC = () => {
                 <span className="hidden md:inline">{t('common.activity_log')}</span>
               </button>
               <ExportButtons 
-                onExportExcel={handleExportExcel} 
-                onExportPDF={handleExportPDF} 
+                onExportExcel={() => handleExportExcel(false)} 
+                onExportPDF={() => handleExportPDF(false)} 
+                onExportExcelSelected={() => handleExportExcel(true)}
+                onExportPDFSelected={() => handleExportPDF(true)}
+                selectedCount={selectedInvoiceIds.length}
               />
               {canCreate && (
                 <button 
@@ -3080,6 +3182,10 @@ export const Invoices: React.FC = () => {
                           base_amount: language === 'ar' ? 'القيمة المعادلة بالعملة المحلية' : 'Equivalent Local Amount',
                           remaining: language === 'ar' ? 'الباقي من الفاتورة' : 'Remaining Balance',
                           entry_number: language === 'ar' ? 'رقم القيد' : 'Entry Number',
+                          created_date: language === 'ar' ? 'تاريخ الإنشاء' : 'Created Date',
+                          created_time: language === 'ar' ? 'وقت الإنشاء' : 'Created Time',
+                          updated_date: language === 'ar' ? 'تاريخ آخر تعديل' : 'Last Modified Date',
+                          updated_time: language === 'ar' ? 'وقت آخر تعديل' : 'Last Modified Time',
                         };
 
                         return (
@@ -3124,10 +3230,18 @@ export const Invoices: React.FC = () => {
                 <table className="w-full [transform:rotateX(180deg)]">
                   <thead>
                     <tr className="bg-slate-50/50 text-slate-500 text-[10px] uppercase tracking-widest font-bold border-b border-slate-100">
+                      <th className="px-6 py-0.5 text-center w-12 no-pdf whitespace-nowrap">
+                        <input 
+                          type="checkbox"
+                          checked={isAllSelected}
+                          onChange={handleSelectAll}
+                          className="rounded border-slate-350 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                        />
+                      </th>
                       {visibleColumns.invoice_number && (
                         <th 
                           style={{ width: columnWidths.invoice_number, minWidth: columnWidths.invoice_number }} 
-                          className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
                           onClick={() => handleSort('invoice_number')}
                         >
                           <div className="flex items-center gap-1">
@@ -3142,7 +3256,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.customer_name && (
                         <th 
                           style={{ width: columnWidths.customer_name, minWidth: columnWidths.customer_name }} 
-                          className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
                           onClick={() => handleSort('customer_name')}
                         >
                           <div className="flex items-center gap-1">
@@ -3157,7 +3271,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.date && (
                         <th 
                           style={{ width: columnWidths.date, minWidth: columnWidths.date }} 
-                          className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
                           onClick={() => handleSort('date')}
                         >
                           <div className="flex items-center gap-1">
@@ -3172,7 +3286,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.description && (
                         <th 
                           style={{ width: columnWidths.description, minWidth: columnWidths.description }} 
-                          className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
                           onClick={() => handleSort('description')}
                         >
                           <div className="flex items-center gap-1">
@@ -3187,7 +3301,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.payment_type && (
                         <th 
                           style={{ width: columnWidths.payment_type, minWidth: columnWidths.payment_type }} 
-                          className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
                           onClick={() => handleSort('payment_type')}
                         >
                           <div className="flex items-center gap-1">
@@ -3202,7 +3316,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.status && (
                         <th 
                           style={{ width: columnWidths.status, minWidth: columnWidths.status }} 
-                          className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
                           onClick={() => handleSort('status')}
                         >
                           <div className="flex items-center gap-1">
@@ -3217,7 +3331,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.currency && isMultiCurrencyEnabled && (
                         <th 
                           style={{ width: columnWidths.currency, minWidth: columnWidths.currency }} 
-                          className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
                           onClick={() => handleSort('currency')}
                         >
                           <div className="flex items-center gap-1">
@@ -3232,7 +3346,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.foreign_amount && isMultiCurrencyEnabled && (
                         <th 
                           style={{ width: columnWidths.foreign_amount, minWidth: columnWidths.foreign_amount }} 
-                          className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
                           onClick={() => handleSort('foreign_amount')}
                         >
                           <div className="flex items-center gap-1">
@@ -3247,7 +3361,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.remaining_foreign && isMultiCurrencyEnabled && (
                         <th 
                           style={{ width: columnWidths.remaining_foreign, minWidth: columnWidths.remaining_foreign }} 
-                          className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
                           onClick={() => handleSort('remaining_foreign')}
                         >
                           <div className="flex items-center gap-1">
@@ -3262,7 +3376,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.subtotal && isVatEnabled && (
                         <th 
                           style={{ width: columnWidths.subtotal, minWidth: columnWidths.subtotal }} 
-                          className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
                           onClick={() => handleSort('subtotal')}
                         >
                           <div className="flex items-center gap-1">
@@ -3277,7 +3391,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.tax_amount && isVatEnabled && (
                         <th 
                           style={{ width: columnWidths.tax_amount, minWidth: columnWidths.tax_amount }} 
-                          className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
                           onClick={() => handleSort('tax_amount')}
                         >
                           <div className="flex items-center gap-1">
@@ -3292,7 +3406,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.base_amount && (
                         <th 
                           style={{ width: columnWidths.base_amount, minWidth: columnWidths.base_amount }} 
-                          className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
                           onClick={() => handleSort('base_amount')}
                         >
                           <div className="flex items-center gap-1">
@@ -3307,7 +3421,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.remaining && (
                         <th 
                           style={{ width: columnWidths.remaining, minWidth: columnWidths.remaining }} 
-                          className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
                           onClick={() => handleSort('remaining')}
                         >
                           <div className="flex items-center gap-1">
@@ -3322,7 +3436,7 @@ export const Invoices: React.FC = () => {
                       {visibleColumns.entry_number && (
                         <th 
                           style={{ width: columnWidths.entry_number, minWidth: columnWidths.entry_number }} 
-                          className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
                           onClick={() => handleSort('entry_number')}
                         >
                           <div className="flex items-center gap-1">
@@ -3334,13 +3448,76 @@ export const Invoices: React.FC = () => {
                           {renderResizeHandles('entry_number')}
                         </th>
                       )}
-                      <th className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
+                      {visibleColumns.created_date && (
+                        <th 
+                          style={{ width: columnWidths.created_date, minWidth: columnWidths.created_date }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('created_at')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'تاريخ الإنشاء' : 'Created Date'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'created_at' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('created_date')}
+                        </th>
+                      )}
+                      {visibleColumns.created_time && (
+                        <th 
+                          style={{ width: columnWidths.created_time, minWidth: columnWidths.created_time }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('created_at')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'وقت الإنشاء' : 'Created Time'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'created_at' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('created_time')}
+                        </th>
+                      )}
+                      {visibleColumns.updated_date && (
+                        <th 
+                          style={{ width: columnWidths.updated_date, minWidth: columnWidths.updated_date }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('updated_at')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'تاريخ آخر تعديل' : 'Last Modified Date'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'updated_at' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('updated_date')}
+                        </th>
+                      )}
+                      {visibleColumns.updated_time && (
+                        <th 
+                          style={{ width: columnWidths.updated_time, minWidth: columnWidths.updated_time }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('updated_at')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'وقت آخر تعديل' : 'Last Modified Time'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'updated_at' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('updated_time')}
+                        </th>
+                      )}
+                      <th className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {loading ? (
                       Array.from({ length: 5 }).map((_, rowIndex) => (
                         <tr key={rowIndex} className="animate-pulse">
+                          <td className="px-6 py-0.5 text-center no-pdf whitespace-nowrap">
+                            <div className="h-4 bg-slate-100 rounded w-4 mx-auto animate-pulse"></div>
+                          </td>
                           {Object.keys(visibleColumns).filter(colKey => {
                             if (colKey === 'currency' || colKey === 'foreign_amount' || colKey === 'remaining_foreign') {
                               return isMultiCurrencyEnabled;
@@ -3352,12 +3529,12 @@ export const Invoices: React.FC = () => {
                           }).map((colKey) => {
                             if (!visibleColumns[colKey]) return null;
                             return (
-                              <td key={colKey} className="px-6 py-0.5">
+                              <td key={colKey} className="px-6 py-0.5 whitespace-nowrap">
                                 <div className="h-4 bg-slate-100 rounded w-2/3"></div>
                               </td>
                             );
                           })}
-                          <td className="px-6 py-0.5">
+                          <td className="px-6 py-0.5 whitespace-nowrap">
                             <div className="h-4 bg-slate-100 rounded w-12 ml-auto"></div>
                           </td>
                         </tr>
@@ -3369,44 +3546,62 @@ export const Invoices: React.FC = () => {
                           if (k === 'currency' || k === 'foreign_amount' || k === 'remaining_foreign') return isMultiCurrencyEnabled;
                           if (k === 'subtotal' || k === 'tax_amount') return isVatEnabled;
                           return true;
-                        }).length + 1} className="px-6 py-12 text-center text-slate-500 italic font-medium">{t('common.no_data')}</td>
+                        }).length + 2} className="px-6 py-12 text-center text-slate-500 italic font-medium whitespace-nowrap">{t('common.no_data')}</td>
                       </tr>
                     ) : (
-                      filteredInvoices.map((inv) => (
+                      (isExportingPDFSelected 
+                        ? filteredInvoices.filter(inv => selectedInvoiceIds.includes(inv.id))
+                        : filteredInvoices
+                      ).map((inv) => (
                         <tr 
                           key={inv.id} 
                           className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
-                         onClick={() => canEdit ? openEditModal(inv) : handleViewInvoice(inv)}
+                          onClick={() => canEdit ? openEditModal(inv) : handleViewInvoice(inv)}
                         >
+                          <td 
+                            className="px-6 py-0.5 text-center w-12 no-pdf whitespace-nowrap"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input 
+                              type="checkbox"
+                              checked={selectedInvoiceIds.includes(inv.id)}
+                              onChange={(e) => {
+                                setSelectedInvoiceIds(prev => 
+                                  prev.includes(inv.id) ? prev.filter(id => id !== inv.id) : [...prev, inv.id]
+                                );
+                              }}
+                              className="rounded border-slate-350 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                            />
+                          </td>
                           {visibleColumns.invoice_number && (
-                            <td style={{ width: columnWidths.invoice_number, minWidth: columnWidths.invoice_number }} className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>
+                            <td style={{ width: columnWidths.invoice_number, minWidth: columnWidths.invoice_number }} className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>
                               <span className="font-mono font-bold text-slate-950 text-xs select-all">
                                 {inv.invoice_number}
                               </span>
                             </td>
                           )}
                           {visibleColumns.customer_name && (
-                            <td style={{ width: columnWidths.customer_name, minWidth: columnWidths.customer_name }} className={`px-6 py-0.5 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>
+                            <td style={{ width: columnWidths.customer_name, minWidth: columnWidths.customer_name }} className={`px-6 py-0.5 font-bold text-slate-900 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>
                               {inv.customer_name}
                             </td>
                           )}
                           {visibleColumns.date && (
-                            <td style={{ width: columnWidths.date, minWidth: columnWidths.date }} className={`px-6 py-0.5 text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(inv.date)}</td>
+                            <td style={{ width: columnWidths.date, minWidth: columnWidths.date }} className={`px-6 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(inv.date)}</td>
                           )}
                           {visibleColumns.description && (
-                            <td style={{ width: columnWidths.description, minWidth: columnWidths.description }} className={`px-6 py-0.5 text-slate-500 max-w-[200px] truncate ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={inv.description}>
+                            <td style={{ width: columnWidths.description, minWidth: columnWidths.description }} className={`px-6 py-0.5 text-slate-500 max-w-[200px] truncate whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={inv.description}>
                               {inv.description || '-'}
                             </td>
                           )}
                           {visibleColumns.payment_type && (
-                            <td style={{ width: columnWidths.payment_type, minWidth: columnWidths.payment_type }} className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <td style={{ width: columnWidths.payment_type, minWidth: columnWidths.payment_type }} className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {inv.payment_type === 'cash' ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100/50">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100/50 whitespace-nowrap">
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                                   نقدية
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100/50">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100/50 whitespace-nowrap">
                                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                                   آجل
                                 </span>
@@ -3414,7 +3609,7 @@ export const Invoices: React.FC = () => {
                             </td>
                           )}
                           {visibleColumns.status && (
-                            <td style={{ width: columnWidths.status, minWidth: columnWidths.status }} className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <td style={{ width: columnWidths.status, minWidth: columnWidths.status }} className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {(() => {
                                 const status = getPaymentStatus(inv);
                                 const statusLabels = {
@@ -3428,7 +3623,7 @@ export const Invoices: React.FC = () => {
                                   unpaid: 'bg-red-50 text-red-700 border-red-100/50',
                                 };
                                 return (
-                                  <span className={`px-3 py-1 rounded-full text-[10px] font-bold border ${statusClasses[status]}`}>
+                                  <span className={`px-3 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap ${statusClasses[status]}`}>
                                     {statusLabels[status]}
                                   </span>
                                 );
@@ -3436,12 +3631,12 @@ export const Invoices: React.FC = () => {
                             </td>
                           )}
                           {visibleColumns.currency && isMultiCurrencyEnabled && (
-                            <td style={{ width: columnWidths.currency, minWidth: columnWidths.currency }} className={`px-6 py-0.5 font-bold text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <td style={{ width: columnWidths.currency, minWidth: columnWidths.currency }} className={`px-6 py-0.5 font-bold text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP')}
                             </td>
                           )}
                           {visibleColumns.foreign_amount && isMultiCurrencyEnabled && (
-                            <td style={{ width: columnWidths.foreign_amount, minWidth: columnWidths.foreign_amount }} className={`px-6 py-0.5 font-bold text-slate-700 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <td style={{ width: columnWidths.foreign_amount, minWidth: columnWidths.foreign_amount }} className={`px-6 py-0.5 font-bold text-slate-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {(() => {
                                 const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
                                 const currencyCode = inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP');
@@ -3451,7 +3646,7 @@ export const Invoices: React.FC = () => {
                             </td>
                           )}
                           {visibleColumns.remaining_foreign && isMultiCurrencyEnabled && (
-                            <td style={{ width: columnWidths.remaining_foreign, minWidth: columnWidths.remaining_foreign }} className={`px-6 py-0.5 font-bold text-slate-700 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <td style={{ width: columnWidths.remaining_foreign, minWidth: columnWidths.remaining_foreign }} className={`px-6 py-0.5 font-bold text-slate-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {(() => {
                                 const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
                                 const currencyCode = inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP');
@@ -3468,22 +3663,22 @@ export const Invoices: React.FC = () => {
                             </td>
                           )}
                           {visibleColumns.subtotal && isVatEnabled && (
-                            <td style={{ width: columnWidths.subtotal, minWidth: columnWidths.subtotal }} className={`px-6 py-0.5 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <td style={{ width: columnWidths.subtotal, minWidth: columnWidths.subtotal }} className={`px-6 py-0.5 font-bold text-slate-900 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {formatMoney(inv.subtotal * (Number(inv.exchange_rate) || 1))}
                             </td>
                           )}
                           {visibleColumns.tax_amount && isVatEnabled && (
-                            <td style={{ width: columnWidths.tax_amount, minWidth: columnWidths.tax_amount }} className={`px-6 py-0.5 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <td style={{ width: columnWidths.tax_amount, minWidth: columnWidths.tax_amount }} className={`px-6 py-0.5 font-bold text-slate-900 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {formatMoney(inv.tax_amount * (Number(inv.exchange_rate) || 1))}
                             </td>
                           )}
                           {visibleColumns.base_amount && (
-                            <td style={{ width: columnWidths.base_amount, minWidth: columnWidths.base_amount }} className={`px-6 py-0.5 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <td style={{ width: columnWidths.base_amount, minWidth: columnWidths.base_amount }} className={`px-6 py-0.5 font-bold text-slate-900 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {formatMoney(inv.total_amount * (Number(inv.exchange_rate) || 1))}
                             </td>
                           )}
                           {visibleColumns.remaining && (
-                            <td style={{ width: columnWidths.remaining, minWidth: columnWidths.remaining }} className={`px-6 py-0.5 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <td style={{ width: columnWidths.remaining, minWidth: columnWidths.remaining }} className={`px-6 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {(() => {
                                 const settlements = (allReceipts.length > 0 || allPayments.length > 0 || entries.length > 0) ? getInvoiceSettlements(inv) : (inv.settlements || []);
                                 const totalSettled = settlements.reduce((sum: number, s: any) => sum + (Number(s.settled_amount || s.amount) || 0), 0);
@@ -3496,7 +3691,7 @@ export const Invoices: React.FC = () => {
                             </td>
                           )}
                           {visibleColumns.entry_number && (
-                            <td style={{ width: columnWidths.entry_number, minWidth: columnWidths.entry_number }} className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <td style={{ width: columnWidths.entry_number, minWidth: columnWidths.entry_number }} className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {inv.entry_number ? (
                                 <button
                                   onClick={(e) => {
@@ -3504,7 +3699,7 @@ export const Invoices: React.FC = () => {
                                     setPendingViewDoc({ type: 'journal', idOrNumber: inv.entry_number! });
                                     setCurrentPage('journal_entries');
                                   }}
-                                  className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-100/50 transition-all active:scale-95"
+                                  className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-100/50 transition-all active:scale-95 whitespace-nowrap"
                                 >
                                   {inv.entry_number}
                                 </button>
@@ -3513,7 +3708,27 @@ export const Invoices: React.FC = () => {
                               )}
                             </td>
                           )}
-                          <td className={`px-6 py-0.5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                          {visibleColumns.created_date && (
+                            <td style={{ width: columnWidths.created_date, minWidth: columnWidths.created_date }} className={`px-6 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {formatTimestampDate(inv.created_at)}
+                            </td>
+                          )}
+                          {visibleColumns.created_time && (
+                            <td style={{ width: columnWidths.created_time, minWidth: columnWidths.created_time }} className={`px-6 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {formatTimestampTime(inv.created_at)}
+                            </td>
+                          )}
+                          {visibleColumns.updated_date && (
+                            <td style={{ width: columnWidths.updated_date, minWidth: columnWidths.updated_date }} className={`px-6 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {formatTimestampDate(inv.updated_at || inv.created_at)}
+                            </td>
+                          )}
+                          {visibleColumns.updated_time && (
+                            <td style={{ width: columnWidths.updated_time, minWidth: columnWidths.updated_time }} className={`px-6 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {formatTimestampTime(inv.updated_at || inv.created_at)}
+                            </td>
+                          )}
+                          <td className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                             <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
                               <button 
                                 onClick={(e) => {
