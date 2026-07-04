@@ -3014,8 +3014,27 @@ export const Invoices: React.FC = () => {
     const total_amount = selectedInvoices.reduce((sum, inv) => sum + (Number(inv.total_amount) || 0), 0);
     const total_discount = selectedInvoices.reduce((sum, inv) => sum + (Number(inv.discount_amount) || 0), 0);
     const net_amount = total_amount - total_discount;
-    return { total_amount, total_discount, net_amount };
-  }, [selectedInvoiceIds, filteredInvoices]);
+
+    const remaining_amount = selectedInvoices.reduce((sum, inv) => {
+      const settlements = (allReceipts.length > 0 || allPayments.length > 0 || entries.length > 0) ? getInvoiceSettlements(inv) : (inv.settlements || []);
+      const totalSettled = settlements.reduce((sSum: number, s: any) => sSum + (Number(s.settled_amount || s.amount) || 0), 0);
+      const remaining = inv.payment_type === 'cash' ? 0 : Math.max(0, inv.total_amount - totalSettled);
+      const remainingLocal = remaining * (Number(inv.exchange_rate) || 1);
+      return sum + remainingLocal;
+    }, 0);
+
+    return { total_amount, total_discount, net_amount, remaining_amount };
+  }, [selectedInvoiceIds, filteredInvoices, allReceipts, allPayments, entries]);
+
+  const totalRemainingFiltered = React.useMemo(() => {
+    return filteredInvoices.reduce((sum, inv) => {
+      const settlements = (allReceipts.length > 0 || allPayments.length > 0 || entries.length > 0) ? getInvoiceSettlements(inv) : (inv.settlements || []);
+      const totalSettled = settlements.reduce((sSum: number, s: any) => sSum + (Number(s.settled_amount || s.amount) || 0), 0);
+      const remaining = inv.payment_type === 'cash' ? 0 : Math.max(0, inv.total_amount - totalSettled);
+      const remainingLocal = remaining * (Number(inv.exchange_rate) || 1);
+      return sum + remainingLocal;
+    }, 0);
+  }, [filteredInvoices, allReceipts, allPayments, entries]);
 
   const isAllSelected = filteredInvoices.length > 0 && filteredInvoices.every(inv => selectedInvoiceIds.includes(inv.id));
 
@@ -3062,14 +3081,15 @@ export const Invoices: React.FC = () => {
               <p className="text-slate-500">{t('invoices.subtitle')}</p>
               {(serverSummary.total_amount !== undefined) && (
                 <div className="mt-2 flex flex-col gap-2">
-                  <div className="flex items-center gap-4 text-sm">
+                  <div className="flex flex-wrap items-center gap-4 text-sm">
                     <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">إجمالي الفواتير: {formatMoney(serverSummary.total_amount)} {(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
                     <span className="bg-red-50 text-red-700 px-3 py-1 rounded-full border border-red-100 font-bold">إجمالي الخصومات: {formatMoney(serverSummary.total_discount || 0)} {(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
                     <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100 font-bold">الصافي: {formatMoney((serverSummary.total_amount || 0) - (serverSummary.total_discount || 0))} {(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
+                    <span className="bg-amber-50 text-amber-700 px-3 py-1 rounded-full border border-amber-100 font-bold">إجمالي المتبقي: {formatMoney(totalRemainingFiltered)} {(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
                   </div>
                   {selectedInvoiceIds.length > 0 && (
                     <div className="flex items-center gap-4 text-sm animate-in slide-in-from-top-1 duration-200">
-                      <span className="bg-zinc-100 text-zinc-700 px-3.5 py-1.5 rounded-full border border-zinc-200 font-bold flex items-center gap-1.5 shadow-sm">
+                      <span className="bg-zinc-100 text-zinc-700 px-3.5 py-1.5 rounded-full border border-zinc-200 font-bold flex flex-wrap items-center gap-1.5 shadow-sm">
                         <span>مجموع المحدد ({selectedInvoiceIds.length}):</span>
                         <span className="text-emerald-700">{formatMoney(selectedTotals.total_amount)}</span>
                         <span className="text-zinc-300 font-normal">/</span>
@@ -3077,6 +3097,8 @@ export const Invoices: React.FC = () => {
                         <span className="text-red-650">{formatMoney(selectedTotals.total_discount)}</span>
                         <span className="text-zinc-300 font-normal">/</span>
                         <span className="text-blue-700">الصافي: {formatMoney(selectedTotals.net_amount)}</span>
+                        <span className="text-zinc-300 font-normal">/</span>
+                        <span className="text-amber-700">المتبقي: {formatMoney(selectedTotals.remaining_amount)}</span>
                         <span className="text-zinc-500 font-mono text-[10px]">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
                       </span>
                     </div>
