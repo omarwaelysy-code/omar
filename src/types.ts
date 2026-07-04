@@ -629,6 +629,7 @@ export interface Account {
   opening_balance_date?: string;
   required_sub_account?: boolean;
   is_active?: boolean;
+  account_usage?: string;
 }
 
 export interface Setting {
