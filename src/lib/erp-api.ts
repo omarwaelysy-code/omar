@@ -3318,10 +3318,10 @@ async function ensureDefaultAccounts(client: any, companyId: string) {
 
   // 2. Define standard accounts
   const defaultAccounts = [
-    { name: 'الخزينة العامة', code: '1101', classification: 'asset' },
-    { name: 'حساب العملاء', code: '1201', classification: 'asset' },
-    { name: 'المبيعات', code: '4101', classification: 'revenue' },
-    { name: 'الخصم المسموح به', code: '5401', classification: 'expense' },
+    { name: 'الخزينة العامة', code: '1101', classification: 'asset', usage: 'main_cash' },
+    { name: 'حساب العملاء', code: '1201', classification: 'asset', usage: 'accounts_receivable' },
+    { name: 'المبيعات', code: '4101', classification: 'revenue', usage: 'sales_revenue' },
+    { name: 'الخصم المسموح به', code: '5401', classification: 'expense', usage: 'granted_discounts' },
   ];
 
   for (const acc of defaultAccounts) {
@@ -3335,8 +3335,8 @@ async function ensureDefaultAccounts(client: any, companyId: string) {
       const typeId = getType(acc.classification);
       if (typeId) {
         await client.query(
-          'INSERT INTO accounts (id, company_id, name, code, type_id, is_active) VALUES ($1, $2, $3, $4, $5, $6)',
-          [uuidv4(), companyId, acc.name, acc.code, typeId, true]
+          'INSERT INTO accounts (id, company_id, name, code, type_id, is_active, account_usage) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+          [uuidv4(), companyId, acc.name, acc.code, typeId, true, acc.usage]
         );
       }
     }

@@ -115,6 +115,8 @@ async function startServer() {
       
       // Other
       'ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "required_sub_account" BOOLEAN DEFAULT FALSE',
+      'ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "account_usage" VARCHAR(50) DEFAULT \'other\'',
+      'ALTER TABLE "payment_methods" ADD COLUMN IF NOT EXISTS "type" VARCHAR(50) DEFAULT \'cash\'',
       
       // Products specific columns from arabic request
       'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "inventory_account_id" VARCHAR(36)',

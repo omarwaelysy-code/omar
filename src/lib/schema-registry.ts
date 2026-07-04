@@ -42,7 +42,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'id', 'company_id', 'code', 'name', 'description', 'address', 'phone', 'storekeeper', 'storekeeper_phone', 'created_at'
   ],
   accounts: [
-    'id', 'company_id', 'type_id', 'parent_id', 'code', 'name', 'opening_balance', 'opening_balance_date', 'required_sub_account', 'is_active', 'created_at'
+    'id', 'company_id', 'type_id', 'parent_id', 'code', 'name', 'opening_balance', 'opening_balance_date', 'required_sub_account', 'is_active', 'account_usage', 'created_at'
   ],
   invoices: [
     'id', 'company_id', 'customer_id', 'customer_name', 'warehouse_id', 'invoice_number', 'date', 'due_date', 'subtotal',

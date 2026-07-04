@@ -337,8 +337,8 @@ export const Customers: React.FC = () => {
         return;
       }
     } else {
-      const defaultAccount = accounts.find(a => a.name.includes('عملاء') || a.name.includes('العملاء'));
-      const defaultCounterAccount = accounts.find(a => a.name.includes('رصيد أول') || a.name.includes('رصيد اول') || a.name.includes('ميزانية افتتاحي') || a.name.includes('رأس المال') || a.name.includes('راس المال'));
+      const defaultAccount = accounts.find(a => a.account_usage === 'accounts_receivable' || a.account_usage === 'customer');
+      const defaultCounterAccount = accounts.find(a => a.account_usage === 'opening_balance');
       setEditingCustomer(null);
       setFormData({ 
         name: '', 
@@ -769,7 +769,7 @@ export const Customers: React.FC = () => {
                             onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
                           >
                             <option value="">{language === 'ar' ? 'اختر الحساب المحاسبي المرتبط...' : 'Select associated account...'}</option>
-                            {accounts.map(account => (
+                            {accounts.filter(a => a.account_usage === 'accounts_receivable' || a.account_usage === 'customer').map(account => (
                               <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
                             ))}
                           </select>
@@ -961,7 +961,7 @@ export const Customers: React.FC = () => {
                                     onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}
                                   >
                                     <option value="">{language === 'ar' ? 'اختر حساب الطرف الآخر...' : 'Select counter account...'}</option>
-                                    {accounts.map(account => (
+                                    {accounts.filter(a => ['opening_balance', 'capital', 'equity', 'retained_earnings', 'other'].includes(a.account_usage || '')).map(account => (
                                       <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
                                     ))}
                                   </select>

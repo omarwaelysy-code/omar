@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -3298,7 +3298,7 @@ export const Returns: React.FC = () => {
                       onChange={(e) => setCustomerFormData({ ...customerFormData, account_id: e.target.value })}
                     >
                       <option value="">{t('common.select_account')}</option>
-                      {accounts.map(account => (
+                      {accounts.filter(a => a.account_usage === "accounts_receivable" || a.account_usage === "customer").map(account => (
                         <option key={account.id} value={account.id}>
                           {account.code} - {account.name}
                         </option>
@@ -3315,7 +3315,7 @@ export const Returns: React.FC = () => {
                         onChange={(e) => setCustomerFormData({ ...customerFormData, counter_account_id: e.target.value })}
                       >
                         <option value="">{t('common.select_counter_account')}</option>
-                        {accounts.map(account => (
+                        {accounts.filter(a => ["opening_balance", "capital", "equity", "retained_earnings", "other"].includes(a.account_usage || "")).map(account => (
                           <option key={account.id} value={account.id}>
                             {account.code} - {account.name}
                           </option>

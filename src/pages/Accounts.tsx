@@ -16,6 +16,7 @@ import { useRef } from 'react';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { useNavigation } from '../contexts/NavigationContext';
 import { FormattedNumberInput } from '../components/FormattedNumberInput';
+import { ACCOUNT_USAGE_OPTIONS, getAccountUsageLabel } from '../utils/accountUsageUtils';
 
 export const Accounts: React.FC = () => {
   const { user } = useAuth();
@@ -41,9 +42,14 @@ export const Accounts: React.FC = () => {
     const headers = {
       'code': t('accounts.column_code'),
       'name': t('accounts.column_name'),
-      'type_name': t('accounts.column_type')
+      'type_name': t('accounts.column_type'),
+      'account_usage_label': language === 'ar' ? 'استخدام الحساب' : 'Account Usage'
     };
-    const formattedData = formatDataForExcel(accounts, headers);
+    const mappedAccounts = accounts.map(a => ({
+      ...a,
+      account_usage_label: getAccountUsageLabel(a.account_usage, language)
+    }));
+    const formattedData = formatDataForExcel(mappedAccounts, headers);
     exportToExcel(formattedData, { filename: 'Accounts_List', sheetName: language === 'ar' ? 'الحسابات' : 'Accounts' });
   };
 
@@ -63,7 +69,8 @@ export const Accounts: React.FC = () => {
     opening_balance: 0,
     required_sub_account: false,
     parent_id: '',
-    is_active: true
+    is_active: true,
+    account_usage: 'other'
   });
 
   useEffect(() => {
@@ -92,7 +99,8 @@ export const Accounts: React.FC = () => {
           opening_balance: 0,
           required_sub_account: result.name?.toLowerCase().includes('عملاء') || result.name?.toLowerCase().includes('موردين') || false,
           parent_id: '',
-          is_active: true
+          is_active: true,
+          account_usage: 'other'
         });
         showNotification(t('common.ai_parse_success'), 'success');
         setAiText('');
@@ -123,7 +131,8 @@ export const Accounts: React.FC = () => {
           { field: 'name', label: 'الاسم' },
           { field: 'type_id', label: 'نوع الحساب' },
           { field: 'required_sub_account', label: 'يلزم حساب فرعي' },
-          { field: 'is_active', label: 'نشط' }
+          { field: 'is_active', label: 'نشط' },
+          { field: 'account_usage', label: 'استخدام الحساب' }
         ];
         await dbService.updateWithLog(
           'accounts',
@@ -183,7 +192,8 @@ export const Accounts: React.FC = () => {
         opening_balance: account.opening_balance || 0,
         required_sub_account: requiredSubAccount,
         parent_id: account.parent_id || '',
-        is_active: account.is_active !== false
+        is_active: account.is_active !== false,
+        account_usage: account.account_usage || 'other'
       };
       console.log('[ERP] Form State being set:', newFormData);
       setFormData(newFormData);
@@ -196,7 +206,8 @@ export const Accounts: React.FC = () => {
         opening_balance: 0,
         required_sub_account: false,
         parent_id: '',
-        is_active: true
+        is_active: true,
+        account_usage: 'other'
       });
     }
     setIsModalOpen(true);
@@ -210,7 +221,8 @@ export const Accounts: React.FC = () => {
 
   const filteredAccounts = accounts.filter(a => 
     a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.code.toLowerCase().includes(searchTerm.toLowerCase())
+    a.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    getAccountUsageLabel(a.account_usage, language).toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -291,6 +303,7 @@ export const Accounts: React.FC = () => {
                 <th className={`px-6 py-4 text-sm font-bold text-slate-700 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.column_code')}</th>
                 <th className={`px-6 py-4 text-sm font-bold text-slate-700 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.column_name')}</th>
                 <th className={`px-6 py-4 text-sm font-bold text-slate-700 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.column_type')}</th>
+                <th className={`px-6 py-4 text-sm font-bold text-slate-700 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'استخدام الحساب' : 'Account Usage'}</th>
                 <th className="px-6 py-4 text-sm font-bold text-slate-700 text-left no-pdf">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
               </tr>
             </thead>
@@ -321,6 +334,9 @@ export const Accounts: React.FC = () => {
                         {account.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
                       </span>
                     </div>
+                  </td>
+                  <td className="px-6 py-4 font-bold text-slate-800">
+                    {getAccountUsageLabel(account.account_usage, language)}
                   </td>
                   <td className="px-6 py-4 text-left no-pdf">
                     <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
@@ -373,7 +389,7 @@ export const Accounts: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="text-lg font-black text-slate-900 tracking-tight leading-tight group-hover:text-emerald-700 transition-colors">{account.name}</h3>
-                    <div className={`flex items-center gap-2 mt-1.5 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                    <div className={`flex items-center gap-2 mt-1.5 flex-wrap ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                       <span className="font-mono text-[10px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md uppercase tracking-wider border border-slate-200">{account.code}</span>
                       <span 
                         onClick={(e) => {
@@ -387,6 +403,9 @@ export const Accounts: React.FC = () => {
                       </span>
                       <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${account.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
                         {account.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
+                      </span>
+                      <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                        {getAccountUsageLabel(account.account_usage, language)}
                       </span>
                     </div>
                   </div>
@@ -531,6 +550,24 @@ export const Accounts: React.FC = () => {
                                 <option key={t.id} value={t.id}>{t.name}</option>
                               ))}
                             </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'استخدام الحساب' : 'Account Usage'}</label>
+                          <div className="relative group">
+                             <Layers className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                             <select 
+                               required
+                               className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14 appearance-none"
+                               value={formData.account_usage}
+                               onChange={(e) => setFormData({...formData, account_usage: e.target.value})}
+                             >
+                               <option value="">{language === 'ar' ? 'اختر استخدام الحساب...' : 'Select Account Usage...'}</option>
+                               {ACCOUNT_USAGE_OPTIONS.map(opt => (
+                                 <option key={opt.key} value={opt.key}>{language === 'ar' ? opt.ar : opt.en}</option>
+                               ))}
+                             </select>
                           </div>
                         </div>
 

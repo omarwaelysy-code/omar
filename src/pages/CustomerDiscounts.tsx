@@ -818,7 +818,7 @@ export const CustomerDiscounts: React.FC = () => {
                             onChange={(e) => setDiscountData({...discountData, account_id: e.target.value})}
                           >
                             <option value="">{t('discount_settings.select_account')}</option>
-                            {accounts.map(a => <option key={a.id} value={a.id}>{a.name} ({a.code})</option>)}
+                             {accounts.filter(acc => acc.account_usage === 'granted_discounts').map(a => <option key={a.id} value={a.id}>{a.name} ({a.code})</option>)}
                           </select>
                           <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                         </div>
@@ -957,11 +957,11 @@ export const CustomerDiscounts: React.FC = () => {
                       onChange={(e) => setNewCustomer({ ...newCustomer, account_id: e.target.value })}
                     >
                       <option value="">اختر الحساب...</option>
-                      {accounts.map(account => (
-                        <option key={account.id} value={account.id}>
-                          {account.code} - {account.name}
-                        </option>
-                      ))}
+                       {accounts.filter(a => a.account_usage === 'accounts_receivable' || a.account_usage === 'customer').map(account => (
+                         <option key={account.id} value={account.id}>
+                           {account.code} - {account.name}
+                         </option>
+                       ))}
                     </select>
                   </div>
                 </div>

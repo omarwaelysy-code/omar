@@ -761,7 +761,7 @@ export const OpeningStockBalances: React.FC = () => {
                       onChange={(e) => setFormData({ ...formData, debit_account_id: e.target.value })}
                     >
                       <option value="">{language === 'ar' ? 'اختر حساب المخزون المدين...' : 'Select inventory debit account...'}</option>
-                      {accounts.map(acc => (
+                      {accounts.filter(a => ['inventory', 'raw_materials', 'work_in_progress', 'finished_goods'].includes(a.account_usage || '')).map(acc => (
                         <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
                       ))}
                     </select>
@@ -778,7 +778,7 @@ export const OpeningStockBalances: React.FC = () => {
                       onChange={(e) => setFormData({ ...formData, credit_account_id: e.target.value })}
                     >
                       <option value="">{language === 'ar' ? 'اختر حساب رأس المال/المقابل الدائن...' : 'Select credit capital account...'}</option>
-                      {accounts.map(acc => (
+                      {accounts.filter(a => ['opening_balance', 'capital', 'equity', 'retained_earnings', 'other'].includes(a.account_usage || '')).map(acc => (
                         <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
                       ))}
                     </select>

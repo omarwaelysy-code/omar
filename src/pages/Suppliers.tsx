@@ -137,7 +137,7 @@ export const Suppliers: React.FC = () => {
       const account1 = accounts.find(a => a.id === finalAccountId);
       const account2 = accounts.find(a => a.id === finalCounterAccountId);
 
-      const isAccountSupplier = (acc: any) => acc && (acc.name.includes('موردين') || acc.name.includes('الموردين') || acc.code?.startsWith('22') || acc.code?.startsWith('21'));
+      const isAccountSupplier = (acc: any) => acc && (acc.account_usage === 'accounts_payable' || acc.account_usage === 'supplier');
       const isAccountOpening = (acc: any) => acc && (acc.name.includes('رصيد') || acc.name.includes('ميزانية') || acc.name.includes('رأس') || acc.name.includes('راس') || acc.code?.startsWith('3'));
 
       if (isAccountOpening(account1) && isAccountSupplier(account2)) {
@@ -337,8 +337,8 @@ export const Suppliers: React.FC = () => {
         return;
       }
     } else {
-      const defaultAccount = accounts.find(a => a.name.includes('موردين') || a.name.includes('الموردين'));
-      const defaultCounterAccount = accounts.find(a => a.name.includes('رصيد أول') || a.name.includes('رصيد اول') || a.name.includes('ميزانية افتتاحي') || a.name.includes('رأس المال') || a.name.includes('راس المال'));
+      const defaultAccount = accounts.find(a => a.account_usage === 'accounts_payable' || a.account_usage === 'supplier');
+      const defaultCounterAccount = accounts.find(a => a.account_usage === 'opening_balance');
       setEditingSupplier(null);
       setFormData({
         name: '',
@@ -744,7 +744,7 @@ export const Suppliers: React.FC = () => {
                             onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
                           >
                             <option value="">{language === 'ar' ? 'اختر الحساب المحاسبي المرتبط...' : 'Select associated account...'}</option>
-                            {accounts.map(account => (
+                            {accounts.filter(a => a.account_usage === 'accounts_payable' || a.account_usage === 'supplier').map(account => (
                               <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
                             ))}
                           </select>
@@ -934,7 +934,7 @@ export const Suppliers: React.FC = () => {
                                     onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}
                                   >
                                     <option value="">{language === 'ar' ? 'اختر حساب الطرف الآخر...' : 'Select counter account...'}</option>
-                                    {accounts.map(account => (
+                                    {accounts.filter(a => ['opening_balance', 'capital', 'equity', 'retained_earnings', 'other'].includes(a.account_usage || '')).map(account => (
                                       <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
                                     ))}
                                   </select>
@@ -947,7 +947,7 @@ export const Suppliers: React.FC = () => {
                                  const account1 = accounts.find(a => a.id === finalAccountId);
                                  const account2 = accounts.find(a => a.id === finalCounterAccountId);
 
-                                 const isAccountSupplier = (acc: any) => acc && (acc.name.includes('موردين') || acc.name.includes('الموردين') || acc.code?.startsWith('22') || acc.code?.startsWith('21'));
+                                 const isAccountSupplier = (acc: any) => acc && (acc.account_usage === 'accounts_payable' || acc.account_usage === 'supplier');
                                  const isAccountOpening = (acc: any) => acc && (acc.name.includes('رصيد') || acc.name.includes('ميزانية') || acc.name.includes('رأس') || acc.name.includes('راس') || acc.code?.startsWith('3'));
 
                                  if (isAccountOpening(account1) && isAccountSupplier(account2)) {

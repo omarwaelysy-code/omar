@@ -140,7 +140,7 @@ export const DiscountSettings: React.FC = () => {
                   onChange={(e) => setSettings({ ...settings, customer_discount_account_id: e.target.value })}
                 >
                   <option value="">{t('discount_settings.select_account')}</option>
-                  {accounts.map(account => (
+                  {accounts.filter(a => a.account_usage === 'granted_discounts').map(account => (
                     <option key={account.id} value={account.id}>{account.name} ({account.code})</option>
                   ))}
                 </select>
@@ -166,7 +166,7 @@ export const DiscountSettings: React.FC = () => {
                   onChange={(e) => setSettings({ ...settings, supplier_discount_account_id: e.target.value })}
                 >
                   <option value="">{t('discount_settings.select_account')}</option>
-                  {accounts.map(account => (
+                  {accounts.filter(a => a.account_usage === 'earned_discounts').map(account => (
                     <option key={account.id} value={account.id}>{account.name} ({account.code})</option>
                   ))}
                 </select>

@@ -361,7 +361,7 @@ export const Expenses: React.FC = () => {
                                 <Box className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300 group-focus-within:text-rose-500 transition-colors`} size={24} />
                                 <select required className="w-full pr-16 pl-6 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black text-slate-900 appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-rose-500/5 transition-all shadow-inner" value={formData.account_id} onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}>
                                   <option value="">Select Account...</option>
-                                  {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                  {accounts.filter(a => ['operating_expense', 'administrative_expense', 'marketing_expense', 'selling_expense', 'financial_expense', 'depreciation_expense'].includes(a.account_usage || '')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                                 </select>
                               </div>
                            </div>

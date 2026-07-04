@@ -36,7 +36,8 @@ export const PaymentMethods: React.FC = () => {
     opening_balance: 0,
     opening_balance_date: new Date().toISOString().slice(0, 10),
     account_id: '',
-    counter_account_id: ''
+    counter_account_id: '',
+    type: 'cash'
   });
 
   useEffect(() => {
@@ -127,7 +128,8 @@ export const PaymentMethods: React.FC = () => {
       opening_balance: 0,
       opening_balance_date: new Date().toISOString().slice(0, 10),
       account_id: '',
-      counter_account_id: ''
+      counter_account_id: '',
+      type: 'cash'
     });
   };
 
@@ -140,7 +142,8 @@ export const PaymentMethods: React.FC = () => {
         opening_balance: Number(method.opening_balance) || 0,
         opening_balance_date: method.opening_balance_date ? new Date(method.opening_balance_date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
         account_id: method.account_id || '',
-        counter_account_id: method.counter_account_id || ''
+        counter_account_id: method.counter_account_id || '',
+        type: method.type || 'cash'
       });
     } else {
       resetForm();
@@ -395,22 +398,47 @@ export const PaymentMethods: React.FC = () => {
                               <input required type="text" placeholder="..." className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black text-slate-900 outline-none focus:bg-white focus:ring-8 focus:ring-indigo-500/5 transition-all shadow-inner" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
                            </div>
                            <div className="space-y-4">
-                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'كود الطريقة' : 'Method Code'}</label>
-                              <div className="relative group">
-                                <Hash className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300 group-focus-within:text-indigo-500 transition-colors`} size={24} />
-                                <input required type="text" placeholder="CASH-01" className="w-full pr-16 pl-6 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] font-mono text-xl font-black text-slate-900 outline-none shadow-inner tracking-widest" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} />
-                              </div>
-                           </div>
-                           <div className="space-y-4">
-                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'الحساب المحاسبي' : 'Linked Account'}</label>
-                              <div className="relative group">
-                                <Box className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300 group-focus-within:text-indigo-500 transition-colors`} size={24} />
-                                <select required className="w-full pr-16 pl-6 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black text-slate-900 appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-indigo-500/5 transition-all shadow-inner" value={formData.account_id} onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}>
-                                  <option value="">Select Account...</option>
-                                  {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
-                                </select>
-                              </div>
-                           </div>
+                               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'نوع طريقة السداد' : 'Payment Method Type'}</label>
+                               <div className="relative group">
+                                 <select required className="w-full pr-16 pl-6 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black text-slate-900 appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-indigo-500/5 transition-all shadow-inner" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value, account_id: '' })}>
+                                   <option value="cash">{language === 'ar' ? 'نقدية (Cash)' : 'Cash'}</option>
+                                   <option value="bank">{language === 'ar' ? 'بنك (Bank)' : 'Bank'}</option>
+                                   <option value="wallet">{language === 'ar' ? 'محفظة إلكترونية (Wallet)' : 'Wallet'}</option>
+                                 </select>
+                               </div>
+                            </div>
+                            <div className="space-y-4">
+                               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'كود الطريقة' : 'Method Code'}</label>
+                               <div className="relative group">
+                                 <Hash className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300 group-focus-within:text-indigo-500 transition-colors`} size={24} />
+                                 <input required type="text" placeholder="CASH-01" className="w-full pr-16 pl-6 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] font-mono text-xl font-black text-slate-900 outline-none shadow-inner tracking-widest" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} />
+                               </div>
+                            </div>
+                            <div className="md:col-span-2 space-y-4">
+                               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'الحساب المحاسبي' : 'Linked Account'}</label>
+                               <div className="relative group">
+                                 <Box className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300 group-focus-within:text-indigo-500 transition-colors`} size={24} />
+                                 <select required className="w-full pr-16 pl-6 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black text-slate-900 appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-indigo-500/5 transition-all shadow-inner" value={formData.account_id} onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}>
+                                   <option value="">{language === 'ar' ? 'اختر الحساب المحاسبي...' : 'Select Account...'}</option>
+                                   {accounts
+                                     .filter(acc => {
+                                       if (formData.type === 'cash') {
+                                         return ['cash', 'main_cash', 'petty_cash'].includes(acc.account_usage || '');
+                                       }
+                                       if (formData.type === 'bank') {
+                                         return ['bank', 'credit_card', 'debit_card', 'cheque', 'post_dated_cheque'].includes(acc.account_usage || '');
+                                       }
+                                       if (formData.type === 'wallet') {
+                                         return acc.account_usage === 'wallet';
+                                       }
+                                       return true;
+                                     })
+                                     .map(acc => (
+                                       <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
+                                     ))}
+                                 </select>
+                               </div>
+                            </div>
                         </div>
                      </div>
 
@@ -462,8 +490,12 @@ export const PaymentMethods: React.FC = () => {
                                  <div className="space-y-4">
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1 text-right">{language === 'ar' ? 'حساب الطرف الآخر للقيد' : 'Counter Account'}</label>
                                     <select required className="w-full px-8 py-5 bg-white border border-slate-200 rounded-[2.5rem] text-xl font-black appearance-none outline-none focus:ring-8 focus:ring-indigo-500/5 transition-all" value={formData.counter_account_id} onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}>
-                                      <option value="">Select counter account...</option>
-                                      {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                      <option value="">{language === 'ar' ? 'اختر حساب الطرف الآخر...' : 'Select counter account...'}</option>
+                                      {accounts
+                                        .filter(acc => ['opening_balance', 'capital', 'equity', 'retained_earnings', 'other'].includes(acc.account_usage || ''))
+                                        .map(acc => (
+                                          <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
+                                        ))}
                                     </select>
                                  </div>
                                  {formData.counter_account_id && (

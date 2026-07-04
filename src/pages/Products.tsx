@@ -1577,14 +1577,14 @@ export const Products: React.FC = () => {
                               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('products.form_revenue_account')}</label>
                               <select required className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner" value={formData.revenue_account_id} onChange={(e) => setFormData({ ...formData, revenue_account_id: e.target.value })}>
                                 <option value="">{t('common.select_category')}</option>
-                                {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                {accounts.filter(a => ['sales_revenue', 'service_revenue', 'other_revenue'].includes(a.account_usage || '')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                               </select>
                            </div>
                            <div className="space-y-4">
                               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('products.form_cost_account')}</label>
                               <select required className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner" value={formData.cost_account_id} onChange={(e) => setFormData({ ...formData, cost_account_id: e.target.value })}>
                                 <option value="">{t('common.select_category')}</option>
-                                {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                {accounts.filter(a => a.account_usage === 'cost_of_sales').map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                               </select>
                            </div>
 
@@ -1602,7 +1602,7 @@ export const Products: React.FC = () => {
                                    onChange={(e) => setFormData({ ...formData, inventory_account_id: e.target.value })}
                                  >
                                    <option value="">{t('common.select_account')}</option>
-                                   {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                   {accounts.filter(a => ['inventory', 'raw_materials', 'work_in_progress', 'finished_goods'].includes(a.account_usage || '')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                                  </select>
                                </div>
                                 <div className="space-y-4 md:col-span-1">
@@ -1656,7 +1656,7 @@ export const Products: React.FC = () => {
                                    onChange={(e) => setFormData({ ...formData, vat_account_id: e.target.value })}
                                  >
                                    <option value="">{t('common.select_account')}</option>
-                                   {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                   {accounts.filter(a => ['vat', 'input_vat', 'output_vat', 'withholding_tax'].includes(a.account_usage || '')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                                  </select>
                                </div>
                                <div className="space-y-4">

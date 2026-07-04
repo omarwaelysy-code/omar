@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -2722,7 +2722,7 @@ export const Receipts: React.FC = () => {
                       onChange={(e) => setCustomerFormData({ ...customerFormData, account_id: e.target.value })}
                     >
                       <option value="">اختر الحساب...</option>
-                      {accounts.map(account => (
+                      {accounts.filter(a => a.account_usage === "accounts_receivable" || a.account_usage === "customer").map(account => (
                         <option key={account.id} value={account.id}>
                           {account.code} - {account.name}
                         </option>
@@ -2739,7 +2739,7 @@ export const Receipts: React.FC = () => {
                         onChange={(e) => setCustomerFormData({ ...customerFormData, counter_account_id: e.target.value })}
                       >
                         <option value="">اختر الحساب المقابل...</option>
-                        {accounts.map(account => (
+                        {accounts.filter(a => ["opening_balance", "capital", "equity", "retained_earnings", "other"].includes(a.account_usage || "")).map(account => (
                           <option key={account.id} value={account.id}>
                             {account.code} - {account.name}
                           </option>
@@ -2834,7 +2834,7 @@ export const Receipts: React.FC = () => {
                       onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, account_id: e.target.value })}
                     >
                       <option value="">اختر الحساب...</option>
-                      {accounts.map(account => (
+                      {accounts.filter(a => ["cash", "main_cash", "petty_cash", "bank", "credit_card", "debit_card", "cheque", "post_dated_cheque", "wallet"].includes(a.account_usage || "")).map(account => (
                         <option key={account.id} value={account.id}>
                           {account.code} - {account.name}
                         </option>
@@ -2881,7 +2881,7 @@ export const Receipts: React.FC = () => {
                         onChange={(e) => setPaymentMethodFormData({ ...paymentMethodFormData, counter_account_id: e.target.value })}
                       >
                         <option value="">اختر حساب الطرف الآخر...</option>
-                        {accounts.map(account => (
+                        {accounts.filter(a => ["opening_balance", "capital", "equity", "retained_earnings", "other"].includes(a.account_usage || "")).map(account => (
                           <option key={account.id} value={account.id}>
                             {account.code} - {account.name}
                           </option>
