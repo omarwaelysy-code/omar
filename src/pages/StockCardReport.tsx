@@ -730,9 +730,7 @@ export const StockCardReport: React.FC = () => {
                           <th className="px-5 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'المورد' : 'Supplier'}</th>
                           <th className="px-3 py-3 border-r border-slate-200 bg-emerald-50/20 text-emerald-800 font-bold whitespace-nowrap">{language === 'ar' ? 'الكمية المستلمة' : 'Received Qty'}</th>
                           <th className="px-3 py-3 border-r border-slate-200 bg-blue-50/20 text-blue-800 font-bold whitespace-nowrap">{language === 'ar' ? 'الكمية المفوترة' : 'Billed Qty'}</th>
-                          <th className="px-3 py-3 border-r border-slate-200 bg-amber-50/20 text-amber-800 font-black whitespace-nowrap">{language === 'ar' ? 'الكمية المتبقية' : 'Remaining Qty'}</th>
-                          <th className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'سعر التكلفة الاسترشادي' : 'Unit Cost'}</th>
-                          <th className="px-4 py-3 bg-rose-50/20 text-rose-800 font-black whitespace-nowrap">{language === 'ar' ? 'قيمة الاستلام المتبقية' : 'Remaining Value'}</th>
+                          <th className="px-3 py-3 bg-amber-50/20 text-amber-800 font-black whitespace-nowrap">{language === 'ar' ? 'الكمية المتبقية' : 'Remaining Qty'}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-slate-700 font-bold">
@@ -743,9 +741,7 @@ export const StockCardReport: React.FC = () => {
                             <td className="px-5 py-4 border-r border-slate-200 text-slate-800 font-black whitespace-nowrap">{item.supplier_name || '-'}</td>
                             <td className="px-3 py-4 border-r border-slate-200 bg-emerald-50/5 font-mono text-slate-800">{formatNumber(item.quantity)}</td>
                             <td className="px-3 py-4 border-r border-slate-200 bg-blue-50/5 font-mono text-slate-800">{formatNumber(item.billed_quantity)}</td>
-                            <td className="px-3 py-4 border-r border-slate-200 bg-amber-50/10 font-black font-mono text-amber-700">{formatNumber(item.remaining_quantity)}</td>
-                            <td className="px-4 py-4 border-r border-slate-200 font-mono text-slate-800">{formatNumber(item.unit_cost)}</td>
-                            <td className="px-4 py-4 bg-rose-50/10 font-black font-mono text-rose-700">{formatNumber(item.remainingValue)}</td>
+                            <td className="px-3 py-4 bg-amber-50/10 font-black font-mono text-amber-700">{formatNumber(item.remaining_quantity)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -771,14 +767,6 @@ export const StockCardReport: React.FC = () => {
                     <div className="text-2xl font-black text-slate-800 font-mono">
                       {formatNumber(finalInvoicedQty)} <span className="text-xs text-slate-400 font-bold">{selectedProduct?.unit || ''}</span>
                     </div>
-                    <div className="flex justify-between text-xs font-bold text-slate-500 pt-2 border-t border-slate-100">
-                      <span>{language === 'ar' ? 'متوسط التكلفة:' : 'Avg Cost:'}</span>
-                      <span className="font-mono text-slate-700">{formatNumber(invoicedUnitCost)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs font-bold text-slate-500">
-                      <span>{language === 'ar' ? 'إجمالي القيمة:' : 'Total Value:'}</span>
-                      <span className="font-mono text-blue-600">{formatNumber(finalInvoicedValue)}</span>
-                    </div>
                   </div>
 
                   {/* 2. Uninvoiced stock */}
@@ -790,32 +778,16 @@ export const StockCardReport: React.FC = () => {
                     <div className="text-2xl font-black text-slate-800 font-mono">
                       {formatNumber(totalUninvoicedQty)} <span className="text-xs text-slate-400 font-bold">{selectedProduct?.unit || ''}</span>
                     </div>
-                    <div className="flex justify-between text-xs font-bold text-slate-500 pt-2 border-t border-slate-100">
-                      <span>{language === 'ar' ? 'متوسط التكلفة:' : 'Avg Cost:'}</span>
-                      <span className="font-mono text-slate-700">{formatNumber(uninvoicedUnitCost)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs font-bold text-slate-500">
-                      <span>{language === 'ar' ? 'إجمالي القيمة:' : 'Total Value:'}</span>
-                      <span className="font-mono text-amber-600">{formatNumber(totalUninvoicedValue)}</span>
-                    </div>
                   </div>
 
                   {/* 3. Net Physical stock */}
                   <div className="bg-emerald-600 p-5 rounded-2xl shadow-sm text-right text-white space-y-2">
                     <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-emerald-100">{language === 'ar' ? 'إجمالي الرصيد الفعلي (الفيزيائي)' : 'Total Physical Balance'}</span>
-                      <span className="w-2.5 h-2.5 bg-white rounded-full animate-ping"></span>
+                      <span className="text-xs font-bold text-emerald-100">{language === 'ar' ? 'إجمالي الرصيد الفعلي' : 'Total Actual Balance'}</span>
+                      <span className="w-2.5 h-2.5 bg-white rounded-full"></span>
                     </div>
                     <div className="text-2xl font-black font-mono">
                       {formatNumber(totalPhysicalQty)} <span className="text-xs text-emerald-100 font-bold">{selectedProduct?.unit || ''}</span>
-                    </div>
-                    <div className="flex justify-between text-xs font-bold text-emerald-100 pt-2 border-t border-emerald-500">
-                      <span>{language === 'ar' ? 'متوسط التكلفة:' : 'Avg Cost:'}</span>
-                      <span className="font-mono text-white">{formatNumber(totalPhysicalUnitCost)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs font-bold text-emerald-100">
-                      <span>{language === 'ar' ? 'إجمالي القيمة:' : 'Total Value:'}</span>
-                      <span className="font-mono text-white">{formatNumber(totalPhysicalValue)}</span>
                     </div>
                   </div>
                 </div>
