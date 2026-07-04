@@ -16,7 +16,7 @@ import { useRef } from 'react';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { useNavigation } from '../contexts/NavigationContext';
 import { FormattedNumberInput } from '../components/FormattedNumberInput';
-import { ACCOUNT_USAGE_OPTIONS, getAccountUsageLabel } from '../utils/accountUsageUtils';
+import { ACCOUNT_USAGE_OPTIONS, getAccountUsageLabel, ACCOUNT_USAGE_GROUPS } from '../utils/accountUsageUtils';
 
 export const Accounts: React.FC = () => {
   const { user } = useAuth();
@@ -36,7 +36,24 @@ export const Accounts: React.FC = () => {
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
   const [isAiParsing, setIsAiParsing] = useState(false);
   const [aiText, setAiText] = useState('');
+  const [isUsageDropdownOpen, setIsUsageDropdownOpen] = useState(false);
+  const [usageSearchTerm, setUsageSearchTerm] = useState('');
   const tableRef = useRef<HTMLTableElement>(null);
+
+  const groupedAndFilteredOptions = React.useMemo(() => {
+    return ACCOUNT_USAGE_GROUPS.map(group => {
+      const filteredItems = ACCOUNT_USAGE_OPTIONS.filter(opt => {
+        if (!group.keys.includes(opt.key)) return false;
+        if (!usageSearchTerm.trim()) return true;
+        const query = usageSearchTerm.toLowerCase();
+        return opt.ar.toLowerCase().includes(query) || opt.en.toLowerCase().includes(query) || opt.key.toLowerCase().includes(query);
+      });
+      return {
+        ...group,
+        items: filteredItems
+      };
+    });
+  }, [usageSearchTerm]);
 
   const handleExportExcel = () => {
     const headers = {
@@ -177,7 +194,8 @@ export const Accounts: React.FC = () => {
   };
 
   const openModal = (account?: Account) => {
-
+    setIsUsageDropdownOpen(false);
+    setUsageSearchTerm('');
     if (account) {
       // Robust boolean conversion for Postgres (handles true, 'true', 1, 't', etc.)
       const rawVal = (account as any).required_sub_account;
@@ -216,6 +234,8 @@ export const Accounts: React.FC = () => {
     setIsModalOpen(false);
     setEditingAccount(null);
     setAiText('');
+    setIsUsageDropdownOpen(false);
+    setUsageSearchTerm('');
   };
 
   const filteredAccounts = accounts.filter(a => 
@@ -553,20 +573,89 @@ export const Accounts: React.FC = () => {
                         </div>
 
                         <div>
-                          <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'استخدام الحساب' : 'Account Usage'}</label>
-                          <div className="relative group">
-                             <Layers className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
-                             <select 
-                               required
-                               className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14 appearance-none"
-                               value={formData.account_usage}
-                               onChange={(e) => setFormData({...formData, account_usage: e.target.value})}
-                             >
-                               <option value="">{language === 'ar' ? 'اختر استخدام الحساب...' : 'Select Account Usage...'}</option>
-                               {ACCOUNT_USAGE_OPTIONS.map(opt => (
-                                 <option key={opt.key} value={opt.key}>{language === 'ar' ? opt.ar : opt.en}</option>
-                               ))}
-                             </select>
+                          <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            {language === 'ar' ? 'استخدام الحساب' : 'Account Usage'}
+                          </label>
+                          <div className="relative">
+                            <Layers className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4.5 text-slate-300 z-10`} size={20} />
+                            
+                            {/* Dropdown Toggle Button */}
+                            <button
+                              type="button"
+                              onClick={() => setIsUsageDropdownOpen(!isUsageDropdownOpen)}
+                              className={`w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ${dir === 'rtl' ? 'pe-14 ps-6 text-right' : 'ps-14 pe-6 text-left'} flex justify-between items-center`}
+                            >
+                              <span>
+                                {formData.account_usage 
+                                  ? getAccountUsageLabel(formData.account_usage, language) 
+                                  : (language === 'ar' ? 'اختر استخدام الحساب...' : 'Select Account Usage...')}
+                              </span>
+                              <span className="text-slate-400 text-xs">▼</span>
+                            </button>
+
+                            {/* Click Outside Overlay */}
+                            {isUsageDropdownOpen && (
+                              <div 
+                                className="fixed inset-0 z-40 bg-transparent"
+                                onClick={() => {
+                                  setIsUsageDropdownOpen(false);
+                                  setUsageSearchTerm('');
+                                }}
+                              />
+                            )}
+
+                            {/* Dropdown Menu */}
+                            {isUsageDropdownOpen && (
+                              <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200/80 rounded-2xl shadow-xl max-h-96 overflow-hidden flex flex-col backdrop-blur-md">
+                                {/* Search Input */}
+                                <div className="p-3 border-b border-slate-100 bg-slate-50/50">
+                                  <input
+                                    type="text"
+                                    value={usageSearchTerm}
+                                    onChange={(e) => setUsageSearchTerm(e.target.value)}
+                                    placeholder={language === 'ar' ? 'ابحث عن استخدام الحساب...' : 'Search account usage...'}
+                                    className={`w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                </div>
+
+                                {/* Options List */}
+                                <div className="overflow-y-auto flex-1 max-h-72">
+                                  {groupedAndFilteredOptions.map(group => {
+                                    if (group.items.length === 0) return null;
+                                    return (
+                                      <div key={group.labelAr} className="mb-2">
+                                        <div className={`bg-slate-100/60 px-4 py-2 text-[10px] font-black text-slate-500 uppercase tracking-wider ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                          {language === 'ar' ? group.labelAr : group.labelEn}
+                                        </div>
+                                        {group.items.map(opt => (
+                                          <button
+                                            key={opt.key}
+                                            type="button"
+                                            onClick={() => {
+                                              setFormData({ ...formData, account_usage: opt.key });
+                                              setIsUsageDropdownOpen(false);
+                                              setUsageSearchTerm('');
+                                            }}
+                                            className={`w-full px-6 py-3.5 text-sm hover:bg-emerald-50/50 transition-colors flex items-center justify-between ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
+                                              formData.account_usage === opt.key ? 'bg-emerald-50 text-emerald-600 font-extrabold' : 'text-slate-700 font-bold'
+                                            }`}
+                                          >
+                                            <span>{language === 'ar' ? opt.ar : opt.en}</span>
+                                            {formData.account_usage === opt.key && <span className="text-emerald-500 text-xs">✓</span>}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    );
+                                  })}
+                                  {groupedAndFilteredOptions.every(g => g.items.length === 0) && (
+                                    <div className="p-6 text-center text-sm font-bold text-slate-400">
+                                      {language === 'ar' ? 'لا توجد نتائج مطابقة' : 'No matching results'}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
 

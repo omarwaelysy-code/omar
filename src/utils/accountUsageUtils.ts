@@ -80,3 +80,43 @@ export const getAccountUsageLabel = (key: string | undefined, lang: 'ar' | 'en')
   if (!opt) return lang === 'ar' ? 'أخرى' : 'Other';
   return lang === 'ar' ? opt.ar : opt.en;
 };
+
+export interface AccountUsageGroup {
+  labelAr: string;
+  labelEn: string;
+  keys: string[];
+}
+
+export const ACCOUNT_USAGE_GROUPS: AccountUsageGroup[] = [
+  {
+    labelAr: 'الميزانية - الأصول',
+    labelEn: 'Balance Sheet - Assets',
+    keys: ['cash', 'main_cash', 'petty_cash', 'bank', 'wallet', 'credit_card', 'debit_card', 'cheque', 'post_dated_cheque', 'customer', 'accounts_receivable', 'inventory', 'raw_materials', 'work_in_progress', 'finished_goods', 'employee_advances', 'employee_loans', 'fixed_asset', 'current_asset']
+  },
+  {
+    labelAr: 'الميزانية - الالتزامات وحقوق الملكية',
+    labelEn: 'Balance Sheet - Liabilities & Equity',
+    keys: ['supplier', 'accounts_payable', 'accumulated_depreciation', 'current_liability', 'long_term_liability', 'loan', 'capital', 'equity', 'retained_earnings']
+  },
+  {
+    labelAr: 'قائمة الدخل - الإيرادات',
+    labelEn: 'Income Statement - Revenues',
+    keys: ['sales_revenue', 'service_revenue', 'other_revenue', 'financial_revenue']
+  },
+  {
+    labelAr: 'قائمة الدخل - التكلفة',
+    labelEn: 'Income Statement - Costs',
+    keys: ['cost_of_sales', 'purchases', 'purchase_returns', 'sales_returns']
+  },
+  {
+    labelAr: 'قائمة الدخل - المصروفات',
+    labelEn: 'Income Statement - Expenses',
+    keys: ['operating_expense', 'administrative_expense', 'marketing_expense', 'selling_expense', 'financial_expense', 'depreciation_expense', 'payroll']
+  },
+  {
+    labelAr: 'أخرى',
+    labelEn: 'Others',
+    keys: ['earned_discounts', 'granted_discounts', 'vat', 'input_vat', 'output_vat', 'withholding_tax', 'employee', 'drawings', 'cost_center', 'project', 'branch', 'department', 'contract', 'investment', 'exchange_difference', 'foreign_currency', 'internal_transfer', 'suspense_account', 'clearing_account', 'opening_balance', 'closing_balance', 'insurance', 'maintenance', 'manufacturing', 'other']
+  }
+];
+
