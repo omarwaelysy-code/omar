@@ -37,8 +37,13 @@ export const GeneralStockMovementsReport: React.FC = () => {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [itemGroups, setItemGroups] = useState<ItemGroup[]>([]);
   const [movements, setMovements] = useState<any[]>([]);
+  const [goodsReceipts, setGoodsReceipts] = useState<any[]>([]);
+  const [goodsReceiptItems, setGoodsReceiptItems] = useState<any[]>([]);
   const [docMap, setDocMap] = useState<Record<string, DocMapInfo>>({});
   const [loading, setLoading] = useState(false);
+
+  const printableAreaRef = useRef<HTMLDivElement>(null);
+  const reportTableRef = useRef<HTMLTableElement>(null);
 
   // Filter states
   const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
@@ -54,8 +59,6 @@ export const GeneralStockMovementsReport: React.FC = () => {
   const [groupBy, setGroupBy] = useState<'all' | 'group' | 'type'>('all');
   const [sortBy, setSortBy] = useState<string>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-
-  const reportTableRef = useRef<HTMLTableElement>(null);
 
   // Load basic reference data
   useEffect(() => {
@@ -83,7 +86,7 @@ export const GeneralStockMovementsReport: React.FC = () => {
     setLoading(true);
     try {
       // 1. Fetch movements & related docs
-      const [mvs, invs, pinvs, rets, prets, jes, adjustments, transfers, openingStocks] = await Promise.all([
+      const [mvs, invs, pinvs, rets, prets, jes, adjustments, transfers, openingStocks, grs, grItems] = await Promise.all([
         dbService.list<any>('inventory_movements', { company_id: user.company_id }),
         dbService.list<any>('invoices', { company_id: user.company_id }),
         dbService.list<any>('purchase_invoices', { company_id: user.company_id }),
@@ -92,7 +95,9 @@ export const GeneralStockMovementsReport: React.FC = () => {
         dbService.list<any>('journal_entries', { company_id: user.company_id }),
         dbService.list<any>('stock_adjustments', { company_id: user.company_id }),
         dbService.list<any>('warehouse_transfers', { company_id: user.company_id }),
-        dbService.list<any>('opening_stock_balances', { company_id: user.company_id })
+        dbService.list<any>('opening_stock_balances', { company_id: user.company_id }),
+        dbService.list<any>('goods_receipts', { company_id: user.company_id }),
+        dbService.list<any>('goods_receipt_items', { company_id: user.company_id })
       ]);
 
       // 2. Build Journal Entry map reference_id -> entry_number
@@ -171,6 +176,8 @@ export const GeneralStockMovementsReport: React.FC = () => {
 
       setDocMap(map);
       setMovements(mvs || []);
+      setGoodsReceipts(grs || []);
+      setGoodsReceiptItems(grItems || []);
     } catch (err) {
       console.error('Failed to load movements ledger', err);
     } finally {
@@ -228,6 +235,15 @@ export const GeneralStockMovementsReport: React.FC = () => {
     }
   };
 
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortOrder('desc');
+    }
+  };
+
   // Nav actions
   const handleProductCodeClick = (productId: string) => {
     sessionStorage.setItem('stock_card_filter_product_id', productId);
@@ -270,13 +286,15 @@ export const GeneralStockMovementsReport: React.FC = () => {
   const processedData = React.useMemo(() => {
     if (movements.length === 0 || products.length === 0) return [];
 
+    const filteredMovements = movements.filter(m => m.movement_type !== 'goods_receipt');
+
     // Map of product ID -> array of movements
     const productMovements: Record<string, any[]> = {};
     products.forEach(p => {
       productMovements[p.id] = [];
     });
 
-    movements.forEach(m => {
+    filteredMovements.forEach(m => {
       if (productMovements[m.product_id]) {
         productMovements[m.product_id].push(m);
       }
@@ -331,6 +349,88 @@ export const GeneralStockMovementsReport: React.FC = () => {
 
     return results;
   }, [movements, products, docMap, warehouses, language]);
+
+  // Load GRNI (Uninvoiced Goods Receipts) data for all products
+  const uninvoicedReceipts = React.useMemo(() => {
+    return goodsReceiptItems
+      .filter(item => {
+        const gr = goodsReceipts.find(g => g.id === item.goods_receipt_id);
+        const prod = products.find(p => p.id === item.product_id);
+        return gr && gr.status === 'posted' && prod && parseFloat(item.remaining_quantity || '0') > 0.0001;
+      })
+      .map(item => {
+        const gr = goodsReceipts.find(g => g.id === item.goods_receipt_id);
+        const prod = products.find(p => p.id === item.product_id)!;
+        const qty = parseFloat(item.quantity || '0');
+        const billedQty = parseFloat(item.billed_quantity || '0');
+        const remainingQty = parseFloat(item.remaining_quantity || '0');
+        return {
+          ...item,
+          product: prod,
+          receipt_number: gr?.receipt_number || '',
+          date: gr?.date || '',
+          supplier_name: gr?.supplier_name || '',
+          quantity: qty,
+          billed_quantity: billedQty,
+          remaining_quantity: remainingQty
+        };
+      })
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [goodsReceiptItems, goodsReceipts, products]);
+
+  const filteredUninvoicedReceipts = React.useMemo(() => {
+    return uninvoicedReceipts.filter(item => {
+      // 1. Date filter
+      const rDate = item.date?.slice(0, 10);
+      if (dateFrom && rDate < dateFrom) return false;
+      if (dateTo && rDate > dateTo) return false;
+
+      // 2. Warehouse filter
+      const gr = goodsReceipts.find(g => g.id === item.goods_receipt_id);
+      if (selectedWarehouseId && gr?.warehouse_id !== selectedWarehouseId) return false;
+
+      // 3. Item Group filter
+      if (filterItemGroupId && item.product.item_group_id !== filterItemGroupId) return false;
+
+      // 4. Item Type filter
+      if (filterItemType && item.product.type !== filterItemType) return false;
+
+      // 5. Search keyword
+      if (searchKeyword) {
+        const kw = searchKeyword.toLowerCase();
+        const codeMatch = (item.product.code || '').toLowerCase().includes(kw);
+        const nameMatch = (item.product.name || '').toLowerCase().includes(kw);
+        const refMatch = (item.receipt_number || '').toLowerCase().includes(kw);
+        const supplierMatch = (item.supplier_name || '').toLowerCase().includes(kw);
+
+        if (!codeMatch && nameMatch && !refMatch && !supplierMatch) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [uninvoicedReceipts, goodsReceipts, dateFrom, dateTo, selectedWarehouseId, filterItemGroupId, filterItemType, searchKeyword]);
+
+  // Summary computations for all products
+  const finalInvoicedQty = React.useMemo(() => {
+    const lastMovementPerProduct: Record<string, number> = {};
+    products.forEach(p => {
+      lastMovementPerProduct[p.id] = 0;
+    });
+    processedData.forEach(m => {
+      if (!dateTo || m.date?.slice(0, 10) <= dateTo) {
+        lastMovementPerProduct[m.product_id] = m.runningQty;
+      }
+    });
+    return Object.values(lastMovementPerProduct).reduce((acc, curr) => acc + curr, 0);
+  }, [products, processedData, dateTo]);
+
+  const totalUninvoicedQty = React.useMemo(() => {
+    return filteredUninvoicedReceipts.reduce((acc, curr) => acc + curr.remaining_quantity, 0);
+  }, [filteredUninvoicedReceipts]);
+
+  const totalPhysicalQty = finalInvoicedQty + totalUninvoicedQty;
 
   // Apply filters
   const filteredData = React.useMemo(() => {
@@ -409,16 +509,6 @@ export const GeneralStockMovementsReport: React.FC = () => {
     return list;
   }, [filteredData, sortBy, sortOrder]);
 
-  // Toggle sort field
-  const handleSort = (field: string) => {
-    if (sortBy === field) {
-      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortOrder('desc'); // Default descending for dates
-    }
-  };
-
   // Group data
   const groupedData = React.useMemo(() => {
     if (groupBy === 'all') {
@@ -494,8 +584,8 @@ export const GeneralStockMovementsReport: React.FC = () => {
   };
 
   const handleExportPDF = async () => {
-    if (reportTableRef.current) {
-      await exportToPDF(reportTableRef.current, {
+    if (printableAreaRef.current) {
+      await exportToPDF(printableAreaRef.current, {
         filename: `General_Stock_Movements_${dateFrom}_to_${dateTo}`,
         reportTitle: language === 'ar'
           ? `تقرير حركة المخزن العامة من ${dateFrom} إلى ${dateTo}`
@@ -522,15 +612,10 @@ export const GeneralStockMovementsReport: React.FC = () => {
       { h1: language === 'ar' ? 'المخزن' : 'Warehouse', h2: '', val: (item) => item.warehouseName },
       { h1: language === 'ar' ? 'العميل / المورد' : 'Customer/Supplier', h2: '', val: (item) => item.partner },
       { h1: language === 'ar' ? 'الوصف / شرح الحركة' : 'Description', h2: '', val: (item) => item.description },
-      
-      // Qty
       { h1: language === 'ar' ? 'الكمية' : 'Quantity', h2: language === 'ar' ? 'وارد (+)' : 'In (+)', val: (item) => item.qtyIn },
       { h1: '', h2: language === 'ar' ? 'منصرف (-)' : 'Out (-)', val: (item) => item.qtyOut },
-      
       { h1: language === 'ar' ? 'سياسة التكلفة' : 'Cost Policy', h2: '', val: (item) => getCostMethodLabel(item.product?.inventory_cost_method) },
       { h1: language === 'ar' ? 'سعر التكلفة' : 'Unit Cost', h2: '', val: (item) => item.unit_cost },
-
-      // Values
       { h1: language === 'ar' ? 'القيم المالية للمخزون' : 'Financial Values', h2: language === 'ar' ? 'قيمة مدين (+)' : 'Debit (+)', val: (item) => item.debitVal },
       { h1: '', h2: language === 'ar' ? 'قيمة دائن (-)' : 'Credit (-)', val: (item) => item.creditVal },
       { h1: '', h2: language === 'ar' ? 'الرصيد' : 'Balance', val: (item) => item.runningValue }
@@ -538,18 +623,18 @@ export const GeneralStockMovementsReport: React.FC = () => {
 
     const headers1 = cols.map(c => c.h1);
     const headers2 = cols.map(c => c.h2);
-    const rows: any[] = [headers1, headers2];
+    const mainRows: any[] = [headers1, headers2];
 
     groupedData.forEach(group => {
       if (groupBy !== 'all') {
         const groupTitleRow = new Array(cols.length).fill('');
         groupTitleRow[0] = group.name;
-        rows.push(groupTitleRow);
+        mainRows.push(groupTitleRow);
       }
 
       group.items.forEach(item => {
         const itemRow = cols.map(c => c.val(item));
-        rows.push(itemRow);
+        mainRows.push(itemRow);
       });
 
       if (groupBy !== 'all' && group.items.length > 0) {
@@ -557,19 +642,17 @@ export const GeneralStockMovementsReport: React.FC = () => {
         const subtotalRow = cols.map((c, index) => {
           if (index === 0) return language === 'ar' ? `إجمالي: ${group.name}` : `Total: ${group.name}`;
           if (index < 9) return '';
-          // Map to correct summary
           if (index === 9) return subTotals.qtyIn;
           if (index === 10) return subTotals.qtyOut;
           if (index === 11 || index === 12) return '';
           if (index === 13) return subTotals.debitVal;
           if (index === 14) return subTotals.creditVal;
           if (index === 15) {
-            // Balance of last item in group
             return group.items[group.items.length - 1].runningValue;
           }
           return '';
         });
-        rows.push(subtotalRow);
+        mainRows.push(subtotalRow);
       }
     });
 
@@ -585,9 +668,65 @@ export const GeneralStockMovementsReport: React.FC = () => {
       if (index === 15) return '-';
       return '';
     });
-    rows.push(grandTotalRow);
+    mainRows.push(grandTotalRow);
 
-    exportToExcel(rows, {
+    // Separator row
+    const emptyRow = new Array(cols.length).fill('');
+
+    // GRNI Section
+    const grniTitleRow = new Array(cols.length).fill('');
+    grniTitleRow[0] = language === 'ar' ? 'إيصالات استلام البضائع غير المفوترة (GRNI)' : 'Goods Receipts Not Invoiced (GRNI)';
+    
+    const grniHeaders = new Array(cols.length).fill('');
+    grniHeaders[0] = language === 'ar' ? 'تاريخ الاستلام' : 'Receipt Date';
+    grniHeaders[1] = language === 'ar' ? 'رقم الإذن' : 'Receipt No.';
+    grniHeaders[2] = language === 'ar' ? 'المورد' : 'Supplier';
+    grniHeaders[3] = language === 'ar' ? 'كود الصنف' : 'Item Code';
+    grniHeaders[4] = language === 'ar' ? 'الصنف' : 'Item Name';
+    grniHeaders[5] = language === 'ar' ? 'الكمية المستلمة' : 'Received Qty';
+    grniHeaders[6] = language === 'ar' ? 'الكمية المفوترة' : 'Billed Qty';
+    grniHeaders[7] = language === 'ar' ? 'الكمية المتبقية' : 'Remaining Qty';
+
+    const grniRows = filteredUninvoicedReceipts.map(item => {
+      const row = new Array(cols.length).fill('');
+      row[0] = item.date?.slice(0, 10);
+      row[1] = item.receipt_number;
+      row[2] = item.supplier_name || '-';
+      row[3] = item.product?.code || '';
+      row[4] = item.product?.name || '';
+      row[5] = item.quantity;
+      row[6] = item.billed_quantity;
+      row[7] = item.remaining_quantity;
+      return row;
+    });
+
+    // Summary Section
+    const summaryTitleRow = new Array(cols.length).fill('');
+    summaryTitleRow[0] = language === 'ar' ? 'ملخص الرصيد النهائي للمخزون' : 'Final Stock Balance Summary';
+    
+    const summaryHeaders = new Array(cols.length).fill('');
+    summaryHeaders[0] = language === 'ar' ? 'الرصيد المفوتر (المنتهي)' : 'Invoiced Balance';
+    summaryHeaders[1] = language === 'ar' ? 'استلامات غير مفوترة' : 'Uninvoiced Receipts';
+    summaryHeaders[2] = language === 'ar' ? 'إجمالي الرصيد الفعلي' : 'Total Actual Balance';
+
+    const summaryRow = new Array(cols.length).fill('');
+    summaryRow[0] = finalInvoicedQty;
+    summaryRow[1] = totalUninvoicedQty;
+    summaryRow[2] = totalPhysicalQty;
+
+    const allData = [
+      ...mainRows,
+      emptyRow,
+      grniTitleRow,
+      grniHeaders,
+      ...grniRows,
+      emptyRow,
+      summaryTitleRow,
+      summaryHeaders,
+      summaryRow
+    ];
+
+    exportToExcel(allData, {
       filename: `General_Stock_Movements_Report_${dateFrom}_to_${dateTo}`,
       sheetName: language === 'ar' ? 'حركات المخزن' : 'Stock Movements'
     });
@@ -809,7 +948,7 @@ export const GeneralStockMovementsReport: React.FC = () => {
       </div>
 
       {/* Report Table Display */}
-      <div id="movements-printable" className="border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm bg-white p-6 md:p-8">
+      <div id="movements-printable" ref={printableAreaRef} className="border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm bg-white p-6 md:p-8 space-y-8">
         <div className="text-center mb-8 border-b border-slate-50 pb-6">
           <h2 className="text-2xl font-black text-slate-900 mb-2">
             {language === 'ar' ? 'كارت حركة وتكلفة الأصناف (كل الأصناف)' : 'All Products Movements & Valuation Ledger'}
@@ -989,6 +1128,106 @@ export const GeneralStockMovementsReport: React.FC = () => {
                 </tr>
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Table 2: Goods Receipts Not Invoiced (GRNI) */}
+        {!loading && filteredData.length > 0 && (
+          <div className="pt-6 border-t border-slate-100">
+            <div className="text-right mb-4">
+              <h4 className="text-lg font-black text-slate-800">
+                {language === 'ar' ? 'إيصالات استلام البضائع غير المفوترة (GRNI)' : 'Goods Receipts Not Invoiced (GRNI)'}
+              </h4>
+              <p className="text-slate-400 text-xs font-bold mt-1">
+                {language === 'ar' 
+                  ? 'الاستلامات المخزنية الموثقة لكافة الأصناف التي لم تصدر لها فواتير شراء بعد (أو المتبقي منها)' 
+                  : 'Posted goods receipts for all products that have not been fully invoiced yet'}
+              </p>
+            </div>
+
+            {filteredUninvoicedReceipts.length === 0 ? (
+              <div className="p-8 text-center border border-dashed border-slate-100 rounded-2xl bg-slate-50/20">
+                <p className="text-slate-400 font-bold text-xs">
+                  {language === 'ar' ? 'لا توجد إيصالات استلام غير مفوترة تطابق الفلاتر المحددة' : 'No uninvoiced goods receipts match the selected filters'}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full min-w-[1200px] border-collapse bg-white text-center text-xs">
+                  <thead className="bg-slate-50 text-[10px] uppercase font-black tracking-widest text-slate-400 border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'تاريخ الاستلام' : 'Receipt Date'}</th>
+                      <th className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'رقم الإذن' : 'Receipt No.'}</th>
+                      <th className="px-5 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'المورد' : 'Supplier'}</th>
+                      <th className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'كود الصنف' : 'Item Code'}</th>
+                      <th className="px-5 py-3 border-r border-slate-200 text-right">{language === 'ar' ? 'الصنف' : 'Item Name'}</th>
+                      <th className="px-3 py-3 border-r border-slate-200 bg-emerald-50/20 text-emerald-800 font-bold whitespace-nowrap">{language === 'ar' ? 'الكمية المستلمة' : 'Received Qty'}</th>
+                      <th className="px-3 py-3 border-r border-slate-200 bg-blue-50/20 text-blue-800 font-bold whitespace-nowrap">{language === 'ar' ? 'الكمية المفوترة' : 'Billed Qty'}</th>
+                      <th className="px-3 py-3 bg-amber-50/20 text-amber-800 font-black whitespace-nowrap">{language === 'ar' ? 'الكمية المتبقية' : 'Remaining Qty'}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700 font-bold">
+                    {filteredUninvoicedReceipts.map((item, idx) => (
+                      <tr key={item.id || idx} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-4 py-4 border-r border-slate-200 font-mono whitespace-nowrap">{item.date?.slice(0, 10)}</td>
+                        <td className="px-4 py-4 border-r border-slate-200 font-mono text-slate-500 whitespace-nowrap">{item.receipt_number}</td>
+                        <td className="px-5 py-4 border-r border-slate-200 text-slate-800 font-black whitespace-nowrap">{item.supplier_name || '-'}</td>
+                        <td className="px-4 py-4 border-r border-slate-200 font-mono text-indigo-600 cursor-pointer hover:underline" onClick={() => handleProductCodeClick(item.product.id)}>{item.product?.code}</td>
+                        <td className="px-5 py-4 border-r border-slate-200 text-right text-slate-900 font-bold whitespace-nowrap">{item.product?.name}</td>
+                        <td className="px-3 py-4 border-r border-slate-200 bg-emerald-50/5 font-mono text-slate-800">{formatNumber(item.quantity)}</td>
+                        <td className="px-3 py-4 border-r border-slate-200 bg-blue-50/5 font-mono text-slate-800">{formatNumber(item.billed_quantity)}</td>
+                        <td className="px-3 py-4 bg-amber-50/10 font-black font-mono text-amber-700">{formatNumber(item.remaining_quantity)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Section 3: Final Inventory Balance (الرصيد النهائي) */}
+        {!loading && filteredData.length > 0 && (
+          <div className="pt-6 border-t border-slate-100">
+            <div className="text-right mb-4">
+              <h4 className="text-lg font-black text-slate-800">
+                {language === 'ar' ? 'ملخص الرصيد النهائي للمخزون' : 'Final Stock Balance Summary'}
+              </h4>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+              {/* 1. Invoiced stock */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm text-right space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-slate-400">{language === 'ar' ? 'الرصيد المفوتر (المنتهي)' : 'Invoiced Balance'}</span>
+                  <span className="w-2.5 h-2.5 bg-blue-500 rounded-full"></span>
+                </div>
+                <div className="text-2xl font-black text-slate-800 font-mono">
+                  {formatNumber(finalInvoicedQty)} <span className="text-xs text-slate-400 font-bold">{language === 'ar' ? 'وحدة' : 'units'}</span>
+                </div>
+              </div>
+
+              {/* 2. Uninvoiced stock */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm text-right space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-slate-400">{language === 'ar' ? 'استلامات غير مفوترة' : 'Uninvoiced Receipts'}</span>
+                  <span className="w-2.5 h-2.5 bg-amber-500 rounded-full"></span>
+                </div>
+                <div className="text-2xl font-black text-slate-800 font-mono">
+                  {formatNumber(totalUninvoicedQty)} <span className="text-xs text-slate-400 font-bold">{language === 'ar' ? 'وحدة' : 'units'}</span>
+                </div>
+              </div>
+
+              {/* 3. Net Physical stock */}
+              <div className="bg-emerald-600 p-5 rounded-2xl shadow-sm text-right text-white space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-emerald-100">{language === 'ar' ? 'إجمالي الرصيد الفعلي' : 'Total Actual Balance'}</span>
+                  <span className="w-2.5 h-2.5 bg-white rounded-full"></span>
+                </div>
+                <div className="text-2xl font-black font-mono">
+                  {formatNumber(totalPhysicalQty)} <span className="text-xs text-emerald-100 font-bold">{language === 'ar' ? 'وحدة' : 'units'}</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
