@@ -275,7 +275,9 @@ export const StockCardReport: React.FC = () => {
 
   const handleExportStockCardExcel = () => {
     if (!selectedProduct) return;
-    const headers = language === 'ar' ? [
+    
+    // 1. Ledger Table Headers & Rows
+    const ledgerHeaders = language === 'ar' ? [
       'التاريخ', 'رقم الحركة', 'رقم القيد', 'نوع الحركة', 'المخزن', 'العميل / المورد', 'الوصف', 
       'الوارد (+)', 'المصرف (-)', 'رصيد الكمية', 
       'سياسة التكلفة', 'تكلفة الوحدة', 
@@ -287,7 +289,7 @@ export const StockCardReport: React.FC = () => {
       'Debit Value (+)', 'Credit Value (-)', 'Running Balance Value'
     ];
 
-    const data = filteredMovements.map(m => [
+    const ledgerRows = filteredMovements.map(m => [
       m.date.slice(0, 10),
       m.reference_number || '',
       m.entry_number || '',
@@ -305,7 +307,85 @@ export const StockCardReport: React.FC = () => {
       m.runningValue || 0
     ]);
 
-    exportToExcel([headers, ...data], { 
+    // 2. Separators & Headers for Uninvoiced Receipts
+    const emptyRow = ['', '', '', '', '', '', '', '', '', '', '', '', '', '', ''];
+
+    const grniTitleRow = language === 'ar' 
+      ? ['إيصالات استلام البضائع غير المفوترة (GRNI)', '', '', '', '', '', '', '', '', '', '', '', '', '', '']
+      : ['Goods Receipts Not Invoiced (GRNI)', '', '', '', '', '', '', '', '', '', '', '', '', '', ''];
+
+    const grniHeaders = language === 'ar' 
+      ? ['تاريخ الاستلام', 'رقم الإذن', 'المورد', 'الكمية المستلمة', 'الكمية المفوترة', 'الكمية المتبقية', '', '', '', '', '', '', '', '', '']
+      : ['Receipt Date', 'Receipt No.', 'Supplier', 'Received Qty', 'Billed Qty', 'Remaining Qty', '', '', '', '', '', '', '', '', ''];
+
+    const uninvoicedReceipts = goodsReceiptItems
+      .filter(item => {
+        const gr = goodsReceipts.find(g => g.id === item.goods_receipt_id);
+        return gr && gr.status === 'posted' && parseFloat(item.remaining_quantity || '0') > 0.0001;
+      })
+      .map(item => {
+        const gr = goodsReceipts.find(g => g.id === item.goods_receipt_id);
+        const qty = parseFloat(item.quantity || '0');
+        const billedQty = parseFloat(item.billed_quantity || '0');
+        const remainingQty = parseFloat(item.remaining_quantity || '0');
+        return {
+          date: gr?.date || '',
+          receipt_number: gr?.receipt_number || '',
+          supplier_name: gr?.supplier_name || '',
+          quantity: qty,
+          billed_quantity: billedQty,
+          remaining_quantity: remainingQty
+        };
+      })
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    const grniRows = uninvoicedReceipts.map(item => [
+      item.date.slice(0, 10),
+      item.receipt_number,
+      item.supplier_name || '-',
+      item.quantity,
+      item.billed_quantity,
+      item.remaining_quantity,
+      '', '', '', '', '', '', '', '', ''
+    ]);
+
+    // 3. Separators & Headers for Final Stock Summary
+    const summaryTitleRow = language === 'ar'
+      ? ['ملخص الرصيد النهائي للمخزون', '', '', '', '', '', '', '', '', '', '', '', '', '', '']
+      : ['Final Stock Balance Summary', '', '', '', '', '', '', '', '', '', '', '', '', '', ''];
+
+    const summaryHeaders = language === 'ar'
+      ? ['الرصيد المفوتر (المنتهي)', 'استلامات غير مفوترة', 'إجمالي الرصيد الفعلي', '', '', '', '', '', '', '', '', '', '', '', '']
+      : ['Invoiced Balance', 'Uninvoiced Receipts', 'Total Actual Balance', '', '', '', '', '', '', '', '', '', '', '', ''];
+
+    const finalInvoicedQty = movementsWithBalances.length > 0 ? movementsWithBalances[movementsWithBalances.length - 1].runningQty : 0;
+    const totalUninvoicedQty = uninvoicedReceipts.reduce((acc, curr) => acc + curr.remaining_quantity, 0);
+    const totalPhysicalQty = finalInvoicedQty + totalUninvoicedQty;
+
+    const summaryRows = [
+      [
+        `${finalInvoicedQty} ${selectedProduct?.unit || ''}`,
+        `${totalUninvoicedQty} ${selectedProduct?.unit || ''}`,
+        `${totalPhysicalQty} ${selectedProduct?.unit || ''}`,
+        '', '', '', '', '', '', '', '', '', '', '', ''
+      ]
+    ];
+
+    // Combine all sections into a single dataset
+    const allData = [
+      ledgerHeaders,
+      ...ledgerRows,
+      emptyRow,
+      grniTitleRow,
+      grniHeaders,
+      ...grniRows,
+      emptyRow,
+      summaryTitleRow,
+      summaryHeaders,
+      ...summaryRows
+    ];
+
+    exportToExcel(allData, { 
       filename: `Stock_Card_${selectedProduct.name}_${new Date().toISOString().slice(0, 10)}`,
       sheetName: language === 'ar' ? 'كارت الصنف' : 'Stock Card' 
     });
