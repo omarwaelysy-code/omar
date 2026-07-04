@@ -10,18 +10,189 @@ export enum OperationType {
 
 const API_BASE = '/api/erp';
 
+let lastBypassPassword = '';
+let bypassClearTimeout: any = null;
+
+function setBypassPassword(password: string) {
+  lastBypassPassword = password;
+  if (bypassClearTimeout) {
+    clearTimeout(bypassClearTimeout);
+  }
+  bypassClearTimeout = setTimeout(() => {
+    lastBypassPassword = '';
+    bypassClearTimeout = null;
+  }, 15000);
+}
+
+function showPasswordModal(closingDate: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const isAr = localStorage.getItem('app_language') === 'ar';
+    
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.4)';
+    overlay.style.backdropFilter = 'blur(4px)';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.zIndex = '99999';
+    overlay.style.fontFamily = 'Cairo, system-ui, sans-serif';
+
+    const modal = document.createElement('div');
+    modal.style.backgroundColor = '#ffffff';
+    modal.style.borderRadius = '24px';
+    modal.style.padding = '30px';
+    modal.style.width = '420px';
+    modal.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)';
+    modal.style.border = '1px solid #f4f4f5';
+    modal.style.display = 'flex';
+    modal.style.flexDirection = 'column';
+    modal.style.gap = '20px';
+    modal.style.direction = isAr ? 'rtl' : 'ltr';
+    modal.style.textAlign = isAr ? 'right' : 'left';
+
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.alignItems = 'center';
+    header.style.gap = '12px';
+    
+    const icon = document.createElement('div');
+    icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`;
+    
+    const title = document.createElement('h3');
+    title.innerText = isAr ? 'فترة مغلقة محاسبياً' : 'Accounting Period Closed';
+    title.style.margin = '0';
+    title.style.fontWeight = '800';
+    title.style.color = '#18181b';
+    title.style.fontSize = '18px';
+
+    header.appendChild(icon);
+    header.appendChild(title);
+    modal.appendChild(header);
+
+    const msg = document.createElement('p');
+    msg.innerText = isAr 
+      ? `⚠️ هذه الفترة مغلقة محاسبياً حتى تاريخ ${closingDate}.\nيرجى إدخال كلمة مرور تجاوز الإغلاق لحفظ العملية:`
+      : `⚠️ This period is closed until ${closingDate}.\nPlease enter the bypass password to save:`;
+    msg.style.margin = '0';
+    msg.style.color = '#71717a';
+    msg.style.fontSize = '14px';
+    msg.style.lineHeight = '1.6';
+    modal.appendChild(msg);
+
+    const input = document.createElement('input');
+    input.type = 'password';
+    input.placeholder = '••••••••';
+    input.style.width = '100%';
+    input.style.padding = '12px 16px';
+    input.style.backgroundColor = '#f4f4f5';
+    input.style.border = '1px solid #e4e4e7';
+    input.style.borderRadius = '12px';
+    input.style.outline = 'none';
+    input.style.fontSize = '16px';
+    input.style.fontWeight = 'bold';
+    input.style.boxSizing = 'border-box';
+    input.style.transition = 'border-color 0.2s';
+    input.addEventListener('focus', () => {
+      input.style.borderColor = '#10b981';
+    });
+    input.addEventListener('blur', () => {
+      input.style.borderColor = '#e4e4e7';
+    });
+    modal.appendChild(input);
+
+    const btnContainer = document.createElement('div');
+    btnContainer.style.display = 'flex';
+    btnContainer.style.gap = '10px';
+    btnContainer.style.marginTop = '10px';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.innerText = isAr ? 'إلغاء' : 'Cancel';
+    cancelBtn.type = 'button';
+    cancelBtn.style.flex = '1';
+    cancelBtn.style.padding = '12px';
+    cancelBtn.style.border = '1px solid #e4e4e7';
+    cancelBtn.style.backgroundColor = '#ffffff';
+    cancelBtn.style.color = '#27272a';
+    cancelBtn.style.borderRadius = '12px';
+    cancelBtn.style.cursor = 'pointer';
+    cancelBtn.style.fontWeight = 'bold';
+    cancelBtn.style.fontSize = '14px';
+    cancelBtn.style.transition = 'background-color 0.2s';
+    cancelBtn.addEventListener('mouseenter', () => cancelBtn.style.backgroundColor = '#f4f4f5');
+    cancelBtn.addEventListener('mouseleave', () => cancelBtn.style.backgroundColor = '#ffffff');
+
+    const okBtn = document.createElement('button');
+    okBtn.innerText = isAr ? 'موافق' : 'OK';
+    okBtn.type = 'button';
+    okBtn.style.flex = '1';
+    okBtn.style.padding = '12px';
+    okBtn.style.border = 'none';
+    okBtn.style.backgroundColor = '#10b981';
+    okBtn.style.color = '#ffffff';
+    okBtn.style.borderRadius = '12px';
+    okBtn.style.cursor = 'pointer';
+    okBtn.style.fontWeight = 'bold';
+    okBtn.style.fontSize = '14px';
+    okBtn.style.transition = 'background-color 0.2s';
+    okBtn.addEventListener('mouseenter', () => okBtn.style.backgroundColor = '#059669');
+    okBtn.addEventListener('mouseleave', () => okBtn.style.backgroundColor = '#10b981');
+
+    btnContainer.appendChild(cancelBtn);
+    btnContainer.appendChild(okBtn);
+    modal.appendChild(btnContainer);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    input.focus();
+
+    const cleanUp = () => {
+      document.body.removeChild(overlay);
+    };
+
+    okBtn.addEventListener('click', () => {
+      cleanUp();
+      resolve(input.value);
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      cleanUp();
+      resolve(null);
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        cleanUp();
+        resolve(input.value);
+      } else if (e.key === 'Escape') {
+        cleanUp();
+        resolve(null);
+      }
+    });
+  });
+}
+
 export async function apiRequest<T>(path: string, method: string = 'GET', body?: any, timeoutMs: number = 30000): Promise<T> {
   const token = localStorage.getItem('auth_token');
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+  const headers: any = {
+    'Content-Type': 'application/json',
+    'Authorization': token ? `Bearer ${token}` : '',
+  };
+  if (lastBypassPassword) {
+    headers['x-closing-password'] = encodeURIComponent(lastBypassPassword);
+  }
+
   try {
     const response = await fetch(`${API_BASE}${path}`, {
       method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
-      },
+      headers,
       body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal
     });
@@ -32,13 +203,10 @@ export async function apiRequest<T>(path: string, method: string = 'GET', body?:
       const error = await response.json().catch(() => ({ error: 'Unknown API error' }));
       
       if (error.error === 'PERIOD_CLOSED') {
-        const isAr = localStorage.getItem('app_language') === 'ar';
-        const promptMsg = isAr 
-          ? `⚠️ هذه الفترة مغلقة محاسبياً حتى تاريخ ${error.closingDate}.\nالرجاء إدخال كلمة مرور الإغلاق لتجاوز المنع وحفظ العملية:`
-          : `⚠️ Accounting period is closed until ${error.closingDate}.\nPlease enter the closing password to bypass and save:`;
-          
-        const password = window.prompt(promptMsg);
+        const password = await showPasswordModal(error.closingDate);
         if (password !== null && password !== '') {
+          setBypassPassword(password);
+          
           const retryResponse = await fetch(`${API_BASE}${path}`, {
             method,
             headers: {
