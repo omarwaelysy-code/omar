@@ -7,6 +7,7 @@ import { TemplateRenderer, normalizeDocumentData } from './TemplateRenderer';
 import html2pdf from 'html2pdf.js';
 import { useNotification } from '../contexts/NotificationContext';
 import { PaperSize, Template, PrintProfile } from '../types';
+import { sanitizeStylesForPDF, replaceOklchWithRgb } from '../utils/pdfUtils';
 
 const DEFAULT_TEMPLATE_LAYOUT = {
   headerHeight: 70,
@@ -374,6 +375,23 @@ export function UnifiedPrintEngine() {
       return;
     }
 
+    // Clean inline styles of oklch in preview area
+    const allPreviewElements = Array.from(printArea.getElementsByTagName('*'));
+    allPreviewElements.concat([printArea]).forEach(el => {
+      const htmlEl = el as HTMLElement;
+      if (htmlEl.style) {
+        const props = ['color', 'backgroundColor', 'borderColor', 'fill', 'stroke'];
+        props.forEach(prop => {
+          // @ts-ignore
+          let val = htmlEl.style[prop];
+          if (val && val.includes('oklch')) {
+            // @ts-ignore
+            htmlEl.style[prop] = replaceOklchWithRgb(val);
+          }
+        });
+      }
+    });
+
     const opt = {
       margin: [
         activeMargins.top,
@@ -397,6 +415,8 @@ export function UnifiedPrintEngine() {
       }
     };
 
+    const restoreStyles = sanitizeStylesForPDF();
+
     try {
       showNotification(language === 'ar' ? 'جاري تحضير ملف PDF...' : 'Preparing PDF file...', 'info');
       // @ts-ignore
@@ -406,6 +426,8 @@ export function UnifiedPrintEngine() {
     } catch (e) {
       console.error(e);
       showNotification(language === 'ar' ? 'فشل تحميل الملف' : 'Failed to download PDF', 'error');
+    } finally {
+      restoreStyles();
     }
   };
 

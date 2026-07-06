@@ -10,6 +10,105 @@ interface PDFOptions {
   reportTitle?: string;
 }
 
+export function oklchToRgb(lStr: string, cStr: string, hStr: string, opacityStr?: string): string {
+  let L = lStr.endsWith('%') ? parseFloat(lStr) / 100 : parseFloat(lStr);
+  let C = parseFloat(cStr);
+  let H = parseFloat(hStr);
+  let opacity = opacityStr ? (opacityStr.endsWith('%') ? parseFloat(opacityStr) / 100 : parseFloat(opacityStr)) : 1;
+
+  if (isNaN(L) || isNaN(C) || isNaN(H)) return 'rgb(0, 0, 0)';
+
+  const phi = (H * Math.PI) / 180;
+  const a = C * Math.cos(phi);
+  const b = C * Math.sin(phi);
+
+  const L_ = L + 0.3963377774 * a + 0.2158017502 * b;
+  const M_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const S_ = L - 0.0894841775 * a - 1.2914855480 * b;
+
+  const l = L_ * L_ * L_;
+  const m = M_ * M_ * M_;
+  const s = S_ * S_ * S_;
+
+  let r =  4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+  let g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+  let b_ = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s;
+
+  const gamma = (c: number) => {
+    if (c <= 0.0031308) return 12.92 * c;
+    return 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+  };
+
+  const R = Math.max(0, Math.min(255, Math.round(gamma(r) * 255)));
+  const G = Math.max(0, Math.min(255, Math.round(gamma(g) * 255)));
+  const B = Math.max(0, Math.min(255, Math.round(gamma(b_) * 255)));
+
+  if (opacity < 1) {
+    return `rgba(${R}, ${G}, ${B}, ${opacity})`;
+  }
+  return `rgb(${R}, ${G}, ${B})`;
+}
+
+export function replaceOklchWithRgb(cssText: string): string {
+  return cssText.replace(/oklch\(\s*([0-9.]+%?)\s+([0-9.]+)\s+([0-9.]+)(?:\s*\/\s*([0-9.]+%?))?\s*\)/g, (match, lStr, cStr, hStr, aStr) => {
+    return oklchToRgb(lStr, cStr, hStr, aStr);
+  });
+}
+
+export const sanitizeStylesForPDF = () => {
+  const backups: Array<{ element: HTMLElement; originalHtml?: string; disabledState?: boolean }> = [];
+  const tempStyles: HTMLStyleElement[] = [];
+
+  // 1. Sanitize all inline <style> tags
+  const styleTags = Array.from(document.getElementsByTagName('style'));
+  styleTags.forEach(tag => {
+    const originalHtml = tag.innerHTML;
+    backups.push({ element: tag, originalHtml });
+    tag.innerHTML = replaceOklchWithRgb(originalHtml);
+  });
+
+  // 2. Handle <link rel="stylesheet"> tags
+  const linkTags = Array.from(document.querySelectorAll('link[rel="stylesheet"]')) as HTMLLinkElement[];
+  linkTags.forEach(link => {
+    try {
+      const sheet = link.sheet;
+      if (sheet) {
+        let cssText = '';
+        const rules = Array.from(sheet.cssRules);
+        rules.forEach(rule => {
+          cssText += rule.cssText + '\n';
+        });
+        
+        const tempStyle = document.createElement('style');
+        tempStyle.innerHTML = replaceOklchWithRgb(cssText);
+        document.head.appendChild(tempStyle);
+        tempStyles.push(tempStyle);
+
+        backups.push({ element: link, disabledState: link.disabled });
+        link.disabled = true;
+      }
+    } catch (err) {
+      console.warn('Could not read rules from link stylesheet:', link.href, err);
+    }
+  });
+
+  return () => {
+    backups.forEach(backup => {
+      if (backup.originalHtml !== undefined) {
+        (backup.element as HTMLStyleElement).innerHTML = backup.originalHtml;
+      }
+      if (backup.disabledState !== undefined) {
+        (backup.element as HTMLLinkElement).disabled = backup.disabledState;
+      }
+    });
+    tempStyles.forEach(tag => {
+      if (tag.parentNode) {
+        tag.parentNode.removeChild(tag);
+      }
+    });
+  };
+};
+
 export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => {
   const { filename, margin = 10, orientation = 'portrait', reportTitle } = options;
 
@@ -114,26 +213,17 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
   });
 
   // 7. Replace Tailwind oklch/oklab colors with compatible hex fallbacks
-  const allElements = Array.from(clone.getElementsByTagName('*'));
-  allElements.forEach(el => {
+  const allCloneElements = Array.from(clone.getElementsByTagName('*'));
+  allCloneElements.concat([clone]).forEach(el => {
     const htmlEl = el as HTMLElement;
     if (htmlEl.style) {
       const props = ['color', 'backgroundColor', 'borderColor', 'fill', 'stroke'];
       props.forEach(prop => {
         // @ts-ignore
         let val = htmlEl.style[prop];
-        if (val && (val.includes('oklch') || val.includes('oklab') || val.includes('color-mix'))) {
-          if (prop === 'backgroundColor') {
-            if (val.includes('0.9') || val.includes('95%') || val.includes('50')) {
-              htmlEl.style.backgroundColor = '#f0fdf4';
-            } else {
-              htmlEl.style.backgroundColor = '#10b981';
-            }
-          } else if (prop === 'borderColor') {
-            htmlEl.style.borderColor = '#e5e7eb';
-          } else {
-            htmlEl.style[prop as any] = '#111827';
-          }
+        if (val && val.includes('oklch')) {
+          // @ts-ignore
+          htmlEl.style[prop] = replaceOklchWithRgb(val);
         }
       });
     }
@@ -169,12 +259,15 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
     pagebreak: { mode: ['css', 'legacy'], avoid: 'tr, .avoid-break, .company-invoice-header' }
   };
 
+  const restoreStyles = sanitizeStylesForPDF();
+
   try {
     await html2pdfFunc().set(opt).from(tempContainer).save();
   } catch (error) {
     console.error('PDF Export Error:', error);
     throw error;
   } finally {
+    restoreStyles();
     if (document.body.contains(tempContainer)) {
       document.body.removeChild(tempContainer);
     }
