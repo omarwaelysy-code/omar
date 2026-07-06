@@ -492,7 +492,25 @@ export function UnifiedPrintEngine() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate PDF on server');
+        let serverErrorMsg = 'Failed to generate PDF on server';
+        try {
+          const errorJson = await response.json();
+          if (errorJson && errorJson.exceptionMessage) {
+            console.error("=================== BACKEND PDF FAILURE DETAILS ===================");
+            console.error(`- Failed File: ${errorJson.failedFile}`);
+            console.error(`- Line Number: ${errorJson.lineNumber}`);
+            console.error(`- Exception Name: ${errorJson.exceptionName}`);
+            console.error(`- Exception Message: ${errorJson.exceptionMessage}`);
+            console.error(`- Stack Trace:\n${errorJson.stackTrace}`);
+            console.error("===================================================================");
+            serverErrorMsg = `Backend PDF Error: ${errorJson.exceptionMessage} (at ${errorJson.failedFile}:${errorJson.lineNumber})`;
+          } else if (errorJson && errorJson.error) {
+            serverErrorMsg = `Backend PDF Error: ${errorJson.error}`;
+          }
+        } catch (e) {
+          // Fallback to generic message if parsing fails
+        }
+        throw new Error(serverErrorMsg);
       }
 
       const blob = await response.blob();
