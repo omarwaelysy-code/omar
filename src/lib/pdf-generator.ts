@@ -667,7 +667,13 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
     browser = await puppeteer.launch({
       headless: true,
       executablePath: execPath,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--headless=new'
+      ]
     });
   } catch (err: any) {
     const launchErr = new Error(
