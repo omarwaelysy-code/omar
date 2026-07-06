@@ -4,10 +4,19 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { X, Printer, Download, FileText, Settings, Sliders } from 'lucide-react';
 import { TemplateRenderer, normalizeDocumentData } from './TemplateRenderer';
-import html2pdf from 'html2pdf.js';
 import { useNotification } from '../contexts/NotificationContext';
 import { PaperSize, Template, PrintProfile } from '../types';
-import { sanitizeStylesForPDF, replaceOklchWithRgb, replaceOklabWithRgb } from '../utils/pdfUtils';
+import { downloadPDF } from '../lib/pdf/PdfExporter';
+import { 
+  SalesInvoicePdf, 
+  PurchaseInvoicePdf, 
+  VoucherPdf, 
+  LedgerPdf,
+  SalesInvoiceDTO,
+  PurchaseInvoiceDTO,
+  VoucherDTO,
+  GeneralLedgerDTO
+} from '../lib/pdf/ReportFactory';
 
 const DEFAULT_TEMPLATE_LAYOUT = {
   headerHeight: 70,
@@ -369,65 +378,128 @@ export function UnifiedPrintEngine() {
   };
 
   const handleDownloadPDF = async () => {
-    const printArea = document.getElementById('unified-print-capture-area');
-    if (!printArea) {
-      toast.error('Capture element not found');
+    if (!documentData) {
+      toast.error('No document data available');
       return;
     }
 
-    // Clean inline styles of oklch/oklab in preview area
-    const allPreviewElements = Array.from(printArea.getElementsByTagName('*'));
-    allPreviewElements.concat([printArea]).forEach(el => {
-      const htmlEl = el as HTMLElement;
-      if (htmlEl.style) {
-        const props = ['color', 'backgroundColor', 'borderColor', 'fill', 'stroke'];
-        props.forEach(prop => {
-          // @ts-ignore
-          let val = htmlEl.style[prop];
-          if (val && (val.includes('oklch') || val.includes('oklab'))) {
-            // @ts-ignore
-            htmlEl.style[prop] = replaceOklabWithRgb(replaceOklchWithRgb(val));
-          }
-        });
-      }
-    });
+    const normalized = normalizeDocumentData(operationType, documentData, company, user);
+    if (!normalized) {
+      toast.error('Could not normalize document data');
+      return;
+    }
 
-    const opt = {
-      margin: [
-        activeMargins.top,
-        activeMargins.right,
-        activeMargins.bottom,
-        activeMargins.left
-      ],
-      filename: `${operationType}_${documentData?.invoice_number || documentData?.voucher_number || documentData?.entry_number || documentData?.order_number || 'doc'}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { 
-        scale: selectedProfile?.dpi === 203 ? 1.8 : 2.5, 
-        useCORS: true, 
-        allowTaint: true,
-        removeContainer: true,
-        logging: false 
-      },
-      jsPDF: { 
-        unit: 'mm', 
-        format: activePaperSizeId === 'custom' ? [actualWidthMm, actualHeightMm] : activePaperSizeId, 
-        orientation: activeOrientation 
-      }
+    const companyDto = {
+      name: normalized.company_name || '',
+      logoUrl: normalized.company_logo || '',
+      taxNumber: normalized.company_tax_number || '',
+      phone: normalized.company_phone || ''
     };
 
-    const restoreStyles = sanitizeStylesForPDF();
+    const itemsDto = (normalized.items || []).map(itm => ({
+      product_code: String(itm.product_code || '-'),
+      product_name: String(itm.product_name || '-'),
+      quantity: String(itm.quantity || '0'),
+      unit: String(itm.unit || 'حبة'),
+      unit_price: String(itm.unit_price || '0'),
+      discount: String(itm.discount || '0'),
+      vat_amount: String(itm.vat_amount || '0'),
+      total: String(itm.total || '0')
+    }));
+
+    let pdfDoc: React.ReactElement | null = null;
+
+    if (operationType === 'invoices' || operationType === 'returns' || operationType === 'sales_orders') {
+      const dto: SalesInvoiceDTO = {
+        company: companyDto,
+        invoice_number: normalized.document_number || '',
+        date: normalized.date || '',
+        payment_method: normalized.payment_method || '',
+        customer_name: normalized.customer_name || '',
+        customer_tax_number: normalized.customer_tax_number,
+        customer_phone: normalized.customer_phone,
+        items: itemsDto,
+        subtotal: String(normalized.subtotal || '0'),
+        discount_amount: String(normalized.discount_amount || '0'),
+        vat_amount: String(normalized.vat_amount || '0'),
+        net_total: String(normalized.net_total || '0'),
+        userName: normalized.user_name,
+        branchName: normalized.branch_name
+      };
+      pdfDoc = <SalesInvoicePdf data={dto} />;
+    } else if (operationType === 'purchase_invoices' || operationType === 'purchase_returns' || operationType === 'purchase_orders') {
+      const dto: PurchaseInvoiceDTO = {
+        company: companyDto,
+        invoice_number: normalized.document_number || '',
+        date: normalized.date || '',
+        payment_method: normalized.payment_method || '',
+        supplier_name: normalized.supplier_name || '',
+        supplier_tax_number: normalized.supplier_tax_number,
+        supplier_phone: normalized.supplier_phone,
+        items: itemsDto,
+        subtotal: String(normalized.subtotal || '0'),
+        discount_amount: String(normalized.discount_amount || '0'),
+        vat_amount: String(normalized.vat_amount || '0'),
+        net_total: String(normalized.net_total || '0'),
+        userName: normalized.user_name,
+        branchName: normalized.branch_name
+      };
+      pdfDoc = <PurchaseInvoicePdf data={dto} />;
+    } else if (operationType === 'receipt_vouchers' || operationType === 'payment_vouchers') {
+      const dto: VoucherDTO = {
+        company: companyDto,
+        voucher_number: normalized.document_number || '',
+        date: normalized.date || '',
+        payment_method: normalized.payment_method || '',
+        party_name: normalized.customer_name || normalized.supplier_name || '',
+        amount: String(normalized.net_total || '0'),
+        description: documentData?.description || '',
+        items: itemsDto.map(itm => ({
+          account_code: itm.product_code,
+          account_name: itm.product_name,
+          description: itm.product_name,
+          amount: itm.total
+        })),
+        userName: normalized.user_name,
+        branchName: normalized.branch_name,
+        isReceipt: operationType === 'receipt_vouchers'
+      };
+      pdfDoc = <VoucherPdf data={dto} />;
+    } else if (operationType === 'journal_entries') {
+      const dto: GeneralLedgerDTO = {
+        company: companyDto,
+        date_from: normalized.date || '',
+        date_to: normalized.date || '',
+        rows: itemsDto.map(itm => ({
+          date: normalized.date || '',
+          entry_num: normalized.document_number || '',
+          account_code: itm.product_code,
+          account_name: itm.product_name,
+          description: itm.product_name,
+          debit: documentData?.journal_entry_lines?.find((l: any) => l.account_id === itm.product_code)?.debit || '0',
+          credit: documentData?.journal_entry_lines?.find((l: any) => l.account_id === itm.product_code)?.credit || '0'
+        })),
+        total_debit: String(normalized.subtotal || '0'),
+        total_credit: String(normalized.subtotal || '0'),
+        userName: normalized.user_name,
+        branchName: normalized.branch_name
+      };
+      pdfDoc = <LedgerPdf data={dto} />;
+    }
+
+    if (!pdfDoc) {
+      toast.error('Document layout not defined for this operation');
+      return;
+    }
 
     try {
       showNotification(language === 'ar' ? 'جاري تحضير ملف PDF...' : 'Preparing PDF file...', 'info');
-      // @ts-ignore
-      const html2pdfFunc = html2pdf.default || html2pdf;
-      await html2pdfFunc().set(opt).from(printArea).save();
+      const filename = `${operationType}_${normalized.document_number || 'doc'}.pdf`;
+      await downloadPDF(pdfDoc, filename);
       showNotification(language === 'ar' ? 'تم تحميل الملف بنجاح' : 'PDF downloaded successfully', 'success');
     } catch (e) {
       console.error(e);
       showNotification(language === 'ar' ? 'فشل تحميل الملف' : 'Failed to download PDF', 'error');
-    } finally {
-      restoreStyles();
     }
   };
 

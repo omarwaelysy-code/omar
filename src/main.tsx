@@ -6,6 +6,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { NavigationProvider } from './contexts/NavigationContext';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { PdfProvider } from './lib/pdf/PdfProvider';
 
 class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean, error: any}> {
   constructor(props: {children: ReactNode}) {
@@ -51,7 +52,9 @@ createRoot(document.getElementById('root')!).render(
       <AuthProvider>
         <NavigationProvider>
           <NotificationProvider>
-            <App />
+            <PdfProvider>
+              <App />
+            </PdfProvider>
           </NotificationProvider>
         </NavigationProvider>
       </AuthProvider>
