@@ -49,6 +49,43 @@ export function oklchToRgb(lStr: string, cStr: string, hStr: string, opacityStr?
   return `rgb(${R}, ${G}, ${B})`;
 }
 
+export function replaceOklabWithRgb(cssText: string): string {
+  return cssText.replace(/oklab\(\s*([0-9.]+%?)\s+([0-9.-]+)\s+([0-9.-]+)(?:\s*\/\s*([0-9.]+%?))?\s*\)/g, (match, lStr, aStr, bStr, alphaStr) => {
+    let L = lStr.endsWith('%') ? parseFloat(lStr) / 100 : parseFloat(lStr);
+    let a = parseFloat(aStr);
+    let b = parseFloat(bStr);
+    let opacity = alphaStr ? (alphaStr.endsWith('%') ? parseFloat(alphaStr) / 100 : parseFloat(alphaStr)) : 1;
+
+    if (isNaN(L) || isNaN(a) || isNaN(b)) return 'rgb(0, 0, 0)';
+
+    const L_ = L + 0.3963377774 * a + 0.2158017502 * b;
+    const M_ = L - 0.1055613458 * a - 0.0638541728 * b;
+    const S_ = L - 0.0894841775 * a - 1.2914855480 * b;
+
+    const l = L_ * L_ * L_;
+    const m = M_ * M_ * M_;
+    const s = S_ * S_ * S_;
+
+    let r =  4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+    let g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+    let b_ = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s;
+
+    const gamma = (c: number) => {
+      if (c <= 0.0031308) return 12.92 * c;
+      return 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+    };
+
+    const R = Math.max(0, Math.min(255, Math.round(gamma(r) * 255)));
+    const G = Math.max(0, Math.min(255, Math.round(gamma(g) * 255)));
+    const B = Math.max(0, Math.min(255, Math.round(gamma(b_) * 255)));
+
+    if (opacity < 1) {
+      return `rgba(${R}, ${G}, ${B}, ${opacity})`;
+    }
+    return `rgb(${R}, ${G}, ${B})`;
+  });
+}
+
 export function replaceOklchWithRgb(cssText: string): string {
   return cssText.replace(/oklch\(\s*([0-9.]+%?)\s+([0-9.]+)\s+([0-9.]+)(?:\s*\/\s*([0-9.]+%?))?\s*\)/g, (match, lStr, cStr, hStr, aStr) => {
     return oklchToRgb(lStr, cStr, hStr, aStr);
@@ -59,12 +96,14 @@ export const sanitizeStylesForPDF = () => {
   const backups: Array<{ element: HTMLElement; originalHtml?: string; disabledState?: boolean }> = [];
   const tempStyles: HTMLStyleElement[] = [];
 
+  const cleanCss = (text: string) => replaceOklabWithRgb(replaceOklchWithRgb(text));
+
   // 1. Sanitize all inline <style> tags
   const styleTags = Array.from(document.getElementsByTagName('style'));
   styleTags.forEach(tag => {
     const originalHtml = tag.innerHTML;
     backups.push({ element: tag, originalHtml });
-    tag.innerHTML = replaceOklchWithRgb(originalHtml);
+    tag.innerHTML = cleanCss(originalHtml);
   });
 
   // 2. Handle <link rel="stylesheet"> tags
@@ -74,13 +113,20 @@ export const sanitizeStylesForPDF = () => {
       const sheet = link.sheet;
       if (sheet) {
         let cssText = '';
-        const rules = Array.from(sheet.cssRules);
-        rules.forEach(rule => {
-          cssText += rule.cssText + '\n';
-        });
+        try {
+          const rules = Array.from(sheet.cssRules);
+          rules.forEach(rule => {
+            cssText += rule.cssText + '\n';
+          });
+        } catch (e) {
+          // Cross-origin CSS file (CORS issue), disable it during print
+          backups.push({ element: link, disabledState: link.disabled });
+          link.disabled = true;
+          return;
+        }
         
         const tempStyle = document.createElement('style');
-        tempStyle.innerHTML = replaceOklchWithRgb(cssText);
+        tempStyle.innerHTML = cleanCss(cssText);
         document.head.appendChild(tempStyle);
         tempStyles.push(tempStyle);
 
@@ -92,7 +138,29 @@ export const sanitizeStylesForPDF = () => {
     }
   });
 
+  // 3. Mock document.styleSheets to exclude any disabled or unreachable sheets
+  const filteredSheets = Array.from(document.styleSheets).filter(sheet => {
+    try {
+      if (sheet.disabled) return false;
+      const testRules = sheet.cssRules;
+      return true;
+    } catch (e) {
+      return false;
+    }
+  });
+
+  Object.defineProperty(document, 'styleSheets', {
+    get() {
+      return filteredSheets;
+    },
+    configurable: true
+  });
+
   return () => {
+    // Restore styleSheets property descriptor
+    // @ts-ignore
+    delete document.styleSheets;
+
     backups.forEach(backup => {
       if (backup.originalHtml !== undefined) {
         (backup.element as HTMLStyleElement).innerHTML = backup.originalHtml;
@@ -221,9 +289,9 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
       props.forEach(prop => {
         // @ts-ignore
         let val = htmlEl.style[prop];
-        if (val && val.includes('oklch')) {
+        if (val && (val.includes('oklch') || val.includes('oklab'))) {
           // @ts-ignore
-          htmlEl.style[prop] = replaceOklchWithRgb(val);
+          htmlEl.style[prop] = replaceOklabWithRgb(replaceOklchWithRgb(val));
         }
       });
     }

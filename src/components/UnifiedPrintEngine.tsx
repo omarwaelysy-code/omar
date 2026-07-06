@@ -7,7 +7,7 @@ import { TemplateRenderer, normalizeDocumentData } from './TemplateRenderer';
 import html2pdf from 'html2pdf.js';
 import { useNotification } from '../contexts/NotificationContext';
 import { PaperSize, Template, PrintProfile } from '../types';
-import { sanitizeStylesForPDF, replaceOklchWithRgb } from '../utils/pdfUtils';
+import { sanitizeStylesForPDF, replaceOklchWithRgb, replaceOklabWithRgb } from '../utils/pdfUtils';
 
 const DEFAULT_TEMPLATE_LAYOUT = {
   headerHeight: 70,
@@ -375,7 +375,7 @@ export function UnifiedPrintEngine() {
       return;
     }
 
-    // Clean inline styles of oklch in preview area
+    // Clean inline styles of oklch/oklab in preview area
     const allPreviewElements = Array.from(printArea.getElementsByTagName('*'));
     allPreviewElements.concat([printArea]).forEach(el => {
       const htmlEl = el as HTMLElement;
@@ -384,9 +384,9 @@ export function UnifiedPrintEngine() {
         props.forEach(prop => {
           // @ts-ignore
           let val = htmlEl.style[prop];
-          if (val && val.includes('oklch')) {
+          if (val && (val.includes('oklch') || val.includes('oklab'))) {
             // @ts-ignore
-            htmlEl.style[prop] = replaceOklchWithRgb(val);
+            htmlEl.style[prop] = replaceOklabWithRgb(replaceOklchWithRgb(val));
           }
         });
       }
