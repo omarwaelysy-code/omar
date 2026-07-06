@@ -629,33 +629,117 @@ function getChromiumExecutablePath(): string | undefined {
 }
 
 export async function generatePDF(templateName: string, dto: any): Promise<Buffer> {
-  const html = generateHTML(templateName, dto);
-  const execPath = getChromiumExecutablePath();
+  // 1. Font existence check
+  const regularPath = path.resolve('./public/fonts/NotoSansArabic-Regular.ttf');
+  const boldPath = path.resolve('./public/fonts/NotoSansArabic-Bold.ttf');
   
-  const browser = await puppeteer.launch({
-    headless: true,
-    executablePath: execPath,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
-  
+  if (!fs.existsSync(regularPath)) {
+    throw new Error(`Font file not found: NotoSansArabic-Regular.ttf (expected at: ${regularPath})`);
+  }
+  if (!fs.existsSync(boldPath)) {
+    throw new Error(`Font file not found: NotoSansArabic-Bold.ttf (expected at: ${boldPath})`);
+  }
+
+  // Load fonts into memory
+  if (!regularFontBase64) {
+    regularFontBase64 = fs.readFileSync(regularPath).toString('base64');
+  }
+  if (!boldFontBase64) {
+    boldFontBase64 = fs.readFileSync(boldPath).toString('base64');
+  }
+
+  // 2. Template compilation check
+  let html = '';
   try {
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    
-    // Renders the exact PDF layout
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: {
-        top: '15mm',
-        right: '10mm',
-        bottom: '15mm',
-        left: '10mm'
-      }
+    html = generateHTML(templateName, dto);
+  } catch (err: any) {
+    throw new Error(`Template generation failed for template: "${templateName}". Original error: ${err.message}. Stack: ${err.stack}`);
+  }
+
+  // 3. Puppeteer diagnostics
+  const execPath = getChromiumExecutablePath();
+  const execPathExists = execPath ? fs.existsSync(execPath) : false;
+
+  let browser: any = null;
+  
+  // Launch browser
+  try {
+    browser = await puppeteer.launch({
+      headless: true,
+      executablePath: execPath,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
-    
+  } catch (err: any) {
+    const launchErr = new Error(
+      `browser.launch failed.\n` +
+      `- Chromium executable path: ${execPath || 'Default Puppeteer'}\n` +
+      `- Does Chromium exist? ${execPathExists}\n` +
+      `- Exception Name: ${err.name || 'Error'}\n` +
+      `- Exception Message: ${err.message}`
+    );
+    launchErr.stack = err.stack;
+    throw launchErr;
+  }
+
+  try {
+    // page setContent
+    let page: any;
+    try {
+      page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle0' });
+    } catch (err: any) {
+      const setContentErr = new Error(
+        `page.setContent failed.\n` +
+        `- browser.launch succeeded? true\n` +
+        `- Exception Name: ${err.name || 'Error'}\n` +
+        `- Exception Message: ${err.message}`
+      );
+      setContentErr.stack = err.stack;
+      throw setContentErr;
+    }
+
+    // page.pdf
+    let pdfBuffer: Buffer;
+    try {
+      pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: {
+          top: '15mm',
+          right: '10mm',
+          bottom: '15mm',
+          left: '10mm'
+        }
+      });
+    } catch (err: any) {
+      const pdfErr = new Error(
+        `page.pdf failed.\n` +
+        `- browser.launch succeeded? true\n` +
+        `- page.setContent succeeded? true\n` +
+        `- Exception Name: ${err.name || 'Error'}\n` +
+        `- Exception Message: ${err.message}`
+      );
+      pdfErr.stack = err.stack;
+      throw pdfErr;
+    }
+
     return pdfBuffer;
   } finally {
-    await browser.close();
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (err: any) {
+        const closeErr = new Error(
+          `browser.close failed.\n` +
+          `- browser.launch succeeded? true\n` +
+          `- page.setContent succeeded? true\n` +
+          `- page.pdf succeeded? true\n` +
+          `- Exception Name: ${err.name || 'Error'}\n` +
+          `- Exception Message: ${err.message}`
+        );
+        closeErr.stack = err.stack;
+        throw closeErr;
+      }
+    }
   }
 }

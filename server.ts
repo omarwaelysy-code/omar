@@ -427,8 +427,8 @@ async function startServer() {
 
   // PDF Printing Endpoint
   app.post("/api/erp/print/pdf", async (req, res, next) => {
+    const { templateName, dto } = req.body;
     try {
-      const { templateName, dto } = req.body;
       if (!templateName || !dto) {
         return res.status(400).json({ error: "Missing templateName or dto" });
       }
@@ -436,8 +436,33 @@ async function startServer() {
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", 'attachment; filename="document.pdf"');
       res.send(pdfBuffer);
-    } catch (err) {
-      next(err);
+    } catch (err: any) {
+      // Parse failing file and line number from stack trace
+      const stack = err.stack || '';
+      const lines = stack.split('\n');
+      const targetLine = lines[1] || '';
+      const match = targetLine.match(/at\s+(?:.*\s+)?\(?([^:]+):(\d+):(\d+)\)?/);
+      const fileName = match ? match[1] : 'Unknown File';
+      const lineNumber = match ? match[2] : 'Unknown Line';
+
+      // Output complete structured diagnostics to console
+      console.error("=================== PDF GENERATION FAILURE ===================");
+      console.error(`- Failed File: ${fileName}`);
+      console.error(`- Line Number: ${lineNumber}`);
+      console.error(`- Exception Name: ${err.name || 'Error'}`);
+      console.error(`- Exception Message: ${err.message}`);
+      console.error(`- Stack Trace:\n${stack}`);
+      console.error("==============================================================");
+
+      // Return the full structured error details back to the client
+      res.status(500).json({
+        error: "PDF Generation failed",
+        failedFile: fileName,
+        lineNumber: lineNumber,
+        exceptionName: err.name || 'Error',
+        exceptionMessage: err.message,
+        stackTrace: stack
+      });
     }
   });
 
