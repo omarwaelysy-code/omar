@@ -9,6 +9,7 @@ import fs from "fs";
 import { initDatabase } from "./src/lib/init-db";
 import { runMigrations } from "./src/lib/migration-runner";
 import erpRouter from "./src/lib/erp-api";
+import { generatePDF } from "./src/lib/pdf-generator";
 
 async function startServer() {
   // Initialize PostgreSQL FIRST
@@ -423,6 +424,22 @@ async function startServer() {
   app.use(cors());
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+  // PDF Printing Endpoint
+  app.post("/api/erp/print/pdf", async (req, res, next) => {
+    try {
+      const { templateName, dto } = req.body;
+      if (!templateName || !dto) {
+        return res.status(400).json({ error: "Missing templateName or dto" });
+      }
+      const pdfBuffer = await generatePDF(templateName, dto);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", 'attachment; filename="document.pdf"');
+      res.send(pdfBuffer);
+    } catch (err) {
+      next(err);
+    }
+  });
 
   // ERP API Routes
   app.use("/api/erp", erpRouter);

@@ -1,12 +1,3 @@
-import React from 'react';
-import { downloadPDF } from '../lib/pdf/PdfExporter';
-import { Document, Page, View, Text } from '@react-pdf/renderer';
-import { PdfHeader } from '../lib/pdf/PdfHeader';
-import { PdfFooter } from '../lib/pdf/PdfFooter';
-import { PdfTable } from '../lib/pdf/PdfTable';
-import { pdfStyles } from '../lib/pdf/PdfTheme';
-import { shapeArabicText } from '../lib/pdf/PdfHelpers';
-
 interface PDFOptions {
   filename: string;
   margin?: number;
@@ -16,7 +7,7 @@ interface PDFOptions {
 
 /**
  * Compatibility Bridge: Parses target DOM tables and compiles them 
- * directly into data-driven @react-pdf/renderer document structures.
+ * directly into data-driven PDF requests sent to the backend Puppeteer compiler.
  */
 export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => {
   if (!element) {
@@ -88,46 +79,51 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
     });
   }
 
-  const documentTitle = options.reportTitle || 'تقرير النظام';
+  // 3. Construct the DTO payload
+  const dto = {
+    company,
+    reportTitle: options.reportTitle || 'تقرير النظام',
+    columns,
+    rows,
+    totals
+  };
 
-  // 3. Construct @react-pdf/renderer document structure
-  const pdfDocument = (
-    <Document>
-      <Page size="A4" orientation={options.orientation || 'portrait'} style={pdfStyles.page}>
-        <PdfHeader
-          companyName={company.name}
-          companyLogo={company.logoUrl}
-          companyTaxNumber={company.taxNumber}
-          companyPhone={company.phone}
-          reportTitle={documentTitle}
-        />
-        
-        {columns.length > 0 ? (
-          <PdfTable
-            columns={columns}
-            data={rows}
-            showTotals={Object.keys(totals).length > 0}
-            totals={totals}
-          />
-        ) : (
-          <View style={{ padding: 10 }}>
-            <Text style={{ fontSize: 10 }}>
-              {shapeArabicText(element.textContent || 'لا توجد بيانات')}
-            </Text>
-          </View>
-        )}
-        
-        <PdfFooter />
-      </Page>
-    </Document>
-  );
+  // 4. Send POST request to backend PDF service
+  try {
+    const response = await fetch('/api/erp/print/pdf', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        templateName: 'ReportTemplate',
+        dto
+      })
+    });
 
-  // 4. Trigger download
-  await downloadPDF(pdfDocument, options.filename || 'report.pdf');
+    if (!response.ok) {
+      throw new Error('Failed to generate PDF on server');
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    
+    const rawFilename = options.filename || 'report';
+    link.download = rawFilename.endsWith('.pdf') ? rawFilename : `${rawFilename}.pdf`;
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Server PDF Generation failed:', error);
+  }
 };
 
 /**
- * Standard browser printing fallback (re-routed from PDF capture method)
+ * Standard browser printing fallback
  */
 export const printElement = (element: HTMLElement) => {
   if (!element) return;

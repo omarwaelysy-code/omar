@@ -16,8 +16,11 @@ RUN npm run build
 # Stage 2: Production Server
 FROM node:22-slim
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Install system dependencies, curl, and Chromium for Puppeteer
+RUN apt-get update && apt-get install -y \
+    curl \
+    chromium \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

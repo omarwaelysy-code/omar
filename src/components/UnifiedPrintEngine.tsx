@@ -6,17 +6,6 @@ import { X, Printer, Download, FileText, Settings, Sliders } from 'lucide-react'
 import { TemplateRenderer, normalizeDocumentData } from './TemplateRenderer';
 import { useNotification } from '../contexts/NotificationContext';
 import { PaperSize, Template, PrintProfile } from '../types';
-import { downloadPDF } from '../lib/pdf/PdfExporter';
-import { 
-  SalesInvoicePdf, 
-  PurchaseInvoicePdf, 
-  VoucherPdf, 
-  LedgerPdf,
-  SalesInvoiceDTO,
-  PurchaseInvoiceDTO,
-  VoucherDTO,
-  GeneralLedgerDTO
-} from '../lib/pdf/ReportFactory';
 
 const DEFAULT_TEMPLATE_LAYOUT = {
   headerHeight: 70,
@@ -379,13 +368,13 @@ export function UnifiedPrintEngine() {
 
   const handleDownloadPDF = async () => {
     if (!documentData) {
-      toast.error('No document data available');
+      showNotification(language === 'ar' ? 'بيانات المستند غير متوفرة' : 'No document data available', 'error');
       return;
     }
 
     const normalized = normalizeDocumentData(operationType, documentData, company, user);
     if (!normalized) {
-      toast.error('Could not normalize document data');
+      showNotification(language === 'ar' ? 'فشل معالجة البيانات' : 'Could not normalize document data', 'error');
       return;
     }
 
@@ -407,10 +396,12 @@ export function UnifiedPrintEngine() {
       total: String(itm.total || '0')
     }));
 
-    let pdfDoc: React.ReactElement | null = null;
+    let templateName = 'ReportTemplate';
+    let dto: any = {};
 
     if (operationType === 'invoices' || operationType === 'returns' || operationType === 'sales_orders') {
-      const dto: SalesInvoiceDTO = {
+      templateName = 'SalesInvoicePdf';
+      dto = {
         company: companyDto,
         invoice_number: normalized.document_number || '',
         date: normalized.date || '',
@@ -426,9 +417,9 @@ export function UnifiedPrintEngine() {
         userName: normalized.user_name,
         branchName: normalized.branch_name
       };
-      pdfDoc = <SalesInvoicePdf data={dto} />;
     } else if (operationType === 'purchase_invoices' || operationType === 'purchase_returns' || operationType === 'purchase_orders') {
-      const dto: PurchaseInvoiceDTO = {
+      templateName = 'PurchaseInvoicePdf';
+      dto = {
         company: companyDto,
         invoice_number: normalized.document_number || '',
         date: normalized.date || '',
@@ -444,9 +435,9 @@ export function UnifiedPrintEngine() {
         userName: normalized.user_name,
         branchName: normalized.branch_name
       };
-      pdfDoc = <PurchaseInvoicePdf data={dto} />;
     } else if (operationType === 'receipt_vouchers' || operationType === 'payment_vouchers') {
-      const dto: VoucherDTO = {
+      templateName = 'VoucherPdf';
+      dto = {
         company: companyDto,
         voucher_number: normalized.document_number || '',
         date: normalized.date || '',
@@ -464,9 +455,9 @@ export function UnifiedPrintEngine() {
         branchName: normalized.branch_name,
         isReceipt: operationType === 'receipt_vouchers'
       };
-      pdfDoc = <VoucherPdf data={dto} />;
     } else if (operationType === 'journal_entries') {
-      const dto: GeneralLedgerDTO = {
+      templateName = 'LedgerPdf';
+      dto = {
         company: companyDto,
         date_from: normalized.date || '',
         date_to: normalized.date || '',
@@ -484,18 +475,36 @@ export function UnifiedPrintEngine() {
         userName: normalized.user_name,
         branchName: normalized.branch_name
       };
-      pdfDoc = <LedgerPdf data={dto} />;
-    }
-
-    if (!pdfDoc) {
-      toast.error('Document layout not defined for this operation');
-      return;
     }
 
     try {
       showNotification(language === 'ar' ? 'جاري تحضير ملف PDF...' : 'Preparing PDF file...', 'info');
-      const filename = `${operationType}_${normalized.document_number || 'doc'}.pdf`;
-      await downloadPDF(pdfDoc, filename);
+      
+      const response = await fetch('/api/erp/print/pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          templateName,
+          dto
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF on server');
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${operationType}_${normalized.document_number || 'doc'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
       showNotification(language === 'ar' ? 'تم تحميل الملف بنجاح' : 'PDF downloaded successfully', 'success');
     } catch (e) {
       console.error(e);
