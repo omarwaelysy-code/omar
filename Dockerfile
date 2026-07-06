@@ -28,8 +28,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --omit=dev
 
-# Copy build artifacts and server code
+# Copy build artifacts, public assets, and server code
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/public ./public
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/server.ts ./
 COPY --from=builder /app/.env.example ./.env
