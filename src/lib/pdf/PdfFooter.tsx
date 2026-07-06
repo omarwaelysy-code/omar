@@ -14,9 +14,12 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
-    fontSize: 7,
-    color: pdfColors.textMuted,
     width: '100%'
+  },
+  footerText: {
+    fontFamily: 'Noto Sans Arabic',
+    fontSize: 7,
+    color: pdfColors.textMuted
   }
 });
 
@@ -28,10 +31,11 @@ export const PdfFooter: React.FC<PdfFooterProps> = ({ systemName = 'نظام ERP
   return (
     <View style={styles.footerContainer} fixed>
       {/* 1. System Stamp */}
-      <Text>{shapeArabicText(systemName)}</Text>
+      <Text style={styles.footerText}>{shapeArabicText(systemName)}</Text>
 
       {/* 2. Dynamic Page Numbers */}
       <Text 
+        style={styles.footerText}
         render={({ pageNumber, totalPages }) => (
           shapeArabicText(`صفحة ${pageNumber} من ${totalPages}`)
         )} 

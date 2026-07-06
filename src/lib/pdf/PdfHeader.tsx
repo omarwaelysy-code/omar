@@ -41,6 +41,7 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   logoText: {
+    fontFamily: 'Noto Sans Arabic',
     fontSize: 8,
     color: pdfColors.textMuted,
     fontWeight: 'bold'
@@ -51,12 +52,14 @@ const styles = StyleSheet.create({
     width: '40%'
   },
   reportTitle: {
+    fontFamily: 'Noto Sans Arabic',
     fontSize: 16,
     fontWeight: 'bold',
     color: pdfColors.primaryDark,
     marginBottom: 4
   },
   metaInfo: {
+    fontFamily: 'Noto Sans Arabic',
     flexDirection: 'column',
     alignItems: 'flex-end',
     width: '20%',
@@ -65,12 +68,14 @@ const styles = StyleSheet.create({
     gap: 3
   },
   companyName: {
+    fontFamily: 'Noto Sans Arabic',
     fontSize: 12,
     fontWeight: 'bold',
     color: pdfColors.primaryDark,
     marginBottom: 3
   },
   companyDetail: {
+    fontFamily: 'Noto Sans Arabic',
     fontSize: 8,
     color: pdfColors.textMuted
   }

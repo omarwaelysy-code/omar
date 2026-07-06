@@ -243,15 +243,18 @@ const localStyles = StyleSheet.create({
     gap: 4
   },
   metaLabel: {
+    fontFamily: 'Noto Sans Arabic',
     fontSize: 8,
     color: pdfColors.textMuted
   },
   metaValue: {
+    fontFamily: 'Noto Sans Arabic',
     fontSize: 9,
     fontWeight: 'bold',
     color: pdfColors.text
   },
   sectionTitle: {
+    fontFamily: 'Noto Sans Arabic',
     fontSize: 10,
     fontWeight: 'bold',
     color: pdfColors.primaryDark,

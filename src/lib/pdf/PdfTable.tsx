@@ -22,6 +22,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4
   },
   headerCell: {
+    fontFamily: 'Noto Sans Arabic',
     color: pdfColors.white,
     fontWeight: 'bold',
     fontSize: 8,
@@ -39,6 +40,7 @@ const styles = StyleSheet.create({
     backgroundColor: pdfColors.bgLight
   },
   bodyCell: {
+    fontFamily: 'Noto Sans Arabic',
     fontSize: 7.5,
     padding: 4,
     color: pdfColors.text
@@ -53,6 +55,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4
   },
   totalCell: {
+    fontFamily: 'Noto Sans Arabic',
     fontWeight: 'bold',
     fontSize: 8,
     padding: 4,

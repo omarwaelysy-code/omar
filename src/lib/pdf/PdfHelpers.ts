@@ -72,7 +72,13 @@ const arabicLetters: { [key: string]: { isolated: string, initial: string, media
   // Alif Maksura
   '\u0649': { isolated: '\uFEEF', initial: '\uFEEF', medial: '\uFEF0', final: '\uFEF0', joinLeft: false, joinRight: true },
   // Hamza
-  '\u0621': { isolated: '\uFE80', initial: '\uFE80', medial: '\uFE80', final: '\uFE80', joinLeft: false, joinRight: false }
+  '\u0621': { isolated: '\uFE80', initial: '\uFE80', medial: '\uFE80', final: '\uFE80', joinLeft: false, joinRight: false },
+  
+  // Lam-Alef Ligatures (Explicitly mapped so they can shape correctly into final/isolated forms)
+  '\uFEFB': { isolated: '\uFEFB', initial: '\uFEFB', medial: '\uFEFC', final: '\uFEFC', joinLeft: false, joinRight: true },
+  '\uFEF5': { isolated: '\uFEF5', initial: '\uFEF5', medial: '\uFEF6', final: '\uFEF6', joinLeft: false, joinRight: true },
+  '\uFEF7': { isolated: '\uFEF7', initial: '\uFEF7', medial: '\uFEF8', final: '\uFEF8', joinLeft: false, joinRight: true },
+  '\uFEF9': { isolated: '\uFEF9', initial: '\uFEF9', medial: '\uFEFA', final: '\uFEFA', joinLeft: false, joinRight: true }
 };
 
 // Shape Lam-Alef ligatures before standard character shaping
@@ -121,15 +127,14 @@ export function shapeArabicText(text: string | number | undefined | null): strin
     }
   }
 
-  // 3. Simple Bidi layout: split text into Latin/numerical blocks and Arabic blocks,
-  // then reverse the character order of Arabic blocks and re-assemble them from right to left.
-  const tokens = shaped.split(/([a-zA-Z0-9\s.,:\/\\%#$()_+\-*@!?&]+)/g);
+  // 3. Bidi layout: split text into Latin/numerical blocks and Arabic blocks (omitting spaces from regex so they act as token boundaries)
+  const tokens = shaped.split(/([a-zA-Z0-9.,:\/\\%#$()_+\-*@!?&]+)/g);
   const processedTokens = tokens.map(token => {
     // If it's a Latin/numeric/symbol block, keep it as is.
     if (/[a-zA-Z0-9]/.test(token)) {
       return token;
     }
-    // If it is an Arabic/shaped block, reverse the characters to flow RTL.
+    // If it is an Arabic/shaped block or spaces, reverse the characters to flow RTL.
     return token.split('').reverse().join('');
   });
 

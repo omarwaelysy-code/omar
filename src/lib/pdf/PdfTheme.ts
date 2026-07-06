@@ -23,20 +23,24 @@ export const pdfStyles = StyleSheet.create({
   },
   // Typography
   title: {
+    fontFamily: 'Noto Sans Arabic',
     fontSize: 18,
     fontWeight: 'bold',
     color: pdfColors.primaryDark,
     marginBottom: 4
   },
   subtitle: {
+    fontFamily: 'Noto Sans Arabic',
     fontSize: 9,
     color: pdfColors.textMuted,
     marginBottom: 10
   },
   boldText: {
+    fontFamily: 'Noto Sans Arabic',
     fontWeight: 'bold'
   },
   normalText: {
+    fontFamily: 'Noto Sans Arabic',
     fontWeight: 'normal'
   },
   // Layout utilities
@@ -83,9 +87,11 @@ export const pdfStyles = StyleSheet.create({
     fontSize: 10
   },
   totalLabel: {
+    fontFamily: 'Noto Sans Arabic',
     color: pdfColors.textMuted
   },
   totalVal: {
+    fontFamily: 'Noto Sans Arabic',
     fontWeight: 'bold',
     color: pdfColors.primaryDark
   },
@@ -109,6 +115,7 @@ export const pdfStyles = StyleSheet.create({
     height: 30
   },
   signatureTitle: {
+    fontFamily: 'Noto Sans Arabic',
     fontSize: 9,
     color: pdfColors.textMuted,
     fontWeight: 'bold'
