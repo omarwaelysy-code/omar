@@ -601,9 +601,14 @@ function generateHTML(templateName: string, dto: any): string {
 // Puppeteer Compiler
 // ----------------------------------------------------
 
+import { execSync } from 'child_process';
+
 function getChromiumExecutablePath(): string | undefined {
   if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-    return process.env.PUPPETEER_EXECUTABLE_PATH;
+    console.log('[PDF-GENERATOR] Env PUPPETEER_EXECUTABLE_PATH specified:', process.env.PUPPETEER_EXECUTABLE_PATH);
+    if (fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
+      return process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
   }
   if (process.platform === 'win32') {
     const paths = [
@@ -612,9 +617,27 @@ function getChromiumExecutablePath(): string | undefined {
       'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
     ];
     for (const p of paths) {
-      if (fs.existsSync(p)) return p;
+      if (fs.existsSync(p)) {
+        console.log('[PDF-GENERATOR] Found Windows browser path:', p);
+        return p;
+      }
     }
   } else {
+    // Dynamic search using `which` commands as requested
+    const commands = ['which chromium', 'which chromium-browser', 'which google-chrome'];
+    for (const cmd of commands) {
+      try {
+        const path = execSync(cmd, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
+        if (path && fs.existsSync(path)) {
+          console.log(`[PDF-GENERATOR] Found Chromium/Chrome via command '${cmd}':`, path);
+          return path;
+        }
+      } catch (e) {
+        // ignore errors if command is not found or fails
+      }
+    }
+
+    // Static fallback list if `which` did not find anything
     const paths = [
       '/usr/bin/chromium',
       '/usr/bin/chromium-browser',
@@ -622,10 +645,14 @@ function getChromiumExecutablePath(): string | undefined {
       '/usr/bin/google-chrome'
     ];
     for (const p of paths) {
-      if (fs.existsSync(p)) return p;
+      if (fs.existsSync(p)) {
+        console.log('[PDF-GENERATOR] Found fallback Linux browser path:', p);
+        return p;
+      }
     }
   }
-  return undefined; // Fallback to Puppeteer default
+  console.log('[PDF-GENERATOR] No Chromium/Chrome path found. Falling back to Puppeteer default.');
+  return undefined;
 }
 
 export async function generatePDF(templateName: string, dto: any): Promise<Buffer> {
@@ -682,18 +709,16 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
   let browser: any = null;
 
   try {
-    // FIX: In Puppeteer v22+, headless:true uses the legacy 'shell' mode.
-    // Use headless:'new' as a string, and remove --headless=new from args
-    // to avoid the conflict that causes browser.launch to fail silently.
     browser = await puppeteer.launch({
-      headless: 'new' as any,
+      headless: true,
       executablePath: execPath,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
-        '--disable-extensions'
+        '--single-process',
+        '--no-zygote'
       ]
     });
     console.log(`${STEP} ✓ Browser launched successfully`);
