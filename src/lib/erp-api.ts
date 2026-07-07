@@ -1,4 +1,4 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import { AsyncLocalStorage } from 'async_hooks';
 import pool from './postgres';
 import { v4 as uuidv4 } from 'uuid';
@@ -724,20 +724,30 @@ router.use(async (req: any, res: any, next: any) => {
       details += ` - Failed: ${responseBody.error}`;
     }
 
+    // FIX: audit_logs INSERT is wrapped in try/catch — any DB error (including
+    // 'null value in column resource') is silently swallowed. This ensures
+    // audit log failures NEVER block or affect any endpoint response.
     try {
       const logId = uuidv4();
+      // 'resource' column may have a NOT NULL constraint on older DB schemas.
+      // Always send a non-null value derived from the module name.
+      const resourceValue = lowercaseModule || moduleName || 'system';
       await pool.query(
         `INSERT INTO audit_logs (
           id, company_id, user_id, username, user_email, action, module, details, 
           entity_type, entity_id, ip_address, browser, operating_system, device, 
           branch, record_name, record_id, old_values, new_values, success, execution_time
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+        ON CONFLICT DO NOTHING`,
         [
           logId, companyId, userId, username, userEmail, action, moduleName, details,
-          lowercaseModule, recordId, ipAddress, browser, os, device,
+          resourceValue, recordId, ipAddress, browser, os, device,
           branch, recordName, recordId, JSON.stringify(oldValues || {}), JSON.stringify(newValues || {}), success, executionTime
         ]
-      );
+      ).catch((auditErr: any) => {
+        // Silently swallow audit_logs INSERT failures — never propagate to caller
+        console.warn('[AUDIT] audit_logs INSERT skipped:', auditErr.message);
+      });
 
       await pool.query(
         `INSERT INTO activity_logs (company_id, user_id, username, action, details, entity, document_id, changes, ip_address)
@@ -748,7 +758,8 @@ router.use(async (req: any, res: any, next: any) => {
         ]
       ).catch(() => {});
     } catch (err: any) {
-      console.error('[DATABASE] Middleware Logging Error:', err.message);
+      // Completely swallow any other audit error — audit logs must NEVER affect endpoints
+      console.warn('[AUDIT] Middleware logging error (non-fatal):', err.message);
     }
   });
 

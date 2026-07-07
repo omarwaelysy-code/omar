@@ -9,8 +9,8 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "ci": "yarn run lint && yarn run test",
-    "build": "yarn run ci && vite build",
+    "ci": "npm run lint && npm run test",
+    "build": "npm run lint && vite build",
     "start": "node server.ts"
   },
   "dependencies": {

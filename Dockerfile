@@ -3,6 +3,9 @@ FROM node:22-slim AS builder
 
 WORKDIR /app
 
+# Skip puppeteer's bundled chromium download in build stage (not needed for vite build)
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+
 # Copy package files
 COPY package*.json ./
 RUN npm install
@@ -10,8 +13,8 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Build the frontend
-RUN npm run build
+# Build the frontend (lint + vite build, no yarn dependency)
+RUN npm run lint && npx vite build
 
 # Stage 2: Production Server
 FROM node:22-slim
@@ -40,7 +43,12 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Install production dependencies only
+# Tell puppeteer to skip downloading its own Chromium (we use system Chromium from apt)
+# and point it to the system chromium binary.
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+# Install production dependencies only (puppeteer won't try to download Chrome)
 COPY package*.json ./
 RUN npm install --omit=dev
 

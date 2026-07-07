@@ -629,55 +629,83 @@ function getChromiumExecutablePath(): string | undefined {
 }
 
 export async function generatePDF(templateName: string, dto: any): Promise<Buffer> {
-  // 1. Font existence check
+  const STEP = '[PDF-GENERATOR]';
+
+  // ── STEP 1: ENTRY ──────────────────────────────────────────────────────────
+  console.log(`${STEP} ▶ ENTER generatePDF | file: pdf-generator.ts | fn: generatePDF | template: ${templateName}`);
+
+  // ── STEP 2: READ DATA ──────────────────────────────────────────────────────
+  console.log(`${STEP} ▶ Reading DTO data | company: ${dto?.company?.name || 'N/A'} | templateName: ${templateName}`);
+
+  // ── STEP 3: FONT LOADING ───────────────────────────────────────────────────
   const regularPath = path.resolve('./public/fonts/NotoSansArabic-Regular.ttf');
   const boldPath = path.resolve('./public/fonts/NotoSansArabic-Bold.ttf');
-  
+  console.log(`${STEP} ▶ Checking fonts | regularPath: ${regularPath} | boldPath: ${boldPath}`);
+
   if (!fs.existsSync(regularPath)) {
-    throw new Error(`Font file not found: NotoSansArabic-Regular.ttf (expected at: ${regularPath})`);
+    const err = new Error(`[pdf-generator.ts] [generatePDF] Font file not found: NotoSansArabic-Regular.ttf (expected at: ${regularPath})`);
+    console.error(`${STEP} ❌ FONT NOT FOUND: ${regularPath}`);
+    throw err;
   }
   if (!fs.existsSync(boldPath)) {
-    throw new Error(`Font file not found: NotoSansArabic-Bold.ttf (expected at: ${boldPath})`);
+    const err = new Error(`[pdf-generator.ts] [generatePDF] Font file not found: NotoSansArabic-Bold.ttf (expected at: ${boldPath})`);
+    console.error(`${STEP} ❌ FONT NOT FOUND: ${boldPath}`);
+    throw err;
   }
 
-  // Load fonts into memory
   if (!regularFontBase64) {
     regularFontBase64 = fs.readFileSync(regularPath).toString('base64');
+    console.log(`${STEP} ✓ Regular font loaded (${regularFontBase64.length} base64 chars)`);
   }
   if (!boldFontBase64) {
     boldFontBase64 = fs.readFileSync(boldPath).toString('base64');
+    console.log(`${STEP} ✓ Bold font loaded (${boldFontBase64.length} base64 chars)`);
   }
 
-  // 2. Template compilation check
+  // ── STEP 4: BUILD HTML ─────────────────────────────────────────────────────
+  console.log(`${STEP} ▶ Building HTML from template: ${templateName}`);
   let html = '';
   try {
     html = generateHTML(templateName, dto);
+    console.log(`${STEP} ✓ HTML built successfully | size: ${html.length} chars`);
   } catch (err: any) {
-    throw new Error(`Template generation failed for template: "${templateName}". Original error: ${err.message}. Stack: ${err.stack}`);
+    console.error(`${STEP} ❌ HTML BUILD FAILED | file: pdf-generator.ts | fn: generateHTML | error: ${err.message}`);
+    console.error(`${STEP} Stack: ${err.stack}`);
+    throw new Error(`[pdf-generator.ts] [generateHTML] Template generation failed for template: "${templateName}". Original error: ${err.message}. Stack: ${err.stack}`);
   }
 
-  // 3. Puppeteer diagnostics
+  // ── STEP 5: CREATE BROWSER ─────────────────────────────────────────────────
   const execPath = getChromiumExecutablePath();
   const execPathExists = execPath ? fs.existsSync(execPath) : false;
+  console.log(`${STEP} ▶ Launching Puppeteer browser | executablePath: ${execPath || 'puppeteer default'} | exists: ${execPathExists}`);
 
   let browser: any = null;
-  
-  // Launch browser
+
   try {
+    // FIX: In Puppeteer v22+, headless:true uses the legacy 'shell' mode.
+    // Use headless:'new' as a string, and remove --headless=new from args
+    // to avoid the conflict that causes browser.launch to fail silently.
     browser = await puppeteer.launch({
-      headless: true,
+      headless: 'new' as any,
       executablePath: execPath,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
-        '--headless=new'
+        '--disable-extensions'
       ]
     });
+    console.log(`${STEP} ✓ Browser launched successfully`);
   } catch (err: any) {
+    console.error(`${STEP} ❌ BROWSER LAUNCH FAILED | file: pdf-generator.ts | fn: generatePDF | line: ~690`);
+    console.error(`${STEP}   Chromium path: ${execPath || 'Default Puppeteer'}`);
+    console.error(`${STEP}   Chromium exists: ${execPathExists}`);
+    console.error(`${STEP}   Error name: ${err.name || 'Error'}`);
+    console.error(`${STEP}   Error message: ${err.message}`);
+    console.error(`${STEP}   Stack: ${err.stack}`);
     const launchErr = new Error(
-      `browser.launch failed.\n` +
+      `[pdf-generator.ts] [generatePDF] browser.launch failed.\n` +
       `- Chromium executable path: ${execPath || 'Default Puppeteer'}\n` +
       `- Does Chromium exist? ${execPathExists}\n` +
       `- Exception Name: ${err.name || 'Error'}\n` +
@@ -688,14 +716,20 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
   }
 
   try {
-    // page setContent
+    // ── STEP 6: page.setContent ──────────────────────────────────────────────
+    console.log(`${STEP} ▶ Creating new browser page and setting HTML content`);
     let page: any;
     try {
       page = await browser.newPage();
       await page.setContent(html, { waitUntil: 'networkidle0' });
+      console.log(`${STEP} ✓ page.setContent succeeded`);
     } catch (err: any) {
+      console.error(`${STEP} ❌ PAGE SETCONTENT FAILED | file: pdf-generator.ts | fn: generatePDF`);
+      console.error(`${STEP}   Error name: ${err.name || 'Error'}`);
+      console.error(`${STEP}   Error message: ${err.message}`);
+      console.error(`${STEP}   Stack: ${err.stack}`);
       const setContentErr = new Error(
-        `page.setContent failed.\n` +
+        `[pdf-generator.ts] [generatePDF] page.setContent failed.\n` +
         `- browser.launch succeeded? true\n` +
         `- Exception Name: ${err.name || 'Error'}\n` +
         `- Exception Message: ${err.message}`
@@ -704,7 +738,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
       throw setContentErr;
     }
 
-    // page.pdf
+    // ── STEP 7: page.pdf ─────────────────────────────────────────────────────
+    console.log(`${STEP} ▶ Generating PDF buffer (A4 format)`);
     let pdfBuffer: Buffer;
     try {
       pdfBuffer = await page.pdf({
@@ -717,9 +752,14 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           left: '10mm'
         }
       });
+      console.log(`${STEP} ✓ page.pdf succeeded | buffer size: ${pdfBuffer?.length ?? 0} bytes`);
     } catch (err: any) {
+      console.error(`${STEP} ❌ PAGE PDF FAILED | file: pdf-generator.ts | fn: generatePDF`);
+      console.error(`${STEP}   Error name: ${err.name || 'Error'}`);
+      console.error(`${STEP}   Error message: ${err.message}`);
+      console.error(`${STEP}   Stack: ${err.stack}`);
       const pdfErr = new Error(
-        `page.pdf failed.\n` +
+        `[pdf-generator.ts] [generatePDF] page.pdf failed.\n` +
         `- browser.launch succeeded? true\n` +
         `- page.setContent succeeded? true\n` +
         `- Exception Name: ${err.name || 'Error'}\n` +
@@ -730,22 +770,20 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
     }
 
     return pdfBuffer;
+
   } finally {
+    // ── STEP 8: CLOSE BROWSER ────────────────────────────────────────────────
     if (browser) {
       try {
         await browser.close();
+        console.log(`${STEP} ✓ Browser closed`);
       } catch (err: any) {
-        const closeErr = new Error(
-          `browser.close failed.\n` +
-          `- browser.launch succeeded? true\n` +
-          `- page.setContent succeeded? true\n` +
-          `- page.pdf succeeded? true\n` +
-          `- Exception Name: ${err.name || 'Error'}\n` +
-          `- Exception Message: ${err.message}`
-        );
-        closeErr.stack = err.stack;
-        throw closeErr;
+        // Log the close error but do NOT throw — the PDF buffer was already returned
+        console.error(`${STEP} ⚠ browser.close failed (non-fatal) | ${err.message}`);
       }
     }
+
+    // ── STEP 9: RESPONSE SENT (logged in server.ts handler) ──────────────────
+    console.log(`${STEP} ✓ generatePDF complete, returning buffer to caller`);
   }
 }

@@ -428,11 +428,20 @@ async function startServer() {
   // PDF Printing Endpoint
   app.post("/api/erp/print/pdf", async (req, res, next) => {
     const { templateName, dto } = req.body;
+    console.log('[PDF-ENDPOINT] ▶ ENTER POST /api/erp/print/pdf | template:', templateName);
     try {
+      // ─ STEP: validate input ──────────────────────────────────────────
       if (!templateName || !dto) {
+        console.warn('[PDF-ENDPOINT] ⚠ Missing templateName or dto in request body');
         return res.status(400).json({ error: "Missing templateName or dto" });
       }
+      // ─ STEP: read data ─────────────────────────────────────────────
+      console.log('[PDF-ENDPOINT] ▶ Data received | templateName:', templateName, '| dto keys:', Object.keys(dto || {}).join(', '));
+      // ─ STEP: generate PDF ─────────────────────────────────────────
+      console.log('[PDF-ENDPOINT] ▶ Calling generatePDF...');
       const pdfBuffer = await generatePDF(templateName, dto);
+      // ─ STEP: send response ────────────────────────────────────────
+      console.log('[PDF-ENDPOINT] ✓ PDF generated successfully | size:', pdfBuffer.length, 'bytes | Sending response 200');
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", 'attachment; filename="document.pdf"');
       res.send(pdfBuffer);
@@ -447,6 +456,8 @@ async function startServer() {
 
       // Output complete structured diagnostics to console
       console.error("=================== PDF GENERATION FAILURE ===================");
+      console.error(`[PDF-ENDPOINT] ❌ FAILED POST /api/erp/print/pdf`);
+      console.error(`- template: ${templateName}`);
       console.error(`- Failed File: ${fileName}`);
       console.error(`- Line Number: ${lineNumber}`);
       console.error(`- Exception Name: ${err.name || 'Error'}`);
@@ -465,6 +476,7 @@ async function startServer() {
       });
     }
   });
+
 
   // ERP API Routes
   app.use("/api/erp", erpRouter);
