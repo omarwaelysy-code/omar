@@ -62,8 +62,10 @@ const ARABIC_MAP: { [key: string]: [string, string, string, string, boolean, boo
 // ----------------------------------------------------
 
 export function shapeArabicText(text: string): string {
+  if (text === null || text === undefined) return '';
+  const val = String(text);
   // Preprocess Lam-Alef ligatures
-  let prepared = text;
+  let prepared = val;
   prepared = prepared.replace(/لأ/g, '\uF002');
   prepared = prepared.replace(/لإ/g, '\uF003');
   prepared = prepared.replace(/لآ/g, '\uF004');
@@ -108,6 +110,8 @@ export function shapeArabicText(text: string): string {
 }
 
 export function segmentText(text: string): TextSegment[] {
+  if (text === null || text === undefined) return [];
+  const val = String(text);
   const segments: TextSegment[] = [];
   let currentText = '';
   let currentDir: Direction | null = null;
@@ -129,8 +133,8 @@ export function segmentText(text: string): TextSegment[] {
     return ' \t\r\n+-*/%=()[]{}.,;:!?@#$&|<>`"\'\\'.includes(char);
   };
 
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
+  for (let i = 0; i < val.length; i++) {
+    const char = val[i];
     if (isNeutralChar(char)) {
       currentText += char;
     } else {
@@ -156,7 +160,9 @@ export function segmentText(text: string): TextSegment[] {
 }
 
 export function prepareTextLine(text: string): string {
-  const segments = segmentText(text);
+  if (text === null || text === undefined) return '';
+  const val = String(text);
+  const segments = segmentText(val);
   if (segments.length === 0) return '';
 
   const processedSegments = segments.map(seg => {
@@ -172,7 +178,9 @@ export function prepareTextLine(text: string): string {
 }
 
 export function wrapRtlText(doc: any, text: string, maxWidth: number): string[] {
-  const lines = text.split('\n');
+  if (text === null || text === undefined) return [];
+  const val = String(text);
+  const lines = val.split('\n');
   const resultLines: string[] = [];
 
   for (const line of lines) {
@@ -213,7 +221,8 @@ export function drawTextLine(doc: any, text: string, x: number, y: number, optio
 
   doc.font(font).fontSize(fontSize).fillColor(color);
 
-  const prepared = prepareTextLine(text);
+  const val = text === null || text === undefined ? '' : String(text);
+  const prepared = prepareTextLine(val);
 
   if (width) {
     const textWidth = doc.widthOfString(prepared);
@@ -232,7 +241,8 @@ export function drawTextLine(doc: any, text: string, x: number, y: number, optio
 export function drawText(doc: any, text: string, x: number, y: number, options: any = {}): number {
   const width = options.width || 200;
   const lineHeight = options.lineHeight || (options.fontSize || 9) * 1.3;
-  const lines = wrapRtlText(doc, text, width);
+  const val = text === null || text === undefined ? '' : String(text);
+  const lines = wrapRtlText(doc, val, width);
 
   let currentY = y;
   for (const line of lines) {

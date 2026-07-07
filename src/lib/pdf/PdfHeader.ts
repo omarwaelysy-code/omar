@@ -1,8 +1,8 @@
 import { PdfTheme } from './PdfTheme';
 import { drawTextLine } from './PdfText';
 
-function drawBase64Image(doc: any, base64Uri: string, x: number, y: number, width: number, height: number): boolean {
-  if (!base64Uri || !base64Uri.startsWith('data:image/')) return false;
+function drawBase64Image(doc: any, base64Uri: any, x: number, y: number, width: number, height: number): boolean {
+  if (!base64Uri || typeof base64Uri !== 'string' || !base64Uri.startsWith('data:image/')) return false;
   try {
     const commaIndex = base64Uri.indexOf(',');
     if (commaIndex === -1) return false;
