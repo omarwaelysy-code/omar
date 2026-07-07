@@ -665,42 +665,48 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
   }
 
   // ── STEP 5: CREATE BROWSER ─────────────────────────────────────────────────
-  const execPath = getChromiumExecutablePath();
-  const execPathExists = execPath ? fs.existsSync(execPath) : false;
-  console.log(`${STEP} ▶ Launching Puppeteer browser | executablePath: ${execPath || 'puppeteer default'} | exists: ${execPathExists}`);
+  console.log("Executable:", "/usr/bin/chromium");
+  console.log("Exists:", fs.existsSync("/usr/bin/chromium"));
+  try {
+    console.log("Version:", execSync("/usr/bin/chromium --version").toString());
+  } catch (e: any) {
+    console.log("Version: error running command:", e.message);
+  }
 
   let browser: any = null;
 
   try {
     browser = await puppeteer.launch({
       headless: true,
-      executablePath: process.platform === 'win32' ? execPath : '/usr/bin/chromium',
+      executablePath: "/usr/bin/chromium",
+      ignoreHTTPSErrors: true,
+      protocolTimeout: 120000,
       args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--single-process',
-        '--no-zygote'
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--disable-software-rasterizer",
+        "--disable-extensions",
+        "--disable-background-networking",
+        "--disable-sync",
+        "--disable-features=site-per-process",
+        "--disable-features=VizDisplayCompositor",
+        "--disable-ipc-flooding-protection",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--single-process",
+        "--no-zygote",
+        "--font-render-hinting=none",
+        "--remote-debugging-port=9222"
       ]
     });
     console.log(`${STEP} ✓ Browser launched successfully`);
   } catch (err: any) {
-    console.error(`${STEP} ❌ BROWSER LAUNCH FAILED | file: pdf-generator.ts | fn: generatePDF | line: ~690`);
-    console.error(`${STEP}   Chromium path: ${execPath || 'Default Puppeteer'}`);
-    console.error(`${STEP}   Chromium exists: ${execPathExists}`);
-    console.error(`${STEP}   Error name: ${err.name || 'Error'}`);
-    console.error(`${STEP}   Error message: ${err.message}`);
-    console.error(`${STEP}   Stack: ${err.stack}`);
-    const launchErr = new Error(
-      `[pdf-generator.ts] [generatePDF] browser.launch failed.\n` +
-      `- Chromium executable path: ${execPath || 'Default Puppeteer'}\n` +
-      `- Does Chromium exist? ${execPathExists}\n` +
-      `- Exception Name: ${err.name || 'Error'}\n` +
-      `- Exception Message: ${err.message}`
-    );
-    launchErr.stack = err.stack;
-    throw launchErr;
+    console.error("RAW PUPPETEER ERROR");
+    console.error(err);
+    console.error(err.stack);
+    throw err;
   }
 
   try {
