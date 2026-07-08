@@ -39,13 +39,49 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
     
     columns = targetThs.map((cell, index) => {
       const text = cell.textContent?.trim() || '';
-      // Dynamically allocate larger width weight to descriptions
-      const isDesc = text.includes('البيان') || text.includes('اسم') || text.includes('شرح');
+      let width = 1.0;
+      let align: 'left' | 'center' | 'right' = 'right';
+      
+      const lowerText = text.toLowerCase();
+      if (lowerText.includes('تاريخ') || lowerText.includes('date')) {
+        width = 1.4;
+        align = 'center';
+      } else if (lowerText.includes('نوع') || lowerText.includes('type')) {
+        width = 1.2;
+        align = 'center';
+      } else if (lowerText.includes('قيد') || lowerText.includes('entry')) {
+        width = 2.2;
+        align = 'center';
+      } else if (lowerText.includes('مرجع') || lowerText.includes('ref')) {
+        width = 1.8;
+        align = 'center';
+      } else if (
+        lowerText.includes('البيان') || 
+        lowerText.includes('اسم') || 
+        lowerText.includes('شرح') || 
+        lowerText.includes('desc') || 
+        lowerText.includes('name') || 
+        lowerText.includes('product') || 
+        lowerText.includes('صنف')
+      ) {
+        width = 3.0;
+        align = 'right';
+      } else if (lowerText.includes('مدين') || lowerText.includes('debit')) {
+        width = 1.2;
+        align = 'right';
+      } else if (lowerText.includes('دائن') || lowerText.includes('credit')) {
+        width = 1.2;
+        align = 'right';
+      } else if (lowerText.includes('رصيد') || lowerText.includes('balance')) {
+        width = 1.4;
+        align = 'right';
+      }
+      
       return {
         id: `col_${index}`,
         label: text,
-        width: isDesc ? 2.5 : 1,
-        align: 'right'
+        width,
+        align
       };
     });
 
@@ -80,12 +116,15 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
   }
 
   // 3. Construct the DTO payload
+  const isRtl = document.documentElement.dir === 'rtl' || document.body.dir === 'rtl' || true;
   const dto = {
     company,
     reportTitle: options.reportTitle || 'تقرير النظام',
     columns,
     rows,
-    totals
+    totals,
+    isRtl,
+    orientation: options.orientation || 'portrait'
   };
 
   // 4. Send POST request to backend PDF service

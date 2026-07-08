@@ -56,19 +56,67 @@ function shapeText(text: any): string {
 
 export function renderArabic(text: string): string {
   if (text === null || text === undefined) return '';
-  // ROOT CAUSE FIX: fontkit (used by PDFKit) already handles Arabic shaping
-  // (GSUB contextual forms: initial/medial/final/isolated) and RTL glyph
-  // ordering internally via the font's OpenType tables.
-  // Pre-shaping with arabic-persian-reshaper converted characters to Unicode
-  // Presentation Forms (U+FB50-U+FEFF) which fontkit then re-shaped with
-  // WRONG contextual forms. Pre-reordering with bidi-js reversed the character
-  // sequence, causing fontkit to produce wrong initial/final form assignments.
-  // The fix: pass raw Arabic text directly to PDFKit and let fontkit do its job.
   return String(text);
 }
 
+export interface TextSegment {
+  text: string;
+  isArabic: boolean;
+}
+
+export function segmentText(text: string): TextSegment[] {
+  if (!text) return [];
+  const segments: TextSegment[] = [];
+  let currentSegment = '';
+  let currentIsArabic = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const code = char.codePointAt(0) || 0;
+    
+    // Arabic unicode ranges:
+    const isArabicChar = (code >= 0x0600 && code <= 0x06FF) ||
+                         (code >= 0x0750 && code <= 0x077F) ||
+                         (code >= 0x08A0 && code <= 0x08FF) ||
+                         (code >= 0xFB50 && code <= 0xFDFF) ||
+                         (code >= 0xFE70 && code <= 0xFEFF);
+
+    const isNeutralChar = char === ' ' || char === '-' || char === '/' || char === ':' || char === '.' || char === ',' || char === '(' || char === ')' || char === '[' || char === ']';
+
+    if (currentSegment === '') {
+      currentSegment = char;
+      currentIsArabic = isArabicChar;
+    } else {
+      if (isArabicChar === currentIsArabic || (isNeutralChar && currentSegment !== '')) {
+        currentSegment += char;
+      } else {
+        segments.push({ text: currentSegment, isArabic: currentIsArabic });
+        currentSegment = char;
+        currentIsArabic = isArabicChar;
+      }
+    }
+  }
+  if (currentSegment !== '') {
+    segments.push({ text: currentSegment, isArabic: currentIsArabic });
+  }
+  return segments;
+}
+
+export function measureTextWidth(doc: any, text: string, fontName: string, fontSize: number): number {
+  const isBold = fontName.includes('Bold');
+  const segments = segmentText(text);
+  let totalWidth = 0;
+  segments.forEach(seg => {
+    const segFont = seg.isArabic 
+      ? (isBold ? 'ArabicBold' : 'ArabicRegular')
+      : (isBold ? 'Helvetica-Bold' : 'Helvetica');
+    doc.font(segFont).fontSize(fontSize);
+    totalWidth += doc.widthOfString(seg.text);
+  });
+  return totalWidth;
+}
+
 export function wrapText(doc: any, rawText: string, maxWidth: number, fontName: string, fontSize: number): string[] {
-  doc.font(fontName).fontSize(fontSize);
   const paragraphs = rawText.split('\n');
   const lines: string[] = [];
 
@@ -84,8 +132,7 @@ export function wrapText(doc: any, rawText: string, maxWidth: number, fontName: 
       if (word === '') continue;
       const testLine = currentLine + word;
       
-      // fontkit measures raw Arabic text correctly using OpenType metrics
-      const testLineWidth = doc.widthOfString(testLine);
+      const testLineWidth = measureTextWidth(doc, testLine, fontName, fontSize);
 
       if (testLineWidth > maxWidth) {
         if (currentLine && currentLine.trim() !== '') {
@@ -95,7 +142,7 @@ export function wrapText(doc: any, rawText: string, maxWidth: number, fontName: 
           // Force break single word
           let testWord = '';
           for (const char of word) {
-            if (doc.widthOfString(testWord + char) > maxWidth) {
+            if (measureTextWidth(doc, testWord + char, fontName, fontSize) > maxWidth) {
               lines.push(testWord);
               testWord = char;
             } else {
@@ -175,10 +222,15 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
   const is58 = dto.paperSize === 'thermal_58' || templateName.toLowerCase().includes('58');
   
   // Page Width (in points): A4 is 595.28, 80mm is ~226.77, 58mm is ~164.41
-  const pageWidth = isThermal ? (is58 ? 164.41 : 226.77) : 595.28;
+  let pageWidth = isThermal ? (is58 ? 164.41 : 226.77) : 595.28;
+  let pageHeight = 841.89; // A4 height
+
+  if (!isThermal && dto.orientation === 'landscape') {
+    pageWidth = 841.89;
+    pageHeight = 595.28;
+  }
   
   // Estimate height dynamically for thermal receipts to avoid empty trailing space
-  let pageHeight = 841.89; // A4 height
   if (isThermal) {
     const itemCount = (dto.items || []).length;
     const rowsCount = (dto.rows || []).length;
@@ -187,6 +239,9 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
     pageHeight = 120 + (itemsLen * 24) + (metaCount * 11) + (dto.description ? 45 : 0) + (qrBuffer ? 60 : 0) + 120;
     if (pageHeight < 280) pageHeight = 280;
   }
+
+  // Resolve RTL flag
+  const isRtl = dto.isRtl !== false;
 
   return new Promise((resolve, reject) => {
     try {
@@ -233,16 +288,61 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
       ) => {
         const fontName = options.font || 'ArabicRegular';
         const fontSize = options.size || (isThermal ? 7.5 : 10);
+        const isBold = fontName.includes('Bold');
         
-        doc.font(fontName).fontSize(fontSize);
+        // Shape and reorder text using our segment reorderer
+        const processed = renderArabic(text);
+        const segments = segmentText(processed);
         
-        // Pass raw text directly to PDFKit - fontkit handles Arabic shaping + RTL natively
-        const textOptions: any = {};
-        if (options.width !== undefined) textOptions.width = options.width;
-        if (options.align !== undefined) textOptions.align = options.align;
-        if (options.lineBreak !== undefined) textOptions.lineBreak = options.lineBreak;
-        
-        doc.text(text, x, y, textOptions);
+        // Measure total width
+        let totalWidth = 0;
+        segments.forEach(seg => {
+          const segFont = seg.isArabic 
+            ? (isBold ? 'ArabicBold' : 'ArabicRegular')
+            : (isBold ? 'Helvetica-Bold' : 'Helvetica');
+          doc.font(segFont).fontSize(fontSize);
+          totalWidth += doc.widthOfString(seg.text);
+        });
+
+        // Determine absolute X starting point
+        let startX = x;
+        const maxWidth = options.width;
+        const align = options.align || (isRtl ? 'right' : 'left');
+        if (maxWidth !== undefined && maxWidth > 0) {
+          if (align === 'right') {
+            startX = x + maxWidth - totalWidth;
+          } else if (align === 'center') {
+            startX = x + (maxWidth - totalWidth) / 2;
+          }
+        }
+
+        // Render segments
+        if (isRtl) {
+          // Draw segments from right to left (first segment is on the far right)
+          let currentSegmentX = startX + totalWidth;
+          segments.forEach(seg => {
+            const segFont = seg.isArabic 
+              ? (isBold ? 'ArabicBold' : 'ArabicRegular')
+              : (isBold ? 'Helvetica-Bold' : 'Helvetica');
+            doc.font(segFont).fontSize(fontSize);
+            
+            const segWidth = doc.widthOfString(seg.text);
+            currentSegmentX -= segWidth;
+            doc.text(seg.text, currentSegmentX, y, { lineBreak: false });
+          });
+        } else {
+          // Draw segments from left to right (first segment is on the far left)
+          let currentSegmentX = startX;
+          segments.forEach(seg => {
+            const segFont = seg.isArabic 
+              ? (isBold ? 'ArabicBold' : 'ArabicRegular')
+              : (isBold ? 'Helvetica-Bold' : 'Helvetica');
+            doc.font(segFont).fontSize(fontSize);
+            
+            doc.text(seg.text, currentSegmentX, y, { lineBreak: false });
+            currentSegmentX += doc.widthOfString(seg.text);
+          });
+        }
       };
 
       // Draw Header Helper
@@ -252,11 +352,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         // 1. Logo
         if (logoBuffer) {
           try {
-            const logoX = isThermal ? (pageWidth - logoSize) / 2 : (doc.page.width - sideMargin - logoSize);
+            const logoX = isRtl ? (doc.page.width - sideMargin - logoSize) : sideMargin;
             doc.image(logoBuffer, logoX, currentY, { width: logoSize, height: logoSize });
-            if (isThermal) {
-              currentY += logoSize + 5;
-            }
           } catch (e: any) {
             console.error(`${STEP} Logo render error:`, e.message);
           }
@@ -266,26 +363,27 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         if (isThermal) {
           renderText(company.name || '', sideMargin, currentY, { width: usableWidth, align: 'center', font: 'ArabicBold', size: 9.5 });
           currentY += 12;
-        } else {
-          renderText(company.name || '', doc.page.width - sideMargin - 310, currentY + 5, { width: 250, align: 'right', font: 'ArabicBold', size: 12 });
-        }
-
-        if (company.taxNumber) {
-          const label = `الرقم الضريبي: ${company.taxNumber}`;
-          if (isThermal) {
-            renderText(label, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7.5 });
+          if (company.taxNumber) {
+            renderText(`الرقم الضريبي: ${company.taxNumber}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7.5 });
             currentY += 10;
-          } else {
-            renderText(label, doc.page.width - sideMargin - 310, currentY + 20, { width: 250, align: 'right', size: 8.5 });
           }
-        }
-        if (company.phone) {
-          const label = `الهاتف: ${company.phone}`;
-          if (isThermal) {
-            renderText(label, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7.5 });
+          if (company.phone) {
+            renderText(`الهاتف: ${company.phone}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7.5 });
             currentY += 10;
-          } else {
-            renderText(label, doc.page.width - sideMargin - 310, currentY + 32, { width: 250, align: 'right', size: 8.5 });
+          }
+        } else {
+          const companyX = isRtl 
+            ? (doc.page.width - sideMargin - (logoBuffer ? logoSize + 15 : 0) - 250)
+            : (sideMargin + (logoBuffer ? logoSize + 15 : 0));
+          const companyAlign = isRtl ? 'right' : 'left';
+          
+          renderText(company.name || '', companyX, currentY + 5, { width: 250, align: companyAlign, font: 'ArabicBold', size: 12 });
+          
+          if (company.taxNumber) {
+            renderText(`الرقم الضريبي: ${company.taxNumber}`, companyX, currentY + 20, { width: 250, align: companyAlign, size: 8.5 });
+          }
+          if (company.phone) {
+            renderText(`الهاتف: ${company.phone}`, companyX, currentY + 32, { width: 250, align: companyAlign, size: 8.5 });
           }
         }
 
@@ -294,17 +392,14 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           currentY += 2;
           renderText(title, sideMargin, currentY, { width: usableWidth, align: 'center', font: 'ArabicBold', size: 9 });
           currentY += 12;
-        } else {
-          renderText(title, sideMargin, currentY + 12, { width: usableWidth - 300, align: 'left', font: 'ArabicBold', size: 15 });
-        }
-
-        if (branchName) {
-          const label = `الفرع: ${branchName}`;
-          if (isThermal) {
-            renderText(label, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7.5 });
+          if (branchName) {
+            renderText(`الفرع: ${branchName}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7.5 });
             currentY += 10;
-          } else {
-            renderText(label, sideMargin, currentY + 30, { width: usableWidth - 300, align: 'left', size: 8.5 });
+          }
+        } else {
+          renderText(title, sideMargin, currentY + 12, { width: usableWidth, align: 'center', font: 'ArabicBold', size: 16 });
+          if (branchName) {
+            renderText(`الفرع: ${branchName}`, sideMargin, currentY + 32, { width: usableWidth, align: 'center', size: 9 });
           }
         }
 
@@ -316,15 +411,21 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           renderText(`التاريخ: ${dateValue}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7 });
           currentY += 12;
         } else {
-          renderText(`المستخدم: ${userName || 'المشرف'}`, sideMargin, currentY + 5, { width: 150, align: 'left', size: 8 });
-          renderText(`التاريخ: ${dateValue}`, sideMargin, currentY + 15, { width: 150, align: 'left', size: 8 });
+          const metaX = isRtl ? sideMargin : (doc.page.width - sideMargin - 250);
+          const metaAlign = isRtl ? 'left' : 'right';
+          renderText(`المستخدم: ${userName || 'المشرف'}`, metaX, currentY + 5, { width: 250, align: metaAlign, size: 8.5 });
+          renderText(`التاريخ: ${dateValue}`, metaX, currentY + 17, { width: 250, align: metaAlign, size: 8.5 });
+        }
+
+        if (!isThermal) {
+          currentY += 50; // Advance currentY past header texts to prevent overlapping
         }
 
         // Divider Line
         doc.strokeColor('#10b981')
            .lineWidth(isThermal ? 1 : 2)
-           .moveTo(sideMargin, currentY + (isThermal ? 0 : 5))
-           .lineTo(doc.page.width - sideMargin, currentY + (isThermal ? 0 : 5))
+           .moveTo(sideMargin, currentY)
+           .lineTo(doc.page.width - sideMargin, currentY)
            .stroke();
 
         currentY += isThermal ? 8 : 15;
@@ -380,33 +481,61 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             doc.strokeColor('#e5e7eb').lineWidth(0.5).moveTo(sideMargin, y + maxCellHeight).lineTo(sideMargin + usableWidth, y + maxCellHeight).stroke();
           }
 
-          // Draw cells
-          let currentX = sideMargin;
-          cellLines.forEach((lines, colIndex) => {
-            const colWidth = colWidths[colIndex];
-            const align = columns[colIndex].align || 'right';
-            
-            doc.fillColor(isHeader ? '#ffffff' : '#1f2937');
+          // Draw cells (supporting RTL and LTR layouts)
+          if (isRtl) {
+            let currentX = sideMargin + usableWidth;
+            cellLines.forEach((lines, colIndex) => {
+              const colWidth = colWidths[colIndex];
+              currentX -= colWidth;
+              const align = columns[colIndex].align || 'right';
+              
+              doc.fillColor(isHeader ? '#ffffff' : '#1f2937');
 
-            lines.forEach((line, lineIndex) => {
-              const textY = y + (isThermal ? 2.5 : 4) + lineIndex * (isThermal ? 9.5 : 11);
-              renderText(line, currentX + (isThermal ? 2 : 5), textY, {
-                width: colWidth - (isThermal ? 4 : 10),
-                align: align,
-                font: cellFont,
-                size: cellSize,
-                lineBreak: false
+              lines.forEach((line, lineIndex) => {
+                const textY = y + (isThermal ? 2.5 : 4) + lineIndex * (isThermal ? 9.5 : 11);
+                renderText(line, currentX + (isThermal ? 2 : 5), textY, {
+                  width: colWidth - (isThermal ? 4 : 10),
+                  align: align,
+                  font: cellFont,
+                  size: cellSize,
+                  lineBreak: false
+                });
               });
+
+              // Vertical borders (on the left boundary of current cell)
+              doc.strokeColor('#e5e7eb').lineWidth(0.5).moveTo(currentX, y).lineTo(currentX, y + maxCellHeight).stroke();
             });
 
-            // Vertical borders
-            doc.strokeColor('#e5e7eb').lineWidth(0.5).moveTo(currentX, y).lineTo(currentX, y + maxCellHeight).stroke();
+            // Right boundary border of the table
+            doc.strokeColor('#e5e7eb').lineWidth(0.5).moveTo(sideMargin + usableWidth, y).lineTo(sideMargin + usableWidth, y + maxCellHeight).stroke();
+          } else {
+            let currentX = sideMargin;
+            cellLines.forEach((lines, colIndex) => {
+              const colWidth = colWidths[colIndex];
+              const align = columns[colIndex].align || 'left';
+              
+              doc.fillColor(isHeader ? '#ffffff' : '#1f2937');
 
-            currentX += colWidth;
-          });
+              lines.forEach((line, lineIndex) => {
+                const textY = y + (isThermal ? 2.5 : 4) + lineIndex * (isThermal ? 9.5 : 11);
+                renderText(line, currentX + (isThermal ? 2 : 5), textY, {
+                  width: colWidth - (isThermal ? 4 : 10),
+                  align: align,
+                  font: cellFont,
+                  size: cellSize,
+                  lineBreak: false
+                });
+              });
 
-          // Rightmost vertical border
-          doc.strokeColor('#e5e7eb').lineWidth(0.5).moveTo(sideMargin + usableWidth, y).lineTo(sideMargin + usableWidth, y + maxCellHeight).stroke();
+              // Vertical borders
+              doc.strokeColor('#e5e7eb').lineWidth(0.5).moveTo(currentX, y).lineTo(currentX, y + maxCellHeight).stroke();
+
+              currentX += colWidth;
+            });
+
+            // Rightmost border
+            doc.strokeColor('#e5e7eb').lineWidth(0.5).moveTo(sideMargin + usableWidth, y).lineTo(sideMargin + usableWidth, y + maxCellHeight).stroke();
+          }
 
           return y + maxCellHeight;
         };
@@ -438,7 +567,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         }
       };
 
-      // Helper to draw Meta Grid
+      // Helper to draw Meta Grid (supporting RTL and LTR)
       const drawMetaGrid = (items: { label: string; val: string }[]) => {
         const colWidth = usableWidth / items.length;
         let maxValHeight = 12;
@@ -470,13 +599,17 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         doc.fillColor('#f9fafb').rect(sideMargin, currentY, usableWidth, maxValHeight).fill();
         doc.strokeColor('#e5e7eb').lineWidth(0.5).rect(sideMargin, currentY, usableWidth, maxValHeight).stroke();
 
-        let currentX = sideMargin;
+        let currentX = isRtl ? (sideMargin + usableWidth) : sideMargin;
         processedItems.forEach((item, index) => {
+          if (isRtl) currentX -= colWidth;
+
+          const align = isRtl ? 'right' : 'left';
+
           doc.fillColor('#4b5563');
           item.wrappedLabel.forEach((line, lineIndex) => {
             renderText(line, currentX + (isThermal ? 2 : 5), currentY + (isThermal ? 3 : 5) + lineIndex * (isThermal ? 9.5 : 11), { 
               width: colWidth - (isThermal ? 4 : 10), 
-              align: 'right',
+              align: align,
               font: fontLabel,
               size: sizeLabel,
               lineBreak: false
@@ -488,7 +621,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           item.wrappedVal.forEach((line, lineIndex) => {
             renderText(line, currentX + (isThermal ? 2 : 5), currentY + (isThermal ? 3 : 5) + labelOffset + lineIndex * (isThermal ? 9.5 : 11), { 
               width: colWidth - (isThermal ? 4 : 10), 
-              align: 'right',
+              align: align,
               font: fontVal,
               size: sizeVal,
               lineBreak: false
@@ -496,13 +629,14 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           });
 
           if (index < items.length - 1) {
+            const separatorX = isRtl ? currentX : (currentX + colWidth);
             doc.strokeColor('#e5e7eb').lineWidth(0.5)
-               .moveTo(currentX + colWidth, currentY)
-               .lineTo(currentX + colWidth, currentY + maxValHeight)
+               .moveTo(separatorX, currentY)
+               .lineTo(separatorX, currentY + maxValHeight)
                .stroke();
           }
 
-          currentX += colWidth;
+          if (!isRtl) currentX += colWidth;
         });
 
         currentY += maxValHeight + (isThermal ? 8 : 15);

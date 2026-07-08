@@ -68,7 +68,7 @@ async function generateFinalProof() {
   return new Promise<void>((resolve) => {
     doc.on('end', () => {
       const outputPath = path.resolve(
-        'C:/Users/user/.gemini/antigravity/brain/e1e96dca-2652-468a-a4d4-c959b3f9ab83/final_proof_arabic.pdf'
+        'C:/Users/Wael Ragab/.gemini/antigravity/brain/acd24ff2-c3ad-48af-94b4-708df3d949d9/final_proof_arabic.pdf'
       );
       fs.writeFileSync(outputPath, Buffer.concat(chunks));
       console.log(`Generated: ${outputPath} (${Buffer.concat(chunks).length} bytes)`);
