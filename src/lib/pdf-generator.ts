@@ -56,21 +56,15 @@ function shapeText(text: any): string {
 
 export function renderArabic(text: string): string {
   if (text === null || text === undefined) return '';
-  const str = String(text);
-
-  // Check if string contains any Arabic characters (Unicode range 0600-06FF)
-  const hasArabic = /[\u0600-\u06ff]/.test(str);
-  if (!hasArabic) {
-    return str;
-  }
-
-  const shaped = shapeText(str);
-  const reordered = processLine(shaped);
-
-  // Temporary debug log
-  console.log(`[DEBUG-ARABIC] Original: "${str}" | Shaped: "${shaped}" | BiDi: "${reordered}"`);
-
-  return reordered;
+  // ROOT CAUSE FIX: fontkit (used by PDFKit) already handles Arabic shaping
+  // (GSUB contextual forms: initial/medial/final/isolated) and RTL glyph
+  // ordering internally via the font's OpenType tables.
+  // Pre-shaping with arabic-persian-reshaper converted characters to Unicode
+  // Presentation Forms (U+FB50-U+FEFF) which fontkit then re-shaped with
+  // WRONG contextual forms. Pre-reordering with bidi-js reversed the character
+  // sequence, causing fontkit to produce wrong initial/final form assignments.
+  // The fix: pass raw Arabic text directly to PDFKit and let fontkit do its job.
+  return String(text);
 }
 
 export function wrapText(doc: any, rawText: string, maxWidth: number, fontName: string, fontSize: number): string[] {
@@ -90,9 +84,8 @@ export function wrapText(doc: any, rawText: string, maxWidth: number, fontName: 
       if (word === '') continue;
       const testLine = currentLine + word;
       
-      // Shape the test line to get precise width of the connected glyphs!
-      const testLineShaped = shapeText(testLine);
-      const testLineWidth = doc.widthOfString(testLineShaped);
+      // fontkit measures raw Arabic text correctly using OpenType metrics
+      const testLineWidth = doc.widthOfString(testLine);
 
       if (testLineWidth > maxWidth) {
         if (currentLine && currentLine.trim() !== '') {
@@ -102,8 +95,7 @@ export function wrapText(doc: any, rawText: string, maxWidth: number, fontName: 
           // Force break single word
           let testWord = '';
           for (const char of word) {
-            const testWordShaped = shapeText(testWord + char);
-            if (doc.widthOfString(testWordShaped) > maxWidth) {
+            if (doc.widthOfString(testWord + char) > maxWidth) {
               lines.push(testWord);
               testWord = char;
             } else {
@@ -243,16 +235,12 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         
         doc.font(fontName).fontSize(fontSize);
         
-        const rendered = renderArabic(text);
-        
-        // Runtime log before doc.text call
-        console.log(`[RUNTIME-DRAW] Original: "${text}" | Rendered: "${rendered}" | Font: "${fontName}" | Size: ${fontSize} | Pos: (${x.toFixed(1)}, ${y.toFixed(1)})`);
-
+        // Pass raw text directly to PDFKit - fontkit handles Arabic shaping + RTL natively
         const textOptions: any = {};
         if (options.width !== undefined) textOptions.width = options.width;
         if (options.align !== undefined) textOptions.align = options.align;
         
-        doc.text(rendered, x, y, textOptions);
+        doc.text(text, x, y, textOptions);
       };
 
       // Draw Header Helper
