@@ -216,11 +216,11 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
       (doc as any).fontkit = fontkit.default || fontkit;
 
       // Register Noto Sans Arabic fonts as path files to guarantee perfect metadata loading
-      doc.registerFont('Arabic-Regular', regularPath);
-      doc.registerFont('Arabic-Bold', boldPath);
+      doc.registerFont('ArabicRegular', regularPath);
+      doc.registerFont('ArabicBold', boldPath);
 
       // Set default font
-      doc.font('Arabic-Regular').fontSize(isThermal ? 7.5 : 10);
+      doc.font('ArabicRegular').fontSize(isThermal ? 7.5 : 10);
 
       const usableWidth = isThermal ? (pageWidth - 20) : (doc.page.width - 60);
       const sideMargin = isThermal ? 10 : 30;
@@ -238,7 +238,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           size?: number;
         } = {}
       ) => {
-        const fontName = options.font || 'Arabic-Regular';
+        const fontName = options.font || 'ArabicRegular';
         const fontSize = options.size || (isThermal ? 7.5 : 10);
         
         doc.font(fontName).fontSize(fontSize);
@@ -274,10 +274,10 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
         // 2. Company Info
         if (isThermal) {
-          renderText(company.name || '', sideMargin, currentY, { width: usableWidth, align: 'center', font: 'Arabic-Bold', size: 9.5 });
+          renderText(company.name || '', sideMargin, currentY, { width: usableWidth, align: 'center', font: 'ArabicBold', size: 9.5 });
           currentY += 12;
         } else {
-          renderText(company.name || '', doc.page.width - sideMargin - 310, currentY + 5, { width: 250, align: 'right', font: 'Arabic-Bold', size: 12 });
+          renderText(company.name || '', doc.page.width - sideMargin - 310, currentY + 5, { width: 250, align: 'right', font: 'ArabicBold', size: 12 });
         }
 
         if (company.taxNumber) {
@@ -302,10 +302,10 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         // 3. Document Title
         if (isThermal) {
           currentY += 2;
-          renderText(title, sideMargin, currentY, { width: usableWidth, align: 'center', font: 'Arabic-Bold', size: 9 });
+          renderText(title, sideMargin, currentY, { width: usableWidth, align: 'center', font: 'ArabicBold', size: 9 });
           currentY += 12;
         } else {
-          renderText(title, sideMargin, currentY + 12, { width: usableWidth - 300, align: 'left', font: 'Arabic-Bold', size: 15 });
+          renderText(title, sideMargin, currentY + 12, { width: usableWidth - 300, align: 'left', font: 'ArabicBold', size: 15 });
         }
 
         if (branchName) {
@@ -352,7 +352,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           const rowHeight = isThermal ? 14 : 18;
           let maxCellHeight = rowHeight;
           
-          const cellFont = isHeader || isTotal ? 'Arabic-Bold' : 'Arabic-Regular';
+          const cellFont = isHeader || isTotal ? 'ArabicBold' : 'ArabicRegular';
           const cellSize = isThermal ? 7.5 : 8.5;
 
           const cellLines = rowItems.map((cellText, colIndex) => {
@@ -447,8 +447,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         const colWidth = usableWidth / items.length;
         let maxValHeight = 12;
 
-        const fontLabel = 'Arabic-Regular';
-        const fontVal = 'Arabic-Bold';
+        const fontLabel = 'ArabicRegular';
+        const fontVal = 'ArabicBold';
         const sizeLabel = isThermal ? 7.5 : 8.5;
         const sizeVal = isThermal ? 7.5 : 9.0;
 
@@ -522,14 +522,14 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
            .moveTo(leftX, currentY + (isThermal ? 20 : 30))
            .lineTo(leftX + boxWidth, currentY + (isThermal ? 20 : 30))
            .stroke();
-        renderText(leftTitle, leftX, currentY + (isThermal ? 24 : 36), { width: boxWidth, align: 'center', font: 'Arabic-Bold', size: isThermal ? 7 : 8.5 });
+        renderText(leftTitle, leftX, currentY + (isThermal ? 24 : 36), { width: boxWidth, align: 'center', font: 'ArabicBold', size: isThermal ? 7 : 8.5 });
 
         const rightX = sideMargin + (3 * usableWidth / 4) - (boxWidth / 2);
         doc.strokeColor('#9ca3af').lineWidth(0.5)
            .moveTo(rightX, currentY + (isThermal ? 20 : 30))
            .lineTo(rightX + boxWidth, currentY + (isThermal ? 20 : 30))
            .stroke();
-        renderText(rightTitle, rightX, currentY + (isThermal ? 24 : 36), { width: boxWidth, align: 'center', font: 'Arabic-Bold', size: isThermal ? 7 : 8.5 });
+        renderText(rightTitle, rightX, currentY + (isThermal ? 24 : 36), { width: boxWidth, align: 'center', font: 'ArabicBold', size: isThermal ? 7 : 8.5 });
 
         currentY += isThermal ? 35 : 55;
       };
@@ -591,7 +591,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
           let summaryY = currentY + (isThermal ? 13 : 15);
           const drawSummaryRow = (label: string, val: string, isBold = false) => {
-            const fontName = isBold ? 'Arabic-Bold' : 'Arabic-Regular';
+            const fontName = isBold ? 'ArabicBold' : 'ArabicRegular';
             const fontSize = isThermal ? (isBold ? 8.5 : 7.5) : (isBold ? 9.5 : 8.5);
             renderText(label, summaryX + 2, summaryY, { width: isThermal ? 65 : 100, align: 'right', font: fontName, size: fontSize });
             renderText(val, summaryX + (isThermal ? 70 : 105), summaryY, { width: isThermal ? 58 : 90, align: 'left', font: fontName, size: fontSize });
@@ -720,8 +720,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           drawMetaGrid(metaItems);
 
           if (dto.description) {
-            const fontLabel = 'Arabic-Regular';
-            const fontVal = 'Arabic-Bold';
+            const fontLabel = 'ArabicRegular';
+            const fontVal = 'ArabicBold';
             const sizeLabel = isThermal ? 7.5 : 8.5;
             const sizeVal = isThermal ? 7.5 : 9.5;
 
@@ -803,14 +803,14 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
            .lineTo(doc.page.width - sideMargin, doc.page.height - (isThermal ? 16 : 40))
            .stroke();
 
-        renderText("نظام ERP السحابي", sideMargin, doc.page.height - (isThermal ? 12 : 32), { align: 'left', font: 'Arabic-Regular', size: isThermal ? 6.5 : 8 });
+        renderText("نظام ERP السحابي", sideMargin, doc.page.height - (isThermal ? 12 : 32), { align: 'left', font: 'ArabicRegular', size: isThermal ? 6.5 : 8 });
 
         if (!isThermal) {
           const pageStr = `صفحة ${i + 1} من ${range.count}`;
           renderText(pageStr, doc.page.width - 150, doc.page.height - 32, {
             width: 120,
             align: 'right',
-            font: 'Arabic-Regular',
+            font: 'ArabicRegular',
             size: 8
           });
         }
