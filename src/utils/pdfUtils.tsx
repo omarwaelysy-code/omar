@@ -7,7 +7,7 @@ interface PDFOptions {
 
 /**
  * Compatibility Bridge: Parses target DOM tables and compiles them 
- * directly into data-driven PDF requests sent to the backend Puppeteer compiler.
+ * directly into data-driven PDF requests sent to the backend PDF engine.
  */
 export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => {
   if (!element) {
