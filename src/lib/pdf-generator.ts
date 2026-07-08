@@ -228,6 +228,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           align?: 'left' | 'right' | 'center';
           font?: string;
           size?: number;
+          lineBreak?: boolean;
         } = {}
       ) => {
         const fontName = options.font || 'ArabicRegular';
@@ -236,18 +237,10 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         doc.font(fontName).fontSize(fontSize);
         
         // Pass raw text directly to PDFKit - fontkit handles Arabic shaping + RTL natively
-        const textOptions: any = { lineBreak: false };
+        const textOptions: any = {};
         if (options.width !== undefined) textOptions.width = options.width;
         if (options.align !== undefined) textOptions.align = options.align;
-        
-        // VISUAL DEBUG MODE: Draw bounding boxes to trace exact layout coordinates
-        if (process.env.DEBUG_PDF_LAYOUT === 'true') {
-          doc.save();
-          const debugWidth = options.width || doc.widthOfString(text);
-          const debugHeight = doc.heightOfString(text, textOptions);
-          doc.lineWidth(0.5).strokeColor('red').rect(x, y, debugWidth, debugHeight).stroke();
-          doc.restore();
-        }
+        if (options.lineBreak !== undefined) textOptions.lineBreak = options.lineBreak;
         
         doc.text(text, x, y, textOptions);
       };
@@ -396,7 +389,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
                 width: colWidth - (isThermal ? 4 : 10),
                 align: align,
                 font: cellFont,
-                size: cellSize
+                size: cellSize,
+                lineBreak: false
               });
             });
 
@@ -478,7 +472,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               width: colWidth - (isThermal ? 4 : 10), 
               align: 'right',
               font: fontLabel,
-              size: sizeLabel
+              size: sizeLabel,
+              lineBreak: false
             });
           });
 
@@ -489,7 +484,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               width: colWidth - (isThermal ? 4 : 10), 
               align: 'right',
               font: fontVal,
-              size: sizeVal
+              size: sizeVal,
+              lineBreak: false
             });
           });
 
@@ -742,7 +738,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
                 width: usableWidth - (isThermal ? 8 : 20), 
                 align: 'right',
                 font: fontVal,
-                size: sizeVal
+                size: sizeVal,
+                lineBreak: false
               });
             });
 
