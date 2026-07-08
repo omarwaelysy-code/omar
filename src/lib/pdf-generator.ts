@@ -236,9 +236,18 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         doc.font(fontName).fontSize(fontSize);
         
         // Pass raw text directly to PDFKit - fontkit handles Arabic shaping + RTL natively
-        const textOptions: any = {};
+        const textOptions: any = { lineBreak: false };
         if (options.width !== undefined) textOptions.width = options.width;
         if (options.align !== undefined) textOptions.align = options.align;
+        
+        // VISUAL DEBUG MODE: Draw bounding boxes to trace exact layout coordinates
+        if (process.env.DEBUG_PDF_LAYOUT === 'true') {
+          doc.save();
+          const debugWidth = options.width || doc.widthOfString(text);
+          const debugHeight = doc.heightOfString(text, textOptions);
+          doc.lineWidth(0.5).strokeColor('red').rect(x, y, debugWidth, debugHeight).stroke();
+          doc.restore();
+        }
         
         doc.text(text, x, y, textOptions);
       };
