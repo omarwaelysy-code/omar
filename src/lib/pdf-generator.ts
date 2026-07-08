@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import PDFDocument from 'pdfkit';
 import * as fontkit from 'fontkit';
 import bidiFactory from 'bidi-js';
@@ -8,6 +9,9 @@ import QRCodeNode from 'qrcode';
 import reshaper from 'arabic-persian-reshaper';
 
 const bidi = bidiFactory();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 interface ColumnDef {
   id: string;
@@ -48,6 +52,25 @@ function shapeText(text: any): string {
   if (text === null || text === undefined) return '';
   const str = String(text);
   return reshaper.ArabicShaper.convertArabic(str);
+}
+
+export function renderArabic(text: string): string {
+  if (text === null || text === undefined) return '';
+  const str = String(text);
+
+  // Check if string contains any Arabic characters (Unicode range 0600-06FF)
+  const hasArabic = /[\u0600-\u06ff]/.test(str);
+  if (!hasArabic) {
+    return str;
+  }
+
+  const shaped = shapeText(str);
+  const reordered = processLine(shaped);
+
+  // Temporary debug log
+  console.log(`[DEBUG-ARABIC] Original: "${str}" | Shaped: "${shaped}" | BiDi: "${reordered}"`);
+
+  return reordered;
 }
 
 export function wrapText(doc: any, rawText: string, maxWidth: number, fontName: string, fontSize: number): string[] {
@@ -107,9 +130,9 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
   const company = dto.company || {};
   
-  // Resolve paths for fonts
-  const regularPath = path.resolve('./public/fonts/NotoSansArabic-Regular.ttf');
-  const boldPath = path.resolve('./public/fonts/NotoSansArabic-Bold.ttf');
+  // Resolve paths for fonts relative to the file location to make it directory-independent
+  const regularPath = path.resolve(__dirname, '../../public/fonts/NotoSansArabic-Regular.ttf');
+  const boldPath = path.resolve(__dirname, '../../public/fonts/NotoSansArabic-Bold.ttf');
 
   if (!fs.existsSync(regularPath) || !fs.existsSync(boldPath)) {
     throw new Error(`Font files not found at ${regularPath} or ${boldPath}`);
@@ -192,9 +215,9 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
       // Register fontkit to support local TTF fonts
       (doc as any).fontkit = fontkit.default || fontkit;
 
-      // Register Noto Sans Arabic fonts as Buffers to support JSDOM test environments
-      doc.registerFont('Arabic-Regular', fs.readFileSync(regularPath));
-      doc.registerFont('Arabic-Bold', fs.readFileSync(boldPath));
+      // Register Noto Sans Arabic fonts as path files to guarantee perfect metadata loading
+      doc.registerFont('Arabic-Regular', regularPath);
+      doc.registerFont('Arabic-Bold', boldPath);
 
       // Set default font
       doc.font('Arabic-Regular').fontSize(isThermal ? 7.5 : 10);
@@ -202,6 +225,32 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
       const usableWidth = isThermal ? (pageWidth - 20) : (doc.page.width - 60);
       const sideMargin = isThermal ? 10 : 30;
       let currentY = isThermal ? 10 : 40;
+
+      // Custom safe text rendering function that enforces correct font, size, and Arabic shaping
+      const renderText = (
+        text: string,
+        x: number,
+        y: number,
+        options: {
+          width?: number;
+          align?: 'left' | 'right' | 'center';
+          font?: string;
+          size?: number;
+        } = {}
+      ) => {
+        const fontName = options.font || 'Arabic-Regular';
+        const fontSize = options.size || (isThermal ? 7.5 : 10);
+        
+        doc.font(fontName).fontSize(fontSize);
+        
+        const rendered = renderArabic(text);
+        
+        const textOptions: any = {};
+        if (options.width !== undefined) textOptions.width = options.width;
+        if (options.align !== undefined) textOptions.align = options.align;
+        
+        doc.text(rendered, x, y, textOptions);
+      };
 
       // Draw Header Helper
       const drawHeader = (title: string, branchName = '', userName = '', dateStr = '') => {
@@ -221,73 +270,61 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         }
 
         // 2. Company Info
-        doc.fillColor('#064e3b').font('Arabic-Bold').fontSize(isThermal ? 9.5 : 12);
-        const nameVisual = processLine(shapeText(company.name || ''));
-        
         if (isThermal) {
-          doc.text(nameVisual, sideMargin, currentY, { width: usableWidth, align: 'center' });
+          renderText(company.name || '', sideMargin, currentY, { width: usableWidth, align: 'center', font: 'Arabic-Bold', size: 9.5 });
           currentY += 12;
         } else {
-          doc.text(nameVisual, doc.page.width - sideMargin - 310, currentY + 5, { width: 250, align: 'right' });
+          renderText(company.name || '', doc.page.width - sideMargin - 310, currentY + 5, { width: 250, align: 'right', font: 'Arabic-Bold', size: 12 });
         }
 
-        doc.fillColor('#4b5563').font('Arabic-Regular').fontSize(isThermal ? 7.5 : 8.5);
         if (company.taxNumber) {
-          const taxVisual = processLine(shapeText(`الرقم الضريبي: ${company.taxNumber}`));
+          const label = `الرقم الضريبي: ${company.taxNumber}`;
           if (isThermal) {
-            doc.text(taxVisual, sideMargin, currentY, { width: usableWidth, align: 'center' });
+            renderText(label, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7.5 });
             currentY += 10;
           } else {
-            doc.text(taxVisual, doc.page.width - sideMargin - 310, currentY + 20, { width: 250, align: 'right' });
+            renderText(label, doc.page.width - sideMargin - 310, currentY + 20, { width: 250, align: 'right', size: 8.5 });
           }
         }
         if (company.phone) {
-          const phoneVisual = processLine(shapeText(`الهاتف: ${company.phone}`));
+          const label = `الهاتف: ${company.phone}`;
           if (isThermal) {
-            doc.text(phoneVisual, sideMargin, currentY, { width: usableWidth, align: 'center' });
+            renderText(label, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7.5 });
             currentY += 10;
           } else {
-            doc.text(phoneVisual, doc.page.width - sideMargin - 310, currentY + 32, { width: 250, align: 'right' });
+            renderText(label, doc.page.width - sideMargin - 310, currentY + 32, { width: 250, align: 'right', size: 8.5 });
           }
         }
 
         // 3. Document Title
-        doc.fillColor('#064e3b').font('Arabic-Bold').fontSize(isThermal ? 9 : 15);
-        const titleVisual = processLine(shapeText(title));
-        
         if (isThermal) {
           currentY += 2;
-          doc.text(titleVisual, sideMargin, currentY, { width: usableWidth, align: 'center' });
+          renderText(title, sideMargin, currentY, { width: usableWidth, align: 'center', font: 'Arabic-Bold', size: 9 });
           currentY += 12;
         } else {
-          doc.text(titleVisual, sideMargin, currentY + 12, { width: usableWidth - 300, align: 'left' });
+          renderText(title, sideMargin, currentY + 12, { width: usableWidth - 300, align: 'left', font: 'Arabic-Bold', size: 15 });
         }
 
         if (branchName) {
-          doc.fillColor('#4b5563').font('Arabic-Regular').fontSize(isThermal ? 7.5 : 8.5);
-          const branchVisual = processLine(shapeText(`الفرع: ${branchName}`));
+          const label = `الفرع: ${branchName}`;
           if (isThermal) {
-            doc.text(branchVisual, sideMargin, currentY, { width: usableWidth, align: 'center' });
+            renderText(label, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7.5 });
             currentY += 10;
           } else {
-            doc.text(branchVisual, sideMargin, currentY + 30, { width: usableWidth - 300, align: 'left' });
+            renderText(label, sideMargin, currentY + 30, { width: usableWidth - 300, align: 'left', size: 8.5 });
           }
         }
 
         // 4. Meta Info
         const dateValue = dateStr || new Date().toLocaleDateString('ar-SA');
-        const userVisual = processLine(shapeText(`المستخدم: ${userName || 'المشرف'}`));
-        const dateVisualStr = processLine(shapeText(`التاريخ: ${dateValue}`));
-        
-        doc.fillColor('#4b5563').font('Arabic-Regular').fontSize(isThermal ? 7 : 8);
         if (isThermal) {
-          doc.text(userVisual, sideMargin, currentY, { width: usableWidth, align: 'center' });
+          renderText(`المستخدم: ${userName || 'المشرف'}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7 });
           currentY += 9;
-          doc.text(dateVisualStr, sideMargin, currentY, { width: usableWidth, align: 'center' });
+          renderText(`التاريخ: ${dateValue}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7 });
           currentY += 12;
         } else {
-          doc.text(userVisual, sideMargin, currentY + 5, { width: 150, align: 'left' });
-          doc.text(dateVisualStr, sideMargin, currentY + 15, { width: 150, align: 'left' });
+          renderText(`المستخدم: ${userName || 'المشرف'}`, sideMargin, currentY + 5, { width: 150, align: 'left', size: 8 });
+          renderText(`التاريخ: ${dateValue}`, sideMargin, currentY + 15, { width: 150, align: 'left', size: 8 });
         }
 
         // Divider Line
@@ -324,8 +361,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             const cellHeight = lineCount * (isThermal ? 9.5 : 11) + (isThermal ? 4.5 : 7);
             if (cellHeight > maxCellHeight) maxCellHeight = cellHeight;
             
-            // Shape and reverse each wrapped line individually
-            return wrapped.map(line => processLine(shapeText(line)));
+            return wrapped; // return raw wrapped lines
           });
 
           // Check for page break (only for A4; thermal receipts print continuously on a single custom page)
@@ -353,13 +389,14 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             const align = columns[colIndex].align || 'right';
             
             doc.fillColor(isHeader ? '#ffffff' : '#1f2937');
-            doc.font(cellFont).fontSize(cellSize);
 
             lines.forEach((line, lineIndex) => {
               const textY = y + (isThermal ? 2.5 : 4) + lineIndex * (isThermal ? 9.5 : 11);
-              doc.text(line, currentX + (isThermal ? 2 : 5), textY, {
+              renderText(line, currentX + (isThermal ? 2 : 5), textY, {
                 width: colWidth - (isThermal ? 4 : 10),
-                align: align
+                align: align,
+                font: cellFont,
+                size: cellSize
               });
             });
 
@@ -414,12 +451,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
         const processedItems = items.map(item => {
           // Wrap raw labels and values first
-          const wrappedLabelRaw = wrapText(doc, item.label, colWidth - (isThermal ? 4 : 10), fontLabel, sizeLabel);
-          const wrappedValRaw = wrapText(doc, item.val, colWidth - (isThermal ? 4 : 10), fontVal, sizeVal);
-
-          // Then shape and reverse each line individually
-          const wrappedLabel = wrappedLabelRaw.map(line => processLine(shapeText(line)));
-          const wrappedVal = wrappedValRaw.map(line => processLine(shapeText(line)));
+          const wrappedLabel = wrapText(doc, item.label, colWidth - (isThermal ? 4 : 10), fontLabel, sizeLabel);
+          const wrappedVal = wrapText(doc, item.val, colWidth - (isThermal ? 4 : 10), fontVal, sizeVal);
 
           const height = (wrappedLabel.length + wrappedVal.length) * (isThermal ? 9.5 : 11) + (isThermal ? 6 : 10);
           if (height > maxValHeight) maxValHeight = height;
@@ -439,20 +472,24 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
         let currentX = sideMargin;
         processedItems.forEach((item, index) => {
-          doc.fillColor('#4b5563').font(fontLabel).fontSize(sizeLabel);
+          doc.fillColor('#4b5563');
           item.wrappedLabel.forEach((line, lineIndex) => {
-            doc.text(line, currentX + (isThermal ? 2 : 5), currentY + (isThermal ? 3 : 5) + lineIndex * (isThermal ? 9.5 : 11), { 
+            renderText(line, currentX + (isThermal ? 2 : 5), currentY + (isThermal ? 3 : 5) + lineIndex * (isThermal ? 9.5 : 11), { 
               width: colWidth - (isThermal ? 4 : 10), 
-              align: 'right' 
+              align: 'right',
+              font: fontLabel,
+              size: sizeLabel
             });
           });
 
-          doc.fillColor('#1f2937').font(fontVal).fontSize(sizeVal);
+          doc.fillColor('#1f2937');
           const labelOffset = item.wrappedLabel.length * (isThermal ? 9.5 : 11);
           item.wrappedVal.forEach((line, lineIndex) => {
-            doc.text(line, currentX + (isThermal ? 2 : 5), currentY + (isThermal ? 3 : 5) + labelOffset + lineIndex * (isThermal ? 9.5 : 11), { 
+            renderText(line, currentX + (isThermal ? 2 : 5), currentY + (isThermal ? 3 : 5) + labelOffset + lineIndex * (isThermal ? 9.5 : 11), { 
               width: colWidth - (isThermal ? 4 : 10), 
-              align: 'right' 
+              align: 'right',
+              font: fontVal,
+              size: sizeVal
             });
           });
 
@@ -482,15 +519,14 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
            .moveTo(leftX, currentY + (isThermal ? 20 : 30))
            .lineTo(leftX + boxWidth, currentY + (isThermal ? 20 : 30))
            .stroke();
-        doc.fillColor('#4b5563').font('Arabic-Bold').fontSize(isThermal ? 7 : 8.5);
-        doc.text(processLine(shapeText(leftTitle)), leftX, currentY + (isThermal ? 24 : 36), { width: boxWidth, align: 'center' });
+        renderText(leftTitle, leftX, currentY + (isThermal ? 24 : 36), { width: boxWidth, align: 'center', font: 'Arabic-Bold', size: isThermal ? 7 : 8.5 });
 
         const rightX = sideMargin + (3 * usableWidth / 4) - (boxWidth / 2);
         doc.strokeColor('#9ca3af').lineWidth(0.5)
            .moveTo(rightX, currentY + (isThermal ? 20 : 30))
            .lineTo(rightX + boxWidth, currentY + (isThermal ? 20 : 30))
            .stroke();
-        doc.text(processLine(shapeText(rightTitle)), rightX, currentY + (isThermal ? 24 : 36), { width: boxWidth, align: 'center' });
+        renderText(rightTitle, rightX, currentY + (isThermal ? 24 : 36), { width: boxWidth, align: 'center', font: 'Arabic-Bold', size: isThermal ? 7 : 8.5 });
 
         currentY += isThermal ? 35 : 55;
       };
@@ -552,10 +588,10 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
           let summaryY = currentY + (isThermal ? 13 : 15);
           const drawSummaryRow = (label: string, val: string, isBold = false) => {
-            doc.fillColor(isBold ? '#064e3b' : '#4b5563');
-            doc.font(isBold ? 'Arabic-Bold' : 'Arabic-Regular').fontSize(isThermal ? (isBold ? 8.5 : 7.5) : (isBold ? 9.5 : 8.5));
-            doc.text(processLine(shapeText(label)), summaryX + 2, summaryY, { width: isThermal ? 65 : 100, align: 'right' });
-            doc.text(processLine(shapeText(val)), summaryX + (isThermal ? 70 : 105), summaryY, { width: isThermal ? 58 : 90, align: 'left' });
+            const fontName = isBold ? 'Arabic-Bold' : 'Arabic-Regular';
+            const fontSize = isThermal ? (isBold ? 8.5 : 7.5) : (isBold ? 9.5 : 8.5);
+            renderText(label, summaryX + 2, summaryY, { width: isThermal ? 65 : 100, align: 'right', font: fontName, size: fontSize });
+            renderText(val, summaryX + (isThermal ? 70 : 105), summaryY, { width: isThermal ? 58 : 90, align: 'left', font: fontName, size: fontSize });
             summaryY += isThermal ? 10 : 12;
           };
 
@@ -686,11 +722,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             const sizeLabel = isThermal ? 7.5 : 8.5;
             const sizeVal = isThermal ? 7.5 : 9.5;
 
-            const descLabelShaped = processLine(shapeText("البيان / الشرح:"));
-            
             // Wrap the raw description first based on font metrics
-            const wrappedDescRaw = wrapText(doc, dto.description, usableWidth - (isThermal ? 8 : 20), fontVal, sizeVal);
-            const wrappedDesc = wrappedDescRaw.map(line => processLine(shapeText(line)));
+            const wrappedDesc = wrapText(doc, dto.description, usableWidth - (isThermal ? 8 : 20), fontVal, sizeVal);
             
             const boxHeight = (isThermal ? 10 : 12) + wrappedDesc.length * (isThermal ? 9.5 : 11) + (isThermal ? 6 : 10);
 
@@ -702,17 +735,14 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             doc.fillColor('#f9fafb').rect(sideMargin, currentY, usableWidth, boxHeight).fill();
             doc.strokeColor('#e5e7eb').lineWidth(0.5).rect(sideMargin, currentY, usableWidth, boxHeight).stroke();
 
-            doc.fillColor('#4b5563').font(fontLabel).fontSize(sizeLabel);
-            doc.text(descLabelShaped, sideMargin + (isThermal ? 4 : 10), currentY + 5, { 
-              width: usableWidth - (isThermal ? 8 : 20), 
-              align: 'right' 
-            });
+            renderText("البيان / الشرح:", sideMargin + (isThermal ? 4 : 10), currentY + 5, { width: usableWidth - (isThermal ? 8 : 20), align: 'right', font: fontLabel, size: sizeLabel });
 
-            doc.fillColor('#1f2937').font(fontVal).fontSize(sizeVal);
             wrappedDesc.forEach((line, lineIndex) => {
-              doc.text(line, sideMargin + (isThermal ? 4 : 10), currentY + (isThermal ? 14 : 16) + lineIndex * (isThermal ? 9.5 : 11), { 
+              renderText(line, sideMargin + (isThermal ? 4 : 10), currentY + (isThermal ? 14 : 16) + lineIndex * (isThermal ? 9.5 : 11), { 
                 width: usableWidth - (isThermal ? 8 : 20), 
-                align: 'right' 
+                align: 'right',
+                font: fontVal,
+                size: sizeVal
               });
             });
 
@@ -770,17 +800,15 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
            .lineTo(doc.page.width - sideMargin, doc.page.height - (isThermal ? 16 : 40))
            .stroke();
 
-        doc.fillColor('#9ca3af').font('Arabic-Regular').fontSize(isThermal ? 6.5 : 8);
-        
-        const footerL = processLine(shapeText("نظام ERP السحابي"));
-        doc.text(footerL, sideMargin, doc.page.height - (isThermal ? 12 : 32), { align: 'left' });
+        renderText("نظام ERP السحابي", sideMargin, doc.page.height - (isThermal ? 12 : 32), { align: 'left', font: 'Arabic-Regular', size: isThermal ? 6.5 : 8 });
 
         if (!isThermal) {
           const pageStr = `صفحة ${i + 1} من ${range.count}`;
-          const footerR = processLine(shapeText(pageStr));
-          doc.text(footerR, doc.page.width - 150, doc.page.height - 32, {
+          renderText(pageStr, doc.page.width - 150, doc.page.height - 32, {
             width: 120,
-            align: 'right'
+            align: 'right',
+            font: 'Arabic-Regular',
+            size: 8
           });
         }
       }
