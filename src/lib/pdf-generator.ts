@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import PDFDocument from 'pdfkit';
-import fontkit from 'fontkit';
+import * as fontkit from 'fontkit';
 import bidiFactory from 'bidi-js';
 import QRCodeNode from 'qrcode';
 // @ts-ignore
@@ -183,7 +183,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
       });
 
       // Register fontkit to support local TTF fonts
-      (doc as any).fontkit = fontkit;
+      (doc as any).fontkit = fontkit.default || fontkit;
 
       // Register Noto Sans Arabic fonts as Buffers to support JSDOM test environments
       doc.registerFont('Arabic-Regular', fs.readFileSync(regularPath));
