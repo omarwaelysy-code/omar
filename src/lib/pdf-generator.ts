@@ -44,8 +44,15 @@ export function processLine(shapedLine: string): string {
   return arr.join('');
 }
 
-export function wrapText(doc: any, shapedText: string, maxWidth: number): string[] {
-  const paragraphs = shapedText.split('\n');
+function shapeText(text: any): string {
+  if (text === null || text === undefined) return '';
+  const str = String(text);
+  return reshaper.ArabicShaper.convertArabic(str);
+}
+
+export function wrapText(doc: any, rawText: string, maxWidth: number, fontName: string, fontSize: number): string[] {
+  doc.font(fontName).fontSize(fontSize);
+  const paragraphs = rawText.split('\n');
   const lines: string[] = [];
 
   for (const para of paragraphs) {
@@ -59,7 +66,12 @@ export function wrapText(doc: any, shapedText: string, maxWidth: number): string
     for (const word of words) {
       if (word === '') continue;
       const testLine = currentLine + word;
-      if (doc.widthOfString(testLine) > maxWidth) {
+      
+      // Shape the test line to get precise width of the connected glyphs!
+      const testLineShaped = shapeText(testLine);
+      const testLineWidth = doc.widthOfString(testLineShaped);
+
+      if (testLineWidth > maxWidth) {
         if (currentLine && currentLine.trim() !== '') {
           lines.push(currentLine);
           currentLine = word.trim() === '' ? '' : word;
@@ -67,7 +79,8 @@ export function wrapText(doc: any, shapedText: string, maxWidth: number): string
           // Force break single word
           let testWord = '';
           for (const char of word) {
-            if (doc.widthOfString(testWord + char) > maxWidth) {
+            const testWordShaped = shapeText(testWord + char);
+            if (doc.widthOfString(testWordShaped) > maxWidth) {
               lines.push(testWord);
               testWord = char;
             } else {
@@ -86,12 +99,6 @@ export function wrapText(doc: any, shapedText: string, maxWidth: number): string
   }
 
   return lines;
-}
-
-function shapeText(text: any): string {
-  if (text === null || text === undefined) return '';
-  const str = String(text);
-  return reshaper.ArabicShaper.convertArabic(str);
 }
 
 export async function generatePDF(templateName: string, dto: any): Promise<Buffer> {
@@ -189,6 +196,9 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
       doc.registerFont('Arabic-Regular', fs.readFileSync(regularPath));
       doc.registerFont('Arabic-Bold', fs.readFileSync(boldPath));
 
+      // Set default font
+      doc.font('Arabic-Regular').fontSize(isThermal ? 7.5 : 10);
+
       const usableWidth = isThermal ? (pageWidth - 20) : (doc.page.width - 60);
       const sideMargin = isThermal ? 10 : 30;
       let currentY = isThermal ? 10 : 40;
@@ -212,8 +222,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
         // 2. Company Info
         doc.fillColor('#064e3b').font('Arabic-Bold').fontSize(isThermal ? 9.5 : 12);
-        const nameShaped = shapeText(company.name || '');
-        const nameVisual = processLine(nameShaped);
+        const nameVisual = processLine(shapeText(company.name || ''));
         
         if (isThermal) {
           doc.text(nameVisual, sideMargin, currentY, { width: usableWidth, align: 'center' });
@@ -224,28 +233,27 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
         doc.fillColor('#4b5563').font('Arabic-Regular').fontSize(isThermal ? 7.5 : 8.5);
         if (company.taxNumber) {
-          const taxShaped = shapeText(`الرقم الضريبي: ${company.taxNumber}`);
+          const taxVisual = processLine(shapeText(`الرقم الضريبي: ${company.taxNumber}`));
           if (isThermal) {
-            doc.text(processLine(taxShaped), sideMargin, currentY, { width: usableWidth, align: 'center' });
+            doc.text(taxVisual, sideMargin, currentY, { width: usableWidth, align: 'center' });
             currentY += 10;
           } else {
-            doc.text(processLine(taxShaped), doc.page.width - sideMargin - 310, currentY + 20, { width: 250, align: 'right' });
+            doc.text(taxVisual, doc.page.width - sideMargin - 310, currentY + 20, { width: 250, align: 'right' });
           }
         }
         if (company.phone) {
-          const phoneShaped = shapeText(`الهاتف: ${company.phone}`);
+          const phoneVisual = processLine(shapeText(`الهاتف: ${company.phone}`));
           if (isThermal) {
-            doc.text(processLine(phoneShaped), sideMargin, currentY, { width: usableWidth, align: 'center' });
+            doc.text(phoneVisual, sideMargin, currentY, { width: usableWidth, align: 'center' });
             currentY += 10;
           } else {
-            doc.text(processLine(phoneShaped), doc.page.width - sideMargin - 310, currentY + 32, { width: 250, align: 'right' });
+            doc.text(phoneVisual, doc.page.width - sideMargin - 310, currentY + 32, { width: 250, align: 'right' });
           }
         }
 
         // 3. Document Title
         doc.fillColor('#064e3b').font('Arabic-Bold').fontSize(isThermal ? 9 : 15);
-        const titleShaped = shapeText(title);
-        const titleVisual = processLine(titleShaped);
+        const titleVisual = processLine(shapeText(title));
         
         if (isThermal) {
           currentY += 2;
@@ -257,29 +265,29 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
         if (branchName) {
           doc.fillColor('#4b5563').font('Arabic-Regular').fontSize(isThermal ? 7.5 : 8.5);
-          const branchShaped = shapeText(`الفرع: ${branchName}`);
+          const branchVisual = processLine(shapeText(`الفرع: ${branchName}`));
           if (isThermal) {
-            doc.text(processLine(branchShaped), sideMargin, currentY, { width: usableWidth, align: 'center' });
+            doc.text(branchVisual, sideMargin, currentY, { width: usableWidth, align: 'center' });
             currentY += 10;
           } else {
-            doc.text(processLine(branchShaped), sideMargin, currentY + 30, { width: usableWidth - 300, align: 'left' });
+            doc.text(branchVisual, sideMargin, currentY + 30, { width: usableWidth - 300, align: 'left' });
           }
         }
 
         // 4. Meta Info
         const dateValue = dateStr || new Date().toLocaleDateString('ar-SA');
-        const userShaped = shapeText(`المستخدم: ${userName || 'المشرف'}`);
-        const dateShaped = shapeText(`التاريخ: ${dateValue}`);
+        const userVisual = processLine(shapeText(`المستخدم: ${userName || 'المشرف'}`));
+        const dateVisualStr = processLine(shapeText(`التاريخ: ${dateValue}`));
         
         doc.fillColor('#4b5563').font('Arabic-Regular').fontSize(isThermal ? 7 : 8);
         if (isThermal) {
-          doc.text(processLine(userShaped), sideMargin, currentY, { width: usableWidth, align: 'center' });
+          doc.text(userVisual, sideMargin, currentY, { width: usableWidth, align: 'center' });
           currentY += 9;
-          doc.text(processLine(dateShaped), sideMargin, currentY, { width: usableWidth, align: 'center' });
+          doc.text(dateVisualStr, sideMargin, currentY, { width: usableWidth, align: 'center' });
           currentY += 12;
         } else {
-          doc.text(processLine(userShaped), sideMargin, currentY + 5, { width: 150, align: 'left' });
-          doc.text(processLine(dateShaped), sideMargin, currentY + 15, { width: 150, align: 'left' });
+          doc.text(userVisual, sideMargin, currentY + 5, { width: 150, align: 'left' });
+          doc.text(dateVisualStr, sideMargin, currentY + 15, { width: 150, align: 'left' });
         }
 
         // Divider Line
@@ -303,13 +311,21 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         const drawRow = (rowItems: string[], y: number, isHeader = false, isTotal = false) => {
           const rowHeight = isThermal ? 14 : 18;
           let maxCellHeight = rowHeight;
+          
+          const cellFont = isHeader || isTotal ? 'Arabic-Bold' : 'Arabic-Regular';
+          const cellSize = isThermal ? 7.5 : 8.5;
+
           const cellLines = rowItems.map((cellText, colIndex) => {
             const colWidth = colWidths[colIndex];
-            const wrapped = wrapText(doc, shapeText(cellText), colWidth - (isThermal ? 4 : 10));
+            
+            // Wrap the raw text first based on correct font metrics
+            const wrapped = wrapText(doc, cellText, colWidth - (isThermal ? 4 : 10), cellFont, cellSize);
             const lineCount = wrapped.length || 1;
             const cellHeight = lineCount * (isThermal ? 9.5 : 11) + (isThermal ? 4.5 : 7);
             if (cellHeight > maxCellHeight) maxCellHeight = cellHeight;
-            return wrapped.map(line => processLine(line));
+            
+            // Shape and reverse each wrapped line individually
+            return wrapped.map(line => processLine(shapeText(line)));
           });
 
           // Check for page break (only for A4; thermal receipts print continuously on a single custom page)
@@ -337,7 +353,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             const align = columns[colIndex].align || 'right';
             
             doc.fillColor(isHeader ? '#ffffff' : '#1f2937');
-            doc.font(isHeader || isTotal ? 'Arabic-Bold' : 'Arabic-Regular').fontSize(isThermal ? 7.5 : 8.5);
+            doc.font(cellFont).fontSize(cellSize);
 
             lines.forEach((line, lineIndex) => {
               const textY = y + (isThermal ? 2.5 : 4) + lineIndex * (isThermal ? 9.5 : 11);
@@ -391,14 +407,19 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         const colWidth = usableWidth / items.length;
         let maxValHeight = 12;
 
-        const processedItems = items.map(item => {
-          const shapedLabel = shapeText(item.label);
-          const processedLabel = processLine(shapedLabel);
-          const shapedVal = shapeText(item.val);
-          const processedVal = processLine(shapedVal);
+        const fontLabel = 'Arabic-Regular';
+        const fontVal = 'Arabic-Bold';
+        const sizeLabel = isThermal ? 7.5 : 8.5;
+        const sizeVal = isThermal ? 7.5 : 9.0;
 
-          const wrappedLabel = wrapText(doc, shapedLabel, colWidth - (isThermal ? 4 : 10)).map(processLine);
-          const wrappedVal = wrapText(doc, shapedVal, colWidth - (isThermal ? 4 : 10)).map(processLine);
+        const processedItems = items.map(item => {
+          // Wrap raw labels and values first
+          const wrappedLabelRaw = wrapText(doc, item.label, colWidth - (isThermal ? 4 : 10), fontLabel, sizeLabel);
+          const wrappedValRaw = wrapText(doc, item.val, colWidth - (isThermal ? 4 : 10), fontVal, sizeVal);
+
+          // Then shape and reverse each line individually
+          const wrappedLabel = wrappedLabelRaw.map(line => processLine(shapeText(line)));
+          const wrappedVal = wrappedValRaw.map(line => processLine(shapeText(line)));
 
           const height = (wrappedLabel.length + wrappedVal.length) * (isThermal ? 9.5 : 11) + (isThermal ? 6 : 10);
           if (height > maxValHeight) maxValHeight = height;
@@ -418,7 +439,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
         let currentX = sideMargin;
         processedItems.forEach((item, index) => {
-          doc.fillColor('#4b5563').font('Arabic-Regular').fontSize(isThermal ? 7.5 : 8.5);
+          doc.fillColor('#4b5563').font(fontLabel).fontSize(sizeLabel);
           item.wrappedLabel.forEach((line, lineIndex) => {
             doc.text(line, currentX + (isThermal ? 2 : 5), currentY + (isThermal ? 3 : 5) + lineIndex * (isThermal ? 9.5 : 11), { 
               width: colWidth - (isThermal ? 4 : 10), 
@@ -426,7 +447,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             });
           });
 
-          doc.fillColor('#1f2937').font('Arabic-Bold').fontSize(isThermal ? 7.5 : 9.0);
+          doc.fillColor('#1f2937').font(fontVal).fontSize(sizeVal);
           const labelOffset = item.wrappedLabel.length * (isThermal ? 9.5 : 11);
           item.wrappedVal.forEach((line, lineIndex) => {
             doc.text(line, currentX + (isThermal ? 2 : 5), currentY + (isThermal ? 3 : 5) + labelOffset + lineIndex * (isThermal ? 9.5 : 11), { 
@@ -660,9 +681,17 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           drawMetaGrid(metaItems);
 
           if (dto.description) {
-            const descLabelShaped = shapeText("البيان / الشرح:");
-            const descShaped = shapeText(dto.description);
-            const wrappedDesc = wrapText(doc, descShaped, usableWidth - (isThermal ? 8 : 20)).map(processLine);
+            const fontLabel = 'Arabic-Regular';
+            const fontVal = 'Arabic-Bold';
+            const sizeLabel = isThermal ? 7.5 : 8.5;
+            const sizeVal = isThermal ? 7.5 : 9.5;
+
+            const descLabelShaped = processLine(shapeText("البيان / الشرح:"));
+            
+            // Wrap the raw description first based on font metrics
+            const wrappedDescRaw = wrapText(doc, dto.description, usableWidth - (isThermal ? 8 : 20), fontVal, sizeVal);
+            const wrappedDesc = wrappedDescRaw.map(line => processLine(shapeText(line)));
+            
             const boxHeight = (isThermal ? 10 : 12) + wrappedDesc.length * (isThermal ? 9.5 : 11) + (isThermal ? 6 : 10);
 
             if (!isThermal && (currentY + boxHeight > doc.page.height - 50)) {
@@ -673,13 +702,13 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             doc.fillColor('#f9fafb').rect(sideMargin, currentY, usableWidth, boxHeight).fill();
             doc.strokeColor('#e5e7eb').lineWidth(0.5).rect(sideMargin, currentY, usableWidth, boxHeight).stroke();
 
-            doc.fillColor('#4b5563').font('Arabic-Regular').fontSize(isThermal ? 7.5 : 8.5);
-            doc.text(processLine(descLabelShaped), sideMargin + (isThermal ? 4 : 10), currentY + 5, { 
+            doc.fillColor('#4b5563').font(fontLabel).fontSize(sizeLabel);
+            doc.text(descLabelShaped, sideMargin + (isThermal ? 4 : 10), currentY + 5, { 
               width: usableWidth - (isThermal ? 8 : 20), 
               align: 'right' 
             });
 
-            doc.fillColor('#1f2937').font('Arabic-Bold').fontSize(isThermal ? 7.5 : 9.5);
+            doc.fillColor('#1f2937').font(fontVal).fontSize(sizeVal);
             wrappedDesc.forEach((line, lineIndex) => {
               doc.text(line, sideMargin + (isThermal ? 4 : 10), currentY + (isThermal ? 14 : 16) + lineIndex * (isThermal ? 9.5 : 11), { 
                 width: usableWidth - (isThermal ? 8 : 20), 
