@@ -336,7 +336,11 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         rows: any[],
         totals: any
       ) => {
-        const colWidths = columns.map(col => (col.width / 100) * usableWidth);
+        const totalWidthWeight = columns.reduce((sum, col) => sum + (col.width || 0), 0);
+        const colWidths = columns.map(col => {
+          const pct = totalWidthWeight > 0 ? ((col.width || 0) / totalWidthWeight) : (1 / (columns.length || 1));
+          return pct * usableWidth;
+        });
 
         const drawRow = (rowItems: string[], y: number, isHeader = false, isTotal = false) => {
           const rowHeight = isThermal ? 14 : 18;
@@ -347,9 +351,10 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
           const cellLines = rowItems.map((cellText, colIndex) => {
             const colWidth = colWidths[colIndex];
+            const wrapWidth = Math.max(20, colWidth - (isThermal ? 4 : 10));
             
             // Wrap the raw text first based on correct font metrics
-            const wrapped = wrapText(doc, cellText, colWidth - (isThermal ? 4 : 10), cellFont, cellSize);
+            const wrapped = wrapText(doc, cellText, wrapWidth, cellFont, cellSize);
             const lineCount = wrapped.length || 1;
             const cellHeight = lineCount * (isThermal ? 9.5 : 11) + (isThermal ? 4.5 : 7);
             if (cellHeight > maxCellHeight) maxCellHeight = cellHeight;
@@ -445,8 +450,9 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
         const processedItems = items.map(item => {
           // Wrap raw labels and values first
-          const wrappedLabel = wrapText(doc, item.label, colWidth - (isThermal ? 4 : 10), fontLabel, sizeLabel);
-          const wrappedVal = wrapText(doc, item.val, colWidth - (isThermal ? 4 : 10), fontVal, sizeVal);
+          const wrapWidth = Math.max(20, colWidth - (isThermal ? 4 : 10));
+          const wrappedLabel = wrapText(doc, item.label, wrapWidth, fontLabel, sizeLabel);
+          const wrappedVal = wrapText(doc, item.val, wrapWidth, fontVal, sizeVal);
 
           const height = (wrappedLabel.length + wrappedVal.length) * (isThermal ? 9.5 : 11) + (isThermal ? 6 : 10);
           if (height > maxValHeight) maxValHeight = height;
