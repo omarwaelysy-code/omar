@@ -1,7 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import PDFDocument from 'pdfkit';
+import fontkit from 'fontkit';
 import bidiFactory from 'bidi-js';
+import QRCodeNode from 'qrcode';
 // @ts-ignore
 import reshaper from 'arabic-persian-reshaper';
 
@@ -106,11 +108,71 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
     throw new Error(`Font files not found at ${regularPath} or ${boldPath}`);
   }
 
+  // Pre-load company logo as Buffer if present
+  let logoBuffer: Buffer | null = null;
+  if (company.logoUrl && company.logoUrl.startsWith('data:image')) {
+    const base64Data = company.logoUrl.split(',')[1];
+    if (base64Data) {
+      try {
+        logoBuffer = Buffer.from(base64Data, 'base64');
+      } catch (e: any) {
+        console.error(`${STEP} Failed to parse base64 logo:`, e.message);
+      }
+    }
+  }
+
+  // Pre-load or generate QR Code Buffer if present
+  let qrBuffer: Buffer | null = null;
+  const qrData = dto.qr_code || dto.qrCode || dto.qrcode;
+  if (qrData) {
+    if (qrData.startsWith('data:image')) {
+      const base64Data = qrData.split(',')[1];
+      if (base64Data) {
+        try {
+          qrBuffer = Buffer.from(base64Data, 'base64');
+        } catch (e: any) {
+          console.error(`${STEP} Failed to parse base64 QR code:`, e.message);
+        }
+      }
+    } else {
+      try {
+        // Generate QR code directly using qrcode library
+        qrBuffer = await QRCodeNode.toBuffer(qrData, { type: 'png', margin: 1, width: 80 });
+      } catch (e: any) {
+        console.error(`${STEP} Failed to generate QR code:`, e.message);
+      }
+    }
+  }
+
+  // Detect paper size options (A4 vs Thermal 80mm/58mm)
+  const isThermal = templateName.toLowerCase().includes('thermal') || 
+                    dto.isThermal || 
+                    dto.paperSize === 'thermal_80' || 
+                    dto.paperSize === 'thermal_58';
+  
+  const is58 = dto.paperSize === 'thermal_58' || templateName.toLowerCase().includes('58');
+  
+  // Page Width (in points): A4 is 595.28, 80mm is ~226.77, 58mm is ~164.41
+  const pageWidth = isThermal ? (is58 ? 164.41 : 226.77) : 595.28;
+  
+  // Estimate height dynamically for thermal receipts to avoid empty trailing space
+  let pageHeight = 841.89; // A4 height
+  if (isThermal) {
+    const itemCount = (dto.items || []).length;
+    const rowsCount = (dto.rows || []).length;
+    const itemsLen = Math.max(itemCount, rowsCount);
+    const metaCount = 4;
+    pageHeight = 120 + (itemsLen * 24) + (metaCount * 11) + (dto.description ? 45 : 0) + (qrBuffer ? 60 : 0) + 120;
+    if (pageHeight < 280) pageHeight = 280;
+  }
+
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({
-        size: 'A4',
-        margins: { top: 40, bottom: 40, left: 30, right: 30 },
+        size: [pageWidth, pageHeight],
+        margins: isThermal 
+          ? { top: 10, bottom: 10, left: 10, right: 10 }
+          : { top: 40, bottom: 40, left: 30, right: 30 },
         bufferPages: true
       });
 
@@ -120,60 +182,88 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         resolve(Buffer.concat(chunks));
       });
 
-      // Register fonts (passing Buffers to support Vitest/JSDOM test environments)
+      // Register fontkit to support local TTF fonts
+      (doc as any).fontkit = fontkit;
+
+      // Register Noto Sans Arabic fonts as Buffers to support JSDOM test environments
       doc.registerFont('Arabic-Regular', fs.readFileSync(regularPath));
       doc.registerFont('Arabic-Bold', fs.readFileSync(boldPath));
 
-      const usableWidth = doc.page.width - 60; // 535.28 points
-      let currentY = 40;
+      const usableWidth = isThermal ? (pageWidth - 20) : (doc.page.width - 60);
+      const sideMargin = isThermal ? 10 : 30;
+      let currentY = isThermal ? 10 : 40;
 
       // Draw Header Helper
       const drawHeader = (title: string, branchName = '', userName = '', dateStr = '') => {
-        const headerHeight = 70;
+        const logoSize = isThermal ? 32 : 50;
         
         // 1. Logo
-        let logoBuffer: Buffer | null = null;
-        if (company.logoUrl && company.logoUrl.startsWith('data:image')) {
-          const base64Data = company.logoUrl.split(',')[1];
-          if (base64Data) {
-            logoBuffer = Buffer.from(base64Data, 'base64');
-          }
-        }
-        
         if (logoBuffer) {
           try {
-            doc.image(logoBuffer, doc.page.width - 80, currentY, { width: 50, height: 50 });
+            const logoX = isThermal ? (pageWidth - logoSize) / 2 : (doc.page.width - sideMargin - logoSize);
+            doc.image(logoBuffer, logoX, currentY, { width: logoSize, height: logoSize });
+            if (isThermal) {
+              currentY += logoSize + 5;
+            }
           } catch (e: any) {
             console.error(`${STEP} Logo render error:`, e.message);
           }
         }
 
-        // 2. Company Info (aligned to the right)
-        doc.fillColor('#064e3b').font('Arabic-Bold').fontSize(12);
+        // 2. Company Info
+        doc.fillColor('#064e3b').font('Arabic-Bold').fontSize(isThermal ? 9.5 : 12);
         const nameShaped = shapeText(company.name || '');
         const nameVisual = processLine(nameShaped);
-        doc.text(nameVisual, doc.page.width - 340, currentY + 5, { width: 250, align: 'right' });
+        
+        if (isThermal) {
+          doc.text(nameVisual, sideMargin, currentY, { width: usableWidth, align: 'center' });
+          currentY += 12;
+        } else {
+          doc.text(nameVisual, doc.page.width - sideMargin - 310, currentY + 5, { width: 250, align: 'right' });
+        }
 
-        doc.fillColor('#4b5563').font('Arabic-Regular').fontSize(8.5);
+        doc.fillColor('#4b5563').font('Arabic-Regular').fontSize(isThermal ? 7.5 : 8.5);
         if (company.taxNumber) {
           const taxShaped = shapeText(`الرقم الضريبي: ${company.taxNumber}`);
-          doc.text(processLine(taxShaped), doc.page.width - 340, currentY + 20, { width: 250, align: 'right' });
+          if (isThermal) {
+            doc.text(processLine(taxShaped), sideMargin, currentY, { width: usableWidth, align: 'center' });
+            currentY += 10;
+          } else {
+            doc.text(processLine(taxShaped), doc.page.width - sideMargin - 310, currentY + 20, { width: 250, align: 'right' });
+          }
         }
         if (company.phone) {
           const phoneShaped = shapeText(`الهاتف: ${company.phone}`);
-          doc.text(processLine(phoneShaped), doc.page.width - 340, currentY + 32, { width: 250, align: 'right' });
+          if (isThermal) {
+            doc.text(processLine(phoneShaped), sideMargin, currentY, { width: usableWidth, align: 'center' });
+            currentY += 10;
+          } else {
+            doc.text(processLine(phoneShaped), doc.page.width - sideMargin - 310, currentY + 32, { width: 250, align: 'right' });
+          }
         }
 
         // 3. Document Title
-        doc.fillColor('#064e3b').font('Arabic-Bold').fontSize(15);
+        doc.fillColor('#064e3b').font('Arabic-Bold').fontSize(isThermal ? 9 : 15);
         const titleShaped = shapeText(title);
         const titleVisual = processLine(titleShaped);
-        doc.text(titleVisual, 30, currentY + 12, { width: usableWidth - 300, align: 'left' });
+        
+        if (isThermal) {
+          currentY += 2;
+          doc.text(titleVisual, sideMargin, currentY, { width: usableWidth, align: 'center' });
+          currentY += 12;
+        } else {
+          doc.text(titleVisual, sideMargin, currentY + 12, { width: usableWidth - 300, align: 'left' });
+        }
 
         if (branchName) {
-          doc.fillColor('#4b5563').font('Arabic-Regular').fontSize(8.5);
+          doc.fillColor('#4b5563').font('Arabic-Regular').fontSize(isThermal ? 7.5 : 8.5);
           const branchShaped = shapeText(`الفرع: ${branchName}`);
-          doc.text(processLine(branchShaped), 30, currentY + 30, { width: usableWidth - 300, align: 'left' });
+          if (isThermal) {
+            doc.text(processLine(branchShaped), sideMargin, currentY, { width: usableWidth, align: 'center' });
+            currentY += 10;
+          } else {
+            doc.text(processLine(branchShaped), sideMargin, currentY + 30, { width: usableWidth - 300, align: 'left' });
+          }
         }
 
         // 4. Meta Info
@@ -181,14 +271,25 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         const userShaped = shapeText(`المستخدم: ${userName || 'المشرف'}`);
         const dateShaped = shapeText(`التاريخ: ${dateValue}`);
         
-        doc.fillColor('#4b5563').font('Arabic-Regular').fontSize(8);
-        doc.text(processLine(userShaped), 30, currentY + 5, { width: 150, align: 'left' });
-        doc.text(processLine(dateShaped), 30, currentY + 15, { width: 150, align: 'left' });
+        doc.fillColor('#4b5563').font('Arabic-Regular').fontSize(isThermal ? 7 : 8);
+        if (isThermal) {
+          doc.text(processLine(userShaped), sideMargin, currentY, { width: usableWidth, align: 'center' });
+          currentY += 9;
+          doc.text(processLine(dateShaped), sideMargin, currentY, { width: usableWidth, align: 'center' });
+          currentY += 12;
+        } else {
+          doc.text(processLine(userShaped), sideMargin, currentY + 5, { width: 150, align: 'left' });
+          doc.text(processLine(dateShaped), sideMargin, currentY + 15, { width: 150, align: 'left' });
+        }
 
         // Divider Line
-        doc.strokeColor('#10b981').lineWidth(2).moveTo(30, currentY + 58).lineTo(doc.page.width - 30, currentY + 58).stroke();
+        doc.strokeColor('#10b981')
+           .lineWidth(isThermal ? 1 : 2)
+           .moveTo(sideMargin, currentY + (isThermal ? 0 : 5))
+           .lineTo(doc.page.width - sideMargin, currentY + (isThermal ? 0 : 5))
+           .stroke();
 
-        currentY += 70;
+        currentY += isThermal ? 8 : 15;
       };
 
       // Helper to draw the table
@@ -200,62 +301,60 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         const colWidths = columns.map(col => (col.width / 100) * usableWidth);
 
         const drawRow = (rowItems: string[], y: number, isHeader = false, isTotal = false) => {
-          const rowHeight = 18;
+          const rowHeight = isThermal ? 14 : 18;
           let maxCellHeight = rowHeight;
           const cellLines = rowItems.map((cellText, colIndex) => {
             const colWidth = colWidths[colIndex];
-            const wrapped = wrapText(doc, shapeText(cellText), colWidth - 10);
+            const wrapped = wrapText(doc, shapeText(cellText), colWidth - (isThermal ? 4 : 10));
             const lineCount = wrapped.length || 1;
-            const cellHeight = lineCount * 11 + 7; // 11pt line height + padding
+            const cellHeight = lineCount * (isThermal ? 9.5 : 11) + (isThermal ? 4.5 : 7);
             if (cellHeight > maxCellHeight) maxCellHeight = cellHeight;
             return wrapped.map(line => processLine(line));
           });
 
-          // Check if we need to break page before drawing this row
-          if (y + maxCellHeight > doc.page.height - 50) {
+          // Check for page break (only for A4; thermal receipts print continuously on a single custom page)
+          if (!isThermal && (y + maxCellHeight > doc.page.height - 50)) {
             doc.addPage();
             y = 40;
-            // Draw repeating header
             if (!isHeader) {
               y = drawRow(columns.map(c => c.label), y, true);
             }
           }
 
-          // Draw background for header or total row
+          // Draw backgrounds and borders
           if (isHeader) {
-            doc.fillColor('#10b981').rect(30, y, usableWidth, maxCellHeight).fill();
+            doc.fillColor('#10b981').rect(sideMargin, y, usableWidth, maxCellHeight).fill();
           } else if (isTotal) {
-            doc.fillColor('#f3f4f6').rect(30, y, usableWidth, maxCellHeight).fill();
+            doc.fillColor('#f3f4f6').rect(sideMargin, y, usableWidth, maxCellHeight).fill();
           } else {
-            // Draw bottom border
-            doc.strokeColor('#e5e7eb').lineWidth(0.5).moveTo(30, y + maxCellHeight).lineTo(30 + usableWidth, y + maxCellHeight).stroke();
+            doc.strokeColor('#e5e7eb').lineWidth(0.5).moveTo(sideMargin, y + maxCellHeight).lineTo(sideMargin + usableWidth, y + maxCellHeight).stroke();
           }
 
           // Draw cells
-          let currentX = 30;
+          let currentX = sideMargin;
           cellLines.forEach((lines, colIndex) => {
             const colWidth = colWidths[colIndex];
             const align = columns[colIndex].align || 'right';
             
             doc.fillColor(isHeader ? '#ffffff' : '#1f2937');
-            doc.font(isHeader || isTotal ? 'Arabic-Bold' : 'Arabic-Regular').fontSize(8.5);
+            doc.font(isHeader || isTotal ? 'Arabic-Bold' : 'Arabic-Regular').fontSize(isThermal ? 7.5 : 8.5);
 
             lines.forEach((line, lineIndex) => {
-              const textY = y + 4 + lineIndex * 11;
-              doc.text(line, currentX + 5, textY, {
-                width: colWidth - 10,
+              const textY = y + (isThermal ? 2.5 : 4) + lineIndex * (isThermal ? 9.5 : 11);
+              doc.text(line, currentX + (isThermal ? 2 : 5), textY, {
+                width: colWidth - (isThermal ? 4 : 10),
                 align: align
               });
             });
 
-            // Draw vertical column borders
+            // Vertical borders
             doc.strokeColor('#e5e7eb').lineWidth(0.5).moveTo(currentX, y).lineTo(currentX, y + maxCellHeight).stroke();
 
             currentX += colWidth;
           });
 
-          // Draw final vertical border on the right
-          doc.strokeColor('#e5e7eb').lineWidth(0.5).moveTo(30 + usableWidth, y).lineTo(30 + usableWidth, y + maxCellHeight).stroke();
+          // Rightmost vertical border
+          doc.strokeColor('#e5e7eb').lineWidth(0.5).moveTo(sideMargin + usableWidth, y).lineTo(sideMargin + usableWidth, y + maxCellHeight).stroke();
 
           return y + maxCellHeight;
         };
@@ -272,7 +371,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           currentY = drawRow(rowItems, currentY);
         }
 
-        // Draw Total Row if totals present
+        // Draw Totals
         if (totals && Object.keys(totals).length > 0) {
           const totalItems = columns.map((col, index) => {
             if (totals[col.id] !== undefined) {
@@ -298,36 +397,42 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           const shapedVal = shapeText(item.val);
           const processedVal = processLine(shapedVal);
 
-          const wrappedLabel = wrapText(doc, shapedLabel, colWidth - 10).map(processLine);
-          const wrappedVal = wrapText(doc, shapedVal, colWidth - 10).map(processLine);
+          const wrappedLabel = wrapText(doc, shapedLabel, colWidth - (isThermal ? 4 : 10)).map(processLine);
+          const wrappedVal = wrapText(doc, shapedVal, colWidth - (isThermal ? 4 : 10)).map(processLine);
 
-          const height = (wrappedLabel.length + wrappedVal.length) * 11 + 10;
+          const height = (wrappedLabel.length + wrappedVal.length) * (isThermal ? 9.5 : 11) + (isThermal ? 6 : 10);
           if (height > maxValHeight) maxValHeight = height;
 
           return { wrappedLabel, wrappedVal };
         });
 
-        // Break page if necessary
-        if (currentY + maxValHeight > doc.page.height - 50) {
+        // Page break check (only A4)
+        if (!isThermal && (currentY + maxValHeight > doc.page.height - 50)) {
           doc.addPage();
           currentY = 40;
         }
 
-        // Draw box background
-        doc.fillColor('#f9fafb').rect(30, currentY, usableWidth, maxValHeight).fill();
-        doc.strokeColor('#e5e7eb').lineWidth(0.5).rect(30, currentY, usableWidth, maxValHeight).stroke();
+        // Draw backgrounds and borders
+        doc.fillColor('#f9fafb').rect(sideMargin, currentY, usableWidth, maxValHeight).fill();
+        doc.strokeColor('#e5e7eb').lineWidth(0.5).rect(sideMargin, currentY, usableWidth, maxValHeight).stroke();
 
-        let currentX = 30;
+        let currentX = sideMargin;
         processedItems.forEach((item, index) => {
-          doc.fillColor('#4b5563').font('Arabic-Regular').fontSize(8.5);
+          doc.fillColor('#4b5563').font('Arabic-Regular').fontSize(isThermal ? 7.5 : 8.5);
           item.wrappedLabel.forEach((line, lineIndex) => {
-            doc.text(line, currentX + 5, currentY + 5 + lineIndex * 11, { width: colWidth - 10, align: 'right' });
+            doc.text(line, currentX + (isThermal ? 2 : 5), currentY + (isThermal ? 3 : 5) + lineIndex * (isThermal ? 9.5 : 11), { 
+              width: colWidth - (isThermal ? 4 : 10), 
+              align: 'right' 
+            });
           });
 
-          doc.fillColor('#1f2937').font('Arabic-Bold').fontSize(9.0);
-          const labelOffset = item.wrappedLabel.length * 11;
+          doc.fillColor('#1f2937').font('Arabic-Bold').fontSize(isThermal ? 7.5 : 9.0);
+          const labelOffset = item.wrappedLabel.length * (isThermal ? 9.5 : 11);
           item.wrappedVal.forEach((line, lineIndex) => {
-            doc.text(line, currentX + 5, currentY + 5 + labelOffset + lineIndex * 11, { width: colWidth - 10, align: 'right' });
+            doc.text(line, currentX + (isThermal ? 2 : 5), currentY + (isThermal ? 3 : 5) + labelOffset + lineIndex * (isThermal ? 9.5 : 11), { 
+              width: colWidth - (isThermal ? 4 : 10), 
+              align: 'right' 
+            });
           });
 
           if (index < items.length - 1) {
@@ -340,33 +445,33 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           currentX += colWidth;
         });
 
-        currentY += maxValHeight + 15;
+        currentY += maxValHeight + (isThermal ? 8 : 15);
       };
 
       // Helper to draw signatures
       const drawSignatures = (leftTitle: string, rightTitle: string) => {
-        if (currentY + 55 > doc.page.height - 50) {
+        if (!isThermal && (currentY + 55 > doc.page.height - 50)) {
           doc.addPage();
           currentY = 40;
         }
-        const boxWidth = 140;
+        const boxWidth = isThermal ? 75 : 140;
 
-        const leftX = 30 + (usableWidth / 4) - (boxWidth / 2);
+        const leftX = sideMargin + (usableWidth / 4) - (boxWidth / 2);
         doc.strokeColor('#9ca3af').lineWidth(0.5)
-           .moveTo(leftX, currentY + 30)
-           .lineTo(leftX + boxWidth, currentY + 30)
+           .moveTo(leftX, currentY + (isThermal ? 20 : 30))
+           .lineTo(leftX + boxWidth, currentY + (isThermal ? 20 : 30))
            .stroke();
-        doc.fillColor('#4b5563').font('Arabic-Bold').fontSize(8.5);
-        doc.text(processLine(shapeText(leftTitle)), leftX, currentY + 36, { width: boxWidth, align: 'center' });
+        doc.fillColor('#4b5563').font('Arabic-Bold').fontSize(isThermal ? 7 : 8.5);
+        doc.text(processLine(shapeText(leftTitle)), leftX, currentY + (isThermal ? 24 : 36), { width: boxWidth, align: 'center' });
 
-        const rightX = 30 + (3 * usableWidth / 4) - (boxWidth / 2);
+        const rightX = sideMargin + (3 * usableWidth / 4) - (boxWidth / 2);
         doc.strokeColor('#9ca3af').lineWidth(0.5)
-           .moveTo(rightX, currentY + 30)
-           .lineTo(rightX + boxWidth, currentY + 30)
+           .moveTo(rightX, currentY + (isThermal ? 20 : 30))
+           .lineTo(rightX + boxWidth, currentY + (isThermal ? 20 : 30))
            .stroke();
-        doc.text(processLine(shapeText(rightTitle)), rightX, currentY + 36, { width: boxWidth, align: 'center' });
+        doc.text(processLine(shapeText(rightTitle)), rightX, currentY + (isThermal ? 24 : 36), { width: boxWidth, align: 'center' });
 
-        currentY += 55;
+        currentY += isThermal ? 35 : 55;
       };
 
       // Switch based on template name
@@ -391,8 +496,12 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           ];
           drawMetaGrid(metaItems);
 
-          // Table Columns
-          const columns: ColumnDef[] = [
+          // Table Columns (simplified structure for narrow thermal rolls)
+          const columns: ColumnDef[] = isThermal ? [
+            { id: 'product_name', label: 'الصنف', width: 55, align: 'right' },
+            { id: 'quantity', label: 'الكمية', width: 15, align: 'right' },
+            { id: 'total', label: 'الإجمالي', width: 30, align: 'right' }
+          ] : [
             { id: 'product_code', label: 'كود الصنف', width: 12, align: 'right' },
             { id: 'product_name', label: 'الصنف', width: 33, align: 'right' },
             { id: 'quantity', label: 'الكمية', width: 10, align: 'right' },
@@ -402,28 +511,31 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             { id: 'vat_amount', label: 'الضريبة', width: 8, align: 'right' },
             { id: 'total', label: 'الإجمالي', width: 8, align: 'right' }
           ];
+          
           drawTable(columns, dto.items || [], null);
 
           // Summary box
-          const summaryWidth = 200;
-          const summaryHeight = 65 + (Number(dto.discount_amount) > 0 ? 12 : 0);
+          const summaryWidth = isThermal ? 130 : 200;
+          const summaryHeight = isThermal 
+            ? (50 + (Number(dto.discount_amount) > 0 ? 10 : 0))
+            : (65 + (Number(dto.discount_amount) > 0 ? 12 : 0));
           
-          if (currentY + summaryHeight > doc.page.height - 50) {
+          if (!isThermal && (currentY + summaryHeight > doc.page.height - 50)) {
             doc.addPage();
             currentY = 40;
           }
 
-          const summaryX = doc.page.width - 30 - summaryWidth;
+          const summaryX = doc.page.width - sideMargin - summaryWidth;
           doc.fillColor('#f9fafb').rect(summaryX, currentY + 10, summaryWidth, summaryHeight).fill();
           doc.strokeColor('#10b981').lineWidth(1.5).rect(summaryX, currentY + 10, summaryWidth, summaryHeight).stroke();
 
-          let summaryY = currentY + 15;
+          let summaryY = currentY + (isThermal ? 13 : 15);
           const drawSummaryRow = (label: string, val: string, isBold = false) => {
             doc.fillColor(isBold ? '#064e3b' : '#4b5563');
-            doc.font(isBold ? 'Arabic-Bold' : 'Arabic-Regular').fontSize(isBold ? 9.5 : 8.5);
-            doc.text(processLine(shapeText(label)), summaryX + 5, summaryY, { width: 100, align: 'right' });
-            doc.text(processLine(shapeText(val)), summaryX + 105, summaryY, { width: 90, align: 'left' });
-            summaryY += 12;
+            doc.font(isBold ? 'Arabic-Bold' : 'Arabic-Regular').fontSize(isThermal ? (isBold ? 8.5 : 7.5) : (isBold ? 9.5 : 8.5));
+            doc.text(processLine(shapeText(label)), summaryX + 2, summaryY, { width: isThermal ? 65 : 100, align: 'right' });
+            doc.text(processLine(shapeText(val)), summaryX + (isThermal ? 70 : 105), summaryY, { width: isThermal ? 58 : 90, align: 'left' });
+            summaryY += isThermal ? 10 : 12;
           };
 
           drawSummaryRow('الإجمالي الفرعي:', dto.subtotal || '0.00');
@@ -431,12 +543,26 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             drawSummaryRow('الخصم:', dto.discount_amount);
           }
           drawSummaryRow('الضريبة (15%):', dto.vat_amount || '0.00');
-          summaryY += 2;
+          summaryY += isThermal ? 1 : 2;
           doc.strokeColor('#e5e7eb').lineWidth(0.5).moveTo(summaryX + 5, summaryY).lineTo(summaryX + summaryWidth - 5, summaryY).stroke();
-          summaryY += 4;
+          summaryY += isThermal ? 3 : 4;
           drawSummaryRow('الصافي النهائي:', dto.net_total || '0.00', true);
 
-          currentY += summaryHeight + 25;
+          currentY += summaryHeight + (isThermal ? 15 : 25);
+
+          // QR Code rendering if present
+          if (qrBuffer) {
+            const qrSize = isThermal ? 50 : 65;
+            const qrX = isThermal ? (pageWidth - qrSize) / 2 : sideMargin;
+            if (!isThermal && (currentY + qrSize > doc.page.height - 50)) {
+              doc.addPage();
+              currentY = 40;
+            }
+            doc.image(qrBuffer, qrX, currentY, { width: qrSize, height: qrSize });
+            if (isThermal) {
+              currentY += qrSize + 10;
+            }
+          }
 
           // Signatures
           drawSignatures(
@@ -463,7 +589,11 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           ];
           drawMetaGrid(metaItems);
 
-          const columns: ColumnDef[] = [
+          const columns: ColumnDef[] = isThermal ? [
+            { id: 'date', label: 'التاريخ', width: 25, align: 'right' },
+            { id: 'reference', label: 'المرجع', width: 25, align: 'right' },
+            { id: 'balance', label: 'الرصيد', width: 50, align: 'right' }
+          ] : [
             { id: 'date', label: 'التاريخ', width: 15, align: 'right' },
             { id: 'reference', label: 'المرجع', width: 15, align: 'right' },
             { id: 'description', label: 'البيان', width: 38, align: 'right' },
@@ -472,7 +602,9 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             { id: 'balance', label: 'الرصيد', width: 10, align: 'right' }
           ];
           
-          const totals = {
+          const totals = isThermal ? {
+            balance: dto.ending_balance || '0.00'
+          } : {
             debit: dto.total_debit || '0.00',
             credit: dto.total_credit || '0.00',
             balance: dto.ending_balance || '0.00'
@@ -490,7 +622,11 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           ];
           drawMetaGrid(metaItems);
 
-          const columns: ColumnDef[] = [
+          const columns: ColumnDef[] = isThermal ? [
+            { id: 'date', label: 'التاريخ', width: 30, align: 'right' },
+            { id: 'account_name', label: 'الحساب', width: 40, align: 'right' },
+            { id: 'debit', label: 'مدين', width: 30, align: 'right' }
+          ] : [
             { id: 'date', label: 'التاريخ', width: 12, align: 'right' },
             { id: 'entry_num', label: 'رقم القيد', width: 12, align: 'right' },
             { id: 'account_code', label: 'كود الحساب', width: 14, align: 'right' },
@@ -500,7 +636,9 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             { id: 'credit', label: 'دائن', width: 9, align: 'right' }
           ];
 
-          const totals = {
+          const totals = isThermal ? {
+            debit: dto.total_debit || '0.00'
+          } : {
             debit: dto.total_debit || '0.00',
             credit: dto.total_credit || '0.00'
           };
@@ -524,30 +662,39 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           if (dto.description) {
             const descLabelShaped = shapeText("البيان / الشرح:");
             const descShaped = shapeText(dto.description);
-            const wrappedDesc = wrapText(doc, descShaped, usableWidth - 20).map(processLine);
-            const boxHeight = 12 + wrappedDesc.length * 11 + 10;
+            const wrappedDesc = wrapText(doc, descShaped, usableWidth - (isThermal ? 8 : 20)).map(processLine);
+            const boxHeight = (isThermal ? 10 : 12) + wrappedDesc.length * (isThermal ? 9.5 : 11) + (isThermal ? 6 : 10);
 
-            if (currentY + boxHeight > doc.page.height - 50) {
+            if (!isThermal && (currentY + boxHeight > doc.page.height - 50)) {
               doc.addPage();
               currentY = 40;
             }
 
-            doc.fillColor('#f9fafb').rect(30, currentY, usableWidth, boxHeight).fill();
-            doc.strokeColor('#e5e7eb').lineWidth(0.5).rect(30, currentY, usableWidth, boxHeight).stroke();
+            doc.fillColor('#f9fafb').rect(sideMargin, currentY, usableWidth, boxHeight).fill();
+            doc.strokeColor('#e5e7eb').lineWidth(0.5).rect(sideMargin, currentY, usableWidth, boxHeight).stroke();
 
-            doc.fillColor('#4b5563').font('Arabic-Regular').fontSize(8.5);
-            doc.text(processLine(descLabelShaped), 40, currentY + 5, { width: usableWidth - 20, align: 'right' });
-
-            doc.fillColor('#1f2937').font('Arabic-Bold').fontSize(9.5);
-            wrappedDesc.forEach((line, lineIndex) => {
-              doc.text(line, 40, currentY + 16 + lineIndex * 11, { width: usableWidth - 20, align: 'right' });
+            doc.fillColor('#4b5563').font('Arabic-Regular').fontSize(isThermal ? 7.5 : 8.5);
+            doc.text(processLine(descLabelShaped), sideMargin + (isThermal ? 4 : 10), currentY + 5, { 
+              width: usableWidth - (isThermal ? 8 : 20), 
+              align: 'right' 
             });
 
-            currentY += boxHeight + 15;
+            doc.fillColor('#1f2937').font('Arabic-Bold').fontSize(isThermal ? 7.5 : 9.5);
+            wrappedDesc.forEach((line, lineIndex) => {
+              doc.text(line, sideMargin + (isThermal ? 4 : 10), currentY + (isThermal ? 14 : 16) + lineIndex * (isThermal ? 9.5 : 11), { 
+                width: usableWidth - (isThermal ? 8 : 20), 
+                align: 'right' 
+              });
+            });
+
+            currentY += boxHeight + (isThermal ? 8 : 15);
           }
 
           if (dto.items && dto.items.length > 0) {
-            const columns: ColumnDef[] = [
+            const columns: ColumnDef[] = isThermal ? [
+              { id: 'account_name', label: 'الحساب الموجه', width: 60, align: 'right' },
+              { id: 'amount', label: 'المبلغ', width: 40, align: 'right' }
+            ] : [
               { id: 'account_code', label: 'كود الحساب', width: 18, align: 'right' },
               { id: 'account_name', label: 'اسم الحساب الموجه', width: 33, align: 'right' },
               { id: 'description', label: 'شرح السطر', width: 33, align: 'right' },
@@ -559,7 +706,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             drawTable(columns, dto.items, totals);
           }
 
-          currentY += 10;
+          currentY += isThermal ? 5 : 10;
           drawSignatures('توقيع أمين الصندوق', 'توقيع المستلم');
           break;
         }
@@ -584,27 +731,29 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         }
       }
 
-      // Add page numbers and footer on all pages
+      // Add page numbers and footers (only for A4; thermal receipts print on a single continuous page)
       const range = doc.bufferedPageRange();
       for (let i = range.start; i < range.start + range.count; i++) {
         doc.switchToPage(i);
         
         doc.strokeColor('#e5e7eb').lineWidth(0.5)
-           .moveTo(30, doc.page.height - 40)
-           .lineTo(doc.page.width - 30, doc.page.height - 40)
+           .moveTo(sideMargin, doc.page.height - (isThermal ? 16 : 40))
+           .lineTo(doc.page.width - sideMargin, doc.page.height - (isThermal ? 16 : 40))
            .stroke();
 
-        doc.fillColor('#9ca3af').font('Arabic-Regular').fontSize(8);
+        doc.fillColor('#9ca3af').font('Arabic-Regular').fontSize(isThermal ? 6.5 : 8);
         
         const footerL = processLine(shapeText("نظام ERP السحابي"));
-        doc.text(footerL, 30, doc.page.height - 32, { align: 'left' });
+        doc.text(footerL, sideMargin, doc.page.height - (isThermal ? 12 : 32), { align: 'left' });
 
-        const pageStr = `صفحة ${i + 1} من ${range.count}`;
-        const footerR = processLine(shapeText(pageStr));
-        doc.text(footerR, doc.page.width - 150, doc.page.height - 32, {
-          width: 120,
-          align: 'right'
-        });
+        if (!isThermal) {
+          const pageStr = `صفحة ${i + 1} من ${range.count}`;
+          const footerR = processLine(shapeText(pageStr));
+          doc.text(footerR, doc.page.width - 150, doc.page.height - 32, {
+            width: 120,
+            align: 'right'
+          });
+        }
       }
 
       doc.end();

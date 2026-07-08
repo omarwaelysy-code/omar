@@ -252,5 +252,69 @@ describe('PDF Engine Architectural Tests', () => {
       expect(buffer).toBeInstanceOf(Buffer);
       expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
     });
+
+    it('should generate a valid thermal receipt invoice PDF buffer (80mm) with dynamic QR code', async () => {
+      const dto = {
+        company: mockCompany,
+        invoice_number: 'INV-THERM-80',
+        date: '2026-07-08',
+        payment_method: 'مدى',
+        customer_name: 'زبون نقدي سريع',
+        items: [
+          {
+            product_name: 'كولا علبة صغير بارد',
+            quantity: '3',
+            total: '7.50'
+          },
+          {
+            product_name: 'سندوتش جبنة شيدر لذيذ',
+            quantity: '1',
+            total: '12.00'
+          }
+        ],
+        subtotal: '19.50',
+        vat_amount: '2.93',
+        net_total: '22.43',
+        isThermal: true,
+        paperSize: 'thermal_80',
+        qr_code: 'https://zatca.gov.sa/einvoicing/test-qr-data-cryptographic-payload',
+        branchName: 'فرع السوبرماركت السريع',
+        userName: 'كاشير 1'
+      };
+
+      const buffer = await generatePDF('SalesInvoicePdf', dto);
+      expect(buffer).toBeInstanceOf(Buffer);
+      expect(buffer.length).toBeGreaterThan(100);
+      expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
+    });
+
+    it('should generate a valid thermal receipt invoice PDF buffer (58mm)', async () => {
+      const dto = {
+        company: mockCompany,
+        invoice_number: 'INV-THERM-58',
+        date: '2026-07-08',
+        payment_method: 'كاش',
+        customer_name: 'زبون سريع',
+        items: [
+          {
+            product_name: 'مياه معدنية 500 مل',
+            quantity: '1',
+            total: '1.50'
+          }
+        ],
+        subtotal: '1.50',
+        vat_amount: '0.23',
+        net_total: '1.73',
+        isThermal: true,
+        paperSize: 'thermal_58',
+        branchName: 'فرع المحطة',
+        userName: 'كاشير 2'
+      };
+
+      const buffer = await generatePDF('SalesInvoicePdf', dto);
+      expect(buffer).toBeInstanceOf(Buffer);
+      expect(buffer.length).toBeGreaterThan(100);
+      expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
+    });
   });
 });
