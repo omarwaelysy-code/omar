@@ -245,6 +245,9 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         
         const rendered = renderArabic(text);
         
+        // Runtime log before doc.text call
+        console.log(`[RUNTIME-DRAW] Original: "${text}" | Rendered: "${rendered}" | Font: "${fontName}" | Size: ${fontSize} | Pos: (${x.toFixed(1)}, ${y.toFixed(1)})`);
+
         const textOptions: any = {};
         if (options.width !== undefined) textOptions.width = options.width;
         if (options.align !== undefined) textOptions.align = options.align;
