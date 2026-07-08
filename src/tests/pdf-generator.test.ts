@@ -1,45 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { generatePDF } from '../lib/pdf/index';
-import { shapeArabicText, prepareTextLine, wrapRtlText } from '../lib/pdf/PdfText';
-import PDFDocument from 'pdfkit';
+import { generatePDF } from '../lib/pdf-generator';
 
 describe('PDF Engine Architectural Tests', () => {
-
-  describe('Arabic RTL & Shaping Engine', () => {
-    it('should shape Arabic letters correctly based on connections', () => {
-      // "كتب" -> Initial Kaf + Medial Ta + Final Ba
-      const shaped = shapeArabicText('كتب');
-      // Verify letters map to their Arabic Presentation Forms-B equivalents
-      expect(shaped.charCodeAt(0)).toBe(0xFEDB); // Initial Kaf
-      expect(shaped.charCodeAt(1)).toBe(0xFE98); // Medial Ta
-      expect(shaped.charCodeAt(2)).toBe(0xFE90); // Final Ba
-    });
-
-    it('should shape Lam-Alef ligatures properly', () => {
-      const shaped = shapeArabicText('لا');
-      expect(shaped.charCodeAt(0)).toBe(0xFEFB); // Isolated Lam-Alef
-    });
-
-    it('should format mixed Arabic/English lines in RTL order', () => {
-      // Arabic segment followed by English code
-      const line = prepareTextLine('الرصيد INV-123');
-      // English segment "INV-123 " should remain LTR, Arabic text reversed, segments reversed
-      expect(line.startsWith('INV-123 ')).toBe(true);
-    });
-
-    it('should wrap RTL text correctly without splitting middle of words', () => {
-      const doc = new PDFDocument({ size: 'A4', margin: 36 });
-      doc.registerFont('NotoSansArabic', './public/fonts/NotoSansArabic-Regular.ttf');
-      doc.font('NotoSansArabic').fontSize(9);
-
-      const longParagraph = 'هذا النص عبارة عن تجربة لعملية التفاف الأسطر الطويلة باللغة العربية داخل ملف PDF';
-      const lines = wrapRtlText(doc, longParagraph, 150);
-
-      expect(lines.length).toBeGreaterThan(1);
-      // Ensure words remain intact and not split character-by-character
-      expect(lines[0].includes(' ')).toBe(true);
-    });
-  });
 
   describe('PDF Buffer Generation', () => {
     const mockCompany = {

@@ -9,7 +9,7 @@ import fs from "fs";
 import { initDatabase } from "./src/lib/init-db";
 import { runMigrations } from "./src/lib/migration-runner";
 import erpRouter from "./src/lib/erp-api";
-import { generatePDF } from "./src/lib/pdf/index";
+import { generatePDF } from "./src/lib/pdf-generator";
 
 async function startServer() {
   // Initialize PostgreSQL FIRST
