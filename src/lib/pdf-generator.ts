@@ -62,7 +62,6 @@ export function renderArabic(text: string): string {
 export interface TextSegment {
   text: string;
   isArabic: boolean;
-  isNeutral?: boolean;
 }
 
 export function segmentText(text: string): TextSegment[] {
@@ -70,7 +69,6 @@ export function segmentText(text: string): TextSegment[] {
   const segments: TextSegment[] = [];
   let currentSegment = '';
   let currentIsArabic = false;
-  let currentIsNeutral = false;
 
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
@@ -83,28 +81,27 @@ export function segmentText(text: string): TextSegment[] {
                          (code >= 0xFB50 && code <= 0xFDFF) ||
                          (code >= 0xFE70 && code <= 0xFEFF);
 
-    const isNeutralChar = char === ' ' || char === '-' || char === '/' || char === ':' || char === '.' || char === ',' || char === '+' || char === '=' || char === '%' || char === '$' || char === '(' || char === ')' || char === '[' || char === ']';
-
-    const isArabic = isArabicChar;
-    const isNeutral = isNeutralChar;
+    const isSpaceChar = char === ' ';
 
     if (currentSegment === '') {
       currentSegment = char;
-      currentIsArabic = isArabic;
-      currentIsNeutral = isNeutral;
+      currentIsArabic = isArabicChar;
     } else {
-      if (isNeutral !== currentIsNeutral || (!isNeutral && isArabic !== currentIsArabic)) {
-        segments.push({ text: currentSegment, isArabic: currentIsArabic, isNeutral: currentIsNeutral });
+      const isPrevSpace = currentSegment === ' ';
+      const isCurrSpace = isSpaceChar;
+      const isArabicTransition = isArabicChar !== currentIsArabic;
+
+      if (isPrevSpace || isCurrSpace || isArabicTransition) {
+        segments.push({ text: currentSegment, isArabic: currentIsArabic });
         currentSegment = char;
-        currentIsArabic = isArabic;
-        currentIsNeutral = isNeutral;
+        currentIsArabic = isArabicChar;
       } else {
         currentSegment += char;
       }
     }
   }
   if (currentSegment !== '') {
-    segments.push({ text: currentSegment, isArabic: currentIsArabic, isNeutral: currentIsNeutral });
+    segments.push({ text: currentSegment, isArabic: currentIsArabic });
   }
   return segments;
 }
@@ -114,7 +111,9 @@ export function measureTextWidth(doc: any, text: string, fontName: string, fontS
   const segments = segmentText(text);
   let totalWidth = 0;
   segments.forEach(seg => {
-    const segFont = seg.isArabic 
+    // Only use Helvetica if the segment contains English alphabetical characters, '+' or '/' to preserve baseline and prevent tofu
+    const useHelvetica = /[a-zA-Z]|\+|\//.test(seg.text);
+    const segFont = !useHelvetica 
       ? (isBold ? 'ArabicBold' : 'ArabicRegular')
       : (isBold ? 'Helvetica-Bold' : 'Helvetica');
     doc.font(segFont).fontSize(fontSize);
@@ -328,7 +327,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           // Draw segments from right to left (first segment is on the far right)
           let currentSegmentX = startX + totalWidth;
           segments.forEach(seg => {
-            const segFont = seg.isArabic 
+            const useHelvetica = /[a-zA-Z]|\+|\//.test(seg.text);
+            const segFont = !useHelvetica 
               ? (isBold ? 'ArabicBold' : 'ArabicRegular')
               : (isBold ? 'Helvetica-Bold' : 'Helvetica');
             doc.font(segFont).fontSize(fontSize);
@@ -341,7 +341,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           // Draw segments from left to right (first segment is on the far left)
           let currentSegmentX = startX;
           segments.forEach(seg => {
-            const segFont = seg.isArabic 
+            const useHelvetica = /[a-zA-Z]|\+|\//.test(seg.text);
+            const segFont = !useHelvetica 
               ? (isBold ? 'ArabicBold' : 'ArabicRegular')
               : (isBold ? 'Helvetica-Bold' : 'Helvetica');
             doc.font(segFont).fontSize(fontSize);
@@ -363,7 +364,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           const now = new Date();
           const pad = (n: number) => String(n).padStart(2, '0');
           const printDateTime = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-          const dateLabel = `تاريخ الطباعة: ${printDateTime}`;
+          const dateLabel = printDateTime; // Remove "تاريخ الطباعة:" label as requested
           
           if (isThermal) {
             renderText(title, sideMargin, currentY, { width: usableWidth, align: 'center', font: 'ArabicBold', size: 9.5 });
