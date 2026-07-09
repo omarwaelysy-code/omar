@@ -62,6 +62,7 @@ export function renderArabic(text: string): string {
 export interface TextSegment {
   text: string;
   isArabic: boolean;
+  isNeutral?: boolean;
 }
 
 export function segmentText(text: string): TextSegment[] {
@@ -69,6 +70,7 @@ export function segmentText(text: string): TextSegment[] {
   const segments: TextSegment[] = [];
   let currentSegment = '';
   let currentIsArabic = false;
+  let currentIsNeutral = false;
 
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
@@ -81,23 +83,28 @@ export function segmentText(text: string): TextSegment[] {
                          (code >= 0xFB50 && code <= 0xFDFF) ||
                          (code >= 0xFE70 && code <= 0xFEFF);
 
-    const isNeutralChar = char === ' ' || char === '-' || char === '/' || char === ':' || char === '.' || char === ',' || char === '(' || char === ')' || char === '[' || char === ']';
+    const isNeutralChar = char === ' ' || char === '-' || char === '/' || char === ':' || char === '.' || char === ',' || char === '+' || char === '=' || char === '%' || char === '$' || char === '(' || char === ')' || char === '[' || char === ']';
+
+    const isArabic = isArabicChar;
+    const isNeutral = isNeutralChar;
 
     if (currentSegment === '') {
       currentSegment = char;
-      currentIsArabic = isArabicChar;
+      currentIsArabic = isArabic;
+      currentIsNeutral = isNeutral;
     } else {
-      if (isArabicChar === currentIsArabic || (isNeutralChar && currentSegment !== '')) {
-        currentSegment += char;
-      } else {
-        segments.push({ text: currentSegment, isArabic: currentIsArabic });
+      if (isNeutral !== currentIsNeutral || (!isNeutral && isArabic !== currentIsArabic)) {
+        segments.push({ text: currentSegment, isArabic: currentIsArabic, isNeutral: currentIsNeutral });
         currentSegment = char;
-        currentIsArabic = isArabicChar;
+        currentIsArabic = isArabic;
+        currentIsNeutral = isNeutral;
+      } else {
+        currentSegment += char;
       }
     }
   }
   if (currentSegment !== '') {
-    segments.push({ text: currentSegment, isArabic: currentIsArabic });
+    segments.push({ text: currentSegment, isArabic: currentIsArabic, isNeutral: currentIsNeutral });
   }
   return segments;
 }
