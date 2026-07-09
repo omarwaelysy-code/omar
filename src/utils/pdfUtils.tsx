@@ -98,14 +98,21 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
                          tds.some(td => td.textContent?.includes('الإجمالي') || td.textContent?.includes('الصافي'));
       
       const rowData: any = {};
-      tds.forEach((td, index) => {
+      let colVisualIndex = 0;
+      tds.forEach((td) => {
         const text = td.textContent?.trim() || '';
-        rowData[`col_${index}`] = text;
+        const colspan = parseInt(td.getAttribute('colspan') || '1', 10);
+        
+        // Map the text to the last index covered by this colspan to align it correctly
+        const targetIndex = colVisualIndex + colspan - 1;
+        rowData[`col_${targetIndex}`] = text;
+        
+        colVisualIndex += colspan;
       });
 
       if (isTotalRow) {
         columns.forEach(col => {
-          if (rowData[col.id]) {
+          if (rowData[col.id] !== undefined && rowData[col.id] !== '') {
             totals[col.id] = rowData[col.id];
           }
         });

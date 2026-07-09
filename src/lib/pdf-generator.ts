@@ -349,76 +349,102 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
       const drawHeader = (title: string, branchName = '', userName = '', dateStr = '') => {
         const logoSize = isThermal ? 32 : 50;
         
-        // 1. Logo
-        if (logoBuffer) {
-          try {
-            const logoX = isRtl ? (doc.page.width - sideMargin - logoSize) : sideMargin;
-            doc.image(logoBuffer, logoX, currentY, { width: logoSize, height: logoSize });
-          } catch (e: any) {
-            console.error(`${STEP} Logo render error:`, e.message);
-          }
-        }
+        const isStatement = title.includes('كشف حساب') || templateName.toLowerCase().includes('statement') || dto.isStatement;
 
-        // 2. Company Info
-        if (isThermal) {
-          renderText(company.name || '', sideMargin, currentY, { width: usableWidth, align: 'center', font: 'ArabicBold', size: 9.5 });
-          currentY += 12;
-          if (company.taxNumber) {
-            renderText(`الرقم الضريبي: ${company.taxNumber}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7.5 });
-            currentY += 10;
-          }
-          if (company.phone) {
-            renderText(`الهاتف: ${company.phone}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7.5 });
-            currentY += 10;
-          }
-        } else {
-          const companyX = isRtl 
-            ? (doc.page.width - sideMargin - (logoBuffer ? logoSize + 15 : 0) - 250)
-            : (sideMargin + (logoBuffer ? logoSize + 15 : 0));
-          const companyAlign = isRtl ? 'right' : 'left';
+        if (isStatement) {
+          // Clean Statement Header Layout (No logo/company info/user/branch, centered title, print date/time on top left)
+          const now = new Date();
+          const pad = (n: number) => String(n).padStart(2, '0');
+          const printDateTime = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+          const dateLabel = `تاريخ الطباعة: ${printDateTime}`;
           
-          renderText(company.name || '', companyX, currentY + 5, { width: 250, align: companyAlign, font: 'ArabicBold', size: 12 });
-          
-          if (company.taxNumber) {
-            renderText(`الرقم الضريبي: ${company.taxNumber}`, companyX, currentY + 20, { width: 250, align: companyAlign, size: 8.5 });
-          }
-          if (company.phone) {
-            renderText(`الهاتف: ${company.phone}`, companyX, currentY + 32, { width: 250, align: companyAlign, size: 8.5 });
-          }
-        }
-
-        // 3. Document Title
-        if (isThermal) {
-          currentY += 2;
-          renderText(title, sideMargin, currentY, { width: usableWidth, align: 'center', font: 'ArabicBold', size: 9 });
-          currentY += 12;
-          if (branchName) {
-            renderText(`الفرع: ${branchName}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7.5 });
-            currentY += 10;
+          if (isThermal) {
+            renderText(title, sideMargin, currentY, { width: usableWidth, align: 'center', font: 'ArabicBold', size: 9.5 });
+            currentY += 12;
+            renderText(dateLabel, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7.5 });
+            currentY += 12;
+          } else {
+            // Centered Title
+            renderText(title, sideMargin, currentY + 12, { width: usableWidth, align: 'center', font: 'ArabicBold', size: 16 });
+            
+            // Print date/time on top left
+            renderText(dateLabel, sideMargin, currentY + 12, { width: 250, align: 'left', size: 8.5 });
+            
+            currentY += 45; // Advance past title & metadata
           }
         } else {
-          renderText(title, sideMargin, currentY + 12, { width: usableWidth, align: 'center', font: 'ArabicBold', size: 16 });
-          if (branchName) {
-            renderText(`الفرع: ${branchName}`, sideMargin, currentY + 32, { width: usableWidth, align: 'center', size: 9 });
+          // Standard Invoice / Report Header Layout
+          // 1. Logo
+          if (logoBuffer) {
+            try {
+              const logoX = isRtl ? (doc.page.width - sideMargin - logoSize) : sideMargin;
+              doc.image(logoBuffer, logoX, currentY, { width: logoSize, height: logoSize });
+            } catch (e: any) {
+              console.error(`${STEP} Logo render error:`, e.message);
+            }
           }
-        }
 
-        // 4. Meta Info
-        const dateValue = dateStr || new Date().toLocaleDateString('ar-SA');
-        if (isThermal) {
-          renderText(`المستخدم: ${userName || 'المشرف'}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7 });
-          currentY += 9;
-          renderText(`التاريخ: ${dateValue}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7 });
-          currentY += 12;
-        } else {
-          const metaX = isRtl ? sideMargin : (doc.page.width - sideMargin - 250);
-          const metaAlign = isRtl ? 'left' : 'right';
-          renderText(`المستخدم: ${userName || 'المشرف'}`, metaX, currentY + 5, { width: 250, align: metaAlign, size: 8.5 });
-          renderText(`التاريخ: ${dateValue}`, metaX, currentY + 17, { width: 250, align: metaAlign, size: 8.5 });
-        }
+          // 2. Company Info
+          if (isThermal) {
+            renderText(company.name || '', sideMargin, currentY, { width: usableWidth, align: 'center', font: 'ArabicBold', size: 9.5 });
+            currentY += 12;
+            if (company.taxNumber) {
+              renderText(`الرقم الضريبي: ${company.taxNumber}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7.5 });
+              currentY += 10;
+            }
+            if (company.phone) {
+              renderText(`الهاتف: ${company.phone}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7.5 });
+              currentY += 10;
+            }
+          } else {
+            const companyX = isRtl 
+              ? (doc.page.width - sideMargin - (logoBuffer ? logoSize + 15 : 0) - 250)
+              : (sideMargin + (logoBuffer ? logoSize + 15 : 0));
+            const companyAlign = isRtl ? 'right' : 'left';
+            
+            renderText(company.name || '', companyX, currentY + 5, { width: 250, align: companyAlign, font: 'ArabicBold', size: 12 });
+            
+            if (company.taxNumber) {
+              renderText(`الرقم الضريبي: ${company.taxNumber}`, companyX, currentY + 20, { width: 250, align: companyAlign, size: 8.5 });
+            }
+            if (company.phone) {
+              renderText(`الهاتف: ${company.phone}`, companyX, currentY + 32, { width: 250, align: companyAlign, size: 8.5 });
+            }
+          }
 
-        if (!isThermal) {
-          currentY += 50; // Advance currentY past header texts to prevent overlapping
+          // 3. Document Title
+          if (isThermal) {
+            currentY += 2;
+            renderText(title, sideMargin, currentY, { width: usableWidth, align: 'center', font: 'ArabicBold', size: 9 });
+            currentY += 12;
+            if (branchName) {
+              renderText(`الفرع: ${branchName}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7.5 });
+              currentY += 10;
+            }
+          } else {
+            renderText(title, sideMargin, currentY + 12, { width: usableWidth, align: 'center', font: 'ArabicBold', size: 16 });
+            if (branchName) {
+              renderText(`الفرع: ${branchName}`, sideMargin, currentY + 32, { width: usableWidth, align: 'center', size: 9 });
+            }
+          }
+
+          // 4. Meta Info
+          const dateValue = dateStr || new Date().toLocaleDateString('ar-SA');
+          if (isThermal) {
+            renderText(`المستخدم: ${userName || 'المشرف'}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7 });
+            currentY += 9;
+            renderText(`التاريخ: ${dateValue}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7 });
+            currentY += 12;
+          } else {
+            const metaX = isRtl ? sideMargin : (doc.page.width - sideMargin - 250);
+            const metaAlign = isRtl ? 'left' : 'right';
+            renderText(`المستخدم: ${userName || 'المشرف'}`, metaX, currentY + 5, { width: 250, align: metaAlign, size: 8.5 });
+            renderText(`التاريخ: ${dateValue}`, metaX, currentY + 17, { width: 250, align: metaAlign, size: 8.5 });
+          }
+
+          if (!isThermal) {
+            currentY += 50; // Advance currentY past header texts to prevent overlapping
+          }
         }
 
         // Divider Line
@@ -554,10 +580,17 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
         // Draw Totals
         if (totals && Object.keys(totals).length > 0) {
+          // Check if any non-numeric column already has a custom label in totals payload
+          const hasExistingLabel = columns.some((col) => {
+            const isNumericCol = col.id.includes('debit') || col.id.includes('credit') || col.id.includes('balance') || 
+                                 col.id === 'col_5' || col.id === 'col_6' || col.id === 'col_7';
+            return !isNumericCol && totals[col.id] !== undefined && totals[col.id] !== '';
+          });
+
           const totalItems = columns.map((col, index) => {
             if (totals[col.id] !== undefined) {
               return String(totals[col.id]);
-            } else if (index === 0) {
+            } else if (index === 0 && !hasExistingLabel) {
               return 'الإجمالي';
             } else {
               return '';
@@ -937,12 +970,18 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
            .lineTo(doc.page.width - sideMargin, doc.page.height - (isThermal ? 16 : 40))
            .stroke();
 
-        renderText("نظام ERP السحابي", sideMargin, doc.page.height - (isThermal ? 12 : 32), { align: 'left', font: 'ArabicRegular', size: isThermal ? 6.5 : 8 });
+        const footerY = doc.page.height - (isThermal ? 12 : 32);
+        
+        // Website URL on the left
+        renderText("www.obrain.tech", sideMargin, footerY, { align: 'left', font: 'ArabicRegular', size: isThermal ? 6.5 : 8 });
 
         if (!isThermal) {
-          const pageStr = `صفحة ${i + 1} من ${range.count}`;
-          renderText(pageStr, doc.page.width - 150, doc.page.height - 32, {
-            width: 120,
+          const pageStr = isRtl 
+            ? `صفحة ${i + 1} من ${range.count}`
+            : `Page ${i + 1} of ${range.count}`;
+          
+          renderText(pageStr, doc.page.width - sideMargin - 150, footerY, {
+            width: 150,
             align: 'right',
             font: 'ArabicRegular',
             size: 8
