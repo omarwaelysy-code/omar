@@ -335,7 +335,9 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             
             const segWidth = doc.widthOfString(seg.text);
             currentSegmentX -= segWidth;
-            doc.text(seg.text, currentSegmentX, y, { lineBreak: false });
+            // Adjust NotoSans Arabic baseline to align with Helvetica
+            const adjustedY = !useHelvetica ? (y - fontSize * 0.22) : y;
+            doc.text(seg.text, currentSegmentX, adjustedY, { lineBreak: false });
           });
         } else {
           // Draw segments from left to right (first segment is on the far left)
@@ -347,7 +349,9 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               : (isBold ? 'Helvetica-Bold' : 'Helvetica');
             doc.font(segFont).fontSize(fontSize);
             
-            doc.text(seg.text, currentSegmentX, y, { lineBreak: false });
+            // Adjust NotoSans Arabic baseline to align with Helvetica
+            const adjustedY = !useHelvetica ? (y - fontSize * 0.22) : y;
+            doc.text(seg.text, currentSegmentX, adjustedY, { lineBreak: false });
             currentSegmentX += doc.widthOfString(seg.text);
           });
         }
@@ -471,11 +475,38 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         rows: any[],
         totals: any
       ) => {
-        const totalWidthWeight = columns.reduce((sum, col) => sum + (col.width || 0), 0);
-        const colWidths = columns.map(col => {
-          const pct = totalWidthWeight > 0 ? ((col.width || 0) / totalWidthWeight) : (1 / (columns.length || 1));
-          return pct * usableWidth;
+        // Find the description/name column to allocate remaining/surplus width to it
+        const descCol = columns.find(col => {
+          const label = (col.label || '').toLowerCase();
+          return col.id === 'col_4' || col.id === 'description' || 
+                 label.includes('البيان') || label.includes('description') || label.includes('desc');
         });
+
+        let colWidths: number[] = [];
+        if (descCol) {
+          // Total target weight based on default layout configuration
+          const baseTotalWeight = columns.reduce((sum, col) => sum + (col.width || 0), 0);
+          let allocatedWidth = 0;
+          
+          columns.forEach((col, idx) => {
+            if (col.id === descCol.id) {
+              colWidths[idx] = 0; // Temp placeholder
+            } else {
+              const pct = (col.width || 1) / baseTotalWeight;
+              colWidths[idx] = pct * usableWidth;
+              allocatedWidth += colWidths[idx];
+            }
+          });
+          
+          const descIndex = columns.findIndex(col => col.id === descCol.id);
+          colWidths[descIndex] = Math.max(50, usableWidth - allocatedWidth);
+        } else {
+          const totalWidthWeight = columns.reduce((sum, col) => sum + (col.width || 0), 0);
+          colWidths = columns.map(col => {
+            const pct = totalWidthWeight > 0 ? ((col.width || 0) / totalWidthWeight) : (1 / (columns.length || 1));
+            return pct * usableWidth;
+          });
+        }
 
         const drawRow = (rowItems: string[], y: number, isHeader = false, isTotal = false) => {
           const rowHeight = isThermal ? 14 : 18;
@@ -580,7 +611,21 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         // Draw Body Rows
         for (const row of rows) {
           const rowItems = columns.map(col => {
-            const val = row[col.id];
+            let val = row[col.id];
+            // Translate system default descriptions on English LTR reports
+            if (!isRtl && (col.id === 'col_4' || col.id === 'description') && val) {
+              const strVal = String(val).trim();
+              if (strVal === 'فاتورة مبيعات' || strVal === 'مبيعات فاتورة') val = 'Sales Invoice';
+              else if (strVal === 'مرتجع مبيعات' || strVal === 'مبيعات مرتجع') val = 'Sales Return';
+              else if (strVal === 'سند قبض' || strVal === 'قبض سند') val = 'Receipt Voucher';
+              else if (strVal === 'سند صرف' || strVal === 'صرف سند') val = 'Payment Voucher';
+              else if (strVal === 'قيد يومية' || strVal === 'يومية قيد') val = 'Journal Entry';
+              else if (strVal === 'رصيد منقول' || strVal === 'منقول رصيد') val = 'Balance Forward';
+              else if (strVal === 'رصيد افتتاحي' || strVal === 'افتتاحي رصيد') val = 'Opening Balance';
+              else if (strVal === 'رصيد أول' || strVal === 'أول رصيد') val = 'Opening Balance';
+              else if (strVal === 'فاتورة مشتريات' || strVal === 'مشتريات فاتورة') val = 'Purchase Invoice';
+              else if (strVal === 'مرتجع مشتريات' || strVal === 'مشتريات مرتجع') val = 'Purchase Return';
+            }
             return val !== undefined ? String(val) : '';
           });
           currentY = drawRow(rowItems, currentY);
@@ -597,9 +642,16 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
           const totalItems = columns.map((col, index) => {
             if (totals[col.id] !== undefined) {
-              return String(totals[col.id]);
+              let val = totals[col.id];
+              // Translate totals labels in English reports
+              if (!isRtl && (col.id === 'col_4' || col.id === 'description' || col.id === 'col_3') && val) {
+                const strVal = String(val).trim();
+                if (strVal === 'الرصيد الختامي' || strVal === 'ختامي رصيد' || strVal === 'الرصيد النهائي' || strVal === 'الرصيد المتبقي') val = 'Ending Balance';
+                else if (strVal === 'الرصيد الافتتاحي' || strVal === 'الرصيد الأول') val = 'Opening Balance';
+              }
+              return String(val);
             } else if (index === 0 && !hasExistingLabel) {
-              return 'الإجمالي';
+              return isRtl ? 'الإجمالي' : 'Total';
             } else {
               return '';
             }

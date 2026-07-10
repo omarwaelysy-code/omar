@@ -37,8 +37,14 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
     const ths = Array.from(table.querySelectorAll('thead th, tr:first-child th'));
     const targetThs = ths.length > 0 ? ths : Array.from(table.querySelectorAll('tr:first-child td'));
     
-    columns = targetThs.map((cell, index) => {
+    const validIndices: number[] = [];
+    columns = [];
+
+    targetThs.forEach((cell, index) => {
       const text = cell.textContent?.trim() || '';
+      // Skip empty columns (checkboxes, selection/action columns, spacing gaps)
+      if (text === '') return;
+
       let width = 1.0;
       let align: 'left' | 'center' | 'right' = 'right';
       
@@ -77,12 +83,13 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
         align = 'right';
       }
       
-      return {
+      columns.push({
         id: `col_${index}`,
         label: text,
         width,
         align
-      };
+      });
+      validIndices.push(index);
     });
 
     // Parse the table body rows
@@ -98,17 +105,26 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
                          tds.some(td => td.textContent?.includes('الإجمالي') || td.textContent?.includes('الصافي'));
       
       const rowData: any = {};
-      let colVisualIndex = 0;
-      tds.forEach((td) => {
-        const text = td.textContent?.trim() || '';
-        const colspan = parseInt(td.getAttribute('colspan') || '1', 10);
-        
-        // Map the text to the last index covered by this colspan to align it correctly
-        const targetIndex = colVisualIndex + colspan - 1;
-        rowData[`col_${targetIndex}`] = text;
-        
-        colVisualIndex += colspan;
-      });
+      
+      if (isTotalRow) {
+        let colVisualIndex = 0;
+        tds.forEach((td) => {
+          const text = td.textContent?.trim() || '';
+          const colspan = parseInt(td.getAttribute('colspan') || '1', 10);
+          
+          const targetIndex = colVisualIndex + colspan - 1;
+          rowData[`col_${targetIndex}`] = text;
+          
+          colVisualIndex += colspan;
+        });
+      } else {
+        // Map normal row cells using only valid column indices to prevent shifting
+        validIndices.forEach(idx => {
+          if (tds[idx]) {
+            rowData[`col_${idx}`] = tds[idx].textContent?.trim() || '';
+          }
+        });
+      }
 
       if (isTotalRow) {
         columns.forEach(col => {
