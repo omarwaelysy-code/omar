@@ -111,8 +111,8 @@ export function measureTextWidth(doc: any, text: string, fontName: string, fontS
   const segments = segmentText(text);
   let totalWidth = 0;
   segments.forEach(seg => {
-    // Only use Helvetica if the segment contains English alphabetical characters, '+' or '/' to preserve baseline and prevent tofu
-    const useHelvetica = /[a-zA-Z]|\+|\//.test(seg.text);
+    // Only use Helvetica if the segment contains English alphabetical characters, symbols (+, /) or parentheses to prevent tofu
+    const useHelvetica = /[a-zA-Z]|\+|\/|\(|\)/.test(seg.text);
     const segFont = !useHelvetica 
       ? (isBold ? 'ArabicBold' : 'ArabicRegular')
       : (isBold ? 'Helvetica-Bold' : 'Helvetica');
@@ -327,7 +327,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           // Draw segments from right to left (first segment is on the far right)
           let currentSegmentX = startX + totalWidth;
           segments.forEach(seg => {
-            const useHelvetica = /[a-zA-Z]|\+|\//.test(seg.text);
+            const useHelvetica = /[a-zA-Z]|\+|\/|\(|\)/.test(seg.text);
             const segFont = !useHelvetica 
               ? (isBold ? 'ArabicBold' : 'ArabicRegular')
               : (isBold ? 'Helvetica-Bold' : 'Helvetica');
@@ -343,7 +343,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           // Draw segments from left to right (first segment is on the far left)
           let currentSegmentX = startX;
           segments.forEach(seg => {
-            const useHelvetica = /[a-zA-Z]|\+|\//.test(seg.text);
+            const useHelvetica = /[a-zA-Z]|\+|\/|\(|\)/.test(seg.text);
             const segFont = !useHelvetica 
               ? (isBold ? 'ArabicBold' : 'ArabicRegular')
               : (isBold ? 'Helvetica-Bold' : 'Helvetica');
@@ -361,7 +361,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
       const drawHeader = (title: string, branchName = '', userName = '', dateStr = '') => {
         const logoSize = isThermal ? 32 : 50;
         
-        const isStatement = title.includes('كشف حساب') || title.toLowerCase().includes('statement') || templateName.toLowerCase().includes('statement') || dto.isStatement;
+        const isStatement = title.includes('كشف حساب') || title.includes('ارصدة') || title.includes('أرصدة') || title.toLowerCase().includes('statement') || title.toLowerCase().includes('balances') || templateName.toLowerCase().includes('statement') || dto.isStatement;
 
         if (isStatement) {
           // Clean Statement Header Layout (No logo/company info/user/branch, centered title, print date/time on top left)

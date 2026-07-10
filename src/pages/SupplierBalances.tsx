@@ -209,7 +209,8 @@ export const SupplierBalances: React.FC = () => {
       await exportToPDF(reportRef.current, {
         filename: `supplier-balances-${new Date().toISOString().slice(0, 10)}.pdf`,
         margin: 10,
-        orientation: 'landscape'
+        orientation: 'landscape',
+        reportTitle: language === 'ar' ? 'تقرير أرصدة الموردين التفصيلي' : 'Detailed Supplier Balances Report'
       });
     } catch (e) {
       console.error(e);
