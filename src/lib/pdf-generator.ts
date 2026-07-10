@@ -357,7 +357,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
       const drawHeader = (title: string, branchName = '', userName = '', dateStr = '') => {
         const logoSize = isThermal ? 32 : 50;
         
-        const isStatement = title.includes('كشف حساب') || templateName.toLowerCase().includes('statement') || dto.isStatement;
+        const isStatement = title.includes('كشف حساب') || title.toLowerCase().includes('statement') || templateName.toLowerCase().includes('statement') || dto.isStatement;
 
         if (isStatement) {
           // Clean Statement Header Layout (No logo/company info/user/branch, centered title, print date/time on top left)

@@ -123,7 +123,7 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
   }
 
   // 3. Construct the DTO payload
-  const isRtl = document.documentElement.dir === 'rtl' || document.body.dir === 'rtl' || true;
+  const isRtl = document.documentElement.dir === 'rtl' || document.body.dir === 'rtl';
   const dto = {
     company,
     reportTitle: options.reportTitle || 'تقرير النظام',
