@@ -6,7 +6,7 @@ import { Calendar, Download, Printer, Wallet, ArrowLeftRight, BarChart3, Refresh
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
-import { formatNumber } from '../utils/formatUtils';
+import { formatNumber, formatDate } from '../utils/formatUtils';
 import { useNavigation } from '../contexts/NavigationContext';
 
 interface CashBalanceData {
@@ -606,7 +606,17 @@ export const CashBalances: React.FC = () => {
     if (reportRef.current) {
       const filename = viewMode === 'summary' ? 'Cash_Balances_Report' : `Statement_${selectedMethodId}`;
       const title = viewMode === 'summary' 
-        ? (language === 'ar' ? 'تقرير النقدية (الخزائن والبنوك) خلال فترة' : 'Cash & Bank Report (Period)')
+        ? (() => {
+            if (language === 'ar') {
+              const startStr = dateRange.start ? ` من ${formatDate(dateRange.start)}` : '';
+              const endStr = dateRange.end ? ` إلى ${formatDate(dateRange.end)}` : '';
+              return `تقرير النقدية الخزائن والبنوك${startStr}${endStr}`;
+            } else {
+              const startStr = dateRange.start ? ` from ${formatDate(dateRange.start)}` : '';
+              const endStr = dateRange.end ? ` to ${formatDate(dateRange.end)}` : '';
+              return `Cash & Bank Report${startStr}${endStr}`;
+            }
+          })()
         : (language === 'ar' ? `كشف حركة: ${paymentMethods.find(m => m.id === selectedMethodId)?.name}` : `Statement: ${paymentMethods.find(m => m.id === selectedMethodId)?.name}`);
       
       await exportToPDF(reportRef.current, { 

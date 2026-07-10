@@ -70,7 +70,7 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
         lowerText.includes('product') || 
         lowerText.includes('صنف')
       ) {
-        width = 3.0;
+        width = targetThs.length > 10 ? 1.6 : 3.0;
         align = 'right';
       } else if (lowerText.includes('مدين') || lowerText.includes('debit')) {
         width = 1.2;
@@ -142,6 +142,38 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
       }
     });
   }
+
+  // 2.5 Filter out completely empty columns (delete excess empty columns)
+  const nonEmptyColumnIds = new Set<string>();
+  columns.forEach(col => {
+    // Keep metadata/important text columns
+    const isMeta = col.id === 'col_0' || col.id === 'col_1' || col.id === 'col_2' || col.id === 'col_3' || 
+                   col.label.includes('كود') || col.label.includes('الاسم') || col.label.includes('اسم') || 
+                   col.label.toLowerCase().includes('code') || col.label.toLowerCase().includes('name') ||
+                   col.label.toLowerCase().includes('desc') || col.label.toLowerCase().includes('date') ||
+                   col.label.toLowerCase().includes('type') || col.label.toLowerCase().includes('ref') ||
+                   col.label.includes('تاريخ') || col.label.includes('بيان') || col.label.includes('الرصيد') ||
+                   col.label.toLowerCase().includes('balance');
+    
+    if (isMeta) {
+      nonEmptyColumnIds.add(col.id);
+      return;
+    }
+
+    const hasValue = rows.some(row => {
+      const val = (row[col.id] || '').trim();
+      return val !== '' && val !== '-' && val !== '0' && val !== '0.00' && val !== '0.0' && val !== '0.00+' && val !== '0.00-';
+    });
+
+    const totalVal = (totals[col.id] || '').trim();
+    const hasTotal = totalVal !== '' && totalVal !== '-' && totalVal !== '0' && totalVal !== '0.00' && totalVal !== '0.0';
+
+    if (hasValue || hasTotal) {
+      nonEmptyColumnIds.add(col.id);
+    }
+  });
+
+  columns = columns.filter(col => nonEmptyColumnIds.has(col.id));
 
   // 3. Construct the DTO payload
   const isRtl = document.documentElement.dir === 'rtl' || document.body.dir === 'rtl';

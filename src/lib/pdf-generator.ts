@@ -361,7 +361,18 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
       const drawHeader = (title: string, branchName = '', userName = '', dateStr = '') => {
         const logoSize = isThermal ? 32 : 50;
         
-        const isStatement = title.includes('كشف حساب') || title.includes('ارصدة') || title.includes('أرصدة') || title.toLowerCase().includes('statement') || title.toLowerCase().includes('balances') || templateName.toLowerCase().includes('statement') || dto.isStatement;
+        const titleLower = title.toLowerCase();
+        const isStatement = title.includes('كشف حساب') || 
+                            title.includes('تقرير') || 
+                            title.includes('قائمة') || 
+                            title.includes('الميزانية') ||
+                            titleLower.includes('statement') || 
+                            titleLower.includes('report') || 
+                            titleLower.includes('balances') || 
+                            titleLower.includes('balance') || 
+                            titleLower.includes('income') || 
+                            templateName.toLowerCase().includes('statement') || 
+                            dto.isStatement;
 
         if (isStatement) {
           // Clean Statement Header Layout (No logo/company info/user/branch, centered title, print date/time on top left)
@@ -513,7 +524,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           let maxCellHeight = rowHeight;
           
           const cellFont = isHeader || isTotal ? 'ArabicBold' : 'ArabicRegular';
-          const cellSize = isThermal ? 7.5 : 8.5;
+          const cellSize = isThermal ? 7.5 : (columns.length > 12 ? 6.0 : (columns.length > 9 ? 7.0 : 8.5));
 
           const cellLines = rowItems.map((cellText, colIndex) => {
             const colWidth = colWidths[colIndex];
