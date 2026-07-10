@@ -210,7 +210,9 @@ export const CustomerBalances: React.FC = () => {
         filename: `customer-balances-${new Date().toISOString().slice(0, 10)}.pdf`,
         margin: 10,
         orientation: 'landscape',
-        reportTitle: language === 'ar' ? 'تقرير أرصدة العملاء التفصيلي' : 'Detailed Customer Balances Report'
+        reportTitle: language === 'ar' 
+          ? `أرصدة العملاء كما في ${endDate ? formatDate(endDate) : formatDate(new Date())}` 
+          : `Customer Balances as of ${endDate ? formatDate(endDate) : formatDate(new Date())}`
       });
     } catch (e) {
       console.error(e);

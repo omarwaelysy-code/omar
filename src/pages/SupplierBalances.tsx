@@ -210,7 +210,9 @@ export const SupplierBalances: React.FC = () => {
         filename: `supplier-balances-${new Date().toISOString().slice(0, 10)}.pdf`,
         margin: 10,
         orientation: 'landscape',
-        reportTitle: language === 'ar' ? 'تقرير أرصدة الموردين التفصيلي' : 'Detailed Supplier Balances Report'
+        reportTitle: language === 'ar' 
+          ? `أرصدة الموردين كما في ${endDate ? formatDate(endDate) : formatDate(new Date())}` 
+          : `Supplier Balances as of ${endDate ? formatDate(endDate) : formatDate(new Date())}`
       });
     } catch (e) {
       console.error(e);
