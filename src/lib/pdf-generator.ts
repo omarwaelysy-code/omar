@@ -336,7 +336,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             const segWidth = doc.widthOfString(seg.text);
             currentSegmentX -= segWidth;
             // Adjust NotoSans Arabic baseline to align with Helvetica
-            const adjustedY = !useHelvetica ? (y - fontSize * 0.33) : y;
+            const adjustedY = !useHelvetica ? (y - fontSize * 0.45) : y;
             doc.text(seg.text, currentSegmentX, adjustedY, { lineBreak: false });
           });
         } else {
@@ -350,7 +350,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             doc.font(segFont).fontSize(fontSize);
             
             // Adjust NotoSans Arabic baseline to align with Helvetica
-            const adjustedY = !useHelvetica ? (y - fontSize * 0.33) : y;
+            const adjustedY = !useHelvetica ? (y - fontSize * 0.45) : y;
             doc.text(seg.text, currentSegmentX, adjustedY, { lineBreak: false });
             currentSegmentX += doc.widthOfString(seg.text);
           });

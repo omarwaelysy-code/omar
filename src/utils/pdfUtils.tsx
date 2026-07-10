@@ -103,7 +103,11 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
 
       const isTotalRow = tr.classList.contains('total-row') || 
                          tr.style.fontWeight === 'bold' || 
-                         tds.some(td => td.textContent?.includes('الإجمالي') || td.textContent?.includes('الصافي'));
+                         tds.some(td => {
+                           const text = td.textContent || '';
+                           return text.includes('الإجمالي') || text.includes('الصافي') || 
+                                  text.toLowerCase().includes('total') || text.toLowerCase().includes('ending balance');
+                         });
       
       const rowData: any = {};
       
