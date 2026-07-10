@@ -625,18 +625,11 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           const rowItems = columns.map(col => {
             let val = row[col.id];
             // Translate system default descriptions on English LTR reports
-            if (!isRtl && (col.id === 'col_4' || col.id === 'description') && val) {
-              const strVal = String(val).trim();
-              if (strVal === 'فاتورة مبيعات' || strVal === 'مبيعات فاتورة') val = 'Sales Invoice';
-              else if (strVal === 'مرتجع مبيعات' || strVal === 'مبيعات مرتجع') val = 'Sales Return';
-              else if (strVal === 'سند قبض' || strVal === 'قبض سند') val = 'Receipt Voucher';
-              else if (strVal === 'سند صرف' || strVal === 'صرف سند') val = 'Payment Voucher';
-              else if (strVal === 'قيد يومية' || strVal === 'يومية قيد') val = 'Journal Entry';
-              else if (strVal === 'رصيد منقول' || strVal === 'منقول رصيد') val = 'Balance Forward';
-              else if (strVal === 'رصيد افتتاحي' || strVal === 'افتتاحي رصيد') val = 'Opening Balance';
-              else if (strVal === 'رصيد أول' || strVal === 'أول رصيد') val = 'Opening Balance';
-              else if (strVal === 'فاتورة مشتريات' || strVal === 'مشتريات فاتورة') val = 'Purchase Invoice';
-              else if (strVal === 'مرتجع مشتريات' || strVal === 'مشتريات مرتجع') val = 'Purchase Return';
+            const isDescCol = col.id === 'col_4' || col.id === 'description' || 
+                              col.label.toLowerCase().includes('desc') || 
+                              col.label.includes('البيان') || col.label.includes('بيان');
+            if (!isRtl && isDescCol && val) {
+              val = translateSystemDescription(String(val));
             }
             return val !== undefined ? String(val) : '';
           });
@@ -1067,4 +1060,88 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
       reject(e);
     }
   });
+}
+
+function translateSystemDescription(text: string): string {
+  if (!text) return '';
+  let res = text.trim();
+  
+  // Exact translations
+  if (res === 'فاتورة مبيعات' || res === 'مبيعات فاتورة') return 'Sales Invoice';
+  if (res === 'مرتجع مبيعات' || res === 'مبيعات مرتجع') return 'Sales Return';
+  if (res === 'سند قبض' || res === 'قبض سند') return 'Receipt Voucher';
+  if (res === 'سند صرف' || res === 'صرف سند') return 'Payment Voucher';
+  if (res === 'قيد يومية' || res === 'يومية قيد') return 'Journal Entry';
+  if (res === 'رصيد منقول' || res === 'منقول رصيد') return 'Balance Forward';
+  if (res === 'رصيد افتتاحي' || res === 'افتتاحي رصيد') return 'Opening Balance';
+  if (res === 'رصيد أول' || res === 'أول رصيد' || res === 'رصيد أول الفترة') return 'Beginning Balance';
+  if (res === 'فاتورة مشتريات' || res === 'مشتريات فاتورة') return 'Purchase Invoice';
+  if (res === 'مرتجع مشتريات' || res === 'مشتريات مرتجع') return 'Purchase Return';
+
+  // Pattern translations
+  // 1. تحصيل فاتورة مبيعات رقم [X] - [Y]
+  if (res.includes('تحصيل فاتورة مبيعات رقم') && res.includes('-')) {
+    const match = res.match(/تحصيل فاتورة مبيعات رقم\s*([^\s-]+)\s*-\s*(.*)/);
+    if (match) {
+      return `Collection of Sales Invoice no. ${match[1]} - ${match[2]}`;
+    }
+  }
+  
+  // 1.1 تحصيل فاتورة مبيعات رقم [X]
+  if (res.includes('تحصيل فاتورة مبيعات رقم')) {
+    const match = res.match(/تحصيل فاتورة مبيعات رقم\s*(.*)/);
+    if (match) {
+      return `Collection of Sales Invoice no. ${match[1]}`;
+    }
+  }
+
+  // 2. سداد فاتورة مشتريات رقم [X] - [Y]
+  if (res.includes('سداد فاتورة مشتريات رقم') && res.includes('-')) {
+    const match = res.match(/سداد فاتورة مشتريات رقم\s*([^\s-]+)\s*-\s*(.*)/);
+    if (match) {
+      return `Payment of Purchase Invoice no. ${match[1]} - ${match[2]}`;
+    }
+  }
+
+  // 2.1 سداد فاتورة مشتريات رقم [X]
+  if (res.includes('سداد فاتورة مشتريات رقم')) {
+    const match = res.match(/سداد فاتورة مشتريات رقم\s*(.*)/);
+    if (match) {
+      return `Payment of Purchase Invoice no. ${match[1]}`;
+    }
+  }
+
+  // 3. سند صرف رقم [X] من حساب: [Y]
+  if (res.includes('سند صرف رقم') && res.includes('من حساب:')) {
+    const match = res.match(/سند صرف رقم\s*([^\s:]+)\s*من حساب:\s*(.*)/);
+    if (match) {
+      return `Payment Voucher no. ${match[1]} from account: ${match[2]}`;
+    }
+  }
+
+  // 4. سند قبض رقم [X] إلى حساب: [Y]
+  if (res.includes('سند قبض رقم') && res.includes('إلى حساب:')) {
+    const match = res.match(/سند قبض رقم\s*([^\s:]+)\s*إلى حساب:\s*(.*)/);
+    if (match) {
+      return `Receipt Voucher no. ${match[1]} to account: ${match[2]}`;
+    }
+  }
+
+  // 5. تحصيل من العميل: [X]
+  if (res.includes('تحصيل من العميل:')) {
+    const match = res.match(/تحصيل من العميل:\s*(.*)/);
+    if (match) {
+      return `Collection from Customer: ${match[1]}`;
+    }
+  }
+
+  // 6. تحويل من [X] إلى [Y]
+  if (res.includes('تحويل من') && res.includes('إلى')) {
+    const match = res.match(/تحويل من\s*(.*?)\s*إلى\s*(.*)/);
+    if (match) {
+      return `Transfer from ${match[1]} to ${match[2]}`;
+    }
+  }
+
+  return res;
 }
