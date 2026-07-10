@@ -210,9 +210,19 @@ export const SupplierBalances: React.FC = () => {
         filename: `supplier-balances-${new Date().toISOString().slice(0, 10)}.pdf`,
         margin: 10,
         orientation: 'landscape',
-        reportTitle: language === 'ar' 
-          ? `أرصدة الموردين كما في ${endDate ? formatDate(endDate) : formatDate(new Date())}` 
-          : `Supplier Balances as of ${endDate ? formatDate(endDate) : formatDate(new Date())}`
+        reportTitle: (() => {
+          if (language === 'ar') {
+            if (startDate && endDate) return `أرصدة الموردين من ${formatDate(startDate)} إلى ${formatDate(endDate)}`;
+            if (startDate) return `أرصدة الموردين من ${formatDate(startDate)}`;
+            if (endDate) return `أرصدة الموردين إلى ${formatDate(endDate)}`;
+            return 'أرصدة الموردين';
+          } else {
+            if (startDate && endDate) return `Supplier Balances from ${formatDate(startDate)} to ${formatDate(endDate)}`;
+            if (startDate) return `Supplier Balances from ${formatDate(startDate)}`;
+            if (endDate) return `Supplier Balances to ${formatDate(endDate)}`;
+            return 'Supplier Balances';
+          }
+        })()
       });
     } catch (e) {
       console.error(e);

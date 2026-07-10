@@ -210,9 +210,19 @@ export const CustomerBalances: React.FC = () => {
         filename: `customer-balances-${new Date().toISOString().slice(0, 10)}.pdf`,
         margin: 10,
         orientation: 'landscape',
-        reportTitle: language === 'ar' 
-          ? `أرصدة العملاء كما في ${endDate ? formatDate(endDate) : formatDate(new Date())}` 
-          : `Customer Balances as of ${endDate ? formatDate(endDate) : formatDate(new Date())}`
+        reportTitle: (() => {
+          if (language === 'ar') {
+            if (startDate && endDate) return `أرصدة العملاء من ${formatDate(startDate)} إلى ${formatDate(endDate)}`;
+            if (startDate) return `أرصدة العملاء من ${formatDate(startDate)}`;
+            if (endDate) return `أرصدة العملاء إلى ${formatDate(endDate)}`;
+            return 'أرصدة العملاء';
+          } else {
+            if (startDate && endDate) return `Customer Balances from ${formatDate(startDate)} to ${formatDate(endDate)}`;
+            if (startDate) return `Customer Balances from ${formatDate(startDate)}`;
+            if (endDate) return `Customer Balances to ${formatDate(endDate)}`;
+            return 'Customer Balances';
+          }
+        })()
       });
     } catch (e) {
       console.error(e);
