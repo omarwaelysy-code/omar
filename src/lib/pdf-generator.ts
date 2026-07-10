@@ -363,6 +363,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         
         const titleLower = title.toLowerCase();
         const isStatement = title.includes('كشف حساب') || 
+                            title.includes('كشف حركة') || 
                             title.includes('تقرير') || 
                             title.includes('قائمة') || 
                             title.includes('الميزانية') ||

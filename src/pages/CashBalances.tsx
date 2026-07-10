@@ -617,7 +617,18 @@ export const CashBalances: React.FC = () => {
               return `Cash & Bank Report${startStr}${endStr}`;
             }
           })()
-        : (language === 'ar' ? `كشف حركة: ${paymentMethods.find(m => m.id === selectedMethodId)?.name}` : `Statement: ${paymentMethods.find(m => m.id === selectedMethodId)?.name}`);
+        : (() => {
+            const methodName = paymentMethods.find(m => m.id === selectedMethodId)?.name || '';
+            if (language === 'ar') {
+              const startStr = dateRange.start ? ` من ${formatDate(dateRange.start)}` : '';
+              const endStr = dateRange.end ? ` إلى ${formatDate(dateRange.end)}` : '';
+              return `كشف حركة: ${methodName}${startStr}${endStr}`;
+            } else {
+              const startStr = dateRange.start ? ` from ${formatDate(dateRange.start)}` : '';
+              const endStr = dateRange.end ? ` to ${formatDate(dateRange.end)}` : '';
+              return `Statement: ${methodName}${startStr}${endStr}`;
+            }
+          })()
       
       await exportToPDF(reportRef.current, { 
         filename, 
