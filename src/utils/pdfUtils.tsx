@@ -111,7 +111,7 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
         let colVisualIndex = 0;
         tds.forEach((td) => {
           const text = td.textContent?.trim() || '';
-          const colspan = parseInt(td.getAttribute('colspan') || '1', 10);
+          const colspan = (td as HTMLTableCellElement).colSpan || 1;
           
           const targetIndex = colVisualIndex + colspan - 1;
           rowData[`col_${targetIndex}`] = text;
