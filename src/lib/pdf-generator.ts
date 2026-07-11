@@ -367,11 +367,13 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
                             title.includes('تقرير') || 
                             title.includes('قائمة') || 
                             title.includes('الميزانية') ||
+                            title.includes('كارت') ||
                             titleLower.includes('statement') || 
                             titleLower.includes('report') || 
                             titleLower.includes('balances') || 
                             titleLower.includes('balance') || 
                             titleLower.includes('income') || 
+                            titleLower.includes('card') ||
                             templateName.toLowerCase().includes('statement') || 
                             dto.isStatement;
 

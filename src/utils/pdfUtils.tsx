@@ -33,9 +33,60 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
   if (tables.length > 0) {
     const table = tables[0];
     
-    // Parse the table header columns
-    const ths = Array.from(table.querySelectorAll('thead th, tr:first-child th'));
-    const targetThs = ths.length > 0 ? ths : Array.from(table.querySelectorAll('tr:first-child td'));
+    // Reconstruct columns from complex rowSpan/colSpan thead grid
+    const headerRows = Array.from(table.querySelectorAll('thead tr'));
+    let targetThs: HTMLTableCellElement[] = [];
+
+    if (headerRows.length > 1) {
+      // Reconstruct leaf header cells using a 2D grid
+      const numRows = headerRows.length;
+      // Estimate max columns count by counting td in the first body row
+      const firstBodyRow = table.querySelector('tbody tr');
+      const numCols = firstBodyRow ? firstBodyRow.querySelectorAll('td, th').length : 30;
+      
+      const grid: (HTMLTableCellElement | null)[][] = Array.from({ length: numRows }, () => Array(numCols).fill(null));
+      
+      headerRows.forEach((tr, r) => {
+        const cells = Array.from(tr.querySelectorAll('th, td')) as HTMLTableCellElement[];
+        let c = 0;
+        cells.forEach(cell => {
+          // Find first unassigned column in row r
+          while (c < numCols && grid[r][c] !== null) {
+            c++;
+          }
+          if (c >= numCols) return;
+
+          const rowspan = cell.rowSpan || 1;
+          const colspan = cell.colSpan || 1;
+          
+          for (let dr = 0; dr < rowspan; dr++) {
+            for (let dc = 0; dc < colspan; dc++) {
+              if (r + dr < numRows && c + dc < numCols) {
+                grid[r + dr][c + dc] = cell;
+              }
+            }
+          }
+          c += colspan;
+        });
+      });
+
+      // Get bottom-most (leaf) cell for each column
+      for (let colIdx = 0; colIdx < numCols; colIdx++) {
+        let leafCell: HTMLTableCellElement | null = null;
+        for (let rowIdx = numRows - 1; rowIdx >= 0; rowIdx--) {
+          if (grid[rowIdx][colIdx] !== null) {
+            leafCell = grid[rowIdx][colIdx];
+            break;
+          }
+        }
+        if (leafCell) {
+          targetThs.push(leafCell);
+        }
+      }
+    } else {
+      const ths = Array.from(table.querySelectorAll('thead th, tr:first-child th')) as HTMLTableCellElement[];
+      targetThs = ths.length > 0 ? ths : Array.from(table.querySelectorAll('tr:first-child td')) as HTMLTableCellElement[];
+    }
     
     const validIndices: number[] = [];
     columns = [];
