@@ -41,8 +41,18 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
       // Reconstruct leaf header cells using a 2D grid
       const numRows = headerRows.length;
       // Estimate max columns count by counting td in the first body row
-      const firstBodyRow = table.querySelector('tbody tr');
-      const numCols = firstBodyRow ? firstBodyRow.querySelectorAll('td, th').length : 30;
+      // Estimate max columns count by finding a row in tbody with the maximum cells
+      const bodyRows = Array.from(table.querySelectorAll('tbody tr'));
+      let maxColsRow = bodyRows[0];
+      let maxCellsCount = 0;
+      bodyRows.forEach(row => {
+        const count = row.querySelectorAll('td, th').length;
+        if (count > maxCellsCount) {
+          maxCellsCount = count;
+          maxColsRow = row;
+        }
+      });
+      const numCols = maxColsRow ? maxColsRow.querySelectorAll('td, th').length : 30;
       
       const grid: (HTMLTableCellElement | null)[][] = Array.from({ length: numRows }, () => Array(numCols).fill(null));
       
