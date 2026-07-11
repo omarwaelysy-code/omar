@@ -395,6 +395,7 @@ export const StockCardReport: React.FC = () => {
     if (printableAreaRef.current && selectedProduct) {
       await exportToPDF(printableAreaRef.current, {
         filename: `Stock_Card_${selectedProduct.name}`,
+        orientation: 'landscape',
         reportTitle: (() => {
           if (language === 'ar') {
             const startStr = dateFrom ? ` من ${formatDate(dateFrom)}` : '';

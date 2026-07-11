@@ -479,6 +479,7 @@ export const StockBalancesReport: React.FC = () => {
     if (reportTableRef.current) {
       await exportToPDF(reportTableRef.current, {
         filename: `Stock_Balances_Report_${dateFrom}_to_${dateTo}`,
+        orientation: 'landscape',
         reportTitle: (() => {
           if (language === 'ar') {
             const startStr = dateFrom ? ` من ${formatDate(dateFrom)}` : '';

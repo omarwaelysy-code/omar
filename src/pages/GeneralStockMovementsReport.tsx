@@ -587,6 +587,7 @@ export const GeneralStockMovementsReport: React.FC = () => {
     if (printableAreaRef.current) {
       await exportToPDF(printableAreaRef.current, {
         filename: `General_Stock_Movements_${dateFrom}_to_${dateTo}`,
+        orientation: 'landscape',
         reportTitle: (() => {
           if (language === 'ar') {
             const startStr = dateFrom ? ` من ${formatDate(dateFrom)}` : '';
