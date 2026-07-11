@@ -24,14 +24,18 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
   };
 
   // 2. Locate and Parse DOM tables inside element
-  const tables = Array.from(element.getElementsByTagName('table'));
+  let table: HTMLTableElement | null = null;
+  if (element.tagName.toLowerCase() === 'table') {
+    table = element as HTMLTableElement;
+  } else {
+    table = element.querySelector('table');
+  }
   
   let columns: Array<{ id: string; label: string; width?: number; align?: 'left' | 'center' | 'right' }> = [];
   let rows: any[] = [];
   let totals: { [key: string]: string } = {};
 
-  if (tables.length > 0) {
-    const table = tables[0];
+  if (table) {
     
     // Reconstruct columns from complex rowSpan/colSpan thead grid
     const headerRows = Array.from(table.querySelectorAll('thead tr'));
