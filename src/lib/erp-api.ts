@@ -1713,10 +1713,10 @@ router.post('/system/import-excel', authenticateToken, authorizeRoles('super_adm
 
 // Database Health Check
 router.get('/db-health', async (req, res) => {
+  let client;
   try {
-    const client = await pool.connect();
+    client = await pool.connect();
     await client.query('SELECT 1');
-    client.release();
     res.json({ 
       status: 'ok', 
       message: 'Database connected successfully'
@@ -1730,6 +1730,8 @@ router.get('/db-health', async (req, res) => {
       host: process.env.DB_HOST || 'localhost',
       port: process.env.DB_PORT || '5432'
     });
+  } finally {
+    if (client) client.release();
   }
 });
 

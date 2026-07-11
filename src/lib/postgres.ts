@@ -1,4 +1,4 @@
-﻿import pg from 'pg';
+import pg from 'pg';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -27,6 +27,23 @@ const pool = new Pool({
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 15000,
 });
+
+// Intercept pool.connect to return a client with an idempotent release method.
+// This prevents pool corruption or crashes caused by calling client.release() multiple times.
+const originalConnect = pool.connect.bind(pool);
+pool.connect = (async (...args: any[]) => {
+  const client = await originalConnect(...args);
+  let released = false;
+  const originalRelease = client.release;
+  client.release = function(err?: any) {
+    if (released) {
+      return;
+    }
+    released = true;
+    return originalRelease.call(this, err);
+  };
+  return client;
+}) as any;
 
 // Debug connection info
 
