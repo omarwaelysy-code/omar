@@ -145,7 +145,7 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
 
     // Parse the table body rows
     const tbodyTrs = Array.from(table.querySelectorAll('tbody tr, tfoot tr'));
-    const trs = tbodyTrs.length > 0 ? tbodyTrs : Array.from(table.querySelectorAll('tr')).slice(ths.length > 0 ? 0 : 1);
+    const trs = tbodyTrs.length > 0 ? tbodyTrs : Array.from(table.querySelectorAll('tr')).slice(targetThs.length > 0 ? 0 : 1);
     
     trs.forEach(trElement => {
       const tr = trElement as HTMLTableRowElement;
