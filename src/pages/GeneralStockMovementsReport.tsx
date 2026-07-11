@@ -587,9 +587,17 @@ export const GeneralStockMovementsReport: React.FC = () => {
     if (printableAreaRef.current) {
       await exportToPDF(printableAreaRef.current, {
         filename: `General_Stock_Movements_${dateFrom}_to_${dateTo}`,
-        reportTitle: language === 'ar'
-          ? `تقرير حركة المخزن العامة من ${dateFrom} إلى ${dateTo}`
-          : `General Stock Movements Report from ${dateFrom} to ${dateTo}`
+        reportTitle: (() => {
+          if (language === 'ar') {
+            const startStr = dateFrom ? ` من ${formatDate(dateFrom)}` : '';
+            const endStr = dateTo ? ` إلى ${formatDate(dateTo)}` : '';
+            return `تقرير حركة المخزن العامة${startStr}${endStr}`;
+          } else {
+            const startStr = dateFrom ? ` from ${formatDate(dateFrom)}` : '';
+            const endStr = dateTo ? ` to ${formatDate(dateTo)}` : '';
+            return `General Stock Movements Report${startStr}${endStr}`;
+          }
+        })()
       });
     }
   };

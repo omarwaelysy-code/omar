@@ -4,7 +4,7 @@ import { Product, Warehouse } from '../types';
 import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNavigation } from '../contexts/NavigationContext';
-import { formatNumber } from '../utils/formatUtils';
+import { formatNumber, formatDate } from '../utils/formatUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { exportToPDF } from '../utils/pdfUtils';
 import { 
@@ -479,9 +479,17 @@ export const StockBalancesReport: React.FC = () => {
     if (reportTableRef.current) {
       await exportToPDF(reportTableRef.current, {
         filename: `Stock_Balances_Report_${dateFrom}_to_${dateTo}`,
-        reportTitle: language === 'ar'
-          ? `تقرير حركة وأرصدة المخزون من ${dateFrom} إلى ${dateTo}`
-          : `Stock Balances & Movements Report from ${dateFrom} to ${dateTo}`
+        reportTitle: (() => {
+          if (language === 'ar') {
+            const startStr = dateFrom ? ` من ${formatDate(dateFrom)}` : '';
+            const endStr = dateTo ? ` إلى ${formatDate(dateTo)}` : '';
+            return `تقرير حركة وأرصدة المخزون${startStr}${endStr}`;
+          } else {
+            const startStr = dateFrom ? ` from ${formatDate(dateFrom)}` : '';
+            const endStr = dateTo ? ` to ${formatDate(dateTo)}` : '';
+            return `Stock Balances & Movements Report${startStr}${endStr}`;
+          }
+        })()
       });
     }
   };

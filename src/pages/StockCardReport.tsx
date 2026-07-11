@@ -395,9 +395,17 @@ export const StockCardReport: React.FC = () => {
     if (printableAreaRef.current && selectedProduct) {
       await exportToPDF(printableAreaRef.current, {
         filename: `Stock_Card_${selectedProduct.name}`,
-        reportTitle: language === 'ar' 
-          ? `كارت حركة وتكلفة الصنف: ${selectedProduct.name} (${selectedProduct.code})` 
-          : `Stock Card: ${selectedProduct.name} (${selectedProduct.code})`
+        reportTitle: (() => {
+          if (language === 'ar') {
+            const startStr = dateFrom ? ` من ${formatDate(dateFrom)}` : '';
+            const endStr = dateTo ? ` إلى ${formatDate(dateTo)}` : '';
+            return `كارت حركة وتكلفة الصنف: ${selectedProduct.name} (${selectedProduct.code})${startStr}${endStr}`;
+          } else {
+            const startStr = dateFrom ? ` from ${formatDate(dateFrom)}` : '';
+            const endStr = dateTo ? ` to ${formatDate(dateTo)}` : '';
+            return `Stock Card: ${selectedProduct.name} (${selectedProduct.code})${startStr}${endStr}`;
+          }
+        })()
       });
     }
   };
