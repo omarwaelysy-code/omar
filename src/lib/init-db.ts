@@ -1,4 +1,4 @@
-﻿import pool from './postgres';
+import pool from './postgres';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -1083,6 +1083,16 @@ async function seedDatabase(client: any) {
     }
   } catch (e) {
     console.warn('    ! User seeding failed:', e);
+  }
+
+  // 2b. Update Wael Ragab to Super Admin
+  try {
+    await client.query(
+      "UPDATE users SET role = 'super_admin', company_id = 'SYSTEM' WHERE email = $1",
+      ['acc.wael2005@gmail.com']
+    );
+  } catch (e) {
+    console.warn('    ! Updating Wael Super Admin role failed:', e);
   }
 
   // 3. Global Config

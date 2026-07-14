@@ -54,7 +54,13 @@ pool.connect = function(cb?: any) {
     return originalConnect((err: any, client: any, done: any) => {
       if (err) return cb(err, client, done);
       wrapClientRelease(client);
-      return cb(err, client, client.release);
+      let doneReleased = false;
+      const wrappedDone = (err2?: any) => {
+        if (doneReleased) return;
+        doneReleased = true;
+        return done(err2);
+      };
+      return cb(err, client, wrappedDone);
     });
   }
   // Promise-based call (used by application code: await pool.connect()).

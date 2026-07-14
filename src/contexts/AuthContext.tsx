@@ -99,7 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUserMemberships(memberships);
 
       if (memberships.length > 0) {
-        const isSuperAdminEmail = email === 'omarwaelysy@gmail.com' || email === 'omarwaelsys@gmail.com';
+        const isSuperAdminEmail = email === 'omarwaelysy@gmail.com' || email === 'omarwaelsys@gmail.com' || email === 'acc.wael2005@gmail.com';
         const preferredCompanyId = localStorage.getItem(`preferred_company_${userId}`);
         const preferredMembership = memberships.find(m => m.company_id === preferredCompanyId);
         
@@ -120,7 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else {
         // Fallback for super admin
-        const isSuperAdminEmail = email === 'omarwaelysy@gmail.com' || email === 'omarwaelsys@gmail.com';
+        const isSuperAdminEmail = email === 'omarwaelysy@gmail.com' || email === 'omarwaelsys@gmail.com' || email === 'acc.wael2005@gmail.com';
         setUser({ 
           id: userId, 
           username: email.split('@')[0], 

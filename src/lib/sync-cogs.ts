@@ -107,11 +107,86 @@ export async function syncCOGSForJournalEntry(client: any, companyId: string, jo
         }
     }
 
-    if (addedCOGS) {
-       const updatedLines = await client.query('SELECT SUM(debit) as d, SUM(credit) as c FROM journal_entry_lines WHERE journal_entry_id = $1', [journalEntryId]);
-       if (updatedLines.rows.length > 0) {
-           await client.query('UPDATE journal_entries SET total_debit = $1, total_credit = $2 WHERE id = $3', 
-             [parseFloat(updatedLines.rows[0].d || '0'), parseFloat(updatedLines.rows[0].c || '0'), journalEntryId]);
-       }
+    await balanceAndValidateJournalEntry(client, journalEntryId);
+}
+
+export async function balanceAndValidateJournalEntry(client: any, journalEntryId: string) {
+  // 1. Fetch all lines
+  const { rows: lines } = await client.query(
+    'SELECT id, debit, credit FROM journal_entry_lines WHERE journal_entry_id = $1',
+    [journalEntryId]
+  );
+
+  let totalDebit = 0;
+  let totalCredit = 0;
+  for (const line of lines) {
+    totalDebit += parseFloat(line.debit || 0);
+    totalCredit += parseFloat(line.credit || 0);
+  }
+
+  // Round to 2 decimal places to avoid floating point issues
+  totalDebit = Math.round(totalDebit * 100) / 100;
+  totalCredit = Math.round(totalCredit * 100) / 100;
+
+  const diff = Math.round((totalDebit - totalCredit) * 100) / 100;
+
+  if (Math.abs(diff) > 0) {
+    if (Math.abs(diff) < 1.0) {
+      // Auto-adjust minor discrepancy on the largest line
+      if (diff > 0) {
+        // More debits than credits: add diff to the largest credit line
+        let largestLine = null;
+        let maxVal = -1;
+        for (const line of lines) {
+          const val = parseFloat(line.credit || 0);
+          if (val > maxVal) {
+            maxVal = val;
+            largestLine = line;
+          }
+        }
+        if (largestLine) {
+          const newCredit = Math.round((parseFloat(largestLine.credit || 0) + diff) * 100) / 100;
+          await client.query(
+            'UPDATE journal_entry_lines SET credit = $1 WHERE id = $2',
+            [newCredit, largestLine.id]
+          );
+        }
+      } else {
+        // More credits than debits: add absolute diff to the largest debit line
+        let largestLine = null;
+        let maxVal = -1;
+        for (const line of lines) {
+          const val = parseFloat(line.debit || 0);
+          if (val > maxVal) {
+            maxVal = val;
+            largestLine = line;
+          }
+        }
+        if (largestLine) {
+          const newDebit = Math.round((parseFloat(largestLine.debit || 0) + Math.abs(diff)) * 100) / 100;
+          await client.query(
+            'UPDATE journal_entry_lines SET debit = $1 WHERE id = $2',
+            [newDebit, largestLine.id]
+          );
+        }
+      }
+
+      // Re-read totals after adjustment
+      const { rows: adjustedLines } = await client.query(
+        'SELECT SUM(debit) as d, SUM(credit) as c FROM journal_entry_lines WHERE journal_entry_id = $1',
+        [journalEntryId]
+      );
+      totalDebit = Math.round(parseFloat(adjustedLines[0].d || 0) * 100) / 100;
+      totalCredit = Math.round(parseFloat(adjustedLines[0].c || 0) * 100) / 100;
+    } else {
+      // Significant difference: throw error to trigger rollback
+      throw new Error(`القيد غير متزن بمقدار ${Math.abs(diff).toFixed(2)} (مجموع المدين: ${totalDebit.toFixed(2)}، مجموع الدائن: ${totalCredit.toFixed(2)})`);
     }
+  }
+
+  // Update header totals
+  await client.query(
+    'UPDATE journal_entries SET total_debit = $1, total_credit = $2 WHERE id = $3',
+    [totalDebit, totalCredit, journalEntryId]
+  );
 }

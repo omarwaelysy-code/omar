@@ -13,7 +13,7 @@ import fs from 'fs';
 import path from 'path';
 import * as XLSX from 'xlsx';
 import multer from 'multer';
-import { syncCOGSForJournalEntry } from './sync-cogs';
+import { syncCOGSForJournalEntry, balanceAndValidateJournalEntry } from './sync-cogs';
 import { recordPurchase, recordSale, recordSalesReturn, recordPurchaseReturn, recalculateProductStock, reverseAndRecalculate, recordTransfer, recordAdjustment, recordGoodsReceipt } from './cost-engine';
 import { InventoryMovementService } from '../services/InventoryMovementService';
 import { LicensingMiddleware } from './subscription/middlewares/LicensingMiddleware';
@@ -5294,10 +5294,10 @@ router.post('/journal_entries', authenticateToken, TransactionsLimitMiddleware, 
 
     
     if (['invoice', 'return', 'sales_return'].includes(finalEntryData.reference_type)) {
-
        await syncCOGSForJournalEntry(client, companyId, entryId, finalEntryData.reference_id, finalEntryData.reference_type);
     }
 
+    await balanceAndValidateJournalEntry(client, entryId);
     await client.query('COMMIT');
 
     // Audit Log
@@ -5383,6 +5383,7 @@ router.put('/journal_entries/:id', authenticateToken, async (req: AuthRequest, r
       );
     }
 
+    await balanceAndValidateJournalEntry(client, entryId);
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
@@ -7007,6 +7008,7 @@ router.post('/opening_stock_balances', authenticateToken, async (req: AuthReques
       }, movementLines, client);
     }
 
+    await balanceAndValidateJournalEntry(client, entryId);
     await client.query('COMMIT');
     res.status(201).json({ id: docId, document_number: docData.document_number });
   } catch (error: any) {
@@ -7253,6 +7255,7 @@ router.put('/opening_stock_balances/:id', authenticateToken, async (req: AuthReq
       }, movementLines, client);
     }
 
+    await balanceAndValidateJournalEntry(client, entryId);
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
@@ -7400,8 +7403,9 @@ router.post('/stock_adjustments', authenticateToken, async (req: AuthRequest, re
       }
     }
 
+    let entryId: string | null = null;
     if (journalLines.length > 0) {
-      const entryId = uuidv4();
+      entryId = uuidv4();
       const entryNumber = await generateNextSequence(client, companyId, 'journal_entries', docData.date);
 
       const totalDebit = journalLines.reduce((sum: number, line: any) => sum + (line.debit || 0), 0);
@@ -7479,6 +7483,9 @@ router.post('/stock_adjustments', authenticateToken, async (req: AuthRequest, re
       }, movementLines, client);
     }
 
+    if (entryId) {
+      await balanceAndValidateJournalEntry(client, entryId);
+    }
     await client.query('COMMIT');
     res.status(201).json({ id: docId, adjustment_number: docData.adjustment_number });
   } catch (error: any) {
@@ -7619,8 +7626,9 @@ router.put('/stock_adjustments/:id', authenticateToken, async (req: AuthRequest,
       }
     }
 
+    let entryId: string | null = null;
     if (journalLines.length > 0) {
-      const entryId = uuidv4();
+      entryId = uuidv4();
       const entryNumber = await generateNextSequence(client, companyId, 'journal_entries', docData.date);
       
       const totalDebit = journalLines.reduce((sum: number, line: any) => sum + (line.debit || 0), 0);
@@ -7698,6 +7706,9 @@ router.put('/stock_adjustments/:id', authenticateToken, async (req: AuthRequest,
       }, movementLines, client);
     }
 
+    if (entryId) {
+      await balanceAndValidateJournalEntry(client, entryId);
+    }
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
