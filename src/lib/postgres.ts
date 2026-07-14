@@ -30,9 +30,11 @@ const pool = new Pool({
 
 // Intercept pool.connect to return a client with an idempotent release method.
 // This prevents pool corruption or crashes caused by calling client.release() multiple times.
+// NOTE: pg-pool's own query() method calls this.connect(callback) internally,
+// so this override must handle both the Promise path (no callback) and the callback path.
 const originalConnect = pool.connect.bind(pool);
-pool.connect = (async (...args: any[]) => {
-  const client = await originalConnect(...args);
+
+function wrapClientRelease(client: any): any {
   let released = false;
   const originalRelease = client.release;
   client.release = function(err?: any) {
@@ -43,7 +45,21 @@ pool.connect = (async (...args: any[]) => {
     return originalRelease.call(this, err);
   };
   return client;
-}) as any;
+}
+
+pool.connect = function(cb?: any) {
+  if (cb) {
+    // Callback-based call (used internally by pg-pool's query() method).
+    // Wrap the callback to patch the client before forwarding.
+    return originalConnect((err: any, client: any, done: any) => {
+      if (err) return cb(err, client, done);
+      wrapClientRelease(client);
+      return cb(err, client, client.release);
+    });
+  }
+  // Promise-based call (used by application code: await pool.connect()).
+  return originalConnect().then((client: any) => wrapClientRelease(client));
+} as any;
 
 // Debug connection info
 
