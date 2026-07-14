@@ -165,15 +165,21 @@ export default function App() {
   );
 
   function getPageComponent(id: string) {
-    // Role-based access control for pages
     // Super Admin specific pages
     if (isSuperAdmin) {
-      if (id === 'super_admin_dashboard') return <SuperAdminDashboard />;
+      if (id === 'dashboard' || id === 'super_admin_dashboard') return <SuperAdminDashboard />;
       if (id === 'companies') return <SuperAdminDashboard initialTab="companies" />;
+      if (id === 'users') return <SuperAdminDashboard initialTab="users" />;
+      if (id === 'subscriptions') return <SuperAdminDashboard initialTab="subscriptions" />;
+      if (id === 'system_settings') return <SuperAdminDashboard initialTab="settings" />;
+      if (id === 'activity_log') return <SuperAdminDashboard initialTab="audit" />;
       if (id === 'system_check') return <SuperAdminDashboard initialTab="system" />;
-      if (id === 'currencies') return <Currencies />;
-      // Only show Super Admin dashboard for 'dashboard' if no specific company is selected or explicitly requested
-      if (id === 'dashboard' && (!user?.company_id || user.company_id === 'system')) return <SuperAdminDashboard />;
+      if (id === 'monitoring') return <SuperAdminDashboard initialTab="monitoring" />;
+      if (id === 'backup_restore') return <BackupRestore />;
+      if (id === 'global_reports') return <SuperAdminDashboard initialTab="reports" />;
+      
+      // Prevent any company ERP route from loading for Super Admin
+      return <SuperAdminDashboard />;
     }
 
     switch (id) {

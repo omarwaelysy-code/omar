@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { dbService } from '../services/dbService';
 import { Company, User, ActivityLog, AuditLog, SystemConfig } from '../types';
@@ -42,7 +42,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface SuperAdminDashboardProps {
-  initialTab?: 'companies' | 'users' | 'logs' | 'system' | 'audit';
+  initialTab?: 'companies' | 'users' | 'logs' | 'system' | 'audit' | 'subscriptions' | 'settings' | 'monitoring' | 'reports';
 }
 
 export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initialTab }) => {
@@ -55,7 +55,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
   
   // Use simplified mode to keep UI clean
   const simplifiedMode = true;
-  const [activeTab, setActiveTab] = useState<'companies' | 'users' | 'logs' | 'system' | 'audit'>(initialTab || 'companies');
+  const [activeTab, setActiveTab] = useState<'companies' | 'users' | 'logs' | 'system' | 'audit' | 'subscriptions' | 'settings' | 'monitoring' | 'reports'>(initialTab as any || 'companies');
   const [config, setConfig] = useState<SystemConfig | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   
@@ -579,6 +579,38 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
               >
                 سجل الرقابة
               </button>
+              <button
+                onClick={() => setActiveTab('subscriptions')}
+                className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
+                  activeTab === 'subscriptions' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+                }`}
+              >
+                الاشتراكات
+              </button>
+              <button
+                onClick={() => setActiveTab('settings')}
+                className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
+                  activeTab === 'settings' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+                }`}
+              >
+                إعدادات النظام
+              </button>
+              <button
+                onClick={() => setActiveTab('monitoring')}
+                className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
+                  activeTab === 'monitoring' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+                }`}
+              >
+                المراقبة
+              </button>
+              <button
+                onClick={() => setActiveTab('reports')}
+                className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
+                  activeTab === 'reports' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+                }`}
+              >
+                التقارير الشاملة
+              </button>
             {!simplifiedMode && (
               <button
                 onClick={() => setActiveTab('logs')}
@@ -1015,6 +1047,38 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {activeTab === 'subscriptions' && (
+            <div className="p-12 text-center text-stone-500">
+              <CreditCard className="w-16 h-16 mx-auto mb-4 text-stone-300" />
+              <h3 className="text-xl font-bold mb-2">إدارة الاشتراكات</h3>
+              <p>يتم تحميل وحدة الاشتراكات...</p>
+            </div>
+          )}
+
+          {activeTab === 'settings' && (
+            <div className="p-12 text-center text-stone-500">
+              <Settings className="w-16 h-16 mx-auto mb-4 text-stone-300" />
+              <h3 className="text-xl font-bold mb-2">إعدادات النظام العامة</h3>
+              <p>يتم تحميل إعدادات النظام...</p>
+            </div>
+          )}
+
+          {activeTab === 'monitoring' && (
+            <div className="p-12 text-center text-stone-500">
+              <Activity className="w-16 h-16 mx-auto mb-4 text-stone-300" />
+              <h3 className="text-xl font-bold mb-2">مراقبة أداء النظام</h3>
+              <p>يتم تحميل لوحة المراقبة...</p>
+            </div>
+          )}
+
+          {activeTab === 'reports' && (
+            <div className="p-12 text-center text-stone-500">
+              <Globe className="w-16 h-16 mx-auto mb-4 text-stone-300" />
+              <h3 className="text-xl font-bold mb-2">التقارير الشاملة</h3>
+              <p>يتم تحميل التقارير الشاملة...</p>
             </div>
           )}
         </div>

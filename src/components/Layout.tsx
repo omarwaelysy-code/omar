@@ -48,7 +48,9 @@ import {
   Home,
   ListPlus,
   Sliders,
-  LayoutTemplate
+  LayoutTemplate,
+  Globe,
+  Activity
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
@@ -443,14 +445,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       { id: 'dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
       { id: 'companies', label: t('nav.companies'), icon: Building2 },
       { id: 'users', label: t('nav.users'), icon: UsersIcon },
-      { id: 'system_check', label: 'System Integrity', icon: ShieldCheck },
-      { id: 'activity_log', label: 'Audit Logs', icon: History },
+      { id: 'subscriptions', label: t('nav.subscriptions') || 'Subscriptions', icon: CreditCard },
+      { id: 'system_settings', label: t('nav.system_settings') || 'System Settings', icon: Settings },
+      { id: 'activity_log', label: t('nav.audit_logs') || 'Audit Logs', icon: History },
+      { id: 'system_check', label: t('nav.system_check') || 'System Integrity', icon: ShieldCheck },
+      { id: 'monitoring', label: t('nav.monitoring') || 'Monitoring', icon: Activity },
+      { id: 'backup_restore', label: t('nav.backup_restore') || 'Backups', icon: Database },
+      { id: 'global_reports', label: t('nav.global_reports') || 'Global Reports', icon: Globe },
     ];
 
     if (isSuperAdmin) {
-      // For Super Admin, we merge both menus to give them full control
-      const superAdminSpecificItems = superAdminNavItems.filter(s => !navItems.some(n => n.id === s.id));
-      return [...superAdminSpecificItems, ...navItems];
+      // For Super Admin, we DO NOT merge company menus. Super Admins should be completely isolated from company modules.
+      return superAdminNavItems;
     }
     if (isCompanyAdmin) return navItems;
 
