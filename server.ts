@@ -3,7 +3,6 @@ dotenv.config();
 
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
 import cors from "cors";
 import fs from "fs";
 import { initDatabase } from "./src/lib/init-db";
@@ -520,6 +519,7 @@ async function startServer() {
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     console.log("Starting in DEVELOPMENT mode with Vite middleware");
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
