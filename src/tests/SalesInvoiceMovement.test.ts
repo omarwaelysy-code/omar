@@ -26,7 +26,7 @@ const getPostHandler = () => {
     (l: any) => l.route && l.route.path === '/invoices' && l.route.methods.post
   );
   if (!layer) throw new Error('Route POST /invoices not found');
-  return layer.route.stack[1].handle;
+  return layer.route.stack[layer.route.stack.length - 1].handle;
 };
 
 const getPutHandler = () => {
@@ -34,7 +34,7 @@ const getPutHandler = () => {
     (l: any) => l.route && l.route.path === '/invoices/:id' && l.route.methods.put
   );
   if (!layer) throw new Error('Route PUT /invoices/:id not found');
-  return layer.route.stack[1].handle;
+  return layer.route.stack[layer.route.stack.length - 1].handle;
 };
 
 const getDeleteHandler = () => {
@@ -42,7 +42,7 @@ const getDeleteHandler = () => {
     (l: any) => l.route && l.route.path === '/invoices/:id' && l.route.methods.delete
   );
   if (!layer) throw new Error('Route DELETE /invoices/:id not found');
-  return layer.route.stack[1].handle;
+  return layer.route.stack[layer.route.stack.length - 1].handle;
 };
 
 describe('Sales Invoice and Inventory Movement Integration (Phase 5)', () => {

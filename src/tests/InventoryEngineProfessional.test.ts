@@ -27,7 +27,7 @@ const getHandler = (path: string, method: 'post' | 'put' | 'delete') => {
     (l: any) => l.route && l.route.path === path && l.route.methods[method]
   );
   if (!layer) throw new Error(`Route ${method.toUpperCase()} ${path} not found`);
-  return layer.route.stack[1].handle;
+  return layer.route.stack[layer.route.stack.length - 1].handle;
 };
 
 describe('Professional Inventory Engine Integration (Phase 8)', () => {

@@ -16,6 +16,13 @@ import multer from 'multer';
 import { syncCOGSForJournalEntry } from './sync-cogs';
 import { recordPurchase, recordSale, recordSalesReturn, recordPurchaseReturn, recalculateProductStock, reverseAndRecalculate, recordTransfer, recordAdjustment, recordGoodsReceipt } from './cost-engine';
 import { InventoryMovementService } from '../services/InventoryMovementService';
+import { LicensingMiddleware } from './subscription/middlewares/LicensingMiddleware';
+import { FeatureFlagMiddleware } from './subscription/middlewares/FeatureFlagMiddleware';
+import { UsersLimitMiddleware } from './subscription/middlewares/limits/UsersLimitMiddleware';
+import { BranchesLimitMiddleware } from './subscription/middlewares/limits/BranchesLimitMiddleware';
+import { WarehousesLimitMiddleware } from './subscription/middlewares/limits/WarehousesLimitMiddleware';
+import { DevicesLimitMiddleware } from './subscription/middlewares/limits/DevicesLimitMiddleware';
+import { TransactionsLimitMiddleware } from './subscription/middlewares/limits/TransactionsLimitMiddleware';
 
 export function getEffectiveModule(moduleName: string): string {
   const mapping: { [key: string]: string } = {
@@ -1806,7 +1813,7 @@ const getList = async (table: string, filters: any) => {
 };
 
 // --- Authentication & Users ---
-router.post('/auth/register', async (req, res) => {
+router.post('/auth/register', UsersLimitMiddleware, async (req, res) => {
   try {
     const { username, name, email, password, company_id, role } = req.body;
     const id = uuidv4();
@@ -2962,7 +2969,18 @@ modules.forEach(moduleName => {
   // Create
   if (!transactionalModules.includes(moduleName)) {
     routeNames.forEach(rn => {
-      router.post(`/${rn}`, authenticateToken, async (req: AuthRequest, res) => {
+      router.post(`/${rn}`, authenticateToken, async (req: AuthRequest, res, next) => {
+        if (rn === 'users' || rn === 'roles') {
+          return UsersLimitMiddleware(req, res, () => next());
+        }
+        if (rn === 'departments') {
+          return BranchesLimitMiddleware(req, res, () => next());
+        }
+        if (rn === 'warehouses') {
+          return WarehousesLimitMiddleware(req, res, () => next());
+        }
+        next();
+      }, async (req: AuthRequest, res) => {
         try {
           const targetModule = getEffectiveModule(moduleName);
           if (!await checkPermission(req, targetModule, 'create')) {
@@ -3350,7 +3368,7 @@ async function ensureDefaultAccounts(client: any, companyId: string) {
   }
 }
 
-router.post('/invoices', authenticateToken, async (req: AuthRequest, res) => {
+router.post('/invoices', authenticateToken, TransactionsLimitMiddleware, async (req: AuthRequest, res) => {
   const client = await pool.connect();
   try {
     const companyId = req.user?.company_id;
@@ -4303,7 +4321,7 @@ export async function revertPurchaseInvoiceBillingFromGoodsReceipts(
 }
 
 // --- Purchase Invoices with Items (Transaction) ---
-router.post('/purchase_invoices', authenticateToken, async (req: AuthRequest, res) => {
+router.post('/purchase_invoices', authenticateToken, TransactionsLimitMiddleware, async (req: AuthRequest, res) => {
   const client = await pool.connect();
   try {
     const companyId = req.user?.company_id;
@@ -5217,7 +5235,7 @@ router.put('/purchase_returns/:id', authenticateToken, async (req: AuthRequest, 
 });
 
 // --- Journal Entries (Accounting Transaction) ---
-router.post('/journal_entries', authenticateToken, async (req: AuthRequest, res) => {
+router.post('/journal_entries', authenticateToken, TransactionsLimitMiddleware, async (req: AuthRequest, res) => {
   const client = await pool.connect();
   try {
     const companyId = req.user?.company_id;

@@ -4,6 +4,8 @@ import { dbService } from '../services/dbService';
 import { Company, User, ActivityLog, AuditLog, SystemConfig } from '../types';
 import { MaintenanceService } from '../services/MaintenanceService';
 import { AuditService } from '../services/AuditService';
+import { SubscriptionsTab } from '../components/super-admin/SubscriptionsTab';
+import { FeatureManagerTab } from '../components/super-admin/FeatureManagerTab';
 import { 
   Building2, 
   Users, 
@@ -42,7 +44,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface SuperAdminDashboardProps {
-  initialTab?: 'companies' | 'users' | 'logs' | 'system' | 'audit' | 'subscriptions' | 'settings' | 'monitoring' | 'reports';
+  initialTab?: 'companies' | 'users' | 'logs' | 'system' | 'audit' | 'subscriptions' | 'feature-manager' | 'settings' | 'monitoring' | 'reports';
 }
 
 export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initialTab }) => {
@@ -55,7 +57,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
   
   // Use simplified mode to keep UI clean
   const simplifiedMode = true;
-  const [activeTab, setActiveTab] = useState<'companies' | 'users' | 'logs' | 'system' | 'audit' | 'subscriptions' | 'settings' | 'monitoring' | 'reports'>(initialTab as any || 'companies');
+  const [activeTab, setActiveTab] = useState<'companies' | 'users' | 'logs' | 'system' | 'audit' | 'subscriptions' | 'feature-manager' | 'settings' | 'monitoring' | 'reports'>(initialTab as any || 'companies');
   const [config, setConfig] = useState<SystemConfig | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   
@@ -588,6 +590,14 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                 الاشتراكات
               </button>
               <button
+                onClick={() => setActiveTab('feature-manager')}
+                className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
+                  activeTab === 'feature-manager' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+                }`}
+              >
+                الميزات
+              </button>
+              <button
                 onClick={() => setActiveTab('settings')}
                 className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
                   activeTab === 'settings' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
@@ -1051,11 +1061,11 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
           )}
 
           {activeTab === 'subscriptions' && (
-            <div className="p-12 text-center text-stone-500">
-              <CreditCard className="w-16 h-16 mx-auto mb-4 text-stone-300" />
-              <h3 className="text-xl font-bold mb-2">إدارة الاشتراكات</h3>
-              <p>يتم تحميل وحدة الاشتراكات...</p>
-            </div>
+            <SubscriptionsTab companies={companies} />
+          )}
+
+          {activeTab === 'feature-manager' && (
+            <FeatureManagerTab companies={companies} />
           )}
 
           {activeTab === 'settings' && (

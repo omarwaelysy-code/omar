@@ -8,6 +8,7 @@ import fs from "fs";
 import { initDatabase } from "./src/lib/init-db";
 import { runMigrations } from "./src/lib/migration-runner";
 import erpRouter from "./src/lib/erp-api";
+import subscriptionRouter from "./src/lib/subscription/subscription-api";
 import { generatePDF } from "./src/lib/pdf-generator";
 
 async function startServer() {
@@ -479,6 +480,9 @@ async function startServer() {
 
   // ERP API Routes
   app.use("/api/erp", erpRouter);
+
+  // Subscription API Routes
+  app.use("/api/subscriptions", subscriptionRouter);
 
   // Health check
   app.get("/api/health", (req, res) => {

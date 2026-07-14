@@ -26,7 +26,7 @@ const getPostHandler = () => {
     (l: any) => l.route && l.route.path === '/purchase_invoices' && l.route.methods.post
   );
   if (!layer) throw new Error('Route POST /purchase_invoices not found');
-  return layer.route.stack[1].handle;
+  return layer.route.stack[layer.route.stack.length - 1].handle;
 };
 
 describe('Purchase Invoice and Inventory Movement Integration', () => {

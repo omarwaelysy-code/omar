@@ -26,7 +26,7 @@ const getPostHandler = () => {
     (l: any) => l.route && l.route.path === '/purchase_returns' && l.route.methods.post
   );
   if (!layer) throw new Error('Route POST /purchase_returns not found');
-  return layer.route.stack[1].handle;
+  return layer.route.stack[layer.route.stack.length - 1].handle;
 };
 
 const getPutHandler = () => {
@@ -34,7 +34,7 @@ const getPutHandler = () => {
     (l: any) => l.route && l.route.path === '/purchase_returns/:id' && l.route.methods.put
   );
   if (!layer) throw new Error('Route PUT /purchase_returns/:id not found');
-  return layer.route.stack[1].handle;
+  return layer.route.stack[layer.route.stack.length - 1].handle;
 };
 
 const getDeleteHandler = () => {
@@ -42,7 +42,7 @@ const getDeleteHandler = () => {
     (l: any) => l.route && l.route.path === '/purchase_returns/:id' && l.route.methods.delete
   );
   if (!layer) throw new Error('Route DELETE /purchase_returns/:id not found');
-  return layer.route.stack[1].handle;
+  return layer.route.stack[layer.route.stack.length - 1].handle;
 };
 
 describe('Purchase Return and Inventory Movement Integration (Phase 6)', () => {
