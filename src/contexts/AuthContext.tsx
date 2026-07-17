@@ -180,11 +180,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       const membership = userMemberships.find(m => m.company_id === companyId);
       if (membership) {
-        if (user.role === 'super_admin') {
+        const isSuperAdminEmail = user.email === 'omarwaelysy@gmail.com' || user.email === 'omarwaelsys@gmail.com' || user.email === 'acc.wael2005@gmail.com';
+        if (isSuperAdminEmail) {
           setWorkspaceMode('company');
         }
         setUser({
           ...membership,
+          role: isSuperAdminEmail ? 'super_admin' : membership.role,
           must_change_password: membership.must_change_password || false
         });
         localStorage.setItem(`preferred_company_${user.id}`, companyId);
