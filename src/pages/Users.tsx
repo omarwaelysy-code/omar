@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -598,7 +598,7 @@ export const Users: React.FC = () => {
             >
               {language === 'ar' ? 'إلغاء' : 'Cancel'}
             </button>
-            {!(permissionsTargetType === 'user' && selectedUser?.role === 'admin') && (
+            {!(permissionsTargetType === 'user' && (selectedUser?.role === 'admin' || selectedUser?.role === 'super_admin')) && (
               <button
                 onClick={savePermissions}
                 disabled={loading}
@@ -617,7 +617,7 @@ export const Users: React.FC = () => {
 
           {/* Modal Body */}
             <div className="flex-1 overflow-y-auto p-6 bg-slate-50/40 custom-scrollbar space-y-6">
-              {permissionsTargetType === 'user' && selectedUser && selectedUser.role === 'admin' ? (
+              {permissionsTargetType === 'user' && selectedUser && (selectedUser.role === 'admin' || selectedUser.role === 'super_admin') ? (
                 <div className="bg-emerald-50/50 border border-emerald-100 p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-4 text-emerald-700">
                   <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-2">
                     <Shield size={40} className="shrink-0" />
@@ -659,7 +659,7 @@ export const Users: React.FC = () => {
                         >
                           <option value="">{language === 'ar' ? '-- اختر مستخدماً للنسخ --' : '-- Choose a user to copy --'}</option>
                           {users
-                            .filter(u => u.id !== selectedUser?.id && u.role !== 'admin')
+                            .filter(u => u.id !== selectedUser?.id && u.role !== 'admin' && u.role !== 'super_admin')
                             .map(u => (
                               <option key={u.id} value={u.id}>{u.username}</option>
                             ))}
@@ -1279,7 +1279,7 @@ export const Users: React.FC = () => {
                 >
                   {language === 'ar' ? 'إلغاء' : 'Cancel'}
                 </button>
-                {!(permissionsTargetType === 'user' && selectedUser?.role === 'admin') && (
+                {!(permissionsTargetType === 'user' && (selectedUser?.role === 'admin' || selectedUser?.role === 'super_admin')) && (
                   <button 
                     onClick={savePermissions}
                     disabled={loading}
@@ -1383,8 +1383,8 @@ export const Users: React.FC = () => {
               .map((user) => (
                 <div key={user.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all group relative">
                   <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${user.role === 'admin' ? 'bg-emerald-50 text-emerald-600 shadow-inner' : user.role === 'manager' ? 'bg-blue-50 text-blue-600 shadow-inner' : 'bg-slate-50 text-slate-400 shadow-inner'}`}>
-                      {user.role === 'admin' ? <Shield size={24} /> : <UserIcon size={24} />}
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${user.role === 'admin' || user.role === 'super_admin' ? 'bg-emerald-50 text-emerald-600 shadow-inner' : user.role === 'manager' ? 'bg-blue-50 text-blue-600 shadow-inner' : 'bg-slate-50 text-slate-400 shadow-inner'}`}>
+                      {user.role === 'admin' || user.role === 'super_admin' ? <Shield size={24} /> : <UserIcon size={24} />}
                     </div>
                     <div className="text-right flex-1 min-w-0">
                       <h4 className="font-bold text-slate-900 truncate">{user.username}</h4>
@@ -1392,9 +1392,9 @@ export const Users: React.FC = () => {
                       
                       <div className="flex flex-wrap gap-1 mt-2">
                         <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-black">
-                          {user.role === 'admin' ? (language === 'ar' ? 'مدير عام' : 'Super Admin') : user.role === 'manager' ? (language === 'ar' ? 'مدير' : 'Manager') : (language === 'ar' ? 'مستخدم' : 'User')}
+                          {user.role === 'super_admin' ? (language === 'ar' ? 'مدير عام النظام' : 'System Super Admin') : user.role === 'admin' ? (language === 'ar' ? 'مدير عام' : 'Super Admin') : user.role === 'manager' ? (language === 'ar' ? 'مدير' : 'Manager') : (language === 'ar' ? 'مستخدم' : 'User')}
                         </span>
-                        {user.role !== 'admin' && (
+                        {user.role !== 'admin' && user.role !== 'super_admin' && (
                           <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-black border border-emerald-100/50 truncate max-w-[150px]" title={getUserAssignedRoleNames(user)}>
                             {language === 'ar' ? 'أدوار' : 'Roles'}: {getUserAssignedRoleNames(user)}
                           </span>
