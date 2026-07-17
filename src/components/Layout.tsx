@@ -774,7 +774,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                             <Building2 size={16} />
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-bold truncate">{membership.company_name}</p>
-                              <p className="text-[10px] opacity-50">{membership.role === 'admin' ? t('common.role_admin') : t('common.role_user')}</p>
+                              <p className="text-[10px] opacity-50">
+                                {user?.role === 'super_admin' 
+                                  ? t('common.role_super_admin') 
+                                  : (membership.role === 'admin' ? t('common.role_admin') : t('common.role_user'))}
+                              </p>
                             </div>
                             {user?.company_id === membership.company_id && (
                               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -793,7 +797,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             <div className={`hidden xl:block ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
               <p className="font-bold text-xs text-slate-800 leading-none">{user?.username}</p>
               <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                {isSuperAdmin ? t('common.role_super_admin') : isCompanyAdmin ? t('common.role_company_admin') : t('common.role_user')}
+                {user?.role === 'super_admin' ? t('common.role_super_admin') : isCompanyAdmin ? t('common.role_company_admin') : t('common.role_user')}
               </p>
             </div>
             <div className="w-8 h-8 rounded-lg bg-brand-primary/10 flex items-center justify-center font-bold text-brand-primary shadow-sm">
@@ -1197,7 +1201,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                               <div className="flex-1 min-w-0">
                                 <p className="font-bold truncate">{membership.company_name}</p>
                                 <p className={`text-[10px] font-bold ${user?.company_id === membership.company_id ? 'text-white/70' : 'text-slate-400'}`}>
-                                  {membership.role === 'admin' ? t('common.role_admin') : t('common.role_user')}
+                                  {user?.role === 'super_admin' 
+                                    ? t('common.role_super_admin') 
+                                    : (membership.role === 'admin' ? t('common.role_admin') : t('common.role_user'))}
                                 </p>
                               </div>
                             </button>
@@ -1214,7 +1220,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                       <div>
                         <p className="font-bold text-slate-900">{user?.username}</p>
                         <p className="text-xs text-emerald-600 font-bold uppercase tracking-tighter">
-                          {isSuperAdmin ? t('common.role_super_admin') : isCompanyAdmin ? t('common.role_admin') : isManager ? t('common.manager') : t('common.role_user')}
+                          {user?.role === 'super_admin' ? t('common.role_super_admin') : isCompanyAdmin ? t('common.role_admin') : isManager ? t('common.manager') : t('common.role_user')}
                         </p>
                       </div>
                     </div>
