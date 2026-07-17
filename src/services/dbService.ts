@@ -178,6 +178,17 @@ function showPasswordModal(closingDate: string): Promise<string | null> {
 
 export async function apiRequest<T>(path: string, method: string = 'GET', body?: any, timeoutMs: number = 30000): Promise<T> {
   const token = localStorage.getItem('auth_token');
+  const authUserStr = localStorage.getItem('auth_user');
+  let activeCompanyId = '';
+  if (authUserStr) {
+    try {
+      const parsedUser = JSON.parse(authUserStr);
+      activeCompanyId = parsedUser.company_id || '';
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -185,6 +196,9 @@ export async function apiRequest<T>(path: string, method: string = 'GET', body?:
     'Content-Type': 'application/json',
     'Authorization': token ? `Bearer ${token}` : '',
   };
+  if (activeCompanyId) {
+    headers['x-company-id'] = activeCompanyId;
+  }
   if (lastBypassPassword) {
     headers['x-closing-password'] = encodeURIComponent(lastBypassPassword);
   }
@@ -212,6 +226,7 @@ export async function apiRequest<T>(path: string, method: string = 'GET', body?:
             headers: {
               'Content-Type': 'application/json',
               'Authorization': token ? `Bearer ${token}` : '',
+              'x-company-id': activeCompanyId,
               'x-closing-password': encodeURIComponent(password)
             },
             body: body ? JSON.stringify(body) : undefined,

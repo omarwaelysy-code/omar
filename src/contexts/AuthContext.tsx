@@ -184,11 +184,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (isSuperAdminEmail) {
           setWorkspaceMode('company');
         }
-        setUser({
+        const updatedUser = {
           ...membership,
           role: isSuperAdminEmail ? 'super_admin' : membership.role,
           must_change_password: membership.must_change_password || false
-        });
+        };
+        setUser(updatedUser);
+        localStorage.setItem('auth_user', JSON.stringify(updatedUser));
         localStorage.setItem(`preferred_company_${user.id}`, companyId);
       }
     } finally {
