@@ -529,6 +529,13 @@ async function applyQueryFiltersRestrictions(req: AuthRequest, moduleName: strin
 
 const router = Router();
 
+export let latestServerError: any = null;
+
+router.get('/debug/latest-error', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.json(latestServerError || { message: 'No error recorded yet' });
+});
+
 export const requestContainer = new AsyncLocalStorage<{ req: any; res: any }>();
 
 router.use((req, res, next) => {
@@ -5107,6 +5114,13 @@ router.post('/purchase_returns', authenticateToken, async (req: AuthRequest, res
     res.status(201).json({ id: returnId });
   } catch (error: any) {
     if (client) await client.query('ROLLBACK');
+    latestServerError = {
+      message: error.message,
+      stack: error.stack,
+      route: 'POST /purchase_returns',
+      time: new Date().toISOString(),
+      body: req.body
+    };
     console.error('[CRASH PREVENTED] Purchase return creation error:', error);
     sendError(res, 500, 'Failed to create purchase return', error.message);
   } finally {
@@ -5233,6 +5247,13 @@ router.put('/purchase_returns/:id', authenticateToken, async (req: AuthRequest, 
     res.json({ success: true });
   } catch (error: any) {
     if (client) await client.query('ROLLBACK');
+    latestServerError = {
+      message: error.message,
+      stack: error.stack,
+      route: 'PUT /purchase_returns/:id',
+      time: new Date().toISOString(),
+      body: req.body
+    };
     console.error('[CRASH PREVENTED] Purchase return update error:', error);
     sendError(res, 500, 'Failed to update purchase return', error.message);
   } finally {
