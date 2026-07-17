@@ -3111,7 +3111,8 @@ modules.forEach(moduleName => {
           let query = `UPDATE "${moduleName}" SET ${setClause}${hasUpdatedAt ? ', updated_at = CURRENT_TIMESTAMP' : ''} WHERE id = $${keys.length + 1}`;
           let params = [...values, id];
 
-          if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies') {
+          const isSuperAdmin = req.user?.role === 'super_admin';
+          if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies' && !isSuperAdmin) {
             query += ` AND company_id = $${keys.length + 2}`;
             params.push(companyId);
           }
@@ -3262,7 +3263,8 @@ modules.forEach(moduleName => {
         let query = `DELETE FROM "${moduleName}" WHERE id = $1`;
         let params = [id];
 
-        if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies') {
+        const isSuperAdmin = req.user?.role === 'super_admin';
+        if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies' && !isSuperAdmin) {
           query += ` AND company_id = $2`;
           params.push(companyId);
         }
@@ -3684,7 +3686,8 @@ router.put('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
     
     let query = `UPDATE "invoices" SET ${invSetClause}, "updated_at" = CURRENT_TIMESTAMP WHERE id = $${invKeys.length + 1}`;
     let params = [...invValues, invoiceId];
-    if (companyId) {
+    const isSuperAdmin = req.user?.role === 'super_admin';
+    if (companyId && !isSuperAdmin) {
       query += ` AND company_id = $${invKeys.length + 2}`;
       params.push(companyId);
     }
@@ -3983,7 +3986,8 @@ router.put('/returns/:id', authenticateToken, async (req: AuthRequest, res) => {
     
     let query = `UPDATE "returns" SET ${rSetClause} WHERE id = $${rKeys.length + 1}`;
     let params = [...rValues, returnId];
-    if (companyId) {
+    const isSuperAdmin = req.user?.role === 'super_admin';
+    if (companyId && !isSuperAdmin) {
       query += ` AND company_id = $${rKeys.length + 2}`;
       params.push(companyId);
     }
@@ -4714,7 +4718,8 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
     
     let query = `UPDATE "purchase_invoices" SET ${invSetClause} WHERE id = $${invKeys.length + 1}`;
     let params = [...invValues, invoiceId];
-    if (companyId) {
+    const isSuperAdmin = req.user?.role === 'super_admin';
+    if (companyId && !isSuperAdmin) {
       query += ` AND company_id = $${invKeys.length + 2}`;
       params.push(companyId);
     }
@@ -5128,7 +5133,8 @@ router.put('/purchase_returns/:id', authenticateToken, async (req: AuthRequest, 
     
     let query = `UPDATE "purchase_returns" SET ${rSetClause} WHERE id = $${rKeys.length + 1}`;
     let params = [...rValues, returnId];
-    if (companyId) {
+    const isSuperAdmin = req.user?.role === 'super_admin';
+    if (companyId && !isSuperAdmin) {
       query += ` AND company_id = $${rKeys.length + 2}`;
       params.push(companyId);
     }
@@ -5357,7 +5363,8 @@ router.put('/journal_entries/:id', authenticateToken, async (req: AuthRequest, r
     
     let query = `UPDATE "journal_entries" SET ${setClause} WHERE id = $${keys.length + 1}`;
     let params = [...Object.values(entryData), entryId];
-    if (companyId) {
+    const isSuperAdmin = req.user?.role === 'super_admin';
+    if (companyId && !isSuperAdmin) {
       query += ` AND company_id = $${keys.length + 2}`;
       params.push(companyId);
     }
