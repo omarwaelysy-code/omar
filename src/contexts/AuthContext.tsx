@@ -17,6 +17,8 @@ interface AuthContextType {
   isStandardUser: boolean;
   hasPermission: (moduleId: string, action: keyof ModulePermissions) => boolean;
   fetchProfile: (userId: string, email: string) => Promise<void>;
+  workspaceMode?: 'super_admin' | 'company';
+  setWorkspaceMode?: (mode: 'super_admin' | 'company') => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,6 +28,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [userMemberships, setUserMemberships] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [workspaceMode, setWorkspaceModeState] = useState<'super_admin' | 'company'>(() => {
+    return (localStorage.getItem('workspace_mode') as any) || 'super_admin';
+  });
+
+  const setWorkspaceMode = (mode: 'super_admin' | 'company') => {
+    localStorage.setItem('workspace_mode', mode);
+    setWorkspaceModeState(mode);
+  };
 
   useEffect(() => {
     const initAuth = async () => {
@@ -170,6 +180,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       const membership = userMemberships.find(m => m.company_id === companyId);
       if (membership) {
+        if (user.role === 'super_admin') {
+          setWorkspaceMode('company');
+        }
         setUser({
           ...membership,
           must_change_password: membership.must_change_password || false
@@ -195,13 +208,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     window.location.href = '/login';
   };
 
-  const isSuperAdmin = user?.role === 'super_admin';
+  const isSuperAdmin = user?.role === 'super_admin' && workspaceMode === 'super_admin';
   const isCompanyAdmin = user?.role === 'admin' && user?.company_id !== 'system';
   const isManager = user?.role === 'manager';
   const isStandardUser = user?.role === 'user';
 
   const hasPermission = React.useCallback((moduleId: string, action: keyof ModulePermissions): boolean => {
-    if (isSuperAdmin || isCompanyAdmin) return true;
+    if (user?.role === 'super_admin' || isCompanyAdmin) return true;
     if (isManager) {
       if (action === 'delete') return false;
       return true;
@@ -213,9 +226,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     const modulePerms = user.permissions[moduleId];
     return modulePerms ? modulePerms[action] : false;
-  }, [isSuperAdmin, isCompanyAdmin, isManager, user]);
+  }, [isCompanyAdmin, isManager, user]);
 
-  const isAuthenticated = !!user && (isSuperAdmin || !!user.company_id);
+  const isAuthenticated = !!user && (user?.role === 'super_admin' || !!user.company_id);
 
   const value = React.useMemo(() => ({ 
     user, 
@@ -230,9 +243,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isManager,
     isStandardUser,
     hasPermission,
-    fetchProfile
-  }), [user, userMemberships, loading, isAuthenticated, isSuperAdmin, isCompanyAdmin, isManager, isStandardUser, hasPermission]);
-
+    fetchProfile,
+    workspaceMode,
+    setWorkspaceMode
+  }), [user, userMemberships, loading, isAuthenticated, isSuperAdmin, isCompanyAdmin, isManager, isStandardUser, hasPermission, workspaceMode]);
   return (
     <AuthContext.Provider value={value}>
       {children}
