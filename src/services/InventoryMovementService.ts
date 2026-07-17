@@ -318,9 +318,13 @@ export class InventoryMovementService {
     if (moves.length === 0) return;
 
     for (const originalMovement of moves) {
-      // Update original movement status to 'reversed'
+      // Update original movement status to 'reversed' and rename movement_number to free it up
       await client.query(
-        `UPDATE "inventory_movements_v2" SET "status" = 'reversed', "updated_at" = NOW() WHERE "id" = $1`,
+        `UPDATE "inventory_movements_v2" 
+         SET "status" = 'reversed', 
+             "movement_number" = "movement_number" || '-REV-' || SUBSTRING("id" FROM 1 FOR 8), 
+             "updated_at" = NOW() 
+         WHERE "id" = $1`,
         [originalMovement.id]
       );
 

@@ -1176,4 +1176,18 @@ async function seedDatabase(client: any) {
   } catch (e) {
     console.warn('    ! Dashboard template seeding failed:', e);
   }
+
+  // 5. Cleanup existing legacy reversed movements to free up movement numbers
+  try {
+    const renameRes = await client.query(`
+      UPDATE "inventory_movements_v2" 
+      SET "movement_number" = "movement_number" || '-REV-' || SUBSTRING("id" FROM 1 FOR 8) 
+      WHERE "status" = 'reversed' AND "movement_number" NOT LIKE '%-REV-%'
+    `);
+    if (renameRes.rowCount > 0) {
+      console.log(`    * Free'd up ${renameRes.rowCount} movement numbers by renaming legacy reversed movements.`);
+    }
+  } catch (e) {
+    console.warn('    ! Legacy reversed movements renaming failed:', e);
+  }
 }
