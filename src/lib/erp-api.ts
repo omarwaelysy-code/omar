@@ -2156,6 +2156,20 @@ function sanitizeData(table: string, data: any) {
   return sanitized;
 }
 
+function incrementDocumentNumber(docNum: string): string {
+  const parts = docNum.split('-');
+  if (parts.length > 0) {
+    const lastPart = parts[parts.length - 1];
+    const seq = parseInt(lastPart, 10);
+    if (!isNaN(seq)) {
+      const newSeq = String(seq + 1).padStart(lastPart.length, '0');
+      parts[parts.length - 1] = newSeq;
+      return parts.join('-');
+    }
+  }
+  return docNum + '-1';
+}
+
 export async function generateNextSequence(client: any, companyId: string, moduleName: string, dateStr: string): Promise<string> {
   let numField = 'invoice_number';
   let prefix = 'INV';
@@ -2178,6 +2192,8 @@ export async function generateNextSequence(client: any, companyId: string, modul
     case 'goods_receipts': numField = 'receipt_number'; prefix = 'GR'; break;
   }
 
+  let generatedNumber = '';
+
   if (moduleName === 'employees') {
     const sql = `SELECT employee_code FROM "employees" WHERE company_id = $1 ORDER BY id DESC LIMIT 500`;
     const rows = await client.query(sql, [companyId]);
@@ -2193,10 +2209,10 @@ export async function generateNextSequence(client: any, companyId: string, modul
       }
     });
     const nextSeq = String(maxSeq + 1).padStart(6, '0');
-    return `EMP-${nextSeq}`;
+    generatedNumber = `EMP-${nextSeq}`;
   }
 
-  if (moduleName === 'sales_orders' || moduleName === 'purchase_orders') {
+  else if (moduleName === 'sales_orders' || moduleName === 'purchase_orders') {
     const parts = dateStr.slice(0, 10).split('-');
     const year = parts[0];
     const month = parts[1].padStart(2, '0');
@@ -2216,18 +2232,16 @@ export async function generateNextSequence(client: any, companyId: string, modul
        }
     });
     const nextSeq = String(maxSeq + 1).padStart(6, '0');
-    return `${datePrefix}-${nextSeq}`;
+    generatedNumber = `${datePrefix}-${nextSeq}`;
   }
 
-  if (moduleName === 'journal_entries') {
-    // Requested format: JE-YYYY-MM-DD-00001
+  else if (moduleName === 'journal_entries') {
     const parts = dateStr.slice(0, 10).split('-');
     const year = parts[0];
     const month = parts[1].padStart(2, '0');
     const day = parts[2].padStart(2, '0');
     const datePrefix = `JE-${year}-${month}-${day}`;
     
-    // Using LIKE to match anything starting with this prefix
     const sql = `SELECT ${numField} FROM "${moduleName}" WHERE company_id = $1 AND ${numField} LIKE $2 ORDER BY id DESC LIMIT 500`;
     const rows = await client.query(sql, [companyId, `${datePrefix}-%`]);
     let maxSeq = 0;
@@ -2242,9 +2256,8 @@ export async function generateNextSequence(client: any, companyId: string, modul
        }
     });
     const nextSeq = String(maxSeq + 1).padStart(5, '0');
-    return `${datePrefix}-${nextSeq}`;
+    generatedNumber = `${datePrefix}-${nextSeq}`;
   } else {
-    // New format: PREFIX-YYYY-MM-NNNNNN
     const parts = dateStr.slice(0, 10).split('-');
     const year = parts[0];
     const month = parts[1].padStart(2, '0');
@@ -2264,8 +2277,27 @@ export async function generateNextSequence(client: any, companyId: string, modul
       }
     });
     const nextSeq = String(maxSeq + 1).padStart(6, '0');
-    return `${datePrefix}-${nextSeq}`;
+    generatedNumber = `${datePrefix}-${nextSeq}`;
   }
+
+  let finalNumber = generatedNumber;
+  if (moduleName !== 'employees' && moduleName !== 'journal_entries') {
+    while (true) {
+      try {
+        const existCheck = await client.query(
+          `SELECT 1 FROM "inventory_movements_v2" WHERE "company_id" = $1 AND "movement_number" = $2 LIMIT 1`,
+          [companyId, finalNumber]
+        );
+        if (existCheck.rows.length === 0) {
+          break;
+        }
+        finalNumber = incrementDocumentNumber(finalNumber);
+      } catch (checkErr) {
+        break;
+      }
+    }
+  }
+  return finalNumber;
 }
 
 router.get('/utils/next-sequence/:moduleName', authenticateToken, async (req: any, res) => {
