@@ -401,7 +401,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
     }
   };
 
-  const updateUserRole = async (userId: string, newRole: 'admin' | 'user' | 'manager', companyId?: string) => {
+  const updateUserRole = async (userId: string, newRole: 'super_admin' | 'admin' | 'user' | 'manager', companyId?: string) => {
     try {
       const updateData: any = { role: newRole };
       if (companyId) updateData.company_id = companyId;
@@ -772,12 +772,12 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        u.role === 'admin' && u.company_id === 'system' ? 'bg-purple-100 text-purple-800' :
+                        u.role === 'super_admin' || (u.role === 'admin' && u.company_id === 'system') ? 'bg-purple-100 text-purple-800' :
                         u.role === 'admin' ? 'bg-blue-100 text-blue-800' :
                         u.role === 'manager' ? 'bg-amber-100 text-amber-800' :
                         'bg-stone-100 text-stone-800'
                       }`}>
-                        {u.role === 'admin' && u.company_id === 'system' ? 'مدير عام' :
+                        {u.role === 'super_admin' || (u.role === 'admin' && u.company_id === 'system') ? 'مدير عام' :
                          u.role === 'admin' ? 'مدير شركة' : u.role === 'manager' ? 'مشرف' : 'مستخدم'}
                       </span>
                     </td>
@@ -1189,6 +1189,19 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
               <div className="space-y-2">
                 <label className="text-xs font-bold text-zinc-400 uppercase">الدور الوظيفي</label>
                 <div className="grid grid-cols-1 gap-3">
+                  <button
+                    onClick={() => updateUserRole(editingUser.id, 'super_admin', editingUser.company_id)}
+                    className={`w-full p-4 rounded-2xl border-2 transition-all text-right flex items-center justify-between ${
+                      editingUser.role === 'super_admin' ? 'border-purple-500 bg-purple-50' : 'border-zinc-100 hover:border-zinc-200'
+                    }`}
+                  >
+                    <div>
+                      <p className="font-bold text-zinc-900">مدير عام للنظام</p>
+                      <p className="text-xs text-zinc-500">كامل الصلاحيات على كل الشركات وإدارة الاشتراكات</p>
+                    </div>
+                    {editingUser.role === 'super_admin' && <CheckCircle2 className="text-purple-500" />}
+                  </button>
+
                   <button
                     onClick={() => updateUserRole(editingUser.id, 'admin', editingUser.company_id)}
                     className={`w-full p-4 rounded-2xl border-2 transition-all text-right flex items-center justify-between ${
