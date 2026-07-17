@@ -137,7 +137,7 @@ export class InventoryMovementService {
       // Perform validation and simulation (Dry Run logic) to construct final entities
       const { movement: finalMovement, lines: finalLines } = await this.createMovementDryRun(client, movement, lines);
 
-      // Insert Header
+      // Insert Header with collision-proof retry on movement_number
       const headerQuery = `
         INSERT INTO "inventory_movements_v2" (
           id, company_id, branch_id, warehouse_id, movement_number, movement_type,
@@ -146,22 +146,56 @@ export class InventoryMovementService {
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         RETURNING *
       `;
-      await client.query(headerQuery, [
-        finalMovement.id,
-        finalMovement.company_id,
-        finalMovement.branch_id,
-        finalMovement.warehouse_id,
-        finalMovement.movement_number,
-        finalMovement.movement_type,
-        finalMovement.source_document_type,
-        finalMovement.source_document_id,
-        finalMovement.movement_date,
-        finalMovement.status,
-        finalMovement.notes,
-        finalMovement.created_by,
-        finalMovement.created_at,
-        finalMovement.updated_at
-      ]);
+
+      let movementNumber = finalMovement.movement_number;
+      const maxRetries = 20;
+      let inserted = false;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const savepointName = `sp_movement_insert_${attempt}`;
+        try {
+          await client.query(`SAVEPOINT ${savepointName}`);
+          await client.query(headerQuery, [
+            attempt === 0 ? finalMovement.id : require('uuid').v4(),
+            finalMovement.company_id,
+            finalMovement.branch_id,
+            finalMovement.warehouse_id,
+            movementNumber,
+            finalMovement.movement_type,
+            finalMovement.source_document_type,
+            finalMovement.source_document_id,
+            finalMovement.movement_date,
+            finalMovement.status,
+            finalMovement.notes,
+            finalMovement.created_by,
+            finalMovement.created_at,
+            finalMovement.updated_at
+          ]);
+          await client.query(`RELEASE SAVEPOINT ${savepointName}`);
+          finalMovement.movement_number = movementNumber;
+          inserted = true;
+          break; // Success
+        } catch (insertErr: any) {
+          await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          if (insertErr.code === '23505' && insertErr.constraint === 'uq_movements_v2_company_number') {
+            // Increment the sequence part of the movement number and retry
+            const parts = movementNumber.split('-');
+            if (parts.length > 0) {
+              const lastPart = parts[parts.length - 1];
+              const seq = parseInt(lastPart, 10);
+              if (!isNaN(seq)) {
+                parts[parts.length - 1] = String(seq + 1).padStart(lastPart.length, '0');
+                movementNumber = parts.join('-');
+                continue;
+              }
+            }
+            throw insertErr; // Can't increment, rethrow
+          }
+          throw insertErr; // Different error, rethrow
+        }
+      }
+      if (!inserted) {
+        throw new Error(`Failed to insert movement after ${maxRetries} retries due to movement_number collisions.`);
+      }
 
       // Insert Detail Lines
       const lineInsertQuery = `
