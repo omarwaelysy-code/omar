@@ -2197,6 +2197,11 @@ export async function ensureUniqueSequenceNumber(
     default: return proposedNumber || '';
   }
 
+  // Lock the company row to serialize sequence generation per company and avoid concurrent duplicates
+  if (companyId) {
+    await client.query('SELECT 1 FROM "companies" WHERE "id" = $1 FOR UPDATE', [companyId]);
+  }
+
   let candidateNumber = proposedNumber;
   if (!candidateNumber) {
     candidateNumber = await generateNextSequence(client, companyId, moduleName, dateStr);
@@ -3067,13 +3072,19 @@ modules.forEach(moduleName => {
         }
         next();
       }, async (req: AuthRequest, res) => {
+        const client = await pool.connect();
         try {
+          await client.query('BEGIN');
           const targetModule = getEffectiveModule(moduleName);
           if (!await checkPermission(req, targetModule, 'create')) {
+            await client.query('ROLLBACK');
             return res.status(403).json({ error: 'Access Denied: No Create Permission' });
           }
           const companyId = req.user?.company_id;
-          if (!companyId && moduleName !== 'companies') return sendError(res, 401, 'Unauthorized');
+          if (!companyId && moduleName !== 'companies') {
+            await client.query('ROLLBACK');
+            return sendError(res, 401, 'Unauthorized');
+          }
 
           // Special case for users: handle password/temp_password hashing
           if (moduleName === 'users') {
@@ -3088,13 +3099,13 @@ modules.forEach(moduleName => {
 
           const dateStr = req.body.date || new Date().toISOString().slice(0, 10);
           if (moduleName === 'employees') {
-            req.body.employee_code = await ensureUniqueSequenceNumber(pool, companyId, 'employees', '', req.body.employee_code);
+            req.body.employee_code = await ensureUniqueSequenceNumber(client, companyId, 'employees', '', req.body.employee_code);
           } else if (moduleName === 'cash_transfers') {
-            req.body.transfer_number = await ensureUniqueSequenceNumber(pool, companyId, 'cash_transfers', dateStr, req.body.transfer_number);
+            req.body.transfer_number = await ensureUniqueSequenceNumber(client, companyId, 'cash_transfers', dateStr, req.body.transfer_number);
           } else if (moduleName === 'payment_vouchers') {
-            req.body.voucher_number = await ensureUniqueSequenceNumber(pool, companyId, 'payment_vouchers', dateStr, req.body.voucher_number);
+            req.body.voucher_number = await ensureUniqueSequenceNumber(client, companyId, 'payment_vouchers', dateStr, req.body.voucher_number);
           } else if (moduleName === 'receipt_vouchers') {
-            req.body.voucher_number = await ensureUniqueSequenceNumber(pool, companyId, 'receipt_vouchers', dateStr, req.body.voucher_number);
+            req.body.voucher_number = await ensureUniqueSequenceNumber(client, companyId, 'receipt_vouchers', dateStr, req.body.voucher_number);
           }
 
           const sanitizedData = sanitizeData(moduleName, req.body);
@@ -3111,10 +3122,12 @@ modules.forEach(moduleName => {
           const values = Object.values(data);
           const placeholders = keys.map((_, index) => `$${index + 1}`).join(', ');
           
-          const result = await pool.query(
+          const result = await client.query(
             `INSERT INTO "${moduleName}" ("${keys.join('", "')}") VALUES (${placeholders}) RETURNING *`,
             values
           );
+
+          await client.query('COMMIT');
 
           // Audit Log
           logAudit({
@@ -3133,6 +3146,7 @@ modules.forEach(moduleName => {
 
           res.status(201).json(parseRow(moduleName, result.rows[0] || data));
         } catch (error: any) {
+          await client.query('ROLLBACK');
           console.error(`[CRITICAL] Error in POST /${moduleName}:`, {
             message: error.message,
             stack: error.stack,
@@ -3140,6 +3154,8 @@ modules.forEach(moduleName => {
             user: req.user?.email
           });
           sendError(res, 500, `Failed to create ${moduleName}. ${error.message}`, error.message);
+        } finally {
+          client.release();
         }
       });
     });
