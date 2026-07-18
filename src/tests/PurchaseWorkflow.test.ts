@@ -41,7 +41,7 @@ describe('Purchase Workflow Mode & Goods Receipts Integration', () => {
 
     mockClient = {
       query: vi.fn().mockImplementation(async (text: string, params: any[] = []) => {
-        const textClean = text.toLowerCase();
+        const textClean = text.toLowerCase().trim();
         if (textClean.includes('select purchase_workflow_mode')) {
           return { rows: [{ purchase_workflow_mode: 'Simple' }] };
         }
@@ -53,6 +53,9 @@ describe('Purchase Workflow Mode & Goods Receipts Integration', () => {
         }
         if (textClean.includes('select cost_price') || textClean.includes('select unit_cost')) {
           return { rows: [{ cost_price: 10, stock: 5 }] };
+        }
+        if (textClean.includes('document_sequences')) {
+          return { rows: [{ last_seq: 1 }], rowCount: 1 };
         }
         return { rows: [], rowCount: 1 };
       }),
@@ -95,9 +98,12 @@ describe('Purchase Workflow Mode & Goods Receipts Integration', () => {
   it('Enterprise Strict Mode: should block purchase invoice without Goods Receipt', async () => {
     // Custom mock to return Enterprise Strict mode
     mockClient.query = vi.fn().mockImplementation(async (text: string, params: any[] = []) => {
-      const textClean = text.toLowerCase();
+      const textClean = text.toLowerCase().trim();
       if (textClean.includes('select purchase_workflow_mode') || textClean.includes('select * from companies')) {
         return { rows: [{ id: 'comp-abc', purchase_workflow_mode: 'Enterprise Strict' }] };
+      }
+      if (textClean.includes('document_sequences')) {
+        return { rows: [{ last_seq: 1 }], rowCount: 1 };
       }
       return { rows: [], rowCount: 1 };
     });
@@ -131,12 +137,15 @@ describe('Purchase Workflow Mode & Goods Receipts Integration', () => {
 
   it('Enterprise Strict Mode: should allow purchase invoice with Goods Receipt and not double post movement', async () => {
     mockClient.query = vi.fn().mockImplementation(async (text: string, params: any[] = []) => {
-      const textClean = text.toLowerCase();
+      const textClean = text.toLowerCase().trim();
       if (textClean.includes('select purchase_workflow_mode') || textClean.includes('select * from companies')) {
         return { rows: [{ id: 'comp-abc', purchase_workflow_mode: 'Enterprise Strict' }] };
       }
       if (textClean.includes('from products')) {
         return { rows: [{ id: params[0], name: 'Product 123', code: 'P123', type: 'product', is_service: false }] };
+      }
+      if (textClean.includes('document_sequences')) {
+        return { rows: [{ last_seq: 1 }], rowCount: 1 };
       }
       return { rows: [], rowCount: 1 };
     });
@@ -170,12 +179,15 @@ describe('Purchase Workflow Mode & Goods Receipts Integration', () => {
 
   it('Enterprise Flexible Mode: should auto-generate Goods Receipt and post movement if requested', async () => {
     mockClient.query = vi.fn().mockImplementation(async (text: string, params: any[] = []) => {
-      const textClean = text.toLowerCase();
+      const textClean = text.toLowerCase().trim();
       if (textClean.includes('select purchase_workflow_mode') || textClean.includes('select * from companies')) {
         return { rows: [{ id: 'comp-abc', purchase_workflow_mode: 'Enterprise Flexible' }] };
       }
       if (textClean.includes('from products')) {
         return { rows: [{ id: params[0], name: 'Product 123', code: 'P123', type: 'product', is_service: false }] };
+      }
+      if (textClean.includes('document_sequences')) {
+        return { rows: [{ last_seq: 1 }], rowCount: 1 };
       }
       return { rows: [], rowCount: 1 };
     });

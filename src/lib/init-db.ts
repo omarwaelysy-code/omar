@@ -89,6 +89,23 @@ export async function initDatabase() {
       );
     `, 'companies table');
 
+    // Document Sequences Table - Atomic counter per company+module+period
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "document_sequences" (
+        "id" VARCHAR(100) PRIMARY KEY,
+        "company_id" VARCHAR(36) NOT NULL,
+        "module" VARCHAR(50) NOT NULL,
+        "period" VARCHAR(20) NOT NULL,
+        "last_seq" INTEGER NOT NULL DEFAULT 0,
+        "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE("company_id", "module", "period")
+      );
+    `, 'document_sequences table');
+
+    await safeQuery(`
+      CREATE INDEX IF NOT EXISTS "idx_doc_seq_lookup" ON "document_sequences"("company_id", "module", "period");
+    `, 'document_sequences index');
+
     await safeQuery(`
       CREATE TABLE IF NOT EXISTS "roles" (
         "id" VARCHAR(36) PRIMARY KEY,

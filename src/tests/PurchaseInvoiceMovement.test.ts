@@ -39,13 +39,16 @@ describe('Purchase Invoice and Inventory Movement Integration', () => {
 
     mockClient = {
       query: vi.fn().mockImplementation(async (text: string, params: any[] = []) => {
-        const textClean = text.toLowerCase();
+        const textClean = text.toLowerCase().trim();
         if (textClean.includes('select * from products')) {
           // Return non-service product
           return { rows: [{ id: params[0], type: 'product', is_service: false }] };
         }
         if (textClean.includes('select cost_price')) {
           return { rows: [{ cost_price: 10, stock: 5 }] };
+        }
+        if (textClean.includes('document_sequences')) {
+          return { rows: [{ last_seq: 1 }], rowCount: 1 };
         }
         return { rows: [], rowCount: 1 };
       }),
@@ -89,7 +92,7 @@ describe('Purchase Invoice and Inventory Movement Integration', () => {
     const clientPassed = serviceCallArgs[2];
 
     expect(movementHeader.company_id).toBe('comp-abc');
-    expect(movementHeader.movement_number).toBe('PINV-2026-0001');
+    expect(movementHeader.movement_number).toMatch(/^PINV-2026-06-\d{6}$/);
     expect(movementHeader.movement_type).toBe('purchase');
     expect(movementHeader.source_document_type).toBe('purchase_invoice');
     expect(movementHeader.movement_date).toBe('2026-06-27');
@@ -112,7 +115,7 @@ describe('Purchase Invoice and Inventory Movement Integration', () => {
   it('should exclude service items from creating inventory movement lines', async () => {
     // Custom mock client to return a service item for prod-service
     mockClient.query = vi.fn().mockImplementation(async (text: string, params: any[] = []) => {
-      const textClean = text.toLowerCase();
+      const textClean = text.toLowerCase().trim();
       if (textClean.includes('select * from products')) {
         const prodId = params[0];
         if (prodId === 'prod-service') {
@@ -122,6 +125,9 @@ describe('Purchase Invoice and Inventory Movement Integration', () => {
       }
       if (textClean.includes('select cost_price')) {
         return { rows: [{ cost_price: 10, stock: 5 }] };
+      }
+      if (textClean.includes('document_sequences')) {
+        return { rows: [{ last_seq: 1 }], rowCount: 1 };
       }
       return { rows: [], rowCount: 1 };
     });

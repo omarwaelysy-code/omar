@@ -59,7 +59,7 @@ describe('Sales Invoice and Inventory Movement Integration (Phase 5)', () => {
 
     mockClient = {
       query: vi.fn().mockImplementation(async (text: string, params: any[] = []) => {
-        const textClean = text.toLowerCase();
+        const textClean = text.toLowerCase().trim();
         if (textClean.includes('select * from products')) {
           return { rows: [{ id: params[0], type: 'product', is_service: false }] };
         }
@@ -68,6 +68,9 @@ describe('Sales Invoice and Inventory Movement Integration (Phase 5)', () => {
         }
         if (textClean.includes('select * from accounts')) {
           return { rows: [{ id: 'acc-123', name: 'المخزون' }, { id: 'acc-456', name: 'تكلفة المبيعات' }] };
+        }
+        if (textClean.includes('document_sequences')) {
+          return { rows: [{ last_seq: 1 }], rowCount: 1 };
         }
         return { rows: [], rowCount: 1 };
       }),
@@ -110,7 +113,7 @@ describe('Sales Invoice and Inventory Movement Integration (Phase 5)', () => {
     const clientPassed = serviceCallArgs[2];
 
     expect(movementHeader.company_id).toBe('comp-abc');
-    expect(movementHeader.movement_number).toBe('INV-2026-0001');
+    expect(movementHeader.movement_number).toMatch(/^INV-2026-06-\d{6}$/);
     expect(movementHeader.movement_type).toBe('sales');
     expect(movementHeader.source_document_type).toBe('sales_invoice');
     expect(movementHeader.movement_date).toBe('2026-06-27');

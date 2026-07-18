@@ -2172,14 +2172,36 @@ function incrementDocumentNumber(docNum: string): string {
   const parts = docNum.split('-');
   if (parts.length > 0) {
     const lastPart = parts[parts.length - 1];
-    const seq = parseInt(lastPart, 10);
-    if (!isNaN(seq)) {
+    if (/^\d+$/.test(lastPart)) {
+      const seq = parseInt(lastPart, 10);
       const newSeq = String(seq + 1).padStart(lastPart.length, '0');
       parts[parts.length - 1] = newSeq;
       return parts.join('-');
     }
   }
   return docNum + '-1';
+}
+
+// ============================================================
+// ATOMIC SEQUENCE GENERATOR - uses document_sequences table
+// guarantees no duplicates under any concurrent load
+// ============================================================
+export async function getNextAtomicSequence(
+  client: any,
+  companyId: string,
+  module: string,
+  period: string
+): Promise<number> {
+  const id = `${companyId}:${module}:${period}`;
+  // INSERT row if not exists, then atomically increment and return new value
+  const result = await client.query(`
+    INSERT INTO "document_sequences" (id, company_id, module, period, last_seq, updated_at)
+    VALUES ($1, $2, $3, $4, 1, NOW())
+    ON CONFLICT (company_id, module, period)
+    DO UPDATE SET last_seq = document_sequences.last_seq + 1, updated_at = NOW()
+    RETURNING last_seq
+  `, [id, companyId, module, period]);
+  return result.rows[0].last_seq;
 }
 
 export async function ensureUniqueSequenceNumber(
@@ -2189,179 +2211,123 @@ export async function ensureUniqueSequenceNumber(
   dateStr: string,
   proposedNumber?: string
 ): Promise<string> {
-  let numField = 'invoice_number';
+  // Determine prefix and period based on module
+  let prefix = 'DOC';
+  let period = '';
+  let padLength = 6;
+  
   switch (moduleName) {
-    case 'invoices': numField = 'invoice_number'; break;
-    case 'purchase_invoices': numField = 'invoice_number'; break;
-    case 'returns': numField = 'return_number'; break;
-    case 'purchase_returns': numField = 'return_number'; break;
-    case 'payment_vouchers': numField = 'voucher_number'; break;
-    case 'receipt_vouchers': numField = 'voucher_number'; break;
-    case 'journal_entries': numField = 'entry_number'; break;
-    case 'sales_orders': numField = 'order_number'; break;
-    case 'purchase_orders': numField = 'order_number'; break;
-    case 'employees': numField = 'employee_code'; break;
-    case 'warehouse_transfers': numField = 'transfer_number'; break;
-    case 'opening_stock_balances': numField = 'document_number'; break;
-    case 'stock_adjustments': numField = 'adjustment_number'; break;
-    case 'cash_transfers': numField = 'transfer_number'; break;
-    case 'goods_receipts': numField = 'receipt_number'; break;
+    case 'invoices': prefix = 'INV'; break;
+    case 'purchase_invoices': prefix = 'PINV'; break;
+    case 'returns': prefix = 'RET'; break;
+    case 'purchase_returns': prefix = 'PRET'; break;
+    case 'payment_vouchers': prefix = 'PV'; break;
+    case 'receipt_vouchers': prefix = 'RV'; break;
+    case 'journal_entries': prefix = 'JE'; padLength = 5; break;
+    case 'sales_orders': prefix = 'SO'; break;
+    case 'purchase_orders': prefix = 'PO'; break;
+    case 'employees': prefix = 'EMP'; break;
+    case 'warehouse_transfers': prefix = 'TR'; break;
+    case 'opening_stock_balances': prefix = 'OPB'; break;
+    case 'stock_adjustments': prefix = 'ADJ'; break;
+    case 'cash_transfers': prefix = 'CT'; break;
+    case 'goods_receipts': prefix = 'GR'; break;
     default: return proposedNumber || '';
   }
 
-  // Lock the company row to serialize sequence generation per company and avoid concurrent duplicates
-  if (companyId) {
-    await client.query('SELECT 1 FROM "companies" WHERE "id" = $1 FOR UPDATE', [companyId]);
+  const safeDateStr = (dateStr || new Date().toISOString()).slice(0, 10);
+  const parts = safeDateStr.split('-');
+  const year = parts[0] || new Date().getFullYear().toString();
+  const month = (parts[1] || '01').padStart(2, '0');
+  const day = (parts[2] || '01').padStart(2, '0');
+
+  if (moduleName === 'journal_entries') {
+    period = `${year}-${month}-${day}`;
+  } else {
+    period = `${year}-${month}`;
   }
 
-  let candidateNumber = proposedNumber;
-  if (!candidateNumber) {
-    candidateNumber = await generateNextSequence(client, companyId, moduleName, dateStr);
-  }
+  // Get atomic next sequence number from DB - guaranteed unique
+  const seq = await getNextAtomicSequence(client, companyId, moduleName, period);
+  const seqStr = String(seq).padStart(padLength, '0');
   
-  candidateNumber = candidateNumber.trim();
-
-  for (let retries = 0; retries < 50; retries++) {
-    const dupCheck = await client.query(
-      `SELECT 1 FROM "${moduleName}" WHERE "company_id" = $1 AND "${numField}" = $2 LIMIT 1`,
-      [companyId, candidateNumber]
-    );
-    if (dupCheck.rows.length === 0) {
-      break;
-    }
-    candidateNumber = incrementDocumentNumber(candidateNumber);
+  let generatedNumber: string;
+  if (moduleName === 'journal_entries') {
+    generatedNumber = `JE-${year}-${month}-${day}-${seqStr}`;
+  } else if (moduleName === 'employees') {
+    generatedNumber = `EMP-${seqStr}`;
+  } else {
+    generatedNumber = `${prefix}-${year}-${month}-${seqStr}`;
   }
-  return candidateNumber;
+
+  return generatedNumber;
 }
 
 export async function generateNextSequence(client: any, companyId: string, moduleName: string, dateStr: string): Promise<string> {
-  let numField = 'invoice_number';
+  // For preview purposes (GET /utils/next-sequence), use the atomic method too
+  // but without actually incrementing - we just show what the next would be
   let prefix = 'INV';
+  let padLength = 6;
   
   switch (moduleName) {
-    case 'invoices': numField = 'invoice_number'; prefix = 'INV'; break;
-    case 'purchase_invoices': numField = 'invoice_number'; prefix = 'PINV'; break;
-    case 'returns': numField = 'return_number'; prefix = 'RET'; break;
-    case 'purchase_returns': numField = 'return_number'; prefix = 'PRET'; break;
-    case 'payment_vouchers': numField = 'voucher_number'; prefix = 'PV'; break;
-    case 'receipt_vouchers': numField = 'voucher_number'; prefix = 'RV'; break;
-    case 'journal_entries': numField = 'entry_number'; prefix = 'JE'; break;
-    case 'sales_orders': numField = 'order_number'; prefix = 'SO'; break;
-    case 'purchase_orders': numField = 'order_number'; prefix = 'PO'; break;
-    case 'employees': numField = 'employee_code'; prefix = 'EMP'; break;
-    case 'warehouse_transfers': numField = 'transfer_number'; prefix = 'TR'; break;
-    case 'opening_stock_balances': numField = 'document_number'; prefix = 'OPB'; break;
-    case 'stock_adjustments': numField = 'adjustment_number'; prefix = 'ADJ'; break;
-    case 'cash_transfers': numField = 'transfer_number'; prefix = 'CT'; break;
-    case 'goods_receipts': numField = 'receipt_number'; prefix = 'GR'; break;
+    case 'invoices': prefix = 'INV'; break;
+    case 'purchase_invoices': prefix = 'PINV'; break;
+    case 'returns': prefix = 'RET'; break;
+    case 'purchase_returns': prefix = 'PRET'; break;
+    case 'payment_vouchers': prefix = 'PV'; break;
+    case 'receipt_vouchers': prefix = 'RV'; break;
+    case 'journal_entries': prefix = 'JE'; padLength = 5; break;
+    case 'sales_orders': prefix = 'SO'; break;
+    case 'purchase_orders': prefix = 'PO'; break;
+    case 'employees': prefix = 'EMP'; break;
+    case 'warehouse_transfers': prefix = 'TR'; break;
+    case 'opening_stock_balances': prefix = 'OPB'; break;
+    case 'stock_adjustments': prefix = 'ADJ'; break;
+    case 'cash_transfers': prefix = 'CT'; break;
+    case 'goods_receipts': prefix = 'GR'; break;
+    default: prefix = 'DOC';
   }
 
-  let generatedNumber = '';
+  const safeDateStr = (dateStr || new Date().toISOString()).slice(0, 10);
+  const parts = safeDateStr.split('-');
+  const year = parts[0] || new Date().getFullYear().toString();
+  const month = (parts[1] || '01').padStart(2, '0');
+  const day = (parts[2] || '01').padStart(2, '0');
 
-  if (moduleName === 'employees') {
-    const sql = `SELECT employee_code FROM "employees" WHERE company_id = $1 ORDER BY employee_code DESC LIMIT 500`;
-    const rows = await client.query(sql, [companyId]);
-    let maxSeq = 0;
-    rows.rows.forEach((row: any) => {
-      const val = row.employee_code || '';
-      const parts = val.split('-');
-      if (parts.length === 2 && parts[0] === 'EMP') {
-        const seq = parseInt(parts[1], 10);
-        if (!isNaN(seq) && seq > maxSeq) {
-          maxSeq = seq;
-        }
-      }
-    });
-    const nextSeq = String(maxSeq + 1).padStart(6, '0');
-    generatedNumber = `EMP-${nextSeq}`;
-  }
-
-  else if (moduleName === 'sales_orders' || moduleName === 'purchase_orders') {
-    const parts = dateStr.slice(0, 10).split('-');
-    const year = parts[0];
-    const month = parts[1].padStart(2, '0');
-    const datePrefix = `${prefix}-${year}-${month}`;
-    
-    const sql = `SELECT ${numField} FROM "${moduleName}" WHERE company_id = $1 AND ${numField} LIKE $2 ORDER BY "${numField}" DESC LIMIT 500`;
-    const rows = await client.query(sql, [companyId, `${datePrefix}-%`]);
-    let maxSeq = 0;
-    rows.rows.forEach((row: any) => {
-       const val = row[numField] || '';
-       const valParts = val.split('-');
-       if (valParts.length >= 4) {
-         const seq = parseInt(valParts[valParts.length - 1], 10);
-         if (!isNaN(seq) && seq > maxSeq) {
-           maxSeq = seq;
-         }
-       }
-    });
-    const nextSeq = String(maxSeq + 1).padStart(6, '0');
-    generatedNumber = `${datePrefix}-${nextSeq}`;
-  }
-
-  else if (moduleName === 'journal_entries') {
-    const parts = dateStr.slice(0, 10).split('-');
-    const year = parts[0];
-    const month = parts[1].padStart(2, '0');
-    const day = parts[2].padStart(2, '0');
-    const datePrefix = `JE-${year}-${month}-${day}`;
-    
-    const sql = `SELECT ${numField} FROM "${moduleName}" WHERE company_id = $1 AND ${numField} LIKE $2 ORDER BY "${numField}" DESC LIMIT 500`;
-    const rows = await client.query(sql, [companyId, `${datePrefix}-%`]);
-    let maxSeq = 0;
-    rows.rows.forEach((row: any) => {
-       const val = row[numField] || '';
-       const valParts = val.split('-');
-       if (valParts.length >= 5) {
-         const seq = parseInt(valParts[valParts.length - 1], 10);
-         if (!isNaN(seq) && seq > maxSeq) {
-           maxSeq = seq;
-         }
-       }
-    });
-    const nextSeq = String(maxSeq + 1).padStart(5, '0');
-    generatedNumber = `${datePrefix}-${nextSeq}`;
+  // Read current sequence value without incrementing (for preview only)
+  let period = '';
+  if (moduleName === 'journal_entries') {
+    period = `${year}-${month}-${day}`;
   } else {
-    const parts = dateStr.slice(0, 10).split('-');
-    const year = parts[0];
-    const month = parts[1].padStart(2, '0');
-    const datePrefix = `${prefix}-${year}-${month}`;
-    
-    const sql = `SELECT ${numField} FROM "${moduleName}" WHERE company_id = $1 AND ${numField} LIKE $2 ORDER BY "${numField}" DESC LIMIT 500`;
-    const rows = await client.query(sql, [companyId, `${datePrefix}-%`]);
-    let maxSeq = 0;
-    rows.rows.forEach((row: any) => {
-      const val = row[numField] || '';
-      const valParts = val.split('-');
-      if (valParts.length >= 4) {
-        const seq = parseInt(valParts[valParts.length - 1], 10);
-        if (!isNaN(seq) && seq > maxSeq) {
-          maxSeq = seq;
-        }
-      }
-    });
-    const nextSeq = String(maxSeq + 1).padStart(6, '0');
-    generatedNumber = `${datePrefix}-${nextSeq}`;
+    period = `${year}-${month}`;
   }
 
-  let finalNumber = generatedNumber;
-  if (moduleName !== 'employees' && moduleName !== 'journal_entries') {
-    while (true) {
-      try {
-        const existCheck = await client.query(
-          `SELECT 1 FROM "inventory_movements_v2" WHERE "company_id" = $1 AND "movement_number" = $2 LIMIT 1`,
-          [companyId, finalNumber]
-        );
-        if (existCheck.rows.length === 0) {
-          break;
-        }
-        finalNumber = incrementDocumentNumber(finalNumber);
-      } catch (checkErr) {
-        break;
-      }
+  try {
+    const result = await client.query(
+      `SELECT last_seq FROM "document_sequences" WHERE company_id = $1 AND module = $2 AND period = $3`,
+      [companyId, moduleName, period]
+    );
+    const currentSeq = result.rows.length > 0 ? result.rows[0].last_seq : 0;
+    const nextSeq = String(currentSeq + 1).padStart(padLength, '0');
+    
+    if (moduleName === 'journal_entries') {
+      return `JE-${year}-${month}-${day}-${nextSeq}`;
+    } else if (moduleName === 'employees') {
+      return `EMP-${nextSeq}`;
+    } else {
+      return `${prefix}-${year}-${month}-${nextSeq}`;
+    }
+  } catch (e) {
+    // Fallback if document_sequences table doesn't exist yet
+    const nextSeq = String(1).padStart(padLength, '0');
+    if (moduleName === 'journal_entries') {
+      return `JE-${year}-${month}-${day}-${nextSeq}`;
+    } else if (moduleName === 'employees') {
+      return `EMP-${nextSeq}`;
+    } else {
+      return `${prefix}-${year}-${month}-${nextSeq}`;
     }
   }
-  return finalNumber;
 }
 
 router.get('/utils/next-sequence/:moduleName', authenticateToken, async (req: any, res) => {

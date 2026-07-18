@@ -38,7 +38,7 @@ describe('Professional Inventory Engine Integration (Phase 8)', () => {
 
     mockClient = {
       query: vi.fn().mockImplementation(async (text: string, params: any[] = []) => {
-        const textClean = text.toLowerCase();
+        const textClean = text.toLowerCase().trim();
         if (textClean.includes('from products')) {
           return { rows: [{ id: params[0], name: 'test product', code: 'PROD-123', type: 'product', is_service: false, weighted_average_cost: 12, cost_price: 12, stock: 15 }] };
         }
@@ -47,6 +47,9 @@ describe('Professional Inventory Engine Integration (Phase 8)', () => {
         }
         if (textClean.includes('from warehouses')) {
           return { rows: [{ id: 'wh-from', name: 'المخزن الرئيسي' }, { id: 'wh-to', name: 'مخزن المعرض' }] };
+        }
+        if (textClean.includes('document_sequences')) {
+          return { rows: [{ last_seq: 1 }], rowCount: 1 };
         }
         return { rows: [], rowCount: 1 };
       }),

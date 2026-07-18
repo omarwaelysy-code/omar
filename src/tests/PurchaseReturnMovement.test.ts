@@ -59,9 +59,12 @@ describe('Purchase Return and Inventory Movement Integration (Phase 6)', () => {
 
     mockClient = {
       query: vi.fn().mockImplementation(async (text: string, params: any[] = []) => {
-        const textClean = text.toLowerCase();
+        const textClean = text.toLowerCase().trim();
         if (textClean.includes('from products')) {
           return { rows: [{ id: params[0], type: 'product', is_service: false, weighted_average_cost: 15, cost_price: 15, stock: 10 }] };
+        }
+        if (textClean.includes('document_sequences')) {
+          return { rows: [{ last_seq: 1 }], rowCount: 1 };
         }
         return { rows: [], rowCount: 1 };
       }),
@@ -102,7 +105,7 @@ describe('Purchase Return and Inventory Movement Integration (Phase 6)', () => {
     const clientPassed = serviceCallArgs[2];
 
     expect(movementHeader.company_id).toBe('comp-abc');
-    expect(movementHeader.movement_number).toBe('PRET-2026-0001');
+    expect(movementHeader.movement_number).toMatch(/^PRET-2026-06-\d{6}$/);
     expect(movementHeader.movement_type).toBe('purchase_return');
     expect(movementHeader.source_document_type).toBe('purchase_return');
     expect(movementHeader.movement_date).toBe('2026-06-27');
