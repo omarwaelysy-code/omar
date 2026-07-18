@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -2311,10 +2311,17 @@ export const PurchaseInvoices: React.FC = () => {
       const discountVal = Number(discount_amount) || 0;
 
       (sanitizedItems || []).forEach(item => {
-        const itemTotal = Number(item.total) || 0;
-        const itemVat = isVatEnabled ? Number(item.vat_amount || 0) : 0;
-        const itemDiscount = subtotalVal > 0 ? Number(((itemTotal / subtotalVal) * discountVal).toFixed(2)) : 0;
-        const itemNetTotal = Number((itemTotal + itemVat - itemDiscount).toFixed(2));
+        // Calculate in foreign currency first (no rounding)
+        const itemTotalFC = Number(item.total) || 0;
+        const itemVatFC = isVatEnabled ? Number(item.vat_amount || 0) : 0;
+        const itemDiscountFC = subtotalVal > 0 ? (itemTotalFC / subtotalVal) * discountVal : 0;
+        const itemNetTotalFC = itemTotalFC + itemVatFC - itemDiscountFC;
+
+        // Convert to local currency and round once
+        const itemTotal = Number((itemTotalFC * rate).toFixed(2));
+        const itemVat = Number((itemVatFC * rate).toFixed(2));
+        const itemDiscount = Number((itemDiscountFC * rate).toFixed(2));
+        const itemNetTotal = Number((itemNetTotalFC * rate).toFixed(2));
 
         let debitAccountId = '';
         let debitAccountName = '';
@@ -2342,7 +2349,7 @@ export const PurchaseInvoices: React.FC = () => {
           account_id: debitAccountId,
           account_name: debitAccountName,
           account_code: debitAccountCode,
-          debit: Number((itemTotal * rate).toFixed(2)),
+          debit: itemTotal,
           credit: 0,
           product_name: item.product_name || item.category_name,
           description: t('pi.purchase_description', { name: item.product_name || item.category_name, number: invoice_number }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : '')
@@ -2367,7 +2374,7 @@ export const PurchaseInvoices: React.FC = () => {
             account_id: vatAccountId,
             account_name: vatAccountName,
             account_code: vatAccountCode,
-            debit: Number((itemVat * rate).toFixed(2)),
+            debit: itemVat,
             credit: 0,
             product_name: item.product_name || item.category_name,
             description: `ضريبة القيمة المضافة - صنف: ${item.product_name || item.category_name} - فاتورة رقم ${invoice_number}`
@@ -2383,7 +2390,7 @@ export const PurchaseInvoices: React.FC = () => {
             account_name: discountAccount?.name || t('pi.discount_account_default'),
             account_code: discountAccount?.code || '',
             debit: 0,
-            credit: Number((itemDiscount * rate).toFixed(2)),
+            credit: itemDiscount,
             product_name: item.product_name || item.category_name,
             description: t('pi.discount_description', { number: invoice_number }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : '')
           });
@@ -2403,7 +2410,7 @@ export const PurchaseInvoices: React.FC = () => {
             account_name: cashAccountName,
             account_code: cashAccountCode,
             debit: 0,
-            credit: Number((itemNetTotal * rate).toFixed(2)),
+            credit: itemNetTotal,
             product_name: item.product_name || item.category_name,
             description: t('pi.payment_description', { number: invoice_number, supplier: supplier?.name }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : ''),
             sub_account_id: invoiceData.payment_method_id,
@@ -2415,7 +2422,7 @@ export const PurchaseInvoices: React.FC = () => {
             account_id: supplierAccountId,
             account_name: supplierAccountName,
             account_code: supplierAccountCode,
-            debit: Number((itemNetTotal * rate).toFixed(2)),
+            debit: itemNetTotal,
             credit: 0,
             product_name: item.product_name || item.category_name,
             description: t('pi.settlement_description', { number: invoice_number, supplier: supplier?.name }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : ''),
@@ -2430,7 +2437,7 @@ export const PurchaseInvoices: React.FC = () => {
             account_name: supplierAccountName,
             account_code: supplierAccountCode,
             debit: 0,
-            credit: Number((itemNetTotal * rate).toFixed(2)),
+            credit: itemNetTotal,
             product_name: item.product_name || item.category_name,
             description: t('pi.invoice_description', { number: invoice_number, supplier: supplier?.name }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : ''),
             supplier_id: invoiceData.supplier_id,
@@ -2445,7 +2452,7 @@ export const PurchaseInvoices: React.FC = () => {
             account_name: supplierAccountName,
             account_code: supplierAccountCode,
             debit: 0,
-            credit: Number((itemNetTotal * rate).toFixed(2)),
+            credit: itemNetTotal,
             product_name: item.product_name || item.category_name,
             description: t('pi.invoice_description', { number: invoice_number, supplier: supplier?.name }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : ''),
             supplier_id: invoiceData.supplier_id,

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -396,10 +396,17 @@ export const Returns: React.FC = () => {
         const product = products.find(p => p.id === item.product_id);
         if (!product) return;
 
-        const itemTotal = Number(item.total) || 0;
-        const itemVat = isVatEnabled ? (Number(item.vat_amount) || 0) : 0;
-        const itemDiscount = subtotalVal > 0 ? Number(((itemTotal / subtotalVal) * discountVal).toFixed(2)) : 0;
-        const itemNetTotal = Number((itemTotal + itemVat - itemDiscount).toFixed(2));
+        // Calculate in foreign currency first (no rounding)
+        const itemTotalFC = Number(item.total) || 0;
+        const itemVatFC = isVatEnabled ? (Number(item.vat_amount) || 0) : 0;
+        const itemDiscountFC = subtotalVal > 0 ? (itemTotalFC / subtotalVal) * discountVal : 0;
+        const itemNetTotalFC = itemTotalFC + itemVatFC - itemDiscountFC;
+
+        // Convert to local currency and round once
+        const itemTotal = Number((itemTotalFC * rate).toFixed(2));
+        const itemVat = Number((itemVatFC * rate).toFixed(2));
+        const itemDiscount = Number((itemDiscountFC * rate).toFixed(2));
+        const itemNetTotal = Number((itemNetTotalFC * rate).toFixed(2));
 
         let debitAccountId = product.revenue_account_id || '';
         let debitAccountName = product.revenue_account_name || 'حساب مردودات المبيعات';
@@ -412,7 +419,7 @@ export const Returns: React.FC = () => {
           account_name: debitAccountName,
           account_code: debitAccountCode,
           product_name: item.product_name,
-          debit: Number((itemTotal * rate).toFixed(2)),
+          debit: itemTotal,
           credit: 0,
           description: `مرتجع صنف: ${item.product_name} - مرتجع ${return_number}`
         });
@@ -436,7 +443,7 @@ export const Returns: React.FC = () => {
             account_name: vatAccountName,
             account_code: vatAccountCode,
             product_name: item.product_name,
-            debit: Number((itemVat * rate).toFixed(2)),
+            debit: itemVat,
             credit: 0,
             description: `ضريبة القيمة المضافة مرتجعة - صنف: ${item.product_name} - مرتجع رقم ${return_number}`
           });
@@ -454,7 +461,7 @@ export const Returns: React.FC = () => {
             account_code: discountAccountCode,
             product_name: item.product_name,
             debit: 0,
-            credit: Number((itemDiscount * rate).toFixed(2)),
+            credit: itemDiscount,
             description: `تسوية خصم صنف: ${item.product_name} - مرتجع مبيعات رقم ${return_number}`
           });
         }
@@ -536,7 +543,7 @@ export const Returns: React.FC = () => {
             account_code: creditAccountCode,
             product_name: item.product_name,
             debit: 0,
-            credit: Number((itemNetTotal * rate).toFixed(2)),
+            credit: itemNetTotal,
             description: `دفع نقدية صنف: ${item.product_name} - مرتجع رقم ${return_number} - ${customer?.name || '...'}`,
             sub_account_id: paymentMethodId,
             sub_account_type: 'payment_method'
@@ -553,7 +560,7 @@ export const Returns: React.FC = () => {
             account_name: customerAccountName,
             account_code: customerAccountCode,
             product_name: item.product_name,
-            debit: Number((itemNetTotal * rate).toFixed(2)),
+            debit: itemNetTotal,
             credit: 0,
             description: `تسوية نقدية لمرتجع صنف: ${item.product_name} - مرتجع رقم ${return_number}`,
             customer_id: selectedCustomerId,
@@ -568,7 +575,7 @@ export const Returns: React.FC = () => {
             account_code: customerAccountCode,
             product_name: item.product_name,
             debit: 0,
-            credit: Number((itemNetTotal * rate).toFixed(2)),
+            credit: itemNetTotal,
             description: `مرتجع مبيعات صنف: ${item.product_name} - مرتجع رقم ${return_number}`,
             customer_id: selectedCustomerId,
             customer_name: customer?.name,
@@ -583,7 +590,7 @@ export const Returns: React.FC = () => {
             account_code: creditAccountCode,
             product_name: item.product_name,
             debit: 0,
-            credit: Number((itemNetTotal * rate).toFixed(2)),
+            credit: itemNetTotal,
             description: `مرتجع مبيعات صنف: ${item.product_name} - مرتجع رقم ${return_number} - ${customer?.name || '...'}`,
             customer_id: selectedCustomerId,
             customer_name: customer?.name,
@@ -934,10 +941,17 @@ export const Returns: React.FC = () => {
         const product = products.find(p => p.id === item.product_id);
         if (!product) return;
 
-        const itemTotal = Number(item.total) || 0;
-        const itemVat = isVatEnabled ? Number(item.vat_amount || 0) : 0;
-        const itemDiscount = subtotalVal > 0 ? Number(((itemTotal / subtotalVal) * discountVal).toFixed(2)) : 0;
-        const itemNetTotal = Number((itemTotal + itemVat - itemDiscount).toFixed(2));
+        // Calculate in foreign currency first (no rounding)
+        const itemTotalFC = Number(item.total) || 0;
+        const itemVatFC = isVatEnabled ? Number(item.vat_amount || 0) : 0;
+        const itemDiscountFC = subtotalVal > 0 ? (itemTotalFC / subtotalVal) * discountVal : 0;
+        const itemNetTotalFC = itemTotalFC + itemVatFC - itemDiscountFC;
+
+        // Convert to local currency and round once
+        const itemTotal = Number((itemTotalFC * rate).toFixed(2));
+        const itemVat = Number((itemVatFC * rate).toFixed(2));
+        const itemDiscount = Number((itemDiscountFC * rate).toFixed(2));
+        const itemNetTotal = Number((itemNetTotalFC * rate).toFixed(2));
 
         let debitAccountId = product.revenue_account_id || '';
         let debitAccountName = product.revenue_account_name || 'حساب مردودات المبيعات';
@@ -950,7 +964,7 @@ export const Returns: React.FC = () => {
           account_name: debitAccountName,
           account_code: debitAccountCode,
           product_name: item.product_name,
-          debit: Number((itemTotal * rate).toFixed(2)),
+          debit: itemTotal,
           credit: 0,
           description: `مرتجع مبيعات صنف: ${item.product_name} - مرتجع ${return_number}`
         });
@@ -974,7 +988,7 @@ export const Returns: React.FC = () => {
             account_name: vatAccountName,
             account_code: vatAccountCode,
             product_name: item.product_name,
-            debit: Number((itemVat * rate).toFixed(2)),
+            debit: itemVat,
             credit: 0,
             description: `ضريبة القيمة المضافة مرتجعة - صنف: ${item.product_name} - مرتجع رقم ${return_number}`
           });
@@ -992,7 +1006,7 @@ export const Returns: React.FC = () => {
             account_code: discountAccountCode,
             product_name: item.product_name,
             debit: 0,
-            credit: Number((itemDiscount * rate).toFixed(2)),
+            credit: itemDiscount,
             description: `تسوية خصم صنف: ${item.product_name} - مرتجع مبيعات رقم ${return_number}`
           });
         }
@@ -1074,7 +1088,7 @@ export const Returns: React.FC = () => {
             account_code: creditAccountCode,
             product_name: item.product_name,
             debit: 0,
-            credit: Number((itemNetTotal * rate).toFixed(2)),
+            credit: itemNetTotal,
             description: `دفع نقدية صنف: ${item.product_name} - مرتجع رقم ${return_number} - ${customer?.name}`,
             sub_account_id: paymentMethodId,
             sub_account_type: 'payment_method'
@@ -1086,7 +1100,7 @@ export const Returns: React.FC = () => {
             account_name: customerAccountName,
             account_code: customerAccountCode,
             product_name: item.product_name,
-            debit: Number((itemNetTotal * rate).toFixed(2)),
+            debit: itemNetTotal,
             credit: 0,
             description: `تسوية نقدية لمرتجع صنف: ${item.product_name} - مرتجع رقم ${return_number}`,
             customer_id: selectedCustomerId,
@@ -1101,7 +1115,7 @@ export const Returns: React.FC = () => {
             account_code: customerAccountCode,
             product_name: item.product_name,
             debit: 0,
-            credit: Number((itemNetTotal * rate).toFixed(2)),
+            credit: itemNetTotal,
             description: `مرتجع مبيعات صنف: ${item.product_name} - مرتجع رقم ${return_number}`,
             customer_id: selectedCustomerId,
             customer_name: customer?.name,
@@ -1116,7 +1130,7 @@ export const Returns: React.FC = () => {
             account_code: creditAccountCode,
             product_name: item.product_name,
             debit: 0,
-            credit: Number((itemNetTotal * rate).toFixed(2)),
+            credit: itemNetTotal,
             description: `مرتجع مبيعات صنف: ${item.product_name} - مرتجع رقم ${return_number} - ${customer?.name}`,
             customer_id: selectedCustomerId,
             customer_name: customer?.name,
