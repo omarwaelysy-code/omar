@@ -536,6 +536,18 @@ router.get('/debug/latest-error', (req, res) => {
   res.json(latestServerError || { message: 'No error recorded yet' });
 });
 
+router.get('/debug/db-query', async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  try {
+    const r1 = await pool.query('SELECT id, name FROM companies');
+    const r2 = await pool.query('SELECT id, return_number, date, company_id FROM returns ORDER BY date DESC, id DESC LIMIT 10');
+    const r3 = await pool.query('SELECT id, entry_number, date, company_id FROM journal_entries ORDER BY date DESC, entry_number DESC LIMIT 10');
+    res.json({ companies: r1.rows, returns: r2.rows, journalEntries: r3.rows });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message, stack: error.stack });
+  }
+});
+
 export const requestContainer = new AsyncLocalStorage<{ req: any; res: any }>();
 
 router.use((req, res, next) => {

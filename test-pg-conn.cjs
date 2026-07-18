@@ -33,13 +33,17 @@ async function run() {
   }
 
   try {
-    const invoices = await activePool.query('SELECT id, invoice_number, customer_id, payment_type, total_amount, date FROM invoices LIMIT 5');
-    console.log('\n--- Invoices ---');
-    console.table(invoices.rows);
+    const companies = await activePool.query('SELECT id, name FROM companies');
+    console.log('\n--- Companies ---');
+    console.table(companies.rows);
 
-    const customers = await activePool.query('SELECT id, name, account_id, opening_balance FROM customers LIMIT 5');
-    console.log('\n--- Customers ---');
-    console.table(customers.rows);
+    const returns = await activePool.query('SELECT id, return_number, date, company_id FROM returns ORDER BY date DESC, id DESC LIMIT 10');
+    console.log('\n--- Returns ---');
+    console.table(returns.rows);
+
+    const journalEntries = await activePool.query('SELECT id, entry_number, date, company_id FROM journal_entries WHERE date = \'2026-07-18\' ORDER BY entry_number DESC LIMIT 10');
+    console.log('\n--- Journal Entries ---');
+    console.table(journalEntries.rows);
 
   } catch (e) {
     console.error('Query error:', e);
