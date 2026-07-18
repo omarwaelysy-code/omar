@@ -2195,7 +2195,7 @@ export async function generateNextSequence(client: any, companyId: string, modul
   let generatedNumber = '';
 
   if (moduleName === 'employees') {
-    const sql = `SELECT employee_code FROM "employees" WHERE company_id = $1 ORDER BY id DESC LIMIT 500`;
+    const sql = `SELECT employee_code FROM "employees" WHERE company_id = $1 ORDER BY employee_code DESC LIMIT 500`;
     const rows = await client.query(sql, [companyId]);
     let maxSeq = 0;
     rows.rows.forEach((row: any) => {
@@ -2218,7 +2218,7 @@ export async function generateNextSequence(client: any, companyId: string, modul
     const month = parts[1].padStart(2, '0');
     const datePrefix = `${prefix}-${year}-${month}`;
     
-    const sql = `SELECT ${numField} FROM "${moduleName}" WHERE company_id = $1 AND ${numField} LIKE $2 ORDER BY id DESC LIMIT 500`;
+    const sql = `SELECT ${numField} FROM "${moduleName}" WHERE company_id = $1 AND ${numField} LIKE $2 ORDER BY "${numField}" DESC LIMIT 500`;
     const rows = await client.query(sql, [companyId, `${datePrefix}-%`]);
     let maxSeq = 0;
     rows.rows.forEach((row: any) => {
@@ -2242,7 +2242,7 @@ export async function generateNextSequence(client: any, companyId: string, modul
     const day = parts[2].padStart(2, '0');
     const datePrefix = `JE-${year}-${month}-${day}`;
     
-    const sql = `SELECT ${numField} FROM "${moduleName}" WHERE company_id = $1 AND ${numField} LIKE $2 ORDER BY id DESC LIMIT 500`;
+    const sql = `SELECT ${numField} FROM "${moduleName}" WHERE company_id = $1 AND ${numField} LIKE $2 ORDER BY "${numField}" DESC LIMIT 500`;
     const rows = await client.query(sql, [companyId, `${datePrefix}-%`]);
     let maxSeq = 0;
     rows.rows.forEach((row: any) => {
@@ -2263,7 +2263,7 @@ export async function generateNextSequence(client: any, companyId: string, modul
     const month = parts[1].padStart(2, '0');
     const datePrefix = `${prefix}-${year}-${month}`;
     
-    const sql = `SELECT ${numField} FROM "${moduleName}" WHERE company_id = $1 AND ${numField} LIKE $2 ORDER BY id DESC LIMIT 500`;
+    const sql = `SELECT ${numField} FROM "${moduleName}" WHERE company_id = $1 AND ${numField} LIKE $2 ORDER BY "${numField}" DESC LIMIT 500`;
     const rows = await client.query(sql, [companyId, `${datePrefix}-%`]);
     let maxSeq = 0;
     rows.rows.forEach((row: any) => {
