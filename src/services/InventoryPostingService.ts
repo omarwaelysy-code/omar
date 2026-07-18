@@ -26,6 +26,16 @@ export class InventoryPostingService {
         movement.source_document_id || ''
       );
 
+      // 1.5 Fetch company settings if needed for negative stock allowance
+      let allowNegativeStock = false;
+      if (direction === 'OUT') {
+        const compRes = await client.query(
+          `SELECT settings->>'allow_negative_stock' as allow_neg FROM companies WHERE id = $1`,
+          [movement.company_id]
+        );
+        allowNegativeStock = compRes.rows[0]?.allow_neg === 'true';
+      }
+
       // 2. Compute the new stock and average cost (Moving Average)
       let afterQty = beforeQty;
       let afterCost = beforeCost;
@@ -39,8 +49,8 @@ export class InventoryPostingService {
         }
       } else if (direction === 'OUT') {
         afterQty = beforeQty - quantity;
-        // Constraint check: Negative stock is not allowed
-        if (afterQty < 0) {
+        // Constraint check: Negative stock is not allowed unless setting is true
+        if (afterQty < 0 && !allowNegativeStock) {
           throw new Error(`الكمية المطلوبة غير متوفرة في المخزن لهذا المنتج. الرصيد الحالي: ${beforeQty}، الكمية المطلوبة: ${quantity} (Negative stock is not allowed. Product ID: ${productId})`);
         }
         afterCost = beforeCost; // Cost remains unchanged on outflow under Moving Average

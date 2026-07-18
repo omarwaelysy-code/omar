@@ -49,6 +49,7 @@ interface CompanyData {
   wht_enabled: boolean;
   purchase_workflow_mode?: 'Simple' | 'Enterprise Strict' | 'Enterprise Flexible';
   goods_receipt_matching_mode?: 'SupplierProduct' | 'ProductOnly' | 'SupplierProductWarehouse' | 'SmartMatching';
+  allow_negative_stock?: boolean;
 }
 
 // Searchable Select Component
@@ -1014,6 +1015,44 @@ export function CompanySettings() {
                       : 'Automatically matches by supplier, product, warehouse, and remaining quantity.'}
                   </p>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3.5.5: Allow Negative Stock Setting */}
+        <div className="bg-white p-8 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+          <div className="flex items-center gap-2 text-indigo-600 justify-end">
+            <span className="font-bold text-lg">{language === 'ar' ? 'السحب على المكشوف' : 'Negative Stock'}</span>
+            <TrendingUp className="w-5 h-5" />
+          </div>
+          <div className="space-y-4">
+            <div
+              className="flex items-center justify-between cursor-pointer select-none p-4 rounded-2xl border border-slate-100 hover:bg-slate-50 transition-colors"
+              onClick={() => setData((prev) => ({ ...prev, allow_negative_stock: !prev.allow_negative_stock }))}
+            >
+              <div className="flex flex-col gap-0.5 flex-1">
+                <span className="font-bold text-slate-800 text-sm">
+                  {language === 'ar' ? 'السماح بصرف رصيد بالسالب (تخطي رصيد المخزون)' : 'Allow Negative Stock Balance'}
+                </span>
+                <span className="text-xs text-slate-400 font-medium leading-relaxed mt-1">
+                  {language === 'ar' 
+                    ? 'يسمح بعمليات الصرف أو البيع حتى لو كان رصيد الصنف في المخزن أقل من الصفر (غير متوفر).'
+                    : 'Allows dispensing or selling items even if the stock balance is below zero (out of stock).'}
+                </span>
+              </div>
+              <div
+                className={`relative w-14 h-8 rounded-full transition-all duration-300 shadow-inner ms-4 flex-shrink-0 ${
+                  data.allow_negative_stock ? 'bg-indigo-600' : 'bg-slate-200'
+                }`}
+              >
+                <div
+                  className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
+                    dir === 'rtl'
+                      ? data.allow_negative_stock ? 'translate-x-[-120%]' : 'translate-x-[-10%]'
+                      : data.allow_negative_stock ? 'translate-x-[120%]' : 'translate-x-[10%]'
+                  }`}
+                />
               </div>
             </div>
           </div>

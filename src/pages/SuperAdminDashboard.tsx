@@ -224,7 +224,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
             user.username,
             editingCompany.id,
             'تعديل بيانات شركة',
-            `تعديل بيانات الشركة: ${companyData.name}`,
+            `تعديل إعدادات الشركة: ${companyData.name}`,
             'companies',
             editingCompany.id
           );
@@ -1268,7 +1268,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
             >
               <div className="p-6 border-b border-stone-200 flex justify-between items-center bg-stone-50">
                 <h2 className="text-xl font-bold text-stone-800">
-                  {editingCompany ? 'تعديل بيانات الشركة' : 'إضافة شركة جديدة'}
+                  {editingCompany ? 'تعديل إعدادات الشركة' : 'إضافة شركة جديدة'}
                 </h2>
                 <button 
                   onClick={() => setShowModal(false)}
