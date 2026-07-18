@@ -2248,16 +2248,52 @@ export async function ensureUniqueSequenceNumber(
   }
 
   // Get atomic next sequence number from DB - guaranteed unique
-  const seq = await getNextAtomicSequence(client, companyId, moduleName, period);
-  const seqStr = String(seq).padStart(padLength, '0');
+  let seq = await getNextAtomicSequence(client, companyId, moduleName, period);
+  let seqStr = String(seq).padStart(padLength, '0');
   
-  let generatedNumber: string;
-  if (moduleName === 'journal_entries') {
-    generatedNumber = `JE-${year}-${month}-${day}-${seqStr}`;
-  } else if (moduleName === 'employees') {
-    generatedNumber = `EMP-${seqStr}`;
-  } else {
-    generatedNumber = `${prefix}-${year}-${month}-${seqStr}`;
+  const generateString = () => {
+    if (moduleName === 'journal_entries') {
+      return `JE-${year}-${month}-${day}-${seqStr}`;
+    } else if (moduleName === 'employees') {
+      return `EMP-${seqStr}`;
+    } else {
+      return `${prefix}-${year}-${month}-${seqStr}`;
+    }
+  };
+  let generatedNumber = generateString();
+
+  const tableNames: any = {
+    'invoices': { table: 'invoices', field: 'invoice_number' },
+    'purchase_invoices': { table: 'purchase_invoices', field: 'invoice_number' },
+    'returns': { table: 'returns', field: 'return_number' },
+    'purchase_returns': { table: 'purchase_returns', field: 'return_number' },
+    'payment_vouchers': { table: 'payment_vouchers', field: 'voucher_number' },
+    'receipt_vouchers': { table: 'receipt_vouchers', field: 'voucher_number' },
+    'journal_entries': { table: 'journal_entries', field: 'entry_number' },
+    'sales_orders': { table: 'sales_orders', field: 'order_number' },
+    'purchase_orders': { table: 'purchase_orders', field: 'order_number' },
+    'goods_receipts': { table: 'goods_receipts', field: 'receipt_number' }
+  };
+
+  const target = tableNames[moduleName];
+  if (target) {
+    let isUnique = false;
+    let attempts = 0;
+    while (!isUnique && attempts < 100) {
+      attempts++;
+      try {
+        const res = await client.query(`SELECT 1 FROM "${target.table}" WHERE company_id = $1 AND "${target.field}" = $2 LIMIT 1`, [companyId, generatedNumber]);
+        if (res.rows.length === 0) {
+          isUnique = true;
+        } else {
+          seq = await getNextAtomicSequence(client, companyId, moduleName, period);
+          seqStr = String(seq).padStart(padLength, '0');
+          generatedNumber = generateString();
+        }
+      } catch (e) {
+        break; // If table/column doesn't exist, ignore and return
+      }
+    }
   }
 
   return generatedNumber;
