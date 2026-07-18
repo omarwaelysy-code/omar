@@ -471,10 +471,17 @@ export const PurchaseReturns: React.FC = () => {
       (items || []).forEach(item => {
         const product = products.find(p => p.id === item.product_id);
         
-        const itemTotal = (Number(item.quantity) || 0) * (Number(item.unit_price) || 0);
-        const itemVat = isVatEnabled ? (Number(item.vat_amount) || 0) : 0;
-        const itemDiscount = subtotalVal > 0 ? Number(((itemTotal / subtotalVal) * discountVal).toFixed(2)) : 0;
-        const itemNetTotal = Number((itemTotal + itemVat - itemDiscount).toFixed(2));
+        // Calculate in foreign currency first (no rounding)
+        const itemTotalFC = (Number(item.quantity) || 0) * (Number(item.unit_price) || 0);
+        const itemVatFC = isVatEnabled ? (Number(item.vat_amount) || 0) : 0;
+        const itemDiscountFC = subtotalVal > 0 ? (itemTotalFC / subtotalVal) * discountVal : 0;
+        const itemNetTotalFC = itemTotalFC + itemVatFC - itemDiscountFC;
+
+        // Convert to local currency and round once
+        const itemTotal = Number((itemTotalFC * rate).toFixed(2));
+        const itemVat = Number((itemVatFC * rate).toFixed(2));
+        const itemDiscount = Number((itemDiscountFC * rate).toFixed(2));
+        const itemNetTotal = Number((itemNetTotalFC * rate).toFixed(2));
 
         let creditAccountId = '';
         let creditAccountName = '';
@@ -497,7 +504,7 @@ export const PurchaseReturns: React.FC = () => {
           account_code: creditAccountCode,
           product_name: item.product_name,
           debit: 0,
-          credit: Number((itemTotal * rate).toFixed(2)),
+          credit: itemTotal,
           description: `مرتجع مشتريات صنف: ${item.product_name} - مرتجع ${return_number}`,
           operation_id: item.operation_id || null,
           department_id: item.department_id || null,
@@ -524,7 +531,7 @@ export const PurchaseReturns: React.FC = () => {
             account_code: vatAccountCode,
             product_name: item.product_name,
             debit: 0,
-            credit: Number((itemVat * rate).toFixed(2)),
+            credit: itemVat,
             description: `ضريبة القيمة المضافة - صنف: ${item.product_name} - مرتجع رقم ${return_number}`
           });
         }
@@ -540,7 +547,7 @@ export const PurchaseReturns: React.FC = () => {
             account_name: discountAccount?.name || 'حساب الخصم المكتسب',
             account_code: discountAccountCode,
             product_name: item.product_name,
-            debit: Number((itemDiscount * rate).toFixed(2)),
+            debit: itemDiscount,
             credit: 0,
             description: `تسوية خصم صنف: ${item.product_name} - مرتجع مشتريات رقم ${return_number}`
           });
@@ -566,7 +573,7 @@ export const PurchaseReturns: React.FC = () => {
             account_name: cashAccountName,
             account_code: cashAccountCode,
             product_name: item.product_name,
-            debit: Number((itemNetTotal * rate).toFixed(2)),
+            debit: itemNetTotal,
             credit: 0,
             description: `استلام نقدية مقابل مرتجع صنف: ${item.product_name} - مرتجع رقم ${return_number} - ${supplier?.name || '...'}`
           });
@@ -578,7 +585,7 @@ export const PurchaseReturns: React.FC = () => {
             account_code: supplierAccountCode,
             product_name: item.product_name,
             debit: 0,
-            credit: Number((itemNetTotal * rate).toFixed(2)),
+            credit: itemNetTotal,
             description: `تسوية نقدية لمرتجع صنف: ${item.product_name} - مرتجع رقم ${return_number}`,
             supplier_id: returnData.supplier_id,
             supplier_name: supplier?.name
@@ -589,7 +596,7 @@ export const PurchaseReturns: React.FC = () => {
             account_name: supplierAccountName,
             account_code: supplierAccountCode,
             product_name: item.product_name,
-            debit: Number((itemNetTotal * rate).toFixed(2)),
+            debit: itemNetTotal,
             credit: 0,
             description: `مرتجع مشتريات صنف: ${item.product_name} - مرتجع رقم ${return_number}`,
             supplier_id: returnData.supplier_id,
@@ -602,7 +609,7 @@ export const PurchaseReturns: React.FC = () => {
             account_name: supplierAccountName,
             account_code: supplierAccountCode,
             product_name: item.product_name,
-            debit: Number((itemNetTotal * rate).toFixed(2)),
+            debit: itemNetTotal,
             credit: 0,
             description: `مرتجع مشتريات صنف: ${item.product_name} - مرتجع رقم ${return_number}`,
             supplier_id: returnData.supplier_id,
@@ -611,8 +618,32 @@ export const PurchaseReturns: React.FC = () => {
         }
       });
 
-      const totalDebit = journalItems.reduce((sum, i) => sum + (Number(i.debit) || 0), 0);
-      const totalCredit = journalItems.reduce((sum, i) => sum + (Number(i.credit) || 0), 0);
+      let total_debit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0).toFixed(2)) || 0;
+      let total_credit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0).toFixed(2)) || 0;
+
+      // Adjust for rounding differences if rate conversion introduces minor discrepancies
+      const diff = Number((total_debit - total_credit).toFixed(2));
+      if (diff !== 0 && journalItems.length > 0) {
+        if (diff > 0) {
+          // More debits than credits: add diff to the credit of the first credit item
+          const creditItem = journalItems.find(item => (Number(item.credit) || 0) > 0);
+          if (creditItem) {
+            creditItem.credit = Number((Number(creditItem.credit) + diff).toFixed(2));
+          } else {
+            journalItems[0].credit = Number((Number(journalItems[0].credit) + diff).toFixed(2));
+          }
+        } else {
+          // More credits than debits: add absolute diff to the debit of the first debit item
+          const debitItem = journalItems.find(item => (Number(item.debit) || 0) > 0);
+          if (debitItem) {
+            debitItem.debit = Number((Number(debitItem.debit) + Math.abs(diff)).toFixed(2));
+          } else {
+            journalItems[0].debit = Number((Number(journalItems[0].debit) + Math.abs(diff)).toFixed(2));
+          }
+        }
+        total_debit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0).toFixed(2)) || 0;
+        total_credit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0).toFixed(2)) || 0;
+      }
 
       setPreviewJournalEntry({
         id: 'preview',
@@ -622,8 +653,8 @@ export const PurchaseReturns: React.FC = () => {
         reference_type: 'purchase_return',
         description: `قيد مرتجع مشتريات رقم ${return_number}`,
         items: journalItems,
-        total_debit: totalDebit,
-        total_credit: totalCredit,
+        total_debit: total_debit,
+        total_credit: total_credit,
         company_id: user.company_id,
         created_at: new Date().toISOString(),
         created_by: user.id
