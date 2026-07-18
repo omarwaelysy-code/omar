@@ -2383,6 +2383,74 @@ router.get('/utils/next-sequence/:moduleName', authenticateToken, async (req: an
   }
 });
 
+router.post('/utils/fix-duplicate-pinv', authenticateToken, async (req: any, res) => {
+  const client = await pool.connect();
+  try {
+    const companyId = req.user?.company_id;
+    if (!companyId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const duplicates = await client.query(`
+      SELECT invoice_number, COUNT(*) as count
+      FROM purchase_invoices
+      WHERE company_id = $1
+      GROUP BY invoice_number
+      HAVING COUNT(*) > 1
+    `, [companyId]);
+
+    let fixedCount = 0;
+
+    for (const dup of duplicates.rows) {
+      const invoiceNumber = dup.invoice_number;
+      const invoices = await client.query(`
+        SELECT id, date, created_at
+        FROM purchase_invoices
+        WHERE company_id = $1 AND invoice_number = $2
+        ORDER BY created_at ASC
+      `, [companyId, invoiceNumber]);
+
+      // Keep the first one, modify the rest
+      for (let i = 1; i < invoices.rows.length; i++) {
+        const inv = invoices.rows[i];
+        const period = inv.date.slice(0, 7);
+        
+        let currentMax = 0;
+        const maxRes = await client.query(`
+          SELECT MAX(CAST(SUBSTRING(invoice_number FROM 14) AS INTEGER)) as max_seq
+          FROM purchase_invoices
+          WHERE company_id = $1 AND invoice_number LIKE $2
+        `, [companyId, `PINV-${period}-%`]);
+        
+        if (maxRes.rows[0].max_seq) currentMax = maxRes.rows[0].max_seq;
+
+        const nextSeq = currentMax + 1;
+        const newInvoiceNumber = `PINV-${period}-${String(nextSeq).padStart(6, '0')}`;
+
+        await client.query('BEGIN');
+        await client.query(`UPDATE purchase_invoices SET invoice_number = $1 WHERE id = $2`, [newInvoiceNumber, inv.id]);
+        await client.query(`UPDATE journal_entries SET reference_number = $1 WHERE reference_type = 'purchase_invoice' AND reference_id = $2`, [newInvoiceNumber, inv.id]);
+        await client.query(`UPDATE purchase_orders SET invoice_number = $1 WHERE invoice_id = $2`, [newInvoiceNumber, inv.id]);
+        await client.query('COMMIT');
+
+        await client.query(`
+          INSERT INTO document_sequences (id, company_id, module, period, last_seq, created_at, updated_at)
+          VALUES (gen_random_uuid(), $1, 'purchase_invoices', $2, $3, NOW(), NOW())
+          ON CONFLICT (company_id, module, period)
+          DO UPDATE SET last_seq = GREATEST(document_sequences.last_seq, $3), updated_at = NOW()
+        `, [companyId, period, nextSeq]);
+        
+        fixedCount++;
+      }
+    }
+
+    res.json({ success: true, message: `Fixed ${fixedCount} duplicate invoices.` });
+  } catch (error: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
 router.get('/detailed-journal-entries', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const isSuperAdmin = req.user?.role === 'super_admin';
