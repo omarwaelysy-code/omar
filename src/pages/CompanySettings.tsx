@@ -334,7 +334,8 @@ export function CompanySettings() {
             vat_enabled: settings.vat_enabled || company.vat_enabled || false,
             wht_enabled: settings.wht_enabled || company.wht_enabled || false,
             purchase_workflow_mode: company.purchase_workflow_mode || settings.purchase_workflow_mode || 'Simple',
-            goods_receipt_matching_mode: company.goods_receipt_matching_mode || 'SmartMatching'
+            goods_receipt_matching_mode: company.goods_receipt_matching_mode || 'SmartMatching',
+            allow_negative_stock: settings.allow_negative_stock || false
           });
 
           setErAutoUpdate(settings.er_auto_update || false);
@@ -393,6 +394,7 @@ export function CompanySettings() {
         wht_enabled: data.wht_enabled,
         purchase_workflow_mode: data.purchase_workflow_mode || 'Simple',
         goods_receipt_matching_mode: data.goods_receipt_matching_mode || 'SmartMatching',
+        allow_negative_stock: data.allow_negative_stock || false,
         barcode_scanner: barcodeSettings,
       };
 
