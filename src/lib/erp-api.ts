@@ -2170,6 +2170,53 @@ function incrementDocumentNumber(docNum: string): string {
   return docNum + '-1';
 }
 
+export async function ensureUniqueSequenceNumber(
+  client: any,
+  companyId: string,
+  moduleName: string,
+  dateStr: string,
+  proposedNumber?: string
+): Promise<string> {
+  let numField = 'invoice_number';
+  switch (moduleName) {
+    case 'invoices': numField = 'invoice_number'; break;
+    case 'purchase_invoices': numField = 'invoice_number'; break;
+    case 'returns': numField = 'return_number'; break;
+    case 'purchase_returns': numField = 'return_number'; break;
+    case 'payment_vouchers': numField = 'voucher_number'; break;
+    case 'receipt_vouchers': numField = 'voucher_number'; break;
+    case 'journal_entries': numField = 'entry_number'; break;
+    case 'sales_orders': numField = 'order_number'; break;
+    case 'purchase_orders': numField = 'order_number'; break;
+    case 'employees': numField = 'employee_code'; break;
+    case 'warehouse_transfers': numField = 'transfer_number'; break;
+    case 'opening_stock_balances': numField = 'document_number'; break;
+    case 'stock_adjustments': numField = 'adjustment_number'; break;
+    case 'cash_transfers': numField = 'transfer_number'; break;
+    case 'goods_receipts': numField = 'receipt_number'; break;
+    default: return proposedNumber || '';
+  }
+
+  let candidateNumber = proposedNumber;
+  if (!candidateNumber) {
+    candidateNumber = await generateNextSequence(client, companyId, moduleName, dateStr);
+  }
+  
+  candidateNumber = candidateNumber.trim();
+
+  for (let retries = 0; retries < 50; retries++) {
+    const dupCheck = await client.query(
+      `SELECT 1 FROM "${moduleName}" WHERE "company_id" = $1 AND "${numField}" = $2 LIMIT 1`,
+      [companyId, candidateNumber]
+    );
+    if (dupCheck.rows.length === 0) {
+      break;
+    }
+    candidateNumber = incrementDocumentNumber(candidateNumber);
+  }
+  return candidateNumber;
+}
+
 export async function generateNextSequence(client: any, companyId: string, moduleName: string, dateStr: string): Promise<string> {
   let numField = 'invoice_number';
   let prefix = 'INV';
@@ -3039,18 +3086,15 @@ modules.forEach(moduleName => {
             }
           }
 
-          // Special case for employees: handle automatic code generation
+          const dateStr = req.body.date || new Date().toISOString().slice(0, 10);
           if (moduleName === 'employees') {
-            if (!req.body.employee_code) {
-              req.body.employee_code = await generateNextSequence(pool, companyId, 'employees', '');
-            }
-          }
-
-          // Special case for cash_transfers: handle automatic transfer_number generation
-          if (moduleName === 'cash_transfers') {
-            if (!req.body.transfer_number) {
-              req.body.transfer_number = await generateNextSequence(pool, companyId, 'cash_transfers', req.body.date || new Date().toISOString().slice(0, 10));
-            }
+            req.body.employee_code = await ensureUniqueSequenceNumber(pool, companyId, 'employees', '', req.body.employee_code);
+          } else if (moduleName === 'cash_transfers') {
+            req.body.transfer_number = await ensureUniqueSequenceNumber(pool, companyId, 'cash_transfers', dateStr, req.body.transfer_number);
+          } else if (moduleName === 'payment_vouchers') {
+            req.body.voucher_number = await ensureUniqueSequenceNumber(pool, companyId, 'payment_vouchers', dateStr, req.body.voucher_number);
+          } else if (moduleName === 'receipt_vouchers') {
+            req.body.voucher_number = await ensureUniqueSequenceNumber(pool, companyId, 'receipt_vouchers', dateStr, req.body.voucher_number);
           }
 
           const sanitizedData = sanitizeData(moduleName, req.body);
@@ -3462,7 +3506,13 @@ router.post('/invoices', authenticateToken, TransactionsLimitMiddleware, async (
     // Double check specific fields that might be null from frontend
     invoiceData.status = invoiceData.status || 'paid';
     invoiceData.payment_type = invoiceData.payment_type || 'cash';
-    invoiceData.invoice_number = invoiceData.invoice_number || `INV-${Date.now()}`;
+    invoiceData.invoice_number = await ensureUniqueSequenceNumber(
+      client,
+      companyId,
+      'invoices',
+      invoiceData.date as string,
+      invoiceData.invoice_number
+    );
 
     let sourceOrdersStr = '';
     if (req.body.order_ids && req.body.order_ids.length > 0) {
@@ -3901,6 +3951,15 @@ router.post('/returns', authenticateToken, async (req: AuthRequest, res) => {
     const returnId = returnData.id || uuidv4();
     if (!isUUID(returnId)) return sendError(res, 400, 'Invalid Return ID format');
     
+    // Ensure unique return_number
+    returnData.return_number = await ensureUniqueSequenceNumber(
+      client,
+      companyId,
+      'returns',
+      returnData.date as string,
+      returnData.return_number
+    );
+
     // Insert Return
     const rData = { ...returnData, id: returnId };
     const rKeys = Object.keys(rData);
@@ -4531,6 +4590,15 @@ await client.query(
 
     const isLinkedToGR = finalGrIds.length > 0;
 
+    // Ensure unique invoice_number
+    invoiceData.invoice_number = await ensureUniqueSequenceNumber(
+      client,
+      companyId,
+      'purchase_invoices',
+      invoiceData.date as string,
+      invoiceData.invoice_number
+    );
+
     // Insert Purchase Invoice
     const invData = { ...invoiceData, id: invoiceId };
     const invKeys = Object.keys(invData);
@@ -5061,6 +5129,15 @@ router.post('/purchase_returns', authenticateToken, async (req: AuthRequest, res
     const returnId = returnData.id || uuidv4();
     if (!isUUID(returnId)) return sendError(res, 400, 'Invalid Return ID format');
     
+    // Ensure unique return_number
+    returnData.return_number = await ensureUniqueSequenceNumber(
+      client,
+      companyId,
+      'purchase_returns',
+      returnData.date as string,
+      returnData.return_number
+    );
+
     // Insert Purchase Return
     const rData = { ...returnData, id: returnId };
     const rKeys = Object.keys(rData);
@@ -5326,28 +5403,13 @@ router.post('/journal_entries', authenticateToken, TransactionsLimitMiddleware, 
     const entryId = entryData.id || uuidv4();
     if (!isUUID(entryId)) return sendError(res, 400, 'Invalid Entry ID format');
 
-    if (!entryData.entry_number && entryData.date) {
-      let candidateNumber = await generateNextSequence(client, companyId, 'journal_entries', entryData.date as string);
-      // Ensure uniqueness: check if this entry_number already exists and increment if so
-      for (let retries = 0; retries < 10; retries++) {
-        const dupCheck = await client.query(
-          `SELECT 1 FROM "journal_entries" WHERE "company_id" = $1 AND "entry_number" = $2 LIMIT 1`,
-          [companyId, candidateNumber]
-        );
-        if (dupCheck.rows.length === 0) break;
-        // Increment the last numeric segment
-        const parts = candidateNumber.split('-');
-        const lastPart = parts[parts.length - 1];
-        const seq = parseInt(lastPart, 10);
-        if (!isNaN(seq)) {
-          parts[parts.length - 1] = String(seq + 1).padStart(lastPart.length, '0');
-          candidateNumber = parts.join('-');
-        } else {
-          break;
-        }
-      }
-      entryData.entry_number = candidateNumber;
-    }
+    entryData.entry_number = await ensureUniqueSequenceNumber(
+      client,
+      companyId,
+      'journal_entries',
+      entryData.date as string,
+      entryData.entry_number
+    );
     const finalEntryData = { ...entryData, id: entryId };
     const keys = Object.keys(finalEntryData);
     const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
@@ -5842,7 +5904,13 @@ router.post('/sales_orders', authenticateToken, async (req: AuthRequest, res) =>
     const orderId = orderData.id || uuidv4();
     orderData.status = 'pending';
 
-    orderData.order_number = await generateNextSequence(client, companyId, 'sales_orders', orderData.date as string);
+    orderData.order_number = await ensureUniqueSequenceNumber(
+      client,
+      companyId,
+      'sales_orders',
+      orderData.date as string,
+      orderData.order_number
+    );
 
     const ordData = { ...orderData, id: orderId };
     const ordKeys = Object.keys(ordData);
@@ -5989,7 +6057,13 @@ router.post('/purchase_orders', authenticateToken, async (req: AuthRequest, res)
     const orderId = orderData.id || uuidv4();
     orderData.status = 'pending';
 
-    orderData.order_number = await generateNextSequence(client, companyId, 'purchase_orders', orderData.date as string);
+    orderData.order_number = await ensureUniqueSequenceNumber(
+      client,
+      companyId,
+      'purchase_orders',
+      orderData.date as string,
+      orderData.order_number
+    );
 
     const ordData = { ...orderData, id: orderId };
     const ordKeys = Object.keys(ordData);
@@ -6138,9 +6212,13 @@ router.post('/goods_receipts', authenticateToken, async (req: AuthRequest, res) 
     const receiptId = receiptData.id || uuidv4();
     receiptData.id = receiptId;
 
-    if (!receiptData.receipt_number) {
-      receiptData.receipt_number = await generateNextSequence(client, companyId, 'goods_receipts', receiptData.date as string);
-    }
+    receiptData.receipt_number = await ensureUniqueSequenceNumber(
+      client,
+      companyId,
+      'goods_receipts',
+      receiptData.date as string,
+      receiptData.receipt_number
+    );
 
     const grKeys = Object.keys(receiptData);
     const grValues = Object.values(receiptData);
@@ -6517,9 +6595,13 @@ router.post('/warehouse_transfers', authenticateToken, async (req: AuthRequest, 
     const transferId = transferData.id || uuidv4();
     transferData.id = transferId;
     
-    if (!transferData.transfer_number) {
-      transferData.transfer_number = await generateNextSequence(client, companyId, 'warehouse_transfers', transferData.date);
-    }
+    transferData.transfer_number = await ensureUniqueSequenceNumber(
+      client,
+      companyId,
+      'warehouse_transfers',
+      transferData.date as string,
+      transferData.transfer_number
+    );
 
     const whRes = await client.query('SELECT id, name FROM warehouses WHERE id IN ($1, $2)', [transferData.from_warehouse_id, transferData.to_warehouse_id]);
     const warehouses = whRes.rows;
@@ -6867,9 +6949,13 @@ router.post('/opening_stock_balances', authenticateToken, async (req: AuthReques
     const docId = docData.id || uuidv4();
     docData.id = docId;
     
-    if (!docData.document_number) {
-      docData.document_number = await generateNextSequence(client, companyId, 'opening_stock_balances', docData.date);
-    }
+    docData.document_number = await ensureUniqueSequenceNumber(
+      client,
+      companyId,
+      'opening_stock_balances',
+      docData.date as string,
+      docData.document_number
+    );
 
     const keys = Object.keys(docData);
     const values = Object.values(docData);
@@ -7367,9 +7453,13 @@ router.post('/stock_adjustments', authenticateToken, async (req: AuthRequest, re
     const docId = docData.id || uuidv4();
     docData.id = docId;
     
-    if (!docData.adjustment_number) {
-      docData.adjustment_number = await generateNextSequence(client, companyId, 'stock_adjustments', docData.date);
-    }
+    docData.adjustment_number = await ensureUniqueSequenceNumber(
+      client,
+      companyId,
+      'stock_adjustments',
+      docData.date as string,
+      docData.adjustment_number
+    );
 
     const keys = Object.keys(docData);
     const values = Object.values(docData);
