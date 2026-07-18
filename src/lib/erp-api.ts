@@ -5327,7 +5327,26 @@ router.post('/journal_entries', authenticateToken, TransactionsLimitMiddleware, 
     if (!isUUID(entryId)) return sendError(res, 400, 'Invalid Entry ID format');
 
     if (!entryData.entry_number && entryData.date) {
-      entryData.entry_number = await generateNextSequence(client, companyId, 'journal_entries', entryData.date as string);
+      let candidateNumber = await generateNextSequence(client, companyId, 'journal_entries', entryData.date as string);
+      // Ensure uniqueness: check if this entry_number already exists and increment if so
+      for (let retries = 0; retries < 10; retries++) {
+        const dupCheck = await client.query(
+          `SELECT 1 FROM "journal_entries" WHERE "company_id" = $1 AND "entry_number" = $2 LIMIT 1`,
+          [companyId, candidateNumber]
+        );
+        if (dupCheck.rows.length === 0) break;
+        // Increment the last numeric segment
+        const parts = candidateNumber.split('-');
+        const lastPart = parts[parts.length - 1];
+        const seq = parseInt(lastPart, 10);
+        if (!isNaN(seq)) {
+          parts[parts.length - 1] = String(seq + 1).padStart(lastPart.length, '0');
+          candidateNumber = parts.join('-');
+        } else {
+          break;
+        }
+      }
+      entryData.entry_number = candidateNumber;
     }
     const finalEntryData = { ...entryData, id: entryId };
     const keys = Object.keys(finalEntryData);
