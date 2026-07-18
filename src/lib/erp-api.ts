@@ -4469,7 +4469,7 @@ await client.query(
     if (workflowMode === 'Enterprise Flexible' && finalGrIds.length === 0 && req.body.auto_generate_gr) {
       const receiptId = uuidv4();
       autoGenReceiptId = receiptId;
-      const receiptNumber = await generateNextSequence(client, companyId, 'goods_receipts', invoiceData.date as string);
+      const receiptNumber = await ensureUniqueSequenceNumber(client, companyId, 'goods_receipts', invoiceData.date as string);
       
       const receiptData = {
         id: receiptId,
@@ -4855,7 +4855,7 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
         if (workflowMode === 'Enterprise Flexible' && finalGrIds.length === 0 && req.body.auto_generate_gr) {
           const receiptId = uuidv4();
           autoGenReceiptId = receiptId;
-          const receiptNumber = await generateNextSequence(client, companyId, 'goods_receipts', invoiceData.date as string);
+          const receiptNumber = await ensureUniqueSequenceNumber(client, companyId, 'goods_receipts', invoiceData.date as string);
           
           const receiptData = {
             id: receiptId,
@@ -7032,7 +7032,7 @@ router.post('/opening_stock_balances', authenticateToken, async (req: AuthReques
 
     // Insert journal entry
     const entryId = uuidv4();
-    const entryNumber = await generateNextSequence(client, companyId, 'journal_entries', docData.date);
+    const entryNumber = await ensureUniqueSequenceNumber(client, companyId, 'journal_entries', docData.date);
     await client.query(
       `INSERT INTO "journal_entries" (id, company_id, entry_number, date, description, reference_id, reference_type, total_debit, total_credit, created_at, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)`,
@@ -7279,7 +7279,7 @@ router.put('/opening_stock_balances/:id', authenticateToken, async (req: AuthReq
 
     // Insert journal entry
     const entryId = uuidv4();
-    const entryNumber = await generateNextSequence(client, companyId, 'journal_entries', docData.date);
+    const entryNumber = await ensureUniqueSequenceNumber(client, companyId, 'journal_entries', docData.date);
     await client.query(
       `INSERT INTO "journal_entries" (id, company_id, entry_number, date, description, reference_id, reference_type, total_debit, total_credit, created_at, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)`,
@@ -7575,7 +7575,7 @@ router.post('/stock_adjustments', authenticateToken, async (req: AuthRequest, re
     let entryId: string | null = null;
     if (journalLines.length > 0) {
       entryId = uuidv4();
-      const entryNumber = await generateNextSequence(client, companyId, 'journal_entries', docData.date);
+      const entryNumber = await ensureUniqueSequenceNumber(client, companyId, 'journal_entries', docData.date);
 
       const totalDebit = journalLines.reduce((sum: number, line: any) => sum + (line.debit || 0), 0);
       const totalCredit = journalLines.reduce((sum: number, line: any) => sum + (line.credit || 0), 0);
@@ -7798,7 +7798,7 @@ router.put('/stock_adjustments/:id', authenticateToken, async (req: AuthRequest,
     let entryId: string | null = null;
     if (journalLines.length > 0) {
       entryId = uuidv4();
-      const entryNumber = await generateNextSequence(client, companyId, 'journal_entries', docData.date);
+      const entryNumber = await ensureUniqueSequenceNumber(client, companyId, 'journal_entries', docData.date);
       
       const totalDebit = journalLines.reduce((sum: number, line: any) => sum + (line.debit || 0), 0);
       const totalCredit = journalLines.reduce((sum: number, line: any) => sum + (line.credit || 0), 0);
