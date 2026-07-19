@@ -614,7 +614,7 @@ export const Accounts: React.FC = () => {
                           initial={{ opacity: 0, y: 10, scale: 0.95 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                          className={`absolute ${dir === 'rtl' ? 'right-0' : 'left-0'} bottom-full mb-2 w-[800px] max-w-[90vw] md:max-w-[800px] bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200 z-[160] overflow-hidden`}
+                          className={`absolute ${dir === 'rtl' ? 'right-0' : 'left-0'} top-full mt-2 w-[800px] max-w-[90vw] md:max-w-[800px] bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200 z-[160] overflow-hidden`}
                         >
                           <div className="p-4 border-b border-slate-100 bg-slate-50/50 sticky top-0 z-10">
                             <div className="relative">
