@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Account, AccountType } from '../types';
-import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, BookOpen, User, Layers, AlertCircle, LayoutGrid, List } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, BookOpen, User, Layers, AlertCircle, LayoutGrid, List, ChevronRight, ChevronLeft, Save } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
@@ -245,8 +245,10 @@ export const Accounts: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="space-y-6 animate-in fade-in duration-500 max-w-[1400px] mx-auto p-4 md:p-8" dir={dir}>
+      {!isModalOpen ? (
+        <>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 bg-emerald-600 text-white rounded-3xl flex items-center justify-center shadow-xl shadow-emerald-500/20">
             <BookOpen size={28} />
@@ -460,337 +462,160 @@ export const Accounts: React.FC = () => {
     </div>
   )}
 
-      <AnimatePresence>
-        {isModalOpen && (
-          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 md:p-6" dir={dir}>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={closeModal}
-              className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm"
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-5xl bg-slate-50 shadow-2xl rounded-[3rem] overflow-hidden flex flex-col md:flex-row max-h-[95vh] border border-white"
-            >
-              {/* Form Side */}
-              <div className="flex-1 flex flex-col overflow-hidden bg-white">
-                <div className={`p-8 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white z-10 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-emerald-600 text-white rounded-[1.5rem] flex items-center justify-center shadow-xl shadow-emerald-500/20">
-                       <BookOpen size={28} />
-                    </div>
-                    <div>
-                       <h3 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-1">{editingAccount ? t('accounts.edit') : t('accounts.add')}</h3>
-                       <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">{language === 'ar' ? 'إدخال بيانات الحساب المحاسبي' : 'General Ledger Account Data'}</p>
-                    </div>
-                  </div>
-                  <button onClick={closeModal} className="text-slate-300 hover:text-slate-900 p-3 hover:bg-slate-50 rounded-full transition-all">
-                    <X size={24} />
-                  </button>
+      </>
+      ) : (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[85vh] relative">
+          <div className="p-2 md:p-2.5 md:px-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70] flex-wrap gap-2" dir={dir}>
+            <div className="flex items-center gap-2 shrink-0">
+              <button 
+                type="button"
+                onClick={closeModal} 
+                className="flex items-center gap-1 px-2.5 py-0.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap"
+              >
+                {dir === 'rtl' ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+                <span>{language === 'ar' ? 'العودة للقائمة' : 'Return to List'}</span>
+              </button>
+            </div>
+            
+            <div className="flex items-center gap-4 flex-wrap w-full md:w-auto flex-1 justify-center md:justify-end">
+              <h3 className="text-sm md:text-base font-black text-slate-900 tracking-tight leading-none font-sans mr-auto md:mr-0">
+                {editingAccount ? t('accounts.edit') : t('accounts.add')}
+              </h3>
+            </div>
+            
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button 
+                type="button"
+                onClick={closeModal}
+                className="w-20 py-1 rounded-lg bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-all flex items-center gap-1 justify-center active:scale-95 border border-zinc-200 shadow-sm text-[11px] whitespace-nowrap font-sans"
+              >
+                <X size={12} />
+                <span>{language === 'ar' ? 'إلغاء' : 'Cancel'}</span>
+              </button>
+              <button 
+                type="submit"
+                form="account-form"
+                className="w-20 py-1 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-1 justify-center active:scale-95 shadow-sm text-[11px] whitespace-nowrap font-sans"
+              >
+                <Save size={12} />
+                <span>{language === 'ar' ? 'حفظ' : 'Save'}</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8 bg-slate-50/50">
+            <div className="max-w-5xl mx-auto space-y-8">
+              <div className="bg-white p-6 rounded-[2rem] border border-emerald-100 shadow-sm">
+                <div className="flex items-center gap-2 mb-4 text-emerald-700 font-bold text-sm">
+                  <Sparkles size={18} />
+                  <span>{t('accounts.ai_input')}</span>
                 </div>
-                
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
-                  <div className="p-8 md:p-12 space-y-10">
-                    {/* AI Section (Matching Transactions look) */}
-                    <div className="bg-emerald-50/50 p-6 rounded-[2rem] border border-emerald-100/50" dir={dir}>
-                      <div className={`flex items-center gap-3 mb-4 text-emerald-800 font-black text-xs uppercase tracking-widest ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse text-right'}`}>
-                        <Sparkles size={16} className="text-emerald-600" />
-                        <span>{t('accounts.ai_input')}</span>
-                      </div>
-                      <div className={`flex flex-col md:flex-row gap-3 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                        <input 
-                          type="text"
-                          placeholder={t('accounts.ai_placeholder')}
-                          className={`flex-1 px-6 py-4 bg-white border border-emerald-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none font-bold text-slate-900 placeholder:text-slate-400 shadow-sm ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                          value={aiText}
-                          onChange={(e) => setAiText(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && handleAiParse()}
-                        />
-                        <button 
-                           onClick={handleAiParse}
-                           disabled={isAiParsing || !aiText.trim()}
-                           className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-sm hover:bg-emerald-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 border border-emerald-500/50 active:scale-95"
-                        >
-                          {isAiParsing ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Sparkles size={18} />}
-                          {isAiParsing ? t('accounts.ai_analyzing') : t('accounts.ai_analyze')}
-                        </button>
-                      </div>
-                    </div>
-
-                    <form onSubmit={handleSubmit} className="space-y-10">
-                      {/* Basic Fields Section */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
-                        <div className="md:col-span-2">
-                          <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.form_name')}</label>
-                          <div className="relative group">
-                            <FileText className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
-                            <input 
-                              required
-                              type="text" 
-                              className="w-full px-6 py-4 bg-white border border-slate-100 rounded-2xl text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none placeholder:text-slate-300 ps-14"
-                              placeholder={language === 'ar' ? 'مثال: البنك الأهلي، الموردين، المبيعات' : 'e.g., National Bank, Suppliers, Sales'}
-                              value={formData.name}
-                              onChange={(e) => setFormData({...formData, name: e.target.value})}
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.form_code')}</label>
-                          <div className="relative group">
-                            <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
-                            <input 
-                              required
-                              type="text" 
-                              className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-mono text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14 tracking-widest"
-                              placeholder="1101"
-                              value={formData.code}
-                              onChange={(e) => setFormData({...formData, code: e.target.value})}
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.form_type')}</label>
-                          <div className="relative group">
-                             <Layers className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
-                             <select 
-                              required
-                              className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14 appearance-none"
-                              value={formData.type_id}
-                              onChange={(e) => setFormData({...formData, type_id: e.target.value, parent_id: ''})}
-                            >
-                              <option value="">{t('common.select_category')}</option>
-                              {types.map(t => (
-                                <option key={t.id} value={t.id}>{t.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                            {language === 'ar' ? 'استخدام الحساب' : 'Account Usage'}
-                          </label>
-                          <div className="relative">
-                            <Layers className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4.5 text-slate-300 z-10`} size={20} />
-                            
-                            {/* Dropdown Toggle Button */}
-                            <button
-                              type="button"
-                              onClick={() => setIsUsageDropdownOpen(!isUsageDropdownOpen)}
-                              className={`w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ${dir === 'rtl' ? 'pe-14 ps-6 text-right' : 'ps-14 pe-6 text-left'} flex justify-between items-center`}
-                            >
-                              <span>
-                                {formData.account_usage 
-                                  ? getAccountUsageLabel(formData.account_usage, language) 
-                                  : (language === 'ar' ? 'اختر استخدام الحساب...' : 'Select Account Usage...')}
-                              </span>
-                              <span className="text-slate-400 text-xs">▼</span>
-                            </button>
-
-                            {/* Click Outside Overlay */}
-                            {isUsageDropdownOpen && (
-                              <div 
-                                className="fixed inset-0 z-40 bg-transparent"
-                                onClick={() => {
-                                  setIsUsageDropdownOpen(false);
-                                  setUsageSearchTerm('');
-                                }}
-                              />
-                            )}
-
-                            {/* Dropdown Menu */}
-                            {isUsageDropdownOpen && (
-                              <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200/80 rounded-2xl shadow-xl max-h-96 overflow-hidden flex flex-col backdrop-blur-md">
-                                {/* Search Input */}
-                                <div className="p-3 border-b border-slate-100 bg-slate-50/50">
-                                  <input
-                                    type="text"
-                                    value={usageSearchTerm}
-                                    onChange={(e) => setUsageSearchTerm(e.target.value)}
-                                    placeholder={language === 'ar' ? 'ابحث عن استخدام الحساب...' : 'Search account usage...'}
-                                    className={`w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
-                                </div>
-
-                                {/* Options List */}
-                                <div className="overflow-y-auto flex-1 max-h-72">
-                                  {groupedAndFilteredOptions.map(group => {
-                                    if (group.items.length === 0) return null;
-                                    return (
-                                      <div key={group.labelAr} className="mb-2">
-                                        <div className={`bg-slate-100/60 px-4 py-2 text-[10px] font-black text-slate-500 uppercase tracking-wider ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                          {language === 'ar' ? group.labelAr : group.labelEn}
-                                        </div>
-                                        {group.items.map(opt => (
-                                          <button
-                                            key={opt.key}
-                                            type="button"
-                                            onClick={() => {
-                                              setFormData({ ...formData, account_usage: opt.key });
-                                              setIsUsageDropdownOpen(false);
-                                              setUsageSearchTerm('');
-                                            }}
-                                            className={`w-full px-6 py-3.5 text-sm hover:bg-emerald-50/50 transition-colors flex items-center justify-between ${dir === 'rtl' ? 'text-right' : 'text-left'} ${
-                                              formData.account_usage === opt.key ? 'bg-emerald-50 text-emerald-600 font-extrabold' : 'text-slate-700 font-bold'
-                                            }`}
-                                          >
-                                            <span>{language === 'ar' ? opt.ar : opt.en}</span>
-                                            {formData.account_usage === opt.key && <span className="text-emerald-500 text-xs">✓</span>}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    );
-                                  })}
-                                  {groupedAndFilteredOptions.every(g => g.items.length === 0) && (
-                                    <div className="p-6 text-center text-sm font-bold text-slate-400">
-                                      {language === 'ar' ? 'لا توجد نتائج مطابقة' : 'No matching results'}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="md:col-span-2">
-                           <div className="flex items-center gap-3 mb-6 p-4 bg-amber-50 rounded-2xl border border-amber-100">
-                              <AlertCircle size={20} className="text-amber-600" />
-                              <p className="text-[11px] font-bold text-amber-800 leading-tight">
-                                {language === 'ar' 
-                                  ? 'تأكد من صحة الحساب الرئيسي، حيث يؤثر ذلك على شجرة الحسابات والتقارير الختامية.' 
-                                  : 'Ensure the parent account is correct as it affects the chart of accounts and final reports.'}
-                              </p>
-                           </div>
-
-                          <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الحساب الرئيسي (اختياري)' : 'Parent Account (Optional)'}</label>
-                          <div className="relative group">
-                             <BookOpen className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
-                             <select 
-                              className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14 appearance-none"
-                              value={formData.parent_id}
-                              onChange={(e) => setFormData({...formData, parent_id: e.target.value})}
-                            >
-                              <option value="">{language === 'ar' ? 'حساب رئيسي (مستوى أول)' : 'Main Account (Level 1)'}</option>
-                              {accounts
-                                .filter(a => a.type_id === formData.type_id && a.id !== editingAccount?.id)
-                                .map(a => (
-                                  <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                                ))}
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="md:col-span-2 space-y-8">
-                          <div className="p-8 bg-slate-50/50 rounded-[2.5rem] border border-slate-100">
-                            <label className={`block text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}</label>
-                            <div className="relative group mb-4">
-                              <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
-                              <FormattedNumberInput
-                                required
-                                className="w-full px-6 py-5 bg-white border border-slate-200 rounded-2xl text-3xl font-black text-emerald-600 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14"
-                                placeholder="0.00"
-                                value={formData.opening_balance}
-                                onChange={(val) => setFormData({...formData, opening_balance: val})}
-                              />
-                            </div>
-                            <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl w-fit border border-emerald-100/50 mx-auto">
-                               <Sparkles size={14} />
-                               <span className="text-[10px] font-black uppercase tracking-widest">{language === 'ar' ? 'القيمة الموجبة للمدين والسالبة للدائن' : 'Positive for Debit, Negative for Credit'}</span>
-                            </div>
-                          </div>
-                          
-                          <div 
-                            className={`p-8 bg-white border border-slate-200 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-200 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}
-                            onClick={() => setFormData({...formData, required_sub_account: !formData.required_sub_account})}
-                          >
-                            <div className="flex items-center gap-5">
-                              <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center transition-all duration-500 ${formData.required_sub_account ? 'bg-emerald-600 font-black text-white shadow-xl shadow-emerald-500/30 rotate-6' : 'bg-slate-100 text-slate-400 font-bold'}`}>
-                                 <User size={32} />
-                              </div>
-                              <div>
-                                 <p className="font-black text-slate-900 text-xl leading-tight mb-1">{language === 'ar' ? 'يلزم حساب فرعي' : 'Required Sub-account'}</p>
-                                 <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">{language === 'ar' ? 'المطالبة باختيار عميل أو مورد عند القيد' : 'Demand a customer or supplier selection on entry'}</p>
-                              </div>
-                            </div>
-                            <div className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 ${formData.required_sub_account ? 'bg-emerald-500' : 'bg-slate-200'}`}>
-                               <div className={`w-6 h-6 bg-white rounded-full transition-transform duration-300 shadow-md ${formData.required_sub_account ? (dir === 'rtl' ? '-translate-x-6' : 'translate-x-6') : 'translate-x-0'}`} />
-                            </div>
-                          </div>
-
-                          <div 
-                            className={`p-8 bg-white border border-slate-200 rounded-[2.5rem] flex items-center justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-200 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}
-                            onClick={() => setFormData({...formData, is_active: !formData.is_active})}
-                          >
-                            <div className="flex items-center gap-5">
-                              <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center transition-all duration-500 ${formData.is_active ? 'bg-emerald-600 font-black text-white shadow-xl shadow-emerald-500/30 rotate-6' : 'bg-slate-100 text-slate-400 font-bold'}`}>
-                                 <AlertCircle size={32} />
-                              </div>
-                              <div>
-                                 <p className="font-black text-slate-900 text-xl leading-tight mb-1">{language === 'ar' ? 'حالة النشاط' : 'Active Status'}</p>
-                                 <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">{language === 'ar' ? 'تحديد ما إذا كان الحساب نشطاً في النظام أم لا' : 'Specify if the account is active in the system'}</p>
-                              </div>
-                            </div>
-                            <div className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 ${formData.is_active ? 'bg-emerald-500' : 'bg-slate-200'}`}>
-                               <div className={`w-6 h-6 bg-white rounded-full transition-transform duration-300 shadow-md ${formData.is_active ? (dir === 'rtl' ? '-translate-x-6' : 'translate-x-6') : 'translate-x-0'}`} />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Footer Actions */}
-                      <div className="pt-12 pb-6 flex gap-4 sticky bottom-0 bg-white/90 backdrop-blur-md z-20">
-                        <button 
-                          type="submit"
-                          className="flex-1 py-5 bg-zinc-900 text-white rounded-[1.5rem] font-black text-xl hover:bg-zinc-800 transition-all shadow-2xl active:scale-95 border border-white/10"
-                        >
-                          {editingAccount ? (language === 'ar' ? 'تحديث البيانات' : 'Update Data') : (language === 'ar' ? 'حفظ الحساب' : 'Save Account')}
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={closeModal}
-                          className="px-10 py-5 bg-slate-100 text-slate-500 rounded-[1.5rem] font-black hover:bg-slate-200 transition-all active:scale-95 border border-slate-200"
-                        >
-                          {t('common.cancel')}
-                        </button>
-                      </div>
-                    </form>
-                  </div>
+                <div className="flex flex-col md:flex-row gap-3">
+                  <input 
+                    type="text"
+                    placeholder={t('accounts.ai_placeholder')}
+                    className="flex-1 px-6 py-4 bg-zinc-50 border border-emerald-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 outline-none text-sm transition-all"
+                    value={aiText}
+                    onChange={(e) => setAiText(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAiParse()}
+                  />
+                  <button 
+                    onClick={handleAiParse}
+                    disabled={isAiParsing || !aiText.trim()}
+                    className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-bold text-sm hover:bg-emerald-700 disabled:opacity-50 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 whitespace-nowrap flex gap-2 items-center justify-center"
+                  >
+                    {isAiParsing ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Sparkles size={16} />}
+                    {isAiParsing ? t('accounts.ai_analyzing') : t('accounts.ai_analyze')}
+                  </button>
                 </div>
               </div>
 
-              {/* Activity Side (Only when editing) */}
-              {editingAccount && (
-                <div className="hidden lg:flex w-[400px] flex-col bg-slate-50 border-s border-slate-200 overflow-hidden">
-                  <div className="p-8 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
-                     <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-slate-400">
-                           <History size={20} />
-                         </div>
-                         <div>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block leading-none mb-1">Audit Trail</span>
-                            <span className="font-black text-slate-900">{language === 'ar' ? 'سجل نشاط الحساب' : 'Activity Log'}</span>
-                         </div>
-                      </div>
+              <form id="account-form" onSubmit={handleSubmit} className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="md:col-span-2">
+                    <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">{t('accounts.form_name')}</label>
+                    <div className="relative group">
+                      <FileText className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                      <input 
+                        required
+                        type="text" 
+                        className={`w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all font-bold ${dir === 'rtl' ? 'pr-12' : 'pl-12'}`}
+                        placeholder={language === 'ar' ? 'مثال: البنك الأهلي، الموردين، المبيعات' : 'e.g., National Bank, Suppliers, Sales'}
+                        value={formData.name}
+                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      />
+                    </div>
                   </div>
-                  <div className="flex-1 overflow-y-auto custom-scrollbar">
-                     <InlineActivityLog category="accounts" documentId={editingAccount.id} />
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">{t('accounts.form_code')}</label>
+                    <div className="relative group">
+                      <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                      <input 
+                        required
+                        type="text" 
+                        className={`w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all font-mono font-bold ${dir === 'rtl' ? 'pr-12' : 'pl-12'}`}
+                        placeholder="1101"
+                        value={formData.code}
+                        onChange={(e) => setFormData({...formData, code: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">{t('accounts.form_type')}</label>
+                    <select 
+                      required
+                      className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all appearance-none font-bold"
+                      value={formData.type_id}
+                      onChange={(e) => setFormData({...formData, type_id: e.target.value})}
+                    >
+                      <option value="">{t('accounts.select_type')}</option>
+                      {types.map(type => (
+                        <option key={type.id} value={type.id}>{type.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">{t('accounts.form_usage')}</label>
+                    <select 
+                      required
+                      className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all appearance-none font-bold"
+                      value={formData.account_usage || ''}
+                      onChange={(e) => setFormData({...formData, account_usage: e.target.value as any})}
+                    >
+                      <option value="">{t('accounts.usage_general')}</option>
+                      <option value="cash">{t('accounts.usage_cash')}</option>
+                      <option value="bank">{t('accounts.usage_bank')}</option>
+                      <option value="customer">{t('accounts.usage_customer')}</option>
+                      <option value="supplier">{t('accounts.usage_supplier')}</option>
+                      <option value="inventory">{t('accounts.usage_inventory')}</option>
+                      <option value="tax">{t('accounts.usage_tax')}</option>
+                      <option value="discount">{t('accounts.usage_discount')}</option>
+                      <option value="cogs">{t('accounts.usage_cogs')}</option>
+                    </select>
                   </div>
                 </div>
-              )}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
-      {/* Delete Confirmation Modal */}
-      {isDeleteModalOpen && (
+                <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-zinc-900 leading-none mb-1">{language === 'ar' ? 'حالة النشاط' : 'Activity Status'}</h4>
+                    <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{language === 'ar' ? 'تحديد ما إذا كان الحساب نشطاً في النظام أم لا' : 'Specify whether the account is active in the system or not'}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.is_active ? 'bg-emerald-600' : 'bg-slate-200'}`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.is_active ? (dir === 'rtl' ? '-translate-x-6' : 'translate-x-6') : (dir === 'rtl' ? '-translate-x-1' : 'translate-x-1')}`}
+                    />
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+{isDeleteModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" dir={dir}>
           <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 duration-200 border border-slate-200 text-center">
             <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">

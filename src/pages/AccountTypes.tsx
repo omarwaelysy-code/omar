@@ -3,7 +3,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { AccountType } from '../types';
-import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, PieChart, LayoutGrid, List } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, PieChart, LayoutGrid, List, Save, ChevronRight, ChevronLeft } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { parseAccountType, parseAccountTypesBulk } from '../services/geminiService';
@@ -208,8 +208,10 @@ export const AccountTypes: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto p-4 md:p-8" dir={dir}>
+      {!isModalOpen ? (
+        <>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('nav.account_types')}</h2>
           <p className="text-zinc-500 text-sm">{language === 'ar' ? 'تعريف أنواع الحسابات وتصنيفها (ميزانية / قائمة دخل).' : 'Define account types and their classifications (Balance Sheet / Income Statement).'}</p>
@@ -397,158 +399,176 @@ export const AccountTypes: React.FC = () => {
       )}
     </div>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full md:h-auto md:max-w-lg md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
-            <div className="p-6 border-b border-zinc-50 flex items-center justify-between bg-zinc-50/50">
-              <h3 className="text-xl font-bold text-zinc-900">{editingType ? (language === 'ar' ? 'تعديل نوع حساب' : 'Edit Account Type') : (language === 'ar' ? 'إضافة نوع حساب جديد' : 'Add New Account Type')}</h3>
-              <button onClick={closeModal} className="text-zinc-400 hover:text-zinc-600 p-2 hover:bg-zinc-100 rounded-full transition-all">
-                <X size={24} />
+      </>
+      ) : (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
+          <div className="p-2 md:p-2.5 md:px-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70] flex-wrap gap-2" dir={dir}>
+            <div className="flex items-center gap-2 shrink-0">
+              <button 
+                type="button"
+                onClick={closeModal} 
+                className="flex items-center gap-1 px-2.5 py-0.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap"
+              >
+                {dir === 'rtl' ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+                <span>{language === 'ar' ? 'العودة للقائمة' : 'Return to List'}</span>
               </button>
             </div>
             
-            <div className="p-6 bg-emerald-50/50 border-b border-emerald-100">
-              <div className="flex items-center gap-2 mb-3 text-emerald-700 font-bold text-sm">
-                <Sparkles size={18} />
-                <span>{language === 'ar' ? 'الإدخال الذكي (AI)' : 'Smart Input (AI)'}</span>
-              </div>
-              <div className="flex gap-2">
-                <input 
-                  type="text"
-                  placeholder={language === 'ar' ? 'مثال: أصول متداولة تابعة للميزانية بكود 11' : 'e.g. Current Assets under Balance Sheet with code 11'}
-                  className="flex-1 px-4 py-2 bg-white border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
-                  value={aiText}
-                  onChange={(e) => setAiText(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleAiParse()}
-                />
-                <button 
-                  onClick={handleAiParse}
-                  disabled={isAiParsing || !aiText.trim()}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 disabled:opacity-50 transition-all flex items-center gap-2"
-                >
-                  {isAiParsing ? (language === 'ar' ? 'جاري التحليل...' : 'Analyzing...') : (language === 'ar' ? 'تحليل' : 'Analyze')}
-                </button>
-              </div>
+            <div className="flex items-center gap-4 flex-wrap w-full md:w-auto flex-1 justify-center md:justify-end">
+              <h3 className="text-sm md:text-base font-black text-slate-900 tracking-tight leading-none font-sans mr-auto md:mr-0">
+                {editingType ? (language === 'ar' ? 'تعديل نوع حساب' : 'Edit Account Type') : (language === 'ar' ? 'إضافة نوع حساب جديد' : 'Create New Account Type')}
+              </h3>
             </div>
+            
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button 
+                type="button"
+                onClick={closeModal}
+                className="w-20 py-1 rounded-lg bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-all flex items-center gap-1 justify-center active:scale-95 border border-zinc-200 shadow-sm text-[11px] whitespace-nowrap font-sans"
+              >
+                <X size={12} />
+                <span>{language === 'ar' ? 'إلغاء' : 'Cancel'}</span>
+              </button>
+              <button 
+                type="submit"
+                form="account-type-form"
+                className="w-20 py-1 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-1 justify-center active:scale-95 shadow-sm text-[11px] whitespace-nowrap font-sans"
+              >
+                <Save size={12} />
+                <span>{language === 'ar' ? 'حفظ' : 'Save'}</span>
+              </button>
+            </div>
+          </div>
 
-            <form onSubmit={handleSubmit} className="p-8 space-y-5 flex-1 overflow-y-auto">
-              <div className="space-y-5">
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{language === 'ar' ? 'كود النوع' : 'Type Code'}</label>
-                  <div className="relative">
-                    <Hash className="absolute left-3 top-3 text-zinc-400" size={18} />
-                    <input 
-                      required
-                      type="text" 
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                      placeholder={language === 'ar' ? 'مثال: 11، 21، 31' : 'e.g. 11, 21, 31'}
-                      value={formData.code}
-                      onChange={(e) => setFormData({...formData, code: e.target.value})}
-                    />
-                  </div>
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8 bg-slate-50/50">
+            <div className="max-w-4xl mx-auto space-y-8">
+              <div className="bg-white p-6 rounded-[2rem] border border-emerald-100 shadow-sm">
+                <div className="flex items-center gap-2 mb-4 text-emerald-700 font-bold text-sm">
+                  <Sparkles size={18} />
+                  <span>{language === 'ar' ? 'الإدخال الذكي (AI)' : 'Smart Input (AI)'}</span>
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{language === 'ar' ? 'اسم النوع' : 'Type Name'}</label>
-                  <div className="relative">
-                    <FileText className="absolute left-3 top-3 text-zinc-400" size={18} />
-                    <input 
-                      required
-                      type="text" 
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                      placeholder={language === 'ar' ? 'مثال: أصول متداولة، خصوم طويلة الأجل' : 'e.g. Current Assets, Long-term liabilities'}
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{language === 'ar' ? 'تابع لـ' : 'Statement'}</label>
-                  <select 
-                    required
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
-                    value={formData.statement_type}
-                    onChange={(e) => {
-                      const val = e.target.value as 'income_statement' | 'balance_sheet';
-                      setFormData({
-                        ...formData, 
-                        statement_type: val,
-                        classification: val === 'income_statement' ? 'revenue' : 'asset'
-                      });
-                    }}
-                  >
-                    <option value="balance_sheet">{language === 'ar' ? 'الميزانية العمومية' : 'Balance Sheet'}</option>
-                    <option value="income_statement">{language === 'ar' ? 'قائمة الدخل' : 'Income Statement'}</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{language === 'ar' ? 'التصنيف' : 'Classification'}</label>
-                  <select 
-                    required
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all appearance-none"
-                    value={formData.classification}
-                    onChange={(e) => setFormData({...formData, classification: e.target.value as any})}
-                  >
-                    {formData.statement_type === 'balance_sheet' ? (
-                      <>
-                        <option value="asset">{language === 'ar' ? 'أصل' : 'Asset'}</option>
-                        <option value="cash_and_equivalents">{language === 'ar' ? 'نقدية وما في حكمها' : 'Cash & Cash Equivalents'}</option>
-                        <option value="receivables">{language === 'ar' ? 'عملاء' : 'Customers / Receivables'}</option>
-                        <option value="liability">{language === 'ar' ? 'التزام (خصوم)' : 'Liability'}</option>
-                        <option value="payables">{language === 'ar' ? 'موردين' : 'Suppliers / Payables'}</option>
-                        <option value="equity">{language === 'ar' ? 'حقوق ملكية' : 'Equity'}</option>
-                        <option value="liability_equity">{language === 'ar' ? 'التزام / حقوق ملكية (مشترك)' : 'Liability/Equity (Joint)'}</option>
-                      </>
-                    ) : (
-                      <>
-                        <option value="revenue">{language === 'ar' ? 'إيراد' : 'Revenue'}</option>
-                        <option value="other_revenue">{language === 'ar' ? 'ايرادات اخرى' : 'Other Revenues'}</option>
-                        <option value="cost">{language === 'ar' ? 'تكلفة' : 'Cost'}</option>
-                        <option value="expense">{language === 'ar' ? 'مصروف' : 'Expense'}</option>
-                        <option value="interest_expense">{language === 'ar' ? 'فوائد مدينة' : 'Debit Interest'}</option>
-                        <option value="depreciation">{language === 'ar' ? 'اهلاكات' : 'Depreciation'}</option>
-                        <option value="other_expense">{language === 'ar' ? 'مصروفات اخرى' : 'Other Expenses'}</option>
-                      </>
-                    )}
-                  </select>
-                </div>
-              </div>
-              {/* Active / Inactive Status Toggle */}
-              <div className="pt-4 pb-4 border-t border-slate-100 flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-bold text-zinc-900 leading-none mb-1">{language === 'ar' ? 'حالة النشاط' : 'Activity Status'}</h4>
-                  <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{language === 'ar' ? 'تحديد ما إذا كان نوع الحساب نشطاً في النظام أم لا' : 'Specify whether the account type is active in the system or not'}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.is_active ? 'bg-emerald-600' : 'bg-slate-200'}`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.is_active ? '-translate-x-6' : '-translate-x-1'}`}
+                <div className="flex flex-col md:flex-row gap-3">
+                  <input 
+                    type="text"
+                    placeholder={language === 'ar' ? 'مثال: أصول متداولة تابعة للميزانية بكود 11' : 'e.g. Current Assets under Balance Sheet with code 11'}
+                    className="flex-1 px-6 py-4 bg-zinc-50 border border-emerald-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 outline-none text-sm transition-all"
+                    value={aiText}
+                    onChange={(e) => setAiText(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAiParse()}
                   />
-                </button>
+                  <button 
+                    onClick={handleAiParse}
+                    disabled={isAiParsing || !aiText.trim()}
+                    className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-bold text-sm hover:bg-emerald-700 disabled:opacity-50 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 whitespace-nowrap"
+                  >
+                    {isAiParsing ? (language === 'ar' ? 'جاري التحليل...' : 'Analyzing...') : (language === 'ar' ? 'تحليل ذكي' : 'Smart Analyze')}
+                  </button>
+                </div>
               </div>
-              <div className="pt-4 flex gap-3">
-                <button 
-                  type="submit"
-                  className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
-                >
-                  {editingType ? (language === 'ar' ? 'تحديث البيانات' : 'Update Details') : (language === 'ar' ? 'حفظ النوع' : 'Save Type')}
-                </button>
-                <button 
-                  type="button"
-                  onClick={closeModal}
-                  className="px-8 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all active:scale-95"
-                >
-                  إلغاء
-                </button>
-              </div>
-            </form>
+
+              <form id="account-type-form" onSubmit={handleSubmit} className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">{language === 'ar' ? 'كود النوع' : 'Type Code'}</label>
+                    <div className="relative group">
+                      <Hash className="absolute left-4 top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors" size={20} />
+                      <input 
+                        required
+                        type="text" 
+                        className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all font-mono font-bold"
+                        placeholder={language === 'ar' ? 'مثال: 11، 21، 31' : 'e.g. 11, 21, 31'}
+                        value={formData.code}
+                        onChange={(e) => setFormData({...formData, code: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">{language === 'ar' ? 'اسم النوع' : 'Type Name'}</label>
+                    <div className="relative group">
+                      <FileText className="absolute left-4 top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors" size={20} />
+                      <input 
+                        required
+                        type="text" 
+                        className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all font-bold"
+                        placeholder={language === 'ar' ? 'مثال: أصول متداولة، خصوم طويلة الأجل' : 'e.g. Current Assets, Long-term liabilities'}
+                        value={formData.name}
+                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">{language === 'ar' ? 'تابع لـ' : 'Statement'}</label>
+                    <select 
+                      required
+                      className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all appearance-none font-bold"
+                      value={formData.statement_type}
+                      onChange={(e) => {
+                        const val = e.target.value as 'income_statement' | 'balance_sheet';
+                        setFormData({
+                          ...formData, 
+                          statement_type: val,
+                          classification: val === 'income_statement' ? 'revenue' : 'asset'
+                        });
+                      }}
+                    >
+                      <option value="balance_sheet">{language === 'ar' ? 'الميزانية العمومية' : 'Balance Sheet'}</option>
+                      <option value="income_statement">{language === 'ar' ? 'قائمة الدخل' : 'Income Statement'}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">{language === 'ar' ? 'التصنيف' : 'Classification'}</label>
+                    <select 
+                      required
+                      className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all appearance-none font-bold"
+                      value={formData.classification}
+                      onChange={(e) => setFormData({...formData, classification: e.target.value as any})}
+                    >
+                      {formData.statement_type === 'balance_sheet' ? (
+                        <>
+                          <option value="asset">{language === 'ar' ? 'أصل' : 'Asset'}</option>
+                          <option value="cash_and_equivalents">{language === 'ar' ? 'نقدية وما في حكمها' : 'Cash & Cash Equivalents'}</option>
+                          <option value="receivables">{language === 'ar' ? 'عملاء' : 'Customers / Receivables'}</option>
+                          <option value="liability">{language === 'ar' ? 'التزام (خصوم)' : 'Liability'}</option>
+                          <option value="payables">{language === 'ar' ? 'موردين' : 'Suppliers / Payables'}</option>
+                          <option value="equity">{language === 'ar' ? 'حقوق ملكية' : 'Equity'}</option>
+                          <option value="liability_equity">{language === 'ar' ? 'التزام / حقوق ملكية (مشترك)' : 'Liability/Equity (Joint)'}</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="revenue">{language === 'ar' ? 'إيراد' : 'Revenue'}</option>
+                          <option value="other_revenue">{language === 'ar' ? 'ايرادات اخرى' : 'Other Revenues'}</option>
+                          <option value="cost">{language === 'ar' ? 'تكلفة' : 'Cost'}</option>
+                          <option value="expense">{language === 'ar' ? 'مصروف' : 'Expense'}</option>
+                          <option value="interest_expense">{language === 'ar' ? 'فوائد مدينة' : 'Debit Interest'}</option>
+                          <option value="depreciation">{language === 'ar' ? 'اهلاكات' : 'Depreciation'}</option>
+                          <option value="other_expense">{language === 'ar' ? 'مصروفات اخرى' : 'Other Expenses'}</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-zinc-900 leading-none mb-1">{language === 'ar' ? 'حالة النشاط' : 'Activity Status'}</h4>
+                    <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{language === 'ar' ? 'تحديد ما إذا كان نوع الحساب نشطاً في النظام أم لا' : 'Specify whether the account type is active in the system or not'}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.is_active ? 'bg-emerald-600' : 'bg-slate-200'}`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.is_active ? (dir === 'rtl' ? '-translate-x-6' : 'translate-x-6') : (dir === 'rtl' ? '-translate-x-1' : 'translate-x-1')}`}
+                    />
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
-
-      {isDeleteModalOpen && (
+{isDeleteModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 animate-in zoom-in-95 duration-200">
             <h3 className="text-xl font-bold text-zinc-900 mb-4">{language === 'ar' ? 'تأكيد الحذف' : 'Confirm Delete'}</h3>
