@@ -583,14 +583,18 @@ export const Accounts: React.FC = () => {
                       onChange={(e) => setFormData({...formData, account_usage: e.target.value as any})}
                     >
                       <option value="">{t('accounts.usage_general')}</option>
-                      <option value="cash">{t('accounts.usage_cash')}</option>
-                      <option value="bank">{t('accounts.usage_bank')}</option>
-                      <option value="customer">{t('accounts.usage_customer')}</option>
-                      <option value="supplier">{t('accounts.usage_supplier')}</option>
-                      <option value="inventory">{t('accounts.usage_inventory')}</option>
-                      <option value="tax">{t('accounts.usage_tax')}</option>
-                      <option value="discount">{t('accounts.usage_discount')}</option>
-                      <option value="cogs">{t('accounts.usage_cogs')}</option>
+                      {ACCOUNT_USAGE_GROUPS.map((group, idx) => (
+                        <optgroup key={idx} label={language === 'ar' ? group.labelAr : group.labelEn}>
+                          {group.keys.map(key => {
+                            const option = ACCOUNT_USAGE_OPTIONS.find(o => o.key === key);
+                            return option ? (
+                              <option key={key} value={key}>
+                                {language === 'ar' ? option.ar : option.en}
+                              </option>
+                            ) : null;
+                          })}
+                        </optgroup>
+                      ))}
                     </select>
                   </div>
                 </div>
