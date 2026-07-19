@@ -430,8 +430,17 @@ export const AccountTypes: React.FC = () => {
                 <span>{language === 'ar' ? 'إلغاء' : 'Cancel'}</span>
               </button>
               <button 
-                type="submit"
-                form="account-type-form"
+                type="button"
+                onClick={() => {
+                  const form = document.getElementById('account-type-form') as HTMLFormElement;
+                  if (form) {
+                    if (form.requestSubmit) {
+                      form.requestSubmit();
+                    } else {
+                      document.getElementById('hidden-account-type-submit')?.click();
+                    }
+                  }
+                }}
                 className="w-20 py-1 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-1 justify-center active:scale-95 shadow-sm text-[11px] whitespace-nowrap font-sans"
               >
                 <Save size={12} />
@@ -467,6 +476,7 @@ export const AccountTypes: React.FC = () => {
               </div>
 
               <form id="account-type-form" onSubmit={handleSubmit} className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-8">
+                <button type="submit" id="hidden-account-type-submit" className="hidden" />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">{language === 'ar' ? 'كود النوع' : 'Type Code'}</label>

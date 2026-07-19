@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Account, AccountType } from '../types';
-import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, BookOpen, User, Layers, AlertCircle, LayoutGrid, List, ChevronRight, ChevronLeft, Save } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, BookOpen, User, Layers, AlertCircle, LayoutGrid, List, ChevronRight, ChevronLeft, Save, ChevronDown, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
@@ -39,6 +39,17 @@ export const Accounts: React.FC = () => {
   const [isUsageDropdownOpen, setIsUsageDropdownOpen] = useState(false);
   const [usageSearchTerm, setUsageSearchTerm] = useState('');
   const tableRef = useRef<HTMLTableElement>(null);
+  const usageDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (usageDropdownRef.current && !usageDropdownRef.current.contains(event.target as Node)) {
+        setIsUsageDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const groupedAndFilteredOptions = React.useMemo(() => {
     return ACCOUNT_USAGE_GROUPS.map(group => {
@@ -493,8 +504,17 @@ export const Accounts: React.FC = () => {
                 <span>{language === 'ar' ? 'إلغاء' : 'Cancel'}</span>
               </button>
               <button 
-                type="submit"
-                form="account-form"
+                type="button"
+                onClick={() => {
+                  const form = document.getElementById('account-form') as HTMLFormElement;
+                  if (form) {
+                    if (form.requestSubmit) {
+                      form.requestSubmit();
+                    } else {
+                      document.getElementById('hidden-account-submit')?.click();
+                    }
+                  }
+                }}
                 className="w-20 py-1 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-1 justify-center active:scale-95 shadow-sm text-[11px] whitespace-nowrap font-sans"
               >
                 <Save size={12} />
@@ -531,6 +551,7 @@ export const Accounts: React.FC = () => {
               </div>
 
               <form id="account-form" onSubmit={handleSubmit} className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-8">
+                <button type="submit" id="hidden-account-submit" className="hidden" />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="md:col-span-2">
                     <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">{t('accounts.form_name')}</label>
@@ -574,28 +595,82 @@ export const Accounts: React.FC = () => {
                       ))}
                     </select>
                   </div>
-                  <div>
+                  <div className="relative" ref={usageDropdownRef}>
                     <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">{t('accounts.form_usage')}</label>
-                    <select 
-                      required
-                      className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all appearance-none font-bold"
-                      value={formData.account_usage || ''}
-                      onChange={(e) => setFormData({...formData, account_usage: e.target.value as any})}
+                    <button
+                      type="button"
+                      onClick={() => setIsUsageDropdownOpen(!isUsageDropdownOpen)}
+                      className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all flex items-center justify-between font-bold"
                     >
-                      <option value="">{t('accounts.usage_general')}</option>
-                      {ACCOUNT_USAGE_GROUPS.map((group, idx) => (
-                        <optgroup key={idx} label={language === 'ar' ? group.labelAr : group.labelEn}>
-                          {group.keys.map(key => {
-                            const option = ACCOUNT_USAGE_OPTIONS.find(o => o.key === key);
-                            return option ? (
-                              <option key={key} value={key}>
-                                {language === 'ar' ? option.ar : option.en}
-                              </option>
-                            ) : null;
-                          })}
-                        </optgroup>
-                      ))}
-                    </select>
+                      <span>
+                        {formData.account_usage ? getAccountUsageLabel(formData.account_usage, language) : t('accounts.usage_general')}
+                      </span>
+                      <ChevronDown size={20} className="text-slate-400" />
+                    </button>
+                    
+                    <AnimatePresence>
+                      {isUsageDropdownOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                          className={`absolute ${dir === 'rtl' ? 'right-0' : 'left-0'} bottom-full mb-2 w-[800px] max-w-[90vw] md:max-w-[800px] bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200 z-[160] overflow-hidden`}
+                        >
+                          <div className="p-4 border-b border-slate-100 bg-slate-50/50 sticky top-0 z-10">
+                            <div className="relative">
+                              <Search className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 text-slate-400`} size={18} />
+                              <input
+                                type="text"
+                                placeholder={language === 'ar' ? 'البحث في استخدامات الحساب...' : 'Search account usages...'}
+                                className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold`}
+                                value={usageSearchTerm}
+                                onChange={(e) => setUsageSearchTerm(e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <div className="max-h-[50vh] overflow-y-auto custom-scrollbar p-4 md:p-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                              {groupedAndFilteredOptions.map((group, idx) => {
+                                if (group.items.length === 0) return null;
+                                return (
+                                  <div key={idx} className="space-y-3">
+                                    <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
+                                      {language === 'ar' ? group.labelAr : group.labelEn}
+                                    </h4>
+                                    <div className="space-y-1">
+                                      {group.items.map(opt => (
+                                        <button
+                                          key={opt.key}
+                                          type="button"
+                                          onClick={() => {
+                                            setFormData({...formData, account_usage: opt.key as any});
+                                            setIsUsageDropdownOpen(false);
+                                            setUsageSearchTerm('');
+                                          }}
+                                          className={`w-full text-start px-3 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-between ${
+                                            formData.account_usage === opt.key
+                                              ? 'bg-emerald-50 text-emerald-700'
+                                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                                          }`}
+                                        >
+                                          <span>{language === 'ar' ? opt.ar : opt.en}</span>
+                                          {formData.account_usage === opt.key && <CheckCircle2 size={16} />}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {groupedAndFilteredOptions.every(g => g.items.length === 0) && (
+                              <div className="py-8 text-center text-slate-500 font-bold">
+                                {language === 'ar' ? 'لا توجد نتائج' : 'No results found'}
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
 
