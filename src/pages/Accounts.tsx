@@ -17,6 +17,7 @@ import { useViewPreference } from '../hooks/useViewPreference';
 import { useNavigation } from '../contexts/NavigationContext';
 import { FormattedNumberInput } from '../components/FormattedNumberInput';
 import { ACCOUNT_USAGE_OPTIONS, getAccountUsageLabel, ACCOUNT_USAGE_GROUPS } from '../utils/accountUsageUtils';
+import { generateDefaultCOA } from '../services/coaService';
 
 export const Accounts: React.FC = () => {
   const { user } = useAuth();
@@ -38,6 +39,10 @@ export const Accounts: React.FC = () => {
   const [aiText, setAiText] = useState('');
   const [isUsageDropdownOpen, setIsUsageDropdownOpen] = useState(false);
   const [usageSearchTerm, setUsageSearchTerm] = useState('');
+  const [isCoaWizardOpen, setIsCoaWizardOpen] = useState(false);
+  const [coaBusinessType, setCoaBusinessType] = useState<'commercial' | 'service' | 'all'>('all');
+  const [isGeneratingCoa, setIsGeneratingCoa] = useState(false);
+  const [coaProgress, setCoaProgress] = useState('');
   const tableRef = useRef<HTMLTableElement>(null);
   const usageDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -138,6 +143,22 @@ export const Accounts: React.FC = () => {
       showNotification(t('common.ai_parse_error'), 'error');
     } finally {
       setIsAiParsing(false);
+    }
+  };
+
+  const handleGenerateCOA = async () => {
+    if (!user) return;
+    try {
+      setIsGeneratingCoa(true);
+      await generateDefaultCOA(user.company_id, user.id, user.username, language, coaBusinessType, setCoaProgress);
+      setIsCoaWizardOpen(false);
+      showNotification(language === 'ar' ? 'تم توليد الدليل المحاسبي بنجاح' : 'Chart of Accounts generated successfully', 'success');
+    } catch (e) {
+      console.error(e);
+      showNotification(language === 'ar' ? 'حدث خطأ أثناء بناء الدليل' : 'Error generating COA', 'error');
+    } finally {
+      setIsGeneratingCoa(false);
+      setCoaProgress('');
     }
   };
 
@@ -285,6 +306,16 @@ export const Accounts: React.FC = () => {
             onExportExcel={handleExportExcel} 
             onExportPDF={handleExportPDF} 
           />
+          {accounts.length === 0 && (
+            <button 
+              onClick={() => setIsCoaWizardOpen(true)}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-indigo-50 text-indigo-600 rounded-2xl font-bold hover:bg-indigo-100 transition-all active:scale-95 border border-indigo-200"
+              title={language === 'ar' ? 'إنشاء دليل محاسبي افتراضي' : 'Generate Default COA'}
+            >
+              <Sparkles size={20} />
+              <span className="hidden md:inline">{language === 'ar' ? 'دليل آلي' : 'Auto COA'}</span>
+            </button>
+          )}
           <button 
             onClick={() => openModal()}
             className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95 border border-emerald-500/50"
