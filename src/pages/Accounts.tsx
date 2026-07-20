@@ -754,6 +754,105 @@ export const Accounts: React.FC = () => {
         </div>
       )}
 
+      {isCoaWizardOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" dir={dir}>
+          <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 duration-200 border border-slate-200">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-black text-slate-900 tracking-tight">
+                {language === 'ar' ? 'الدليل المحاسبي الآلي' : 'Auto Chart of Accounts'}
+              </h3>
+              <button 
+                onClick={() => setIsCoaWizardOpen(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition-all"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            <p className="text-slate-500 mb-6 font-medium text-sm leading-relaxed">
+              {language === 'ar' 
+                ? 'سيقوم النظام بإنشاء شجرة حسابات قياسية متكاملة مناسبة لنشاطك التجاري.'
+                : 'The system will generate a standard integrated chart of accounts suitable for your business activity.'}
+            </p>
+
+            <div className="space-y-4 mb-8">
+              <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-50 transition-all has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50/50 has-[:checked]:ring-1 has-[:checked]:ring-indigo-500">
+                <input 
+                  type="radio" 
+                  name="businessType" 
+                  value="all"
+                  checked={coaBusinessType === 'all'}
+                  onChange={() => setCoaBusinessType('all')}
+                  className="w-5 h-5 text-indigo-600 focus:ring-indigo-500"
+                />
+                <div className="flex flex-col">
+                  <span className="font-bold text-slate-900 text-sm">
+                    {language === 'ar' ? 'شامل (تجاري وخدمي)' : 'Comprehensive (Commercial & Service)'}
+                  </span>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-50 transition-all has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50/50 has-[:checked]:ring-1 has-[:checked]:ring-indigo-500">
+                <input 
+                  type="radio" 
+                  name="businessType" 
+                  value="commercial"
+                  checked={coaBusinessType === 'commercial'}
+                  onChange={() => setCoaBusinessType('commercial')}
+                  className="w-5 h-5 text-indigo-600 focus:ring-indigo-500"
+                />
+                <div className="flex flex-col">
+                  <span className="font-bold text-slate-900 text-sm">
+                    {language === 'ar' ? 'تجاري فقط' : 'Commercial Only'}
+                  </span>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-50 transition-all has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50/50 has-[:checked]:ring-1 has-[:checked]:ring-indigo-500">
+                <input 
+                  type="radio" 
+                  name="businessType" 
+                  value="service"
+                  checked={coaBusinessType === 'service'}
+                  onChange={() => setCoaBusinessType('service')}
+                  className="w-5 h-5 text-indigo-600 focus:ring-indigo-500"
+                />
+                <div className="flex flex-col">
+                  <span className="font-bold text-slate-900 text-sm">
+                    {language === 'ar' ? 'خدمي فقط' : 'Service Only'}
+                  </span>
+                </div>
+              </label>
+            </div>
+
+            {coaProgress && (
+              <div className="mb-6 p-4 bg-indigo-50 rounded-xl flex items-center gap-3 border border-indigo-100">
+                <div className="w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin shrink-0" />
+                <span className="text-sm font-bold text-indigo-700">{coaProgress}</span>
+              </div>
+            )}
+
+            <button 
+              onClick={handleGenerateCOA}
+              disabled={isGeneratingCoa}
+              className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-500/20 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isGeneratingCoa ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>{language === 'ar' ? 'جاري البناء...' : 'Building...'}</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles size={18} />
+                  <span>{language === 'ar' ? 'بناء الدليل الآن' : 'Generate COA Now'}</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       <PageActivityLog 
         isOpen={isActivityLogOpen} 
         onClose={() => {
