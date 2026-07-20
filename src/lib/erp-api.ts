@@ -1867,20 +1867,28 @@ router.post('/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     const { rows }: any = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    const user = rows[0];
-
-    if (!user) {
+    
+    if (rows.length === 0) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    let isPasswordValid = await bcrypt.compare(password, user.password_hash);
+    let validUser = null;
     
-    // Support temporary passwords
-    if (!isPasswordValid && user.temp_password && password === user.temp_password) {
-      isPasswordValid = true;
+    for (const user of rows) {
+      let isPasswordValid = await bcrypt.compare(password, user.password_hash);
+      
+      // Support temporary passwords
+      if (!isPasswordValid && user.temp_password && password === user.temp_password) {
+        isPasswordValid = true;
+      }
+      
+      if (isPasswordValid) {
+        validUser = user;
+        break; // Found the company this password belongs to!
+      }
     }
 
-    if (!isPasswordValid) {
+    if (!validUser) {
       logAudit({
         action: 'LOGIN_FAILED',
         module: 'AUTH',
@@ -1892,25 +1900,25 @@ router.post('/auth/login', async (req, res) => {
 
     // Log login activity
     logAudit({
-      company_id: user.company_id,
-      user_id: user.id,
-      username: user.username || user.name || user.email,
-      user_email: user.email,
+      company_id: validUser.company_id,
+      user_id: validUser.id,
+      username: validUser.username || validUser.name || validUser.email,
+      user_email: validUser.email,
       action: 'LOGIN',
       module: 'AUTH',
-      details: `User logged in: ${user.username || user.email}`,
+      details: `User logged in: ${validUser.username || validUser.email}`,
       entity_type: 'auth',
-      entity_id: user.id,
+      entity_id: validUser.id,
       ip_address: getIp(req)
     });
 
     const token = jwt.sign(
       { 
-        id: user.id, 
-        email: user.email, 
-        company_id: user.company_id, 
-        role: user.role, 
-        username: user.username || user.name || user.email 
+        id: validUser.id, 
+        email: validUser.email, 
+        company_id: validUser.company_id, 
+        role: validUser.role, 
+        username: validUser.username || validUser.name || validUser.email 
       },
       JWT_SECRET,
       { expiresIn: '24h' }
@@ -2746,7 +2754,10 @@ modules.forEach(moduleName => {
         // For other tables, we apply company_id filter by default if present in schema
         const queryFilters = { ...req.query } as any;
         const isSuperAdmin = req.user?.role === 'super_admin';
-        const isOwnEmailQuery = moduleName === 'users' && queryFilters.email === req.user?.email;
+        const isOwnEmailQuery = moduleName === 'users' && (
+          queryFilters.email === req.user?.email || 
+          (typeof queryFilters.email === 'string' && typeof req.user?.email === 'string' && queryFilters.email.toLowerCase() === req.user.email.toLowerCase())
+        );
 
         if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && !queryFilters.company_id && req.user?.company_id && !isSuperAdmin && !isOwnEmailQuery) {
           queryFilters.company_id = req.user.company_id;

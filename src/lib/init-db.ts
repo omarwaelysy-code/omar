@@ -1207,4 +1207,15 @@ async function seedDatabase(client: any) {
   } catch (e) {
     console.warn('    ! Legacy reversed movements renaming failed:', e);
   }
+
+  // 6. Fix multi-tenant users unique constraint
+  try {
+    await client.query(`
+      ALTER TABLE "users" DROP CONSTRAINT IF EXISTS users_email_key;
+      ALTER TABLE "users" ADD CONSTRAINT users_email_company_key UNIQUE (email, company_id);
+    `);
+    console.log('    * Applied multi-tenant unique constraint for users table.');
+  } catch (e) {
+    console.warn('    ! Migration for users table unique constraint failed:', e);
+  }
 }
