@@ -1927,12 +1927,12 @@ router.post('/auth/login', async (req, res) => {
     res.json({ 
       token, 
       user: { 
-        id: user.id, 
-        username: user.username, 
-        name: user.name,
-        email: user.email, 
-        company_id: user.company_id, 
-        role: user.role 
+        id: validUser.id, 
+        username: validUser.username, 
+        name: validUser.name,
+        email: validUser.email, 
+        company_id: validUser.company_id, 
+        role: validUser.role 
       } 
     });
   } catch (error: any) {
