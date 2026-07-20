@@ -2746,7 +2746,9 @@ modules.forEach(moduleName => {
         // For other tables, we apply company_id filter by default if present in schema
         const queryFilters = { ...req.query } as any;
         const isSuperAdmin = req.user?.role === 'super_admin';
-        if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && !queryFilters.company_id && req.user?.company_id && !isSuperAdmin) {
+        const isOwnEmailQuery = moduleName === 'users' && queryFilters.email === req.user?.email;
+
+        if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && !queryFilters.company_id && req.user?.company_id && !isSuperAdmin && !isOwnEmailQuery) {
           queryFilters.company_id = req.user.company_id;
         }
 
