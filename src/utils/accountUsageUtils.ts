@@ -14,9 +14,12 @@ export const ACCOUNT_USAGE_OPTIONS: AccountUsageOption[] = [
   { key: 'credit_card', ar: 'بطاقة ائتمان', en: 'Credit Card' },
   { key: 'debit_card', ar: 'بطاقة خصم', en: 'Debit Card' },
 
-  // Receivables & Customers (Merged per request)
+  // Receivables & Customers
   { key: 'cheque', ar: 'أوراق قبض', en: 'Notes Receivable' },
   { key: 'customer', ar: 'عملاء', en: 'Customers' },
+
+  // Payables & Suppliers (Merged supplier & accounts_payable)
+  { key: 'supplier', ar: 'موردين', en: 'Suppliers' },
 
   // Inventory & Production
   { key: 'inventory', ar: 'مخزون', en: 'Inventory' },
@@ -36,9 +39,7 @@ export const ACCOUNT_USAGE_OPTIONS: AccountUsageOption[] = [
   { key: 'accumulated_depreciation', ar: 'مجمع الإهلاك', en: 'Accumulated Depreciation' },
   { key: 'investment', ar: 'استثمار', en: 'Investment' },
 
-  // Suppliers & Liabilities
-  { key: 'supplier', ar: 'موردين', en: 'Suppliers' },
-  { key: 'accounts_payable', ar: 'ذمم الموردين', en: 'Accounts Payable' },
+  // Liabilities & Loans
   { key: 'current_liability', ar: 'التزامات متداولة', en: 'Current Liability' },
   { key: 'long_term_liability', ar: 'التزامات طويلة الأجل', en: 'Long Term Liability' },
   { key: 'loan', ar: 'قرض', en: 'Loan' },
@@ -71,11 +72,13 @@ export const ACCOUNT_USAGE_OPTIONS: AccountUsageOption[] = [
   { key: 'financial_expense', ar: 'مصروفات مالية', en: 'Financial Expense' },
   { key: 'depreciation_expense', ar: 'إهلاك', en: 'Depreciation Expense' },
 
-  // Taxes & System
+  // Taxes
   { key: 'vat', ar: 'ضريبة قيمة مضافة', en: 'VAT' },
   { key: 'input_vat', ar: 'ضريبة مدخلات', en: 'Input VAT' },
   { key: 'output_vat', ar: 'ضريبة مخرجات', en: 'Output VAT' },
   { key: 'withholding_tax', ar: 'ضرائب مستقطعة', en: 'Withholding Tax' },
+
+  // System & Others
   { key: 'cost_center', ar: 'مركز تكلفة', en: 'Cost Center' },
   { key: 'project', ar: 'مشروع', en: 'Project' },
   { key: 'branch', ar: 'فرع', en: 'Branch' },
@@ -101,6 +104,9 @@ export const getAccountUsageLabel = (key: string | undefined, lang: 'ar' | 'en')
   if (key === 'accounts_receivable' || key === 'customer') {
     return lang === 'ar' ? 'عملاء' : 'Customers';
   }
+  if (key === 'accounts_payable' || key === 'supplier') {
+    return lang === 'ar' ? 'موردين' : 'Suppliers';
+  }
   const opt = ACCOUNT_USAGE_OPTIONS.find(o => o.key === key);
   if (!opt) return lang === 'ar' ? 'أخرى' : 'Other';
   return lang === 'ar' ? opt.ar : opt.en;
@@ -124,6 +130,16 @@ export const ACCOUNT_USAGE_GROUPS: AccountUsageGroup[] = [
     keys: ['cheque', 'post_dated_cheque', 'customer', 'accounts_receivable']
   },
   {
+    labelAr: 'أوراق الدفع والموردين',
+    labelEn: 'Payables & Suppliers',
+    keys: ['supplier', 'accounts_payable']
+  },
+  {
+    labelAr: 'الالتزامات والقروض',
+    labelEn: 'Liabilities & Loans',
+    keys: ['current_liability', 'long_term_liability', 'loan']
+  },
+  {
     labelAr: 'المخزون والإنتاج',
     labelEn: 'Inventory & Production',
     keys: ['inventory', 'raw_materials', 'work_in_progress', 'finished_goods']
@@ -137,11 +153,6 @@ export const ACCOUNT_USAGE_GROUPS: AccountUsageGroup[] = [
     labelAr: 'الأصول الثابتة والمتداولة الأخرى',
     labelEn: 'Fixed & Other Current Assets',
     keys: ['fixed_asset', 'current_asset', 'accumulated_depreciation', 'investment']
-  },
-  {
-    labelAr: 'الموردون والالتزامات والقروض',
-    labelEn: 'Suppliers, Liabilities & Loans',
-    keys: ['supplier', 'accounts_payable', 'current_liability', 'long_term_liability', 'loan']
   },
   {
     labelAr: 'حقوق الملكية ورأس المال',
@@ -164,9 +175,14 @@ export const ACCOUNT_USAGE_GROUPS: AccountUsageGroup[] = [
     keys: ['operating_expense', 'administrative_expense', 'marketing_expense', 'selling_expense', 'financial_expense', 'depreciation_expense']
   },
   {
-    labelAr: 'الضرائب والحسابات الأخرى',
-    labelEn: 'Taxes & Other Accounts',
-    keys: ['vat', 'input_vat', 'output_vat', 'withholding_tax', 'cost_center', 'project', 'branch', 'department', 'contract', 'exchange_difference', 'foreign_currency', 'internal_transfer', 'suspense_account', 'clearing_account', 'opening_balance', 'closing_balance', 'insurance', 'maintenance', 'manufacturing', 'other']
+    labelAr: 'الضرائب',
+    labelEn: 'Taxes',
+    keys: ['vat', 'input_vat', 'output_vat', 'withholding_tax']
+  },
+  {
+    labelAr: 'أخرى',
+    labelEn: 'Others',
+    keys: ['cost_center', 'project', 'branch', 'department', 'contract', 'exchange_difference', 'foreign_currency', 'internal_transfer', 'suspense_account', 'clearing_account', 'opening_balance', 'closing_balance', 'insurance', 'maintenance', 'manufacturing', 'other']
   }
 ];
 
