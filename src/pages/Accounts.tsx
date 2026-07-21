@@ -659,40 +659,44 @@ export const Accounts: React.FC = () => {
                               />
                             </div>
                           </div>
-                          <div className="max-h-[50vh] overflow-y-auto custom-scrollbar p-4 md:p-6">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                              {groupedAndFilteredOptions.map((group, idx) => {
-                                if (group.items.length === 0) return null;
-                                return (
-                                  <div key={idx} className="space-y-3">
-                                    <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
-                                      {language === 'ar' ? group.labelAr : group.labelEn}
+                          <div className="max-h-[60vh] overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-6">
+                            {groupedAndFilteredOptions.map((group, idx) => {
+                              if (group.items.length === 0) return null;
+                              return (
+                                <div key={idx} className="space-y-3 pb-6 border-b-4 border-slate-300 last:border-b-0 last:pb-0">
+                                  <div className="flex items-center justify-between">
+                                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide flex items-center gap-2">
+                                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block" />
+                                      <span>{language === 'ar' ? group.labelAr : group.labelEn}</span>
                                     </h4>
-                                    <div className="space-y-1">
-                                      {group.items.map(opt => (
-                                        <button
-                                          key={opt.key}
-                                          type="button"
-                                          onClick={() => {
-                                            setFormData({...formData, account_usage: opt.key as any});
-                                            setIsUsageDropdownOpen(false);
-                                            setUsageSearchTerm('');
-                                          }}
-                                          className={`w-full text-start px-3 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-between ${
-                                            formData.account_usage === opt.key
-                                              ? 'bg-emerald-50 text-emerald-700'
-                                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                                          }`}
-                                        >
-                                          <span>{language === 'ar' ? opt.ar : opt.en}</span>
-                                          {formData.account_usage === opt.key && <CheckCircle2 size={16} />}
-                                        </button>
-                                      ))}
-                                    </div>
+                                    <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full">
+                                      {group.items.length} {language === 'ar' ? 'عنصر' : 'items'}
+                                    </span>
                                   </div>
-                                );
-                              })}
-                            </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-1">
+                                    {group.items.map(opt => (
+                                      <button
+                                        key={opt.key}
+                                        type="button"
+                                        onClick={() => {
+                                          setFormData({...formData, account_usage: opt.key as any});
+                                          setIsUsageDropdownOpen(false);
+                                          setUsageSearchTerm('');
+                                        }}
+                                        className={`w-full text-start px-3.5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-between ${
+                                          formData.account_usage === opt.key
+                                            ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
+                                            : 'bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/60'
+                                        }`}
+                                      >
+                                        <span>{language === 'ar' ? opt.ar : opt.en}</span>
+                                        {formData.account_usage === opt.key && <CheckCircle2 size={16} />}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
                             {groupedAndFilteredOptions.every(g => g.items.length === 0) && (
                               <div className="py-8 text-center text-slate-500 font-bold">
                                 {language === 'ar' ? 'لا توجد نتائج' : 'No results found'}
