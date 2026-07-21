@@ -20,6 +20,7 @@ export const ACCOUNT_USAGE_OPTIONS: AccountUsageOption[] = [
 
   // Payables & Suppliers (Merged supplier & accounts_payable)
   { key: 'supplier', ar: 'موردين', en: 'Suppliers' },
+  { key: 'notes_payable', ar: 'أوراق دفع', en: 'Notes Payable' },
 
   // Inventory & Production
   { key: 'inventory', ar: 'مخزون', en: 'Inventory' },
@@ -132,7 +133,7 @@ export const ACCOUNT_USAGE_GROUPS: AccountUsageGroup[] = [
   {
     labelAr: 'أوراق الدفع والموردين',
     labelEn: 'Payables & Suppliers',
-    keys: ['supplier', 'accounts_payable']
+    keys: ['supplier', 'accounts_payable', 'notes_payable']
   },
   {
     labelAr: 'الالتزامات والقروض',
