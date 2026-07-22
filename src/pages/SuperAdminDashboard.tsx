@@ -51,6 +51,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
   const { user, isSuperAdmin } = useAuth();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -87,7 +88,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
         dbService.listAll<User>('users'),
         dbService.listAll<ActivityLog>('activity_logs'),
         MaintenanceService.getStatus(),
-        dbService.listAll<AuditLog>('audit_logs')
+        dbService.listAll<AuditLog>('audit_logs'),
+        fetch('/api/subscriptions', { headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } }).then(res => res.json())
       ]);
       
       const allCompanies = fetchResults[0].status === 'fulfilled' ? fetchResults[0].value : [];
@@ -95,12 +97,14 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
       const allLogs = fetchResults[2].status === 'fulfilled' ? fetchResults[2].value : [];
       const sysConfig = fetchResults[3].status === 'fulfilled' ? fetchResults[3].value : null;
       const v2AuditLogs = fetchResults[4].status === 'fulfilled' ? fetchResults[4].value : [];
+      const allSubscriptions = fetchResults[5].status === 'fulfilled' && Array.isArray(fetchResults[5].value) ? fetchResults[5].value : [];
       
       const allowedActions = ['إضافة شركة جديدة', 'تعديل بيانات شركة', 'حذف شركة', 'إضافة مستخدم', 'حذف مستخدم'];
       const filteredLogs = allLogs.filter(log => allowedActions.includes(log.action));
       
       setCompanies(allCompanies);
       setUsers(allUsers);
+      setSubscriptions(allSubscriptions);
       setLogs(filteredLogs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
       setConfig(sysConfig);
       setAuditLogs(v2AuditLogs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
@@ -193,27 +197,34 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
   const stats = [
     { label: 'إجمالي الشركات', value: companies.length, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'إجمالي المستخدمين', value: users.length, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'اشتراكات نشطة', value: subscriptions.filter(s => s.subscription_status === 'Active').length, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'اشتراكات منتهية', value: subscriptions.filter(s => s.subscription_status === 'Expired').length, icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const now = new Date();
-      const expiry = new Date();
-      expiry.setDate(now.getDate() + (formData.subscription_days || 30));
-
       const companyData = {
-        ...formData,
-        subscription_start: now.toISOString(),
-        subscription_end: expiry.toISOString(),
-        subscription_expiry: expiry.toISOString(),
-        created_at: now.toISOString(),
+        name: formData.name,
+        code: formData.code,
+        email: formData.email,
+        phone: formData.phone,
+        company_status: formData.company_status,
         settings: {
           currency: 'EGP',
           timezone: 'Africa/Cairo',
           language: 'ar',
           fiscal_year_start: '01-01'
         }
+      };
+      
+      const newCompanyPayload = {
+        ...companyData,
+        users_limit: formData.users_limit,
+        transactions_limit: formData.transactions_limit,
+        subscription_days: formData.subscription_days,
+        subscription_plan: formData.subscription_plan,
+        subscription_status: formData.subscription_status,
       };
 
       if (editingCompany) {
@@ -230,7 +241,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
           );
         }
       } else {
-        const companyId = await dbService.add('companies', companyData);
+        const companyId = await dbService.add('companies', newCompanyPayload);
         
         if (user) {
           await dbService.logActivity(

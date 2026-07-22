@@ -23,6 +23,7 @@ import { BranchesLimitMiddleware } from './subscription/middlewares/limits/Branc
 import { WarehousesLimitMiddleware } from './subscription/middlewares/limits/WarehousesLimitMiddleware';
 import { DevicesLimitMiddleware } from './subscription/middlewares/limits/DevicesLimitMiddleware';
 import { TransactionsLimitMiddleware } from './subscription/middlewares/limits/TransactionsLimitMiddleware';
+import { subscriptionService } from './subscription/SubscriptionService';
 
 export function getEffectiveModule(moduleName: string): string {
   const mapping: { [key: string]: string } = {
@@ -3159,11 +3160,18 @@ modules.forEach(moduleName => {
         if (rn === 'users' || rn === 'roles') {
           return UsersLimitMiddleware(req, res, () => next());
         }
-        if (rn === 'departments') {
+        if (rn === 'departments' || rn === 'cost_centers') {
           return BranchesLimitMiddleware(req, res, () => next());
         }
         if (rn === 'warehouses') {
           return WarehousesLimitMiddleware(req, res, () => next());
+        }
+        if (rn === 'pos_sessions') {
+          return DevicesLimitMiddleware(req, res, () => next());
+        }
+        const txRoutes = ['receipt_vouchers', 'payment_vouchers', 'cash_transfers', 'sales_orders', 'purchase_orders', 'returns', 'purchase_returns'];
+        if (txRoutes.includes(rn)) {
+          return TransactionsLimitMiddleware(req, res, () => next());
         }
         next();
       }, async (req: AuthRequest, res) => {
@@ -3221,6 +3229,28 @@ modules.forEach(moduleName => {
             `INSERT INTO "${moduleName}" ("${keys.join('", "')}") VALUES (${placeholders}) RETURNING *`,
             values
           );
+
+          if (moduleName === 'companies') {
+            const newCompanyId = result.rows[0].id;
+            const planMap: Record<string, string> = { basic: 'Basic', pro: 'Pro', enterprise: 'Enterprise' };
+            const plan = planMap[req.body.subscription_plan?.toLowerCase()] || 'Basic';
+            
+            const days = parseInt(req.body.subscription_days || '30', 10);
+            const endDate = new Date();
+            endDate.setDate(endDate.getDate() + days);
+
+            await subscriptionService.create({
+              company_id: newCompanyId,
+              plan_type: plan,
+              subscription_status: req.body.subscription_status === 'suspended' ? 'Suspended' : (days <= 14 ? 'Trial' : 'Active'),
+              end_date: endDate.toISOString().split('T')[0],
+              max_users: parseInt(req.body.users_limit || '5', 10),
+              max_branches: plan === 'Enterprise' ? 100 : plan === 'Pro' ? 10 : 3,
+              max_warehouses: plan === 'Enterprise' ? 100 : plan === 'Pro' ? 10 : 3,
+              max_devices: plan === 'Enterprise' ? 100 : plan === 'Pro' ? 10 : 3,
+              max_monthly_transactions: parseInt(req.body.transactions_limit || '1000', 10)
+            }, req.user?.email || 'system');
+          }
 
           await client.query('COMMIT');
 

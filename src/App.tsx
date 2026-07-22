@@ -44,6 +44,7 @@ import { PeriodClosing } from './pages/PeriodClosing';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { DashboardBuilder } from './pages/DashboardBuilder';
+import { LandingPage } from './pages/LandingPage';
 
 // Lazy load heavy screens for optimized bundle size & faster initial load
 const Invoices = React.lazy(() => import('./pages/Invoices').then(m => ({ default: m.Invoices })));
@@ -90,6 +91,22 @@ export default function App() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState<string | null>(null);
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+
+  React.useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigateTo = (path: string) => {
+    if (window.location.pathname !== path) {
+      window.history.pushState({}, '', path);
+    }
+    setCurrentPath(path);
+  };
 
   React.useEffect(() => {
     const checkHealth = async () => {
@@ -127,13 +144,20 @@ export default function App() {
           <MaintenanceModeGuard key="app">
             <ChangePasswordModal />
             {!isAuthenticated ? (
-              <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4">
-                {authMode === 'login' ? (
-                  <Login onToggle={() => setAuthMode('register')} />
-                ) : (
-                  <Register onToggle={() => setAuthMode('login')} />
-                )}
-              </div>
+              currentPath === '/login' ? (
+                <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4">
+                  {authMode === 'login' ? (
+                    <Login onToggle={() => setAuthMode('register')} />
+                  ) : (
+                    <Register onToggle={() => setAuthMode('login')} />
+                  )}
+                </div>
+              ) : (
+                <LandingPage
+                  onGetStarted={() => navigateTo('/login')}
+                  onLogin={() => navigateTo('/login')}
+                />
+              )
             ) : (
               <Layout onNavigate={setCurrentPage} currentPage={currentPage}>
                 <div className="relative w-full h-full">

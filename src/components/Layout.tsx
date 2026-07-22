@@ -168,6 +168,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
   const [isCompanyMenuOpen, setIsCompanyMenuOpen] = React.useState(false);
   const [expandedMenus, setExpandedMenus] = React.useState<string[]>(['sales']);
   const [company, setCompany] = useState<Company | null>(null);
+  const [activeFeatures, setActiveFeatures] = useState<string[]>([]);
+  const [featuresLoaded, setFeaturesLoaded] = useState(false);
   
   // Change Password Modal State
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
@@ -190,6 +192,28 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         setCompany(compData);
       }
     });
+    
+    // Fetch active features
+    const fetchFeatures = async () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        if (!token) return;
+        const res = await fetch('/api/subscriptions/my-features', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const featuresData = await res.json();
+          const active = featuresData.filter((f: any) => f.is_enabled).map((f: any) => f.feature_name);
+          setActiveFeatures(active);
+        }
+      } catch (err) {
+        console.error('Failed to fetch features', err);
+      } finally {
+        setFeaturesLoaded(true);
+      }
+    };
+    
+    fetchFeatures();
     
     return () => unsubscribe();
   }, [user?.company_id]);
@@ -458,9 +482,30 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       // For Super Admin, we DO NOT merge company menus. Super Admins should be completely isolated from company modules.
       return superAdminNavItems;
     }
-    if (isCompanyAdmin) return navItems;
 
-    return navItems.map(item => {
+    let filteredByFeatures = navItems;
+    if (featuresLoaded) {
+      const featureMap: Record<string, string> = {
+        'sales': 'sales',
+        'purchases': 'purchases',
+        'warehouses_menu': 'inventory',
+        'general_ledger': 'accounting',
+        'cash': 'accounting', // or cash
+        'flexible_operations': 'flexible_operations'
+      };
+      
+      filteredByFeatures = navItems.filter(item => {
+        const requiredFeature = featureMap[item.id];
+        if (requiredFeature) {
+           return activeFeatures.includes(requiredFeature);
+        }
+        return true;
+      });
+    }
+
+    if (isCompanyAdmin) return filteredByFeatures;
+
+    return filteredByFeatures.map(item => {
       // Check if top-level item should be visible
       const canView = hasPermission(item.id, 'view') || item.id === 'currencies' || item.id === 'templates_menu';
       

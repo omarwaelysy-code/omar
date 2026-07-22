@@ -6,7 +6,19 @@ import { authenticateToken, authorizeRoles, AuthRequest } from '../auth-middlewa
 
 const router = Router();
 
-// Secure all routes in this router to super_admin only
+// GET /api/subscriptions/my-features
+router.get('/my-features', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const companyId = req.user?.company_id;
+    if (!companyId) return res.status(400).json({ error: 'Company ID required' });
+    const features = await featureService.getFeatures(companyId);
+    res.json(features);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Secure all other routes in this router to super_admin only
 router.use(authenticateToken, authorizeRoles('super_admin'));
 
 // GET /api/subscriptions
