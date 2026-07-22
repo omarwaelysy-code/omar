@@ -4,7 +4,6 @@ import { HeroSection } from '../components/landing/HeroSection';
 import { FeaturesSection } from '../components/landing/FeaturesSection';
 import { SolutionsSection } from '../components/landing/SolutionsSection';
 import { AboutSection } from '../components/landing/AboutSection';
-import { PricingSection } from '../components/landing/PricingSection';
 import { ContactSection } from '../components/landing/ContactSection';
 import { FooterSection } from '../components/landing/FooterSection';
 
@@ -17,7 +16,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin 
   const [activeSection, setActiveSection] = useState('home');
 
   useEffect(() => {
-    const sectionIds = ['home', 'features', 'solutions', 'about-us', 'pricing', 'contact'];
+    const sectionIds = ['home', 'features', 'solutions', 'about-us', 'contact'];
     
     const handleObserver = (entries: IntersectionObserverEntry[]) => {
       entries.forEach((entry) => {
@@ -72,14 +71,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin 
         {/* 4. About Us Section */}
         <AboutSection />
 
-        {/* 5. Pricing Section */}
-        <PricingSection onSelectPlan={onGetStarted} />
-
-        {/* 6. Contact Section */}
+        {/* 5. Contact Section */}
         <ContactSection />
       </main>
 
-      {/* 7. Footer Section */}
+      {/* 6. Footer Section */}
       <FooterSection onNavigateToSection={handleNavigateToSection} />
     </div>
   );

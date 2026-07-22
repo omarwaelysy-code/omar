@@ -26,7 +26,6 @@ export const FooterSection: React.FC<FooterSectionProps> = ({ onNavigateToSectio
                 { id: 'features', label: 'Features' },
                 { id: 'solutions', label: 'Solutions' },
                 { id: 'about-us', label: 'About Us' },
-                { id: 'pricing', label: 'Pricing' },
                 { id: 'contact', label: 'Contact' },
               ].map((item) => (
                 <li key={item.id}>

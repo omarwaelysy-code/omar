@@ -13,7 +13,6 @@ export const navItems = [
   { id: 'features', label: 'Features' },
   { id: 'solutions', label: 'Solutions' },
   { id: 'about-us', label: 'About Us' },
-  { id: 'pricing', label: 'Pricing' },
   { id: 'contact', label: 'Contact' },
 ];
 
