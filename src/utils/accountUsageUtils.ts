@@ -4,101 +4,84 @@ export interface AccountUsageOption {
   en: string;
 }
 
+export interface AccountUsageGroup {
+  macroAr: string;
+  macroEn: string;
+  labelAr: string;
+  labelEn: string;
+  keys: string[];
+}
+
 export const ACCOUNT_USAGE_OPTIONS: AccountUsageOption[] = [
-  // Cash & Banking
+  // 1. الميزانية - أصول
   { key: 'cash', ar: 'نقدية', en: 'Cash' },
-  { key: 'main_cash', ar: 'صندوق رئيسي', en: 'Main Cash' },
   { key: 'petty_cash', ar: 'عهد نقدية', en: 'Petty Cash' },
   { key: 'bank', ar: 'بنك', en: 'Bank' },
   { key: 'wallet', ar: 'محفظة إلكترونية', en: 'Wallet' },
   { key: 'credit_card', ar: 'بطاقة ائتمان', en: 'Credit Card' },
   { key: 'debit_card', ar: 'بطاقة خصم', en: 'Debit Card' },
 
-  // Receivables & Customers
   { key: 'cheque', ar: 'أوراق قبض', en: 'Notes Receivable' },
   { key: 'customer', ar: 'عملاء', en: 'Customers' },
 
-  // Payables & Suppliers (Merged supplier & accounts_payable)
-  { key: 'supplier', ar: 'موردين', en: 'Suppliers' },
-  { key: 'notes_payable', ar: 'أوراق دفع', en: 'Notes Payable' },
-
-  // Inventory & Production
   { key: 'inventory', ar: 'مخزون', en: 'Inventory' },
   { key: 'raw_materials', ar: 'خامات', en: 'Raw Materials' },
   { key: 'work_in_progress', ar: 'إنتاج تحت التشغيل', en: 'Work In Progress' },
   { key: 'finished_goods', ar: 'منتجات تامة', en: 'Finished Goods' },
 
-  // Employee Accounts
-  { key: 'employee_advances', ar: 'سلف موظفين', en: 'Employee Advances' },
-  { key: 'employee_loans', ar: 'قروض موظفين', en: 'Employee Loans' },
-  { key: 'payroll', ar: 'مرتبات', en: 'Payroll' },
-  { key: 'employee', ar: 'موظف', en: 'Employee' },
-
-  // Assets
   { key: 'fixed_asset', ar: 'أصل ثابت', en: 'Fixed Asset' },
   { key: 'current_asset', ar: 'أصل متداول', en: 'Current Asset' },
   { key: 'accumulated_depreciation', ar: 'مجمع الإهلاك', en: 'Accumulated Depreciation' },
   { key: 'investment', ar: 'استثمار', en: 'Investment' },
 
-  // Liabilities & Loans
+  // 2. الميزانية - التزامات
+  { key: 'supplier', ar: 'موردين', en: 'Suppliers' },
+  { key: 'notes_payable', ar: 'أوراق دفع', en: 'Notes Payable' },
+
   { key: 'current_liability', ar: 'التزامات متداولة', en: 'Current Liability' },
   { key: 'long_term_liability', ar: 'التزامات طويلة الأجل', en: 'Long Term Liability' },
   { key: 'loan', ar: 'قرض', en: 'Loan' },
 
-  // Equity & Capital
+  { key: 'employee_advances', ar: 'سلف موظفين', en: 'Employee Advances' },
+  { key: 'payroll', ar: 'رواتب مستحقة', en: 'Accrued Salaries' },
+
+  { key: 'vat', ar: 'ضريبة قيمة مضافة', en: 'VAT' },
+  { key: 'payroll_tax', ar: 'ضرائب كسب عمل', en: 'Payroll Tax' },
+  { key: 'income_tax', ar: 'ضرائب دخل', en: 'Income Tax' },
+  { key: 'withholding_tax_customers', ar: 'ضرائب خصم من العملاء', en: 'Tax Withheld by Customers' },
+  { key: 'withholding_tax_suppliers', ar: 'ضرائب خصم على الموردين', en: 'Tax Withheld for Suppliers' },
+
+  // 3. الميزانية - حقوق ملكية
   { key: 'capital', ar: 'رأس المال', en: 'Capital' },
   { key: 'equity', ar: 'حقوق الملكية', en: 'Equity' },
   { key: 'retained_earnings', ar: 'أرباح محتجزة', en: 'Retained Earnings' },
-  { key: 'drawings', ar: 'مسحوبات', en: 'Drawings' },
+  { key: 'drawings', ar: 'جاري شركاء', en: 'Partners Current Account' },
 
-  // Revenues & Sales
+  // 4. قائمة الدخل - إيرادات
   { key: 'sales_revenue', ar: 'مبيعات', en: 'Sales Revenue' },
   { key: 'service_revenue', ar: 'إيرادات خدمات', en: 'Service Revenue' },
   { key: 'other_revenue', ar: 'إيرادات أخرى', en: 'Other Revenue' },
   { key: 'financial_revenue', ar: 'إيرادات مالية', en: 'Financial Revenue' },
-  { key: 'earned_discounts', ar: 'خصومات مكتسبة', en: 'Earned Discounts' },
+  { key: 'sales_returns', ar: 'مردودات مبيعات', en: 'Sales Returns' },
+  { key: 'earned_discounts', ar: 'خصم مبيعات', en: 'Sales Discount' },
 
-  // Costs & Purchases
+  // 5. قائمة الدخل - تكاليف
   { key: 'cost_of_sales', ar: 'تكلفة المبيعات', en: 'Cost of Sales' },
   { key: 'purchases', ar: 'مشتريات', en: 'Purchases' },
   { key: 'purchase_returns', ar: 'مردودات مشتريات', en: 'Purchase Returns' },
-  { key: 'sales_returns', ar: 'مردودات مبيعات', en: 'Sales Returns' },
-  { key: 'granted_discounts', ar: 'خصومات ممنوحة', en: 'Granted Discounts' },
+  { key: 'granted_discounts', ar: 'خصم مشتريات', en: 'Purchase Discount' },
 
-  // Expenses
+  // 6. قائمة الدخل - مصروفات / إهلاك / فوائد
   { key: 'operating_expense', ar: 'مصروفات تشغيلية', en: 'Operating Expense' },
   { key: 'administrative_expense', ar: 'مصروفات إدارية', en: 'Administrative Expense' },
   { key: 'marketing_expense', ar: 'مصروفات تسويق', en: 'Marketing Expense' },
   { key: 'selling_expense', ar: 'مصروفات بيع', en: 'Selling Expense' },
-  { key: 'financial_expense', ar: 'مصروفات مالية', en: 'Financial Expense' },
-  { key: 'depreciation_expense', ar: 'إهلاك', en: 'Depreciation Expense' },
-
-  // Taxes
-  { key: 'vat', ar: 'ضريبة قيمة مضافة', en: 'VAT' },
-  { key: 'input_vat', ar: 'ضريبة مدخلات', en: 'Input VAT' },
-  { key: 'output_vat', ar: 'ضريبة مخرجات', en: 'Output VAT' },
-  { key: 'withholding_tax', ar: 'ضرائب مستقطعة', en: 'Withholding Tax' },
-
-  // System & Others
-  { key: 'cost_center', ar: 'مركز تكلفة', en: 'Cost Center' },
-  { key: 'project', ar: 'مشروع', en: 'Project' },
-  { key: 'branch', ar: 'فرع', en: 'Branch' },
-  { key: 'department', ar: 'قسم', en: 'Department' },
-  { key: 'contract', ar: 'عقد', en: 'Contract' },
-  { key: 'exchange_difference', ar: 'فرق عملة', en: 'Exchange Difference' },
-  { key: 'foreign_currency', ar: 'عملة أجنبية', en: 'Foreign Currency' },
-  { key: 'internal_transfer', ar: 'تحويل داخلي', en: 'Internal Transfer' },
-  { key: 'suspense_account', ar: 'حساب معلق', en: 'Suspense Account' },
-  { key: 'clearing_account', ar: 'حساب تسوية', en: 'Clearing Account' },
-  { key: 'opening_balance', ar: 'رصيد افتتاحي', en: 'Opening Balance' },
-  { key: 'closing_balance', ar: 'رصيد إقفالي', en: 'Closing Balance' },
-  { key: 'insurance', ar: 'تأمين', en: 'Insurance' },
-  { key: 'maintenance', ar: 'صيانة', en: 'Maintenance' },
-  { key: 'manufacturing', ar: 'تصنيع', en: 'Manufacturing' },
-  { key: 'other', ar: 'أخرى', en: 'Other' }
+  { key: 'financial_expense', ar: 'مصروفات مالية (فوائد)', en: 'Financial Expense (Interest)' },
+  { key: 'depreciation_expense', ar: 'إهلاك', en: 'Depreciation Expense' }
 ];
 
 export const getAccountUsageLabel = (key: string | undefined, lang: 'ar' | 'en'): string => {
+  if (!key) return lang === 'ar' ? 'عام' : 'General';
   if (key === 'post_dated_cheque' || key === 'cheque') {
     return lang === 'ar' ? 'أوراق قبض' : 'Notes Receivable';
   }
@@ -108,82 +91,121 @@ export const getAccountUsageLabel = (key: string | undefined, lang: 'ar' | 'en')
   if (key === 'accounts_payable' || key === 'supplier') {
     return lang === 'ar' ? 'موردين' : 'Suppliers';
   }
+  if (key === 'main_cash') {
+    return lang === 'ar' ? 'نقدية' : 'Cash';
+  }
+  if (key === 'earned_discounts') {
+    return lang === 'ar' ? 'خصم مبيعات' : 'Sales Discount';
+  }
+  if (key === 'granted_discounts') {
+    return lang === 'ar' ? 'خصم مشتريات' : 'Purchase Discount';
+  }
+  if (key === 'drawings') {
+    return lang === 'ar' ? 'جاري شركاء' : 'Partners Current Account';
+  }
+  if (key === 'payroll') {
+    return lang === 'ar' ? 'رواتب مستحقة' : 'Accrued Salaries';
+  }
   const opt = ACCOUNT_USAGE_OPTIONS.find(o => o.key === key);
-  if (!opt) return lang === 'ar' ? 'أخرى' : 'Other';
+  if (!opt) return key;
   return lang === 'ar' ? opt.ar : opt.en;
 };
 
-export interface AccountUsageGroup {
-  labelAr: string;
-  labelEn: string;
-  keys: string[];
-}
-
 export const ACCOUNT_USAGE_GROUPS: AccountUsageGroup[] = [
+  // 1. الميزانية - أصول
   {
+    macroAr: 'الميزانية - أصول',
+    macroEn: 'Balance Sheet - Assets',
     labelAr: 'النقدية والبنوك والوسائل المالية',
     labelEn: 'Cash, Banks & Payment Methods',
-    keys: ['cash', 'main_cash', 'petty_cash', 'bank', 'wallet', 'credit_card', 'debit_card']
+    keys: ['cash', 'petty_cash', 'bank', 'wallet', 'credit_card', 'debit_card']
   },
   {
+    macroAr: 'الميزانية - أصول',
+    macroEn: 'Balance Sheet - Assets',
     labelAr: 'أوراق القبض والعملاء',
     labelEn: 'Receivables & Customers',
     keys: ['cheque', 'post_dated_cheque', 'customer', 'accounts_receivable']
   },
   {
-    labelAr: 'أوراق الدفع والموردين',
-    labelEn: 'Payables & Suppliers',
-    keys: ['supplier', 'accounts_payable', 'notes_payable']
-  },
-  {
-    labelAr: 'الالتزامات والقروض',
-    labelEn: 'Liabilities & Loans',
-    keys: ['current_liability', 'long_term_liability', 'loan']
-  },
-  {
+    macroAr: 'الميزانية - أصول',
+    macroEn: 'Balance Sheet - Assets',
     labelAr: 'المخزون والإنتاج',
     labelEn: 'Inventory & Production',
     keys: ['inventory', 'raw_materials', 'work_in_progress', 'finished_goods']
   },
   {
-    labelAr: 'حسابات الموظفين',
-    labelEn: 'Employee Accounts',
-    keys: ['employee_advances', 'employee_loans', 'payroll', 'employee']
-  },
-  {
+    macroAr: 'الميزانية - أصول',
+    macroEn: 'Balance Sheet - Assets',
     labelAr: 'الأصول الثابتة والمتداولة الأخرى',
     labelEn: 'Fixed & Other Current Assets',
     keys: ['fixed_asset', 'current_asset', 'accumulated_depreciation', 'investment']
   },
+
+  // 2. الميزانية - التزامات
   {
+    macroAr: 'الميزانية - التزامات',
+    macroEn: 'Balance Sheet - Liabilities',
+    labelAr: 'أوراق الدفع والموردين',
+    labelEn: 'Payables & Suppliers',
+    keys: ['supplier', 'accounts_payable', 'notes_payable']
+  },
+  {
+    macroAr: 'الميزانية - التزامات',
+    macroEn: 'Balance Sheet - Liabilities',
+    labelAr: 'الالتزامات والقروض',
+    labelEn: 'Liabilities & Loans',
+    keys: ['current_liability', 'long_term_liability', 'loan']
+  },
+  {
+    macroAr: 'الميزانية - التزامات',
+    macroEn: 'Balance Sheet - Liabilities',
+    labelAr: 'حسابات الموظفين والرواتب',
+    labelEn: 'Employee Accounts & Payroll',
+    keys: ['employee_advances', 'payroll']
+  },
+  {
+    macroAr: 'الميزانية - التزامات',
+    macroEn: 'Balance Sheet - Liabilities',
+    labelAr: 'الضرائب',
+    labelEn: 'Taxes',
+    keys: ['vat', 'payroll_tax', 'income_tax', 'withholding_tax_customers', 'withholding_tax_suppliers']
+  },
+
+  // 3. الميزانية - حقوق ملكية
+  {
+    macroAr: 'الميزانية - حقوق ملكية',
+    macroEn: 'Balance Sheet - Equity',
     labelAr: 'حقوق الملكية ورأس المال',
     labelEn: 'Equity & Capital',
     keys: ['capital', 'equity', 'retained_earnings', 'drawings']
   },
+
+  // 4. قائمة الدخل - إيرادات
   {
-    labelAr: 'الإيرادات والمبيعات',
-    labelEn: 'Revenues & Sales',
-    keys: ['sales_revenue', 'service_revenue', 'other_revenue', 'financial_revenue', 'earned_discounts']
+    macroAr: 'قائمة الدخل - إيرادات',
+    macroEn: 'Income Statement - Revenues',
+    labelAr: 'الإيرادات والمبيعات والمردودات',
+    labelEn: 'Revenues, Sales & Returns',
+    keys: ['sales_revenue', 'service_revenue', 'other_revenue', 'financial_revenue', 'sales_returns', 'earned_discounts']
   },
+
+  // 5. قائمة الدخل - تكاليف
   {
+    macroAr: 'قائمة الدخل - تكاليف',
+    macroEn: 'Income Statement - Costs',
     labelAr: 'التكاليف والمشتريات',
     labelEn: 'Costs & Purchases',
-    keys: ['cost_of_sales', 'purchases', 'purchase_returns', 'sales_returns', 'granted_discounts']
+    keys: ['cost_of_sales', 'purchases', 'purchase_returns', 'granted_discounts']
   },
+
+  // 6. قائمة الدخل - مصروفات / إهلاك / فوائد
   {
-    labelAr: 'المصروفات',
-    labelEn: 'Expenses',
+    macroAr: 'قائمة الدخل - مصروفات / إهلاك / فوائد',
+    macroEn: 'Income Statement - Expenses / Depreciation / Interest',
+    labelAr: 'المصروفات والإهلاك والفوائد',
+    labelEn: 'Expenses, Depreciation & Interest',
     keys: ['operating_expense', 'administrative_expense', 'marketing_expense', 'selling_expense', 'financial_expense', 'depreciation_expense']
-  },
-  {
-    labelAr: 'الضرائب',
-    labelEn: 'Taxes',
-    keys: ['vat', 'input_vat', 'output_vat', 'withholding_tax']
-  },
-  {
-    labelAr: 'أخرى',
-    labelEn: 'Others',
-    keys: ['cost_center', 'project', 'branch', 'department', 'contract', 'exchange_difference', 'foreign_currency', 'internal_transfer', 'suspense_account', 'clearing_account', 'opening_balance', 'closing_balance', 'insurance', 'maintenance', 'manufacturing', 'other']
   }
 ];
 
