@@ -649,7 +649,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           )}
         </div>
 
-        <nav className="flex items-center gap-px xl:gap-0.5 flex-1">
+        <nav className="flex items-center gap-1 xl:gap-2 flex-1 overflow-x-auto no-scrollbar whitespace-nowrap min-w-0 flex-nowrap">
           {filteredNavItems.map((item: any) => {
             const isActive = item.subItems 
               ? item.subItems.some((sub: any) => sub.id === currentPage)
@@ -657,16 +657,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             
             if (item.subItems) {
               return (
-                <div key={item.id} className="relative group px-px">
+                <div key={item.id} className="relative group px-px shrink-0">
                   <button
                     className={`
-                      flex items-center gap-0.5 xl:gap-1 px-1 xl:px-1 py-1 rounded-lg transition-all font-semibold text-[11px] xl:text-xs
+                      flex items-center gap-1 px-2 py-1.5 rounded-lg transition-all font-semibold text-xs xl:text-sm whitespace-nowrap shrink-0
                       ${isActive ? 'bg-brand-primary/10 text-brand-primary' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                     `}
                   >
-                    <item.icon size={14} className="shrink-0" />
+                    <item.icon size={15} className="shrink-0" />
                     <span>{item.label}</span>
-                    <ChevronDown size={12} className="opacity-50 group-hover:rotate-180 transition-transform shrink-0" />
+                    <ChevronDown size={13} className="opacity-50 group-hover:rotate-180 transition-transform shrink-0" />
                   </button>
                   
                   {/* Dropdown */}
@@ -712,11 +712,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 key={item.id}
                 onClick={() => handleNavClick(item.id, item.label, item.path)}
                 className={`
-                  flex items-center gap-0.5 xl:gap-1 px-1 xl:px-1 py-1 rounded-lg transition-all font-semibold text-[11px] xl:text-xs
+                  flex items-center gap-1 px-2 py-1.5 rounded-lg transition-all font-semibold text-xs xl:text-sm whitespace-nowrap shrink-0
                   ${currentPage === item.id ? 'bg-brand-primary text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                 `}
               >
-                <item.icon size={14} className="shrink-0" />
+                <item.icon size={15} className="shrink-0" />
                 <span>{item.label}</span>
               </button>
             );
