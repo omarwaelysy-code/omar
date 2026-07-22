@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 
 export const FeaturesSection: React.FC = () => {
   return (
-    <section id="features" className="w-full bg-white pt-2 lg:pt-6 pb-16 lg:pb-24 font-sans scroll-mt-24">
+    <section id="features" className="w-full bg-white pt-16 lg:pt-24 pb-20 lg:pb-28 font-sans scroll-mt-24 overflow-hidden">
       <div className="w-full max-w-[1240px] mx-auto px-6 sm:px-10 lg:px-12">
         
         {/* Top Header Row (Left Text + Right Graph Illustration) */}
@@ -42,7 +42,7 @@ export const FeaturesSection: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* 3 Feature Cards (Matching exact target reference image proportions) */}
+        {/* 3 Feature Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 mt-12 lg:mt-16">
           
           {/* Card 1: Finance Management */}

@@ -9,7 +9,7 @@ interface HeroSectionProps {
 
 export const HeroSection: React.FC<HeroSectionProps> = ({ onLogin }) => {
   return (
-    <section id="home" className="w-full bg-white font-sans scroll-mt-24 pt-4 lg:pt-8 pb-8 lg:pb-12">
+    <section id="home" className="w-full bg-white font-sans scroll-mt-24 pt-8 lg:pt-12 pb-16 lg:pb-24 border-b border-slate-100/60 overflow-hidden">
       <div className="w-full max-w-[1240px] mx-auto px-6 sm:px-10 lg:px-12 relative">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center relative">
           
@@ -66,18 +66,18 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onLogin }) => {
             <DottedGrid cols={3} rows={6} color="#2DD4BF" />
           </div>
 
-          {/* Right Column - Hero Visual Graphic */}
+          {/* Right Column - Hero Visual Graphic (Self-contained, non-overlapping) */}
           <motion.div 
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
             className="lg:col-span-6 xl:col-span-6 relative flex justify-center lg:justify-end z-10"
           >
-            <div className="relative w-full max-w-[620px] flex justify-end">
+            <div className="relative w-full max-w-[580px] lg:max-w-[620px] flex justify-end">
               <img
                 src="/hero-image.png"
                 alt="Obrain ERP Platform Illustration"
-                className="w-full h-auto object-contain select-none pointer-events-none max-h-[640px] drop-shadow-xl"
+                className="w-full h-auto object-contain select-none pointer-events-none drop-shadow-xl"
               />
             </div>
           </motion.div>
