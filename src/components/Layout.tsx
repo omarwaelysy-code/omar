@@ -484,13 +484,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
     }
 
     let filteredByFeatures = navItems;
-    if (featuresLoaded) {
+    if (featuresLoaded && activeFeatures.length > 0) {
       const featureMap: Record<string, string> = {
         'sales': 'sales',
         'purchases': 'purchases',
         'warehouses_menu': 'inventory',
         'general_ledger': 'accounting',
-        'cash': 'accounting', // or cash
+        'cash': 'accounting',
         'flexible_operations': 'flexible_operations'
       };
       
@@ -539,7 +539,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       
       return canView ? item : null;
     }).filter(Boolean) as typeof navItems;
-  }, [user, isSuperAdmin, isCompanyAdmin, hasPermission, company, t, language]);
+  }, [user, isSuperAdmin, isCompanyAdmin, hasPermission, company, t, language, featuresLoaded, activeFeatures]);
 
 
   // Update nav item click to use openTab
