@@ -630,8 +630,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       )}
 
       {/* Desktop Top Navigation */}
-      <header className="hidden md:flex sticky top-0 z-[150] bg-white border-b border-slate-200 h-16 items-center px-4 xl:px-8 shadow-sm">
-        <div className={`flex items-center gap-1.5 xl:gap-3 ${dir === 'rtl' ? 'ml-1.5 xl:ml-4' : 'mr-1.5 xl:mr-4'}`}>
+      <header className="hidden md:flex sticky top-0 z-[200] bg-white border-b border-slate-200 h-16 items-center px-3 xl:px-6 shadow-sm">
+        <div className={`flex items-center gap-1.5 xl:gap-3 ${dir === 'rtl' ? 'ml-2 xl:ml-4' : 'mr-2 xl:mr-4'} shrink-0`}>
           {company?.logo_url ? (
             <div className="flex items-center gap-2 xl:gap-3">
               <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 p-1 flex items-center justify-center">
@@ -649,7 +649,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           )}
         </div>
 
-        <nav className="flex items-center gap-1 xl:gap-2 flex-1 overflow-x-auto no-scrollbar whitespace-nowrap min-w-0 flex-nowrap">
+        <nav className="flex items-center gap-0.5 xl:gap-1 flex-1 min-w-0">
           {filteredNavItems.map((item: any) => {
             const isActive = item.subItems 
               ? item.subItems.some((sub: any) => sub.id === currentPage)
@@ -657,10 +657,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             
             if (item.subItems) {
               return (
-                <div key={item.id} className="relative group px-px shrink-0">
+                <div key={item.id} className="relative group shrink-0">
                   <button
+                    type="button"
+                    onClick={() => toggleMenu(item.id)}
                     className={`
-                      flex items-center gap-1 px-2 py-1.5 rounded-lg transition-all font-semibold text-xs xl:text-sm whitespace-nowrap shrink-0
+                      flex items-center gap-1 px-2 py-1.5 rounded-lg transition-all font-semibold text-xs xl:text-sm whitespace-nowrap cursor-pointer
                       ${isActive ? 'bg-brand-primary/10 text-brand-primary' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                     `}
                   >
@@ -669,8 +671,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                     <ChevronDown size={13} className="opacity-50 group-hover:rotate-180 transition-transform shrink-0" />
                   </button>
                   
-                  {/* Dropdown */}
-                  <div className={`absolute top-full ${dir === 'rtl' ? 'right-0' : 'left-0'} pt-2 opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-200 z-[160]`}>
+                  {/* Dropdown Menu */}
+                  <div className={`absolute top-full ${dir === 'rtl' ? 'right-0' : 'left-0'} pt-2 opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-200 z-[220]`}>
                     <div className="bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 min-w-[260px]">
                       {item.subItems.map((sub: any) => {
                         if (sub.isDivider) {
@@ -688,9 +690,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                         return (
                           <button
                             key={sub.id}
+                            type="button"
                             onClick={() => handleNavClick(sub.id, sub.label, sub.path)}
                             className={`
-                              w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}
+                              w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all cursor-pointer ${dir === 'rtl' ? 'text-right' : 'text-left'}
                               ${currentPage === sub.id 
                                 ? 'bg-brand-primary text-white shadow-sm' 
                                 : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
@@ -710,9 +713,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             return (
               <button
                 key={item.id}
+                type="button"
                 onClick={() => handleNavClick(item.id, item.label, item.path)}
                 className={`
-                  flex items-center gap-1 px-2 py-1.5 rounded-lg transition-all font-semibold text-xs xl:text-sm whitespace-nowrap shrink-0
+                  flex items-center gap-1 px-2 py-1.5 rounded-lg transition-all font-semibold text-xs xl:text-sm whitespace-nowrap shrink-0 cursor-pointer
                   ${currentPage === item.id ? 'bg-brand-primary text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                 `}
               >
@@ -723,10 +727,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           })}
         </nav>
 
-        <div className={`flex items-center gap-0.5 xl:gap-1.5 ${dir === 'rtl' ? 'mr-auto' : 'ml-auto'}`}>
+        <div className={`flex items-center gap-0.5 xl:gap-1.5 ${dir === 'rtl' ? 'mr-auto' : 'ml-auto'} shrink-0`}>
           <button 
+            type="button"
             onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
-            className="p-1 text-slate-500 hover:bg-slate-100 rounded-lg transition-all group flex items-center gap-1"
+            className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition-all group flex items-center gap-1 cursor-pointer"
             title={language === 'ar' ? 'English' : 'العربية'}
           >
             <Languages size={18} />
@@ -734,8 +739,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           </button>
 
           <button 
+            type="button"
             onClick={() => setIsCenterOpen(true)}
-            className="relative p-1 text-slate-500 hover:bg-slate-100 rounded-lg transition-all group"
+            className="relative p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition-all group cursor-pointer"
           >
             <Bell size={18} />
             {unreadCount > 0 && (
@@ -767,14 +773,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 {isCompanyMenuOpen && (
                   <>
                     <div 
-                      className="fixed inset-0 z-[155]" 
+                      className="fixed inset-0 z-[180]" 
                       onClick={() => setIsCompanyMenuOpen(false)}
                     />
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 10 }}
-                      className={`absolute top-full ${dir === 'rtl' ? 'left-0' : 'right-0'} mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-[160]`}
+                      className={`absolute top-full ${dir === 'rtl' ? 'left-0' : 'right-0'} mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-[220]`}
                     >
                       <p className="text-[10px] font-black text-slate-400 px-3 py-2 uppercase tracking-widest">{t('common.switch_company')}</p>
                       <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar">
