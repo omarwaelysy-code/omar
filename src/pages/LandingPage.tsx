@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { LandingHeader } from '../components/landing/LandingHeader';
 import { HeroSection } from '../components/landing/HeroSection';
 import { FeaturesSection } from '../components/landing/FeaturesSection';
+import { HowItWorksSection } from '../components/landing/HowItWorksSection';
 import { SolutionsSection } from '../components/landing/SolutionsSection';
 import { AboutSection } from '../components/landing/AboutSection';
 import { ContactSection } from '../components/landing/ContactSection';
@@ -16,7 +17,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin 
   const [activeSection, setActiveSection] = useState('home');
 
   useEffect(() => {
-    const sectionIds = ['home', 'features', 'solutions', 'about-us', 'contact'];
+    const sectionIds = ['home', 'features', 'how-it-works', 'solutions', 'about-us', 'contact'];
     
     const handleObserver = (entries: IntersectionObserverEntry[]) => {
       entries.forEach((entry) => {
@@ -62,20 +63,23 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin 
         {/* 1. Hero Section */}
         <HeroSection onLogin={onLogin} />
 
-        {/* 2. Features Section (Pixel-Perfect from Attached Design) */}
+        {/* 2. Features Section */}
         <FeaturesSection />
 
-        {/* 3. Solutions Section */}
+        {/* 3. How It Works Section */}
+        <HowItWorksSection />
+
+        {/* 4. Solutions Section */}
         <SolutionsSection />
 
-        {/* 4. About Us Section */}
+        {/* 5. About Us Section */}
         <AboutSection />
 
-        {/* 5. Contact Section */}
+        {/* 6. Contact Section */}
         <ContactSection />
       </main>
 
-      {/* 6. Footer Section */}
+      {/* Footer Section */}
       <FooterSection onNavigateToSection={handleNavigateToSection} />
     </div>
   );
