@@ -38,7 +38,7 @@ export const LandingHeader: React.FC<LandingHeaderProps> = ({
         ? 'bg-white/90 backdrop-blur-md border-b border-slate-100 shadow-xs py-3.5' 
         : 'bg-white py-5'
     }`}>
-      <div className="w-full max-w-[1340px] mx-auto px-6 sm:px-10 lg:px-14 flex items-center justify-between font-sans">
+      <div className="w-full max-w-[1240px] mx-auto px-6 sm:px-10 lg:px-12 flex items-center justify-between font-sans">
         
         {/* Unified Obrain Logo */}
         <Logo 

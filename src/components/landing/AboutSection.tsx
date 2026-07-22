@@ -5,7 +5,7 @@ import { Shield, Award, Users, Globe } from 'lucide-react';
 export const AboutSection: React.FC = () => {
   return (
     <section id="about-us" className="w-full bg-white py-20 lg:py-28 font-sans scroll-mt-24">
-      <div className="w-full max-w-[1340px] mx-auto px-6 sm:px-10 lg:px-14">
+      <div className="w-full max-w-[1240px] mx-auto px-6 sm:px-10 lg:px-12">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           
           <motion.div 

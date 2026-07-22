@@ -10,7 +10,7 @@ interface HeroSectionProps {
 export const HeroSection: React.FC<HeroSectionProps> = ({ onLogin }) => {
   return (
     <section id="home" className="w-full bg-white font-sans scroll-mt-24 pt-4 lg:pt-8 pb-8 lg:pb-12">
-      <div className="w-full max-w-[1340px] mx-auto px-6 sm:px-10 lg:px-14 relative">
+      <div className="w-full max-w-[1240px] mx-auto px-6 sm:px-10 lg:px-12 relative">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center relative">
           
           {/* Left Column - Content */}

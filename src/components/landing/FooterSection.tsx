@@ -8,7 +8,7 @@ interface FooterSectionProps {
 export const FooterSection: React.FC<FooterSectionProps> = ({ onNavigateToSection }) => {
   return (
     <footer className="w-full bg-slate-900 text-white py-16 font-sans border-t border-slate-800">
-      <div className="w-full max-w-[1340px] mx-auto px-6 sm:px-10 lg:px-14">
+      <div className="w-full max-w-[1240px] mx-auto px-6 sm:px-10 lg:px-12">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-10 pb-12 border-b border-slate-800">
           
           <div className="md:col-span-5">

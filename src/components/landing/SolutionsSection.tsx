@@ -23,7 +23,7 @@ export const SolutionsSection: React.FC = () => {
 
   return (
     <section id="solutions" className="w-full bg-slate-50/70 py-20 lg:py-28 font-sans scroll-mt-24">
-      <div className="w-full max-w-[1340px] mx-auto px-6 sm:px-10 lg:px-14">
+      <div className="w-full max-w-[1240px] mx-auto px-6 sm:px-10 lg:px-12">
         
         <motion.div 
           initial={{ opacity: 0, y: 30 }}
