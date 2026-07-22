@@ -645,7 +645,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
               <span className="font-black text-slate-900 tracking-tight text-sm xl:text-lg truncate max-w-[80px] xl:max-w-[200px]">{company.name}</span>
             </div>
           ) : (
-            <Logo variant="full" className="h-8" />
+            <Logo variant="full" size="md" animatePulse={true} />
           )}
         </div>
 
@@ -978,7 +978,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                   <span className="font-bold text-slate-900 truncate max-w-[120px]">{company.name}</span>
                 </div>
               ) : (
-                <Logo variant="full" className="h-8" />
+                <Logo variant="full" size="md" animatePulse={true} />
               )}
             </div>
             <div className="flex items-center gap-2">

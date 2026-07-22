@@ -45,6 +45,7 @@ import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { DashboardBuilder } from './pages/DashboardBuilder';
 import { LandingPage } from './pages/LandingPage';
+import { NotFound } from './pages/NotFound';
 
 // Lazy load heavy screens for optimized bundle size & faster initial load
 const Invoices = React.lazy(() => import('./pages/Invoices').then(m => ({ default: m.Invoices })));
@@ -152,11 +153,13 @@ export default function App() {
                     <Register onToggle={() => setAuthMode('login')} />
                   )}
                 </div>
-              ) : (
+              ) : currentPath === '/' ? (
                 <LandingPage
                   onGetStarted={() => navigateTo('/login')}
                   onLogin={() => navigateTo('/login')}
                 />
+              ) : (
+                <NotFound onGoHome={() => navigateTo('/')} />
               )
             ) : (
               <Layout onNavigate={setCurrentPage} currentPage={currentPage}>
