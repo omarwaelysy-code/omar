@@ -1,16 +1,24 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Shield, CheckCircle, Award } from 'lucide-react';
+import { CheckCircle2, CheckCircle } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 
 export const AboutSection: React.FC = () => {
   const { t } = useLanguage();
+
+  const sellingPoints = [
+    t('landing.about.point_1'),
+    t('landing.about.point_2'),
+    t('landing.about.point_3'),
+    t('landing.about.point_4')
+  ];
 
   return (
     <section id="about-us" className="w-full bg-white py-20 lg:py-28 font-sans scroll-mt-24">
       <div className="w-full max-w-[1240px] mx-auto px-6 sm:px-10 lg:px-12">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           
+          {/* Left Column: Updated Content & Green Check Points */}
           <motion.div 
             initial={{ opacity: 0, x: -25 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -18,39 +26,36 @@ export const AboutSection: React.FC = () => {
             transition={{ duration: 0.5, ease: "easeOut" }}
             className="lg:col-span-6"
           >
-            <span className="text-[#1B853A] font-bold text-sm lg:text-base uppercase tracking-wider block mb-3">
+            <span className="text-[#1B853A] font-bold text-sm lg:text-base uppercase tracking-wider block mb-3.5">
               {t('landing.about.tag')}
             </span>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#0B0F19] tracking-tight leading-tight">
-              {t('landing.about.title')}
+
+            <h2 className="text-3xl sm:text-4xl lg:text-[44px] font-extrabold text-[#0B0F19] tracking-tight leading-[1.16]">
+              {t('landing.about.title_1')}<br />
+              {t('landing.about.title_2')}
             </h2>
-            <p className="mt-6 text-[#4B5563] text-base sm:text-lg leading-relaxed font-normal">
-              {t('landing.about.description')}
-            </p>
 
-            <div className="mt-8 grid grid-cols-2 gap-6 pt-6 border-t border-slate-100">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-[#1B853A]/10 flex items-center justify-center shrink-0">
-                  <Shield className="w-6 h-6 text-[#1B853A]" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-lg text-[#0B0F19]">{t('landing.about.stat_1_title')}</h4>
-                  <p className="text-sm text-[#4B5563]">{t('landing.about.stat_1_desc')}</p>
-                </div>
-              </div>
+            <div className="mt-6 space-y-4 text-[#4B5563] text-base lg:text-lg leading-relaxed font-normal">
+              <p>{t('landing.about.description_1')}</p>
+              <p>{t('landing.about.description_2')}</p>
+            </div>
 
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-[#006CFF]/10 flex items-center justify-center shrink-0">
-                  <Award className="w-6 h-6 text-[#006CFF]" />
+            {/* Four Selling Points with Green Check Icons */}
+            <div className="mt-8 space-y-4">
+              {sellingPoints.map((point, index) => (
+                <div key={index} className="flex items-center gap-3.5">
+                  <div className="w-6 h-6 rounded-full bg-[#1B853A]/10 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-5 h-5 text-[#1B853A]" />
+                  </div>
+                  <span className="font-bold text-base text-[#0B0F19]">
+                    {point}
+                  </span>
                 </div>
-                <div>
-                  <h4 className="font-bold text-lg text-[#0B0F19]">{t('landing.about.stat_2_title')}</h4>
-                  <p className="text-sm text-[#4B5563]">{t('landing.about.stat_2_desc')}</p>
-                </div>
-              </div>
+              ))}
             </div>
           </motion.div>
 
+          {/* Right Column: Original Dark Information Card (Preserved Unchanged) */}
           <motion.div 
             initial={{ opacity: 0, x: 25 }}
             whileInView={{ opacity: 1, x: 0 }}
