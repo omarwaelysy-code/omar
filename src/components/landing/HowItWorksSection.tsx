@@ -1,31 +1,35 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { User, Settings, TrendingUp, CheckCircle2, ArrowRight } from 'lucide-react';
+import { User, Settings, TrendingUp, CheckCircle2, ArrowRight, ArrowLeft } from 'lucide-react';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export const HowItWorksSection: React.FC = () => {
+  const { t, dir } = useLanguage();
+  const isRtl = dir === 'rtl';
+
   const steps = [
     {
-      number: 'Step 1',
-      title: 'Sign Up',
-      description: 'Create your account in just a few minutes.',
+      number: t('landing.how_it_works.step_1'),
+      title: t('landing.how_it_works.step_1_title'),
+      description: t('landing.how_it_works.step_1_desc'),
       icon: <User className="w-10 h-10 text-[#1B853A]" />
     },
     {
-      number: 'Step 2',
-      title: 'Setup',
-      description: 'Configure your business and modules.',
+      number: t('landing.how_it_works.step_2'),
+      title: t('landing.how_it_works.step_2_title'),
+      description: t('landing.how_it_works.step_2_desc'),
       icon: <Settings className="w-10 h-10 text-[#1B853A]" />
     },
     {
-      number: 'Step 3',
-      title: 'Manage',
-      description: 'Manage your operations in one integrated system.',
+      number: t('landing.how_it_works.step_3'),
+      title: t('landing.how_it_works.step_3_title'),
+      description: t('landing.how_it_works.step_3_desc'),
       icon: <TrendingUp className="w-10 h-10 text-[#1B853A]" />
     },
     {
-      number: 'Step 4',
-      title: 'Grow',
-      description: 'Make smarter decisions and grow your business.',
+      number: t('landing.how_it_works.step_4'),
+      title: t('landing.how_it_works.step_4_title'),
+      description: t('landing.how_it_works.step_4_desc'),
       icon: <CheckCircle2 className="w-10 h-10 text-[#1B853A]" />
     }
   ];
@@ -65,14 +69,14 @@ export const HowItWorksSection: React.FC = () => {
           className="mb-16 lg:mb-20 max-w-2xl"
         >
           <span className="text-[#1B853A] font-bold text-sm lg:text-base uppercase tracking-wider block mb-3.5">
-            HOW IT WORKS
+            {t('landing.how_it_works.tag')}
           </span>
-          <h2 className="text-4xl sm:text-5xl lg:text-[54px] font-extrabold text-[#0B0F19] tracking-tight leading-[1.14]">
-            Simple steps to streamline<br />
-            your business
+          <h2 className="text-4xl sm:text-5xl lg:text-[54px] font-extrabold text-[#0B0F19] tracking-tight leading-[1.16]">
+            {t('landing.how_it_works.title_1')}<br />
+            {t('landing.how_it_works.title_2')}
           </h2>
           <p className="mt-5 text-[#4B5563] text-base lg:text-lg leading-relaxed font-normal">
-            Getting started with Obrain ERP is easy and fast.
+            {t('landing.how_it_works.description')}
           </p>
         </motion.div>
 
@@ -97,17 +101,21 @@ export const HowItWorksSection: React.FC = () => {
                   {step.icon}
                 </motion.div>
 
-                {/* Animated Dotted Connection Line (Hidden on last item & small screens) */}
+                {/* Animated Dotted Connection Line */}
                 {index < steps.length - 1 && (
-                  <div className="hidden lg:flex items-center absolute left-[65%] right-[-35%] top-1/2 -translate-y-1/2 z-0 pointer-events-none px-2">
+                  <div className={`hidden lg:flex items-center absolute ${isRtl ? 'right-[65%] left-[-35%]' : 'left-[65%] right-[-35%]'} top-1/2 -translate-y-1/2 z-0 pointer-events-none px-2`}>
                     <motion.div 
                       initial={{ scaleX: 0 }}
                       whileInView={{ scaleX: 1 }}
                       viewport={{ once: true }}
                       transition={{ duration: 0.6, delay: 0.3 + index * 0.15, ease: "easeInOut" }}
-                      className="w-full border-t-2 border-dotted border-[#1B853A] origin-left flex-1"
+                      className={`w-full border-t-2 border-dotted border-[#1B853A] ${isRtl ? 'origin-right' : 'origin-left'} flex-1`}
                     />
-                    <ArrowRight className="w-4 h-4 text-[#1B853A] shrink-0 -ml-1" strokeWidth={2.5} />
+                    {isRtl ? (
+                      <ArrowLeft className="w-4 h-4 text-[#1B853A] shrink-0 -mr-1" strokeWidth={2.5} />
+                    ) : (
+                      <ArrowRight className="w-4 h-4 text-[#1B853A] shrink-0 -ml-1" strokeWidth={2.5} />
+                    )}
                   </div>
                 )}
               </div>

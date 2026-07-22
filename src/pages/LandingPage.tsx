@@ -7,6 +7,7 @@ import { SolutionsSection } from '../components/landing/SolutionsSection';
 import { AboutSection } from '../components/landing/AboutSection';
 import { ContactSection } from '../components/landing/ContactSection';
 import { FooterSection } from '../components/landing/FooterSection';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -15,6 +16,7 @@ interface LandingPageProps {
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin }) => {
   const [activeSection, setActiveSection] = useState('home');
+  const { dir } = useLanguage();
 
   useEffect(() => {
     const sectionIds = ['home', 'features', 'how-it-works', 'solutions', 'about-us', 'contact'];
@@ -50,7 +52,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin 
   };
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans antialiased selection:bg-[#1B853A]/20" dir="ltr">
+    <div className="min-h-screen bg-white text-slate-900 font-sans antialiased selection:bg-[#1B853A]/20" dir={dir}>
       {/* Sticky Glassmorphism Header with Active Link Indicator */}
       <LandingHeader 
         activeSection={activeSection}

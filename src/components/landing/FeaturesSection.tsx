@@ -1,7 +1,10 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export const FeaturesSection: React.FC = () => {
+  const { t } = useLanguage();
+
   return (
     <section id="features" className="w-full bg-white pt-16 lg:pt-24 pb-20 lg:pb-28 font-sans scroll-mt-24 overflow-hidden">
       <div className="w-full max-w-[1240px] mx-auto px-6 sm:px-10 lg:px-12">
@@ -17,16 +20,16 @@ export const FeaturesSection: React.FC = () => {
           {/* Left Text Header */}
           <div className="lg:col-span-6">
             <span className="text-[#1B853A] font-bold text-sm lg:text-base uppercase tracking-wider block mb-3.5">
-              FEATURES
+              {t('landing.features.tag')}
             </span>
 
-            <h2 className="text-3xl sm:text-4xl lg:text-[44px] font-extrabold text-[#0F172A] tracking-tight leading-[1.15]">
-              Everything you need<br />
-              in one integrated system
+            <h2 className="text-3xl sm:text-4xl lg:text-[44px] font-extrabold text-[#0F172A] tracking-tight leading-[1.18]">
+              {t('landing.features.title_1')}<br />
+              {t('landing.features.title_2')}
             </h2>
 
             <p className="mt-5 text-[#4B5563] text-base lg:text-lg max-w-[480px] leading-relaxed font-normal">
-              Obrain ERP comes with a wide range of powerful features to support every department in your business.
+              {t('landing.features.description')}
             </p>
           </div>
 
@@ -66,11 +69,11 @@ export const FeaturesSection: React.FC = () => {
               </div>
 
               <h3 className="text-2xl font-bold text-[#0F172A] mb-3 tracking-tight">
-                Finance Management
+                {t('landing.features.card_1_title')}
               </h3>
 
               <p className="text-[#4B5563] text-base leading-relaxed font-normal">
-                Track expenses, manage budgets, and generate financial reports with ease.
+                {t('landing.features.card_1_desc')}
               </p>
             </div>
           </motion.div>
@@ -93,11 +96,11 @@ export const FeaturesSection: React.FC = () => {
               </div>
 
               <h3 className="text-2xl font-bold text-[#0F172A] mb-3 tracking-tight">
-                Inventory Management
+                {t('landing.features.card_2_title')}
               </h3>
 
               <p className="text-[#4B5563] text-base leading-relaxed font-normal">
-                Monitor stock levels and optimize inventory operations in real time.
+                {t('landing.features.card_2_desc')}
               </p>
             </div>
           </motion.div>
@@ -121,11 +124,11 @@ export const FeaturesSection: React.FC = () => {
               </div>
 
               <h3 className="text-2xl font-bold text-[#0F172A] mb-3 tracking-tight">
-                Sales & CRM
+                {t('landing.features.card_3_title')}
               </h3>
 
               <p className="text-[#4B5563] text-base leading-relaxed font-normal">
-                Strengthen customer relationships and boost sales performance.
+                {t('landing.features.card_3_desc')}
               </p>
             </div>
           </motion.div>

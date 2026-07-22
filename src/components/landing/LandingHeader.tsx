@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Logo } from '../Logo';
 import { motion } from 'framer-motion';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 interface LandingHeaderProps {
   activeSection: string;
@@ -8,20 +10,22 @@ interface LandingHeaderProps {
   onNavigateToSection: (sectionId: string) => void;
 }
 
-export const navItems = [
-  { id: 'home', label: 'Home' },
-  { id: 'features', label: 'Features' },
-  { id: 'solutions', label: 'Solutions' },
-  { id: 'about-us', label: 'About Us' },
-  { id: 'contact', label: 'Contact' },
-];
-
 export const LandingHeader: React.FC<LandingHeaderProps> = ({ 
   activeSection, 
   onGetStarted,
   onNavigateToSection 
 }) => {
   const [scrolled, setScrolled] = useState(false);
+  const { t } = useLanguage();
+
+  const navItems = [
+    { id: 'home', labelKey: 'landing.nav.home' },
+    { id: 'features', labelKey: 'landing.nav.features' },
+    { id: 'how-it-works', labelKey: 'landing.nav.how_it_works' },
+    { id: 'solutions', labelKey: 'landing.nav.solutions' },
+    { id: 'about-us', labelKey: 'landing.nav.about_us' },
+    { id: 'contact', labelKey: 'landing.nav.contact' },
+  ];
 
   useEffect(() => {
     const handleScroll = () => {
@@ -46,7 +50,7 @@ export const LandingHeader: React.FC<LandingHeaderProps> = ({
         />
 
         {/* Center Nav Links with active indicator */}
-        <nav className="hidden md:flex items-center gap-8 lg:gap-10">
+        <nav className="hidden md:flex items-center gap-7 lg:gap-9">
           {navItems.map((item) => {
             const isActive = activeSection === item.id;
             return (
@@ -61,7 +65,7 @@ export const LandingHeader: React.FC<LandingHeaderProps> = ({
                   isActive ? 'text-[#1B853A]' : 'text-[#27272A] hover:text-[#1B853A]'
                 }`}
               >
-                {item.label}
+                {t(item.labelKey)}
                 
                 {/* Active Indicator Underline */}
                 {isActive && (
@@ -76,14 +80,16 @@ export const LandingHeader: React.FC<LandingHeaderProps> = ({
           })}
         </nav>
 
-        {/* Right Get Started Button */}
-        <div>
+        {/* Right Section: Language Switcher + Get Started Button */}
+        <div className="flex items-center gap-3 sm:gap-4">
+          <LanguageSwitcher />
+
           <button
             type="button"
             onClick={onGetStarted}
-            className="bg-[#1B853A] hover:bg-[#167431] active:scale-[0.98] text-white px-7 py-2.5 rounded-lg font-semibold text-base transition-all duration-200 shadow-xs hover:shadow-md cursor-pointer"
+            className="bg-[#1B853A] hover:bg-[#167431] active:scale-[0.98] text-white px-6 sm:px-7 py-2.5 rounded-xl font-semibold text-base transition-all duration-200 shadow-xs hover:shadow-md cursor-pointer shrink-0"
           >
-            Get Started
+            {t('landing.nav.get_started')}
           </button>
         </div>
       </div>

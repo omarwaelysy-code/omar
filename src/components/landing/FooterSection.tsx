@@ -1,11 +1,24 @@
 import React from 'react';
 import { Logo } from '../Logo';
+import { ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface FooterSectionProps {
   onNavigateToSection: (sectionId: string) => void;
 }
 
 export const FooterSection: React.FC<FooterSectionProps> = ({ onNavigateToSection }) => {
+  const { t } = useLanguage();
+
+  const quickLinks = [
+    { id: 'home', labelKey: 'landing.nav.home' },
+    { id: 'features', labelKey: 'landing.nav.features' },
+    { id: 'how-it-works', labelKey: 'landing.nav.how_it_works' },
+    { id: 'solutions', labelKey: 'landing.nav.solutions' },
+    { id: 'about-us', labelKey: 'landing.nav.about_us' },
+    { id: 'contact', labelKey: 'landing.nav.contact' },
+  ];
+
   return (
     <footer className="w-full bg-slate-900 text-white py-16 font-sans border-t border-slate-800">
       <div className="w-full max-w-[1240px] mx-auto px-6 sm:px-10 lg:px-12">
@@ -14,20 +27,16 @@ export const FooterSection: React.FC<FooterSectionProps> = ({ onNavigateToSectio
           <div className="md:col-span-5">
             <Logo size="md" color="white" className="mb-4" />
             <p className="text-slate-400 text-sm max-w-sm leading-relaxed">
-              Obrain ERP is the unified enterprise management system for finance, inventory, sales, and operations.
+              {t('landing.footer.description')}
             </p>
           </div>
 
           <div className="md:col-span-3">
-            <h4 className="text-sm font-bold uppercase tracking-wider text-slate-300 mb-4">Quick Links</h4>
+            <h4 className="text-sm font-bold uppercase tracking-wider text-slate-300 mb-4">
+              {t('landing.footer.quick_links')}
+            </h4>
             <ul className="space-y-2.5">
-              {[
-                { id: 'home', label: 'Home' },
-                { id: 'features', label: 'Features' },
-                { id: 'solutions', label: 'Solutions' },
-                { id: 'about-us', label: 'About Us' },
-                { id: 'contact', label: 'Contact' },
-              ].map((item) => (
+              {quickLinks.map((item) => (
                 <li key={item.id}>
                   <a
                     href={`#${item.id}`}
@@ -35,9 +44,9 @@ export const FooterSection: React.FC<FooterSectionProps> = ({ onNavigateToSectio
                       e.preventDefault();
                       onNavigateToSection(item.id);
                     }}
-                    className="text-slate-400 text-sm hover:text-white transition-colors"
+                    className="text-slate-400 hover:text-white text-sm transition-colors"
                   >
-                    {item.label}
+                    {t(item.labelKey)}
                   </a>
                 </li>
               ))}
@@ -45,25 +54,32 @@ export const FooterSection: React.FC<FooterSectionProps> = ({ onNavigateToSectio
           </div>
 
           <div className="md:col-span-4">
-            <h4 className="text-sm font-bold uppercase tracking-wider text-slate-300 mb-4">Compliance & Security</h4>
-            <p className="text-slate-400 text-xs leading-relaxed mb-4">
-              Enterprise-grade AES-256 encryption, strict audit logs, and cloud automated backups.
+            <h4 className="text-sm font-bold uppercase tracking-wider text-slate-300 mb-4">
+              {t('landing.footer.security_title')}
+            </h4>
+            <p className="text-slate-400 text-sm leading-relaxed mb-4">
+              {t('landing.footer.security_desc')}
             </p>
-            <span className="inline-block bg-slate-800 text-emerald-400 text-xs font-semibold px-3 py-1 rounded-full">
-              System Status: All Systems Operational
-            </span>
+            <div className="flex items-center gap-2 text-xs text-[#2DD4BF] bg-slate-800/80 px-3.5 py-2 rounded-lg border border-slate-700 w-fit">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{t('landing.footer.system_status')}</span>
+            </div>
           </div>
 
         </div>
 
-        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 font-medium">
-          <p>&copy; 2026 Obrain System. All rights reserved.</p>
-          <div className="flex gap-6">
-            <a href="#privacy" onClick={(e) => e.preventDefault()} className="hover:text-slate-400">Privacy Policy</a>
-            <a href="#terms" onClick={(e) => e.preventDefault()} className="hover:text-slate-400">Terms of Service</a>
-            <a href="#security" onClick={(e) => e.preventDefault()} className="hover:text-slate-400">Security</a>
+        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-4">
+          <p>{t('landing.footer.copyright')}</p>
+          <div className="flex items-center gap-6">
+            <a href="#" className="hover:text-slate-200 transition-colors">{t('landing.footer.privacy')}</a>
+            <a href="#" className="hover:text-slate-200 transition-colors">{t('landing.footer.terms')}</a>
+            <a href="#" className="hover:text-slate-200 transition-colors flex items-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>{t('landing.footer.security')}</span>
+            </a>
           </div>
         </div>
+
       </div>
     </footer>
   );

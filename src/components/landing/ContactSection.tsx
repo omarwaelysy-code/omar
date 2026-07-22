@@ -1,16 +1,22 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Phone, MapPin, Send, CheckCircle } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, CheckCircle2 } from 'lucide-react';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export const ContactSection: React.FC = () => {
+  const { t } = useLanguage();
   const [submitted, setSubmitted] = useState(false);
-  const [formData, setFormData] = useState({ name: '', email: '', message: '' });
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    message: ''
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 4000);
     setFormData({ name: '', email: '', message: '' });
+    setTimeout(() => setSubmitted(false), 5000);
   };
 
   return (
@@ -19,117 +25,123 @@ export const ContactSection: React.FC = () => {
         
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
           
-          <motion.div 
-            initial={{ opacity: 0, x: -30 }}
+          {/* Left Column: Contact Info */}
+          <motion.div
+            initial={{ opacity: 0, x: -25 }}
             whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, margin: "-80px" }}
+            viewport={{ once: true, margin: "-60px" }}
             transition={{ duration: 0.5, ease: "easeOut" }}
             className="lg:col-span-5"
           >
             <span className="text-[#1B853A] font-bold text-sm lg:text-base uppercase tracking-wider block mb-3">
-              CONTACT US
+              {t('landing.contact.tag')}
             </span>
-            <h2 className="text-4xl sm:text-5xl lg:text-[46px] font-extrabold text-[#0B0F19] tracking-tight leading-[1.15]">
-              Get in Touch with Our Team
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-[#0B0F19] tracking-tight">
+              {t('landing.contact.title')}
             </h2>
-            <p className="mt-6 text-[#4B5563] text-base lg:text-lg leading-relaxed">
-              Have questions about Obrain ERP or need a tailored demo for your company? Contact our team and we'll respond within 24 hours.
+            <p className="mt-4 text-[#4B5563] text-base leading-relaxed font-normal">
+              {t('landing.contact.description')}
             </p>
 
-            <div className="space-y-6 mt-8">
+            <div className="mt-8 space-y-6">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-[#1B853A]/10 text-[#1B853A] flex items-center justify-center shrink-0">
-                  <Mail size={20} />
+                <div className="w-12 h-12 rounded-xl bg-[#1B853A]/10 flex items-center justify-center shrink-0">
+                  <Mail className="w-5 h-5 text-[#1B853A]" />
                 </div>
                 <div>
-                  <h4 className="text-xs uppercase tracking-wider text-slate-400 font-bold">Email</h4>
-                  <p className="text-base font-semibold text-[#0B0F19]">contact@obrainsystem.com</p>
+                  <h4 className="text-sm font-semibold text-[#4B5563]">{t('landing.contact.email_label')}</h4>
+                  <p className="font-bold text-[#0B0F19]">contact@obrain.tech</p>
                 </div>
               </div>
 
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-[#1B853A]/10 text-[#1B853A] flex items-center justify-center shrink-0">
-                  <Phone size={20} />
+                <div className="w-12 h-12 rounded-xl bg-[#1B853A]/10 flex items-center justify-center shrink-0">
+                  <Phone className="w-5 h-5 text-[#1B853A]" />
                 </div>
                 <div>
-                  <h4 className="text-xs uppercase tracking-wider text-slate-400 font-bold">Phone</h4>
-                  <p className="text-base font-semibold text-[#0B0F19]">+1 (800) 555-OBRAIN</p>
+                  <h4 className="text-sm font-semibold text-[#4B5563]">{t('landing.contact.phone_label')}</h4>
+                  <p className="font-bold text-[#0B0F19]">+966 (0) 11 800 9000</p>
                 </div>
               </div>
 
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-[#1B853A]/10 text-[#1B853A] flex items-center justify-center shrink-0">
-                  <MapPin size={20} />
+                <div className="w-12 h-12 rounded-xl bg-[#1B853A]/10 flex items-center justify-center shrink-0">
+                  <MapPin className="w-5 h-5 text-[#1B853A]" />
                 </div>
                 <div>
-                  <h4 className="text-xs uppercase tracking-wider text-slate-400 font-bold">HQ Location</h4>
-                  <p className="text-base font-semibold text-[#0B0F19]">Innovation Tower, Financial District</p>
+                  <h4 className="text-sm font-semibold text-[#4B5563]">{t('landing.contact.hq_label')}</h4>
+                  <p className="font-bold text-[#0B0F19]">{t('landing.contact.hq_val')}</p>
                 </div>
               </div>
             </div>
           </motion.div>
 
-          <motion.div 
-            initial={{ opacity: 0, x: 30 }}
+          {/* Right Column: Contact Form */}
+          <motion.div
+            initial={{ opacity: 0, x: 25 }}
             whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, margin: "-80px" }}
+            viewport={{ once: true, margin: "-60px" }}
             transition={{ duration: 0.5, ease: "easeOut" }}
-            className="lg:col-span-7"
+            className="lg:col-span-7 bg-slate-50 border border-slate-200/80 rounded-3xl p-8 sm:p-10 shadow-xs"
           >
-            <div className="bg-slate-50 border border-slate-200/80 rounded-3xl p-8 sm:p-10 shadow-xs">
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {submitted && (
-                  <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm font-bold flex items-center gap-3">
-                    <CheckCircle className="text-[#1B853A]" size={20} />
-                    Thank you! Your message has been sent successfully.
-                  </div>
-                )}
+            {submitted && (
+              <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-[#1B853A] text-sm font-medium flex items-center gap-3">
+                <CheckCircle2 className="w-5 h-5 shrink-0" />
+                <span>{t('landing.contact.success')}</span>
+              </div>
+            )}
 
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Your Name</label>
-                  <input
-                    required
-                    type="text"
-                    placeholder="John Doe"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#1B853A]/20 focus:border-[#1B853A] outline-none text-slate-900 font-medium"
-                  />
-                </div>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div>
+                <label className="block text-sm font-semibold text-[#0B0F19] mb-2">
+                  {t('landing.contact.form_name')}
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder={t('landing.contact.form_name_placeholder')}
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#1B853A] text-sm"
+                />
+              </div>
 
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Work Email</label>
-                  <input
-                    required
-                    type="email"
-                    placeholder="john@company.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#1B853A]/20 focus:border-[#1B853A] outline-none text-slate-900 font-medium"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-semibold text-[#0B0F19] mb-2">
+                  {t('landing.contact.form_email')}
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder={t('landing.contact.form_email_placeholder')}
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#1B853A] text-sm"
+                />
+              </div>
 
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Message</label>
-                  <textarea
-                    required
-                    rows={4}
-                    placeholder="Tell us about your team size and operational needs..."
-                    value={formData.message}
-                    onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#1B853A]/20 focus:border-[#1B853A] outline-none text-slate-900 font-medium resize-none"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-semibold text-[#0B0F19] mb-2">
+                  {t('landing.contact.form_message')}
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  placeholder={t('landing.contact.form_message_placeholder')}
+                  value={formData.message}
+                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#1B853A] text-sm"
+                />
+              </div>
 
-                <button
-                  type="submit"
-                  className="w-full bg-[#1B853A] hover:bg-[#167431] text-white py-3.5 rounded-xl font-semibold text-base flex items-center justify-center gap-2.5 transition-all shadow-md active:scale-[0.98] cursor-pointer"
-                >
-                  <Send size={18} />
-                  <span>Send Message</span>
-                </button>
-              </form>
-            </div>
+              <button
+                type="submit"
+                className="w-full bg-[#1B853A] hover:bg-[#167431] text-white py-3.5 px-6 rounded-xl font-semibold text-base flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer"
+              >
+                <span>{t('landing.contact.send')}</span>
+                <Send className="w-4 h-4" />
+              </button>
+            </form>
           </motion.div>
 
         </div>
