@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 
 interface LogoProps {
@@ -6,9 +6,8 @@ interface LogoProps {
   variant?: 'full' | 'icon';
   color?: 'green' | 'white' | 'dark';
   size?: 'sm' | 'md' | 'lg' | 'xl';
-  animateStartup?: boolean;
-  animatePulse?: boolean;
   onClick?: () => void;
+  disableAnimation?: boolean;
 }
 
 export const Logo: React.FC<LogoProps> = ({ 
@@ -16,25 +15,13 @@ export const Logo: React.FC<LogoProps> = ({
   variant = 'full',
   color = 'green',
   size = 'md',
-  animateStartup = false,
-  animatePulse = true,
-  onClick
+  onClick,
+  disableAnimation = false
 }) => {
-  const [pulse, setPulse] = useState(false);
-
-  useEffect(() => {
-    if (!animatePulse) return;
-    const interval = setInterval(() => {
-      setPulse(true);
-      setTimeout(() => setPulse(false), 800);
-    }, 4500);
-    return () => clearInterval(interval);
-  }, [animatePulse]);
-
   const getGreenColor = () => {
     if (color === 'white') return "#FFFFFF";
     if (color === 'dark') return "#18181b";
-    return "#1B853A"; // Obrain Primary Green
+    return "#1B853A"; // Signature Obrain Green
   };
 
   const getTextColor = () => {
@@ -45,57 +32,58 @@ export const Logo: React.FC<LogoProps> = ({
   const green = getGreenColor();
   const text = getTextColor();
 
-  // Size mapping (increased ~25% for high visibility & readability)
+  // Size mapping (25% larger, aligned vertical proportion)
   const sizeMap = {
-    sm: { icon: 'w-8 h-8', text: 'text-2xl', gap: 'gap-2.5' },
-    md: { icon: 'w-11 h-11', text: 'text-3xl', gap: 'gap-3' },
-    lg: { icon: 'w-14 h-14', text: 'text-4xl', gap: 'gap-3.5' },
-    xl: { icon: 'w-20 h-20', text: 'text-5xl', gap: 'gap-4' }
+    sm: { icon: 'w-7 h-7', text: 'text-xl', gap: 'gap-2.5' },
+    md: { icon: 'w-10 h-10', text: 'text-2xl', gap: 'gap-3' },
+    lg: { icon: 'w-12 h-12', text: 'text-3xl', gap: 'gap-3.5' },
+    xl: { icon: 'w-16 h-16', text: 'text-4xl', gap: 'gap-4' }
   };
 
   const currentSize = sizeMap[size] || sizeMap.md;
 
   return (
     <motion.div 
-      className={`inline-flex items-center ${currentSize.gap} select-none ${onClick ? 'cursor-pointer' : ''} ${className}`}
+      className={`inline-flex items-center ${currentSize.gap} select-none transform-gpu ${onClick ? 'cursor-pointer' : ''} ${className}`}
       onClick={onClick}
-      initial={animateStartup ? { opacity: 0, scale: 0.85 } : { opacity: 1, scale: 1 }}
-      animate={{ 
-        opacity: 1, 
-        scale: pulse ? 1.03 : 1,
+      animate={disableAnimation ? undefined : {
+        scale: [1, 1.02, 1],
+        rotate: [0, 1, 0]
       }}
-      whileHover={{ scale: 1.05 }}
-      transition={{ 
-        duration: animateStartup ? 0.5 : 0.2, 
-        ease: [0.22, 1, 0.36, 1] 
+      transition={disableAnimation ? undefined : {
+        duration: 7,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }}
+      whileHover={{ 
+        scale: 1.05,
+        rotate: 2,
+        transition: { duration: 0.25, ease: [0.22, 1, 0.36, 1] }
       }}
     >
-      {/* Icon SVG */}
-      <motion.div 
-        className={`relative ${currentSize.icon} flex items-center justify-center shrink-0`}
-        initial={animateStartup ? { rotate: -360, opacity: 0, scale: 0.7 } : { rotate: 0 }}
-        animate={{ rotate: 0, opacity: 1, scale: 1 }}
-        transition={{ duration: animateStartup ? 0.8 : 0, ease: "easeOut" }}
-      >
+      {/* Precision Vector SVG Icon */}
+      <div className={`relative ${currentSize.icon} flex items-center justify-center shrink-0`}>
         <svg 
           viewBox="0 0 100 100" 
           className="w-full h-full object-contain"
           fill="none" 
           xmlns="http://www.w3.org/2000/svg"
         >
-          {/* Obrain signature green Q emblem */}
           <path 
-            d="M50 10C27.9086 10 10 27.9086 10 50C10 72.0914 27.9086 90 50 90C59.5 90 68.2 86.7 75.1 81.2L85 91.1C87 93.1 90.1 91.7 90.1 88.9V75.1C90.1 75.1 90 50 90 50C90 27.9086 72.0914 10 50 10ZM50 70C38.9543 70 30 61.0457 30 50C30 38.9543 38.9543 30 50 30C61.0457 30 70 38.9543 70 50C70 61.0457 61.0457 70 50 70Z" 
+            d="M50 10C27.9086 10 10 27.9086 10 50C10 72.0914 27.9086 90 50 90C60.5 90 70 85.8 77 78.8L86 87.8C87.6 89.4 90.3 88.3 90.3 86.1V73C90.3 73 90 50 90 50C90 27.9086 72.0914 10 50 10ZM50 68C40.0589 68 32 59.9411 32 50C32 40.0589 40.0589 32 50 32C59.9411 32 68 40.0589 68 50C68 59.9411 59.9411 68 50 68Z" 
             fill={green} 
           />
         </svg>
-      </motion.div>
+      </div>
 
-      {/* Text */}
+      {/* Typography: Obrain Wordmark (Font Weight 600, Plus Jakarta Sans/Manrope, tracking-wide) */}
       {variant === 'full' && (
         <span 
-          className={`font-extrabold ${currentSize.text} tracking-tight font-sans`}
-          style={{ color: text }}
+          className={`font-semibold ${currentSize.text} tracking-[0.02em] leading-none flex items-center`}
+          style={{ 
+            color: text, 
+            fontFamily: '"Plus Jakarta Sans", "Manrope", sans-serif'
+          }}
         >
           Obrain
         </span>

@@ -122,8 +122,8 @@ export default function App() {
         setDbError(err.message || 'Network error while connecting to database');
       } finally {
         if (!authLoading) {
-          // Add a slight delay for smooth transition
-          setTimeout(() => setLoading(false), 500);
+          // 1.8s startup animation sequence
+          setTimeout(() => setLoading(false), 1800);
         }
       }
     };

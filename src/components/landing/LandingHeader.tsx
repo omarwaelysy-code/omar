@@ -24,11 +24,9 @@ export const LandingHeader: React.FC<LandingHeaderProps> = ({ onGetStarted }) =>
     }`}>
       <div className="w-full max-w-[1340px] mx-auto px-6 sm:px-10 lg:px-14 flex items-center justify-between font-sans">
         
-        {/* Unified Obrain Logo with startup rotation, pulse & hover scale */}
+        {/* Unified Obrain Logo */}
         <Logo 
           size="md" 
-          animateStartup={true} 
-          animatePulse={true} 
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} 
         />
 

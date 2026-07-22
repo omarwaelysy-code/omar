@@ -67,7 +67,7 @@ export const Login: React.FC<LoginProps> = ({ onToggle }) => {
         className="w-full max-w-[420px] z-10"
       >
         <div className="text-center mb-10">
-          <Logo variant="full" size="lg" animateStartup={true} animatePulse={true} className="justify-center mb-4" />
+          <Logo variant="full" size="lg" className="justify-center mb-4" />
           <p className="text-slate-500 font-medium">{t('common.app_description')}</p>
         </div>
 

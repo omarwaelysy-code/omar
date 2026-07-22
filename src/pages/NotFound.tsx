@@ -24,7 +24,7 @@ export const NotFound: React.FC<NotFoundProps> = ({ onGoHome }) => {
         transition={{ duration: 0.4 }}
         className="bg-white border border-slate-200 shadow-xl rounded-3xl p-10 max-w-lg w-full flex flex-col items-center"
       >
-        <Logo size="xl" animateStartup={true} animatePulse={true} className="mb-6" />
+        <Logo size="xl" className="mb-6" />
         
         <div className="inline-block bg-[#1B853A]/10 text-[#1B853A] font-extrabold text-sm px-4 py-1.5 rounded-full mb-4">
           Error 404
