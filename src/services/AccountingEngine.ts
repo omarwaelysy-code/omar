@@ -22,7 +22,8 @@ export class AccountingEngine {
 
       entries.forEach(entry => {
         const entryDateStr = (entry.date || '').slice(0, 10);
-        entry.items?.forEach(item => {
+        const itemsList = (entry.items && Array.isArray(entry.items) && entry.items.length > 0) ? entry.items : ((entry as any).lines || (entry as any).journal_entry_lines || []);
+        itemsList.forEach((item: any) => {
           if (item.account_id === account.id) {
             const debit = Number(item.debit) || 0;
             const credit = Number(item.credit) || 0;
@@ -89,7 +90,8 @@ export class AccountingEngine {
 
     entries.forEach(entry => {
       const entryDateStr = (entry.date || '').slice(0, 10);
-      entry.items?.forEach(item => {
+      const itemsList = (entry.items && Array.isArray(entry.items) && entry.items.length > 0) ? entry.items : ((entry as any).lines || (entry as any).journal_entry_lines || []);
+      itemsList.forEach((item: any) => {
         if (item.account_id === account.id) {
           const debit = Number(item.debit) || 0;
           const credit = Number(item.credit) || 0;
