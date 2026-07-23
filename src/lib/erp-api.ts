@@ -2274,7 +2274,7 @@ function sanitizeData(table: string, data: any) {
       let value = data[key];
       
       // Convert empty strings to null for IDs, decimals and dates
-      if (value === '' && (key.endsWith('_id') || key.endsWith('_date') || key === 'date' || key === 'amount' || key === 'price' || key === 'unit_price' || key === 'total' || key === 'subtotal')) {
+      if (value === '' && (key.endsWith('_id') || key.endsWith('_date') || key.endsWith('_start') || key.endsWith('_end') || key.endsWith('_expiry') || key === 'date' || key === 'amount' || key === 'price' || key === 'unit_price' || key === 'total' || key === 'subtotal')) {
         value = null;
       } 
       

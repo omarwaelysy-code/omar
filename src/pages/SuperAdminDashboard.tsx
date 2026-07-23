@@ -187,12 +187,31 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
     fetchData();
   };
 
+  const formatDateForInput = (val: any): string => {
+    if (!val) return '';
+    const str = String(val).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+      return str.slice(0, 10);
+    }
+    try {
+      const d = new Date(str);
+      if (!isNaN(d.getTime())) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+    } catch (e) {}
+    return '';
+  };
+
   const getSubscriptionStatus = (company: Company) => {
     if (company.company_status === 'suspended') return { label: 'موقوف', color: 'bg-red-100 text-red-800', icon: XCircle };
     
-    const now = new Date();
-    const expiry = new Date(company.subscription_end || '');
-    if (expiry < now) return { label: 'منتهي', color: 'bg-amber-100 text-amber-800', icon: AlertCircle };
+    const nowStr = formatDateForInput(new Date());
+    const endStr = formatDateForInput(company.subscription_end || company.subscription_expiry);
+    
+    if (endStr && endStr < nowStr) return { label: 'منتهي', color: 'bg-amber-100 text-amber-800', icon: AlertCircle };
     
     return { label: 'نشط', color: 'bg-emerald-100 text-emerald-800', icon: CheckCircle2 };
   };
@@ -207,15 +226,15 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const startDate = formData.subscription_start || todayStr;
-      let endDate = formData.subscription_end || formData.subscription_expiry;
+      const todayStr = formatDateForInput(new Date());
+      const startDate = formatDateForInput(formData.subscription_start) || todayStr;
+      let endDate = formatDateForInput(formData.subscription_end || formData.subscription_expiry);
       
       if (!endDate) {
         const days = Number(formData.subscription_days) || 30;
         const d = new Date(startDate);
         d.setDate(d.getDate() + days);
-        endDate = d.toISOString().slice(0, 10);
+        endDate = formatDateForInput(d);
       }
 
       const companyData = {
@@ -716,9 +735,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
               </thead>
               <tbody className="divide-y divide-stone-200">
                 {filteredCompanies.map((company) => {
-                  const createdAtStr = company.created_at ? new Date(company.created_at).toISOString().slice(0, 10) : 'تأسيسي';
-                  const startDateStr = company.subscription_start ? new Date(company.subscription_start).toISOString().slice(0, 10) : (company.created_at ? new Date(company.created_at).toISOString().slice(0, 10) : '-');
-                  const endDateStr = company.subscription_end || company.subscription_expiry ? new Date(company.subscription_end || company.subscription_expiry!).toISOString().slice(0, 10) : '-';
+                  const createdAtStr = formatDateForInput(company.created_at) || 'تأسيسي';
+                  const startDateStr = formatDateForInput(company.subscription_start || company.created_at) || '-';
+                  const endDateStr = formatDateForInput(company.subscription_end || company.subscription_expiry) || '-';
 
                   const registeredUsers = users.filter(u => u.company_id === company.id).length;
                   const activeUsersCount = (company as any).active_users_count || registeredUsers;
@@ -785,8 +804,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                           <button 
                             onClick={() => {
                               setEditingCompany(company);
-                              const startDate = company.subscription_start ? new Date(company.subscription_start).toISOString().slice(0, 10) : (company.created_at ? new Date(company.created_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
-                              const endDate = company.subscription_end || company.subscription_expiry ? new Date(company.subscription_end || company.subscription_expiry!).toISOString().slice(0, 10) : '';
+                              const startDate = formatDateForInput(company.subscription_start || company.created_at) || formatDateForInput(new Date());
+                              const endDate = formatDateForInput(company.subscription_end || company.subscription_expiry);
 
                               setFormData({
                                 ...company,
@@ -1456,13 +1475,13 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                     <input
                       required
                       type="date"
-                      value={formData.subscription_start || ''}
+                      value={formatDateForInput(formData.subscription_start)}
                       onChange={(e) => {
                         const newStart = e.target.value;
                         const days = Number(formData.subscription_days) || 30;
                         const d = new Date(newStart);
                         d.setDate(d.getDate() + days);
-                        const newEnd = d.toISOString().slice(0, 10);
+                        const newEnd = formatDateForInput(d);
                         setFormData({
                           ...formData,
                           subscription_start: newStart,
@@ -1482,7 +1501,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                     <input
                       required
                       type="date"
-                      value={formData.subscription_end || formData.subscription_expiry || ''}
+                      value={formatDateForInput(formData.subscription_end || formData.subscription_expiry)}
                       onChange={(e) => setFormData({ ...formData, subscription_end: e.target.value, subscription_expiry: e.target.value })}
                       className="w-full px-4 py-2 bg-stone-50 border border-stone-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 outline-none font-bold"
                     />
