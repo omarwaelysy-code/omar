@@ -61,7 +61,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
   
   // Use simplified mode to keep UI clean
   const simplifiedMode = true;
-  const [activeTab, setActiveTab] = useState<'companies' | 'users' | 'logs' | 'system' | 'audit' | 'subscriptions' | 'feature-manager' | 'settings' | 'monitoring' | 'reports'>(initialTab as any || 'companies');
+  const [activeTab, setActiveTab] = useState<'super_admins' | 'companies' | 'users' | 'logs' | 'system' | 'audit' | 'subscriptions' | 'feature-manager' | 'settings' | 'monitoring' | 'reports'>((initialTab as any) || 'super_admins');
   const [config, setConfig] = useState<SystemConfig | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   
@@ -510,11 +510,27 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
     }
   };
 
+  const isSuperAdminUser = (u: User) => {
+    const superAdminEmails = ['omarwaelysy@gmail.com', 'omarwaelsys@gmail.com', 'acc.wael2005@gmail.com'];
+    return u.role === 'super_admin' || (u.role === 'admin' && u.company_id === 'system') || (u.email && superAdminEmails.includes(u.email.trim().toLowerCase()));
+  };
+
   const filteredCompanies = companies.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const filteredSuperAdmins = users.filter(u => isSuperAdminUser(u) && (
+    (u.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
+  ));
+
+  const filteredCompanyUsers = users.filter(u => !isSuperAdminUser(u) && (
+    (u.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (u.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (u.company_id && companies.find(c => c.id === u.company_id)?.name.toLowerCase().includes(searchTerm.toLowerCase()))
+  ));
 
   if (loading) {
     return (
@@ -609,22 +625,33 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
 
       <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
         <div className="border-b border-stone-200">
-          <div className="flex p-1">
+          <div className="flex p-1 gap-1 overflow-x-auto">
             <button
-              onClick={() => setActiveTab('companies')}
-              className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === 'companies' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+              onClick={() => setActiveTab('super_admins')}
+              className={`flex-1 py-3 text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${
+                activeTab === 'super_admins' ? 'bg-purple-600 text-white shadow-sm' : 'text-stone-600 hover:bg-stone-100'
               }`}
             >
-              الشركات
+              <Shield className="w-4 h-4" />
+              <span>السوبر أدمن</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('companies')}
+              className={`flex-1 py-3 text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${
+                activeTab === 'companies' ? 'bg-emerald-600 text-white shadow-sm' : 'text-stone-600 hover:bg-stone-100'
+              }`}
+            >
+              <Building2 className="w-4 h-4" />
+              <span>الشركات</span>
             </button>
             <button
               onClick={() => setActiveTab('users')}
-              className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === 'users' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+              className={`flex-1 py-3 text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${
+                activeTab === 'users' ? 'bg-blue-600 text-white shadow-sm' : 'text-stone-600 hover:bg-stone-100'
               }`}
             >
-              المستخدمين
+              <Users className="w-4 h-4" />
+              <span>مستخدمين الشركات</span>
             </button>
             <button
                onClick={() => setActiveTab('system')}
@@ -837,122 +864,211 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
             </table>
           )}
 
-          {activeTab === 'users' && (
-            <div className="p-4 bg-stone-50 border-b border-stone-200 flex justify-between items-center">
-              <h3 className="text-sm font-bold text-stone-600">إدارة المستخدمين</h3>
-              <button
-                onClick={cleanupOrphanedUsers}
-                className="flex items-center gap-2 text-xs font-bold text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-all border border-red-100"
-                title="حذف المستخدمين غير المرتبطين بشركة"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>تنظيف المستخدمين اليتامى</span>
-              </button>
-            </div>
-          )}
-          {activeTab === 'users' && (
-            <table className="w-full text-right">
-              <thead className="bg-stone-50 border-b border-stone-200">
-                <tr>
-                  <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">المستخدم</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الشركة</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الدور</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">كلمة المرور المؤقتة</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الحالة</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">تاريخ الانضمام</th>
-                  <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-200">
-                {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-stone-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-stone-100 rounded-full flex items-center justify-center">
-                          <Users className="w-6 h-6 text-stone-400" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-stone-900">{u.username}</p>
-                          <p className="text-xs text-stone-500">{u.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600">
-                      {companies.find(c => c.id === u.company_id)?.name || 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        u.role === 'super_admin' || (u.role === 'admin' && u.company_id === 'system') ? 'bg-purple-100 text-purple-800' :
-                        u.role === 'admin' ? 'bg-blue-100 text-blue-800' :
-                        u.role === 'manager' ? 'bg-amber-100 text-amber-800' :
-                        'bg-stone-100 text-stone-800'
-                      }`}>
-                        {u.role === 'super_admin' || (u.role === 'admin' && u.company_id === 'system') ? 'مدير عام' :
-                         u.role === 'admin' ? 'مدير شركة' : u.role === 'manager' ? 'مشرف' : 'مستخدم'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {u.temp_password ? (
-                        <code className="bg-amber-50 text-amber-700 px-2 py-1 rounded text-xs font-mono border border-amber-100">
-                          {u.temp_password}
-                        </code>
-                      ) : (
-                        <span className="text-xs text-stone-400">تم التغيير</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        u.status === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
-                      }`}>
-                        {u.status === 'active' ? 'نشط' : 'غير نشط'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600">{u.created_at?.split('T')[0] || 'N/A'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-left">
-                      <div className="flex items-center justify-end gap-2">
-                        {!(u.role === 'admin' && u.company_id === 'system') && (
-                          <>
-                            {u.temp_password && (
-                              <button 
-                                onClick={() => handleResendEmail(u)}
-                                className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                                title="إرسال بيانات الدخول"
-                              >
-                                <Send className="w-5 h-5" />
-                              </button>
-                            )}
-                            <button 
-                              onClick={() => handleResetPassword(u)}
-                              className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                              title="إعادة تعيين كلمة المرور"
-                            >
-                              <Key className="w-5 h-5" />
-                            </button>
-                            <button 
-                              onClick={() => {
-                                setEditingUser(u);
-                                setShowUserRoleModal(true);
-                              }}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                              title="تعديل الدور"
-                            >
-                              <Edit2 className="w-5 h-5" />
-                            </button>
-                            <button 
-                              onClick={() => deleteUser(u.id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="حذف"
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
+          {activeTab === 'super_admins' && (
+            <>
+              <div className="p-4 bg-purple-50/50 border-b border-stone-200 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-purple-600" />
+                  <h3 className="text-sm font-bold text-purple-900">إدارة المدير العام (Super Admins)</h3>
+                  <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 text-xs font-bold border border-purple-200">
+                    {filteredSuperAdmins.length} مدير عام
+                  </span>
+                </div>
+              </div>
+              <table className="w-full text-right">
+                <thead className="bg-stone-50 border-b border-stone-200">
+                  <tr>
+                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">المدير العام</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الدور الوظيفي</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">كلمة المرور المؤقتة</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الحالة</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">تاريخ الانضمام</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-left">الإجراءات</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-stone-200">
+                  {filteredSuperAdmins.map((u) => (
+                    <tr key={u.id} className="hover:bg-purple-50/30 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center border border-purple-200">
+                            <Shield className="w-5 h-5 text-purple-600" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-stone-900">{u.username}</p>
+                            <p className="text-xs text-stone-500 font-mono">{u.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                          <Shield className="w-3.5 h-3.5" />
+                          <span>مدير عام النظام (Super Admin)</span>
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {u.temp_password ? (
+                          <code className="bg-amber-50 text-amber-700 px-2 py-1 rounded text-xs font-mono border border-amber-100 font-bold">
+                            {u.temp_password}
+                          </code>
+                        ) : (
+                          <span className="text-xs text-stone-400">تم التغيير</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                          u.status === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {u.status === 'active' ? 'نشط' : 'غير نشط'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-xs font-mono text-stone-600 font-medium">
+                        {u.created_at?.split('T')[0] || 'تأسيسي'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-left">
+                        <div className="flex items-center justify-end gap-2">
+                          {u.temp_password && (
+                            <button 
+                              onClick={() => handleResendEmail(u)}
+                              className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                              title="إرسال بيانات الدخول"
+                            >
+                              <Send className="w-5 h-5" />
+                            </button>
+                          )}
+                          <button 
+                            onClick={() => handleResetPassword(u)}
+                            className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                            title="إعادة تعيين كلمة المرور"
+                          >
+                            <Key className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+
+          {activeTab === 'users' && (
+            <>
+              <div className="p-4 bg-stone-50 border-b border-stone-200 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-blue-600" />
+                  <h3 className="text-sm font-bold text-stone-700">إدارة مستخدمي الشركات</h3>
+                  <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-bold border border-blue-200">
+                    {filteredCompanyUsers.length} مستخدم
+                  </span>
+                </div>
+                <button
+                  onClick={cleanupOrphanedUsers}
+                  className="flex items-center gap-2 text-xs font-bold text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-all border border-red-100"
+                  title="حذف المستخدمين غير المرتبطين بشركة"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>تنظيف المستخدمين اليتامى</span>
+                </button>
+              </div>
+
+              <table className="w-full text-right">
+                <thead className="bg-stone-50 border-b border-stone-200">
+                  <tr>
+                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">المستخدم</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الشركة</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الدور</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">كلمة المرور المؤقتة</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الحالة</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">تاريخ الانضمام</th>
+                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-left">الإجراءات</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-200">
+                  {filteredCompanyUsers.map((u) => (
+                    <tr key={u.id} className="hover:bg-stone-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-stone-100 rounded-full flex items-center justify-center">
+                            <Users className="w-6 h-6 text-stone-400" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-stone-900">{u.username}</p>
+                            <p className="text-xs text-stone-500 font-mono">{u.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-stone-700">
+                        {companies.find(c => c.id === u.company_id)?.name || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          u.role === 'admin' ? 'bg-blue-100 text-blue-800' :
+                          u.role === 'manager' ? 'bg-amber-100 text-amber-800' :
+                          'bg-stone-100 text-stone-800'
+                        }`}>
+                          {u.role === 'admin' ? 'مدير شركة' : u.role === 'manager' ? 'مشرف' : 'مستخدم'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {u.temp_password ? (
+                          <code className="bg-amber-50 text-amber-700 px-2 py-1 rounded text-xs font-mono border border-amber-100 font-bold">
+                            {u.temp_password}
+                          </code>
+                        ) : (
+                          <span className="text-xs text-stone-400">تم التغيير</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          u.status === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {u.status === 'active' ? 'نشط' : 'غير نشط'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-xs font-mono text-stone-600 font-medium">{u.created_at?.split('T')[0] || 'N/A'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-left">
+                        <div className="flex items-center justify-end gap-2">
+                          {u.temp_password && (
+                            <button 
+                              onClick={() => handleResendEmail(u)}
+                              className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                              title="إرسال بيانات الدخول"
+                            >
+                              <Send className="w-5 h-5" />
+                            </button>
+                          )}
+                          <button 
+                            onClick={() => handleResetPassword(u)}
+                            className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                            title="إعادة تعيين كلمة المرور"
+                          >
+                            <Key className="w-5 h-5" />
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setEditingUser(u);
+                              setShowUserRoleModal(true);
+                            }}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="تعديل الدور"
+                          >
+                            <Edit2 className="w-5 h-5" />
+                          </button>
+                          <button 
+                            onClick={() => deleteUser(u.id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="حذف"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
           )}
 
           {activeTab === 'logs' && (
