@@ -65,7 +65,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }, 4000);
   }, []);
 
-  const addPersistentNotification = useCallback((n: Omit<AppNotification, 'id' | 'timestamp' | 'read'> & { id?: string }) => {
+  const addPersistentNotification = useCallback((n: Omit<AppNotification, 'id' | 'timestamp' | 'read'> & { id?: string; showToast?: boolean }) => {
     const id = n.id || Math.random().toString(36).substring(2, 9);
     
     setPersistentNotifications((prev) => {
@@ -91,8 +91,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return [newNotification, ...prev];
     });
 
-    // Also show a toast for persistent notifications
-    showNotification(n.message, n.type);
+    // Show toast only if explicitly requested (default is false so toast popups don't flood on load)
+    if (n.showToast) {
+      showNotification(n.message, n.type);
+    }
   }, [showNotification]);
 
   const markAsRead = (id: string) => {
