@@ -2789,6 +2789,64 @@ router.get('/paper-sizes', authenticateToken, async (req: AuthRequest, res) => {
   }
 });
 
+// =========================================================================
+// DEDICATED ROUTES FOR AUDIT & ACTIVITY LOGS
+// Must be BEFORE the generic modules.forEach to take priority
+// =========================================================================
+router.get('/audit_logs', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const isSuperAdmin = req.user?.role === 'super_admin' || req.user?.role === 'admin' ||
+      ['acc.wael2005@gmail.com', 'omarwaelysy@gmail.com', 'omarwaelsys@gmail.com'].includes((req.user?.email || '').toLowerCase());
+    const requestedCompanyId = req.query.company_id as string | undefined;
+    const targetCompanyId = requestedCompanyId || (!isSuperAdmin ? req.user?.company_id : undefined);
+
+    let query = 'SELECT * FROM audit_logs';
+    const params: any[] = [];
+
+    if (targetCompanyId) {
+      query += ' WHERE (company_id = $1 OR company_id IS NULL)';
+      params.push(targetCompanyId);
+    }
+
+    query += ' ORDER BY created_at DESC';
+
+    console.log(`[AUDIT_LOGS] user=${req.user?.email} isSuperAdmin=${isSuperAdmin} targetCompanyId=${targetCompanyId} query=${query}`);
+    const result = await pool.query(query, params);
+    console.log(`[AUDIT_LOGS] returned ${result.rows.length} rows`);
+    res.json(result.rows);
+  } catch (err: any) {
+    console.error('[AUDIT_LOGS] Error fetching audit_logs:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/activity_logs', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const isSuperAdmin = req.user?.role === 'super_admin' || req.user?.role === 'admin' ||
+      ['acc.wael2005@gmail.com', 'omarwaelysy@gmail.com', 'omarwaelsys@gmail.com'].includes((req.user?.email || '').toLowerCase());
+    const requestedCompanyId = req.query.company_id as string | undefined;
+    const targetCompanyId = requestedCompanyId || (!isSuperAdmin ? req.user?.company_id : undefined);
+
+    let query = 'SELECT * FROM activity_logs';
+    const params: any[] = [];
+
+    if (targetCompanyId) {
+      query += ' WHERE (company_id = $1 OR company_id IS NULL)';
+      params.push(targetCompanyId);
+    }
+
+    query += ' ORDER BY id DESC';
+
+    console.log(`[ACTIVITY_LOGS] user=${req.user?.email} isSuperAdmin=${isSuperAdmin} targetCompanyId=${targetCompanyId}`);
+    const result = await pool.query(query, params);
+    console.log(`[ACTIVITY_LOGS] returned ${result.rows.length} rows`);
+    res.json(result.rows);
+  } catch (err: any) {
+    console.error('[ACTIVITY_LOGS] Error fetching activity_logs:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 modules.forEach(moduleName => {
   const hyphenName = moduleName.replace(/_/g, '-');
   const routeNames = [moduleName];
