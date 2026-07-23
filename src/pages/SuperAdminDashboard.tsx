@@ -291,6 +291,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
               must_change_password: true
             });
           }
+          setTempPasswordData({ email: formData.email || '', password: tempPassword });
+          setShowTempPasswordModal(true);
         }
 
         if (user) {
@@ -309,9 +311,6 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
           // Simulate sending email
 
         }
-
-        setTempPasswordData({ email: formData.email || '', password: tempPassword });
-        setShowTempPasswordModal(true);
       }
       
       const [allCompanies, allUsers] = await Promise.all([

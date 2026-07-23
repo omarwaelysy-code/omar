@@ -41,6 +41,7 @@ export const Accounts: React.FC = () => {
   const [usageSearchTerm, setUsageSearchTerm] = useState('');
   const [isCoaWizardOpen, setIsCoaWizardOpen] = useState(false);
   const [coaBusinessType, setCoaBusinessType] = useState<'commercial' | 'service' | 'all'>('all');
+  const [coaLanguage, setCoaLanguage] = useState<'ar' | 'en'>(language || 'ar');
   const [isGeneratingCoa, setIsGeneratingCoa] = useState(false);
   const [coaProgress, setCoaProgress] = useState('');
   const tableRef = useRef<HTMLTableElement>(null);
@@ -169,7 +170,7 @@ export const Accounts: React.FC = () => {
     if (!user) return;
     try {
       setIsGeneratingCoa(true);
-      await generateDefaultCOA(user.company_id, user.id, user.username, language, coaBusinessType, setCoaProgress);
+      await generateDefaultCOA(user.company_id, user.id, user.username, coaLanguage, coaBusinessType, setCoaProgress);
       setIsCoaWizardOpen(false);
       showNotification(language === 'ar' ? 'تم توليد الدليل المحاسبي بنجاح' : 'Chart of Accounts generated successfully', 'success');
     } catch (e) {
@@ -812,7 +813,33 @@ export const Accounts: React.FC = () => {
                 : 'The system will generate a standard integrated chart of accounts suitable for your business activity.'}
             </p>
 
+            {/* Language Selection */}
+            <div className="mb-6">
+              <label className="block text-xs font-bold text-slate-500 mb-2">
+                {language === 'ar' ? 'لغة الدليل المحاسبي:' : 'COA Language:'}
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCoaLanguage('ar')}
+                  className={`py-3 px-4 rounded-xl font-bold text-sm border transition-all ${coaLanguage === 'ar' ? 'border-indigo-600 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-500/20' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                >
+                  العربية (Arabic)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCoaLanguage('en')}
+                  className={`py-3 px-4 rounded-xl font-bold text-sm border transition-all ${coaLanguage === 'en' ? 'border-indigo-600 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-500/20' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                >
+                  English
+                </button>
+              </div>
+            </div>
+
             <div className="space-y-4 mb-8">
+              <label className="block text-xs font-bold text-slate-500 mb-1">
+                {language === 'ar' ? 'نوع النشاط التجاري:' : 'Business Activity Type:'}
+              </label>
               <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-50 transition-all has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50/50 has-[:checked]:ring-1 has-[:checked]:ring-indigo-500">
                 <input 
                   type="radio" 

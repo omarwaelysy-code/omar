@@ -1913,10 +1913,11 @@ router.post('/auth/register', UsersLimitMiddleware, async (req, res) => {
 router.post('/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const { rows }: any = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const cleanEmail = email ? String(email).trim().toLowerCase() : '';
+    const { rows }: any = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
     
     if (rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid email or password' });
+      return res.status(401).json({ error: 'حدث خطأ في البيانات المدخلة، يرجى التأكد من البريد الإلكتروني وكلمة المرور' });
     }
 
     let validUser = null;
@@ -1939,11 +1940,34 @@ router.post('/auth/login', async (req, res) => {
       logAudit({
         action: 'LOGIN_FAILED',
         module: 'AUTH',
-        details: `Login failure for: ${email}`,
+        details: `Login failure for: ${cleanEmail}`,
         ip_address: getIp(req)
       });
-      return res.status(401).json({ error: 'Invalid email or password' });
+      return res.status(401).json({ error: 'حدث خطأ في البيانات المدخلة، يرجى التأكد من البريد الإلكتروني وكلمة المرور' });
     }
+
+    // Single Active Session Enforcement: Check if user is logged in elsewhere (active in last 15 mins)
+    const activeCheck = await pool.query(
+      `SELECT active_session_token, last_active_at 
+       FROM users 
+       WHERE LOWER(email) = LOWER($1) 
+         AND active_session_token IS NOT NULL 
+         AND last_active_at > (CURRENT_TIMESTAMP - INTERVAL '15 minutes')`,
+      [cleanEmail]
+    );
+
+    if (activeCheck.rows.length > 0) {
+      return res.status(403).json({ 
+        error: 'هذا البريد الإلكتروني مفتوح حالياً في مكان آخر. يجب تسجيل الخروج من الجلسة المفتوحة أولاً لتتمكن من الدخول.' 
+      });
+    }
+
+    // Set new active session token & activity timestamp
+    const sessionToken = uuidv4();
+    await pool.query(
+      'UPDATE users SET active_session_token = $1, last_active_at = CURRENT_TIMESTAMP WHERE LOWER(email) = LOWER($2)',
+      [sessionToken, cleanEmail]
+    );
 
     // Log login activity
     logAudit({
@@ -1965,7 +1989,8 @@ router.post('/auth/login', async (req, res) => {
         email: validUser.email, 
         company_id: validUser.company_id, 
         role: validUser.role, 
-        username: validUser.username || validUser.name || validUser.email 
+        username: validUser.username || validUser.name || validUser.email,
+        session_token: sessionToken
       },
       JWT_SECRET,
       { expiresIn: '24h' }
@@ -1973,6 +1998,7 @@ router.post('/auth/login', async (req, res) => {
 
     res.json({ 
       token, 
+      sessionToken,
       user: { 
         id: validUser.id, 
         username: validUser.username, 
@@ -1983,7 +2009,38 @@ router.post('/auth/login', async (req, res) => {
       } 
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'حدث خطأ في البيانات المدخلة، يرجى التأكد من البريد الإلكتروني وكلمة المرور' });
+  }
+});
+
+router.post('/auth/heartbeat', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const email = req.user?.email;
+    if (email) {
+      await pool.query(
+        'UPDATE users SET last_active_at = CURRENT_TIMESTAMP WHERE LOWER(email) = LOWER($1)',
+        [email.trim().toLowerCase()]
+      );
+    }
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Heartbeat error' });
+  }
+});
+
+router.post('/auth/logout', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const email = req.user?.email;
+    if (email) {
+      await pool.query(
+        'UPDATE users SET active_session_token = NULL, last_active_at = NULL WHERE LOWER(email) = LOWER($1)',
+        [email.trim().toLowerCase()]
+      );
+    }
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Logout error' });
   }
 });
 

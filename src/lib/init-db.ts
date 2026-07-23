@@ -128,9 +128,14 @@ export async function initDatabase() {
         "temp_password" VARCHAR(255),
         "permissions" JSONB DEFAULT '{}',
         "must_change_password" BOOLEAN DEFAULT FALSE,
+        "active_session_token" TEXT,
+        "last_active_at" TIMESTAMP,
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `, 'users table');
+
+    await safeQuery('ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "active_session_token" TEXT;', 'active_session_token col');
+    await safeQuery('ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "last_active_at" TIMESTAMP;', 'last_active_at col');
 
     await safeQuery(`
       CREATE TABLE IF NOT EXISTS "system_config" (
