@@ -7,7 +7,7 @@ export class SubscriptionService {
   /**
    * Create a new subscription.
    */
-  async create(data: any, createdBy: string = 'system'): Promise<any> {
+  async create(data: any, createdBy: string = 'system', existingClient?: any): Promise<any> {
     const subscriptionId = randomUUID();
     
     const subscriptionData = {
@@ -15,9 +15,13 @@ export class SubscriptionService {
       ...data
     };
     
-    const client = await pool.connect();
+    const client = existingClient || await pool.connect();
+    const shouldManageTransaction = !existingClient;
+
     try {
-      await client.query('BEGIN');
+      if (shouldManageTransaction) {
+        await client.query('BEGIN');
+      }
       
       const newSubscription = await subscriptionRepository.createSubscription(subscriptionData, client);
       
@@ -32,13 +36,19 @@ export class SubscriptionService {
         change_reason: 'Initial Subscription Creation'
       }, client);
 
-      await client.query('COMMIT');
+      if (shouldManageTransaction) {
+        await client.query('COMMIT');
+      }
       return newSubscription;
     } catch (error) {
-      await client.query('ROLLBACK');
+      if (shouldManageTransaction) {
+        await client.query('ROLLBACK');
+      }
       throw error;
     } finally {
-      client.release();
+      if (shouldManageTransaction) {
+        client.release();
+      }
     }
   }
 

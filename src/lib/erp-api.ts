@@ -3295,7 +3295,7 @@ modules.forEach(moduleName => {
               max_warehouses: plan === 'Enterprise' ? 100 : plan === 'Pro' ? 10 : 3,
               max_devices: plan === 'Enterprise' ? 100 : plan === 'Pro' ? 10 : 3,
               max_monthly_transactions: parseInt(req.body.transactions_limit || '1000', 10)
-            }, req.user?.email || 'system');
+            }, req.user?.email || 'system', client);
           }
 
           await client.query('COMMIT');
