@@ -85,9 +85,11 @@ import { UnifiedPrintEngine } from './components/UnifiedPrintEngine';
 import { LoadingScreen } from './components/LoadingScreen';
 import { AnimatePresence } from 'framer-motion';
 
+import { SubscriptionExpiredScreen } from './components/SubscriptionExpiredScreen';
+
 export default function App() {
   const { t, dir } = useLanguage();
-  const { isAuthenticated, loading: authLoading, isSuperAdmin, user } = useAuth();
+  const { isAuthenticated, loading: authLoading, isSuperAdmin, user, isSubscriptionExpired } = useAuth();
   const { currentPage, setCurrentPage, openTabs, activeTabId } = useNavigation();
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(true);
@@ -110,33 +112,19 @@ export default function App() {
   };
 
   React.useEffect(() => {
-    const checkHealth = async () => {
-      try {
-        const response = await fetch('/api/erp/db-health');
-        
-        if (!response.ok) {
-          const data = await response.json();
-          setDbError(data.error || data.message || 'Failed to connect to database');
-        }
-      } catch (err: any) {
-        setDbError(err.message || 'Network error while connecting to database');
-      } finally {
-        if (!authLoading) {
-          // 1.8s startup animation sequence
-          setTimeout(() => setLoading(false), 1800);
-        }
-      }
-    };
-
-    checkHealth();
-  }, [authLoading]);
+    // Initial load handling
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   if (dbError) {
     return <DatabaseError error={dbError} />;
   }
 
   return (
-    <div className={`min-h-screen ${dir === 'rtl' ? 'font-sans' : 'font-sans'}`} dir={dir}>
+    <div className={`min-h-screen bg-stone-50 font-sans text-stone-900 ${dir === 'rtl' ? 'rtl' : 'ltr'}`} dir={dir}>
       <UnifiedPrintEngine />
       <AnimatePresence mode="wait">
         {loading ? (
@@ -161,6 +149,8 @@ export default function App() {
               ) : (
                 <NotFound onGoHome={() => navigateTo('/')} />
               )
+            ) : isSubscriptionExpired && window.location.pathname !== '/super-admin@m@r2020' ? (
+              <SubscriptionExpiredScreen />
             ) : (
               <Layout onNavigate={setCurrentPage} currentPage={currentPage}>
                 <div className="relative w-full h-full">

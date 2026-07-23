@@ -15,6 +15,8 @@ interface AuthContextType {
   isCompanyAdmin: boolean;
   isManager: boolean;
   isStandardUser: boolean;
+  isSubscriptionExpired: boolean;
+  subscriptionExpiredDetails: { expired: boolean; expiryDate: string; companyName: string; reason: string };
   hasPermission: (moduleId: string, action: keyof ModulePermissions) => boolean;
   fetchProfile: (userId: string, email: string) => Promise<void>;
   workspaceMode?: 'super_admin' | 'company';
@@ -28,6 +30,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [userMemberships, setUserMemberships] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [subscriptionExpiredDetails, setSubscriptionExpiredDetails] = useState<{ expired: boolean; expiryDate: string; companyName: string; reason: string }>({
+    expired: false,
+    expiryDate: '',
+    companyName: '',
+    reason: ''
+  });
   const [workspaceMode, setWorkspaceModeState] = useState<'super_admin' | 'company'>(() => {
     return (localStorage.getItem('workspace_mode') as any) || 'super_admin';
   });
@@ -66,6 +74,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initAuth();
   }, []);
+
+  const checkCompanyExpiry = async (companyId: string): Promise<{ isExpired: boolean; endDateStr: string; companyName: string; reason: string }> => {
+    if (!companyId || companyId === 'system' || companyId === 'SYSTEM') {
+      return { isExpired: false, endDateStr: '', companyName: '', reason: '' };
+    }
+    try {
+      const comp = await dbService.get<any>('companies', companyId);
+      if (comp) {
+        const nowStr = new Date().toISOString().slice(0, 10);
+        const endDateStr = comp.subscription_end || comp.subscription_expiry ? new Date(comp.subscription_end || comp.subscription_expiry).toISOString().slice(0, 10) : '';
+        const isSuspended = comp.company_status === 'suspended' || comp.subscription_status === 'suspended' || comp.subscription_status === 'Suspended';
+        const isExpiredStatus = comp.subscription_status === 'expired' || comp.subscription_status === 'Expired';
+        const isExpiredDate = Boolean(endDateStr && endDateStr < nowStr);
+
+        if (isSuspended) {
+          return { isExpired: true, endDateStr, companyName: comp.name || companyId, reason: 'تم إيقاف هذه الشركة بواسطة إدارة النظام.' };
+        }
+        if (isExpiredStatus || isExpiredDate) {
+          return { isExpired: true, endDateStr, companyName: comp.name || companyId, reason: `انتهى اشتراك الشركة بتاريخ ${endDateStr || 'السابق'}.` };
+        }
+      }
+    } catch (e) {
+      console.error('Error checking company expiry:', e);
+    }
+    return { isExpired: false, endDateStr: '', companyName: '', reason: '' };
+  };
 
   const fetchProfile = async (userId: string, email: string) => {
     try {
@@ -115,6 +149,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         const activeMembership = preferredMembership || memberships[0];
         
+        if (activeMembership && activeMembership.company_id) {
+          const expiryCheck = await checkCompanyExpiry(activeMembership.company_id);
+          setSubscriptionExpiredDetails({
+            expired: expiryCheck.isExpired,
+            expiryDate: expiryCheck.endDateStr,
+            companyName: expiryCheck.companyName,
+            reason: expiryCheck.reason
+          });
+        }
+
         // Force super_admin role if email matches, even if they have other memberships
         if (isSuperAdminEmail) {
           setUser({ 
@@ -180,20 +224,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       const isSuperAdminEmail = user.email === 'omarwaelysy@gmail.com' || user.email === 'omarwaelsys@gmail.com' || user.email === 'acc.wael2005@gmail.com';
       
-      if (!isSuperAdminEmail) {
-        const comp = await dbService.get<any>('companies', companyId);
-        if (comp) {
-          const now = new Date();
-          const expiry = comp.subscription_end || comp.subscription_expiry ? new Date(comp.subscription_end || comp.subscription_expiry) : null;
-          const isExpired = (comp.subscription_status === 'expired' || comp.subscription_status === 'Expired') || (expiry && expiry < now) || comp.company_status === 'suspended';
-          
-          if (isExpired) {
-            const dateStr = expiry ? expiry.toISOString().slice(0, 10) : '';
-            alert(`عفواً، لقد انتهى اشتراك الشركة (${comp.name})${dateStr ? ' بتاريخ ' + dateStr : ''}. لا يمكن فتح الشركة أو الوصول إليها.`);
-            return;
-          }
-        }
-      }
+      const expiryCheck = await checkCompanyExpiry(companyId);
+      setSubscriptionExpiredDetails({
+        expired: expiryCheck.isExpired,
+        expiryDate: expiryCheck.endDateStr,
+        companyName: expiryCheck.companyName,
+        reason: expiryCheck.reason
+      });
 
       const membership = userMemberships.find(m => m.company_id === companyId);
       if (membership) {
