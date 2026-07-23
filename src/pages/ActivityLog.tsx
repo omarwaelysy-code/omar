@@ -41,13 +41,14 @@ export const ActivityLogPage: React.FC = () => {
     if (!user) return;
     setLoading(true);
     try {
+      const params = user.company_id ? { company_id: user.company_id } : undefined;
       const [auditData, activityData] = await Promise.all([
-        dbService.listAll<any>('audit_logs').catch(() => []),
-        dbService.listAll<any>('activity_logs').catch(() => [])
+        dbService.list<any>('audit_logs', params).catch(() => []),
+        dbService.list<any>('activity_logs', params).catch(() => [])
       ]);
 
       // Normalize activity_logs data (Legacy)
-      const normalizedActivity = activityData.map(l => {
+      const normalizedActivity = (Array.isArray(activityData) ? activityData : []).map(l => {
         let mod = l.module || 'SYSTEM';
         let act = l.action || '';
         
@@ -60,16 +61,16 @@ export const ActivityLogPage: React.FC = () => {
         }
         
         return {
-          id: String(l.id),
-          user_id: l.user_id,
-          username: l.username || '',
-          user_email: l.user_email || '',
+          id: String(l.id || Math.random().toString(36).substr(2, 9)),
+          user_id: l.user_id || '',
+          username: l.username || l.user_email || 'مستخدم',
+          user_email: l.user_email || l.username || '',
           company_id: l.company_id || '',
           created_at: l.created_at || l.timestamp || new Date().toISOString(),
           module: mod,
-          action: act || l.action,
+          action: act || l.action || 'VIEW',
           details: l.details || '',
-          ip_address: l.ip_address || '0.0.0.0',
+          ip_address: l.ip_address || '127.0.0.1',
           browser: 'Unknown',
           operating_system: 'Unknown',
           device: 'Desktop',
@@ -84,17 +85,17 @@ export const ActivityLogPage: React.FC = () => {
       });
 
       // Normalize audit_logs data (Upgraded)
-      const normalizedAudit = auditData.map(l => ({
-        id: String(l.id),
+      const normalizedAudit = (Array.isArray(auditData) ? auditData : []).map(l => ({
+        id: String(l.id || Math.random().toString(36).substr(2, 9)),
         user_id: l.user_id || '',
-        username: l.username || '',
-        user_email: l.user_email || '',
+        username: l.username || l.user_email || 'مستخدم',
+        user_email: l.user_email || l.username || '',
         company_id: l.company_id || '',
         created_at: l.created_at || new Date().toISOString(),
         module: l.module || 'SYSTEM',
-        action: l.action || '',
+        action: l.action || 'VIEW',
         details: l.details || '',
-        ip_address: l.ip_address || '0.0.0.0',
+        ip_address: l.ip_address || '127.0.0.1',
         browser: l.browser || 'Unknown',
         operating_system: l.operating_system || 'Unknown',
         device: l.device || 'Desktop',
@@ -108,7 +109,15 @@ export const ActivityLogPage: React.FC = () => {
       }));
 
       // Combine and sort DESC
-      const combined = [...normalizedAudit, ...normalizedActivity];
+      const combinedMap = new Map<string, ActivityLog>();
+      [...normalizedAudit, ...normalizedActivity].forEach(item => {
+        // Use composite key to deduplicate identical logs created by backward-compat double write
+        const key = item.id && item.id.length > 20 ? item.id : `${item.user_id}_${item.created_at}_${item.action}`;
+        if (!combinedMap.has(key)) {
+          combinedMap.set(key, item as any);
+        }
+      });
+      const combined = Array.from(combinedMap.values());
       combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       setLogs(combined);
@@ -176,23 +185,23 @@ export const ActivityLogPage: React.FC = () => {
         (log as any).record_id,
         JSON.stringify((log as any).old_values || {}),
         JSON.stringify((log as any).new_values || {})
-      ].some(val => val && String(val).toLowerCase().includes(searchTerm.toLowerCase()));
+      ].some(val => val && String(val).toLowerCase().includes(searchTerm.trim().toLowerCase()));
 
     // 2. Filter matches
     const matchesStartDate = !startDate || new Date(log.created_at) >= new Date(startDate);
     const matchesEndDate = !endDate || new Date(log.created_at) <= new Date(`${endDate}T23:59:59`);
-    const matchesUser = userFilter === 'all' || log.username === userFilter;
+    const matchesUser = userFilter === 'all' || log.username === userFilter || log.user_email === userFilter;
     const matchesCompany = companyFilter === 'all' || log.company_id === companyFilter;
     const matchesBranch = branchFilter === 'all' || (log as any).branch === branchFilter;
-    const matchesModule = moduleFilter === 'all' || String(log.module).toUpperCase() === moduleFilter;
-    const matchesAction = actionFilter === 'all' || log.action === actionFilter;
+    const matchesModule = moduleFilter === 'all' || String(log.module || '').toUpperCase() === moduleFilter.toUpperCase();
+    const matchesAction = actionFilter === 'all' || String(log.action || '').toUpperCase() === actionFilter.toUpperCase();
     const matchesStatus = 
       statusFilter === 'all' || 
       (statusFilter === 'success' && (log as any).success) ||
       (statusFilter === 'failed' && !(log as any).success);
     const matchesDevice = deviceFilter === 'all' || (log as any).device === deviceFilter;
     const matchesBrowser = browserFilter === 'all' || (log as any).browser === browserFilter;
-    const matchesIp = !ipFilter || (log.ip_address || '').includes(ipFilter);
+    const matchesIp = !ipFilter || (log.ip_address || '').includes(ipFilter.trim());
 
     return (
       matchesSearch && matchesStartDate && matchesEndDate && matchesUser &&

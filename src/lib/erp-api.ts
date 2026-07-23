@@ -2830,11 +2830,9 @@ modules.forEach(moduleName => {
         }
 
         let rows;
-        if (moduleName === 'activity_logs') {
-        const isSuperAdmin = req.user?.role === 'super_admin';
-        const companyId = isSuperAdmin ? req.query.company_id : (req.query.company_id || req.user?.company_id);
+      if (moduleName === 'activity_logs') {
+        const companyId = req.query.company_id || req.user?.company_id;
         
-        // Basic validation for company_id if provided (though it's VARCHAR(36) in activity_logs, usually matches user's company_id)
         if (companyId && typeof companyId !== 'string') return sendError(res, 400, 'Invalid company_id format');
 
         let query = 'SELECT * FROM activity_logs';
@@ -2852,11 +2850,6 @@ modules.forEach(moduleName => {
         rows = queryResult.rows;
       } else if (moduleName === 'audit_logs') {
         const companyId = req.query.company_id || req.user?.company_id;
-        const isSuperAdmin = req.user?.role === 'super_admin';
-
-        if (!companyId && !isSuperAdmin) {
-          return sendError(res, 400, 'company_id is required');
-        }
 
         let query = 'SELECT * FROM audit_logs';
         let params: any[] = [];
