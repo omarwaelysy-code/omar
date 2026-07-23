@@ -1983,8 +1983,8 @@ router.post('/auth/login', async (req, res) => {
     // Super admins are exempt (they manage multiple companies)
     // =========================================================
     const forceLogin = req.body.force === true;
-    const sessionTimeoutMs = 5 * 60 * 1000; // 5 minutes without heartbeat = session expired
-    const fiveMinutesAgo = new Date(Date.now() - sessionTimeoutMs);
+    const sessionTimeoutMs = 90 * 1000; // 90 seconds - heartbeat fires every 60s so 90s = safe buffer
+    const sessionCutoff = new Date(Date.now() - sessionTimeoutMs);
 
     if (!isSuperAdminUser && !forceLogin) {
       // Check if any user record with this email has an active session
@@ -1995,7 +1995,7 @@ router.post('/auth/login', async (req, res) => {
            AND active_session_token IS NOT NULL 
            AND last_active_at IS NOT NULL
            AND last_active_at > $2`,
-        [cleanEmail, fiveMinutesAgo.toISOString()]
+        [cleanEmail, sessionCutoff.toISOString()]
       );
 
       if (activeSessionRes.rows.length > 0) {
