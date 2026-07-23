@@ -3499,6 +3499,27 @@ modules.forEach(moduleName => {
 
         await client.query('BEGIN');
 
+        if (moduleName === 'companies') {
+          const tablesToDelete = [
+            'company_subscriptions', 'users', 'roles', 'journal_entry_items', 'journal_entries',
+            'invoice_items', 'invoices', 'purchase_invoice_items', 'purchase_invoices',
+            'sales_order_items', 'sales_orders', 'purchase_order_items', 'purchase_orders',
+            'return_items', 'returns', 'purchase_return_items', 'purchase_returns',
+            'inventory_movements', 'products', 'item_groups', 'customers', 'suppliers',
+            'payment_methods', 'expense_categories', 'receipt_vouchers', 'payment_vouchers',
+            'customer_discounts', 'supplier_discounts', 'accounts', 'account_types',
+            'settings', 'activity_logs', 'audit_logs', 'branches', 'warehouses', 'period_closings'
+          ];
+
+          for (const tbl of tablesToDelete) {
+            try {
+              await client.query(`DELETE FROM "${tbl}" WHERE company_id = $1`, [id]);
+            } catch (e) {
+              // Ignore tables that might not exist or don't have company_id
+            }
+          }
+        }
+
         if (moduleName === 'sales_orders' || moduleName === 'purchase_orders') {
           const statusRes = await client.query(`SELECT status, invoice_number FROM "${moduleName}" WHERE id = $1`, [id]);
           if (statusRes.rows.length > 0 && statusRes.rows[0].status === 'converted') {
