@@ -1,4 +1,4 @@
-﻿import { JournalEntry, Account, TrialBalanceItem, LedgerLine, AccountType, Customer, Supplier } from '../types';
+import { JournalEntry, Account, TrialBalanceItem, LedgerLine, AccountType, Customer, Supplier } from '../types';
 
 export class AccountingEngine {
   /**
@@ -317,6 +317,111 @@ export class AccountingEngine {
   }
 
   /**
+   * Resolves classification and statement type for an account cleanly and reliably.
+   */
+  public static resolveAccountClassification(
+    acc: Account | undefined,
+    accountTypes: AccountType[]
+  ): { classification: string; statement_type: string } {
+    if (!acc) return { classification: 'asset', statement_type: 'balance_sheet' };
+
+    // 1. Direct type_id match in accountTypes array
+    if (acc.type_id && Array.isArray(accountTypes) && accountTypes.length > 0) {
+      const type = accountTypes.find(t => t.id === acc.type_id);
+      if (type && type.classification) {
+        return {
+          classification: type.classification,
+          statement_type: type.statement_type || (['revenue', 'cost', 'expense', 'interest_expense', 'depreciation', 'other_revenue', 'other_expense'].includes(type.classification) ? 'income_statement' : 'balance_sheet')
+        };
+      }
+    }
+
+    // 2. Direct property check on account object
+    const accTypeStr = String((acc as any).type || (acc as any).classification || (acc as any).type_name || '').toLowerCase();
+    if (accTypeStr.includes('revenue') || accTypeStr.includes('sales') || accTypeStr.includes('إيراد')) {
+      return { classification: 'revenue', statement_type: 'income_statement' };
+    }
+    if (accTypeStr.includes('cost') || accTypeStr.includes('تكلفة')) {
+      return { classification: 'cost', statement_type: 'income_statement' };
+    }
+    if (accTypeStr.includes('expense') || accTypeStr.includes('مصروف')) {
+      return { classification: 'expense', statement_type: 'income_statement' };
+    }
+    if (accTypeStr.includes('asset') || accTypeStr.includes('أصل') || accTypeStr.includes('أصول')) {
+      return { classification: 'asset', statement_type: 'balance_sheet' };
+    }
+    if (accTypeStr.includes('liability') || accTypeStr.includes('خصم') || accTypeStr.includes('خصوم') || accTypeStr.includes('التزام')) {
+      return { classification: 'liability', statement_type: 'balance_sheet' };
+    }
+    if (accTypeStr.includes('equity') || accTypeStr.includes('ملكيات') || accTypeStr.includes('حقوق')) {
+      return { classification: 'equity', statement_type: 'balance_sheet' };
+    }
+
+    // 3. Match by standard Chart of Accounts code prefix
+    const code = String(acc.code || '').trim();
+    if (code.startsWith('1')) {
+      if (code.startsWith('1101') || code.startsWith('1102')) {
+        return { classification: 'cash_and_equivalents', statement_type: 'balance_sheet' };
+      }
+      if (code.startsWith('1103')) {
+        return { classification: 'receivables', statement_type: 'balance_sheet' };
+      }
+      return { classification: 'asset', statement_type: 'balance_sheet' };
+    }
+    if (code.startsWith('2')) {
+      if (code.startsWith('2101')) {
+        return { classification: 'payables', statement_type: 'balance_sheet' };
+      }
+      return { classification: 'liability', statement_type: 'balance_sheet' };
+    }
+    if (code.startsWith('3')) {
+      return { classification: 'equity', statement_type: 'balance_sheet' };
+    }
+    if (code.startsWith('4')) {
+      return { classification: 'revenue', statement_type: 'income_statement' };
+    }
+    if (code.startsWith('5')) {
+      return { classification: 'cost', statement_type: 'income_statement' };
+    }
+    if (code.startsWith('6') || code.startsWith('7') || code.startsWith('8') || code.startsWith('9')) {
+      return { classification: 'expense', statement_type: 'income_statement' };
+    }
+
+    // 4. Match by account name keywords
+    const name = String(acc.name || '').toLowerCase();
+    if (name.includes('إيراد') || name.includes('مبيعات') || name.includes('إيرادات')) {
+      return { classification: 'revenue', statement_type: 'income_statement' };
+    }
+    if (name.includes('تكلفة') || name.includes('مشتريات')) {
+      return { classification: 'cost', statement_type: 'income_statement' };
+    }
+    if (name.includes('مصروف') || name.includes('عمومية') || name.includes('إدارية') || name.includes('إهلاك')) {
+      return { classification: 'expense', statement_type: 'income_statement' };
+    }
+    if (name.includes('عملاء') || name.includes('العملاء') || name.includes('مدينون')) {
+      return { classification: 'receivables', statement_type: 'balance_sheet' };
+    }
+    if (name.includes('موردين') || name.includes('الموردين') || name.includes('دائنون')) {
+      return { classification: 'payables', statement_type: 'balance_sheet' };
+    }
+    if (name.includes('نقدية') || name.includes('صندوق') || name.includes('خزينة') || name.includes('بنك')) {
+      return { classification: 'cash_and_equivalents', statement_type: 'balance_sheet' };
+    }
+    if (name.includes('أصول') || name.includes('مخزون') || name.includes('سيارات') || name.includes('أثاث') || name.includes('مباني')) {
+      return { classification: 'asset', statement_type: 'balance_sheet' };
+    }
+    if (name.includes('خصوم') || name.includes('إلتزامات') || name.includes('قروض')) {
+      return { classification: 'liability', statement_type: 'balance_sheet' };
+    }
+    if (name.includes('حقوق') || name.includes('رأس المال') || name.includes('أرباح')) {
+      return { classification: 'equity', statement_type: 'balance_sheet' };
+    }
+
+    // Default fallback
+    return { classification: 'asset', statement_type: 'balance_sheet' };
+  }
+
+  /**
    * Calculates Income Statement data.
    */
   static calculateIncomeStatement(
@@ -330,24 +435,22 @@ export class AccountingEngine {
     
     // Map classifications to accounts in trial balance
     const mappedAccounts = trialBalance.map(a => {
-      const type = accountTypes.find(t => t.id === (accounts.find(acc => acc.id === a.id)?.type_id));
-      return { ...a, typeInfo: type };
+      const acc = accounts.find(account => account.id === a.id);
+      const typeInfo = this.resolveAccountClassification(acc, accountTypes);
+      return { ...a, typeInfo };
     });
 
-    const isIncomeStatementType = (type: AccountType | undefined) => {
-      if (!type) return false;
-      // Primary check: classification
+    const isIncomeStatementType = (type: { classification: string; statement_type: string }) => {
       if (['revenue', 'cost', 'expense', 'interest_expense', 'depreciation', 'other_revenue', 'other_expense'].includes(type.classification)) return true;
       if (['asset', 'liability', 'equity', 'liability_equity', 'cash_and_equivalents', 'receivables', 'payables'].includes(type.classification)) return false;
-      // Secondary check: statement_type
       return type.statement_type === 'income_statement';
     };
 
     const isAccounts = mappedAccounts.filter(a => isIncomeStatementType(a.typeInfo));
     
-    const revenues = isAccounts.filter(a => ['revenue', 'other_revenue'].includes(a.typeInfo?.classification || ''));
-    const costs = isAccounts.filter(a => a.typeInfo?.classification === 'cost');
-    const expenses = isAccounts.filter(a => ['expense', 'interest_expense', 'depreciation', 'other_expense'].includes(a.typeInfo?.classification || ''));
+    const revenues = isAccounts.filter(a => ['revenue', 'other_revenue'].includes(a.typeInfo.classification));
+    const costs = isAccounts.filter(a => a.typeInfo.classification === 'cost');
+    const expenses = isAccounts.filter(a => ['expense', 'interest_expense', 'depreciation', 'other_expense'].includes(a.typeInfo.classification));
 
     // Sign handling: Revenue is normally Credit, Cost/Expense normally Debit
     // For Income Statement we use MOVEMENTS in the period
@@ -386,16 +489,14 @@ export class AccountingEngine {
 
     // Map classifications
     const mappedAccounts = trialBalance.map(a => {
-      const type = accountTypes.find(t => t.id === (accounts.find(acc => acc.id === a.id)?.type_id));
-      return { ...a, typeInfo: type };
+      const acc = accounts.find(account => account.id === a.id);
+      const typeInfo = this.resolveAccountClassification(acc, accountTypes);
+      return { ...a, typeInfo };
     });
 
-    const isBalanceSheetType = (type: AccountType | undefined) => {
-      if (!type) return false;
-      // Primary check: classification
+    const isBalanceSheetType = (type: { classification: string; statement_type: string }) => {
       if (['asset', 'liability', 'equity', 'liability_equity', 'cash_and_equivalents', 'receivables', 'payables'].includes(type.classification)) return true;
       if (['revenue', 'cost', 'expense', 'interest_expense', 'depreciation', 'other_revenue', 'other_expense'].includes(type.classification)) return false;
-      // Secondary check: statement_type
       return type.statement_type === 'balance_sheet';
     };
 
@@ -404,9 +505,9 @@ export class AccountingEngine {
     // Calculate Net Profit for the entire period up to targetDate (Cumulative)
     const incomeStatement = this.calculateIncomeStatement(accounts, accountTypes, entries, startDate, endDate);
     
-    const assets = bsAccounts.filter(a => ['asset', 'cash_and_equivalents', 'receivables'].includes(a.typeInfo?.classification || ''));
-    const liabilities = bsAccounts.filter(a => ['liability', 'liability_equity', 'payables'].includes(a.typeInfo?.classification || ''));
-    const equity = bsAccounts.filter(a => a.typeInfo?.classification === 'equity');
+    const assets = bsAccounts.filter(a => ['asset', 'cash_and_equivalents', 'receivables'].includes(a.typeInfo.classification));
+    const liabilities = bsAccounts.filter(a => ['liability', 'liability_equity', 'payables'].includes(a.typeInfo.classification));
+    const equity = bsAccounts.filter(a => a.typeInfo.classification === 'equity');
 
     const totalAssets = assets.reduce((sum, a) => sum + (a.closing.debit - a.closing.credit), 0);
     

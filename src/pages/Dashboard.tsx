@@ -2408,10 +2408,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialEditMode = false })
       const statsMonth = now.getMonth();
       const statsYear = now.getFullYear();
       
-      const startOfMonth = `${statsYear}-${String(statsMonth + 1).padStart(2, '0')}-01`;
+      const startOfYear = `${statsYear}-01-01`;
       const today = now.toISOString().split('T')[0];
 
-      const incomeStatement = AccountingEngine.calculateIncomeStatement(accounts, accountTypes, journalEntries, startOfMonth, today);
+      const incomeStatement = AccountingEngine.calculateIncomeStatement(accounts, accountTypes, journalEntries, startOfYear, today);
       const balanceSheet = AccountingEngine.calculateBalanceSheet(accounts, accountTypes, journalEntries, today);
 
       const netProfit = incomeStatement.netProfit;
@@ -2445,24 +2445,37 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialEditMode = false })
           return sum;
         }, 0);
 
-      const totalCustomerBalances = balanceSheet.assets
+      const customerAccIds = new Set(customers.map(c => c.account_id).filter(Boolean));
+      const calculatedCustomerBalances = balanceSheet.assets
         .filter(a => {
           const acc = accounts.find(account => account.id === a.id);
-          return acc?.name.includes('عملاء') || acc?.name.includes('العملاء') || customers.some(c => c.account_id === a.id);
+          const code = String(acc?.code || '').trim();
+          const name = String(acc?.name || '').toLowerCase();
+          return code.startsWith('1103') || name.includes('عملاء') || name.includes('العملاء') || customerAccIds.has(a.id);
         })
         .reduce((sum, a) => sum + a.balance, 0);
 
-      const totalSupplierBalances = balanceSheet.liabilities
+      const totalCustomerBalances = calculatedCustomerBalances !== 0 ? calculatedCustomerBalances : customers.reduce((sum, c) => sum + (Number(c.balance) || 0), 0);
+
+      const supplierAccIds = new Set(suppliers.map(s => s.account_id).filter(Boolean));
+      const calculatedSupplierBalances = balanceSheet.liabilities
         .filter(l => {
           const acc = accounts.find(account => account.id === l.id);
-          return acc?.name.includes('موردين') || acc?.name.includes('الموردين') || suppliers.some(s => s.account_id === l.id);
+          const code = String(acc?.code || '').trim();
+          const name = String(acc?.name || '').toLowerCase();
+          return code.startsWith('2101') || name.includes('موردين') || name.includes('الموردين') || supplierAccIds.has(l.id);
         })
         .reduce((sum, l) => sum + l.balance, 0);
 
+      const totalSupplierBalances = calculatedSupplierBalances !== 0 ? calculatedSupplierBalances : suppliers.reduce((sum, s) => sum + (Number(s.balance) || 0), 0);
+
+      const pmAccIds = new Set(paymentMethods.map(p => p.account_id).filter(Boolean));
       const totalCashBalance = balanceSheet.assets
         .filter(a => {
           const acc = accounts.find(account => account.id === a.id);
-          return acc?.name.includes('نقدية') || acc?.name.includes('صندوق') || acc?.name.includes('خزينة') || acc?.name.includes('بنك') || paymentMethods.some(p => p.account_id === a.id);
+          const code = String(acc?.code || '').trim();
+          const name = String(acc?.name || '').toLowerCase();
+          return code.startsWith('1101') || code.startsWith('1102') || name.includes('نقدية') || name.includes('صندوق') || name.includes('خزينة') || name.includes('بنك') || pmAccIds.has(a.id);
         })
         .reduce((sum, a) => sum + a.balance, 0);
 
