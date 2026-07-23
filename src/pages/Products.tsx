@@ -465,12 +465,21 @@ export const Products: React.FC = () => {
   };
 
   const resetForm = () => {
+    const defaultRevenue = accounts.find(a => ['sales_revenue', 'service_revenue', 'other_revenue', 'financial_revenue', 'sales_returns', 'earned_discounts'].includes(a.account_usage || ''));
+    const defaultCost = accounts.find(a => ['cost_of_sales', 'purchases', 'purchase_returns', 'granted_discounts'].includes(a.account_usage || ''));
+    const defaultInventory = accounts.find(a => ['inventory', 'raw_materials', 'work_in_progress', 'finished_goods'].includes(a.account_usage || ''));
+    const defaultVat = accounts.find(a => a.account_usage === 'vat');
+
     setEditingProduct(null);
     setFormData({ 
       code: '', name: '', type: 'finished_good', category: '', unit: 'قطعة',
       sale_price: 0, cost_price: 0, description: '', image_url: '', 
-      barcode: '', stock: 0, min_stock: 0, revenue_account_id: '', 
-      cost_account_id: '', inventory_account_id: '', inventory_cost_method: 'wac', vat_account_id: '',
+      barcode: '', stock: 0, min_stock: 0, 
+      revenue_account_id: defaultRevenue?.id || '', 
+      cost_account_id: defaultCost?.id || '', 
+      inventory_account_id: defaultInventory?.id || '', 
+      inventory_cost_method: 'wac', 
+      vat_account_id: defaultVat?.id || '',
       vat_rate: 0, counter_account_id: '', item_group_id: '', barcode_settings: null as any, is_active: true
     });
     setDateFrom('');

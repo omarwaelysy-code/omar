@@ -128,13 +128,14 @@ export const PaymentMethods: React.FC = () => {
   };
 
   const resetForm = () => {
+    const defaultCashAccount = accounts.find(a => ['cash', 'petty_cash', 'bank', 'wallet', 'credit_card', 'debit_card', 'main_cash'].includes(a.account_usage || ''));
     setEditingMethod(null);
     setFormData({
       code: '',
       name: '',
       opening_balance: 0,
       opening_balance_date: new Date().toISOString().slice(0, 10),
-      account_id: '',
+      account_id: defaultCashAccount?.id || '',
       counter_account_id: '',
       type: 'cash'
     });

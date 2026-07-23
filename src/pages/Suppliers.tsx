@@ -343,7 +343,7 @@ export const Suppliers: React.FC = () => {
         return;
       }
     } else {
-      const defaultAccount = accounts.find(a => a.account_usage === 'accounts_payable' || a.account_usage === 'supplier');
+      const defaultAccount = accounts.find(a => a.account_usage === 'supplier') || accounts.find(a => a.account_usage === 'accounts_payable');
       const defaultCounterAccount = accounts.find(a => a.account_usage === 'opening_balance');
       setEditingSupplier(null);
       setFormData({

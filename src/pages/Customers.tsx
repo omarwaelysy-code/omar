@@ -343,7 +343,7 @@ export const Customers: React.FC = () => {
         return;
       }
     } else {
-      const defaultAccount = accounts.find(a => a.account_usage === 'accounts_receivable' || a.account_usage === 'customer');
+      const defaultAccount = accounts.find(a => a.account_usage === 'customer') || accounts.find(a => a.account_usage === 'accounts_receivable');
       const defaultCounterAccount = accounts.find(a => a.account_usage === 'opening_balance');
       setEditingCustomer(null);
       setFormData({ 

@@ -49,6 +49,19 @@ export const DiscountSettings: React.FC = () => {
     }
   }, [user]);
 
+  // Auto-suggest default matching accounts if empty
+  useEffect(() => {
+    if (accounts.length > 0) {
+      const defaultCustAccount = accounts.find(a => a.account_usage === 'earned_discounts' || a.account_usage === 'sales_discount');
+      const defaultSuppAccount = accounts.find(a => a.account_usage === 'granted_discounts' || a.account_usage === 'purchase_discount');
+
+      setSettings(prev => ({
+        customer_discount_account_id: prev.customer_discount_account_id || defaultCustAccount?.id || '',
+        supplier_discount_account_id: prev.supplier_discount_account_id || defaultSuppAccount?.id || ''
+      }));
+    }
+  }, [accounts]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
