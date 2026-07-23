@@ -216,11 +216,18 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
     return { label: 'نشط', color: 'bg-emerald-100 text-emerald-800', icon: CheckCircle2 };
   };
 
+  const realCompanies = companies.filter(c => c.id !== 'system' && c.id !== 'SYSTEM' && c.code !== 'SYS-ROOT');
+  const realCompanyUsers = users.filter(u => !isSuperAdminUser(u));
+
   const stats = [
-    { label: 'إجمالي الشركات', value: companies.length, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'إجمالي المستخدمين', value: users.length, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'اشتراكات نشطة', value: subscriptions.filter(s => s.subscription_status === 'Active').length, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'اشتراكات منتهية', value: subscriptions.filter(s => s.subscription_status === 'Expired').length, icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
+    { label: 'إجمالي الشركات', value: realCompanies.length, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'إجمالي مستخدمي الشركات', value: realCompanyUsers.length, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'اشتراكات نشطة', value: realCompanies.filter(c => c.company_status === 'active' && (c.subscription_status === 'active' || c.subscription_status === 'Active')).length, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'اشتراكات منتهية', value: realCompanies.filter(c => {
+        const nowStr = formatDateForInput(new Date());
+        const endStr = formatDateForInput(c.subscription_end || c.subscription_expiry);
+        return c.company_status === 'suspended' || c.subscription_status === 'expired' || c.subscription_status === 'Expired' || (endStr && endStr < nowStr);
+      }).length, icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -515,21 +522,35 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
     return u.role === 'super_admin' || (u.role === 'admin' && u.company_id === 'system') || (u.email && superAdminEmails.includes(u.email.trim().toLowerCase()));
   };
 
-  const filteredCompanies = companies.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  const clientCompanies = companies.filter(c => c.id !== 'system' && c.id !== 'SYSTEM' && c.code !== 'SYS-ROOT');
+
+  const filteredCompanies = clientCompanies.filter(c => 
+    (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (c.code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (c.email || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredSuperAdmins = users.filter(u => isSuperAdminUser(u) && (
+  // Group and deduplicate Super Admins by email so each Super Admin appears exactly once
+  const uniqueSuperAdminMap = new Map<string, User>();
+  users.filter(u => isSuperAdminUser(u)).forEach(u => {
+    const emailKey = (u.email || '').trim().toLowerCase();
+    if (!emailKey) return;
+    if (!uniqueSuperAdminMap.has(emailKey) || (u.created_at && new Date(u.created_at) > new Date(uniqueSuperAdminMap.get(emailKey)!.created_at || 0))) {
+      uniqueSuperAdminMap.set(emailKey, u);
+    }
+  });
+
+  const superAdminsList = Array.from(uniqueSuperAdminMap.values());
+
+  const filteredSuperAdmins = superAdminsList.filter(u => 
     (u.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
-  ));
+  );
 
   const filteredCompanyUsers = users.filter(u => !isSuperAdminUser(u) && (
     (u.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (u.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (u.company_id && companies.find(c => c.id === u.company_id)?.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    (u.company_id && clientCompanies.find(c => c.id === u.company_id)?.name.toLowerCase().includes(searchTerm.toLowerCase()))
   ));
 
   if (loading) {
