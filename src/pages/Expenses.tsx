@@ -54,6 +54,13 @@ export const Expenses: React.FC = () => {
 
     try {
       const selectedAccount = accounts.find(a => a.id === formData.account_id);
+      const validExpenseUsages = ['operating_expense', 'administrative_expense', 'marketing_expense', 'selling_expense', 'financial_expense', 'depreciation_expense'];
+
+      if (!selectedAccount || !validExpenseUsages.includes(selectedAccount.account_usage || '')) {
+        showNotification('خطأ: حساب بند المصروف يلزم أن يكون من قسم (قائمة الدخل - مصروفات / إهلاك / فوائد)', 'error');
+        return;
+      }
+
       const dataToSave = {
         ...formData,
         account_name: selectedAccount?.name || '',

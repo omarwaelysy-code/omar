@@ -416,6 +416,30 @@ export const Products: React.FC = () => {
       const inventoryAccount = accounts.find(a => a.id === formData.inventory_account_id);
       const vatAccount = accounts.find(a => a.id === formData.vat_account_id);
       const itemGroupObj = itemGroups.find(g => g.id === formData.item_group_id);
+
+      const validRevenueUsages = ['sales_revenue', 'service_revenue', 'other_revenue', 'financial_revenue', 'sales_returns', 'earned_discounts'];
+      const validCostUsages = ['cost_of_sales', 'purchases', 'purchase_returns', 'granted_discounts'];
+      const validInventoryUsages = ['inventory', 'raw_materials', 'work_in_progress', 'finished_goods'];
+
+      if (!revenueAccount || !validRevenueUsages.includes(revenueAccount.account_usage || '')) {
+        showNotification('خطأ: حساب الإيرادات يلزم أن يكون من قسم (قائمة الدخل - إيرادات)', 'error');
+        return;
+      }
+
+      if (!costAccount || !validCostUsages.includes(costAccount.account_usage || '')) {
+        showNotification('خطأ: حساب التكلفة يلزم أن يكون من قسم (قائمة الدخل - تكاليف)', 'error');
+        return;
+      }
+
+      if (isPhysicalProduct && (!inventoryAccount || !validInventoryUsages.includes(inventoryAccount.account_usage || ''))) {
+        showNotification('خطأ: حساب المخزون يلزم أن يكون من قسم (المخزون والإنتاج)', 'error');
+        return;
+      }
+
+      if (vatAccount && vatAccount.account_usage !== 'vat') {
+        showNotification('خطأ: حساب ضريبة القيمة المضافة يلزم أن يكون من قسم (الضرائب) بـ استخدام (ضريبة قيمة مضافة)', 'error');
+        return;
+      }
       
       const dataToSave = {
         ...formData,

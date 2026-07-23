@@ -55,6 +55,21 @@ export const DiscountSettings: React.FC = () => {
     setSaving(true);
 
     try {
+      const custDiscountAccount = accounts.find(a => a.id === settings.customer_discount_account_id);
+      const suppDiscountAccount = accounts.find(a => a.id === settings.supplier_discount_account_id);
+
+      if (settings.customer_discount_account_id && (!custDiscountAccount || (custDiscountAccount.account_usage !== 'earned_discounts' && custDiscountAccount.account_usage !== 'sales_discount'))) {
+        showNotification('خطأ: حساب خصم العملاء (مسموح به) يلزم أن يكون من قسم (قائمة الدخل - إيرادات) بـ استخدام (خصم مبيعات)', 'error');
+        setSaving(false);
+        return;
+      }
+
+      if (settings.supplier_discount_account_id && (!suppDiscountAccount || (suppDiscountAccount.account_usage !== 'granted_discounts' && suppDiscountAccount.account_usage !== 'purchase_discount'))) {
+        showNotification('خطأ: حساب خصم الموردين (مكتسب) يلزم أن يكون من قسم (قائمة الدخل - تكاليف) بـ استخدام (خصم مشتريات)', 'error');
+        setSaving(false);
+        return;
+      }
+
       const docs = await dbService.getDocsByFilter<any>('settings', user.company_id, [
         { field: 'type', operator: '==', value: 'discount_settings' }
       ]);
@@ -140,7 +155,7 @@ export const DiscountSettings: React.FC = () => {
                   onChange={(e) => setSettings({ ...settings, customer_discount_account_id: e.target.value })}
                 >
                   <option value="">{t('discount_settings.select_account')}</option>
-                  {accounts.filter(a => a.account_usage === 'granted_discounts').map(account => (
+                  {accounts.filter(a => a.account_usage === 'earned_discounts' || a.account_usage === 'sales_discount').map(account => (
                     <option key={account.id} value={account.id}>{account.name} ({account.code})</option>
                   ))}
                 </select>
@@ -166,7 +181,7 @@ export const DiscountSettings: React.FC = () => {
                   onChange={(e) => setSettings({ ...settings, supplier_discount_account_id: e.target.value })}
                 >
                   <option value="">{t('discount_settings.select_account')}</option>
-                  {accounts.filter(a => a.account_usage === 'earned_discounts').map(account => (
+                  {accounts.filter(a => a.account_usage === 'granted_discounts' || a.account_usage === 'purchase_discount').map(account => (
                     <option key={account.id} value={account.id}>{account.name} ({account.code})</option>
                   ))}
                 </select>

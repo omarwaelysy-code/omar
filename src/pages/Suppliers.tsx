@@ -146,6 +146,13 @@ export const Suppliers: React.FC = () => {
       }
 
       const selectedAccount = accounts.find(a => a.id === finalAccountId);
+      const validSupplierUsages = ['supplier', 'accounts_payable'];
+
+      if (!selectedAccount || !validSupplierUsages.includes(selectedAccount.account_usage || '')) {
+        showNotification('خطأ: يجب أن يكون الحساب المحاسبي للمورد من قسم (أوراق الدفع والموردين) بـ استخدام (موردين)', 'error');
+        return;
+      }
+
       const dataToSave = {
         ...formData,
         account_id: finalAccountId,

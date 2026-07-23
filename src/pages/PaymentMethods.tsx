@@ -60,6 +60,13 @@ export const PaymentMethods: React.FC = () => {
 
     try {
       const selectedAccount = accounts.find(a => a.id === formData.account_id);
+      const validCashUsages = ['cash', 'petty_cash', 'bank', 'wallet', 'credit_card', 'debit_card', 'main_cash'];
+
+      if (!selectedAccount || !validCashUsages.includes(selectedAccount.account_usage || '')) {
+        showNotification('خطأ: يجب أن يكون الحساب المحاسبي لطريقة السداد من قسم (النقدية والبنوك والوسائل المالية)', 'error');
+        return;
+      }
+
       const dataToSave = {
         ...formData,
         account_name: selectedAccount?.name || '',

@@ -146,6 +146,13 @@ export const Customers: React.FC = () => {
       }
 
       const selectedAccount = accounts.find(a => a.id === finalAccountId);
+      const validCustomerUsages = ['customer', 'accounts_receivable'];
+
+      if (!selectedAccount || !validCustomerUsages.includes(selectedAccount.account_usage || '')) {
+        showNotification('خطأ: يجب أن يكون الحساب المحاسبي للعميل من قسم (أوراق القبض والعملاء) بـ استخدام (عملاء)', 'error');
+        return;
+      }
+
       const dataToSave = {
         ...formData,
         account_id: finalAccountId,

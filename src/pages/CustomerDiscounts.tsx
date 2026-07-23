@@ -818,7 +818,7 @@ export const CustomerDiscounts: React.FC = () => {
                             onChange={(e) => setDiscountData({...discountData, account_id: e.target.value})}
                           >
                             <option value="">{t('discount_settings.select_account')}</option>
-                             {accounts.filter(acc => acc.account_usage === 'granted_discounts').map(a => <option key={a.id} value={a.id}>{a.name} ({a.code})</option>)}
+                             {accounts.filter(acc => acc.account_usage === 'earned_discounts' || acc.account_usage === 'sales_discount').map(a => <option key={a.id} value={a.id}>{a.name} ({a.code})</option>)}
                           </select>
                           <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                         </div>
