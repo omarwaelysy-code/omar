@@ -35,7 +35,7 @@ export const STANDARD_COA_TEMPLATE: TemplateType[] = [
             name_ar: 'النقدية وما في حكمها',
             name_en: 'Cash and Cash Equivalents',
             children: [
-              { code: '110101', name_ar: 'الصندوق الرئيسي', name_en: 'Main Cash', usage: 'main_cash' },
+              { code: '110101', name_ar: 'الصندوق الرئيسي', name_en: 'Main Cash', usage: 'cash' },
               { code: '110102', name_ar: 'صندوق المصروفات النثرية', name_en: 'Petty Cash', usage: 'petty_cash' },
               { code: '110103', name_ar: 'البنك', name_en: 'Bank', usage: 'bank' }
             ]
@@ -44,10 +44,10 @@ export const STANDARD_COA_TEMPLATE: TemplateType[] = [
             code: '1102',
             name_ar: 'الذمم المدينة',
             name_en: 'Accounts Receivable',
-            usage: 'accounts_receivable',
+            usage: 'customer',
             children: [
               { code: '110201', name_ar: 'العملاء', name_en: 'Customers', usage: 'customer' },
-              { code: '110202', name_ar: 'شيكات تحت التحصيل', name_en: 'Post Dated Cheques', usage: 'post_dated_cheque' }
+              { code: '110202', name_ar: 'شيكات تحت التحصيل', name_en: 'Post Dated Cheques', usage: 'cheque' }
             ]
           },
           {
@@ -66,7 +66,7 @@ export const STANDARD_COA_TEMPLATE: TemplateType[] = [
             name_en: 'Other Receivables',
             children: [
               { code: '110401', name_ar: 'سلف الموظفين', name_en: 'Employee Advances', usage: 'employee_advances' },
-              { code: '110402', name_ar: 'ضريبة القيمة المضافة - مدخلات', name_en: 'Input VAT', usage: 'input_vat' }
+              { code: '110402', name_ar: 'ضريبة القيمة المضافة - مدخلات', name_en: 'Input VAT', usage: 'vat' }
             ]
           }
         ]
@@ -121,7 +121,7 @@ export const STANDARD_COA_TEMPLATE: TemplateType[] = [
             code: '2101',
             name_ar: 'الذمم الدائنة',
             name_en: 'Accounts Payable',
-            usage: 'accounts_payable',
+            usage: 'supplier',
             children: [
               { code: '210101', name_ar: 'الموردون', name_en: 'Suppliers', usage: 'supplier' }
             ]
@@ -132,7 +132,7 @@ export const STANDARD_COA_TEMPLATE: TemplateType[] = [
             name_en: 'Other Payables',
             children: [
               { code: '210201', name_ar: 'رواتب مستحقة', name_en: 'Accrued Salaries', usage: 'payroll' },
-              { code: '210202', name_ar: 'ضريبة القيمة المضافة - مخرجات', name_en: 'Output VAT', usage: 'output_vat' }
+              { code: '210202', name_ar: 'ضريبة القيمة المضافة - مخرجات', name_en: 'Output VAT', usage: 'vat' }
             ]
           }
         ]
@@ -176,7 +176,7 @@ export const STANDARD_COA_TEMPLATE: TemplateType[] = [
           { code: '4101', name_ar: 'إيرادات مبيعات بضاعة', name_en: 'Sales Revenue', usage: 'sales_revenue', business_type: 'commercial' },
           { code: '4102', name_ar: 'إيرادات خدمات', name_en: 'Service Revenue', usage: 'service_revenue', business_type: 'service' },
           { code: '4103', name_ar: 'مرتجعات المبيعات', name_en: 'Sales Returns', usage: 'sales_returns', business_type: 'commercial' },
-          { code: '4104', name_ar: 'خصم مسموح به', name_en: 'Granted Discounts', usage: 'granted_discounts' }
+          { code: '4104', name_ar: 'خصم مسموح به', name_en: 'Sales Discount', usage: 'earned_discounts' }
         ]
       },
       {
@@ -202,7 +202,7 @@ export const STANDARD_COA_TEMPLATE: TemplateType[] = [
       { code: '5102', name_ar: 'تكاليف تشغيل الخدمات', name_en: 'Cost of Services', business_type: 'service' },
       { code: '5103', name_ar: 'المشتريات', name_en: 'Purchases', usage: 'purchases', business_type: 'commercial' },
       { code: '5104', name_ar: 'مرتجعات المشتريات', name_en: 'Purchase Returns', usage: 'purchase_returns', business_type: 'commercial' },
-      { code: '5105', name_ar: 'خصم مكتسب', name_en: 'Earned Discounts', usage: 'earned_discounts' }
+      { code: '5105', name_ar: 'خصم مكتسب', name_en: 'Purchase Discount', usage: 'granted_discounts' }
     ]
   },
   {

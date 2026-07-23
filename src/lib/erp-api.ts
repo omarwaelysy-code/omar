@@ -3615,10 +3615,13 @@ async function ensureDefaultAccounts(client: any, companyId: string) {
 
   // 2. Define standard accounts
   const defaultAccounts = [
-    { name: 'الخزينة العامة', code: '1101', classification: 'asset', usage: 'main_cash' },
-    { name: 'حساب العملاء', code: '1201', classification: 'asset', usage: 'accounts_receivable' },
+    { name: 'الخزينة العامة', code: '1101', classification: 'asset', usage: 'cash' },
+    { name: 'حساب العملاء', code: '1201', classification: 'asset', usage: 'customer' },
+    { name: 'حساب الموردين', code: '2101', classification: 'liability', usage: 'supplier' },
     { name: 'المبيعات', code: '4101', classification: 'revenue', usage: 'sales_revenue' },
-    { name: 'الخصم المسموح به', code: '5401', classification: 'expense', usage: 'granted_discounts' },
+    { name: 'تكلفة المبيعات', code: '5101', classification: 'cost', usage: 'cost_of_sales' },
+    { name: 'الخصم المسموح به (مبيعات)', code: '4104', classification: 'revenue', usage: 'earned_discounts' },
+    { name: 'الخصم المكتسب (مشتريات)', code: '5105', classification: 'cost', usage: 'granted_discounts' },
   ];
 
   for (const acc of defaultAccounts) {
