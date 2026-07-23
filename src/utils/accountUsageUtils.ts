@@ -81,7 +81,7 @@ export const ACCOUNT_USAGE_OPTIONS: AccountUsageOption[] = [
 ];
 
 export const getAccountUsageLabel = (key: string | undefined, lang: 'ar' | 'en'): string => {
-  if (!key) return lang === 'ar' ? 'عام' : 'General';
+  if (!key || key === 'other' || key === 'none') return lang === 'ar' ? 'عام' : 'General';
   if (key === 'post_dated_cheque' || key === 'cheque') {
     return lang === 'ar' ? 'أوراق قبض' : 'Notes Receivable';
   }
@@ -107,7 +107,7 @@ export const getAccountUsageLabel = (key: string | undefined, lang: 'ar' | 'en')
     return lang === 'ar' ? 'رواتب مستحقة' : 'Accrued Salaries';
   }
   const opt = ACCOUNT_USAGE_OPTIONS.find(o => o.key === key);
-  if (!opt) return key;
+  if (!opt) return lang === 'ar' ? 'عام' : 'General';
   return lang === 'ar' ? opt.ar : opt.en;
 };
 

@@ -56,7 +56,7 @@ export const generateDefaultCOA = async (
           company_id,
           opening_balance: 0,
           required_sub_account: !!(acc.children && acc.children.length > 0),
-          account_usage: acc.usage || 'other'
+          account_usage: acc.usage || null
         };
 
         const newAccId = await dbService.add('accounts', accData);
