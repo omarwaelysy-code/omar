@@ -1,5 +1,36 @@
 import '@testing-library/jest-dom';
+import React from 'react';
 import { vi } from 'vitest';
+
+// Global top-level module mocks
+vi.mock('react-barcode', () => ({
+  default: () => null
+}));
+
+vi.mock('react-qr-code', () => ({
+  default: () => null
+}));
+
+vi.mock('@zxing/browser', () => {
+  return {
+    BrowserMultiFormatReader: class {
+      decodeFromVideoElement = vi.fn((videoEl, callback) => {
+        // Store for simulating raw scans in tests
+        (globalThis as any).__mockZXingScan = callback;
+      });
+      stop = vi.fn().mockResolvedValue(undefined);
+    }
+  };
+});
+
+vi.mock('recharts', async () => {
+  const original = await vi.importActual<typeof import('recharts')>('recharts');
+  return {
+    ...original,
+    ResponsiveContainer: ({ children }: any) =>
+      React.createElement('div', { style: { width: 800, height: 400 } }, children),
+  };
+});
 
 if (typeof window !== 'undefined') {
 
@@ -24,15 +55,6 @@ if (typeof window !== 'undefined') {
     })),
   });
 
-  // Global mocks to avoid canvas/JSDOM import memory leaks
-  vi.mock('react-barcode', () => ({
-    default: () => null
-  }));
-
-  vi.mock('react-qr-code', () => ({
-    default: () => null
-  }));
-
   // Mock navigator.mediaDevices
   if (typeof navigator !== 'undefined') {
     Object.defineProperty(navigator, 'mediaDevices', {
@@ -50,19 +72,6 @@ if (typeof window !== 'undefined') {
       }
     });
   }
-
-  // Mock @zxing/browser
-  vi.mock('@zxing/browser', () => {
-    return {
-      BrowserMultiFormatReader: class {
-        decodeFromVideoElement = vi.fn((videoEl, callback) => {
-          // Store for simulating raw scans in tests
-          (globalThis as any).__mockZXingScan = callback;
-        });
-        stop = vi.fn().mockResolvedValue(undefined);
-      }
-    };
-  });
 
   // Mock Web Audio API AudioContext
   class MockAudioContext {
@@ -98,5 +107,3 @@ if (typeof window !== 'undefined') {
     value: MockAudioContext
   });
 }
-
-

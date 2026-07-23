@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { BarcodeScanner, HIDScannerListener } from '../components/BarcodeScanner';
 import { useBarcodeScanner, lookupProductByBarcode, playBeep } from '../hooks/useBarcodeScanner';
 import { Product } from '../types';
@@ -146,26 +146,30 @@ describe('Barcode Scanner System', () => {
 
   // ── 3. HID Keyboard Scanner Listener ──
   describe('USB/Bluetooth Barcode Scanner Listener', () => {
-    it('should collect keyboard events and trigger onScan when Enter key is pressed', () => {
+    it('should collect keyboard events and trigger onScan when Enter key is pressed', async () => {
       const onScan = vi.fn();
       render(<HIDScannerListener enabled={true} onScan={onScan} />);
 
-      // Simulate character inputs
-      fireEvent.keyDown(document, { key: '6' });
-      fireEvent.keyDown(document, { key: '2' });
-      fireEvent.keyDown(document, { key: '2' });
-      fireEvent.keyDown(document, { key: '1' });
-      fireEvent.keyDown(document, { key: 'Enter' });
+      // Simulate character inputs inside act
+      await act(async () => {
+        fireEvent.keyDown(document, { key: '6' });
+        fireEvent.keyDown(document, { key: '2' });
+        fireEvent.keyDown(document, { key: '2' });
+        fireEvent.keyDown(document, { key: '1' });
+        fireEvent.keyDown(document, { key: 'Enter' });
+      });
 
       expect(onScan).toHaveBeenCalledWith('6221');
     });
 
-    it('should ignore input if listener is disabled', () => {
+    it('should ignore input if listener is disabled', async () => {
       const onScan = vi.fn();
       render(<HIDScannerListener enabled={false} onScan={onScan} />);
 
-      fireEvent.keyDown(document, { key: '6' });
-      fireEvent.keyDown(document, { key: 'Enter' });
+      await act(async () => {
+        fireEvent.keyDown(document, { key: '6' });
+        fireEvent.keyDown(document, { key: 'Enter' });
+      });
 
       expect(onScan).not.toHaveBeenCalled();
     });
@@ -179,17 +183,19 @@ describe('Barcode Scanner System', () => {
       const onMultipleFound = vi.fn();
       const onClose = vi.fn();
 
-      render(
-        <BarcodeScanner
-          products={mockProducts}
-          onProductFound={onProductFound}
-          onProductNotFound={onProductNotFound}
-          onMultipleFound={onMultipleFound}
-          onClose={onClose}
-          settings={mockSettings}
-          language="ar"
-        />
-      );
+      await act(async () => {
+        render(
+          <BarcodeScanner
+            products={mockProducts}
+            onProductFound={onProductFound}
+            onProductNotFound={onProductNotFound}
+            onMultipleFound={onMultipleFound}
+            onClose={onClose}
+            settings={mockSettings}
+            language="ar"
+          />
+        );
+      });
 
       // Verify instruction text exists in Arabic
       expect(screen.getByText('وجه الكاميرا إلى الباركود')).toBeInTheDocument();
@@ -200,27 +206,31 @@ describe('Barcode Scanner System', () => {
       const onProductFound = vi.fn();
       const onClose = vi.fn();
 
-      render(
-        <BarcodeScanner
-          products={mockProducts}
-          onProductFound={onProductFound}
-          onProductNotFound={vi.fn()}
-          onMultipleFound={vi.fn()}
-          onClose={onClose}
-          settings={mockSettings}
-          continuousMode={false} // One-shot mode
-        />
-      );
+      await act(async () => {
+        render(
+          <BarcodeScanner
+            products={mockProducts}
+            onProductFound={onProductFound}
+            onProductNotFound={vi.fn()}
+            onMultipleFound={vi.fn()}
+            onClose={onClose}
+            settings={mockSettings}
+            continuousMode={false} // One-shot mode
+          />
+        );
+      });
 
       // Wait for camera/ZXing registration
       await waitFor(() => expect((globalThis as any).__mockZXingScan).not.toBeNull());
       const scanTrigger = (globalThis as any).__mockZXingScan;
 
-      // Simulate 3 matching frame decodes
+      // Simulate 3 matching frame decodes inside act
       const resultObj = { getText: () => '6221000123456' };
-      scanTrigger(resultObj, null);
-      scanTrigger(resultObj, null);
-      scanTrigger(resultObj, null);
+      await act(async () => {
+        scanTrigger(resultObj, null);
+        scanTrigger(resultObj, null);
+        scanTrigger(resultObj, null);
+      });
 
       // In one-shot mode: should fire callback and automatically trigger close/stop camera
       expect(onProductFound).toHaveBeenCalledWith(mockProducts[0]);
@@ -229,25 +239,29 @@ describe('Barcode Scanner System', () => {
     it('should handle unregistered barcode and trigger not found warning', async () => {
       const onProductNotFound = vi.fn();
 
-      render(
-        <BarcodeScanner
-          products={mockProducts}
-          onProductFound={vi.fn()}
-          onProductNotFound={onProductNotFound}
-          onMultipleFound={vi.fn()}
-          onClose={vi.fn()}
-          settings={mockSettings}
-          continuousMode={true}
-        />
-      );
+      await act(async () => {
+        render(
+          <BarcodeScanner
+            products={mockProducts}
+            onProductFound={vi.fn()}
+            onProductNotFound={onProductNotFound}
+            onMultipleFound={vi.fn()}
+            onClose={vi.fn()}
+            settings={mockSettings}
+            continuousMode={true}
+          />
+        );
+      });
 
       await waitFor(() => expect((globalThis as any).__mockZXingScan).not.toBeNull());
       const scanTrigger = (globalThis as any).__mockZXingScan;
 
       const resultObj = { getText: () => '9999999999999' };
-      scanTrigger(resultObj, null);
-      scanTrigger(resultObj, null);
-      scanTrigger(resultObj, null);
+      await act(async () => {
+        scanTrigger(resultObj, null);
+        scanTrigger(resultObj, null);
+        scanTrigger(resultObj, null);
+      });
 
       await waitFor(() => {
         expect(onProductNotFound).toHaveBeenCalledWith('9999999999999');
@@ -258,25 +272,29 @@ describe('Barcode Scanner System', () => {
     it('should handle duplicate barcodes and trigger warning', async () => {
       const onMultipleFound = vi.fn();
 
-      render(
-        <BarcodeScanner
-          products={mockProducts}
-          onProductFound={vi.fn()}
-          onProductNotFound={vi.fn()}
-          onMultipleFound={onMultipleFound}
-          onClose={vi.fn()}
-          settings={mockSettings}
-          continuousMode={true}
-        />
-      );
+      await act(async () => {
+        render(
+          <BarcodeScanner
+            products={mockProducts}
+            onProductFound={vi.fn()}
+            onProductNotFound={vi.fn()}
+            onMultipleFound={onMultipleFound}
+            onClose={vi.fn()}
+            settings={mockSettings}
+            continuousMode={true}
+          />
+        );
+      });
 
       await waitFor(() => expect((globalThis as any).__mockZXingScan).not.toBeNull());
       const scanTrigger = (globalThis as any).__mockZXingScan;
 
       const resultObj = { getText: () => '6221000888888' };
-      scanTrigger(resultObj, null);
-      scanTrigger(resultObj, null);
-      scanTrigger(resultObj, null);
+      await act(async () => {
+        scanTrigger(resultObj, null);
+        scanTrigger(resultObj, null);
+        scanTrigger(resultObj, null);
+      });
 
       await waitFor(() => {
         expect(onMultipleFound).toHaveBeenCalledWith('6221000888888');
@@ -296,22 +314,28 @@ describe('Barcode Scanner System', () => {
       // Override navigator mediaDevices mock just for this test
       vi.spyOn(navigator.mediaDevices, 'getUserMedia').mockResolvedValue(mockStream as any);
 
-      const { unmount } = render(
-        <BarcodeScanner
-          products={mockProducts}
-          onProductFound={vi.fn()}
-          onProductNotFound={vi.fn()}
-          onMultipleFound={vi.fn()}
-          onClose={vi.fn()}
-          settings={mockSettings}
-        />
-      );
+      let unmountFn: () => void = () => {};
+      await act(async () => {
+        const { unmount } = render(
+          <BarcodeScanner
+            products={mockProducts}
+            onProductFound={vi.fn()}
+            onProductNotFound={vi.fn()}
+            onMultipleFound={vi.fn()}
+            onClose={vi.fn()}
+            settings={mockSettings}
+          />
+        );
+        unmountFn = unmount;
+      });
 
       // Wait until the camera is fully initialized/active to ensure streamRef is assigned
       await waitFor(() => expect(screen.queryByText(/جاري فتح الكاميرا/)).toBeNull());
       
-      // Unmount to trigger cleanups
-      unmount();
+      // Unmount to trigger cleanups inside act
+      await act(async () => {
+        unmountFn();
+      });
       
       // Stream tracks should be stopped immediately
       await waitFor(() => expect(stopMock).toHaveBeenCalled());
@@ -320,16 +344,18 @@ describe('Barcode Scanner System', () => {
     it('should load and initialize under 500ms for premium user experience', async () => {
       const start = performance.now();
       
-      render(
-        <BarcodeScanner
-          products={mockProducts}
-          onProductFound={vi.fn()}
-          onProductNotFound={vi.fn()}
-          onMultipleFound={vi.fn()}
-          onClose={vi.fn()}
-          settings={mockSettings}
-        />
-      );
+      await act(async () => {
+        render(
+          <BarcodeScanner
+            products={mockProducts}
+            onProductFound={vi.fn()}
+            onProductNotFound={vi.fn()}
+            onMultipleFound={vi.fn()}
+            onClose={vi.fn()}
+            settings={mockSettings}
+          />
+        );
+      });
 
       const duration = performance.now() - start;
       expect(duration).toBeLessThan(500); // Verify fast initialization without locks

@@ -52,7 +52,7 @@ describe('LicensingMiddleware', () => {
     await LicensingMiddleware(req, res, next);
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-      code: 'SUBSCRIPTION_SUSPENDED'
+      code: 'COMPANY_SUSPENDED'
     }));
   });
 
@@ -63,8 +63,7 @@ describe('LicensingMiddleware', () => {
     vi.mocked(pool.query).mockResolvedValueOnce({ 
       rows: [{ 
         subscription_status: 'Active',
-        end_date: futureDate.toISOString(),
-        grace_period_days: 7
+        subscription_end: futureDate.toISOString()
       }] 
     } as any);
 
@@ -72,15 +71,14 @@ describe('LicensingMiddleware', () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it('should block POST if subscription is Expired and past grace period', async () => {
+  it('should block POST if subscription is Expired by end date', async () => {
     const pastDate = new Date();
-    pastDate.setDate(pastDate.getDate() - 10); // 10 days ago (past 7 days grace)
+    pastDate.setDate(pastDate.getDate() - 10);
 
     vi.mocked(pool.query).mockResolvedValueOnce({ 
       rows: [{ 
         subscription_status: 'Active',
-        end_date: pastDate.toISOString(),
-        grace_period_days: 7
+        subscription_end: pastDate.toISOString()
       }] 
     } as any);
 
@@ -91,24 +89,25 @@ describe('LicensingMiddleware', () => {
     }));
   });
 
-  it('should allow POST if subscription is Expired but within grace period', async () => {
+  it('should block request if subscription status is Expired', async () => {
     const pastDate = new Date();
-    pastDate.setDate(pastDate.getDate() - 3); // 3 days ago (within 7 days grace)
+    pastDate.setDate(pastDate.getDate() - 3);
 
     vi.mocked(pool.query).mockResolvedValueOnce({ 
       rows: [{ 
-        subscription_status: 'Active',
-        end_date: pastDate.toISOString(),
-        grace_period_days: 7
+        subscription_status: 'Expired',
+        subscription_end: pastDate.toISOString()
       }] 
     } as any);
 
     await LicensingMiddleware(req, res, next);
-    expect(res.setHeader).toHaveBeenCalledWith('X-Subscription-Warning', 'GRACE_PERIOD');
-    expect(next).toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'SUBSCRIPTION_EXPIRED'
+    }));
   });
 
-  it('should allow GET if subscription is Expired and past grace period', async () => {
+  it('should block GET if subscription is Expired', async () => {
     const pastDate = new Date();
     pastDate.setDate(pastDate.getDate() - 10);
 
@@ -117,14 +116,15 @@ describe('LicensingMiddleware', () => {
     vi.mocked(pool.query).mockResolvedValueOnce({ 
       rows: [{ 
         subscription_status: 'Active',
-        end_date: pastDate.toISOString(),
-        grace_period_days: 7
+        subscription_end: pastDate.toISOString()
       }] 
     } as any);
 
     await LicensingMiddleware(req, res, next);
-    expect(res.setHeader).toHaveBeenCalledWith('X-Subscription-Warning', 'EXPIRED_READ_ONLY');
-    expect(next).toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'SUBSCRIPTION_EXPIRED'
+    }));
   });
 });
 

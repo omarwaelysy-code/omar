@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { Products } from '../pages/Products';
 import { dbService } from '../services/dbService';
 
@@ -194,9 +194,9 @@ vi.mock('../services/dbService', () => ({
         ]);
       } else if (collection === 'accounts') {
         callback([
-          { id: 'acc-revenue', name: 'Revenue Account' },
-          { id: 'acc-cost', name: 'Cost Account' },
-          { id: 'acc-inventory', name: 'Inventory Account' }
+          { id: 'acc-revenue', name: 'Revenue Account', account_usage: 'sales_revenue' },
+          { id: 'acc-cost', name: 'Cost Account', account_usage: 'cost_of_sales' },
+          { id: 'acc-inventory', name: 'Inventory Account', account_usage: 'inventory' }
         ]);
       } else if (collection === 'item_groups') {
         callback([
@@ -256,19 +256,25 @@ describe('Barcode System integration in Products screen', () => {
       expect(screen.getByText('صنف تجريبي الأول')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('صنف تجريبي الأول'));
+    await act(async () => {
+      fireEvent.click(screen.getByText('صنف تجريبي الأول'));
+    });
     expect(screen.getByText('تعديل صنف')).toBeInTheDocument();
 
     const settingsBtn = screen.getByTitle('إعدادات الباركود');
     expect(settingsBtn).toBeInTheDocument();
 
-    fireEvent.click(settingsBtn);
+    await act(async () => {
+      fireEvent.click(settingsBtn);
+    });
     expect(screen.getByText('إعدادات الباركود')).toBeInTheDocument();
     expect(screen.getByText('نوع الباركود')).toBeInTheDocument();
     expect(screen.getByText('الهوامش (بكسل)')).toBeInTheDocument();
     
     const cancelBtn = screen.getByRole('button', { name: /cancel|إلغاء/i });
-    fireEvent.click(cancelBtn);
+    await act(async () => {
+      fireEvent.click(cancelBtn);
+    });
   });
 
   it('allows editing barcode settings and saves them to form data state', async () => {
@@ -277,18 +283,29 @@ describe('Barcode System integration in Products screen', () => {
     await waitFor(() => {
       expect(screen.getByText('صنف تجريبي الأول')).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByText('صنف تجريبي الأول'));
 
-    fireEvent.click(screen.getByTitle('إعدادات الباركود'));
+    await act(async () => {
+      fireEvent.click(screen.getByText('صنف تجريبي الأول'));
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTitle('إعدادات الباركود'));
+    });
 
     const heightInput = screen.getByText(/ارتفاع الباركود/i).parentElement?.querySelector('input') as HTMLInputElement;
-    fireEvent.change(heightInput, { target: { value: '75' } });
+    await act(async () => {
+      fireEvent.change(heightInput, { target: { value: '75' } });
+    });
 
     const saveSettingsBtn = screen.getAllByRole('button', { name: /save|حفظ/i }).find(btn => !btn.getAttribute('form')) as HTMLButtonElement;
-    fireEvent.click(saveSettingsBtn);
+    await act(async () => {
+      fireEvent.click(saveSettingsBtn);
+    });
 
     const form = document.getElementById('product-form') as HTMLFormElement;
-    fireEvent.submit(form);
+    await act(async () => {
+      fireEvent.submit(form);
+    });
 
     await waitFor(() => {
       expect(dbService.update).toHaveBeenCalled();
@@ -304,15 +321,22 @@ describe('Barcode System integration in Products screen', () => {
     await waitFor(() => {
       expect(screen.getByText('صنف تجريبي الأول')).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByText('صنف تجريبي الأول'));
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('صنف تجريبي الأول'));
+    });
 
     const printBtn = screen.getByTitle('طباعة الباركود');
-    fireEvent.click(printBtn);
+    await act(async () => {
+      fireEvent.click(printBtn);
+    });
 
     expect(screen.getByText('خيارات طباعة الباركود')).toBeInTheDocument();
 
     const executePrintBtn = screen.getByRole('button', { name: /^طباعة$|^Print$/ });
-    fireEvent.click(executePrintBtn);
+    await act(async () => {
+      fireEvent.click(executePrintBtn);
+    });
 
     await waitFor(() => {
       expect(printSpy).toHaveBeenCalled();
@@ -329,17 +353,23 @@ describe('Barcode System integration in Products screen', () => {
     });
 
     const checkboxes = screen.getAllByRole('checkbox') as HTMLInputElement[];
-    fireEvent.click(checkboxes[1]);
-    fireEvent.click(checkboxes[2]);
+    await act(async () => {
+      fireEvent.click(checkboxes[1]);
+      fireEvent.click(checkboxes[2]);
+    });
 
     const bulkPrintBtn = screen.getByText(/طباعة الباركود \(/i);
     expect(bulkPrintBtn).toBeInTheDocument();
 
-    fireEvent.click(bulkPrintBtn);
+    await act(async () => {
+      fireEvent.click(bulkPrintBtn);
+    });
     expect(screen.getByText('طباعة باركود جماعية')).toBeInTheDocument();
 
     const executeBulkPrintBtn = screen.getByRole('button', { name: /^طباعة$|^Print$/ });
-    fireEvent.click(executeBulkPrintBtn);
+    await act(async () => {
+      fireEvent.click(executeBulkPrintBtn);
+    });
 
     await waitFor(() => {
       expect(printSpy).toHaveBeenCalled();
