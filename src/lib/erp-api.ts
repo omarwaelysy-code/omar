@@ -2830,17 +2830,19 @@ modules.forEach(moduleName => {
         }
 
         let rows;
+      const isSuperAdminUser = req.user?.role === 'super_admin' || ['acc.wael2005@gmail.com', 'omarwaelysy@gmail.com', 'omarwaelsys@gmail.com'].includes((req.user?.email || '').toLowerCase());
+
       if (moduleName === 'activity_logs') {
-        const companyId = req.query.company_id || req.user?.company_id;
+        const targetCompanyId = req.query.company_id || (!isSuperAdminUser ? req.user?.company_id : undefined);
         
-        if (companyId && typeof companyId !== 'string') return sendError(res, 400, 'Invalid company_id format');
+        if (targetCompanyId && typeof targetCompanyId !== 'string') return sendError(res, 400, 'Invalid company_id format');
 
         let query = 'SELECT * FROM activity_logs';
         let params: any[] = [];
         
-        if (companyId) {
-          query += ' WHERE company_id = $1';
-          params.push(companyId);
+        if (targetCompanyId) {
+          query += ' WHERE (company_id = $1 OR company_id IS NULL)';
+          params.push(targetCompanyId);
         }
         
         const orderBy = 'id DESC';
@@ -2849,14 +2851,14 @@ modules.forEach(moduleName => {
         const queryResult = await pool.query(query, params);
         rows = queryResult.rows;
       } else if (moduleName === 'audit_logs') {
-        const companyId = req.query.company_id || req.user?.company_id;
+        const targetCompanyId = req.query.company_id || (!isSuperAdminUser ? req.user?.company_id : undefined);
 
         let query = 'SELECT * FROM audit_logs';
         let params: any[] = [];
 
-        if (companyId) {
-          query += ' WHERE company_id = $1';
-          params.push(companyId);
+        if (targetCompanyId) {
+          query += ' WHERE (company_id = $1 OR company_id IS NULL)';
+          params.push(targetCompanyId);
         }
 
         const orderBy = 'created_at DESC';

@@ -41,7 +41,8 @@ export const ActivityLogPage: React.FC = () => {
     if (!user) return;
     setLoading(true);
     try {
-      const params = user.company_id ? { company_id: user.company_id } : undefined;
+      const isSuperAdminUser = user.role === 'super_admin' || ['acc.wael2005@gmail.com', 'omarwaelysy@gmail.com', 'omarwaelsys@gmail.com'].includes((user.email || '').toLowerCase());
+      const params = (!isSuperAdminUser && user.company_id) ? { company_id: user.company_id } : undefined;
       const [auditData, activityData] = await Promise.all([
         dbService.list<any>('audit_logs', params).catch(() => []),
         dbService.list<any>('activity_logs', params).catch(() => [])
