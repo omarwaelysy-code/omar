@@ -43,12 +43,15 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { useNotification } from '../contexts/NotificationContext';
+
 interface SuperAdminDashboardProps {
   initialTab?: 'companies' | 'users' | 'logs' | 'system' | 'audit' | 'subscriptions' | 'feature-manager' | 'settings' | 'monitoring' | 'reports';
 }
 
 export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initialTab }) => {
   const { user, isSuperAdmin } = useAuth();
+  const { showNotification } = useNotification();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
