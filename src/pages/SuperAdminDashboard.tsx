@@ -257,10 +257,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
         
         // Create initial admin user for the company
         const tempPassword = 'User@' + Math.floor(1000 + Math.random() * 9000);
-        
         const cleanEmail = formData.email!.trim().toLowerCase();
         
-        await fetch('/api/erp/auth/register', {
+        const regRes = await fetch('/api/erp/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -272,15 +271,23 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
           })
         });
 
-        // Update user with temp_password and must_change_password
-        // We need to find the user ID first
+        const regData = await regRes.json();
+
         const users = await dbService.query<User>('users', [{ field: 'email', operator: '==', value: cleanEmail }]);
         const newUser = users.find(u => u.company_id === companyId);
-        if (newUser) {
-          await dbService.update('users', newUser.id, {
-            temp_password: tempPassword,
-            must_change_password: true
-          });
+
+        if (regData.existingUser) {
+          showNotification(
+            `تنبيه: البريد الإلكتروني (${cleanEmail}) مستخدم من قبل في النظام. تم ربط الحساب بالشركة الجديدة مع الحفاظ على كلمة المرور الحالية بدون تغيير.`,
+            'info'
+          );
+        } else {
+          if (newUser) {
+            await dbService.update('users', newUser.id, {
+              temp_password: tempPassword,
+              must_change_password: true
+            });
+          }
         }
 
         if (user) {

@@ -294,8 +294,17 @@ export const Users: React.FC = () => {
         role_ids: []
       });
 
-      await dbService.logActivity(currentUser.id, currentUser.username, currentUser.company_id, 'إضافة مستخدم', `{language === 'ar' ? 'إضافة مستخدم جديد' : 'Add New User'}: ${cleanEmail}`, 'users', newUser.id);
-      showNotification(t('users.add_success') || 'تمت إضافة المستخدم بنجاح', 'success');
+      await dbService.logActivity(currentUser.id, currentUser.username, currentUser.company_id, 'إضافة مستخدم', `${language === 'ar' ? 'إضافة مستخدم جديد' : 'Add New User'}: ${cleanEmail}`, 'users', newUser.id);
+      
+      if (newUser.existingUser) {
+        showNotification(
+          `تنبيه: البريد الإلكتروني (${cleanEmail}) مستخدم من قبل في النظام. تم ربط المستخدم بشركتك مع الحفاظ على كلمة المرور الحالية بدون تغيير.`,
+          'info'
+        );
+      } else {
+        showNotification(t('users.add_success') || 'تمت إضافة المستخدم بنجاح', 'success');
+      }
+
       setIsUserModalOpen(false);
       setUserFormData({ email: '', password: '', role: 'user' });
     } catch (e: any) {

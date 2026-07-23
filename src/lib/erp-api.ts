@@ -1836,29 +1836,75 @@ const getList = async (table: string, filters: any) => {
 router.post('/auth/register', UsersLimitMiddleware, async (req, res) => {
   try {
     const { username, name, email, password, company_id, role } = req.body;
+    const cleanEmail = (email || '').trim().toLowerCase();
+
+    if (!cleanEmail) {
+      return res.status(400).json({ error: 'البريد الإلكتروني مطلوب' });
+    }
+
+    // 1. Check if user already exists in THIS company
+    const { rows: sameCompanyRows } = await pool.query(
+      'SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND company_id = $2',
+      [cleanEmail, company_id]
+    );
+
+    if (sameCompanyRows.length > 0) {
+      return res.status(400).json({ error: 'المستخدم موجود بالفعل في هذه الشركة' });
+    }
+
+    // 2. Check if user exists in ANY company in the database
+    const { rows: existingUserRows } = await pool.query(
+      'SELECT id, password_hash, must_change_password FROM users WHERE LOWER(email) = LOWER($1) ORDER BY created_at ASC LIMIT 1',
+      [cleanEmail]
+    );
+
     const id = uuidv4();
-    const password_hash = await bcrypt.hash(password, 10);
-    
+    let finalPasswordHash = '';
+    let isExistingUser = false;
+    let mustChangePassword = false;
+
+    if (existingUserRows.length > 0) {
+      // User exists in another company: keep existing password_hash!
+      finalPasswordHash = existingUserRows[0].password_hash;
+      mustChangePassword = existingUserRows[0].must_change_password || false;
+      isExistingUser = true;
+    } else {
+      // New user: hash provided password
+      finalPasswordHash = await bcrypt.hash(password || 'User@1234', 10);
+    }
+
     await pool.query(
-      'INSERT INTO users (id, username, name, email, password_hash, company_id, role) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-      [id, username, name || username, email, password_hash, company_id, role || 'user']
+      'INSERT INTO users (id, username, name, email, password_hash, company_id, role, must_change_password) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      [id, username || cleanEmail, name || username || cleanEmail, cleanEmail, finalPasswordHash, company_id, role || 'user', mustChangePassword]
     );
     
     // Log registration
     logAudit({
       company_id,
       user_id: id,
-      username: username || email,
-      user_email: email,
+      username: username || cleanEmail,
+      user_email: cleanEmail,
       action: 'REGISTER',
       module: 'AUTH',
-      details: `New user registration: ${username}`,
+      details: isExistingUser 
+        ? `Registered existing user in new company context: ${cleanEmail}`
+        : `New user registration: ${username || cleanEmail}`,
       entity_type: 'users',
       entity_id: id,
       ip_address: getIp(req)
     });
 
-    res.status(201).json({ id, username, name: name || username, email, role: role || 'user' });
+    res.status(201).json({ 
+      id, 
+      username: username || cleanEmail, 
+      name: name || username || cleanEmail, 
+      email: cleanEmail, 
+      role: role || 'user',
+      existingUser: isExistingUser,
+      message: isExistingUser 
+        ? 'هذا البريد الإلكتروني مسجل سابقاً في النظام. تم ربط الحساب بشركتك مع الحفاظ على كلمة المرور الحالية بدون تغيير.'
+        : 'تم إنشاء المستخدم بنجاح'
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
