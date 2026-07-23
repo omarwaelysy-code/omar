@@ -2,9 +2,13 @@ import { Response, NextFunction } from 'express';
 import pool from '../../postgres';
 import { AuthRequest } from '../../auth-middleware';
 
+const SUPER_ADMIN_EMAILS = ['omarwaelysy@gmail.com', 'omarwaelsys@gmail.com', 'acc.wael2005@gmail.com'];
+
 export const LicensingMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  // Only process if user is authenticated and has a company_id
-  if (!req.user || !req.user.company_id || req.user.company_id === 'system' || req.user.company_id === 'SYSTEM') {
+  const isSuperAdmin = req.user?.role === 'super_admin' || (req.user?.email && SUPER_ADMIN_EMAILS.includes(req.user.email.trim().toLowerCase()));
+
+  // Super admins and system-level requests bypass licensing checks to allow administration
+  if (!req.user || !req.user.company_id || req.user.company_id === 'system' || req.user.company_id === 'SYSTEM' || isSuperAdmin) {
     return next();
   }
 

@@ -145,9 +145,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (memberships.length > 0) {
         const isSuperAdminEmail = email === 'omarwaelysy@gmail.com' || email === 'omarwaelsys@gmail.com' || email === 'acc.wael2005@gmail.com';
         const preferredCompanyId = localStorage.getItem(`preferred_company_${userId}`);
-        const preferredMembership = memberships.find(m => m.company_id === preferredCompanyId);
         
-        const activeMembership = preferredMembership || memberships[0];
+        let selectedMembership: User | null = null;
+        
+        // Check preferred company first if set
+        if (preferredCompanyId) {
+          const pref = memberships.find(m => m.company_id === preferredCompanyId);
+          if (pref && pref.company_id) {
+            const check = await checkCompanyExpiry(pref.company_id);
+            if (!check.isExpired) {
+              selectedMembership = pref;
+            }
+          }
+        }
+
+        // If preferred company is expired or not set, find first non-expired active company
+        if (!selectedMembership) {
+          for (const m of memberships) {
+            if (m.company_id) {
+              const check = await checkCompanyExpiry(m.company_id);
+              if (!check.isExpired) {
+                selectedMembership = m;
+                break;
+              }
+            }
+          }
+        }
+        
+        const activeMembership = selectedMembership || memberships[0];
         
         if (activeMembership && activeMembership.company_id) {
           const expiryCheck = await checkCompanyExpiry(activeMembership.company_id);
@@ -159,7 +184,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
         }
 
-        // Force super_admin role if email matches, even if they have other memberships
+        // Force super_admin role if email matches
         if (isSuperAdminEmail) {
           setUser({ 
             ...activeMembership, 
