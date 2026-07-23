@@ -337,11 +337,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isCompanyAdmin,
     isManager,
     isStandardUser,
+    isSubscriptionExpired: subscriptionExpiredDetails.expired,
+    subscriptionExpiredDetails,
     hasPermission,
     fetchProfile,
     workspaceMode,
     setWorkspaceMode
-  }), [user, userMemberships, loading, isAuthenticated, isSuperAdmin, isCompanyAdmin, isManager, isStandardUser, hasPermission, workspaceMode]);
+  }), [user, userMemberships, loading, isAuthenticated, isSuperAdmin, isCompanyAdmin, isManager, isStandardUser, subscriptionExpiredDetails, hasPermission, workspaceMode]);
   return (
     <AuthContext.Provider value={value}>
       {children}
