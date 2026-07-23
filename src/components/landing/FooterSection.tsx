@@ -20,19 +20,19 @@ export const FooterSection: React.FC<FooterSectionProps> = ({ onNavigateToSectio
   ];
 
   return (
-    <footer className="w-full bg-slate-900 text-white py-16 font-sans border-t border-slate-800">
+    <footer className="w-full bg-[#2563EB] text-white py-16 font-sans border-t border-blue-500/30">
       <div className="w-full max-w-[1240px] mx-auto px-6 sm:px-10 lg:px-12">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-10 pb-12 border-b border-slate-800">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-10 pb-12 border-b border-blue-500/30">
           
           <div className="md:col-span-5">
             <Logo size="md" color="white" className="mb-4" />
-            <p className="text-slate-400 text-sm max-w-sm leading-relaxed">
+            <p className="text-blue-100 text-sm max-w-sm leading-relaxed">
               {t('landing.footer.description')}
             </p>
           </div>
 
           <div className="md:col-span-3">
-            <h4 className="text-sm font-bold uppercase tracking-wider text-slate-300 mb-4">
+            <h4 className="text-sm font-bold uppercase tracking-wider text-white mb-4">
               {t('landing.footer.quick_links')}
             </h4>
             <ul className="space-y-2.5">
@@ -44,7 +44,7 @@ export const FooterSection: React.FC<FooterSectionProps> = ({ onNavigateToSectio
                       e.preventDefault();
                       onNavigateToSection(item.id);
                     }}
-                    className="text-slate-400 hover:text-white text-sm transition-colors"
+                    className="text-blue-100 hover:text-white text-sm transition-colors"
                   >
                     {t(item.labelKey)}
                   </a>
@@ -54,13 +54,13 @@ export const FooterSection: React.FC<FooterSectionProps> = ({ onNavigateToSectio
           </div>
 
           <div className="md:col-span-4">
-            <h4 className="text-sm font-bold uppercase tracking-wider text-slate-300 mb-4">
+            <h4 className="text-sm font-bold uppercase tracking-wider text-white mb-4">
               {t('landing.footer.security_title')}
             </h4>
-            <p className="text-slate-400 text-sm leading-relaxed mb-4">
+            <p className="text-blue-100 text-sm leading-relaxed mb-4">
               {t('landing.footer.security_desc')}
             </p>
-            <div className="flex items-center gap-2 text-xs text-[#2DD4BF] bg-slate-800/80 px-3.5 py-2 rounded-lg border border-slate-700 w-fit">
+            <div className="flex items-center gap-2 text-xs text-[#2DD4BF] bg-white/10 px-3.5 py-2 rounded-lg border border-white/20 w-fit backdrop-blur-sm">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               <span>{t('landing.footer.system_status')}</span>
             </div>
@@ -68,12 +68,12 @@ export const FooterSection: React.FC<FooterSectionProps> = ({ onNavigateToSectio
 
         </div>
 
-        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-4">
+        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-blue-100 gap-4">
           <p>{t('landing.footer.copyright')}</p>
           <div className="flex items-center gap-6">
-            <a href="#" className="hover:text-slate-200 transition-colors">{t('landing.footer.privacy')}</a>
-            <a href="#" className="hover:text-slate-200 transition-colors">{t('landing.footer.terms')}</a>
-            <a href="#" className="hover:text-slate-200 transition-colors flex items-center gap-1">
+            <a href="#" className="hover:text-white transition-colors">{t('landing.footer.privacy')}</a>
+            <a href="#" className="hover:text-white transition-colors">{t('landing.footer.terms')}</a>
+            <a href="#" className="hover:text-white transition-colors flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>{t('landing.footer.security')}</span>
             </a>

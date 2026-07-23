@@ -4,17 +4,13 @@ import {
   Zap, 
   Layers, 
   ShieldCheck, 
-  Users, 
   Wallet, 
   Package, 
   ShoppingCart, 
   Truck, 
   UserCheck, 
   Building2, 
-  BarChart3, 
-  Factory, 
-  Landmark, 
-  Sparkles 
+  BarChart3
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 
@@ -40,7 +36,6 @@ export const SolutionsSection: React.FC = () => {
   ];
 
   const modules = [
-    { id: 'hr', titleKey: 'landing.solutions.mod_hr', icon: <Users className="w-7 h-7" /> },
     { id: 'accounting', titleKey: 'landing.solutions.mod_accounting', icon: <Wallet className="w-7 h-7" /> },
     { id: 'inventory', titleKey: 'landing.solutions.mod_inventory', icon: <Package className="w-7 h-7" /> },
     { id: 'sales', titleKey: 'landing.solutions.mod_sales', icon: <ShoppingCart className="w-7 h-7" /> },
@@ -48,10 +43,7 @@ export const SolutionsSection: React.FC = () => {
     { id: 'customers', titleKey: 'landing.solutions.mod_customers', icon: <UserCheck className="w-7 h-7" /> },
     { id: 'suppliers', titleKey: 'landing.solutions.mod_suppliers', icon: <Building2 className="w-7 h-7" /> },
     { id: 'reports', titleKey: 'landing.solutions.mod_reports', icon: <BarChart3 className="w-7 h-7" /> },
-    { id: 'manufacturing', titleKey: 'landing.solutions.mod_manufacturing', icon: <Factory className="w-7 h-7" /> },
-    { id: 'operations', titleKey: 'landing.solutions.mod_operations', icon: <Layers className="w-7 h-7" /> },
-    { id: 'assets', titleKey: 'landing.solutions.mod_assets', icon: <Landmark className="w-7 h-7" /> },
-    { id: 'ai', titleKey: 'landing.solutions.mod_ai', icon: <Sparkles className="w-7 h-7" /> }
+    { id: 'operations', titleKey: 'landing.solutions.mod_operations', icon: <Layers className="w-7 h-7" /> }
   ];
 
   return (
@@ -131,8 +123,8 @@ export const SolutionsSection: React.FC = () => {
             </p>
           </div>
 
-          {/* 12 Modules Icon Cards Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 sm:gap-5">
+          {/* 8 Modules Icon Cards Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-4 gap-4 sm:gap-5">
             {modules.map((mod, idx) => (
               <motion.div
                 key={mod.id}
