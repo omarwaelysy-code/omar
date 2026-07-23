@@ -1962,6 +1962,36 @@ router.post('/auth/login', async (req, res) => {
       });
     }
 
+    // Subscription Expiration Check: Prevent login if company subscription has expired
+    if (validUser.role !== 'super_admin' && validUser.company_id && validUser.company_id !== 'SYSTEM') {
+      const compRes = await pool.query(
+        `SELECT subscription_status, subscription_end, subscription_expiry, company_status FROM companies WHERE id = $1`,
+        [validUser.company_id]
+      );
+      if (compRes.rows.length > 0) {
+        const comp = compRes.rows[0];
+        const now = new Date();
+        const expiryDate = comp.subscription_end || comp.subscription_expiry ? new Date(comp.subscription_end || comp.subscription_expiry) : null;
+        
+        const isSuspended = comp.company_status === 'suspended' || comp.subscription_status === 'suspended' || comp.subscription_status === 'Suspended';
+        const isExpiredStatus = comp.subscription_status === 'expired' || comp.subscription_status === 'Expired';
+        const isExpiredDate = expiryDate && expiryDate < now;
+
+        if (isSuspended) {
+          return res.status(403).json({
+            error: 'عفواً، تم إيقاف الشركة أو اشتراكها. لا يمكن الدخول حالياً. يرجى التواصل مع الإدارة.'
+          });
+        }
+
+        if (isExpiredStatus || isExpiredDate) {
+          const dateFormatted = expiryDate ? expiryDate.toISOString().slice(0, 10) : '';
+          return res.status(403).json({
+            error: `عفواً، لقد انتهى اشتراك الشركة${dateFormatted ? ' بتاريخ ' + dateFormatted : ''}. لا يمكن فتح الشركة أو الوصول إليها. يرجى التواصل مع الإدارة أو تجديد الاشتراك.`
+          });
+        }
+      }
+    }
+
     // Set new active session token & activity timestamp
     const sessionToken = uuidv4();
     await pool.query(
@@ -3339,14 +3369,21 @@ modules.forEach(moduleName => {
             const plan = planMap[req.body.subscription_plan?.toLowerCase()] || 'Basic';
             
             const days = parseInt(req.body.subscription_days || '30', 10);
-            const endDate = new Date();
-            endDate.setDate(endDate.getDate() + days);
+            const startDate = req.body.subscription_start || new Date().toISOString().slice(0, 10);
+            let endDate = req.body.subscription_end || req.body.subscription_expiry;
+
+            if (!endDate) {
+              const d = new Date(startDate);
+              d.setDate(d.getDate() + days);
+              endDate = d.toISOString().split('T')[0];
+            }
 
             await subscriptionService.create({
               company_id: newCompanyId,
               plan_type: plan,
-              subscription_status: req.body.subscription_status === 'suspended' ? 'Suspended' : (days <= 14 ? 'Trial' : 'Active'),
-              end_date: endDate.toISOString().split('T')[0],
+              subscription_status: req.body.subscription_status === 'suspended' ? 'Suspended' : (req.body.subscription_status === 'expired' ? 'Expired' : 'Active'),
+              start_date: startDate,
+              end_date: endDate,
               max_users: parseInt(req.body.users_limit || '5', 10),
               max_branches: plan === 'Enterprise' ? 100 : plan === 'Pro' ? 10 : 3,
               max_warehouses: plan === 'Enterprise' ? 100 : plan === 'Pro' ? 10 : 3,
@@ -3413,6 +3450,26 @@ modules.forEach(moduleName => {
               if (movementsCount > 0) {
                 return sendError(res, 400, 'لا يمكن تغيير طريقة تقييم المخزون بعد تسجيل حركات مخزنية بالفعل.');
               }
+            }
+
+            // Sync subscription details to company_subscriptions table
+            try {
+              const start_date = req.body.subscription_start || req.body.start_date;
+              const end_date = req.body.subscription_end || req.body.subscription_expiry || req.body.end_date;
+              const max_users = req.body.users_limit !== undefined ? parseInt(req.body.users_limit, 10) : undefined;
+              const status = req.body.subscription_status === 'suspended' ? 'Suspended' : (req.body.subscription_status === 'expired' ? 'Expired' : req.body.subscription_status);
+
+              await pool.query(
+                `UPDATE company_subscriptions 
+                 SET start_date = COALESCE($1, start_date),
+                     end_date = COALESCE($2, end_date),
+                     max_users = COALESCE($3, max_users),
+                     subscription_status = COALESCE($4, subscription_status)
+                 WHERE company_id = $5`,
+                [start_date, end_date, max_users, status, id]
+              );
+            } catch (syncErr) {
+              console.error('Error syncing company_subscriptions on company update:', syncErr);
             }
           }
 

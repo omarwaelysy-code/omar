@@ -283,7 +283,7 @@ export const Users: React.FC = () => {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'فشلت عملية إنشاء الحساب');
+        throw new Error(data.message || data.error || 'فشلت عملية إنشاء الحساب');
       }
 
       const newUser = await response.json();

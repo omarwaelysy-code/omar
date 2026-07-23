@@ -207,12 +207,30 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const startDate = formData.subscription_start || todayStr;
+      let endDate = formData.subscription_end || formData.subscription_expiry;
+      
+      if (!endDate) {
+        const days = Number(formData.subscription_days) || 30;
+        const d = new Date(startDate);
+        d.setDate(d.getDate() + days);
+        endDate = d.toISOString().slice(0, 10);
+      }
+
       const companyData = {
         name: formData.name,
         code: formData.code,
         email: formData.email,
         phone: formData.phone,
-        company_status: formData.company_status,
+        users_limit: Number(formData.users_limit) || 5,
+        subscription_start: startDate,
+        subscription_end: endDate,
+        subscription_expiry: endDate,
+        subscription_days: Number(formData.subscription_days) || 30,
+        subscription_plan: formData.subscription_plan || 'basic',
+        subscription_status: formData.subscription_status || 'active',
+        company_status: formData.company_status || 'active',
         settings: {
           currency: 'EGP',
           timezone: 'Africa/Cairo',
@@ -223,11 +241,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
       
       const newCompanyPayload = {
         ...companyData,
-        users_limit: formData.users_limit,
-        transactions_limit: formData.transactions_limit,
-        subscription_days: formData.subscription_days,
-        subscription_plan: formData.subscription_plan,
-        subscription_status: formData.subscription_status,
+        transactions_limit: formData.transactions_limit || 1000,
       };
 
       if (editingCompany) {
@@ -521,6 +535,11 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
           </button>
           <button 
             onClick={() => {
+              const todayStr = new Date().toISOString().slice(0, 10);
+              const endDate = new Date();
+              endDate.setDate(endDate.getDate() + 30);
+              const defaultEndStr = endDate.toISOString().slice(0, 10);
+
               setEditingCompany(null);
               setFormData({
                 name: '',
@@ -530,6 +549,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                 users_limit: 5,
                 transactions_limit: 1000,
                 subscription_days: 30,
+                subscription_start: todayStr,
+                subscription_end: defaultEndStr,
+                subscription_expiry: defaultEndStr,
                 subscription_plan: 'basic',
                 company_status: 'active',
                 subscription_status: 'active'
@@ -724,7 +746,16 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                         <button 
                           onClick={() => {
                             setEditingCompany(company);
-                            setFormData({ ...company });
+                            const startDate = company.subscription_start ? new Date(company.subscription_start).toISOString().slice(0, 10) : (company.created_at ? new Date(company.created_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+                            const endDate = company.subscription_end || company.subscription_expiry ? new Date(company.subscription_end || company.subscription_expiry!).toISOString().slice(0, 10) : '';
+
+                            setFormData({
+                              ...company,
+                              users_limit: company.users_limit || 5,
+                              subscription_start: startDate,
+                              subscription_end: endDate,
+                              subscription_expiry: endDate
+                            });
                             setShowModal(true);
                           }}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -1345,6 +1376,75 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       className="w-full px-4 py-2 bg-stone-50 border border-stone-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                    />
+                  </div>
+
+                  {/* 1. تاريخ الإنشاء (تلقائي ولا يمكن تغييره) */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-stone-700 flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-stone-400" /> تاريخ الإنشاء (تلقائي)
+                    </label>
+                    <input
+                      disabled
+                      readOnly
+                      type="text"
+                      value={editingCompany?.created_at ? new Date(editingCompany.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' }) : 'تلقائي عند الحفظ'}
+                      className="w-full px-4 py-2 bg-stone-100 border border-stone-200 rounded-lg text-stone-500 font-bold cursor-not-allowed outline-none"
+                    />
+                  </div>
+
+                  {/* 2. عدد المستخدمين المسموح به */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-stone-700 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-blue-600" /> عدد المستخدمين
+                    </label>
+                    <input
+                      required
+                      type="number"
+                      min="1"
+                      value={formData.users_limit || 5}
+                      onChange={(e) => setFormData({ ...formData, users_limit: parseInt(e.target.value) || 1 })}
+                      className="w-full px-4 py-2 bg-stone-50 border border-stone-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 outline-none font-bold"
+                    />
+                  </div>
+
+                  {/* 3. تاريخ بداية الاشتراك */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-stone-700 flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-emerald-600" /> تاريخ بداية الاشتراك
+                    </label>
+                    <input
+                      required
+                      type="date"
+                      value={formData.subscription_start || ''}
+                      onChange={(e) => {
+                        const newStart = e.target.value;
+                        const days = Number(formData.subscription_days) || 30;
+                        const d = new Date(newStart);
+                        d.setDate(d.getDate() + days);
+                        const newEnd = d.toISOString().slice(0, 10);
+                        setFormData({
+                          ...formData,
+                          subscription_start: newStart,
+                          subscription_end: newEnd,
+                          subscription_expiry: newEnd
+                        });
+                      }}
+                      className="w-full px-4 py-2 bg-stone-50 border border-stone-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 outline-none font-bold"
+                    />
+                  </div>
+
+                  {/* 4. تاريخ انتهاء الاشتراك */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-stone-700 flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-amber-600" /> تاريخ انتهاء الاشتراك
+                    </label>
+                    <input
+                      required
+                      type="date"
+                      value={formData.subscription_end || formData.subscription_expiry || ''}
+                      onChange={(e) => setFormData({ ...formData, subscription_end: e.target.value, subscription_expiry: e.target.value })}
+                      className="w-full px-4 py-2 bg-stone-50 border border-stone-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 outline-none font-bold"
                     />
                   </div>
                 </div>

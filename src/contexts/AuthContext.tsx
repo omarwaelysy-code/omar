@@ -178,9 +178,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     try {
       setLoading(true);
+      const isSuperAdminEmail = user.email === 'omarwaelysy@gmail.com' || user.email === 'omarwaelsys@gmail.com' || user.email === 'acc.wael2005@gmail.com';
+      
+      if (!isSuperAdminEmail) {
+        const comp = await dbService.get<any>('companies', companyId);
+        if (comp) {
+          const now = new Date();
+          const expiry = comp.subscription_end || comp.subscription_expiry ? new Date(comp.subscription_end || comp.subscription_expiry) : null;
+          const isExpired = (comp.subscription_status === 'expired' || comp.subscription_status === 'Expired') || (expiry && expiry < now) || comp.company_status === 'suspended';
+          
+          if (isExpired) {
+            const dateStr = expiry ? expiry.toISOString().slice(0, 10) : '';
+            alert(`عفواً، لقد انتهى اشتراك الشركة (${comp.name})${dateStr ? ' بتاريخ ' + dateStr : ''}. لا يمكن فتح الشركة أو الوصول إليها.`);
+            return;
+          }
+        }
+      }
+
       const membership = userMemberships.find(m => m.company_id === companyId);
       if (membership) {
-        const isSuperAdminEmail = user.email === 'omarwaelysy@gmail.com' || user.email === 'omarwaelsys@gmail.com' || user.email === 'acc.wael2005@gmail.com';
         if (isSuperAdminEmail) {
           setWorkspaceMode('company');
         }

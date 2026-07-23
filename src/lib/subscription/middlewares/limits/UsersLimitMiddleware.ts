@@ -19,11 +19,21 @@ export const UsersLimitMiddleware = async (req: AuthRequest, res: Response, next
       [companyId]
     );
 
-    if (subRows.length === 0 || !subRows[0].max_users || subRows[0].max_users === -1) {
-      return next(); // Unlimited or no limit enforced
+    let maxUsers = subRows.length > 0 && subRows[0].max_users ? parseInt(subRows[0].max_users, 10) : null;
+
+    if (!maxUsers || maxUsers <= 0) {
+      const { rows: compRows } = await pool.query(
+        `SELECT users_limit FROM companies WHERE id = $1`,
+        [companyId]
+      );
+      if (compRows.length > 0 && compRows[0].users_limit) {
+        maxUsers = parseInt(compRows[0].users_limit, 10);
+      }
     }
 
-    const maxUsers = subRows[0].max_users;
+    if (!maxUsers || maxUsers === -1) {
+      return next(); // Unlimited
+    }
 
     const { rows: countRows } = await pool.query(
       `SELECT COUNT(*) as count FROM users WHERE company_id = $1`,
@@ -33,9 +43,10 @@ export const UsersLimitMiddleware = async (req: AuthRequest, res: Response, next
     const currentUsers = parseInt(countRows[0].count, 10);
 
     if (currentUsers >= maxUsers) {
+      const msg = `عفواً، تم التوصل إلى الحد الأقصى لعدد المستخدمين المسموح به لهذه الشركة (${maxUsers} مستخدمين). لا يمكن إضافة مستخدم جديد بدون ترقية عدد المستخدمين.`;
       return res.status(403).json({
-        error: 'Limit Exceeded',
-        message: `لقد وصلت للحد الأقصى لعدد المستخدمين (${maxUsers}). يرجى ترقية باقتك لإضافة المزيد.`,
+        error: msg,
+        message: msg,
         code: 'USERS_LIMIT_EXCEEDED'
       });
     }
