@@ -222,11 +222,12 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
   const stats = [
     { label: 'إجمالي الشركات', value: realCompanies.length, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'إجمالي مستخدمي الشركات', value: realCompanyUsers.length, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'اشتراكات نشطة', value: realCompanies.filter(c => c.company_status === 'active' && (c.subscription_status === 'active' || c.subscription_status === 'Active')).length, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'اشتراكات نشطة', value: realCompanies.filter(c => c.company_status === 'active' && (String(c.subscription_status).toLowerCase() === 'active')).length, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
     { label: 'اشتراكات منتهية', value: realCompanies.filter(c => {
         const nowStr = formatDateForInput(new Date());
         const endStr = formatDateForInput(c.subscription_end || c.subscription_expiry);
-        return c.company_status === 'suspended' || c.subscription_status === 'expired' || c.subscription_status === 'Expired' || (endStr && endStr < nowStr);
+        const subStatus = String(c.subscription_status).toLowerCase();
+        return c.company_status === 'suspended' || subStatus === 'expired' || (Boolean(endStr) && endStr < nowStr);
       }).length, icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
   ];
 
