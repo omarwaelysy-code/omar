@@ -2455,7 +2455,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialEditMode = false })
         })
         .reduce((sum, a) => sum + a.balance, 0);
 
-      const totalCustomerBalances = calculatedCustomerBalances !== 0 ? calculatedCustomerBalances : customers.reduce((sum, c) => sum + (Number(c.balance) || 0), 0);
+      const totalCustomerBalances = calculatedCustomerBalances !== 0 ? calculatedCustomerBalances : customers.reduce((sum, c: any) => sum + (Number(c.balance || c.opening_balance) || 0), 0);
 
       const supplierAccIds = new Set(suppliers.map(s => s.account_id).filter(Boolean));
       const calculatedSupplierBalances = balanceSheet.liabilities
@@ -2467,7 +2467,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialEditMode = false })
         })
         .reduce((sum, l) => sum + l.balance, 0);
 
-      const totalSupplierBalances = calculatedSupplierBalances !== 0 ? calculatedSupplierBalances : suppliers.reduce((sum, s) => sum + (Number(s.balance) || 0), 0);
+      const totalSupplierBalances = calculatedSupplierBalances !== 0 ? calculatedSupplierBalances : suppliers.reduce((sum, s: any) => sum + (Number(s.balance || s.opening_balance) || 0), 0);
 
       const pmAccIds = new Set(paymentMethods.map(p => p.account_id).filter(Boolean));
       const totalCashBalance = balanceSheet.assets
